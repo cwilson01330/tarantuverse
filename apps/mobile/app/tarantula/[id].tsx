@@ -1,0 +1,526 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Image,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { apiClient } from '../../src/services/api';
+
+interface TarantulaDetail {
+  id: string;
+  name: string;
+  common_name: string;
+  scientific_name: string;
+  sex?: string;
+  age_years?: number;
+  acquisition_date?: string;
+  enclosure_size?: string;
+  substrate_type?: string;
+  last_fed?: string;
+  last_molt?: string;
+  photo_url?: string;
+  notes?: string;
+}
+
+interface FeedingLog {
+  id: string;
+  fed_at: string;
+  food_type?: string;
+  food_size?: string;
+  accepted: boolean;
+  notes?: string;
+}
+
+interface MoltLog {
+  id: string;
+  molted_at: string;
+  premolt_started_at?: string;
+  leg_span_before?: number;
+  leg_span_after?: number;
+  weight_before?: number;
+  weight_after?: number;
+  notes?: string;
+}
+
+export default function TarantulaDetailScreen() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams();
+  const [tarantula, setTarantula] = useState<TarantulaDetail | null>(null);
+  const [feedingLogs, setFeedingLogs] = useState<FeedingLog[]>([]);
+  const [moltLogs, setMoltLogs] = useState<MoltLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTarantula();
+    fetchFeedingLogs();
+    fetchMoltLogs();
+  }, [id]);
+
+  const fetchTarantula = async () => {
+    try {
+      const response = await apiClient.get(`/tarantulas/${id}`);
+      setTarantula(response.data);
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to load tarantula details');
+      console.error(error);
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFeedingLogs = async () => {
+    try {
+      const response = await apiClient.get(`/tarantulas/${id}/feedings`);
+      // Get only the 5 most recent logs
+      setFeedingLogs(response.data.slice(0, 5));
+    } catch (error: any) {
+      console.error('Failed to load feeding logs:', error);
+    }
+  };
+
+  const fetchMoltLogs = async () => {
+    try {
+      const response = await apiClient.get(`/tarantulas/${id}/molts`);
+      // Get only the 5 most recent logs
+      setMoltLogs(response.data.slice(0, 5));
+    } catch (error: any) {
+      console.error('Failed to load molt logs:', error);
+    }
+  };
+
+  // Refetch logs when screen comes into focus (after adding a log)
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchFeedingLogs();
+      fetchMoltLogs();
+    }, [id])
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#7c3aed" />
+      </View>
+    );
+  }
+
+  if (!tarantula) {
+    return null;
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#1f2937" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Details</Text>
+        <TouchableOpacity style={styles.editButton}>
+          <MaterialCommunityIcons name="pencil" size={24} color="#7c3aed" />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Hero Image */}
+        <View style={styles.heroImageContainer}>
+          {tarantula.photo_url ? (
+            <Image source={{ uri: tarantula.photo_url }} style={styles.heroImage} />
+          ) : (
+            <View style={styles.placeholderHero}>
+              <MaterialCommunityIcons name="spider" size={80} color="#d1d5db" />
+            </View>
+          )}
+        </View>
+
+        {/* Name and Species */}
+        <View style={styles.section}>
+          <Text style={styles.name}>{tarantula.name}</Text>
+          <Text style={styles.scientificName}>{tarantula.scientific_name}</Text>
+          <Text style={styles.commonName}>{tarantula.common_name}</Text>
+        </View>
+
+        {/* Basic Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Basic Information</Text>
+          <View style={styles.infoGrid}>
+            {tarantula.sex && (
+              <View style={styles.infoItem}>
+                <MaterialCommunityIcons
+                  name={tarantula.sex === 'female' ? 'gender-female' : 'gender-male'}
+                  size={20}
+                  color="#7c3aed"
+                />
+                <Text style={styles.infoLabel}>Sex</Text>
+                <Text style={styles.infoValue}>
+                  {tarantula.sex.charAt(0).toUpperCase() + tarantula.sex.slice(1)}
+                </Text>
+              </View>
+            )}
+            {tarantula.age_years !== undefined && (
+              <View style={styles.infoItem}>
+                <MaterialCommunityIcons name="calendar" size={20} color="#7c3aed" />
+                <Text style={styles.infoLabel}>Age</Text>
+                <Text style={styles.infoValue}>{tarantula.age_years} years</Text>
+              </View>
+            )}
+            {tarantula.acquisition_date && (
+              <View style={styles.infoItem}>
+                <MaterialCommunityIcons name="calendar-plus" size={20} color="#7c3aed" />
+                <Text style={styles.infoLabel}>Acquired</Text>
+                <Text style={styles.infoValue}>
+                  {new Date(tarantula.acquisition_date).toLocaleDateString()}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Husbandry */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Husbandry</Text>
+          <View style={styles.infoGrid}>
+            {tarantula.enclosure_size && (
+              <View style={styles.infoItem}>
+                <MaterialCommunityIcons name="cube-outline" size={20} color="#7c3aed" />
+                <Text style={styles.infoLabel}>Enclosure</Text>
+                <Text style={styles.infoValue}>{tarantula.enclosure_size}</Text>
+              </View>
+            )}
+            {tarantula.substrate_type && (
+              <View style={styles.infoItem}>
+                <MaterialCommunityIcons name="layers" size={20} color="#7c3aed" />
+                <Text style={styles.infoLabel}>Substrate</Text>
+                <Text style={styles.infoValue}>{tarantula.substrate_type}</Text>
+              </View>
+            )}
+            {tarantula.last_fed && (
+              <View style={styles.infoItem}>
+                <MaterialCommunityIcons name="food" size={20} color="#7c3aed" />
+                <Text style={styles.infoLabel}>Last Fed</Text>
+                <Text style={styles.infoValue}>
+                  {new Date(tarantula.last_fed).toLocaleDateString()}
+                </Text>
+              </View>
+            )}
+            {tarantula.last_molt && (
+              <View style={styles.infoItem}>
+                <MaterialCommunityIcons name="refresh" size={20} color="#7c3aed" />
+                <Text style={styles.infoLabel}>Last Molt</Text>
+                <Text style={styles.infoValue}>
+                  {new Date(tarantula.last_molt).toLocaleDateString()}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Feeding History */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Feeding History</Text>
+            {feedingLogs.length > 0 && (
+              <TouchableOpacity>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {feedingLogs.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="food-off" size={32} color="#9ca3af" />
+              <Text style={styles.emptyStateText}>No feeding logs yet</Text>
+            </View>
+          ) : (
+            <View style={styles.logList}>
+              {feedingLogs.map((log) => (
+                <View key={log.id} style={styles.logItem}>
+                  <View style={styles.logIcon}>
+                    <MaterialCommunityIcons 
+                      name={log.accepted ? "check-circle" : "close-circle"} 
+                      size={20} 
+                      color={log.accepted ? "#10b981" : "#ef4444"} 
+                    />
+                  </View>
+                  <View style={styles.logContent}>
+                    <Text style={styles.logTitle}>
+                      {log.food_type || 'Unknown food'} {log.food_size ? `(${log.food_size})` : ''}
+                    </Text>
+                    <Text style={styles.logDate}>
+                      {new Date(log.fed_at).toLocaleDateString()}
+                    </Text>
+                    {log.notes && <Text style={styles.logNotes}>{log.notes}</Text>}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Molt History */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Molt History</Text>
+            {moltLogs.length > 0 && (
+              <TouchableOpacity>
+                <Text style={styles.viewAllText}>View All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {moltLogs.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="refresh-circle" size={32} color="#9ca3af" />
+              <Text style={styles.emptyStateText}>No molt logs yet</Text>
+            </View>
+          ) : (
+            <View style={styles.logList}>
+              {moltLogs.map((log) => (
+                <View key={log.id} style={styles.logItem}>
+                  <View style={styles.logIcon}>
+                    <MaterialCommunityIcons name="reload" size={20} color="#7c3aed" />
+                  </View>
+                  <View style={styles.logContent}>
+                    <Text style={styles.logTitle}>
+                      Molt on {new Date(log.molted_at).toLocaleDateString()}
+                    </Text>
+                    {(log.leg_span_before || log.leg_span_after) && (
+                      <Text style={styles.logDate}>
+                        Leg span: {log.leg_span_before || '?'}" → {log.leg_span_after || '?'}"
+                      </Text>
+                    )}
+                    {log.notes && <Text style={styles.logNotes}>{log.notes}</Text>}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Notes */}
+        {tarantula.notes && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notes</Text>
+            <Text style={styles.notes}>{tarantula.notes}</Text>
+          </View>
+        )}
+
+        {/* Bottom spacing */}
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      {/* Action Bar */}
+      <View style={styles.actionBar}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => router.push(`/tarantula/add-feeding?id=${id}`)}
+        >
+          <MaterialCommunityIcons name="food-apple" size={24} color="#fff" />
+          <Text style={styles.actionButtonText}>Feed</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => router.push(`/tarantula/add-molt?id=${id}`)}
+        >
+          <MaterialCommunityIcons name="reload" size={24} color="#fff" />
+          <Text style={styles.actionButtonText}>Molt</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton}>
+          <MaterialCommunityIcons name="camera" size={24} color="#fff" />
+          <Text style={styles.actionButtonText}>Photo</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  editButton: {
+    padding: 8,
+  },
+  content: {
+    flex: 1,
+  },
+  heroImageContainer: {
+    width: '100%',
+    height: 300,
+    backgroundColor: '#f3f4f6',
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  placeholderHero: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+  },
+  section: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  name: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  scientificName: {
+    fontSize: 18,
+    fontStyle: 'italic',
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  commonName: {
+    fontSize: 16,
+    color: '#9ca3af',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 16,
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -8,
+  },
+  infoItem: {
+    width: '50%',
+    paddingHorizontal: 8,
+    marginBottom: 16,
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  notes: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#4b5563',
+  },
+  actionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    paddingBottom: 32,
+  },
+  actionButton: {
+    alignItems: 'center',
+    backgroundColor: '#7c3aed',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    minWidth: 100,
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#7c3aed',
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    marginTop: 8,
+  },
+  logList: {
+    gap: 12,
+  },
+  logItem: {
+    flexDirection: 'row',
+    backgroundColor: '#f9fafb',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  logIcon: {
+    marginRight: 12,
+    paddingTop: 2,
+  },
+  logContent: {
+    flex: 1,
+  },
+  logTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  logDate: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  logNotes: {
+    fontSize: 13,
+    color: '#4b5563',
+    fontStyle: 'italic',
+  },
+});

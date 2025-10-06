@@ -26,6 +26,9 @@ importers:
       '@react-native-async-storage/async-storage':
         specifier: 1.23.1
         version: 1.23.1(react-native@0.81.4)
+      '@react-native-community/datetimepicker':
+        specifier: ^8.4.5
+        version: 8.4.5(expo@54.0.12)(react-native@0.81.4)(react@19.1.0)
       axios:
         specifier: ^1.7.7
         version: 1.12.2
@@ -2369,6 +2372,25 @@ packages:
       prompts: 2.4.2
       semver: 7.7.2
     dev: true
+
+  /@react-native-community/datetimepicker@8.4.5(expo@54.0.12)(react-native@0.81.4)(react@19.1.0):
+    resolution: {integrity: sha512-vvVOJAHjU8TFBzTUjQzANCL6C3pZSE2zjfutCATk790uz7ASEc2tOBD+EIG4BTelWtP2G9jqvXp2L7XGdhEBRg==}
+    peerDependencies:
+      expo: '>=52.0.0'
+      react: '*'
+      react-native: '*'
+      react-native-windows: '*'
+    peerDependenciesMeta:
+      expo:
+        optional: true
+      react-native-windows:
+        optional: true
+    dependencies:
+      expo: 54.0.12(@babel/core@7.28.4)(@expo/metro-runtime@6.1.2)(expo-router@6.0.10)(react-native@0.81.4)(react@19.1.0)
+      invariant: 2.2.4
+      react: 19.1.0
+      react-native: 0.81.4(@babel/core@7.28.4)(@types/react@19.1.17)(react@19.1.0)
+    dev: false
 
   /@react-native/assets-registry@0.81.4:
     resolution: {integrity: sha512-AMcDadefBIjD10BRqkWw+W/VdvXEomR6aEZ0fhQRAv7igrBzb4PTn4vHKYg+sUK0e3wa74kcMy2DLc/HtnGcMA==}
