@@ -44,6 +44,9 @@ class Tarantula(Base):
     enclosure_size = Column(String(50))  # e.g., "10x10x10 inches"
     substrate_type = Column(String(100))
 
+    # Media
+    photo_url = Column(String(500))
+
     # Privacy
     is_public = Column(Boolean, default=False)
 

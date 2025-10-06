@@ -1,30 +1,132 @@
 """
 Feeding log routes
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+import uuid
+
+from app.database import get_db
+from app.models.user import User
+from app.models.tarantula import Tarantula
+from app.models.feeding_log import FeedingLog
+from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate, FeedingLogResponse
+from app.routers.auth import get_current_user
 
 router = APIRouter()
 
 
-@router.get("/tarantulas/{tarantula_id}/feedings")
-async def get_feeding_logs(tarantula_id: str):
+@router.get("/tarantulas/{tarantula_id}/feedings", response_model=List[FeedingLogResponse])
+async def get_feeding_logs(
+    tarantula_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Get all feeding logs for a tarantula"""
-    return {"message": f"List feedings for {tarantula_id} - TODO"}
+    # Verify tarantula belongs to user
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == tarantula_id,
+        Tarantula.user_id == current_user.id
+    ).first()
+
+    if not tarantula:
+        raise HTTPException(status_code=404, detail="Tarantula not found")
+
+    # Get feeding logs ordered by date (most recent first)
+    feedings = db.query(FeedingLog).filter(
+        FeedingLog.tarantula_id == tarantula_id
+    ).order_by(FeedingLog.fed_at.desc()).all()
+
+    return feedings
 
 
-@router.post("/tarantulas/{tarantula_id}/feedings")
-async def create_feeding_log(tarantula_id: str):
+@router.post("/tarantulas/{tarantula_id}/feedings", response_model=FeedingLogResponse, status_code=status.HTTP_201_CREATED)
+async def create_feeding_log(
+    tarantula_id: uuid.UUID,
+    feeding_data: FeedingLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Create a new feeding log"""
-    return {"message": f"Create feeding log for {tarantula_id} - TODO"}
+    # Verify tarantula belongs to user
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == tarantula_id,
+        Tarantula.user_id == current_user.id
+    ).first()
+
+    if not tarantula:
+        raise HTTPException(status_code=404, detail="Tarantula not found")
+
+    # Create feeding log
+    new_feeding = FeedingLog(
+        tarantula_id=tarantula_id,
+        **feeding_data.model_dump()
+    )
+
+    db.add(new_feeding)
+    db.commit()
+    db.refresh(new_feeding)
+
+    return new_feeding
 
 
-@router.put("/{feeding_id}")
-async def update_feeding_log(feeding_id: str):
+@router.put("/feedings/{feeding_id}", response_model=FeedingLogResponse)
+async def update_feeding_log(
+    feeding_id: uuid.UUID,
+    feeding_data: FeedingLogUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Update a feeding log"""
-    return {"message": f"Update feeding {feeding_id} - TODO"}
+    # Get feeding log and verify ownership through tarantula
+    feeding = db.query(FeedingLog).filter(FeedingLog.id == feeding_id).first()
+
+    if not feeding:
+        raise HTTPException(status_code=404, detail="Feeding log not found")
+
+    # Verify ownership
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == feeding.tarantula_id,
+        Tarantula.user_id == current_user.id
+    ).first()
+
+    if not tarantula:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # Update feeding log
+    update_data = feeding_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(feeding, field, value)
+
+    db.commit()
+    db.refresh(feeding)
+
+    return feeding
 
 
-@router.delete("/{feeding_id}")
-async def delete_feeding_log(feeding_id: str):
+@router.delete("/feedings/{feeding_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_feeding_log(
+    feeding_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Delete a feeding log"""
-    return {"message": f"Delete feeding {feeding_id} - TODO"}
+    # Get feeding log and verify ownership through tarantula
+    feeding = db.query(FeedingLog).filter(FeedingLog.id == feeding_id).first()
+
+    if not feeding:
+        raise HTTPException(status_code=404, detail="Feeding log not found")
+
+    # Verify ownership
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == feeding.tarantula_id,
+        Tarantula.user_id == current_user.id
+    ).first()
+
+    if not tarantula:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    db.delete(feeding)
+    db.commit()
+
+    return None

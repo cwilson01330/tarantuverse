@@ -1,10 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
-export default function AddTarantulaPage() {
+export default function EditTarantulaPage() {
   const router = useRouter()
+  const params = useParams()
+  const id = params.id as string
+
   const [formData, setFormData] = useState({
     common_name: '',
     scientific_name: '',
@@ -16,26 +19,59 @@ export default function AddTarantulaPage() {
     notes: '',
   })
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    // Check if user is logged in
     const token = localStorage.getItem('auth_token')
     if (!token) {
       router.push('/login')
+      return
     }
-  }, [router])
+
+    fetchTarantula(token)
+  }, [id, router])
+
+  const fetchTarantula = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch tarantula')
+      }
+
+      const data = await response.json()
+      setFormData({
+        common_name: data.common_name || '',
+        scientific_name: data.scientific_name || '',
+        sex: data.sex || '',
+        date_acquired: data.date_acquired || '',
+        source: data.source || '',
+        price_paid: data.price_paid ? String(data.price_paid) : '',
+        photo_url: data.photo_url || '',
+        notes: data.notes || '',
+      })
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
+    setSubmitting(true)
 
     try {
       const token = localStorage.getItem('auth_token')
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-      // Prepare data - convert empty strings to null for optional fields
       const submitData = {
         common_name: formData.common_name || null,
         scientific_name: formData.scientific_name || null,
@@ -47,8 +83,8 @@ export default function AddTarantulaPage() {
         notes: formData.notes || null,
       }
 
-      const response = await fetch(`${API_URL}/api/v1/tarantulas`, {
-        method: 'POST',
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -59,16 +95,19 @@ export default function AddTarantulaPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Failed to add tarantula')
+        throw new Error(data.detail || 'Failed to update tarantula')
       }
 
-      // Redirect to dashboard
-      router.push('/dashboard')
+      router.push(`/dashboard/tarantulas/${id}`)
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
   }
 
   return (
@@ -76,14 +115,14 @@ export default function AddTarantulaPage() {
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push(`/dashboard/tarantulas/${id}`)}
             className="text-gray-600 hover:text-gray-900"
           >
-            ← Back to Dashboard
+            ← Back to Details
           </button>
         </div>
 
-        <h1 className="text-4xl font-bold mb-8">Add Tarantula</h1>
+        <h1 className="text-4xl font-bold mb-8">Edit Tarantula</h1>
 
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -198,14 +237,14 @@ export default function AddTarantulaPage() {
           <div className="flex gap-4">
             <button
               type="submit"
-              disabled={loading}
+              disabled={submitting}
               className="flex-1 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Adding...' : 'Add Tarantula'}
+              {submitting ? 'Saving...' : 'Save Changes'}
             </button>
             <button
               type="button"
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push(`/dashboard/tarantulas/${id}`)}
               className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
             >
               Cancel

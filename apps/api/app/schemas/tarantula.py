@@ -19,6 +19,7 @@ class TarantulaBase(BaseModel):
     price_paid: Optional[Decimal] = None
     enclosure_size: Optional[str] = Field(None, max_length=50)
     substrate_type: Optional[str] = Field(None, max_length=100)
+    photo_url: Optional[str] = Field(None, max_length=500)
     is_public: bool = False
     notes: Optional[str] = None
 
