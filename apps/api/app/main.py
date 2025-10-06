@@ -4,6 +4,8 @@ Phase 2B Complete: Community features with message board interactions
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import os
 from app.config import settings
 import app.routers.auth as auth
 import app.routers.tarantulas as tarantulas
@@ -13,6 +15,7 @@ import app.routers.molts as molts
 import app.routers.substrate_changes as substrate_changes
 import app.routers.keepers as keepers
 import app.routers.messages as messages
+import app.routers.photos as photos
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -62,6 +65,17 @@ app.include_router(keepers.router, prefix="/api/v1/keepers", tags=["keepers", "c
 
 print("[STARTUP] Registering messages/board router...")
 app.include_router(messages.router, prefix="/api/v1/messages", tags=["messages", "community"])
+
+print("[STARTUP] Registering photos router...")
+app.include_router(photos.router, prefix="/api/v1", tags=["photos"])
+
+# Mount static files for uploaded photos
+uploads_dir = "uploads"
+os.makedirs(uploads_dir, exist_ok=True)
+os.makedirs(os.path.join(uploads_dir, "photos"), exist_ok=True)
+os.makedirs(os.path.join(uploads_dir, "thumbnails"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+print("[STARTUP] Mounted /uploads static files directory")
 
 print("[STARTUP] All routers registered successfully!")
 print(f"[STARTUP] Total app routes: {len(app.routes)}")

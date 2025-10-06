@@ -12,6 +12,7 @@ import {
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
+import PhotoViewer from '../../src/components/PhotoViewer';
 
 interface TarantulaDetail {
   id: string;
@@ -49,18 +50,31 @@ interface MoltLog {
   notes?: string;
 }
 
+interface Photo {
+  id: string;
+  url: string;
+  thumbnail_url?: string;
+  caption?: string;
+  taken_at?: string;
+  created_at: string;
+}
+
 export default function TarantulaDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const [tarantula, setTarantula] = useState<TarantulaDetail | null>(null);
   const [feedingLogs, setFeedingLogs] = useState<FeedingLog[]>([]);
   const [moltLogs, setMoltLogs] = useState<MoltLog[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
+  const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
 
   useEffect(() => {
     fetchTarantula();
     fetchFeedingLogs();
     fetchMoltLogs();
+    fetchPhotos();
   }, [id]);
 
   const fetchTarantula = async () => {
@@ -96,11 +110,23 @@ export default function TarantulaDetailScreen() {
     }
   };
 
+  const fetchPhotos = async () => {
+    try {
+      const response = await apiClient.get(`/tarantulas/${id}/photos`);
+      setPhotos(response.data);
+    } catch (error: any) {
+      console.error('Failed to load photos:', error);
+      // If endpoint doesn't exist yet, silently fail
+      setPhotos([]);
+    }
+  };
+
   // Refetch logs when screen comes into focus (after adding a log)
   useFocusEffect(
     React.useCallback(() => {
       fetchFeedingLogs();
       fetchMoltLogs();
+      fetchPhotos();
     }, [id])
   );
 
@@ -303,6 +329,51 @@ export default function TarantulaDetailScreen() {
           )}
         </View>
 
+        {/* Photo Gallery */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Photos</Text>
+          </View>
+          
+          {photos.length > 0 ? (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.photoGallery}
+            >
+              {photos.map((photo, index) => (
+                <TouchableOpacity 
+                  key={photo.id}
+                  style={styles.photoThumbnail}
+                  onPress={() => {
+                    setPhotoViewerIndex(index);
+                    setPhotoViewerVisible(true);
+                  }}
+                >
+                  <Image 
+                    source={{ uri: photo.thumbnail_url || photo.url }} 
+                    style={styles.thumbnailImage}
+                    resizeMode="cover"
+                  />
+                  {photo.caption && (
+                    <Text style={styles.photoCaption} numberOfLines={2}>
+                      {photo.caption}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="camera-off" size={48} color="#d1d5db" />
+              <Text style={styles.emptyStateText}>No photos yet</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Tap the camera button below to add photos
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Notes */}
         {tarantula.notes && (
           <View style={styles.section}>
@@ -331,11 +402,22 @@ export default function TarantulaDetailScreen() {
           <MaterialCommunityIcons name="reload" size={24} color="#fff" />
           <Text style={styles.actionButtonText}>Molt</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => router.push(`/tarantula/add-photo?id=${id}`)}
+        >
           <MaterialCommunityIcons name="camera" size={24} color="#fff" />
           <Text style={styles.actionButtonText}>Photo</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Photo Viewer Modal */}
+      <PhotoViewer
+        visible={photoViewerVisible}
+        photos={photos}
+        initialIndex={photoViewerIndex}
+        onClose={() => setPhotoViewerVisible(false)}
+      />
     </View>
   );
 }
@@ -489,6 +571,12 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     marginTop: 8,
   },
+  emptyStateSubtext: {
+    fontSize: 12,
+    color: '#d1d5db',
+    marginTop: 4,
+    textAlign: 'center',
+  },
   logList: {
     gap: 12,
   },
@@ -522,5 +610,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#4b5563',
     fontStyle: 'italic',
+  },
+  photoGallery: {
+    marginTop: 12,
+  },
+  photoThumbnail: {
+    marginRight: 12,
+    width: 150,
+    borderRadius: 8,
+    backgroundColor: '#f9fafb',
+    overflow: 'hidden',
+  },
+  thumbnailImage: {
+    width: 150,
+    height: 150,
+    backgroundColor: '#e5e7eb',
+  },
+  photoCaption: {
+    padding: 8,
+    fontSize: 12,
+    color: '#4b5563',
   },
 });
