@@ -87,7 +87,13 @@ export default function DashboardPage() {
               <h1 className="text-3xl font-bold">Welcome back, {user.display_name || user.username}! 🕷️</h1>
               <p className="text-purple-100 mt-1">Manage your tarantula collection</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => router.push('/community')}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+              >
+                🌐 Community
+              </button>
               <button
                 onClick={() => router.push('/dashboard/settings/profile')}
                 className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"

@@ -11,6 +11,7 @@ import app.routers.species as species
 import app.routers.feedings as feedings
 import app.routers.molts as molts
 import app.routers.substrate_changes as substrate_changes
+import app.routers.keepers as keepers
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -54,6 +55,9 @@ app.include_router(molts.router, prefix="/api/v1", tags=["molts"])
 
 print("[STARTUP] Registering substrate changes router...")
 app.include_router(substrate_changes.router, prefix="/api/v1", tags=["substrate_changes"])
+
+print("[STARTUP] Registering keepers/community router...")
+app.include_router(keepers.router, prefix="/api/v1/keepers", tags=["keepers", "community"])
 
 print("[STARTUP] All routers registered successfully!")
 print(f"[STARTUP] Total app routes: {len(app.routes)}")
