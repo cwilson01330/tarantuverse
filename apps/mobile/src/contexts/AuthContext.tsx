@@ -50,7 +50,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
+      console.log('Logging in with:', { email, password: '***' });
       const response = await apiClient.post('/auth/login', { email, password });
+      console.log('Login response:', response.data);
       const { access_token, user: userData } = response.data;
       
       await AsyncStorage.setItem('auth_token', access_token);
@@ -59,6 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(access_token);
       setUser(userData);
     } catch (error: any) {
+      console.error('Login error:', error.response?.data);
       throw new Error(error.response?.data?.detail || 'Login failed');
     }
   };
