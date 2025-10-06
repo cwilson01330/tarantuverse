@@ -101,12 +101,20 @@ export default function CommunityPage() {
               <h1 className="text-4xl font-bold mb-2">🌐 Keeper Community</h1>
               <p className="text-purple-100 text-lg">Discover fellow tarantula enthusiasts</p>
             </div>
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
-            >
-              ← Dashboard
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => router.push('/community/board')}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+              >
+                💬 Message Board
+              </button>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+              >
+                ← Dashboard
+              </button>
+            </div>
           </div>
 
           {/* Search and Filters */}

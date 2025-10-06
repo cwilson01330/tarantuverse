@@ -95,6 +95,12 @@ export default function DashboardPage() {
                 🌐 Community
               </button>
               <button
+                onClick={() => router.push('/community/board')}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+              >
+                💬 Message Board
+              </button>
+              <button
                 onClick={() => router.push('/dashboard/settings/profile')}
                 className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
               >

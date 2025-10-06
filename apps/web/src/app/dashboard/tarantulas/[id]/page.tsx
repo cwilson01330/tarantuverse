@@ -14,6 +14,7 @@ interface Tarantula {
   price_paid?: number
   notes?: string
   photo_url?: string
+  visibility?: string
 
   // Husbandry
   enclosure_type?: string
@@ -406,6 +407,36 @@ export default function TarantulaDetailPage() {
     }
   }
 
+  const handleVisibilityToggle = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      
+      const newVisibility = tarantula?.visibility === 'public' ? 'private' : 'public'
+
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...tarantula,
+          visibility: newVisibility,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update visibility')
+      }
+
+      const data = await response.json()
+      setTarantula(data)
+    } catch (err: any) {
+      setError(err.message || 'Failed to update visibility')
+    }
+  }
+
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center">Loading...</div>
   }
@@ -508,7 +539,7 @@ export default function TarantulaDetailPage() {
       {/* Action Buttons Bar */}
       <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 items-center">
             {tarantula.species_id && (
               <button
                 onClick={() => router.push(`/species/${tarantula.species_id}`)}
@@ -532,6 +563,27 @@ export default function TarantulaDetailPage() {
             >
               🍴 Log Feeding
             </button>
+            
+            {/* Visibility Toggle */}
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
+              <span className="text-sm font-medium text-gray-700">
+                {tarantula.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+              </span>
+              <button
+                onClick={handleVisibilityToggle}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  tarantula.visibility === 'public' ? 'bg-purple-600' : 'bg-gray-300'
+                }`}
+                title={tarantula.visibility === 'public' ? 'Make private' : 'Make public'}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    tarantula.visibility === 'public' ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
             <button
               onClick={() => setDeleteConfirm(true)}
               className="ml-auto px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-all duration-200 font-medium border border-red-200"
