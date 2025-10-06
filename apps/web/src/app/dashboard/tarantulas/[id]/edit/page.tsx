@@ -28,6 +28,20 @@ export default function EditTarantulaPage() {
     photo_url: '',
     notes: '',
     species_id: '',
+    // Husbandry fields
+    enclosure_type: '',
+    enclosure_size: '',
+    substrate_type: '',
+    substrate_depth: '',
+    last_substrate_change: '',
+    target_temp_min: '',
+    target_temp_max: '',
+    target_humidity_min: '',
+    target_humidity_max: '',
+    water_dish: true,
+    misting_schedule: '',
+    last_enclosure_cleaning: '',
+    enclosure_notes: '',
   })
   const [selectedSpecies, setSelectedSpecies] = useState<SelectedSpecies | null>(null)
   const [error, setError] = useState('')
@@ -68,6 +82,20 @@ export default function EditTarantulaPage() {
         photo_url: data.photo_url || '',
         notes: data.notes || '',
         species_id: data.species_id || '',
+        // Husbandry fields
+        enclosure_type: data.enclosure_type || '',
+        enclosure_size: data.enclosure_size || '',
+        substrate_type: data.substrate_type || '',
+        substrate_depth: data.substrate_depth || '',
+        last_substrate_change: data.last_substrate_change || '',
+        target_temp_min: data.target_temp_min ? String(data.target_temp_min) : '',
+        target_temp_max: data.target_temp_max ? String(data.target_temp_max) : '',
+        target_humidity_min: data.target_humidity_min ? String(data.target_humidity_min) : '',
+        target_humidity_max: data.target_humidity_max ? String(data.target_humidity_max) : '',
+        water_dish: data.water_dish !== undefined ? data.water_dish : true,
+        misting_schedule: data.misting_schedule || '',
+        last_enclosure_cleaning: data.last_enclosure_cleaning || '',
+        enclosure_notes: data.enclosure_notes || '',
       })
       // If species_id exists, we could optionally fetch and set selectedSpecies
       // but it's not necessary for the form to work
@@ -108,6 +136,20 @@ export default function EditTarantulaPage() {
         price_paid: formData.price_paid ? parseFloat(formData.price_paid) : null,
         photo_url: formData.photo_url || null,
         notes: formData.notes || null,
+        // Husbandry fields
+        enclosure_type: formData.enclosure_type || null,
+        enclosure_size: formData.enclosure_size || null,
+        substrate_type: formData.substrate_type || null,
+        substrate_depth: formData.substrate_depth || null,
+        last_substrate_change: formData.last_substrate_change || null,
+        target_temp_min: formData.target_temp_min ? parseInt(formData.target_temp_min) : null,
+        target_temp_max: formData.target_temp_max ? parseInt(formData.target_temp_max) : null,
+        target_humidity_min: formData.target_humidity_min ? parseInt(formData.target_humidity_min) : null,
+        target_humidity_max: formData.target_humidity_max ? parseInt(formData.target_humidity_max) : null,
+        water_dish: formData.water_dish,
+        misting_schedule: formData.misting_schedule || null,
+        last_enclosure_cleaning: formData.last_enclosure_cleaning || null,
+        enclosure_notes: formData.enclosure_notes || null,
       }
 
       const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
@@ -260,6 +302,167 @@ export default function EditTarantulaPage() {
               placeholder="https://example.com/image.jpg"
             />
             <p className="text-xs text-gray-500 mt-1">Enter a URL to a photo of your tarantula</p>
+          </div>
+
+          {/* Husbandry Section */}
+          <div className="border-t border-gray-200 pt-6 mt-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">Husbandry Information</h2>
+            <p className="text-sm text-gray-600 mb-6">Optional: Track enclosure setup and environmental conditions</p>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Enclosure Type</label>
+                  <select
+                    value={formData.enclosure_type}
+                    onChange={(e) => setFormData({ ...formData, enclosure_type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  >
+                    <option value="">Select...</option>
+                    <option value="terrestrial">Terrestrial</option>
+                    <option value="arboreal">Arboreal</option>
+                    <option value="fossorial">Fossorial</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Enclosure Size</label>
+                  <input
+                    type="text"
+                    value={formData.enclosure_size}
+                    onChange={(e) => setFormData({ ...formData, enclosure_size: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    placeholder="e.g., 10x10x10 inches"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Substrate Type</label>
+                  <input
+                    type="text"
+                    value={formData.substrate_type}
+                    onChange={(e) => setFormData({ ...formData, substrate_type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    placeholder="e.g., coco fiber"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Substrate Depth</label>
+                  <input
+                    type="text"
+                    value={formData.substrate_depth}
+                    onChange={(e) => setFormData({ ...formData, substrate_depth: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    placeholder="e.g., 3 inches"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Last Substrate Change</label>
+                  <input
+                    type="date"
+                    value={formData.last_substrate_change}
+                    onChange={(e) => setFormData({ ...formData, last_substrate_change: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Last Enclosure Cleaning</label>
+                  <input
+                    type="date"
+                    value={formData.last_enclosure_cleaning}
+                    onChange={(e) => setFormData({ ...formData, last_enclosure_cleaning: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Target Temperature (°F)</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      value={formData.target_temp_min}
+                      onChange={(e) => setFormData({ ...formData, target_temp_min: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      placeholder="Min"
+                    />
+                    <span className="text-gray-500">to</span>
+                    <input
+                      type="number"
+                      value={formData.target_temp_max}
+                      onChange={(e) => setFormData({ ...formData, target_temp_max: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      placeholder="Max"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Target Humidity (%)</label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      value={formData.target_humidity_min}
+                      onChange={(e) => setFormData({ ...formData, target_humidity_min: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      placeholder="Min"
+                    />
+                    <span className="text-gray-500">to</span>
+                    <input
+                      type="number"
+                      value={formData.target_humidity_max}
+                      onChange={(e) => setFormData({ ...formData, target_humidity_max: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      placeholder="Max"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.water_dish}
+                      onChange={(e) => setFormData({ ...formData, water_dish: e.target.checked })}
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    />
+                    <span className="text-sm font-medium">Water Dish Provided</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Misting Schedule</label>
+                  <input
+                    type="text"
+                    value={formData.misting_schedule}
+                    onChange={(e) => setFormData({ ...formData, misting_schedule: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    placeholder="e.g., 2x per week"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Enclosure Notes</label>
+                <textarea
+                  value={formData.enclosure_notes}
+                  onChange={(e) => setFormData({ ...formData, enclosure_notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  placeholder="Modifications, decorations, hide setup, etc."
+                />
+              </div>
+            </div>
           </div>
 
           <div>
