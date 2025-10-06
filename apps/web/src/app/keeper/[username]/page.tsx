@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { use } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 
 interface Keeper {
   id: number
@@ -39,17 +38,18 @@ interface KeeperStats {
   unsexed: number
 }
 
-export default function KeeperProfilePage({ params }: { params: Promise<{ username: string }> }) {
-  const resolvedParams = use(params)
+export default function KeeperProfilePage() {
+  const params = useParams()
   const router = useRouter()
   const [keeper, setKeeper] = useState<Keeper | null>(null)
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [stats, setStats] = useState<KeeperStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const username = resolvedParams.username
+  const username = params.username as string
 
   useEffect(() => {
+    if (!username) return
     fetchKeeperData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username])
