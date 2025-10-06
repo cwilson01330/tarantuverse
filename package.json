@@ -27,5 +27,9 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@8.15.0"
+  "packageManager": "pnpm@8.15.0",
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "expo-constants": "^18.0.9"
+  }
 }

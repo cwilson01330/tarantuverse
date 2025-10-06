@@ -1,37 +1,29 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native'
-import { useRouter } from 'expo-router'
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { useAuth } from '../src/contexts/AuthContext';
 
 export default function Home() {
-  const router = useRouter()
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (user) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/login');
+      }
+    }
+  }, [user, isLoading]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🕷️ Tarantuverse</Text>
-      <Text style={styles.subtitle}>
-        The ultimate tarantula husbandry tracking platform
-      </Text>
-
-      <View style={styles.buttonContainer}>
-        <Pressable
-          style={styles.primaryButton}
-          onPress={() => router.push('/login')}
-        >
-          <Text style={styles.primaryButtonText}>Login</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.secondaryButton}
-          onPress={() => router.push('/register')}
-        >
-          <Text style={styles.secondaryButtonText}>Register</Text>
-        </Pressable>
-      </View>
-
-      <Text style={styles.features}>
-        Track feedings • Log molts • Manage breeding • Connect with keepers
-      </Text>
+      <Text style={styles.logo}>🕷️</Text>
+      <ActivityIndicator size="large" color="#7c3aed" />
+      <Text style={styles.text}>Loading...</Text>
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
@@ -39,50 +31,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
   },
-  title: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    marginBottom: 16,
+  logo: {
+    fontSize: 80,
+    marginBottom: 20,
   },
-  subtitle: {
-    fontSize: 18,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 64,
-  },
-  primaryButton: {
-    backgroundColor: '#dc2626',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  primaryButtonText: {
-    color: '#fff',
+  text: {
+    marginTop: 16,
     fontSize: 16,
-    fontWeight: '600',
+    color: '#6b7280',
   },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: '#dc2626',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  secondaryButtonText: {
-    color: '#dc2626',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  features: {
-    fontSize: 14,
-    color: '#999',
-  },
-})
+});
