@@ -13,17 +13,9 @@ from app.schemas.message import (
     ReplyCreate, ReplyResponse,
     LikeResponse, ReactionCreate, ReactionResponse
 )
-from app.utils.auth import get_current_user
+from app.utils.dependencies import get_current_user
 
 router = APIRouter()
-
-
-def get_current_user_optional(db: Session = Depends(get_db)) -> Optional[User]:
-    """Optional auth - returns None if not authenticated"""
-    try:
-        return get_current_user(db)
-    except:
-        return None
 
 
 def build_message_response(message: Message, user: User, current_user_id: Optional[str] = None, db: Session = None) -> dict:
