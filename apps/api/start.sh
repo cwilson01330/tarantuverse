@@ -1,6 +1,9 @@
 #!/bin/bash
 # Startup script for Render - runs migrations then starts the server
 
+# Change to the API directory
+cd apps/api
+
 echo "Running database migrations..."
 alembic upgrade head
 
