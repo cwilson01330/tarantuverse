@@ -1,0 +1,31 @@
+{
+  "name": "tarantuverse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-platform tarantula husbandry tracking application",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:web\" \"pnpm dev:api\"",
+    "dev:web": "pnpm --filter web dev",
+    "dev:mobile": "pnpm --filter mobile start",
+    "dev:api": "pnpm --filter api dev",
+    "build": "pnpm --filter web build && pnpm --filter mobile build",
+    "build:web": "pnpm --filter web build",
+    "build:mobile": "pnpm --filter mobile build",
+    "lint": "pnpm --filter web lint && pnpm --filter mobile lint",
+    "test": "pnpm --filter web test && pnpm --filter mobile test && pnpm --filter api test",
+    "clean": "rm -rf apps/*/node_modules packages/*/node_modules node_modules"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "turbo": "^2.1.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0"
+}
