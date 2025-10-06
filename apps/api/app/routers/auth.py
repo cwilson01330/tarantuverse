@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
+from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate
 from app.utils.auth import get_password_hash, verify_password, create_access_token
 from app.utils.dependencies import get_current_user
 
@@ -103,4 +103,71 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current authenticated user profile"""
+    return UserResponse.from_orm(current_user)
+
+
+@router.put("/me/profile", response_model=UserResponse)
+async def update_profile(
+    profile_data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current user's profile
+    
+    - **display_name**: Display name
+    - **avatar_url**: URL to avatar image
+    - **profile_bio**: Profile bio/description
+    - **profile_location**: Location (city, country)
+    - **profile_experience_level**: beginner, intermediate, advanced, expert
+    - **profile_years_keeping**: Years of experience keeping tarantulas
+    - **profile_specialties**: Array of specialties (e.g., ['arboreal', 'breeding'])
+    - **social_links**: Social media links (JSON object)
+    - **collection_visibility**: 'private' or 'public'
+    """
+    # Update only provided fields
+    update_data = profile_data.model_dump(exclude_unset=True)
+    
+    # Validate collection_visibility if provided
+    if 'collection_visibility' in update_data:
+        if update_data['collection_visibility'] not in ['private', 'public']:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="collection_visibility must be 'private' or 'public'"
+            )
+    
+    # Validate experience_level if provided
+    valid_experience_levels = ['beginner', 'intermediate', 'advanced', 'expert']
+    if 'profile_experience_level' in update_data:
+        if update_data['profile_experience_level'] not in valid_experience_levels:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"profile_experience_level must be one of: {', '.join(valid_experience_levels)}"
+            )
+    
+    # Update user fields
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+    
+    db.commit()
+    db.refresh(current_user)
+    
+    return UserResponse.from_orm(current_user)
+
+
+@router.patch("/me/visibility", response_model=UserResponse)
+async def update_visibility(
+    visibility_data: UserVisibilityUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Quick toggle for collection visibility
+    
+    - **collection_visibility**: 'private' or 'public'
+    """
+    current_user.collection_visibility = visibility_data.collection_visibility
+    db.commit()
+    db.refresh(current_user)
+    
     return UserResponse.from_orm(current_user)

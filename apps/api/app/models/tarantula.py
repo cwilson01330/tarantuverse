@@ -66,6 +66,7 @@ class Tarantula(Base):
 
     # Privacy
     is_public = Column(Boolean, default=False)
+    visibility = Column(String(20), default='private')  # private, public
 
     # Notes
     notes = Column(Text)

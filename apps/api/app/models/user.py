@@ -1,8 +1,8 @@
 """
 User model
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer
+from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.sql import func
 import uuid
 from app.database import Base
@@ -20,6 +20,15 @@ class User(Base):
     avatar_url = Column(String(500))
     bio = Column(Text)
     is_breeder = Column(Boolean, default=False)
+
+    # Community/Profile fields
+    profile_bio = Column(Text)
+    profile_location = Column(String(255))
+    profile_experience_level = Column(String(50))  # beginner, intermediate, advanced, expert
+    profile_years_keeping = Column(Integer)
+    profile_specialties = Column(ARRAY(String))  # e.g., ['arboreal', 'old_world', 'breeding']
+    social_links = Column(JSONB)  # {instagram: '', youtube: '', website: ''}
+    collection_visibility = Column(String(20), default='private')  # private, public
 
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)

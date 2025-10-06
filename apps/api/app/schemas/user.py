@@ -2,7 +2,7 @@
 User schemas
 """
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
 
@@ -21,6 +21,24 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserProfileUpdate(BaseModel):
+    """Schema for updating user profile"""
+    display_name: Optional[str] = Field(None, max_length=100)
+    avatar_url: Optional[str] = None
+    profile_bio: Optional[str] = None
+    profile_location: Optional[str] = Field(None, max_length=255)
+    profile_experience_level: Optional[str] = Field(None, max_length=50)
+    profile_years_keeping: Optional[int] = None
+    profile_specialties: Optional[List[str]] = None
+    social_links: Optional[Dict[str, str]] = None
+    collection_visibility: Optional[str] = Field(None, max_length=20)
+
+
+class UserVisibilityUpdate(BaseModel):
+    """Schema for quick visibility toggle"""
+    collection_visibility: str = Field(..., pattern="^(private|public)$")
+
+
 class UserResponse(BaseModel):
     """Schema for user response (without password)"""
     id: uuid.UUID
@@ -32,6 +50,14 @@ class UserResponse(BaseModel):
     is_breeder: bool
     is_active: bool
     created_at: datetime
+    # Community fields
+    profile_bio: Optional[str] = None
+    profile_location: Optional[str] = None
+    profile_experience_level: Optional[str] = None
+    profile_years_keeping: Optional[int] = None
+    profile_specialties: Optional[List[str]] = None
+    social_links: Optional[Dict[str, Any]] = None
+    collection_visibility: str = 'private'
 
     class Config:
         from_attributes = True
