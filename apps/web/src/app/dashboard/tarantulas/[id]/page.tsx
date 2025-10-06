@@ -455,7 +455,7 @@ export default function TarantulaDetailPage() {
           <div className="p-8">
             <div className="flex items-start justify-between mb-6">
               <div className="flex-1">
-                <h1 className="text-4xl font-bold mb-2">{tarantula.common_name}</h1>
+                <h1 className="text-4xl font-bold text-gray-900 mb-2">{tarantula.common_name}</h1>
                 <p className="text-xl italic text-gray-600">{tarantula.scientific_name}</p>
                 {tarantula.species_id && (
                   <button
