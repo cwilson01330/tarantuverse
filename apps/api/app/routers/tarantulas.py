@@ -49,7 +49,7 @@ async def create_tarantula(
     """
     new_tarantula = Tarantula(
         user_id=current_user.id,
-        **tarantula_data.dict()
+        **tarantula_data.model_dump()
     )
 
     db.add(new_tarantula)
