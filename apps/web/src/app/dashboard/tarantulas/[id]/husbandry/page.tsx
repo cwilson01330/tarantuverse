@@ -109,7 +109,7 @@ export default function EditHusbandryPage() {
 
       // Prepare data - convert empty strings to null
       const submitData = {
-        enclosure_type: formData.enclosure_type || null,
+        enclosure_type: formData.enclosure_type ? formData.enclosure_type.toLowerCase() : null,
         enclosure_size: formData.enclosure_size || null,
         substrate_type: formData.substrate_type || null,
         substrate_depth: formData.substrate_depth || null,
