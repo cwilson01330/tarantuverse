@@ -47,10 +47,12 @@ export default function KeeperProfilePage({ params }: { params: Promise<{ userna
   const [stats, setStats] = useState<KeeperStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const username = resolvedParams.username
 
   useEffect(() => {
     fetchKeeperData()
-  }, [resolvedParams.username])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username])
 
   const fetchKeeperData = async () => {
     try {
@@ -58,7 +60,7 @@ export default function KeeperProfilePage({ params }: { params: Promise<{ userna
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       
       // Fetch keeper profile
-      const profileResponse = await fetch(`${API_URL}/api/v1/keepers/${resolvedParams.username}`)
+      const profileResponse = await fetch(`${API_URL}/api/v1/keepers/${username}`)
       if (!profileResponse.ok) {
         if (profileResponse.status === 404) {
           throw new Error('Keeper not found or profile is private')
@@ -69,14 +71,14 @@ export default function KeeperProfilePage({ params }: { params: Promise<{ userna
       setKeeper(profileData)
       
       // Fetch collection
-      const collectionResponse = await fetch(`${API_URL}/api/v1/keepers/${resolvedParams.username}/collection`)
+      const collectionResponse = await fetch(`${API_URL}/api/v1/keepers/${username}/collection`)
       if (collectionResponse.ok) {
         const collectionData = await collectionResponse.json()
         setTarantulas(collectionData)
       }
       
       // Fetch stats
-      const statsResponse = await fetch(`${API_URL}/api/v1/keepers/${resolvedParams.username}/stats`)
+      const statsResponse = await fetch(`${API_URL}/api/v1/keepers/${username}/stats`)
       if (statsResponse.ok) {
         const statsData = await statsResponse.json()
         setStats(statsData)
