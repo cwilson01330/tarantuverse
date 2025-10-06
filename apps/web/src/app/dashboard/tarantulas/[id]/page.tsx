@@ -160,7 +160,7 @@ export default function TarantulaDetailPage() {
               {tarantula.price_paid !== null && tarantula.price_paid !== undefined && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Price Paid</h3>
-                  <p className="text-lg">${tarantula.price_paid.toFixed(2)}</p>
+                  <p className="text-lg">${parseFloat(String(tarantula.price_paid)).toFixed(2)}</p>
                 </div>
               )}
             </div>
