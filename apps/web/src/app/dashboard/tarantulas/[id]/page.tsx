@@ -243,28 +243,28 @@ export default function TarantulaDetailPage() {
               {tarantula.sex && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Sex</h3>
-                  <p className="text-lg capitalize">{tarantula.sex}</p>
+                  <p className="text-lg text-gray-900 capitalize">{tarantula.sex}</p>
                 </div>
               )}
 
               {tarantula.date_acquired && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Acquired</h3>
-                  <p className="text-lg">{new Date(tarantula.date_acquired).toLocaleDateString()}</p>
+                  <p className="text-lg text-gray-900">{new Date(tarantula.date_acquired).toLocaleDateString()}</p>
                 </div>
               )}
 
               {tarantula.source && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Source</h3>
-                  <p className="text-lg capitalize">{tarantula.source.replace('_', ' ')}</p>
+                  <p className="text-lg text-gray-900 capitalize">{tarantula.source.replace('_', ' ')}</p>
                 </div>
               )}
 
               {tarantula.price_paid !== null && tarantula.price_paid !== undefined && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Price Paid</h3>
-                  <p className="text-lg">${parseFloat(String(tarantula.price_paid)).toFixed(2)}</p>
+                  <p className="text-lg text-gray-900">${parseFloat(String(tarantula.price_paid)).toFixed(2)}</p>
                 </div>
               )}
             </div>
@@ -365,7 +365,7 @@ export default function TarantulaDetailPage() {
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <p className="font-semibold">
+                            <p className="font-semibold text-gray-900">
                               {new Date(feeding.fed_at).toLocaleDateString()} at {new Date(feeding.fed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </p>
                             <span className={`px-2 py-0.5 rounded text-xs ${feeding.accepted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
@@ -373,13 +373,13 @@ export default function TarantulaDetailPage() {
                             </span>
                           </div>
                           {feeding.food_type && (
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-gray-700">
                               {feeding.food_type}
                               {feeding.food_size && ` (${feeding.food_size})`}
                             </p>
                           )}
                           {feeding.notes && (
-                            <p className="text-sm text-gray-500 mt-1">{feeding.notes}</p>
+                            <p className="text-sm text-gray-600 mt-1">{feeding.notes}</p>
                           )}
                         </div>
                         <button
