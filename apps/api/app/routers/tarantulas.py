@@ -34,19 +34,22 @@ async def get_tarantulas(
 @router.post("/", response_model=TarantulaResponse, status_code=status.HTTP_201_CREATED)
 async def create_tarantula(
     tarantula_data: TarantulaCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Create a new tarantula
 
-    - **name**: Pet name (optional)
-    - **scientific_name**: Scientific name (optional)
+    - **common_name**: Common name
+    - **scientific_name**: Scientific name
     - **species_id**: Link to species database (optional)
     - **sex**: male, female, or unknown
     - **date_acquired**: When you got this tarantula
     - All other fields are optional
     """
+    print(f"[DEBUG] Creating tarantula for user {current_user.id}")
+    print(f"[DEBUG] Tarantula data: {tarantula_data.model_dump()}")
+
     new_tarantula = Tarantula(
         user_id=current_user.id,
         **tarantula_data.model_dump()
@@ -55,6 +58,8 @@ async def create_tarantula(
     db.add(new_tarantula)
     db.commit()
     db.refresh(new_tarantula)
+
+    print(f"[DEBUG] Tarantula created successfully: {new_tarantula.id}")
 
     return new_tarantula
 
@@ -108,7 +113,7 @@ async def update_tarantula(
         )
 
     # Update only provided fields
-    update_data = tarantula_data.dict(exclude_unset=True)
+    update_data = tarantula_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(tarantula, field, value)
 
