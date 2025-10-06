@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
+
+interface SelectedSpecies {
+  id: string
+  scientific_name: string
+  common_names: string[]
+  genus?: string
+  care_level?: string
+  image_url?: string
+}
 
 export default function AddTarantulaPage() {
   const router = useRouter()
@@ -15,6 +25,7 @@ export default function AddTarantulaPage() {
     photo_url: '',
     notes: '',
   })
+  const [selectedSpecies, setSelectedSpecies] = useState<SelectedSpecies | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -25,6 +36,16 @@ export default function AddTarantulaPage() {
       router.push('/login')
     }
   }, [router])
+
+  const handleSpeciesSelect = (species: SelectedSpecies) => {
+    setSelectedSpecies(species)
+    setFormData({
+      ...formData,
+      scientific_name: species.scientific_name,
+      common_name: species.common_names[0] || '',
+      photo_url: species.image_url || formData.photo_url,
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -92,6 +113,18 @@ export default function AddTarantulaPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-1">Species Search</label>
+            <SpeciesAutocomplete
+              onSelect={handleSpeciesSelect}
+              initialValue={formData.scientific_name}
+              placeholder="Search for a species (e.g., Grammostola rosea)"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Start typing to search our species database. Select to auto-fill species info.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Common Name *</label>
@@ -100,7 +133,7 @@ export default function AddTarantulaPage() {
                 required
                 value={formData.common_name}
                 onChange={(e) => setFormData({ ...formData, common_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 placeholder="e.g., Rose Hair"
               />
             </div>
@@ -112,9 +145,12 @@ export default function AddTarantulaPage() {
                 required
                 value={formData.scientific_name}
                 onChange={(e) => setFormData({ ...formData, scientific_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
                 placeholder="e.g., Grammostola rosea"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Or enter manually if not found above
+              </p>
             </div>
           </div>
 
