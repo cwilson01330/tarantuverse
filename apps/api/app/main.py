@@ -1,5 +1,6 @@
 """
 Tarantuverse API - Main Application Entry Point
+Phase 2A Migration: Community features ready for deployment
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
