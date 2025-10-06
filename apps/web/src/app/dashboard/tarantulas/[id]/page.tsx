@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 
 interface Tarantula {
   id: string
+  species_id?: string
   common_name: string
   scientific_name: string
   sex?: string
@@ -13,6 +14,22 @@ interface Tarantula {
   price_paid?: number
   notes?: string
   photo_url?: string
+
+  // Husbandry
+  enclosure_type?: string
+  enclosure_size?: string
+  substrate_type?: string
+  substrate_depth?: string
+  last_substrate_change?: string
+  target_temp_min?: number
+  target_temp_max?: number
+  target_humidity_min?: number
+  target_humidity_max?: number
+  water_dish?: boolean
+  misting_schedule?: string
+  last_enclosure_cleaning?: string
+  enclosure_notes?: string
+
   created_at: string
 }
 
@@ -340,9 +357,17 @@ export default function TarantulaDetailPage() {
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
           <div className="p-8">
             <div className="flex items-start justify-between mb-6">
-              <div>
+              <div className="flex-1">
                 <h1 className="text-4xl font-bold mb-2">{tarantula.common_name}</h1>
                 <p className="text-xl italic text-gray-600">{tarantula.scientific_name}</p>
+                {tarantula.species_id && (
+                  <button
+                    onClick={() => router.push(`/species/${tarantula.species_id}`)}
+                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm inline-flex items-center gap-2"
+                  >
+                    📖 View Care Sheet
+                  </button>
+                )}
               </div>
               {tarantula.photo_url ? (
                 <img
@@ -384,6 +409,86 @@ export default function TarantulaDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Husbandry Section */}
+            {(tarantula.enclosure_type || tarantula.enclosure_size || tarantula.substrate_type || tarantula.target_temp_min || tarantula.target_humidity_min) && (
+              <div className="mb-8 border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold mb-4">Husbandry Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {tarantula.enclosure_type && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Enclosure Type</h4>
+                      <p className="text-lg text-gray-900 capitalize">{tarantula.enclosure_type}</p>
+                    </div>
+                  )}
+                  {tarantula.enclosure_size && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Enclosure Size</h4>
+                      <p className="text-lg text-gray-900">{tarantula.enclosure_size}</p>
+                    </div>
+                  )}
+                  {tarantula.substrate_type && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Substrate</h4>
+                      <p className="text-lg text-gray-900">
+                        {tarantula.substrate_type}
+                        {tarantula.substrate_depth && ` (${tarantula.substrate_depth})`}
+                      </p>
+                    </div>
+                  )}
+                  {tarantula.last_substrate_change && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Last Substrate Change</h4>
+                      <p className="text-lg text-gray-900">{new Date(tarantula.last_substrate_change).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  {(tarantula.target_temp_min || tarantula.target_temp_max) && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Target Temperature</h4>
+                      <p className="text-lg text-gray-900">
+                        {tarantula.target_temp_min && `${tarantula.target_temp_min}°F`}
+                        {tarantula.target_temp_min && tarantula.target_temp_max && ' - '}
+                        {tarantula.target_temp_max && `${tarantula.target_temp_max}°F`}
+                      </p>
+                    </div>
+                  )}
+                  {(tarantula.target_humidity_min || tarantula.target_humidity_max) && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Target Humidity</h4>
+                      <p className="text-lg text-gray-900">
+                        {tarantula.target_humidity_min && `${tarantula.target_humidity_min}%`}
+                        {tarantula.target_humidity_min && tarantula.target_humidity_max && ' - '}
+                        {tarantula.target_humidity_max && `${tarantula.target_humidity_max}%`}
+                      </p>
+                    </div>
+                  )}
+                  {tarantula.water_dish !== undefined && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Water Dish</h4>
+                      <p className="text-lg text-gray-900">{tarantula.water_dish ? 'Yes' : 'No'}</p>
+                    </div>
+                  )}
+                  {tarantula.misting_schedule && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Misting Schedule</h4>
+                      <p className="text-lg text-gray-900">{tarantula.misting_schedule}</p>
+                    </div>
+                  )}
+                  {tarantula.last_enclosure_cleaning && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Last Enclosure Cleaning</h4>
+                      <p className="text-lg text-gray-900">{new Date(tarantula.last_enclosure_cleaning).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+                {tarantula.enclosure_notes && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Enclosure Notes</h4>
+                    <p className="text-gray-700 whitespace-pre-wrap">{tarantula.enclosure_notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {tarantula.notes && (
               <div className="mb-8">
