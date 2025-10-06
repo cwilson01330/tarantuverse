@@ -41,7 +41,7 @@ export default function DashboardPage() {
   const fetchTarantulas = async (token: string) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_URL}/api/v1/tarantulas`, {
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

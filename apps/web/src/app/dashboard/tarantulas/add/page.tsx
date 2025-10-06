@@ -68,7 +68,7 @@ export default function AddTarantulaPage() {
         notes: formData.notes || null,
       }
 
-      const response = await fetch(`${API_URL}/api/v1/tarantulas`, {
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
