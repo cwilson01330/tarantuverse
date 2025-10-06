@@ -44,7 +44,8 @@ export default function ProfileSettingsPage() {
     }
 
     fetchProfile(token)
-  }, [router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchProfile = async (token: string) => {
     try {
