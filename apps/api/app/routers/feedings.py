@@ -11,7 +11,7 @@ from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.feeding_log import FeedingLog
 from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate, FeedingLogResponse
-from app.routers.auth import get_current_user
+from app.utils.dependencies import get_current_user
 
 router = APIRouter()
 

@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.species import Species
 from app.schemas.species import SpeciesCreate, SpeciesUpdate, SpeciesResponse, SpeciesSearchResult
-from app.routers.auth import get_current_user
+from app.utils.dependencies import get_current_user
 
 router = APIRouter()
 
