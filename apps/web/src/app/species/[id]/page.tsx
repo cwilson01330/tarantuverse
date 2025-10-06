@@ -149,22 +149,22 @@ export default function SpeciesCareSheetPage() {
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 {species.native_region && (
-                  <div>
+                  <div className="text-gray-900">
                     <span className="font-semibold">Native to:</span> {species.native_region}
                   </div>
                 )}
                 {species.adult_size && (
-                  <div>
+                  <div className="text-gray-900">
                     <span className="font-semibold">Adult size:</span> {species.adult_size}
                   </div>
                 )}
                 {species.temperament && (
-                  <div>
+                  <div className="text-gray-900">
                     <span className="font-semibold">Temperament:</span> {species.temperament}
                   </div>
                 )}
                 {species.growth_rate && (
-                  <div>
+                  <div className="text-gray-900">
                     <span className="font-semibold">Growth rate:</span> {species.growth_rate}
                   </div>
                 )}
@@ -190,7 +190,7 @@ export default function SpeciesCareSheetPage() {
               {(species.temperature_min || species.temperature_max) && (
                 <div className="mb-3">
                   <p className="text-sm text-gray-600">Temperature</p>
-                  <p className="text-lg">
+                  <p className="text-lg text-gray-900">
                     {species.temperature_min}°F - {species.temperature_max}°F
                   </p>
                 </div>
@@ -198,7 +198,7 @@ export default function SpeciesCareSheetPage() {
               {(species.humidity_min || species.humidity_max) && (
                 <div>
                   <p className="text-sm text-gray-600">Humidity</p>
-                  <p className="text-lg">
+                  <p className="text-lg text-gray-900">
                     {species.humidity_min}% - {species.humidity_max}%
                   </p>
                 </div>
@@ -211,19 +211,19 @@ export default function SpeciesCareSheetPage() {
               {species.enclosure_size_sling && (
                 <div className="mb-2">
                   <p className="text-sm text-gray-600">Sling</p>
-                  <p>{species.enclosure_size_sling}</p>
+                  <p className="text-gray-900">{species.enclosure_size_sling}</p>
                 </div>
               )}
               {species.enclosure_size_juvenile && (
                 <div className="mb-2">
                   <p className="text-sm text-gray-600">Juvenile</p>
-                  <p>{species.enclosure_size_juvenile}</p>
+                  <p className="text-gray-900">{species.enclosure_size_juvenile}</p>
                 </div>
               )}
               {species.enclosure_size_adult && (
                 <div>
                   <p className="text-sm text-gray-600">Adult</p>
-                  <p>{species.enclosure_size_adult}</p>
+                  <p className="text-gray-900">{species.enclosure_size_adult}</p>
                 </div>
               )}
             </div>
@@ -234,13 +234,13 @@ export default function SpeciesCareSheetPage() {
               {species.substrate_type && (
                 <div className="mb-2">
                   <p className="text-sm text-gray-600">Type</p>
-                  <p>{species.substrate_type}</p>
+                  <p className="text-gray-900">{species.substrate_type}</p>
                 </div>
               )}
               {species.substrate_depth && (
                 <div>
                   <p className="text-sm text-gray-600">Depth</p>
-                  <p>{species.substrate_depth}</p>
+                  <p className="text-gray-900">{species.substrate_depth}</p>
                 </div>
               )}
             </div>
@@ -248,7 +248,7 @@ export default function SpeciesCareSheetPage() {
             {/* Additional Care */}
             <div>
               <h3 className="font-semibold text-lg mb-3">Additional Care</h3>
-              <div className="space-y-2">
+              <div className="space-y-2 text-gray-900">
                 <p className="flex items-center gap-2">
                   {species.water_dish_required ? '✓' : '✗'}
                   <span>Water dish {species.water_dish_required ? 'required' : 'optional'}</span>
@@ -275,19 +275,19 @@ export default function SpeciesCareSheetPage() {
               {species.feeding_frequency_sling && (
                 <div>
                   <h3 className="font-semibold mb-2">Sling</h3>
-                  <p>{species.feeding_frequency_sling}</p>
+                  <p className="text-gray-900">{species.feeding_frequency_sling}</p>
                 </div>
               )}
               {species.feeding_frequency_juvenile && (
                 <div>
                   <h3 className="font-semibold mb-2">Juvenile</h3>
-                  <p>{species.feeding_frequency_juvenile}</p>
+                  <p className="text-gray-900">{species.feeding_frequency_juvenile}</p>
                 </div>
               )}
               {species.feeding_frequency_adult && (
                 <div>
                   <h3 className="font-semibold mb-2">Adult</h3>
-                  <p>{species.feeding_frequency_adult}</p>
+                  <p className="text-gray-900">{species.feeding_frequency_adult}</p>
                 </div>
               )}
             </div>
@@ -304,7 +304,7 @@ export default function SpeciesCareSheetPage() {
           <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
             <h2 className="text-2xl font-bold mb-4">Care Guide</h2>
             <div className="prose max-w-none">
-              <p className="whitespace-pre-wrap">{species.care_guide}</p>
+              <p className="whitespace-pre-wrap text-gray-700">{species.care_guide}</p>
             </div>
           </div>
         )}
