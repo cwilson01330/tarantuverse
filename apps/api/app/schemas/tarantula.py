@@ -17,8 +17,22 @@ class TarantulaBase(BaseModel):
     date_acquired: Optional[date] = None
     source: Optional[str] = Field(None, pattern="^(bred|bought|wild_caught)$")
     price_paid: Optional[Decimal] = None
+
+    # Husbandry
+    enclosure_type: Optional[str] = Field(None, pattern="^(terrestrial|arboreal|fossorial)$")
     enclosure_size: Optional[str] = Field(None, max_length=50)
     substrate_type: Optional[str] = Field(None, max_length=100)
+    substrate_depth: Optional[str] = Field(None, max_length=50)
+    last_substrate_change: Optional[date] = None
+    target_temp_min: Optional[Decimal] = None
+    target_temp_max: Optional[Decimal] = None
+    target_humidity_min: Optional[Decimal] = None
+    target_humidity_max: Optional[Decimal] = None
+    water_dish: Optional[bool] = True
+    misting_schedule: Optional[str] = Field(None, max_length=100)
+    last_enclosure_cleaning: Optional[date] = None
+    enclosure_notes: Optional[str] = None
+
     photo_url: Optional[str] = Field(None, max_length=500)
     is_public: bool = False
     notes: Optional[str] = None

@@ -22,6 +22,12 @@ class Source(str, enum.Enum):
     WILD_CAUGHT = "wild_caught"
 
 
+class EnclosureType(str, enum.Enum):
+    TERRESTRIAL = "terrestrial"
+    ARBOREAL = "arboreal"
+    FOSSORIAL = "fossorial"
+
+
 class Tarantula(Base):
     __tablename__ = "tarantulas"
 
@@ -41,8 +47,19 @@ class Tarantula(Base):
     price_paid = Column(Numeric(10, 2))
 
     # Husbandry
+    enclosure_type = Column(SQLEnum(EnclosureType))
     enclosure_size = Column(String(50))  # e.g., "10x10x10 inches"
     substrate_type = Column(String(100))
+    substrate_depth = Column(String(50))  # e.g., "3 inches"
+    last_substrate_change = Column(Date)
+    target_temp_min = Column(Numeric(5, 2))  # Fahrenheit
+    target_temp_max = Column(Numeric(5, 2))
+    target_humidity_min = Column(Numeric(5, 2))  # Percentage
+    target_humidity_max = Column(Numeric(5, 2))
+    water_dish = Column(Boolean, default=True)
+    misting_schedule = Column(String(100))  # e.g., "2x per week"
+    last_enclosure_cleaning = Column(Date)
+    enclosure_notes = Column(Text)  # Modifications, decor, etc.
 
     # Media
     photo_url = Column(String(500))
