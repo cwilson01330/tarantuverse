@@ -118,7 +118,7 @@ export default function SpeciesCareSheetPage() {
             )}
 
             <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-2">{species.scientific_name}</h1>
+              <h1 className="text-4xl font-bold mb-2 text-gray-900">{species.scientific_name}</h1>
               {species.common_names.length > 0 && (
                 <p className="text-xl text-gray-600 mb-4">
                   {species.common_names.join(', ')}
