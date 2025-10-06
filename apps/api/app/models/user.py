@@ -4,6 +4,7 @@ User model
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 import uuid
 from app.database import Base
 
@@ -35,6 +36,9 @@ class User(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships (lazy loading to avoid circular imports)
+    messages = relationship("Message", back_populates="user", lazy="select")
 
     def __repr__(self):
         return f"<User {self.username}>"
