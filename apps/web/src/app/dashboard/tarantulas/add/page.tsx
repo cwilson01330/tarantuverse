@@ -24,6 +24,7 @@ export default function AddTarantulaPage() {
     price_paid: '',
     photo_url: '',
     notes: '',
+    species_id: '',
   })
   const [selectedSpecies, setSelectedSpecies] = useState<SelectedSpecies | null>(null)
   const [error, setError] = useState('')
@@ -41,6 +42,7 @@ export default function AddTarantulaPage() {
     setSelectedSpecies(species)
     setFormData({
       ...formData,
+      species_id: species.id,
       scientific_name: species.scientific_name,
       common_name: species.common_names[0] || '',
       photo_url: species.image_url || formData.photo_url,
@@ -60,6 +62,7 @@ export default function AddTarantulaPage() {
       const submitData = {
         common_name: formData.common_name || null,
         scientific_name: formData.scientific_name || null,
+        species_id: formData.species_id || null,
         sex: formData.sex || null,
         date_acquired: formData.date_acquired || null,
         source: formData.source || null,

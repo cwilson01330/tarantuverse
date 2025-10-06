@@ -2,6 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
+
+interface SelectedSpecies {
+  id: string
+  scientific_name: string
+  common_names: string[]
+  genus?: string
+  care_level?: string
+  image_url?: string
+}
 
 export default function EditTarantulaPage() {
   const router = useRouter()
@@ -17,7 +27,9 @@ export default function EditTarantulaPage() {
     price_paid: '',
     photo_url: '',
     notes: '',
+    species_id: '',
   })
+  const [selectedSpecies, setSelectedSpecies] = useState<SelectedSpecies | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -55,12 +67,26 @@ export default function EditTarantulaPage() {
         price_paid: data.price_paid ? String(data.price_paid) : '',
         photo_url: data.photo_url || '',
         notes: data.notes || '',
+        species_id: data.species_id || '',
       })
+      // If species_id exists, we could optionally fetch and set selectedSpecies
+      // but it's not necessary for the form to work
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSpeciesSelect = (species: SelectedSpecies) => {
+    setSelectedSpecies(species)
+    setFormData({
+      ...formData,
+      species_id: species.id,
+      scientific_name: species.scientific_name,
+      common_name: species.common_names[0] || formData.common_name,
+      photo_url: species.image_url || formData.photo_url,
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,6 +101,7 @@ export default function EditTarantulaPage() {
       const submitData = {
         common_name: formData.common_name || null,
         scientific_name: formData.scientific_name || null,
+        species_id: formData.species_id || null,
         sex: formData.sex || null,
         date_acquired: formData.date_acquired || null,
         source: formData.source || null,
@@ -131,6 +158,18 @@ export default function EditTarantulaPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium mb-1">Species Search</label>
+            <SpeciesAutocomplete
+              onSelect={handleSpeciesSelect}
+              initialValue={formData.scientific_name}
+              placeholder="Search for a species (e.g., Grammostola rosea)"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Start typing to search our species database. Select to link species and enable care sheet access.
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Common Name *</label>
