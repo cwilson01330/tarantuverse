@@ -21,7 +21,7 @@ def upgrade():
     op.create_table(
         'messages',
         sa.Column('id', sa.String(), nullable=False),
-        sa.Column('user_id', sa.String(), nullable=False),
+        sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('title', sa.String(length=200), nullable=False),
         sa.Column('content', sa.Text(), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
