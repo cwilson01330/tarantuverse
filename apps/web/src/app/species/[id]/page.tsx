@@ -181,12 +181,12 @@ export default function SpeciesCareSheetPage() {
 
         {/* Husbandry Requirements */}
         <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
-          <h2 className="text-2xl font-bold mb-6">Husbandry Requirements</h2>
+          <h2 className="text-2xl font-bold mb-6 text-gray-900">Husbandry Requirements</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Temperature & Humidity */}
             <div>
-              <h3 className="font-semibold text-lg mb-3">Climate</h3>
+              <h3 className="font-semibold text-lg mb-3 text-gray-900">Climate</h3>
               {(species.temperature_min || species.temperature_max) && (
                 <div className="mb-3">
                   <p className="text-sm text-gray-600">Temperature</p>
@@ -207,7 +207,7 @@ export default function SpeciesCareSheetPage() {
 
             {/* Enclosure */}
             <div>
-              <h3 className="font-semibold text-lg mb-3">Enclosure</h3>
+              <h3 className="font-semibold text-lg mb-3 text-gray-900">Enclosure</h3>
               {species.enclosure_size_sling && (
                 <div className="mb-2">
                   <p className="text-sm text-gray-600">Sling</p>
@@ -230,7 +230,7 @@ export default function SpeciesCareSheetPage() {
 
             {/* Substrate */}
             <div>
-              <h3 className="font-semibold text-lg mb-3">Substrate</h3>
+              <h3 className="font-semibold text-lg mb-3 text-gray-900">Substrate</h3>
               {species.substrate_type && (
                 <div className="mb-2">
                   <p className="text-sm text-gray-600">Type</p>
@@ -247,7 +247,7 @@ export default function SpeciesCareSheetPage() {
 
             {/* Additional Care */}
             <div>
-              <h3 className="font-semibold text-lg mb-3">Additional Care</h3>
+              <h3 className="font-semibold text-lg mb-3 text-gray-900">Additional Care</h3>
               <div className="space-y-2 text-gray-900">
                 <p className="flex items-center gap-2">
                   {species.water_dish_required ? '✓' : '✗'}
@@ -270,23 +270,23 @@ export default function SpeciesCareSheetPage() {
         {/* Feeding Schedule */}
         {(species.feeding_frequency_sling || species.feeding_frequency_juvenile || species.feeding_frequency_adult) && (
           <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
-            <h2 className="text-2xl font-bold mb-6">Feeding Schedule</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">Feeding Schedule</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {species.feeding_frequency_sling && (
                 <div>
-                  <h3 className="font-semibold mb-2">Sling</h3>
+                  <h3 className="font-semibold mb-2 text-gray-900">Sling</h3>
                   <p className="text-gray-900">{species.feeding_frequency_sling}</p>
                 </div>
               )}
               {species.feeding_frequency_juvenile && (
                 <div>
-                  <h3 className="font-semibold mb-2">Juvenile</h3>
+                  <h3 className="font-semibold mb-2 text-gray-900">Juvenile</h3>
                   <p className="text-gray-900">{species.feeding_frequency_juvenile}</p>
                 </div>
               )}
               {species.feeding_frequency_adult && (
                 <div>
-                  <h3 className="font-semibold mb-2">Adult</h3>
+                  <h3 className="font-semibold mb-2 text-gray-900">Adult</h3>
                   <p className="text-gray-900">{species.feeding_frequency_adult}</p>
                 </div>
               )}
@@ -302,7 +302,7 @@ export default function SpeciesCareSheetPage() {
         {/* Care Guide */}
         {species.care_guide && (
           <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
-            <h2 className="text-2xl font-bold mb-4">Care Guide</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">Care Guide</h2>
             <div className="prose max-w-none">
               <p className="whitespace-pre-wrap text-gray-700">{species.care_guide}</p>
             </div>
