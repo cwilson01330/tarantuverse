@@ -9,8 +9,7 @@ export default function AddTarantulaPage() {
     common_name: '',
     scientific_name: '',
     sex: '',
-    life_stage: '',
-    acquired_date: '',
+    date_acquired: '',
     source: '',
     price_paid: '',
     notes: '',
@@ -37,10 +36,10 @@ export default function AddTarantulaPage() {
 
       // Prepare data - convert empty strings to null for optional fields
       const submitData = {
-        ...formData,
+        common_name: formData.common_name || null,
+        scientific_name: formData.scientific_name || null,
         sex: formData.sex || null,
-        life_stage: formData.life_stage || null,
-        acquired_date: formData.acquired_date || null,
+        date_acquired: formData.date_acquired || null,
         source: formData.source || null,
         price_paid: formData.price_paid ? parseFloat(formData.price_paid) : null,
         notes: formData.notes || null,
@@ -126,24 +125,9 @@ export default function AddTarantulaPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
               >
                 <option value="">Select...</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-                <option value="UNKNOWN">Unknown</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Life Stage</label>
-              <select
-                value={formData.life_stage}
-                onChange={(e) => setFormData({ ...formData, life_stage: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
-              >
-                <option value="">Select...</option>
-                <option value="SLING">Sling</option>
-                <option value="JUVENILE">Juvenile</option>
-                <option value="SUBADULT">Subadult</option>
-                <option value="ADULT">Adult</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="unknown">Unknown</option>
               </select>
             </div>
           </div>
@@ -153,8 +137,8 @@ export default function AddTarantulaPage() {
               <label className="block text-sm font-medium mb-1">Acquired Date</label>
               <input
                 type="date"
-                value={formData.acquired_date}
-                onChange={(e) => setFormData({ ...formData, acquired_date: e.target.value })}
+                value={formData.date_acquired}
+                onChange={(e) => setFormData({ ...formData, date_acquired: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
               />
             </div>
@@ -167,13 +151,9 @@ export default function AddTarantulaPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
               >
                 <option value="">Select...</option>
-                <option value="BREEDER">Breeder</option>
-                <option value="PET_STORE">Pet Store</option>
-                <option value="EXPO">Expo</option>
-                <option value="ONLINE">Online</option>
-                <option value="RESCUE">Rescue</option>
-                <option value="TRADE">Trade</option>
-                <option value="OTHER">Other</option>
+                <option value="bred">Bred</option>
+                <option value="bought">Bought</option>
+                <option value="wild_caught">Wild Caught</option>
               </select>
             </div>
           </div>

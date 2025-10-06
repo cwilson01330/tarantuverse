@@ -8,8 +8,7 @@ interface Tarantula {
   common_name: string
   scientific_name: string
   sex?: string
-  life_stage?: string
-  acquired_date?: string
+  date_acquired?: string
   source?: string
   price_paid?: number
   notes?: string
@@ -140,28 +139,21 @@ export default function TarantulaDetailPage() {
               {tarantula.sex && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Sex</h3>
-                  <p className="text-lg">{tarantula.sex}</p>
+                  <p className="text-lg capitalize">{tarantula.sex}</p>
                 </div>
               )}
 
-              {tarantula.life_stage && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Life Stage</h3>
-                  <p className="text-lg">{tarantula.life_stage}</p>
-                </div>
-              )}
-
-              {tarantula.acquired_date && (
+              {tarantula.date_acquired && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Acquired</h3>
-                  <p className="text-lg">{new Date(tarantula.acquired_date).toLocaleDateString()}</p>
+                  <p className="text-lg">{new Date(tarantula.date_acquired).toLocaleDateString()}</p>
                 </div>
               )}
 
               {tarantula.source && (
                 <div>
                   <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Source</h3>
-                  <p className="text-lg">{tarantula.source.replace('_', ' ')}</p>
+                  <p className="text-lg capitalize">{tarantula.source.replace('_', ' ')}</p>
                 </div>
               )}
 

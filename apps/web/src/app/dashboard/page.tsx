@@ -15,9 +15,7 @@ interface Tarantula {
   common_name: string
   scientific_name: string
   sex?: string
-  life_stage?: string
-  acquired_date?: string
-  photo_url?: string
+  date_acquired?: string
 }
 
 export default function DashboardPage() {
