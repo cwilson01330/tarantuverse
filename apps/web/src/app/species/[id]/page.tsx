@@ -170,7 +170,7 @@ export default function SpeciesCareSheetPage() {
                 )}
               </div>
 
-              {species.times_kept > 0 && (
+              {species.times_kept && species.times_kept > 0 && (
                 <p className="text-sm text-gray-500 mt-4">
                   Kept by {species.times_kept} keeper{species.times_kept !== 1 ? 's' : ''} on Tarantuverse
                 </p>
