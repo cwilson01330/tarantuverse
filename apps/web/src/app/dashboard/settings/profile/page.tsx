@@ -106,21 +106,30 @@ export default function ProfileSettingsPage() {
       const token = localStorage.getItem('auth_token')
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-      const submitData = {
-        display_name: formData.display_name || null,
-        avatar_url: formData.avatar_url || null,
-        profile_bio: formData.profile_bio || null,
-        profile_location: formData.profile_location || null,
-        profile_experience_level: formData.profile_experience_level || null,
-        profile_years_keeping: formData.profile_years_keeping ? parseInt(formData.profile_years_keeping) : null,
-        profile_specialties: formData.profile_specialties.length > 0 ? formData.profile_specialties : null,
-        social_links: {
-          instagram: formData.social_links.instagram || null,
-          youtube: formData.social_links.youtube || null,
-          website: formData.social_links.website || null,
-        },
+      // Build social links object only if at least one link is provided
+      const socialLinksData = {
+        instagram: formData.social_links.instagram || undefined,
+        youtube: formData.social_links.youtube || undefined,
+        website: formData.social_links.website || undefined,
+      }
+      const hasSocialLinks = Object.values(socialLinksData).some(v => v !== undefined)
+
+      const submitData: any = {
         collection_visibility: formData.collection_visibility,
       }
+
+      // Only include fields that have values
+      if (formData.display_name) submitData.display_name = formData.display_name
+      if (formData.avatar_url) submitData.avatar_url = formData.avatar_url
+      if (formData.profile_bio) submitData.profile_bio = formData.profile_bio
+      if (formData.profile_location) submitData.profile_location = formData.profile_location
+      if (formData.profile_experience_level) submitData.profile_experience_level = formData.profile_experience_level
+      if (formData.profile_years_keeping) {
+        const years = parseInt(formData.profile_years_keeping)
+        if (!isNaN(years)) submitData.profile_years_keeping = years
+      }
+      if (formData.profile_specialties.length > 0) submitData.profile_specialties = formData.profile_specialties
+      if (hasSocialLinks) submitData.social_links = socialLinksData
 
       const response = await fetch(`${API_URL}/api/v1/auth/me/profile`, {
         method: 'PUT',
