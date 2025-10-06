@@ -70,3 +70,5 @@ postgres-data/
 .turbo/
 .vercel/
 *.tsbuildinfo
+
+.vercel
