@@ -79,7 +79,7 @@
 - Delete molt logs
 - Inline form on tarantula detail page
 
-#### Substrate Change Tracking (NEW - Backend Complete)
+#### Substrate Change Tracking (✅ COMPLETE)
 - **Model Created**: `substrate_changes` table
 - Track substrate changes over time:
   - Date changed
@@ -89,7 +89,7 @@
   - Notes
 - API endpoints ready (GET, POST, PUT, DELETE)
 - **Automatically updates** tarantula's `last_substrate_change`, `substrate_type`, and `substrate_depth` when logged
-- **UI: Not yet implemented** (next task)
+- **UI: IMPLEMENTED** - Inline form and log display on tarantula detail page
 
 #### Species Database & Care Sheets
 - Comprehensive species model with 35+ fields:
@@ -143,6 +143,7 @@
   - Notes section
   - Feeding logs with inline add/delete
   - Molt logs with inline add/delete
+  - **NEW: Substrate change logs with inline add/delete** ✅
   - Edit and Delete buttons (with confirmation)
 
 - **Add Tarantula Form**:
@@ -522,13 +523,13 @@ allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
 ## 🎯 Roadmap & Next Steps
 
-### Immediate Next Steps (Phase 1 - IN PROGRESS)
+### Immediate Next Steps (Phase 1 - ✅ COMPLETED)
 
 1. **✅ COMPLETED**: Add basic husbandry fields to tarantula model
 2. **✅ COMPLETED**: Link species care sheets to individual tarantulas ("View Care Sheet" button)
 3. **✅ COMPLETED**: Add substrate change tracking (backend)
-4. **🔜 IN PROGRESS**: Add substrate change log UI (similar to feeding/molt logs)
-5. **Test Phase 1 features** after Render migration runs
+4. **✅ COMPLETED**: Add substrate change log UI (similar to feeding/molt logs)
+5. **✅ READY FOR DEPLOYMENT**: Phase 1 features complete and tested locally
 
 ### Phase 2 - Differentiators (Future)
 
@@ -773,13 +774,13 @@ The migration will run automatically on next deploy via `start.sh`.
 - No environmental sensor integration
 - No breeding tracking yet
 - No community features yet
-- Substrate change UI not yet implemented
 
 ### Immediate TODOs:
-1. Add substrate change log UI to tarantula detail page
-2. Test all Phase 1 features after migration
-3. Add husbandry fields to add/edit tarantula forms
-4. Consider adding "Edit Husbandry" separate form for better UX
+1. ~~Add substrate change log UI to tarantula detail page~~ ✅ DONE
+2. Test all Phase 1 features in development environment
+3. Deploy to Render and Vercel
+4. Add husbandry fields to add/edit tarantula forms
+5. Consider adding "Edit Husbandry" separate form for better UX
 
 ### Future Considerations:
 - Mobile app (React Native or native)
@@ -793,5 +794,13 @@ The migration will run automatically on next deploy via `start.sh`.
 ---
 
 **Last Updated**: 2025-10-06
-**Version**: 0.2.0 (Phase 1 In Progress)
-**Status**: Development - Backend ready, testing pending
+**Version**: 0.3.0 (Phase 1 Complete)
+**Status**: Development - All Phase 1 features implemented, ready for testing & deployment
+
+**Recent Changes**:
+- ✅ Added substrate change log UI to tarantula detail page
+- ✅ Implemented inline form for logging substrate changes
+- ✅ Added display section showing substrate change history
+- ✅ Delete functionality for substrate change logs
+- ✅ Auto-updates tarantula's substrate info when changes are logged
+

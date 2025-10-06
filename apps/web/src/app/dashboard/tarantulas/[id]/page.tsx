@@ -58,6 +58,17 @@ interface MoltLog {
   created_at: string
 }
 
+interface SubstrateChange {
+  id: string
+  tarantula_id: string
+  changed_at: string
+  substrate_type?: string
+  substrate_depth?: string
+  reason?: string
+  notes?: string
+  created_at: string
+}
+
 export default function TarantulaDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -66,11 +77,13 @@ export default function TarantulaDetailPage() {
   const [tarantula, setTarantula] = useState<Tarantula | null>(null)
   const [feedings, setFeedings] = useState<FeedingLog[]>([])
   const [molts, setMolts] = useState<MoltLog[]>([])
+  const [substrateChanges, setSubstrateChanges] = useState<SubstrateChange[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [showFeedingForm, setShowFeedingForm] = useState(false)
   const [showMoltForm, setShowMoltForm] = useState(false)
+  const [showSubstrateForm, setShowSubstrateForm] = useState(false)
   const [feedingFormData, setFeedingFormData] = useState({
     fed_at: new Date().toISOString().slice(0, 16),
     food_type: '',
@@ -88,6 +101,13 @@ export default function TarantulaDetailPage() {
     notes: '',
     image_url: '',
   })
+  const [substrateFormData, setSubstrateFormData] = useState({
+    changed_at: new Date().toISOString().slice(0, 10),
+    substrate_type: '',
+    substrate_depth: '',
+    reason: '',
+    notes: '',
+  })
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token')
@@ -99,6 +119,7 @@ export default function TarantulaDetailPage() {
     fetchTarantula(token)
     fetchFeedings(token)
     fetchMolts(token)
+    fetchSubstrateChanges(token)
   }, [id, router])
 
   const fetchTarantula = async (token: string) => {
@@ -283,6 +304,82 @@ export default function TarantulaDetailPage() {
       fetchMolts(token!)
     } catch (err: any) {
       setError(err.message || 'Failed to delete molt')
+    }
+  }
+
+  const fetchSubstrateChanges = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/substrate-changes`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSubstrateChanges(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch substrate changes:', err)
+    }
+  }
+
+  const handleAddSubstrateChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const token = localStorage.getItem('auth_token')
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/substrate-changes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(substrateFormData),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to add substrate change log')
+      }
+
+      // Reset form and refresh
+      setSubstrateFormData({
+        changed_at: new Date().toISOString().slice(0, 10),
+        substrate_type: '',
+        substrate_depth: '',
+        reason: '',
+        notes: '',
+      })
+      setShowSubstrateForm(false)
+      fetchSubstrateChanges(token!)
+      // Also refresh tarantula to update last_substrate_change
+      fetchTarantula(token!)
+    } catch (err: any) {
+      setError(err.message || 'Failed to add substrate change')
+    }
+  }
+
+  const handleDeleteSubstrateChange = async (changeId: string) => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+      const response = await fetch(`${API_URL}/api/v1/substrate-changes/${changeId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete substrate change log')
+      }
+
+      fetchSubstrateChanges(token!)
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete substrate change')
     }
   }
 
@@ -775,6 +872,133 @@ export default function TarantulaDetailPage() {
                         </div>
                         <button
                           onClick={() => handleDeleteMolt(molt.id)}
+                          className="ml-4 text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Substrate Change Logs Section */}
+            <div className="border-t border-gray-200 pt-6 mt-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Substrate Change Logs</h3>
+                <button
+                  onClick={() => setShowSubstrateForm(!showSubstrateForm)}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm"
+                >
+                  {showSubstrateForm ? 'Cancel' : '+ Log Substrate Change'}
+                </button>
+              </div>
+
+              {showSubstrateForm && (
+                <form onSubmit={handleAddSubstrateChange} className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Date Changed *</label>
+                      <input
+                        type="date"
+                        required
+                        value={substrateFormData.changed_at}
+                        onChange={(e) => setSubstrateFormData({ ...substrateFormData, changed_at: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Substrate Type</label>
+                      <input
+                        type="text"
+                        value={substrateFormData.substrate_type}
+                        onChange={(e) => setSubstrateFormData({ ...substrateFormData, substrate_type: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        placeholder="e.g., coco fiber, peat moss"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Substrate Depth</label>
+                      <input
+                        type="text"
+                        value={substrateFormData.substrate_depth}
+                        onChange={(e) => setSubstrateFormData({ ...substrateFormData, substrate_depth: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        placeholder="e.g., 3 inches"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Reason</label>
+                      <select
+                        value={substrateFormData.reason}
+                        onChange={(e) => setSubstrateFormData({ ...substrateFormData, reason: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      >
+                        <option value="">Select reason...</option>
+                        <option value="routine maintenance">Routine Maintenance</option>
+                        <option value="mold">Mold</option>
+                        <option value="rehousing">Rehousing</option>
+                        <option value="flooding">Flooding</option>
+                        <option value="mites">Mites</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <textarea
+                      value={substrateFormData.notes}
+                      onChange={(e) => setSubstrateFormData({ ...substrateFormData, notes: e.target.value })}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      placeholder="Optional notes about the substrate change..."
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                  >
+                    Save Substrate Change
+                  </button>
+                </form>
+              )}
+
+              <div className="space-y-3">
+                {substrateChanges.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No substrate change logs yet</p>
+                ) : (
+                  substrateChanges.map((change) => (
+                    <div key={change.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900 mb-2">
+                            Changed: {new Date(change.changed_at).toLocaleDateString()}
+                          </p>
+                          {change.substrate_type && (
+                            <div className="text-sm text-gray-700 mb-1">
+                              <span className="font-medium">Type:</span> {change.substrate_type}
+                            </div>
+                          )}
+                          {change.substrate_depth && (
+                            <div className="text-sm text-gray-700 mb-1">
+                              <span className="font-medium">Depth:</span> {change.substrate_depth}
+                            </div>
+                          )}
+                          {change.reason && (
+                            <div className="text-sm text-gray-700 mb-1">
+                              <span className="font-medium">Reason:</span>{' '}
+                              <span className="capitalize">{change.reason.replace('_', ' ')}</span>
+                            </div>
+                          )}
+                          {change.notes && (
+                            <p className="text-sm text-gray-600 mt-2">{change.notes}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteSubstrateChange(change.id)}
                           className="ml-4 text-red-600 hover:text-red-800 text-sm"
                         >
                           Delete
