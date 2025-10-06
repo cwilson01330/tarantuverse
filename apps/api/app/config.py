@@ -43,8 +43,9 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     class Config:
-        env_file = ".env"
+        env_file = "../../.env"  # Point to root .env file
         case_sensitive = True
+        extra = "ignore"  # Ignore extra fields in .env
 
 
 settings = Settings()
