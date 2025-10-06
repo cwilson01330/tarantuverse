@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.schemas.tarantula import TarantulaCreate, TarantulaUpdate, TarantulaResponse
-from app.utils.dependencies import get_current_user
+from app.routers.auth import get_current_user
 
 router = APIRouter()
 

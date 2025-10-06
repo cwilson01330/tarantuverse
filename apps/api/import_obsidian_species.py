@@ -9,7 +9,7 @@ from app.database import SessionLocal
 from app.models.species import Species, CareLevel
 
 # Path to Obsidian vault
-VAULT_PATH = "/mnt/c/Users/gwiza/Documents/Obscuravault"
+VAULT_PATH = r"C:\Users\gwiza\Documents\Obscuravault"
 
 
 def parse_species_file(filepath):
