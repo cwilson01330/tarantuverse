@@ -76,12 +76,20 @@ export default function DashboardPage() {
             <h1 className="text-4xl font-bold">Welcome, {user.display_name || user.username}! 🕷️</h1>
             <p className="text-gray-600 mt-2">{user.email}</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-          >
-            Logout
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push('/dashboard/settings/profile')}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              ⚙️ Settings
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
