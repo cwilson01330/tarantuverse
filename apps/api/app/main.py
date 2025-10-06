@@ -4,8 +4,11 @@ Tarantuverse API - Main Application Entry Point
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.routers import auth, species, feedings, molts
-from app.routers.tarantulas import router as tarantulas_router
+import app.routers.auth as auth
+import app.routers.tarantulas as tarantulas
+import app.routers.species as species
+import app.routers.feedings as feedings
+import app.routers.molts as molts
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -34,8 +37,9 @@ print("[STARTUP] Registering auth router...")
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 
 print("[STARTUP] Registering tarantulas router...")
-print(f"[STARTUP] Tarantulas router routes: {[route.path for route in tarantulas_router.routes]}")
-app.include_router(tarantulas_router, prefix="/api/v1/tarantulas", tags=["tarantulas"])
+print(f"[STARTUP] Tarantulas router routes: {[route.path for route in tarantulas.router.routes]}")
+print(f"[STARTUP] Tarantulas router methods: {[(route.path, route.methods) for route in tarantulas.router.routes]}")
+app.include_router(tarantulas.router, prefix="/api/v1/tarantulas", tags=["tarantulas"])
 
 print("[STARTUP] Registering species router...")
 app.include_router(species.router, prefix="/api/v1/species", tags=["species"])
@@ -47,6 +51,10 @@ print("[STARTUP] Registering molts router...")
 app.include_router(molts.router, prefix="/api/v1", tags=["molts"])
 
 print("[STARTUP] All routers registered successfully!")
+print(f"[STARTUP] Total app routes: {len(app.routes)}")
+for route in app.routes:
+    if hasattr(route, 'methods') and hasattr(route, 'path'):
+        print(f"[STARTUP]   {route.methods} {route.path}")
 
 
 @app.get("/")
