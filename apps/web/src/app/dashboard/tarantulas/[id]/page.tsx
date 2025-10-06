@@ -81,6 +81,7 @@ export default function TarantulaDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'husbandry'>('overview')
   const [showFeedingForm, setShowFeedingForm] = useState(false)
   const [showMoltForm, setShowMoltForm] = useState(false)
   const [showSubstrateForm, setShowSubstrateForm] = useState(false)
@@ -433,209 +434,331 @@ export default function TarantulaDetailPage() {
     return null
   }
 
+  // Calculate time since acquired
+  const daysSinceAcquired = tarantula.date_acquired
+    ? Math.floor((new Date().getTime() - new Date(tarantula.date_acquired).getTime()) / (1000 * 60 * 60 * 24))
+    : null
+
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="text-gray-600 hover:text-gray-900"
-          >
-            ← Back to Dashboard
-          </button>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+      {/* Hero Section with Image */}
+      <div className="relative">
+        {/* Background Image or Gradient */}
+        <div className="h-80 relative overflow-hidden bg-gradient-to-br from-purple-600 to-purple-900">
+          {tarantula.photo_url ? (
+            <>
+              <img
+                src={tarantula.photo_url}
+                alt={tarantula.common_name}
+                className="w-full h-full object-cover opacity-40"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+            </>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-9xl opacity-20">
+              🕷️
+            </div>
+          )}
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+        {/* Hero Content Overlay */}
+        <div className="absolute inset-0 flex flex-col justify-end">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 w-full">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="mb-4 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 text-white font-medium inline-flex items-center gap-2"
+            >
+              ← Back
+            </button>
+            
+            <h1 className="text-5xl font-bold text-white mb-2 drop-shadow-lg">
+              {tarantula.common_name}
+            </h1>
+            <p className="text-2xl italic text-purple-100 mb-4 drop-shadow">
+              {tarantula.scientific_name}
+            </p>
+
+            {/* Quick Stats Pills */}
+            <div className="flex flex-wrap gap-2">
+              {tarantula.sex && (
+                <span className="px-4 py-2 rounded-full bg-white/90 backdrop-blur-sm text-purple-900 text-sm font-semibold inline-flex items-center gap-1">
+                  {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
+                </span>
+              )}
+              {daysSinceAcquired !== null && (
+                <span className="px-4 py-2 rounded-full bg-white/90 backdrop-blur-sm text-purple-900 text-sm font-semibold">
+                  📅 {daysSinceAcquired < 30 ? `${daysSinceAcquired}d` : `${Math.floor(daysSinceAcquired / 30)}mo`}
+                </span>
+              )}
+              {tarantula.price_paid && (
+                <span className="px-4 py-2 rounded-full bg-white/90 backdrop-blur-sm text-purple-900 text-sm font-semibold">
+                  💵 ${tarantula.price_paid}
+                </span>
+              )}
+              {tarantula.enclosure_type && (
+                <span className="px-4 py-2 rounded-full bg-white/90 backdrop-blur-sm text-purple-900 text-sm font-semibold capitalize">
+                  🏠 {tarantula.enclosure_type}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons Bar */}
+      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-wrap gap-3">
+            {tarantula.species_id && (
+              <button
+                onClick={() => router.push(`/species/${tarantula.species_id}`)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium inline-flex items-center gap-2 shadow-sm"
+              >
+                📖 Care Sheet
+              </button>
+            )}
+            <button
+              onClick={() => router.push(`/dashboard/tarantulas/${id}/edit`)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200 font-medium inline-flex items-center gap-2 shadow-sm"
+            >
+              ✏️ Edit
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('logs')
+                setShowFeedingForm(true)
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 font-medium inline-flex items-center gap-2 shadow-sm"
+            >
+              🍴 Log Feeding
+            </button>
+            <button
+              onClick={() => setDeleteConfirm(true)}
+              className="ml-auto px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-all duration-200 font-medium border border-red-200"
+            >
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">
             {error}
+          </div>
+        </div>
+      )}
+
+      {/* Tabs Navigation */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div className="flex gap-2 border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+              activeTab === 'overview'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            📊 Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+              activeTab === 'logs'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            📝 Logs
+          </button>
+          <button
+            onClick={() => setActiveTab('husbandry')}
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+              activeTab === 'husbandry'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            🏠 Husbandry
+          </button>
+        </div>
+      </div>
+
+      {/* Tab Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Info Card */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Basic Info */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Basic Information</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {tarantula.date_acquired && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Date Acquired</p>
+                      <p className="text-lg text-gray-900">{new Date(tarantula.date_acquired).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  {tarantula.source && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Source</p>
+                      <p className="text-lg text-gray-900 capitalize">{tarantula.source.replace('_', ' ')}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Recent Activity Timeline */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
+                <div className="space-y-4">
+                  {feedings.length === 0 && molts.length === 0 && substrateChanges.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <div className="text-4xl mb-2">📋</div>
+                      <p>No activity logged yet</p>
+                    </div>
+                  ) : (
+                    <>
+                      {[...feedings.slice(0, 3), ...molts.slice(0, 2), ...substrateChanges.slice(0, 2)]
+                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                        .slice(0, 5)
+                        .map((item: any, index) => {
+                          const isFeeding = 'fed_at' in item
+                          const isMolt = 'molted_at' in item
+                          const isSubstrate = 'changed_at' in item
+                          
+                          return (
+                            <div key={index} className="flex gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition">
+                              <div className="text-3xl">
+                                {isFeeding ? '🍴' : isMolt ? '🔄' : '💨'}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-semibold text-gray-900">
+                                  {isFeeding ? `Fed ${item.food_type || 'food'}` : isMolt ? 'Molted' : 'Substrate Changed'}
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                  {new Date(item.fed_at || item.molted_at || item.changed_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {tarantula.notes && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Notes</h2>
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{tarantula.notes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Stats Card */}
+              <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl shadow-lg p-6 text-white">
+                <h3 className="text-lg font-bold mb-4">Statistics</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-purple-100">Total Feedings</span>
+                    <span className="text-2xl font-bold">{feedings.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-purple-100">Total Molts</span>
+                    <span className="text-2xl font-bold">{molts.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-purple-100">Substrate Changes</span>
+                    <span className="text-2xl font-bold">{substrateChanges.length}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Husbandry */}
+              {(tarantula.target_temp_min || tarantula.target_humidity_min) && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Environment</h3>
+                  <div className="space-y-4">
+                    {(tarantula.target_temp_min || tarantula.target_temp_max) && (
+                      <div>
+                        <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Temperature</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {tarantula.target_temp_min && `${tarantula.target_temp_min}°F`}
+                          {tarantula.target_temp_min && tarantula.target_temp_max && ' - '}
+                          {tarantula.target_temp_max && `${tarantula.target_temp_max}°F`}
+                        </p>
+                      </div>
+                    )}
+                    {(tarantula.target_humidity_min || tarantula.target_humidity_max) && (
+                      <div>
+                        <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Humidity</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {tarantula.target_humidity_min && `${tarantula.target_humidity_min}%`}
+                          {tarantula.target_humidity_min && tarantula.target_humidity_max && ' - '}
+                          {tarantula.target_humidity_max && `${tarantula.target_humidity_max}%`}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="p-8">
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex-1">
-                <h1 className="text-4xl font-bold text-gray-900 mb-2">{tarantula.common_name}</h1>
-                <p className="text-xl italic text-gray-600">{tarantula.scientific_name}</p>
-                {tarantula.species_id && (
-                  <button
-                    onClick={() => router.push(`/species/${tarantula.species_id}`)}
-                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm inline-flex items-center gap-2"
-                  >
-                    📖 View Care Sheet
-                  </button>
-                )}
-              </div>
-              {tarantula.photo_url ? (
-                <img
-                  src={tarantula.photo_url}
-                  alt={tarantula.common_name}
-                  className="w-32 h-32 object-cover rounded-lg"
-                />
-              ) : (
-                <div className="text-8xl">🕷️</div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {tarantula.sex && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Sex</h3>
-                  <p className="text-lg text-gray-900 capitalize">{tarantula.sex}</p>
-                </div>
-              )}
-
-              {tarantula.date_acquired && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Acquired</h3>
-                  <p className="text-lg text-gray-900">{new Date(tarantula.date_acquired).toLocaleDateString()}</p>
-                </div>
-              )}
-
-              {tarantula.source && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Source</h3>
-                  <p className="text-lg text-gray-900 capitalize">{tarantula.source.replace('_', ' ')}</p>
-                </div>
-              )}
-
-              {tarantula.price_paid !== null && tarantula.price_paid !== undefined && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-500 uppercase mb-1">Price Paid</h3>
-                  <p className="text-lg text-gray-900">${parseFloat(String(tarantula.price_paid)).toFixed(2)}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Husbandry Section */}
-            {(tarantula.enclosure_type || tarantula.enclosure_size || tarantula.substrate_type || tarantula.target_temp_min || tarantula.target_humidity_min) && (
-              <div className="mb-8 border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-semibold mb-4">Husbandry Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {tarantula.enclosure_type && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Enclosure Type</h4>
-                      <p className="text-lg text-gray-900 capitalize">{tarantula.enclosure_type}</p>
-                    </div>
-                  )}
-                  {tarantula.enclosure_size && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Enclosure Size</h4>
-                      <p className="text-lg text-gray-900">{tarantula.enclosure_size}</p>
-                    </div>
-                  )}
-                  {tarantula.substrate_type && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Substrate</h4>
-                      <p className="text-lg text-gray-900">
-                        {tarantula.substrate_type}
-                        {tarantula.substrate_depth && ` (${tarantula.substrate_depth})`}
-                      </p>
-                    </div>
-                  )}
-                  {tarantula.last_substrate_change && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Last Substrate Change</h4>
-                      <p className="text-lg text-gray-900">{new Date(tarantula.last_substrate_change).toLocaleDateString()}</p>
-                    </div>
-                  )}
-                  {(tarantula.target_temp_min || tarantula.target_temp_max) && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Target Temperature</h4>
-                      <p className="text-lg text-gray-900">
-                        {tarantula.target_temp_min && `${tarantula.target_temp_min}°F`}
-                        {tarantula.target_temp_min && tarantula.target_temp_max && ' - '}
-                        {tarantula.target_temp_max && `${tarantula.target_temp_max}°F`}
-                      </p>
-                    </div>
-                  )}
-                  {(tarantula.target_humidity_min || tarantula.target_humidity_max) && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Target Humidity</h4>
-                      <p className="text-lg text-gray-900">
-                        {tarantula.target_humidity_min && `${tarantula.target_humidity_min}%`}
-                        {tarantula.target_humidity_min && tarantula.target_humidity_max && ' - '}
-                        {tarantula.target_humidity_max && `${tarantula.target_humidity_max}%`}
-                      </p>
-                    </div>
-                  )}
-                  {tarantula.water_dish !== undefined && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Water Dish</h4>
-                      <p className="text-lg text-gray-900">{tarantula.water_dish ? 'Yes' : 'No'}</p>
-                    </div>
-                  )}
-                  {tarantula.misting_schedule && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Misting Schedule</h4>
-                      <p className="text-lg text-gray-900">{tarantula.misting_schedule}</p>
-                    </div>
-                  )}
-                  {tarantula.last_enclosure_cleaning && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-1">Last Enclosure Cleaning</h4>
-                      <p className="text-lg text-gray-900">{new Date(tarantula.last_enclosure_cleaning).toLocaleDateString()}</p>
-                    </div>
-                  )}
-                </div>
-                {tarantula.enclosure_notes && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold text-gray-500 uppercase mb-2">Enclosure Notes</h4>
-                    <p className="text-gray-700 whitespace-pre-wrap">{tarantula.enclosure_notes}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {tarantula.notes && (
-              <div className="mb-8">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase mb-2">Notes</h3>
-                <p className="text-gray-700 whitespace-pre-wrap">{tarantula.notes}</p>
-              </div>
-            )}
-
-            <div className="border-t border-gray-200 pt-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Feeding Logs</h3>
+        {/* Logs Tab */}
+        {activeTab === 'logs' && (
+          <div className="space-y-8">
+            {/* Feeding Logs Section */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">🍴 Feeding Logs</h2>
                 <button
                   onClick={() => setShowFeedingForm(!showFeedingForm)}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm"
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium shadow-sm"
                 >
                   {showFeedingForm ? 'Cancel' : '+ Add Feeding'}
                 </button>
               </div>
 
               {showFeedingForm && (
-                <form onSubmit={handleAddFeeding} className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <form onSubmit={handleAddFeeding} className="mb-6 p-6 border-2 border-purple-100 rounded-xl bg-purple-50/50">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Date & Time *</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Date & Time *</label>
                       <input
                         type="datetime-local"
                         required
                         value={feedingFormData.fed_at}
                         onChange={(e) => setFeedingFormData({ ...feedingFormData, fed_at: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Food Type</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Food Type</label>
                       <input
                         type="text"
                         value={feedingFormData.food_type}
                         onChange={(e) => setFeedingFormData({ ...feedingFormData, food_type: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                         placeholder="e.g., Cricket, Roach"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Food Size</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Food Size</label>
                       <select
                         value={feedingFormData.food_size}
                         onChange={(e) => setFeedingFormData({ ...feedingFormData, food_size: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       >
                         <option value="">Select...</option>
                         <option value="small">Small</option>
@@ -644,11 +767,11 @@ export default function TarantulaDetailPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Accepted?</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Accepted?</label>
                       <select
                         value={feedingFormData.accepted ? 'true' : 'false'}
                         onChange={(e) => setFeedingFormData({ ...feedingFormData, accepted: e.target.value === 'true' })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       >
                         <option value="true">Yes</option>
                         <option value="false">No</option>
@@ -656,53 +779,59 @@ export default function TarantulaDetailPage() {
                     </div>
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700">Notes</label>
                     <textarea
                       value={feedingFormData.notes}
                       onChange={(e) => setFeedingFormData({ ...feedingFormData, notes: e.target.value })}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       placeholder="Optional notes..."
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                    className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold shadow-sm"
                   >
-                    Save Feeding Log
+                    💾 Save Feeding Log
                   </button>
                 </form>
               )}
 
               <div className="space-y-3">
                 {feedings.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No feeding logs yet</p>
+                  <div className="text-center py-12 text-gray-500">
+                    <div className="text-5xl mb-3">🍽️</div>
+                    <p>No feeding logs yet</p>
+                  </div>
                 ) : (
                   feedings.map((feeding) => (
-                    <div key={feeding.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                    <div key={feeding.id} className="p-5 border border-gray-200 rounded-xl hover:shadow-md hover:border-purple-200 transition-all duration-200 bg-white">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="font-semibold text-gray-900">
-                              {new Date(feeding.fed_at).toLocaleDateString()} at {new Date(feeding.fed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            <span className={`px-2 py-0.5 rounded text-xs ${feeding.accepted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                              {feeding.accepted ? 'Accepted' : 'Refused'}
-                            </span>
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">🍴</span>
+                            <div>
+                              <p className="font-bold text-gray-900">
+                                {new Date(feeding.fed_at).toLocaleDateString()} at {new Date(feeding.fed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              {feeding.food_type && (
+                                <p className="text-sm text-gray-700">
+                                  {feeding.food_type}
+                                  {feeding.food_size && ` (${feeding.food_size})`}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          {feeding.food_type && (
-                            <p className="text-sm text-gray-700">
-                              {feeding.food_type}
-                              {feeding.food_size && ` (${feeding.food_size})`}
-                            </p>
-                          )}
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${feeding.accepted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {feeding.accepted ? '✓ Accepted' : '✗ Refused'}
+                          </span>
                           {feeding.notes && (
-                            <p className="text-sm text-gray-600 mt-1">{feeding.notes}</p>
+                            <p className="text-sm text-gray-600 mt-2 pl-11">{feeding.notes}</p>
                           )}
                         </div>
                         <button
                           onClick={() => handleDeleteFeeding(feeding.id)}
-                          className="ml-4 text-red-600 hover:text-red-800 text-sm"
+                          className="ml-4 px-3 py-1 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition"
                         >
                           Delete
                         </button>
@@ -714,165 +843,173 @@ export default function TarantulaDetailPage() {
             </div>
 
             {/* Molt Logs Section */}
-            <div className="border-t border-gray-200 pt-6 mt-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Molt Logs</h3>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">🔄 Molt Logs</h2>
                 <button
                   onClick={() => setShowMoltForm(!showMoltForm)}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm"
                 >
                   {showMoltForm ? 'Cancel' : '+ Add Molt'}
                 </button>
               </div>
 
               {showMoltForm && (
-                <form onSubmit={handleAddMolt} className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <form onSubmit={handleAddMolt} className="mb-6 p-6 border-2 border-blue-100 rounded-xl bg-blue-50/50">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Molt Date & Time *</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Molt Date & Time *</label>
                       <input
                         type="datetime-local"
                         required
                         value={moltFormData.molted_at}
                         onChange={(e) => setMoltFormData({ ...moltFormData, molted_at: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Premolt Started</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Premolt Started</label>
                       <input
                         type="datetime-local"
                         value={moltFormData.premolt_started_at}
                         onChange={(e) => setMoltFormData({ ...moltFormData, premolt_started_at: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Leg Span Before (inches)</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Leg Span Before (inches)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={moltFormData.leg_span_before}
                         onChange={(e) => setMoltFormData({ ...moltFormData, leg_span_before: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                         placeholder="0.00"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Leg Span After (inches)</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Leg Span After (inches)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={moltFormData.leg_span_after}
                         onChange={(e) => setMoltFormData({ ...moltFormData, leg_span_after: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                         placeholder="0.00"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Weight Before (grams)</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Weight Before (grams)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={moltFormData.weight_before}
                         onChange={(e) => setMoltFormData({ ...moltFormData, weight_before: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                         placeholder="0.00"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Weight After (grams)</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Weight After (grams)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={moltFormData.weight_after}
                         onChange={(e) => setMoltFormData({ ...moltFormData, weight_after: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                         placeholder="0.00"
                       />
                     </div>
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Molt Photo URL</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700">Molt Photo URL</label>
                     <input
                       type="url"
                       value={moltFormData.image_url}
                       onChange={(e) => setMoltFormData({ ...moltFormData, image_url: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       placeholder="https://example.com/molt-photo.jpg"
                     />
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700">Notes</label>
                     <textarea
                       value={moltFormData.notes}
                       onChange={(e) => setMoltFormData({ ...moltFormData, notes: e.target.value })}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       placeholder="Optional notes about the molt..."
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                    className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm"
                   >
-                    Save Molt Log
+                    💾 Save Molt Log
                   </button>
                 </form>
               )}
 
               <div className="space-y-3">
                 {molts.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No molt logs yet</p>
+                  <div className="text-center py-12 text-gray-500">
+                    <div className="text-5xl mb-3">🔄</div>
+                    <p>No molt logs yet</p>
+                  </div>
                 ) : (
                   molts.map((molt) => (
-                    <div key={molt.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                    <div key={molt.id} className="p-5 border border-gray-200 rounded-xl hover:shadow-md hover:border-purple-200 transition-all duration-200 bg-white">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <div className="mb-2">
-                            <p className="font-semibold text-gray-900">
-                              Molted: {new Date(molt.molted_at).toLocaleDateString()} at {new Date(molt.molted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                            {molt.premolt_started_at && (
-                              <p className="text-sm text-gray-600">
-                                Premolt started: {new Date(molt.premolt_started_at).toLocaleDateString()}
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">🔄</span>
+                            <div>
+                              <p className="font-bold text-gray-900">
+                                Molted: {new Date(molt.molted_at).toLocaleDateString()} at {new Date(molt.molted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </p>
+                              {molt.premolt_started_at && (
+                                <p className="text-sm text-gray-600">
+                                  Premolt started: {new Date(molt.premolt_started_at).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="pl-11 space-y-1">
+                            {(molt.leg_span_before || molt.leg_span_after) && (
+                              <div className="text-sm text-gray-700">
+                                <span className="font-medium">Leg span:</span>{' '}
+                                {molt.leg_span_before && `${molt.leg_span_before}"`}
+                                {molt.leg_span_before && molt.leg_span_after && ' → '}
+                                {molt.leg_span_after && `${molt.leg_span_after}"`}
+                              </div>
+                            )}
+                            {(molt.weight_before || molt.weight_after) && (
+                              <div className="text-sm text-gray-700">
+                                <span className="font-medium">Weight:</span>{' '}
+                                {molt.weight_before && `${molt.weight_before}g`}
+                                {molt.weight_before && molt.weight_after && ' → '}
+                                {molt.weight_after && `${molt.weight_after}g`}
+                              </div>
+                            )}
+                            {molt.notes && (
+                              <p className="text-sm text-gray-600 mt-2">{molt.notes}</p>
+                            )}
+                            {molt.image_url && (
+                              <img
+                                src={molt.image_url}
+                                alt="Molt photo"
+                                className="mt-2 w-32 h-32 object-cover rounded-lg shadow-sm"
+                              />
                             )}
                           </div>
-                          {(molt.leg_span_before || molt.leg_span_after) && (
-                            <div className="text-sm text-gray-700 mb-1">
-                              <span className="font-medium">Leg span:</span>{' '}
-                              {molt.leg_span_before && `${molt.leg_span_before}"`}
-                              {molt.leg_span_before && molt.leg_span_after && ' → '}
-                              {molt.leg_span_after && `${molt.leg_span_after}"`}
-                            </div>
-                          )}
-                          {(molt.weight_before || molt.weight_after) && (
-                            <div className="text-sm text-gray-700 mb-1">
-                              <span className="font-medium">Weight:</span>{' '}
-                              {molt.weight_before && `${molt.weight_before}g`}
-                              {molt.weight_before && molt.weight_after && ' → '}
-                              {molt.weight_after && `${molt.weight_after}g`}
-                            </div>
-                          )}
-                          {molt.notes && (
-                            <p className="text-sm text-gray-600 mt-2">{molt.notes}</p>
-                          )}
-                          {molt.image_url && (
-                            <img
-                              src={molt.image_url}
-                              alt="Molt photo"
-                              className="mt-2 w-32 h-32 object-cover rounded-lg"
-                            />
-                          )}
                         </div>
                         <button
                           onClick={() => handleDeleteMolt(molt.id)}
-                          className="ml-4 text-red-600 hover:text-red-800 text-sm"
+                          className="ml-4 px-3 py-1 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition"
                         >
                           Delete
                         </button>
@@ -884,58 +1021,58 @@ export default function TarantulaDetailPage() {
             </div>
 
             {/* Substrate Change Logs Section */}
-            <div className="border-t border-gray-200 pt-6 mt-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Substrate Change Logs</h3>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">💨 Substrate Changes</h2>
                 <button
                   onClick={() => setShowSubstrateForm(!showSubstrateForm)}
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition text-sm"
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition text-sm font-medium shadow-sm"
                 >
-                  {showSubstrateForm ? 'Cancel' : '+ Log Substrate Change'}
+                  {showSubstrateForm ? 'Cancel' : '+ Log Change'}
                 </button>
               </div>
 
               {showSubstrateForm && (
-                <form onSubmit={handleAddSubstrateChange} className="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <form onSubmit={handleAddSubstrateChange} className="mb-6 p-6 border-2 border-amber-100 rounded-xl bg-amber-50/50">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Date Changed *</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Date Changed *</label>
                       <input
                         type="date"
                         required
                         value={substrateFormData.changed_at}
                         onChange={(e) => setSubstrateFormData({ ...substrateFormData, changed_at: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Substrate Type</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Substrate Type</label>
                       <input
                         type="text"
                         value={substrateFormData.substrate_type}
                         onChange={(e) => setSubstrateFormData({ ...substrateFormData, substrate_type: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                         placeholder="e.g., coco fiber, peat moss"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Substrate Depth</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Substrate Depth</label>
                       <input
                         type="text"
                         value={substrateFormData.substrate_depth}
                         onChange={(e) => setSubstrateFormData({ ...substrateFormData, substrate_depth: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                         placeholder="e.g., 3 inches"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Reason</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Reason</label>
                       <select
                         value={substrateFormData.reason}
                         onChange={(e) => setSubstrateFormData({ ...substrateFormData, reason: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       >
                         <option value="">Select reason...</option>
                         <option value="routine maintenance">Routine Maintenance</option>
@@ -948,58 +1085,66 @@ export default function TarantulaDetailPage() {
                     </div>
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Notes</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700">Notes</label>
                     <textarea
                       value={substrateFormData.notes}
                       onChange={(e) => setSubstrateFormData({ ...substrateFormData, notes: e.target.value })}
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
                       placeholder="Optional notes about the substrate change..."
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                    className="w-full py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-semibold shadow-sm"
                   >
-                    Save Substrate Change
+                    💾 Save Substrate Change
                   </button>
                 </form>
               )}
 
               <div className="space-y-3">
                 {substrateChanges.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No substrate change logs yet</p>
+                  <div className="text-center py-12 text-gray-500">
+                    <div className="text-5xl mb-3">💨</div>
+                    <p>No substrate change logs yet</p>
+                  </div>
                 ) : (
                   substrateChanges.map((change) => (
-                    <div key={change.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                    <div key={change.id} className="p-5 border border-gray-200 rounded-xl hover:shadow-md hover:border-purple-200 transition-all duration-200 bg-white">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <p className="font-semibold text-gray-900 mb-2">
-                            Changed: {new Date(change.changed_at).toLocaleDateString()}
-                          </p>
-                          {change.substrate_type && (
-                            <div className="text-sm text-gray-700 mb-1">
-                              <span className="font-medium">Type:</span> {change.substrate_type}
-                            </div>
-                          )}
-                          {change.substrate_depth && (
-                            <div className="text-sm text-gray-700 mb-1">
-                              <span className="font-medium">Depth:</span> {change.substrate_depth}
-                            </div>
-                          )}
-                          {change.reason && (
-                            <div className="text-sm text-gray-700 mb-1">
-                              <span className="font-medium">Reason:</span>{' '}
-                              <span className="capitalize">{change.reason.replace('_', ' ')}</span>
-                            </div>
-                          )}
-                          {change.notes && (
-                            <p className="text-sm text-gray-600 mt-2">{change.notes}</p>
-                          )}
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-2xl">💨</span>
+                            <p className="font-bold text-gray-900">
+                              Changed: {new Date(change.changed_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="pl-11 space-y-1">
+                            {change.substrate_type && (
+                              <div className="text-sm text-gray-700">
+                                <span className="font-medium">Type:</span> {change.substrate_type}
+                              </div>
+                            )}
+                            {change.substrate_depth && (
+                              <div className="text-sm text-gray-700">
+                                <span className="font-medium">Depth:</span> {change.substrate_depth}
+                              </div>
+                            )}
+                            {change.reason && (
+                              <div className="text-sm text-gray-700">
+                                <span className="font-medium">Reason:</span>{' '}
+                                <span className="capitalize">{change.reason.replace('_', ' ')}</span>
+                              </div>
+                            )}
+                            {change.notes && (
+                              <p className="text-sm text-gray-600 mt-2">{change.notes}</p>
+                            )}
+                          </div>
                         </div>
                         <button
                           onClick={() => handleDeleteSubstrateChange(change.id)}
-                          className="ml-4 text-red-600 hover:text-red-800 text-sm"
+                          className="ml-4 px-3 py-1 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition"
                         >
                           Delete
                         </button>
@@ -1010,49 +1155,133 @@ export default function TarantulaDetailPage() {
               </div>
             </div>
           </div>
+        )}
 
-          <div className="bg-gray-50 px-8 py-4 flex gap-4">
-            <button
-              onClick={() => router.push(`/dashboard/tarantulas/${id}/edit`)}
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
-            >
-              Edit Info
-            </button>
-
-            <button
-              onClick={() => router.push(`/dashboard/tarantulas/${id}/husbandry`)}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              Edit Husbandry
-            </button>
-
-            {!deleteConfirm ? (
-              <button
-                onClick={() => setDeleteConfirm(true)}
-                className="px-6 py-2 border border-red-600 text-red-600 rounded-lg hover:bg-red-50 transition"
-              >
-                Delete
-              </button>
+        {/* Husbandry Tab */}
+        {activeTab === 'husbandry' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Husbandry Details</h2>
+            
+            {(tarantula.enclosure_type || tarantula.enclosure_size || tarantula.substrate_type || tarantula.target_temp_min || tarantula.target_humidity_min) ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {tarantula.enclosure_type && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Enclosure Type</p>
+                    <p className="text-2xl font-bold text-gray-900 capitalize">{tarantula.enclosure_type}</p>
+                  </div>
+                )}
+                {tarantula.enclosure_size && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Enclosure Size</p>
+                    <p className="text-2xl font-bold text-gray-900">{tarantula.enclosure_size}</p>
+                  </div>
+                )}
+                {tarantula.substrate_type && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Substrate</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {tarantula.substrate_type}
+                      {tarantula.substrate_depth && ` (${tarantula.substrate_depth})`}
+                    </p>
+                  </div>
+                )}
+                {tarantula.last_substrate_change && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Last Substrate Change</p>
+                    <p className="text-2xl font-bold text-gray-900">{new Date(tarantula.last_substrate_change).toLocaleDateString()}</p>
+                  </div>
+                )}
+                {(tarantula.target_temp_min || tarantula.target_temp_max) && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Target Temperature</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {tarantula.target_temp_min && `${tarantula.target_temp_min}°F`}
+                      {tarantula.target_temp_min && tarantula.target_temp_max && ' - '}
+                      {tarantula.target_temp_max && `${tarantula.target_temp_max}°F`}
+                    </p>
+                  </div>
+                )}
+                {(tarantula.target_humidity_min || tarantula.target_humidity_max) && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Target Humidity</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {tarantula.target_humidity_min && `${tarantula.target_humidity_min}%`}
+                      {tarantula.target_humidity_min && tarantula.target_humidity_max && ' - '}
+                      {tarantula.target_humidity_max && `${tarantula.target_humidity_max}%`}
+                    </p>
+                  </div>
+                )}
+                {tarantula.water_dish !== undefined && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Water Dish</p>
+                    <p className="text-2xl font-bold text-gray-900">{tarantula.water_dish ? '✓ Yes' : '✗ No'}</p>
+                  </div>
+                )}
+                {tarantula.misting_schedule && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Misting Schedule</p>
+                    <p className="text-2xl font-bold text-gray-900">{tarantula.misting_schedule}</p>
+                  </div>
+                )}
+                {tarantula.last_enclosure_cleaning && (
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Last Enclosure Cleaning</p>
+                    <p className="text-2xl font-bold text-gray-900">{new Date(tarantula.last_enclosure_cleaning).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div className="flex gap-2 items-center">
-                <span className="text-sm text-gray-600">Are you sure?</span>
+              <div className="text-center py-12 text-gray-500">
+                <div className="text-5xl mb-3">🏠</div>
+                <p>No husbandry information available</p>
                 <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                  onClick={() => router.push(`/dashboard/tarantulas/${id}/edit`)}
+                  className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
                 >
-                  Confirm Delete
-                </button>
-                <button
-                  onClick={() => setDeleteConfirm(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition"
-                >
-                  Cancel
+                  Add Husbandry Details
                 </button>
               </div>
             )}
+
+            {tarantula.enclosure_notes && (
+              <div className="mt-8 p-6 bg-purple-50 rounded-xl border-2 border-purple-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-3">📝 Enclosure Notes</h3>
+                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{tarantula.enclosure_notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Delete Tarantula?</h2>
+              <p className="text-gray-600">
+                Are you sure you want to delete <strong>{tarantula.common_name}</strong>? 
+                This will also delete all associated logs and cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(false)}
+                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold shadow-sm"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
