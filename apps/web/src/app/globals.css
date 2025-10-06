@@ -8,6 +8,10 @@
   select {
     @apply text-gray-900 bg-white;
   }
+
+  label {
+    @apply text-gray-700;
+  }
 }
 
 :root {

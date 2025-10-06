@@ -32,7 +32,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(tarantulas.router, prefix="/api/v1/tarantulas", tags=["tarantulas"])
 app.include_router(species.router, prefix="/api/v1/species", tags=["species"])
 app.include_router(feedings.router, prefix="/api/v1", tags=["feedings"])
-app.include_router(molts.router, prefix="/api/v1/molts", tags=["molts"])
+app.include_router(molts.router, prefix="/api/v1", tags=["molts"])
 
 
 @app.get("/")
