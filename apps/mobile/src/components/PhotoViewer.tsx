@@ -37,6 +37,17 @@ export default function PhotoViewer({ visible, photos, initialIndex, onClose }: 
     setCurrentIndex(initialIndex);
   }, [initialIndex]);
 
+  // Helper to get full image URL (handles both R2 and local storage URLs)
+  const getImageUrl = (url: string | undefined): string => {
+    if (!url) return '';
+    // If URL starts with http, it's already absolute (R2)
+    if (url.startsWith('http')) {
+      return url;
+    }
+    // Otherwise it's local storage, prepend API base
+    return `https://tarantuverse-api.onrender.com${url}`;
+  };
+
   if (photos.length === 0) return null;
 
   const currentPhoto = photos[currentIndex];
@@ -86,7 +97,7 @@ export default function PhotoViewer({ visible, photos, initialIndex, onClose }: 
           showsVerticalScrollIndicator={false}
         >
           <Image
-            source={{ uri: currentPhoto.url }}
+            source={{ uri: getImageUrl(currentPhoto.url) }}
             style={styles.image}
             resizeMode="contain"
           />
@@ -140,7 +151,7 @@ export default function PhotoViewer({ visible, photos, initialIndex, onClose }: 
                   ]}
                 >
                   <Image
-                    source={{ uri: photo.thumbnail_url || photo.url }}
+                    source={{ uri: getImageUrl(photo.thumbnail_url || photo.url) }}
                     style={styles.thumbnail}
                   />
                 </TouchableOpacity>

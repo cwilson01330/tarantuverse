@@ -113,12 +113,28 @@ export default function TarantulaDetailScreen() {
   const fetchPhotos = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/photos`);
+      console.log('📸 Photos received:', response.data);
       setPhotos(response.data);
     } catch (error: any) {
       console.error('Failed to load photos:', error);
       // If endpoint doesn't exist yet, silently fail
       setPhotos([]);
     }
+  };
+
+  // Helper to get full image URL (handles both R2 and local storage URLs)
+  const getImageUrl = (url: string | undefined): string => {
+    if (!url) return '';
+    // If URL starts with http, it's already absolute (R2)
+    if (url.startsWith('http')) {
+      console.log('✅ R2 URL:', url);
+      return url;
+    }
+    // Otherwise it's local storage, prepend API base
+    const apiBase = 'https://tarantuverse-api.onrender.com';
+    const fullUrl = `${apiBase}${url}`;
+    console.log('⚠️  Local URL converted:', fullUrl);
+    return fullUrl;
   };
 
   // Refetch logs when screen comes into focus (after adding a log)
@@ -351,7 +367,7 @@ export default function TarantulaDetailScreen() {
                   }}
                 >
                   <Image 
-                    source={{ uri: photo.thumbnail_url || photo.url }} 
+                    source={{ uri: getImageUrl(photo.thumbnail_url || photo.url) }} 
                     style={styles.thumbnailImage}
                     resizeMode="cover"
                   />
