@@ -58,3 +58,33 @@ class TarantulaResponse(TarantulaBase):
 
     class Config:
         from_attributes = True
+
+
+class GrowthDataPoint(BaseModel):
+    """Single growth measurement point"""
+    date: datetime
+    weight: Optional[Decimal] = None
+    leg_span: Optional[Decimal] = None
+    days_since_previous: Optional[int] = None
+    weight_change: Optional[Decimal] = None
+    leg_span_change: Optional[Decimal] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class GrowthAnalytics(BaseModel):
+    """Growth analytics for a tarantula"""
+    tarantula_id: uuid.UUID
+    data_points: list[GrowthDataPoint]
+    total_molts: int
+    average_days_between_molts: Optional[float] = None
+    total_weight_gain: Optional[Decimal] = None
+    total_leg_span_gain: Optional[Decimal] = None
+    growth_rate_weight: Optional[Decimal] = None  # grams per month
+    growth_rate_leg_span: Optional[Decimal] = None  # cm per month
+    last_molt_date: Optional[datetime] = None
+    days_since_last_molt: Optional[int] = None
+    
+    class Config:
+        from_attributes = True

@@ -3,12 +3,21 @@ Tarantula routes
 """
 from typing import List
 from uuid import UUID
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
-from app.schemas.tarantula import TarantulaCreate, TarantulaUpdate, TarantulaResponse
+from app.models.molt_log import MoltLog
+from app.schemas.tarantula import (
+    TarantulaCreate,
+    TarantulaUpdate,
+    TarantulaResponse,
+    GrowthAnalytics,
+    GrowthDataPoint
+)
 from app.utils.dependencies import get_current_user
 
 router = APIRouter()
@@ -151,16 +160,17 @@ async def delete_tarantula(
     return None
 
 
-@router.get("/{tarantula_id}/stats")
-async def get_tarantula_stats(
+@router.get("/{tarantula_id}/growth", response_model=GrowthAnalytics)
+async def get_tarantula_growth(
     tarantula_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get analytics and stats for a tarantula
-
-    TODO: Implement growth charts, feeding patterns, etc.
+    Get growth analytics for a tarantula
+    
+    Returns historical molt data with calculated growth rates,
+    time between molts, and overall growth trends.
     """
     tarantula = db.query(Tarantula).filter(
         Tarantula.id == tarantula_id,
@@ -173,7 +183,98 @@ async def get_tarantula_stats(
             detail="Tarantula not found"
         )
 
-    return {
-        "tarantula_id": tarantula_id,
-        "message": "Stats endpoint - coming soon with feeding/molt analytics"
-    }
+    # Get all molt logs ordered by date
+    molt_logs = db.query(MoltLog).filter(
+        MoltLog.tarantula_id == tarantula_id
+    ).order_by(MoltLog.molted_at).all()
+
+    if not molt_logs:
+        # Return empty analytics if no molts recorded
+        return GrowthAnalytics(
+            tarantula_id=tarantula_id,
+            data_points=[],
+            total_molts=0
+        )
+
+    # Build data points with growth calculations
+    data_points = []
+    previous_molt = None
+    
+    for molt in molt_logs:
+        days_since_previous = None
+        weight_change = None
+        leg_span_change = None
+        
+        if previous_molt:
+            # Calculate time since previous molt
+            time_diff = molt.molted_at - previous_molt.molted_at
+            days_since_previous = time_diff.days
+            
+            # Calculate weight change
+            if molt.weight_after and previous_molt.weight_after:
+                weight_change = molt.weight_after - previous_molt.weight_after
+            
+            # Calculate leg span change
+            if molt.leg_span_after and previous_molt.leg_span_after:
+                leg_span_change = molt.leg_span_after - previous_molt.leg_span_after
+        
+        data_point = GrowthDataPoint(
+            date=molt.molted_at,
+            weight=molt.weight_after,
+            leg_span=molt.leg_span_after,
+            days_since_previous=days_since_previous,
+            weight_change=weight_change,
+            leg_span_change=leg_span_change
+        )
+        data_points.append(data_point)
+        previous_molt = molt
+
+    # Calculate summary statistics
+    total_molts = len(molt_logs)
+    
+    # Average days between molts
+    days_between = [dp.days_since_previous for dp in data_points if dp.days_since_previous]
+    average_days_between_molts = sum(days_between) / len(days_between) if days_between else None
+    
+    # Total growth
+    first_molt = molt_logs[0]
+    last_molt = molt_logs[-1]
+    
+    total_weight_gain = None
+    if first_molt.weight_after and last_molt.weight_after:
+        total_weight_gain = last_molt.weight_after - first_molt.weight_after
+    
+    total_leg_span_gain = None
+    if first_molt.leg_span_after and last_molt.leg_span_after:
+        total_leg_span_gain = last_molt.leg_span_after - first_molt.leg_span_after
+    
+    # Growth rate (per month)
+    growth_rate_weight = None
+    growth_rate_leg_span = None
+    
+    if len(molt_logs) > 1:
+        time_span = (last_molt.molted_at - first_molt.molted_at).days
+        months = time_span / 30.44  # Average days per month
+        
+        if months > 0:
+            if total_weight_gain:
+                growth_rate_weight = total_weight_gain / months
+            if total_leg_span_gain:
+                growth_rate_leg_span = total_leg_span_gain / months
+    
+    # Days since last molt
+    last_molt_date = last_molt.molted_at
+    days_since_last_molt = (datetime.now(timezone.utc) - last_molt_date).days
+
+    return GrowthAnalytics(
+        tarantula_id=tarantula_id,
+        data_points=data_points,
+        total_molts=total_molts,
+        average_days_between_molts=average_days_between_molts,
+        total_weight_gain=total_weight_gain,
+        total_leg_span_gain=total_leg_span_gain,
+        growth_rate_weight=growth_rate_weight,
+        growth_rate_leg_span=growth_rate_leg_span,
+        last_molt_date=last_molt_date,
+        days_since_last_molt=days_since_last_molt
+    )

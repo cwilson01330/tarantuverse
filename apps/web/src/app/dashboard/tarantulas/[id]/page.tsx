@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import GrowthChart from '@/components/GrowthChart'
 
 interface Tarantula {
   id: string
@@ -80,6 +81,28 @@ interface Photo {
   created_at: string
 }
 
+interface GrowthDataPoint {
+  date: string
+  weight?: number
+  leg_span?: number
+  days_since_previous?: number
+  weight_change?: number
+  leg_span_change?: number
+}
+
+interface GrowthAnalytics {
+  tarantula_id: string
+  data_points: GrowthDataPoint[]
+  total_molts: number
+  average_days_between_molts?: number
+  total_weight_gain?: number
+  total_leg_span_gain?: number
+  growth_rate_weight?: number
+  growth_rate_leg_span?: number
+  last_molt_date?: string
+  days_since_last_molt?: number
+}
+
 export default function TarantulaDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -90,10 +113,11 @@ export default function TarantulaDetailPage() {
   const [molts, setMolts] = useState<MoltLog[]>([])
   const [substrateChanges, setSubstrateChanges] = useState<SubstrateChange[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'husbandry' | 'photos'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'husbandry' | 'photos' | 'growth'>('overview')
   const [showFeedingForm, setShowFeedingForm] = useState(false)
   const [showMoltForm, setShowMoltForm] = useState(false)
   const [showSubstrateForm, setShowSubstrateForm] = useState(false)
@@ -137,6 +161,7 @@ export default function TarantulaDetailPage() {
     fetchMolts(token)
     fetchSubstrateChanges(token)
     fetchPhotos(token)
+    fetchGrowth(token)
   }, [id, router])
 
   const fetchTarantula = async (token: string) => {
@@ -482,6 +507,24 @@ export default function TarantulaDetailPage() {
     }
   }
 
+  const fetchGrowth = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/growth`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setGrowthData(data)
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch growth data:', err)
+    }
+  }
+
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -711,10 +754,10 @@ export default function TarantulaDetailPage() {
 
       {/* Tabs Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        <div className="flex gap-2 border-b border-gray-200">
+        <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-purple-600 text-purple-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -723,8 +766,18 @@ export default function TarantulaDetailPage() {
             📊 Overview
           </button>
           <button
+            onClick={() => setActiveTab('growth')}
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
+              activeTab === 'growth'
+                ? 'border-purple-600 text-purple-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            📈 Growth
+          </button>
+          <button
             onClick={() => setActiveTab('logs')}
-            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'logs'
                 ? 'border-purple-600 text-purple-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -734,7 +787,7 @@ export default function TarantulaDetailPage() {
           </button>
           <button
             onClick={() => setActiveTab('husbandry')}
-            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'husbandry'
                 ? 'border-purple-600 text-purple-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -744,7 +797,7 @@ export default function TarantulaDetailPage() {
           </button>
           <button
             onClick={() => setActiveTab('photos')}
-            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 ${
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'photos'
                 ? 'border-purple-600 text-purple-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -879,6 +932,21 @@ export default function TarantulaDetailPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Growth Tab */}
+        {activeTab === 'growth' && (
+          <div>
+            {growthData ? (
+              <GrowthChart data={growthData} />
+            ) : (
+              <div className="bg-white rounded-lg shadow p-6">
+                <p className="text-gray-500 text-center py-8">
+                  Loading growth data...
+                </p>
+              </div>
+            )}
           </div>
         )}
 
