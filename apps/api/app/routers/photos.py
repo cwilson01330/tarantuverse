@@ -58,7 +58,7 @@ async def upload_photo(
     # Verify tarantula exists and belongs to user
     tarantula = db.query(Tarantula).filter(
         Tarantula.id == tarantula_id,
-        Tarantula.keeper_id == current_user.id
+        Tarantula.user_id == current_user.id
     ).first()
     
     if not tarantula:
@@ -127,7 +127,7 @@ async def get_photos(
     # Verify tarantula exists and belongs to user
     tarantula = db.query(Tarantula).filter(
         Tarantula.id == tarantula_id,
-        Tarantula.keeper_id == current_user.id
+        Tarantula.user_id == current_user.id
     ).first()
     
     if not tarantula:
@@ -166,7 +166,7 @@ async def delete_photo(
     # Verify tarantula belongs to user
     tarantula = db.query(Tarantula).filter(
         Tarantula.id == photo.tarantula_id,
-        Tarantula.keeper_id == current_user.id
+        Tarantula.user_id == current_user.id
     ).first()
     
     if not tarantula:
