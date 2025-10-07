@@ -79,6 +79,11 @@ async def upload_photo(
         )
         
         db.add(photo)
+        
+        # If this is the first photo, set it as the tarantula's main photo
+        if not tarantula.photo_url:
+            tarantula.photo_url = photo_url
+        
         db.commit()
         db.refresh(photo)
         

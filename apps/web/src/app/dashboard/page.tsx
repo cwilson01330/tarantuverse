@@ -26,6 +26,18 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
 
+  // Helper function to handle both R2 (absolute) and local (relative) URLs
+  const getImageUrl = (url?: string) => {
+    if (!url) return ''
+    // If URL starts with http, it's already absolute (R2)
+    if (url.startsWith('http')) {
+      return url
+    }
+    // Otherwise, it's a local path - prepend the API base URL
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    return `${API_URL}${url}`
+  }
+
   useEffect(() => {
     // Check if user is logged in
     const token = localStorage.getItem('auth_token')
@@ -222,7 +234,7 @@ export default function DashboardPage() {
                       {tarantula.photo_url ? (
                         <>
                           <img
-                            src={tarantula.photo_url}
+                            src={getImageUrl(tarantula.photo_url)}
                             alt={tarantula.common_name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />

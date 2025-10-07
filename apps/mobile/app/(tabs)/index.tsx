@@ -31,6 +31,17 @@ export default function CollectionScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Helper function to handle both R2 (absolute) and local (relative) URLs
+  const getImageUrl = (url?: string) => {
+    if (!url) return '';
+    // If URL starts with http, it's already absolute (R2)
+    if (url.startsWith('http')) {
+      return url;
+    }
+    // Otherwise, it's a local path - prepend the API base URL
+    return `https://tarantuverse-api.onrender.com${url}`;
+  };
+
   useEffect(() => {
     fetchTarantulas();
   }, []);
@@ -60,7 +71,7 @@ export default function CollectionScreen() {
     >
       <View style={styles.imageContainer}>
         {item.photo_url ? (
-          <Image source={{ uri: item.photo_url }} style={styles.image} />
+          <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.image} />
         ) : (
           <View style={styles.placeholderImage}>
             <MaterialCommunityIcons name="spider" size={40} color="#d1d5db" />

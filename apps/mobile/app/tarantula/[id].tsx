@@ -166,7 +166,10 @@ export default function TarantulaDetailScreen() {
           <MaterialCommunityIcons name="arrow-left" size={24} color="#1f2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Details</Text>
-        <TouchableOpacity style={styles.editButton}>
+        <TouchableOpacity 
+          style={styles.editButton}
+          onPress={() => router.push(`/tarantula/edit?id=${id}`)}
+        >
           <MaterialCommunityIcons name="pencil" size={24} color="#7c3aed" />
         </TouchableOpacity>
       </View>
