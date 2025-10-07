@@ -48,6 +48,10 @@ out/
 .expo/
 .expo-shared/
 
+# Metro bundler cache
+.cache/
+.metro-cache/
+
 # Python
 *.py[cod]
 *$py.class
