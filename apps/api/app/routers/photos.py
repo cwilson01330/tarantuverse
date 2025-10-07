@@ -10,8 +10,24 @@ from app.models.tarantula import Tarantula
 from app.routers.auth import get_current_user
 from app.models.user import User
 from app.services.storage import storage_service
+from app.config import settings
 
 router = APIRouter(tags=["photos"])
+
+
+@router.get("/storage-info")
+async def get_storage_info():
+    """Debug endpoint to check storage configuration."""
+    return {
+        "using_r2": storage_service.use_r2,
+        "bucket_name": storage_service.bucket_name if storage_service.use_r2 else None,
+        "public_url_base": storage_service.public_url_base if storage_service.use_r2 else None,
+        "r2_account_id_set": bool(settings.R2_ACCOUNT_ID),
+        "r2_access_key_set": bool(settings.R2_ACCESS_KEY_ID),
+        "r2_secret_key_set": bool(settings.R2_SECRET_ACCESS_KEY),
+        "r2_bucket_name": settings.R2_BUCKET_NAME,
+        "r2_public_url": settings.R2_PUBLIC_URL
+    }
 
 
 @router.post("/tarantulas/{tarantula_id}/photos")
@@ -46,6 +62,10 @@ async def upload_photo(
             filename=file.filename or "upload.jpg",
             content_type=file.content_type
         )
+        
+        # Log the URLs for debugging
+        print(f"📸 Photo uploaded - URL: {photo_url}")
+        print(f"🖼️  Thumbnail created - URL: {thumbnail_url}")
         
         # Create photo record in database
         photo = Photo(
