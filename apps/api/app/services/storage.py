@@ -17,16 +17,26 @@ class StorageService:
     
     def __init__(self):
         """Initialize storage service based on configuration."""
+        # Debug: Print what we're checking
+        print(f"🔍 R2 Configuration Check:")
+        print(f"  R2_ACCOUNT_ID: {'✓' if settings.R2_ACCOUNT_ID else '✗ MISSING'}")
+        print(f"  R2_ACCESS_KEY_ID: {'✓' if settings.R2_ACCESS_KEY_ID else '✗ MISSING'}")
+        print(f"  R2_SECRET_ACCESS_KEY: {'✓' if settings.R2_SECRET_ACCESS_KEY else '✗ MISSING'}")
+        print(f"  R2_BUCKET_NAME: {'✓' if settings.R2_BUCKET_NAME else '✗ MISSING'}")
+        print(f"  R2_PUBLIC_URL: {'✓' if settings.R2_PUBLIC_URL else '✗ MISSING'}")
+        
         self.use_r2 = all([
             settings.R2_ACCOUNT_ID,
             settings.R2_ACCESS_KEY_ID,
             settings.R2_SECRET_ACCESS_KEY,
-            settings.R2_BUCKET_NAME
+            settings.R2_BUCKET_NAME,
+            settings.R2_PUBLIC_URL
         ])
         
         if self.use_r2:
             # Initialize R2 client (S3-compatible)
             endpoint_url = f"https://{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+            print(f"  📡 R2 Endpoint: {endpoint_url}")
             self.s3_client = boto3.client(
                 's3',
                 endpoint_url=endpoint_url,
@@ -38,6 +48,7 @@ class StorageService:
             self.bucket_name = settings.R2_BUCKET_NAME
             self.public_url_base = settings.R2_PUBLIC_URL
             print(f"✅ Using Cloudflare R2 storage: {self.bucket_name}")
+            print(f"  🌐 Public URL: {self.public_url_base}")
         else:
             # Use local filesystem
             self.upload_dir = "uploads/photos"
