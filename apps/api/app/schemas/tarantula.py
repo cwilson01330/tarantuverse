@@ -88,3 +88,29 @@ class GrowthAnalytics(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class PreyTypeCount(BaseModel):
+    """Count of feedings by prey type"""
+    food_type: str
+    count: int
+    percentage: float
+
+
+class FeedingStats(BaseModel):
+    """Feeding statistics and analytics for a tarantula"""
+    tarantula_id: uuid.UUID
+    total_feedings: int
+    total_accepted: int
+    total_refused: int
+    acceptance_rate: float  # percentage 0-100
+    average_days_between_feedings: Optional[float] = None
+    last_feeding_date: Optional[datetime] = None
+    days_since_last_feeding: Optional[int] = None
+    next_feeding_prediction: Optional[date] = None  # predicted date
+    longest_gap_days: Optional[int] = None
+    current_streak_accepted: int = 0
+    prey_type_distribution: list[PreyTypeCount] = []
+    
+    class Config:
+        from_attributes = True

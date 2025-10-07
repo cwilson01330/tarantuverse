@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import GrowthChart from '@/components/GrowthChart'
+import FeedingStatsCard from '@/components/FeedingStatsCard'
 
 interface Tarantula {
   id: string
@@ -103,6 +104,27 @@ interface GrowthAnalytics {
   days_since_last_molt?: number
 }
 
+interface PreyTypeCount {
+  food_type: string
+  count: number
+  percentage: number
+}
+
+interface FeedingStats {
+  tarantula_id: string
+  total_feedings: number
+  total_accepted: number
+  total_refused: number
+  acceptance_rate: number
+  average_days_between_feedings?: number
+  last_feeding_date?: string
+  days_since_last_feeding?: number
+  next_feeding_prediction?: string
+  longest_gap_days?: number
+  current_streak_accepted: number
+  prey_type_distribution: PreyTypeCount[]
+}
+
 export default function TarantulaDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -114,6 +136,7 @@ export default function TarantulaDetailPage() {
   const [substrateChanges, setSubstrateChanges] = useState<SubstrateChange[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null)
+  const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -162,6 +185,7 @@ export default function TarantulaDetailPage() {
     fetchSubstrateChanges(token)
     fetchPhotos(token)
     fetchGrowth(token)
+    fetchFeedingStats(token)
   }, [id, router])
 
   const fetchTarantula = async (token: string) => {
@@ -525,6 +549,24 @@ export default function TarantulaDetailPage() {
     }
   }
 
+  const fetchFeedingStats = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/feeding-stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setFeedingStats(data)
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch feeding stats:', err)
+    }
+  }
+
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -884,6 +926,9 @@ export default function TarantulaDetailPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Feeding Stats Card */}
+              {feedingStats && <FeedingStatsCard data={feedingStats} />}
+              
               {/* Stats Card */}
               <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl shadow-lg p-6 text-white">
                 <h3 className="text-lg font-bold mb-4">Statistics</h3>

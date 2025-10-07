@@ -3,7 +3,8 @@ Tarantula routes
 """
 from typing import List
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, date
+from collections import Counter
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -11,12 +12,15 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.molt_log import MoltLog
+from app.models.feeding_log import FeedingLog
 from app.schemas.tarantula import (
     TarantulaCreate,
     TarantulaUpdate,
     TarantulaResponse,
     GrowthAnalytics,
-    GrowthDataPoint
+    GrowthDataPoint,
+    FeedingStats,
+    PreyTypeCount
 )
 from app.utils.dependencies import get_current_user
 
@@ -277,4 +281,109 @@ async def get_tarantula_growth(
         growth_rate_leg_span=growth_rate_leg_span,
         last_molt_date=last_molt_date,
         days_since_last_molt=days_since_last_molt
+    )
+
+
+@router.get("/{tarantula_id}/feeding-stats", response_model=FeedingStats)
+async def get_feeding_stats(
+    tarantula_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get feeding statistics and analytics for a tarantula
+    
+    Returns feeding patterns, acceptance rates, prey distribution,
+    and predictions for next feeding.
+    """
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == tarantula_id,
+        Tarantula.user_id == current_user.id
+    ).first()
+
+    if not tarantula:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tarantula not found"
+        )
+
+    # Get all feeding logs ordered by date
+    feeding_logs = db.query(FeedingLog).filter(
+        FeedingLog.tarantula_id == tarantula_id
+    ).order_by(FeedingLog.fed_at).all()
+
+    if not feeding_logs:
+        # Return empty stats if no feedings recorded
+        return FeedingStats(
+            tarantula_id=tarantula_id,
+            total_feedings=0,
+            total_accepted=0,
+            total_refused=0,
+            acceptance_rate=0.0,
+            current_streak_accepted=0,
+            prey_type_distribution=[]
+        )
+
+    # Calculate basic stats
+    total_feedings = len(feeding_logs)
+    total_accepted = sum(1 for log in feeding_logs if log.accepted)
+    total_refused = total_feedings - total_accepted
+    acceptance_rate = (total_accepted / total_feedings * 100) if total_feedings > 0 else 0.0
+
+    # Calculate days between feedings
+    days_between = []
+    for i in range(1, len(feeding_logs)):
+        previous_feeding = feeding_logs[i - 1]
+        current_feeding = feeding_logs[i]
+        gap = (current_feeding.fed_at - previous_feeding.fed_at).days
+        days_between.append(gap)
+
+    average_days_between = sum(days_between) / len(days_between) if days_between else None
+    longest_gap = max(days_between) if days_between else None
+
+    # Last feeding info
+    last_feeding = feeding_logs[-1]
+    last_feeding_date = last_feeding.fed_at
+    days_since_last_feeding = (datetime.now(timezone.utc) - last_feeding_date).days
+
+    # Predict next feeding
+    next_feeding_prediction = None
+    if average_days_between:
+        predicted_days = int(average_days_between)
+        next_feeding_prediction = (last_feeding_date + timedelta(days=predicted_days)).date()
+
+    # Calculate current acceptance streak
+    current_streak = 0
+    for log in reversed(feeding_logs):
+        if log.accepted:
+            current_streak += 1
+        else:
+            break
+
+    # Prey type distribution
+    prey_types = [log.food_type for log in feeding_logs if log.food_type]
+    prey_counter = Counter(prey_types)
+    prey_distribution = []
+    
+    for food_type, count in prey_counter.most_common():
+        percentage = (count / len(prey_types) * 100) if prey_types else 0
+        prey_distribution.append(PreyTypeCount(
+            food_type=food_type,
+            count=count,
+            percentage=round(percentage, 1)
+        ))
+
+    return FeedingStats(
+        tarantula_id=tarantula_id,
+        total_feedings=total_feedings,
+        total_accepted=total_accepted,
+        total_refused=total_refused,
+        acceptance_rate=round(acceptance_rate, 1),
+        average_days_between_feedings=average_days_between,
+        last_feeding_date=last_feeding_date,
+        days_since_last_feeding=days_since_last_feeding,
+        next_feeding_prediction=next_feeding_prediction,
+        longest_gap_days=longest_gap,
+        current_streak_accepted=current_streak,
+        prey_type_distribution=prey_distribution
     )
