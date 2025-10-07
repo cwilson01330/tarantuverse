@@ -32,11 +32,18 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in v.split(",")]
         return v
 
-    # File Storage
+    # File Storage (Legacy AWS S3)
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "us-east-1"
     AWS_S3_BUCKET: str = "tarantuverse-uploads"
+    
+    # Cloudflare R2 Storage
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET_NAME: str = "tarantuverse-photos"
+    R2_PUBLIC_URL: str = ""  # e.g., https://pub-xxx.r2.dev
 
     # Environment
     ENVIRONMENT: str = "development"
