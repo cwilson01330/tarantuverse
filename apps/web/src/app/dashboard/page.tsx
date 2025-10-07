@@ -19,10 +19,17 @@ interface Tarantula {
   photo_url?: string
 }
 
+interface FeedingStatus {
+  tarantula_id: string
+  days_since_last_feeding?: number
+  acceptance_rate: number
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
+  const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -64,12 +71,71 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json()
         setTarantulas(data)
+        
+        // Fetch feeding stats for each tarantula
+        fetchAllFeedingStatuses(token, data)
       }
     } catch (error) {
       console.error('Failed to fetch tarantulas:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchAllFeedingStatuses = async (token: string, tarantulasList: Tarantula[]) => {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const statusMap = new Map<string, FeedingStatus>()
+    
+    await Promise.all(
+      tarantulasList.map(async (t) => {
+        try {
+          const response = await fetch(`${API_URL}/api/v1/tarantulas/${t.id}/feeding-stats`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          })
+          if (response.ok) {
+            const data = await response.json()
+            statusMap.set(t.id, {
+              tarantula_id: t.id,
+              days_since_last_feeding: data.days_since_last_feeding,
+              acceptance_rate: data.acceptance_rate,
+            })
+          }
+        } catch (error) {
+          console.error(`Failed to fetch feeding stats for ${t.id}:`, error)
+        }
+      })
+    )
+    
+    setFeedingStatuses(statusMap)
+  }
+
+  const getFeedingStatusBadge = (tarantulaId: string) => {
+    const status = feedingStatuses.get(tarantulaId)
+    if (!status || status.days_since_last_feeding === undefined) return null
+
+    const days = status.days_since_last_feeding
+    let bgColor = 'bg-green-500/90'
+    let textColor = 'text-white'
+    let emoji = '✓'
+    
+    if (days >= 21) {
+      bgColor = 'bg-red-500/90'
+      emoji = '⚠️'
+    } else if (days >= 14) {
+      bgColor = 'bg-orange-500/90'
+      emoji = '⏰'
+    } else if (days >= 7) {
+      bgColor = 'bg-yellow-500/90'
+      emoji = '📅'
+    }
+
+    return (
+      <span className={`px-3 py-1 rounded-full ${bgColor} backdrop-blur-sm ${textColor} text-xs font-semibold shadow-lg`}>
+        {emoji} Fed {days}d ago
+      </span>
+    )
   }
 
   const handleLogout = () => {
@@ -246,11 +312,13 @@ export default function DashboardPage() {
                         </div>
                       )}
 
-                      {/* Status badge */}
+                      {/* Feeding status badge */}
                       <div className="absolute top-3 right-3">
-                        <span className="px-3 py-1 rounded-full bg-green-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
-                          ✓ Active
-                        </span>
+                        {getFeedingStatusBadge(tarantula.id) || (
+                          <span className="px-3 py-1 rounded-full bg-gray-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
+                            No data
+                          </span>
+                        )}
                       </div>
                     </div>
 

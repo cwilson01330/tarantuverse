@@ -24,10 +24,17 @@ interface Tarantula {
   photo_url?: string;
 }
 
+interface FeedingStatus {
+  tarantula_id: string;
+  days_since_last_feeding?: number;
+  acceptance_rate: number;
+}
+
 export default function CollectionScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
+  const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -50,12 +57,62 @@ export default function CollectionScreen() {
     try {
       const response = await apiClient.get('/tarantulas/');
       setTarantulas(response.data);
+      await fetchAllFeedingStatuses(response.data);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load tarantulas');
       console.error(error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchAllFeedingStatuses = async (tarantulasList: Tarantula[]) => {
+    const statusMap = new Map<string, FeedingStatus>();
+    
+    await Promise.all(
+      tarantulasList.map(async (t) => {
+        try {
+          const response = await apiClient.get(`/tarantulas/${t.id}/feeding-stats`);
+          statusMap.set(t.id, {
+            tarantula_id: t.id,
+            days_since_last_feeding: response.data.days_since_last_feeding,
+            acceptance_rate: response.data.acceptance_rate,
+          });
+        } catch (error) {
+          console.error(`Failed to fetch feeding stats for ${t.id}:`, error);
+        }
+      })
+    );
+    
+    setFeedingStatuses(statusMap);
+  };
+
+  const getFeedingStatusBadge = (tarantulaId: string) => {
+    const status = feedingStatuses.get(tarantulaId);
+    if (!status || status.days_since_last_feeding === undefined) return null;
+
+    const days = status.days_since_last_feeding;
+    let badgeStyle = styles.feedingBadgeGreen;
+    let emoji = '✓';
+    
+    if (days >= 21) {
+      badgeStyle = styles.feedingBadgeRed;
+      emoji = '⚠️';
+    } else if (days >= 14) {
+      badgeStyle = styles.feedingBadgeOrange;
+      emoji = '⏰';
+    } else if (days >= 7) {
+      badgeStyle = styles.feedingBadgeYellow;
+      emoji = '📅';
+    }
+
+    return (
+      <View style={[styles.feedingBadge, badgeStyle]}>
+        <Text style={styles.feedingBadgeText}>
+          {emoji} {days}d
+        </Text>
+      </View>
+    );
   };
 
   const onRefresh = useCallback(async () => {
@@ -86,6 +143,7 @@ export default function CollectionScreen() {
             />
           </View>
         )}
+        {getFeedingStatusBadge(item.id)}
       </View>
       <View style={styles.cardContent}>
         <Text style={styles.name}>{item.name}</Text>
@@ -203,6 +261,31 @@ const styles = StyleSheet.create({
   },
   femaleBadge: {
     backgroundColor: '#ec4899',
+  },
+  feedingBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  feedingBadgeGreen: {
+    backgroundColor: 'rgba(34, 197, 94, 0.9)',
+  },
+  feedingBadgeYellow: {
+    backgroundColor: 'rgba(234, 179, 8, 0.9)',
+  },
+  feedingBadgeOrange: {
+    backgroundColor: 'rgba(249, 115, 22, 0.9)',
+  },
+  feedingBadgeRed: {
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+  },
+  feedingBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
   },
   cardContent: {
     padding: 12,
