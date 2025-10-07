@@ -13,6 +13,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import PhotoViewer from '../../src/components/PhotoViewer';
+import GrowthChart from '../../src/components/GrowthChart';
 
 interface TarantulaDetail {
   id: string;
@@ -59,6 +60,28 @@ interface Photo {
   created_at: string;
 }
 
+interface GrowthDataPoint {
+  date: string;
+  weight?: number;
+  leg_span?: number;
+  days_since_previous?: number;
+  weight_change?: number;
+  leg_span_change?: number;
+}
+
+interface GrowthAnalytics {
+  tarantula_id: string;
+  data_points: GrowthDataPoint[];
+  total_molts: number;
+  average_days_between_molts?: number;
+  total_weight_gain?: number;
+  total_leg_span_gain?: number;
+  growth_rate_weight?: number;
+  growth_rate_leg_span?: number;
+  last_molt_date?: string;
+  days_since_last_molt?: number;
+}
+
 export default function TarantulaDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -66,6 +89,7 @@ export default function TarantulaDetailScreen() {
   const [feedingLogs, setFeedingLogs] = useState<FeedingLog[]>([]);
   const [moltLogs, setMoltLogs] = useState<MoltLog[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
@@ -75,6 +99,7 @@ export default function TarantulaDetailScreen() {
     fetchFeedingLogs();
     fetchMoltLogs();
     fetchPhotos();
+    fetchGrowth();
   }, [id]);
 
   const fetchTarantula = async () => {
@@ -119,6 +144,18 @@ export default function TarantulaDetailScreen() {
       console.error('Failed to load photos:', error);
       // If endpoint doesn't exist yet, silently fail
       setPhotos([]);
+    }
+  };
+
+  const fetchGrowth = async () => {
+    try {
+      const response = await apiClient.get(`/tarantulas/${id}/growth`);
+      console.log('📈 Growth data received:', response.data);
+      setGrowthData(response.data);
+    } catch (error: any) {
+      console.error('Failed to load growth data:', error);
+      // Silently fail if no data available
+      setGrowthData(null);
     }
   };
 
@@ -347,6 +384,13 @@ export default function TarantulaDetailScreen() {
             </View>
           )}
         </View>
+
+        {/* Growth Analytics */}
+        {growthData && growthData.total_molts > 0 && (
+          <View style={styles.section}>
+            <GrowthChart data={growthData} />
+          </View>
+        )}
 
         {/* Photo Gallery */}
         <View style={styles.section}>
