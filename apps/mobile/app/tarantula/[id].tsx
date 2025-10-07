@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import PhotoViewer from '../../src/components/PhotoViewer';
 import GrowthChart from '../../src/components/GrowthChart';
+import FeedingStatsCard from '../../src/components/FeedingStatsCard';
 
 interface TarantulaDetail {
   id: string;
@@ -82,6 +83,27 @@ interface GrowthAnalytics {
   days_since_last_molt?: number;
 }
 
+interface PreyTypeCount {
+  food_type: string;
+  count: number;
+  percentage: number;
+}
+
+interface FeedingStats {
+  tarantula_id: string;
+  total_feedings: number;
+  total_accepted: number;
+  total_refused: number;
+  acceptance_rate: number;
+  average_days_between_feedings?: number;
+  last_feeding_date?: string;
+  days_since_last_feeding?: number;
+  next_feeding_prediction?: string;
+  longest_gap_days?: number;
+  current_streak_accepted: number;
+  prey_type_distribution: PreyTypeCount[];
+}
+
 export default function TarantulaDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -90,6 +112,7 @@ export default function TarantulaDetailScreen() {
   const [moltLogs, setMoltLogs] = useState<MoltLog[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null);
+  const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
@@ -100,6 +123,7 @@ export default function TarantulaDetailScreen() {
     fetchMoltLogs();
     fetchPhotos();
     fetchGrowth();
+    fetchFeedingStats();
   }, [id]);
 
   const fetchTarantula = async () => {
@@ -156,6 +180,18 @@ export default function TarantulaDetailScreen() {
       console.error('Failed to load growth data:', error);
       // Silently fail if no data available
       setGrowthData(null);
+    }
+  };
+
+  const fetchFeedingStats = async () => {
+    try {
+      const response = await apiClient.get(`/tarantulas/${id}/feeding-stats`);
+      console.log('🍽️ Feeding stats received:', response.data);
+      setFeedingStats(response.data);
+    } catch (error: any) {
+      console.error('Failed to load feeding stats:', error);
+      // Silently fail if no data available
+      setFeedingStats(null);
     }
   };
 
@@ -384,6 +420,13 @@ export default function TarantulaDetailScreen() {
             </View>
           )}
         </View>
+
+        {/* Feeding Stats */}
+        {feedingStats && (
+          <View style={styles.section}>
+            <FeedingStatsCard data={feedingStats} />
+          </View>
+        )}
 
         {/* Growth Analytics */}
         {growthData && growthData.total_molts > 0 && (
