@@ -35,11 +35,9 @@ interface Stats {
   username: string;
   total_public: number;
   unique_species: number;
-  sex_distribution: {
-    male: number;
-    female: number;
-    unknown: number;
-  };
+  males: number;
+  females: number;
+  unsexed: number;
 }
 
 interface FollowStats {
@@ -392,11 +390,11 @@ export default function KeeperProfileScreen() {
                   <Text style={styles.statLabel}>Species</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: '#ec4899' }]}>{stats.sex_distribution.female}</Text>
+                  <Text style={[styles.statValue, { color: '#ec4899' }]}>{stats.females}</Text>
                   <Text style={styles.statLabel}>Females</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: '#06b6d4' }]}>{stats.sex_distribution.male}</Text>
+                  <Text style={[styles.statValue, { color: '#06b6d4' }]}>{stats.males}</Text>
                   <Text style={styles.statLabel}>Males</Text>
                 </View>
               </>
