@@ -37,16 +37,11 @@ async def get_collection_analytics(
     - Molt statistics
     - Recent activity
     """
-    try:
-        # Get all user's tarantulas
-        tarantulas = db.query(Tarantula).filter(
-            Tarantula.user_id == current_user.id
-        ).all()
-    except Exception as e:
-        print(f"Error in analytics endpoint: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Analytics error: {str(e)}")
+    
+    # Get all user's tarantulas
+    tarantulas = db.query(Tarantula).filter(
+        Tarantula.user_id == current_user.id
+    ).all()
     
     total_count = len(tarantulas)
     
@@ -87,7 +82,7 @@ async def get_collection_analytics(
     }
     
     # Calculate total collection value
-    total_value = sum(t.purchase_price or 0.0 for t in tarantulas)
+    total_value = sum(t.price_paid or 0.0 for t in tarantulas)
     
     # Calculate average age (in months since acquisition)
     ages_in_months = []
