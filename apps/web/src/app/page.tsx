@@ -157,20 +157,20 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-4xl font-bold mb-2">1,000+</div>
+              <div className="text-4xl font-bold mb-2">Growing</div>
               <div className="text-purple-100">Active Keepers</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">5,000+</div>
-              <div className="text-purple-100">Tarantulas Tracked</div>
+              <div className="text-4xl font-bold mb-2">New</div>
+              <div className="text-purple-100">Community Platform</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">50,000+</div>
-              <div className="text-purple-100">Feedings Logged</div>
+              <div className="text-4xl font-bold mb-2">Track</div>
+              <div className="text-purple-100">Your Collection</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2">10,000+</div>
-              <div className="text-purple-100">Molts Recorded</div>
+              <div className="text-4xl font-bold mb-2">Connect</div>
+              <div className="text-purple-100">With Keepers</div>
             </div>
           </div>
         </div>
