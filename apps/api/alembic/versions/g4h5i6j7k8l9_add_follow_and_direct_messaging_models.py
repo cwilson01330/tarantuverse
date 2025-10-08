@@ -1,7 +1,7 @@
 """add follow and direct messaging models
 
-Revision ID: f3g4h5i6j7k8
-Revises: e2f3g4h5i6j7
+Revision ID: g4h5i6j7k8l9
+Revises: f3g4h5i6j7k8
 Create Date: 2025-10-08 12:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'f3g4h5i6j7k8'
-down_revision = 'e2f3g4h5i6j7'
+revision = 'g4h5i6j7k8l9'
+down_revision = 'f3g4h5i6j7k8'
 branch_labels = None
 depends_on = None
 
