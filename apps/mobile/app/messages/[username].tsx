@@ -101,13 +101,16 @@ export default function ConversationScreen() {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to send message');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to send message');
+      }
 
       setNewMessage('');
       fetchConversation();
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
-      Alert.alert('Error', 'Failed to send message');
+      Alert.alert('Error', err.message || 'Failed to send message');
     } finally {
       setSending(false);
     }

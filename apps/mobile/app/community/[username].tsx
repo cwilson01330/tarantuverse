@@ -68,14 +68,14 @@ export default function KeeperProfileScreen() {
 
   const checkAuth = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      if (token) {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setCurrentUser({ id: payload.sub, username: payload.username });
+      const userJson = await AsyncStorage.getItem('user');
+      if (userJson) {
+        const userData = JSON.parse(userJson);
+        setCurrentUser(userData);
         checkFollowingStatus();
       }
     } catch (error) {
-      console.error('Failed to decode token');
+      console.error('Failed to load user data');
     }
   };
 
