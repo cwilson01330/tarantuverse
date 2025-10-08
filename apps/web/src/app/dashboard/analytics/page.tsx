@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { api } from "@/lib/api";
+import apiClient from "@/lib/api";
 
 interface SpeciesCount {
   species_name: string;
@@ -64,7 +64,7 @@ export default function AnalyticsPage() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const response = await api.get("/analytics/collection");
+      const response = await apiClient.get("/analytics/collection");
       setAnalytics(response.data);
       setError(null);
     } catch (err: any) {
