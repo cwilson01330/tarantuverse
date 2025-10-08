@@ -65,7 +65,7 @@ export default function ConversationScreen() {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) return;
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages/direct/conversation/${username}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -88,7 +88,7 @@ export default function ConversationScreen() {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) return;
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages/direct/send`, {
         method: 'POST',
         headers: {
