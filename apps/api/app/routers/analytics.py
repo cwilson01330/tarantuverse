@@ -105,11 +105,11 @@ async def get_collection_analytics(
     for t_id in tarantula_ids:
         feedings = db.query(FeedingLog).filter(
             FeedingLog.tarantula_id == t_id
-        ).order_by(FeedingLog.feeding_date.asc()).all()
+        ).order_by(FeedingLog.fed_at.asc()).all()
         
         if len(feedings) > 1:
             for i in range(1, len(feedings)):
-                days_diff = (feedings[i].feeding_date - feedings[i-1].feeding_date).days
+                days_diff = (feedings[i].fed_at - feedings[i-1].fed_at).days
                 if days_diff > 0:  # Only count positive intervals
                     feeding_intervals.append(days_diff)
     
