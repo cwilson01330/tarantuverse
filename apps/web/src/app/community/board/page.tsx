@@ -33,6 +33,8 @@ interface Reply {
 
 const REACTION_EMOJIS = ['❤️', '👍', '😂', '🔥', '🕷️', '🎉']
 
+type SortOption = 'newest' | 'popular' | 'most_replies'
+
 export default function CommunityBoardPage() {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
@@ -44,6 +46,8 @@ export default function CommunityBoardPage() {
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
   const [replies, setReplies] = useState<Record<string, Reply[]>>({})
   const [replyForms, setReplyForms] = useState<Record<string, string>>({})
+  const [sortBy, setSortBy] = useState<SortOption>('newest')
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     fetchMessages()
@@ -208,6 +212,37 @@ export default function CommunityBoardPage() {
     }
   }
 
+  // Sorting and filtering logic
+  const filteredAndSortedMessages = () => {
+    let result = [...messages]
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      result = result.filter(msg => 
+        msg.title.toLowerCase().includes(query) ||
+        msg.content.toLowerCase().includes(query) ||
+        msg.author_display_name?.toLowerCase().includes(query) ||
+        msg.author_username?.toLowerCase().includes(query)
+      )
+    }
+
+    // Sort
+    switch (sortBy) {
+      case 'popular':
+        result.sort((a, b) => b.like_count - a.like_count)
+        break
+      case 'most_replies':
+        result.sort((a, b) => b.reply_count - a.reply_count)
+        break
+      case 'newest':
+      default:
+        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }
+
+    return result
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -243,8 +278,8 @@ export default function CommunityBoardPage() {
               <h1 className="text-4xl font-bold mb-2">Community Board</h1>
               <p className="text-purple-100">Share updates, ask questions, and connect with keepers</p>
             </div>
-            <button onClick={() => router.push('/dashboard')} className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium">
-              ← Back
+            <button onClick={() => router.push('/community')} className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium">
+              ← Community
             </button>
           </div>
         </div>
@@ -252,6 +287,47 @@ export default function CommunityBoardPage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">{error}</div>}
+
+        {/* Search and Sort Controls */}
+        <div className="mb-6 bg-white rounded-2xl shadow-lg p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search messages..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-3 pl-12 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                />
+                <svg className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Sort */}
+            <div className="sm:w-48">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all appearance-none bg-white cursor-pointer font-medium"
+              >
+                <option value="newest">🕐 Newest First</option>
+                <option value="popular">❤️ Most Liked</option>
+                <option value="most_replies">💬 Most Replies</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Results count */}
+          {searchQuery && (
+            <p className="text-sm text-gray-600">
+              Found {filteredAndSortedMessages().length} message{filteredAndSortedMessages().length !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
 
         {/* New Message Button */}
         {currentUser && (
@@ -291,14 +367,14 @@ export default function CommunityBoardPage() {
 
         {/* Messages List */}
         <div className="space-y-4">
-          {messages.length === 0 ? (
+          {filteredAndSortedMessages().length === 0 ? (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">💬</div>
-              <p className="text-xl text-gray-600 mb-2">No messages yet</p>
-              <p className="text-gray-500">Be the first to post!</p>
+              <p className="text-xl text-gray-600 mb-2">{searchQuery ? 'No messages found' : 'No messages yet'}</p>
+              <p className="text-gray-500">{searchQuery ? 'Try a different search term' : 'Be the first to post!'}</p>
             </div>
           ) : (
-            messages.map((message) => (
+            filteredAndSortedMessages().map((message) => (
               <div key={message.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-200">
                 {/* Message Header */}
                 <div className="flex items-start justify-between mb-3">
