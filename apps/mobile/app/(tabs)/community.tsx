@@ -30,7 +30,7 @@ export default function CommunityScreen() {
 
   const fetchKeepers = async () => {
     try {
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const params = searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : '';
       const response = await fetch(`${API_URL}/api/v1/keepers${params}`);
       if (!response.ok) throw new Error('Failed to fetch');

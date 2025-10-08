@@ -66,7 +66,7 @@ export default function BoardScreen() {
 
   const fetchMessages = async () => {
     try {
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages`);
       if (!response.ok) throw new Error('Failed to fetch');
       const data = await response.json();
@@ -94,7 +94,7 @@ export default function BoardScreen() {
         return;
       }
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages`, {
         method: 'POST',
         headers: {
@@ -123,7 +123,7 @@ export default function BoardScreen() {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) return;
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages/${messageId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -144,7 +144,7 @@ export default function BoardScreen() {
         return;
       }
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages/${messageId}/likes`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -165,7 +165,7 @@ export default function BoardScreen() {
         return;
       }
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages/${messageId}/reactions`, {
         method: 'POST',
         headers: {
@@ -184,7 +184,7 @@ export default function BoardScreen() {
 
   const fetchReplies = async (messageId: string) => {
     try {
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages/${messageId}/replies`);
       if (!response.ok) throw new Error('Failed to fetch replies');
       const data = await response.json();
@@ -216,7 +216,7 @@ export default function BoardScreen() {
         return;
       }
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages/${messageId}/replies`, {
         method: 'POST',
         headers: {
@@ -818,3 +818,4 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
 });
+

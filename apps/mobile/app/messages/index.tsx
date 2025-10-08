@@ -45,7 +45,7 @@ export default function MessagesScreen() {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) return;
 
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const response = await fetch(`${API_URL}/api/v1/messages/direct/conversations`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -317,3 +317,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
