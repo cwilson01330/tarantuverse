@@ -30,11 +30,24 @@ interface FeedingStatus {
   acceptance_rate: number;
 }
 
+interface CollectionStats {
+  total_tarantulas: number;
+  unique_species: number;
+  total_feedings: number;
+  total_molts: number;
+  sex_distribution: {
+    male: number;
+    female: number;
+    unknown: number;
+  };
+}
+
 export default function CollectionScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
+  const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -51,7 +64,17 @@ export default function CollectionScreen() {
 
   useEffect(() => {
     fetchTarantulas();
+    fetchCollectionStats();
   }, []);
+
+  const fetchCollectionStats = async () => {
+    try {
+      const response = await apiClient.get('/analytics/collection');
+      setCollectionStats(response.data);
+    } catch (error) {
+      console.error('Failed to fetch collection stats:', error);
+    }
+  };
 
   const fetchTarantulas = async () => {
     try {
@@ -118,6 +141,7 @@ export default function CollectionScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchTarantulas();
+    await fetchCollectionStats();
     setRefreshing(false);
   }, []);
 
@@ -188,6 +212,50 @@ export default function CollectionScreen() {
             keyExtractor={(item) => item.id}
             numColumns={2}
             contentContainerStyle={styles.list}
+            ListHeaderComponent={
+              collectionStats ? (
+                <View style={styles.statsCard}>
+                  <View style={styles.statsHeader}>
+                    <Text style={styles.statsTitle}>📊 Collection Stats</Text>
+                    <TouchableOpacity onPress={() => router.push('/analytics')}>
+                      <Text style={styles.viewAllLink}>View All →</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.statsGrid}>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{collectionStats.total_tarantulas}</Text>
+                      <Text style={styles.statLabel}>Total</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{collectionStats.unique_species}</Text>
+                      <Text style={styles.statLabel}>Species</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{collectionStats.total_feedings}</Text>
+                      <Text style={styles.statLabel}>Feedings</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Text style={styles.statValue}>{collectionStats.total_molts}</Text>
+                      <Text style={styles.statLabel}>Molts</Text>
+                    </View>
+                  </View>
+                  <View style={styles.sexDistribution}>
+                    <View style={styles.sexItem}>
+                      <MaterialCommunityIcons name="gender-male" size={16} color="#3b82f6" />
+                      <Text style={styles.sexText}>{collectionStats.sex_distribution.male} ♂</Text>
+                    </View>
+                    <View style={styles.sexItem}>
+                      <MaterialCommunityIcons name="gender-female" size={16} color="#ec4899" />
+                      <Text style={styles.sexText}>{collectionStats.sex_distribution.female} ♀</Text>
+                    </View>
+                    <View style={styles.sexItem}>
+                      <MaterialCommunityIcons name="help-circle" size={16} color="#9ca3af" />
+                      <Text style={styles.sexText}>{collectionStats.sex_distribution.unknown} ?</Text>
+                    </View>
+                  </View>
+                </View>
+              ) : null
+            }
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#7c3aed']} />
             }
@@ -216,6 +284,69 @@ const styles = StyleSheet.create({
   },
   list: {
     padding: 8,
+  },
+  statsCard: {
+    margin: 8,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  statsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  viewAllLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7c3aed',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#7c3aed',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  sexDistribution: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  sexItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sexText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
   },
   card: {
     flex: 1,

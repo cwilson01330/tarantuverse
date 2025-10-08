@@ -96,7 +96,7 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
           </Text>
         </View>
 
-        {data.average_days_between_feedings && (
+        {data.average_days_between_feedings != null && data.average_days_between_feedings > 0 && (
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>AVG INTERVAL</Text>
             <Text style={[styles.metricValue, styles.metricBlue]}>
@@ -106,7 +106,7 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
           </View>
         )}
 
-        {data.current_streak_accepted > 0 && (
+        {data.current_streak_accepted != null && data.current_streak_accepted > 0 && (
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>CURRENT STREAK</Text>
             <Text style={[styles.metricValue, styles.metricPurple]}>
@@ -116,7 +116,7 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
           </View>
         )}
 
-        {data.longest_gap_days && (
+        {data.longest_gap_days != null && data.longest_gap_days > 0 && (
           <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>LONGEST GAP</Text>
             <Text style={[styles.metricValue, styles.metricGray]}>
@@ -143,7 +143,7 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
                 <View
                   style={[
                     styles.progressFill,
-                    { width: `${prey.percentage}%` },
+                    { width: `${Math.round(prey.percentage)}%` },
                   ]}
                 />
               </View>

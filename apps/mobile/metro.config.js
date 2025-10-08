@@ -15,20 +15,7 @@ config.transformer = {
   },
 };
 
-config.resolver = {
-  ...config.resolver,
-  // Cache resolutions for faster rebuilds
-  hasteMapCacheDirectory: require('path').join(__dirname, '.cache', 'metro'),
-};
-
 // Increase worker count for parallel processing
 config.maxWorkers = 4;
-
-// Enable better caching
-config.cacheStores = [
-  new (require('metro-cache'))({
-    root: require('path').join(__dirname, '.cache', 'metro-cache'),
-  }),
-];
 
 module.exports = config;

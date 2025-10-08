@@ -1,6 +1,6 @@
 """
 Tarantuverse API - Main Application Entry Point
-Phase 2B Complete: Community features with message board interactions
+Phase 2C Week 3: Collection Dashboard & Analytics
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +16,7 @@ import app.routers.substrate_changes as substrate_changes
 import app.routers.keepers as keepers
 import app.routers.messages as messages
 import app.routers.photos as photos
+import app.routers.analytics as analytics
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -68,6 +69,9 @@ app.include_router(messages.router, prefix="/api/v1/messages", tags=["messages",
 
 print("[STARTUP] Registering photos router...")
 app.include_router(photos.router, prefix="/api/v1", tags=["photos"])
+
+print("[STARTUP] Registering analytics router...")
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

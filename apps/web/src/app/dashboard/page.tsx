@@ -167,6 +167,12 @@ export default function DashboardPage() {
             </div>
             <div className="flex flex-wrap gap-3">
               <button
+                onClick={() => router.push('/dashboard/analytics')}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+              >
+                📊 Analytics
+              </button>
+              <button
                 onClick={() => router.push('/community')}
                 className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
               >
