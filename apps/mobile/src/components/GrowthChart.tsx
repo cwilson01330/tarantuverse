@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import { VictoryLine, VictoryChart, VictoryAxis, VictoryLegend, VictoryTheme } from 'victory-native';
+import { LineChart } from 'react-native-chart-kit';
 import { format } from 'date-fns';
 
 interface GrowthDataPoint {
@@ -206,58 +206,102 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
 
       {/* Chart */}
       <View style={styles.chartContainer}>
-        <VictoryChart
-          width={screenWidth - 32}
-          height={300}
-          theme={VictoryTheme.material}
-          padding={{ left: 50, right: 50, top: 20, bottom: 60 }}
-        >
-          <VictoryAxis
-            tickValues={chartData.map((_, i) => i)}
-            tickFormat={(t) => chartData[t]?.date || ''}
-            style={{
-              tickLabels: { fontSize: 10, angle: -45, textAnchor: 'end' },
-            }}
-          />
-          <VictoryAxis
-            dependentAxis
-            label={(metric === 'both' || metric === 'weight') ? 'Weight (g)' : 'Leg Span (cm)'}
-            style={{
-              axisLabel: { fontSize: 12, padding: 35 },
-              tickLabels: { fontSize: 10 },
-            }}
-          />
-          {(metric === 'both' || metric === 'weight') && hasWeightData && (
-            <VictoryLine
-              data={chartData}
-              x="x"
-              y="weight"
-              style={{
-                data: { stroke: '#10b981', strokeWidth: 2 },
+        {(metric === 'both' || metric === 'weight') && hasWeightData && (
+          <View style={styles.chartWrapper}>
+            <Text style={styles.chartTitle}>Weight (g)</Text>
+            <LineChart
+              data={{
+                labels: chartData.map((d) => d.date),
+                datasets: [
+                  {
+                    data: chartData.map((d) => d.weight || 0),
+                    color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                    strokeWidth: 2,
+                  },
+                ],
               }}
-            />
-          )}
-          {(metric === 'both' || metric === 'leg_span') && hasLegSpanData && (
-            <VictoryLine
-              data={chartData}
-              x="x"
-              y="legSpan"
-              style={{
-                data: { stroke: '#3b82f6', strokeWidth: 2 },
+              width={screenWidth - 32}
+              height={220}
+              chartConfig={{
+                backgroundColor: '#ffffff',
+                backgroundGradientFrom: '#ffffff',
+                backgroundGradientTo: '#ffffff',
+                decimalPlaces: 1,
+                color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                style: {
+                  borderRadius: 16,
+                },
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#10b981',
+                },
+                propsForBackgroundLines: {
+                  strokeDasharray: '', // solid lines
+                  stroke: '#e5e7eb',
+                  strokeWidth: 1,
+                },
               }}
+              bezier
+              style={styles.chart}
+              withInnerLines={true}
+              withOuterLines={true}
+              withVerticalLines={false}
+              withHorizontalLines={true}
+              withVerticalLabels={true}
+              withHorizontalLabels={true}
+              fromZero={false}
             />
-          )}
-        </VictoryChart>
-        {metric === 'both' && hasWeightData && hasLegSpanData && (
-          <View style={styles.legendContainer}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
-              <Text style={styles.legendText}>Weight</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: '#3b82f6' }]} />
-              <Text style={styles.legendText}>Leg Span</Text>
-            </View>
+          </View>
+        )}
+        {(metric === 'both' || metric === 'leg_span') && hasLegSpanData && (
+          <View style={styles.chartWrapper}>
+            <Text style={styles.chartTitle}>Leg Span (cm)</Text>
+            <LineChart
+              data={{
+                labels: chartData.map((d) => d.date),
+                datasets: [
+                  {
+                    data: chartData.map((d) => d.legSpan || 0),
+                    color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+                    strokeWidth: 2,
+                  },
+                ],
+              }}
+              width={screenWidth - 32}
+              height={220}
+              chartConfig={{
+                backgroundColor: '#ffffff',
+                backgroundGradientFrom: '#ffffff',
+                backgroundGradientTo: '#ffffff',
+                decimalPlaces: 1,
+                color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                style: {
+                  borderRadius: 16,
+                },
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#3b82f6',
+                },
+                propsForBackgroundLines: {
+                  strokeDasharray: '',
+                  stroke: '#e5e7eb',
+                  strokeWidth: 1,
+                },
+              }}
+              bezier
+              style={styles.chart}
+              withInnerLines={true}
+              withOuterLines={true}
+              withVerticalLines={false}
+              withHorizontalLines={true}
+              withVerticalLabels={true}
+              withHorizontalLabels={true}
+              fromZero={false}
+            />
           </View>
         )}
       </View>
@@ -406,6 +450,19 @@ const styles = StyleSheet.create({
   chartContainer: {
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  chartWrapper: {
+    marginBottom: 24,
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    marginLeft: 16,
+  },
+  chart: {
+    borderRadius: 16,
   },
   legendContainer: {
     flexDirection: 'row',
