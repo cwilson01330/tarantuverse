@@ -170,39 +170,39 @@ async def get_collection_analytics(
     # Get recent feedings
     recent_feedings = db.query(FeedingLog).filter(
         FeedingLog.tarantula_id.in_(tarantula_ids)
-    ).order_by(FeedingLog.feeding_date.desc()).limit(5).all()
+    ).order_by(FeedingLog.fed_at.desc()).limit(5).all()
     
     for feeding in recent_feedings:
         tarantula = db.query(Tarantula).filter(Tarantula.id == feeding.tarantula_id).first()
         if tarantula:
             recent_activity.append(ActivityItem(
                 type="feeding",
-                date=feeding.feeding_date,
+                date=feeding.fed_at,
                 tarantula_id=str(tarantula.id),
                 tarantula_name=tarantula.common_name,
-                description=f"Fed {feeding.prey_type}" + (" (refused)" if not feeding.was_accepted else "")
+                description=f"Fed {feeding.food_type}" + (" (refused)" if not feeding.accepted else "")
             ))
     
     # Get recent molts
     recent_molts = db.query(MoltLog).filter(
         MoltLog.tarantula_id.in_(tarantula_ids)
-    ).order_by(MoltLog.molt_date.desc()).limit(5).all()
+    ).order_by(MoltLog.molted_at.desc()).limit(5).all()
     
     for molt in recent_molts:
         tarantula = db.query(Tarantula).filter(Tarantula.id == molt.tarantula_id).first()
         if tarantula:
             description = "Molted successfully"
-            if molt.weight_grams or molt.leg_span_cm:
+            if molt.weight_after or molt.leg_span_after:
                 details = []
-                if molt.weight_grams:
-                    details.append(f"{molt.weight_grams}g")
-                if molt.leg_span_cm:
-                    details.append(f"{molt.leg_span_cm}cm")
+                if molt.weight_after:
+                    details.append(f"{molt.weight_after}g")
+                if molt.leg_span_after:
+                    details.append(f"{molt.leg_span_after}cm")
                 description += f" ({', '.join(details)})"
             
             recent_activity.append(ActivityItem(
                 type="molt",
-                date=molt.molt_date,
+                date=molt.molted_at,
                 tarantula_id=str(tarantula.id),
                 tarantula_name=tarantula.common_name,
                 description=description
@@ -211,14 +211,14 @@ async def get_collection_analytics(
     # Get recent substrate changes
     recent_substrate = db.query(SubstrateChange).filter(
         SubstrateChange.tarantula_id.in_(tarantula_ids)
-    ).order_by(SubstrateChange.change_date.desc()).limit(5).all()
+    ).order_by(SubstrateChange.changed_at.desc()).limit(5).all()
     
     for change in recent_substrate:
         tarantula = db.query(Tarantula).filter(Tarantula.id == change.tarantula_id).first()
         if tarantula:
             recent_activity.append(ActivityItem(
                 type="substrate_change",
-                date=change.change_date,
+                date=change.changed_at,
                 tarantula_id=str(tarantula.id),
                 tarantula_name=tarantula.common_name,
                 description=f"Substrate changed to {change.substrate_type}"
