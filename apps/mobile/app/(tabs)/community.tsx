@@ -237,7 +237,13 @@ export default function CommunityScreen() {
         <View style={styles.comingSoon}>
           <Text style={styles.comingSoonEmoji}>💬</Text>
           <Text style={styles.comingSoonTitle}>Message Board</Text>
-          <Text style={styles.comingSoonSubtitle}>Coming soon! Check the web version.</Text>
+          <Text style={styles.comingSoonSubtitle}>Share your thoughts with the community!</Text>
+          <TouchableOpacity 
+            style={styles.openBoardButton}
+            onPress={() => router.push('/community/board')}
+          >
+            <Text style={styles.openBoardButtonText}>Open Message Board</Text>
+          </TouchableOpacity>
           <TouchableOpacity 
             style={styles.backButton}
             onPress={() => setActiveTab('keepers')}
@@ -483,6 +489,24 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     marginBottom: 24,
+  },
+  openBoardButton: {
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    backgroundColor: '#7c3aed',
+    borderRadius: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  openBoardButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: 'white',
+    textAlign: 'center',
   },
   backButton: {
     paddingHorizontal: 24,
