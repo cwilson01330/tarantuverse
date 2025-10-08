@@ -10,7 +10,7 @@ import uuid
 from app.database import get_db
 from app.models.user import User
 from app.models.follow import Follow
-from app.utils.auth import get_current_user
+from app.utils.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/v1/follows", tags=["follows"])
 
