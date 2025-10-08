@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Linking, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface KeeperProfile {
   id: number;
@@ -41,6 +42,11 @@ interface Stats {
   };
 }
 
+interface FollowStats {
+  followers_count: number;
+  following_count: number;
+}
+
 export default function KeeperProfileScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -49,18 +55,53 @@ export default function KeeperProfileScreen() {
   const [profile, setProfile] = useState<KeeperProfile | null>(null);
   const [collection, setCollection] = useState<Tarantula[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [followStats, setFollowStats] = useState<FollowStats | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'collection' | 'about'>('collection');
 
   useEffect(() => {
+    checkAuth();
     fetchData();
   }, [username]);
 
+  const checkAuth = async () => {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setCurrentUser({ id: payload.sub, username: payload.username });
+        checkFollowingStatus();
+      }
+    } catch (error) {
+      console.error('Failed to decode token');
+    }
+  };
+
+  const checkFollowingStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token) return;
+
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/v1/follows/${username}/is-following`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setIsFollowing(data.is_following);
+      }
+    } catch (error) {
+      console.error('Failed to check following status');
+    }
+  };
+
   const fetchData = async () => {
     try {
-      await Promise.all([fetchProfile(), fetchCollection(), fetchStats()]);
+      await Promise.all([fetchProfile(), fetchCollection(), fetchStats(), fetchFollowStats()]);
     } catch (err) {
       console.error('Error fetching keeper data:', err);
     } finally {
@@ -107,6 +148,53 @@ export default function KeeperProfileScreen() {
     } catch (err) {
       console.error('Failed to load stats');
     }
+  };
+
+  const fetchFollowStats = async () => {
+    try {
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/v1/follows/${username}/stats`);
+      if (response.ok) {
+        const data = await response.json();
+        setFollowStats(data);
+      }
+    } catch (error) {
+      console.error('Failed to load follow stats');
+    }
+  };
+
+  const handleFollowToggle = async () => {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const method = isFollowing ? 'DELETE' : 'POST';
+      const response = await fetch(`${API_URL}/api/v1/follows/${username}`, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setIsFollowing(!isFollowing);
+        fetchFollowStats();
+      }
+    } catch (error) {
+      console.error('Failed to toggle follow');
+      Alert.alert('Error', 'Failed to update follow status');
+    }
+  };
+
+  const handleMessage = async () => {
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    router.push(`/messages/${username}`);
   };
 
   const handleRefresh = () => {
@@ -189,16 +277,27 @@ export default function KeeperProfileScreen() {
             <Text style={styles.username}>@{profile.username}</Text>
 
             {/* Action Buttons */}
-            <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.followButton}>
-                <MaterialCommunityIcons name="account-plus" size={20} color="white" />
-                <Text style={styles.followButtonText}>Follow</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.messageButton}>
-                <MaterialCommunityIcons name="message" size={20} color="#7c3aed" />
-                <Text style={styles.messageButtonText}>Message</Text>
-              </TouchableOpacity>
-            </View>
+            {currentUser && currentUser.username !== username && (
+              <View style={styles.actionButtons}>
+                <TouchableOpacity 
+                  style={[styles.followButton, isFollowing && styles.followingButton]}
+                  onPress={handleFollowToggle}
+                >
+                  <MaterialCommunityIcons 
+                    name={isFollowing ? "account-check" : "account-plus"} 
+                    size={20} 
+                    color={isFollowing ? "#7c3aed" : "white"} 
+                  />
+                  <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
+                    {isFollowing ? 'Following' : 'Follow'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
+                  <MaterialCommunityIcons name="message" size={20} color="#7c3aed" />
+                  <Text style={styles.messageButtonText}>Message</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Profile Info */}
             <View style={styles.profileInfo}>
@@ -268,24 +367,40 @@ export default function KeeperProfileScreen() {
         </View>
 
         {/* Stats */}
-        {stats && (
+        {(stats || followStats) && (
           <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{stats.total_public}</Text>
-              <Text style={styles.statLabel}>Tarantulas</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{stats.unique_species}</Text>
-              <Text style={styles.statLabel}>Species</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: '#ec4899' }]}>{stats.sex_distribution.female}</Text>
-              <Text style={styles.statLabel}>Females</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={[styles.statValue, { color: '#06b6d4' }]}>{stats.sex_distribution.male}</Text>
-              <Text style={styles.statLabel}>Males</Text>
-            </View>
+            {followStats && (
+              <>
+                <View style={styles.statCard}>
+                  <Text style={[styles.statValue, { color: '#7c3aed' }]}>{followStats.followers_count}</Text>
+                  <Text style={styles.statLabel}>Followers</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={[styles.statValue, { color: '#3b82f6' }]}>{followStats.following_count}</Text>
+                  <Text style={styles.statLabel}>Following</Text>
+                </View>
+              </>
+            )}
+            {stats && (
+              <>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{stats.total_public}</Text>
+                  <Text style={styles.statLabel}>Tarantulas</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{stats.unique_species}</Text>
+                  <Text style={styles.statLabel}>Species</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={[styles.statValue, { color: '#ec4899' }]}>{stats.sex_distribution.female}</Text>
+                  <Text style={styles.statLabel}>Females</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={[styles.statValue, { color: '#06b6d4' }]}>{stats.sex_distribution.male}</Text>
+                  <Text style={styles.statLabel}>Males</Text>
+                </View>
+              </>
+            )}
           </View>
         )}
 
@@ -455,6 +570,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  followingButton: {
+    backgroundColor: 'white',
+    borderWidth: 2,
+    borderColor: '#7c3aed',
+  },
+  followingButtonText: {
+    color: '#7c3aed',
+  },
   messageButton: {
     flex: 1,
     flexDirection: 'row',
@@ -531,12 +654,14 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     paddingHorizontal: 16,
     marginBottom: 16,
   },
   statCard: {
-    flex: 1,
+    minWidth: '30%',
+    maxWidth: '48%',
     backgroundColor: 'white',
     padding: 16,
     borderRadius: 12,
