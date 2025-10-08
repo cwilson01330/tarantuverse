@@ -218,7 +218,7 @@ export default function CommunityPage() {
               {keepers.map((keeper) => (
                 <div
                   key={keeper.id}
-                  onClick={() => router.push(`/keeper/${keeper.username}`)}
+                  onClick={() => router.push(`/community/${keeper.username}`)}
                   className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-xl hover:border-purple-200 transition-all duration-200 cursor-pointer group"
                 >
                   <div className="flex items-start gap-4 mb-4">
