@@ -2,7 +2,7 @@
 Analytics routes for collection-wide statistics and insights
 """
 from typing import List, Dict, Any
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -177,7 +177,7 @@ async def get_collection_analytics(
         if tarantula:
             recent_activity.append(ActivityItem(
                 type="feeding",
-                date=feeding.fed_at,
+                date=feeding.fed_at.date() if feeding.fed_at else date.today(),
                 tarantula_id=str(tarantula.id),
                 tarantula_name=tarantula.common_name,
                 description=f"Fed {feeding.food_type}" + (" (refused)" if not feeding.accepted else "")
@@ -202,7 +202,7 @@ async def get_collection_analytics(
             
             recent_activity.append(ActivityItem(
                 type="molt",
-                date=molt.molted_at,
+                date=molt.molted_at.date() if molt.molted_at else date.today(),
                 tarantula_id=str(tarantula.id),
                 tarantula_name=tarantula.common_name,
                 description=description
