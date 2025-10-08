@@ -37,11 +37,16 @@ async def get_collection_analytics(
     - Molt statistics
     - Recent activity
     """
-    
-    # Get all user's tarantulas
-    tarantulas = db.query(Tarantula).filter(
-        Tarantula.user_id == current_user.id
-    ).all()
+    try:
+        # Get all user's tarantulas
+        tarantulas = db.query(Tarantula).filter(
+            Tarantula.user_id == current_user.id
+        ).all()
+    except Exception as e:
+        print(f"Error in analytics endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Analytics error: {str(e)}")
     
     total_count = len(tarantulas)
     
