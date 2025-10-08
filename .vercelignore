@@ -1,0 +1,14 @@
+# Ignore mobile app (React Native/Expo - not for web deployment)
+apps/mobile
+
+# Ignore API (deployed separately to Render)
+apps/api
+
+# Ignore docs
+docs
+
+# Ignore scripts
+scripts
+
+# Ignore other workspace files
+packages
