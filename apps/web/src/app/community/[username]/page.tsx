@@ -45,6 +45,11 @@ interface Stats {
   }
 }
 
+interface FollowStats {
+  followers_count: number
+  following_count: number
+}
+
 export default function KeeperProfilePage() {
   const params = useParams()
   const router = useRouter()
@@ -53,17 +58,102 @@ export default function KeeperProfilePage() {
   const [profile, setProfile] = useState<KeeperProfile | null>(null)
   const [collection, setCollection] = useState<Tarantula[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [followStats, setFollowStats] = useState<FollowStats | null>(null)
+  const [isFollowing, setIsFollowing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'collection' | 'about'>('collection')
+  const [currentUser, setCurrentUser] = useState<any>(null)
 
   useEffect(() => {
+    checkAuth()
     if (username) {
       fetchProfile()
       fetchCollection()
       fetchStats()
+      fetchFollowStats()
     }
   }, [username])
+
+  const checkAuth = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        setCurrentUser({ id: payload.sub, username: payload.username })
+        // Check if following
+        if (username) {
+          checkFollowingStatus()
+        }
+      }
+    } catch (error) {
+      console.error('Failed to decode token')
+    }
+  }
+
+  const checkFollowingStatus = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) return
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/follows/${username}/is-following`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setIsFollowing(data.is_following)
+      }
+    } catch (error) {
+      console.error('Failed to check following status')
+    }
+  }
+
+  const fetchFollowStats = async () => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/follows/${username}/stats`)
+      if (response.ok) {
+        const data = await response.json()
+        setFollowStats(data)
+      }
+    } catch (error) {
+      console.error('Failed to load follow stats')
+    }
+  }
+
+  const handleFollowToggle = async () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const method = isFollowing ? 'DELETE' : 'POST'
+      const response = await fetch(`${API_URL}/api/v1/follows/${username}`, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        setIsFollowing(!isFollowing)
+        fetchFollowStats() // Refresh counts
+      }
+    } catch (error) {
+      console.error('Failed to toggle follow')
+    }
+  }
+
+  const handleMessage = () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+    router.push(`/messages/${username}`)
+  }
 
   const fetchProfile = async () => {
     try {
@@ -189,14 +279,26 @@ export default function KeeperProfilePage() {
                 </div>
               </div>
               
-              <div className="flex gap-3">
-                <button className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:shadow-lg transition font-semibold">
-                  Follow
-                </button>
-                <button className="px-6 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition font-semibold">
-                  Message
-                </button>
-              </div>
+              {currentUser && currentUser.username !== username && (
+                <div className="flex gap-3">
+                  <button 
+                    onClick={handleFollowToggle}
+                    className={`px-6 py-2 rounded-lg hover:shadow-lg transition font-semibold ${
+                      isFollowing 
+                        ? 'border-2 border-purple-600 text-purple-600 hover:bg-purple-50' 
+                        : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
+                    }`}
+                  >
+                    {isFollowing ? 'Unfollow' : 'Follow'}
+                  </button>
+                  <button 
+                    onClick={handleMessage}
+                    className="px-6 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition font-semibold"
+                  >
+                    Message
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Profile Info */}
@@ -275,7 +377,7 @@ export default function KeeperProfilePage() {
 
         {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-8">
             <div className="bg-white rounded-xl p-6 shadow text-center">
               <div className="text-3xl font-bold text-purple-600">{stats.total_public}</div>
               <div className="text-sm text-gray-600">Tarantulas</div>
@@ -292,6 +394,18 @@ export default function KeeperProfilePage() {
               <div className="text-3xl font-bold text-cyan-600">{stats.sex_distribution.male}</div>
               <div className="text-sm text-gray-600">Males</div>
             </div>
+            {followStats && (
+              <>
+                <div className="bg-white rounded-xl p-6 shadow text-center">
+                  <div className="text-3xl font-bold text-indigo-600">{followStats.followers_count}</div>
+                  <div className="text-sm text-gray-600">Followers</div>
+                </div>
+                <div className="bg-white rounded-xl p-6 shadow text-center">
+                  <div className="text-3xl font-bold text-teal-600">{followStats.following_count}</div>
+                  <div className="text-sm text-gray-600">Following</div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
