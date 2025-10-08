@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { apiClient } from '../src/services/api';
+import { apiClient } from '../../src/services/api';
 
 interface SpeciesCount {
   species_name: string;
