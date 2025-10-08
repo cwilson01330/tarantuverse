@@ -64,7 +64,7 @@ export default function AnalyticsPage() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get("/analytics/collection");
+      const response = await apiClient.get("/api/v1/analytics/collection");
       setAnalytics(response.data);
       setError(null);
     } catch (err: any) {
