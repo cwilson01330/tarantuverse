@@ -84,35 +84,35 @@ export default function CommunityPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">🕷️</div>
-          <p className="text-xl text-gray-600">Discovering keepers...</p>
+          <p className="text-xl text-gray-300">Discovering keepers...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-dark">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white shadow-lg">
+      <div className="bg-gradient-primary text-white shadow-lg shadow-electric-blue-500/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-4xl font-bold mb-2">🌐 Keeper Community</h1>
-              <p className="text-purple-100 text-lg">Discover fellow tarantula enthusiasts</p>
+              <p className="text-electric-blue-100 text-lg">Discover fellow tarantula enthusiasts</p>
             </div>
             <div className="flex gap-3">
               <button
-                onClick={() => router.push('/community/board')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+                onClick={() => router.push('/community/forums')}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium border border-white/20"
               >
-                💬 Message Board
+                💬 Forums
               </button>
               <button
                 onClick={() => router.push('/dashboard')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium border border-white/20"
               >
                 ← Dashboard
               </button>
@@ -127,11 +127,11 @@ export default function CommunityPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by username, name, or location..."
-                className="flex-1 px-4 py-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-white/30"
+                className="flex-1 px-4 py-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-electric-blue-200 focus:outline-none focus:ring-2 focus:ring-white/30"
               />
               <button
                 type="submit"
-                className="px-6 py-3 bg-white text-purple-600 rounded-lg hover:bg-purple-50 transition font-semibold"
+                className="px-6 py-3 bg-white text-electric-blue-600 rounded-lg hover:bg-electric-blue-50 transition font-semibold"
               >
                 Search
               </button>
@@ -143,11 +143,11 @@ export default function CommunityPage() {
                 onChange={(e) => setExperienceFilter(e.target.value)}
                 className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
               >
-                <option value="">All Experience Levels</option>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="expert">Expert</option>
+                <option value="" className="bg-dark text-gray-100">All Experience Levels</option>
+                <option value="beginner" className="bg-dark text-gray-100">Beginner</option>
+                <option value="intermediate" className="bg-dark text-gray-100">Intermediate</option>
+                <option value="advanced" className="bg-dark text-gray-100">Advanced</option>
+                <option value="expert" className="bg-dark text-gray-100">Expert</option>
               </select>
 
               <select
@@ -155,15 +155,15 @@ export default function CommunityPage() {
                 onChange={(e) => setSpecialtyFilter(e.target.value)}
                 className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
               >
-                <option value="">All Specialties</option>
-                <option value="terrestrial">Terrestrial</option>
-                <option value="arboreal">Arboreal</option>
-                <option value="fossorial">Fossorial</option>
-                <option value="new_world">New World</option>
-                <option value="old_world">Old World</option>
-                <option value="breeding">Breeding</option>
-                <option value="slings">Slings</option>
-                <option value="large_species">Large Species</option>
+                <option value="" className="bg-dark text-gray-100">All Specialties</option>
+                <option value="terrestrial" className="bg-dark text-gray-100">Terrestrial</option>
+                <option value="arboreal" className="bg-dark text-gray-100">Arboreal</option>
+                <option value="fossorial" className="bg-dark text-gray-100">Fossorial</option>
+                <option value="new_world" className="bg-dark text-gray-100">New World</option>
+                <option value="old_world" className="bg-dark text-gray-100">Old World</option>
+                <option value="breeding" className="bg-dark text-gray-100">Breeding</option>
+                <option value="slings" className="bg-dark text-gray-100">Slings</option>
+                <option value="large_species" className="bg-dark text-gray-100">Large Species</option>
               </select>
 
               {(experienceFilter || specialtyFilter || searchQuery) && (
@@ -174,7 +174,7 @@ export default function CommunityPage() {
                     setSearchQuery('')
                     fetchKeepers()
                   }}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition font-medium"
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition font-medium border border-white/20"
                 >
                   Clear Filters
                 </button>
@@ -185,15 +185,15 @@ export default function CommunityPage() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="bg-dark-50 border-b border-electric-blue-500/20 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-1">
             <button
               onClick={() => setActiveTab('keepers')}
               className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
                 activeTab === 'keepers'
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-electric-blue-500 text-electric-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
               }`}
             >
               👥 Keepers
@@ -202,8 +202,8 @@ export default function CommunityPage() {
               onClick={() => setActiveTab('activity')}
               className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
                 activeTab === 'activity'
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-neon-pink-500 text-neon-pink-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-300'
               }`}
             >
               📊 Community Activity
