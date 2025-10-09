@@ -331,7 +331,7 @@ export default function DashboardPage() {
                       {/* Feeding status badge */}
                       <div className="absolute top-3 right-3">
                         {getFeedingStatusBadge(tarantula.id) || (
-                          <span className="px-3 py-1 rounded-full bg-gray-700/90 backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-gray-600/50">
+                          <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
                             No data
                           </span>
                         )}
@@ -350,12 +350,12 @@ export default function DashboardPage() {
                       {/* Quick stats */}
                       <div className="flex flex-wrap gap-2">
                         {tarantula.sex && (
-                          <span className="px-3 py-1 rounded-lg bg-electric-blue-500/20 text-electric-blue-300 text-xs font-semibold border border-electric-blue-500/30">
+                          <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
                             {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
                           </span>
                         )}
                         {tarantula.date_acquired && (
-                          <span className="px-3 py-1 rounded-lg bg-neon-pink-500/20 text-neon-pink-300 text-xs font-semibold border border-neon-pink-500/30">
+                          <span className="px-3 py-1 rounded-lg bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-xs font-semibold border border-pink-200 dark:border-pink-500/30">
                             📅 {new Date(tarantula.date_acquired).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
                           </span>
                         )}
