@@ -14,15 +14,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#0a0a0f',
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 8,
+    color: '#e5e7eb',
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#9ca3af',
   },
 });

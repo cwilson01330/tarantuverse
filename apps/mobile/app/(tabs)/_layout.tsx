@@ -5,10 +5,14 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#7c3aed',
-        tabBarInactiveTintColor: '#9ca3af',
+        tabBarActiveTintColor: '#0066ff', // Electric blue
+        tabBarInactiveTintColor: '#6b7280',
+        tabBarStyle: {
+          backgroundColor: '#1a1a24', // Dark elevated
+          borderTopColor: '#0066ff33', // Electric blue with opacity
+        },
         headerStyle: {
-          backgroundColor: '#7c3aed',
+          backgroundColor: '#0066ff', // Electric blue
         },
         headerTintColor: '#fff',
         headerTitleStyle: {

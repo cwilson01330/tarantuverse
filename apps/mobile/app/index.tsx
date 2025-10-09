@@ -20,7 +20,7 @@ export default function Home() {
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>🕷️</Text>
-      <ActivityIndicator size="large" color="#7c3aed" />
+      <ActivityIndicator size="large" color="#0066ff" />
       <Text style={styles.text}>Loading...</Text>
     </View>
   );
@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#0a0a0f', // Dark background
   },
   logo: {
     fontSize: 80,
@@ -40,6 +40,6 @@ const styles = StyleSheet.create({
   text: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6b7280',
+    color: '#9ca3af', // Gray text
   },
 });

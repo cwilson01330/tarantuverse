@@ -33,7 +33,7 @@ export default function ProfileScreen() {
             <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <MaterialCommunityIcons name="account" size={48} color="#7c3aed" />
+              <MaterialCommunityIcons name="account" size={48} color="#0066ff" />
             </View>
           )}
         </View>
@@ -67,14 +67,14 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#0a0a0f',
   },
   header: {
     alignItems: 'center',
     padding: 32,
-    backgroundColor: '#fff',
+    backgroundColor: '#1a1a24',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#2a2a3a',
   },
   avatarContainer: {
     marginBottom: 16,
@@ -88,38 +88,38 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#0066ff33',
     justifyContent: 'center',
     alignItems: 'center',
   },
   displayName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#e5e7eb',
     marginBottom: 4,
   },
   username: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#9ca3af',
   },
   section: {
     marginTop: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#1a1a24',
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#2a2a3a',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: '#2a2a3a',
   },
   menuText: {
     flex: 1,
     fontSize: 16,
-    color: '#374151',
+    color: '#d1d5db',
     marginLeft: 12,
   },
   logoutText: {

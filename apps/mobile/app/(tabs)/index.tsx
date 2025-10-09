@@ -181,7 +181,7 @@ export default function CollectionScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#7c3aed" />
+        <ActivityIndicator size="large" color="#0066ff" />
       </View>
     );
   }
@@ -256,7 +256,7 @@ export default function CollectionScreen() {
               ) : null
             }
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#7c3aed']} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0066ff']} />
             }
           />
           <TouchableOpacity
@@ -274,7 +274,7 @@ export default function CollectionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#0a0a0f',
   },
   centered: {
     flex: 1,
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   statsCard: {
     margin: 8,
     marginBottom: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#1a1a24',
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
@@ -295,6 +295,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#2a2a3a',
   },
   statsHeader: {
     flexDirection: 'row',
@@ -305,12 +307,12 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#e5e7eb',
   },
   viewAllLink: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#7c3aed',
+    color: '#0066ff',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -323,19 +325,19 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#7c3aed',
+    color: '#0066ff',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#9ca3af',
   },
   sexDistribution: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: '#2a2a3a',
   },
   sexItem: {
     flexDirection: 'row',
@@ -345,18 +347,20 @@ const styles = StyleSheet.create({
   sexText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: '#d1d5db',
   },
   card: {
     flex: 1,
     margin: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#1a1a24',
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: '#2a2a3a',
   },
   imageContainer: {
     position: 'relative',
@@ -370,7 +374,7 @@ const styles = StyleSheet.create({
   placeholderImage: {
     width: '100%',
     height: 150,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#2a2a3a',
     justifyContent: 'center',
     alignItems: 'center',
     borderTopLeftRadius: 12,
@@ -423,18 +427,18 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: '#e5e7eb',
     marginBottom: 4,
   },
   scientificName: {
     fontSize: 13,
     fontStyle: 'italic',
-    color: '#6b7280',
+    color: '#9ca3af',
     marginBottom: 2,
   },
   commonName: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#6b7280',
   },
   empty: {
     flex: 1,
@@ -445,13 +449,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111827',
+    color: '#e5e7eb',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#9ca3af',
     textAlign: 'center',
     marginBottom: 24,
   },
@@ -459,7 +463,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#0066ff',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -476,7 +480,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#7c3aed',
+    backgroundColor: '#0066ff',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
