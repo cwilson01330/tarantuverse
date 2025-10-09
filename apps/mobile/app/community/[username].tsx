@@ -75,7 +75,7 @@ export default function KeeperProfileScreen() {
         checkFollowingStatus();
       }
     } catch (error) {
-      console.error('Failed to load user data');
+      // Silently fail - will show login prompt if needed
     }
   };
 
@@ -93,7 +93,7 @@ export default function KeeperProfileScreen() {
         setIsFollowing(data.is_following);
       }
     } catch (error) {
-      console.error('Failed to check following status');
+      // Silently fail - follow status will default to false
     }
   };
 
@@ -101,7 +101,7 @@ export default function KeeperProfileScreen() {
     try {
       await Promise.all([fetchProfile(), fetchCollection(), fetchStats(), fetchFollowStats()]);
     } catch (err) {
-      console.error('Error fetching keeper data:', err);
+      // Errors are handled in individual fetch functions
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -131,7 +131,7 @@ export default function KeeperProfileScreen() {
         setCollection(data);
       }
     } catch (err) {
-      console.error('Failed to load collection');
+      // Silently fail - collection is optional
     }
   };
 
@@ -144,7 +144,7 @@ export default function KeeperProfileScreen() {
         setStats(data);
       }
     } catch (err) {
-      console.error('Failed to load stats');
+      // Silently fail - stats are optional
     }
   };
 
@@ -157,7 +157,7 @@ export default function KeeperProfileScreen() {
         setFollowStats(data);
       }
     } catch (error) {
-      console.error('Failed to load follow stats');
+      // Silently fail - follow stats are optional
     }
   };
 
@@ -181,7 +181,6 @@ export default function KeeperProfileScreen() {
         fetchFollowStats();
       }
     } catch (error) {
-      console.error('Failed to toggle follow');
       Alert.alert('Error', 'Failed to update follow status');
     }
   };

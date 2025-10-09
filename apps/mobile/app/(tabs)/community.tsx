@@ -37,7 +37,7 @@ export default function CommunityScreen() {
       const data = await response.json();
       setKeepers(data);
     } catch (error) {
-      console.error('Failed to fetch keepers:', error);
+      // Show empty state - user will see "No keepers found"
     } finally {
       setLoading(false);
       setRefreshing(false);

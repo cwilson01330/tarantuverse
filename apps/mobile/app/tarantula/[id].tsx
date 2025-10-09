@@ -132,7 +132,6 @@ export default function TarantulaDetailScreen() {
       setTarantula(response.data);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load tarantula details');
-      console.error(error);
       router.back();
     } finally {
       setLoading(false);
@@ -145,7 +144,7 @@ export default function TarantulaDetailScreen() {
       // Get only the 5 most recent logs
       setFeedingLogs(response.data.slice(0, 5));
     } catch (error: any) {
-      console.error('Failed to load feeding logs:', error);
+      // Silently fail - feeding logs are optional
     }
   };
 
@@ -155,18 +154,16 @@ export default function TarantulaDetailScreen() {
       // Get only the 5 most recent logs
       setMoltLogs(response.data.slice(0, 5));
     } catch (error: any) {
-      console.error('Failed to load molt logs:', error);
+      // Silently fail - molt logs are optional
     }
   };
 
   const fetchPhotos = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/photos`);
-      console.log('📸 Photos received:', response.data);
       setPhotos(response.data);
     } catch (error: any) {
-      console.error('Failed to load photos:', error);
-      // If endpoint doesn't exist yet, silently fail
+      // Silently fail if endpoint doesn't exist yet
       setPhotos([]);
     }
   };
@@ -174,10 +171,8 @@ export default function TarantulaDetailScreen() {
   const fetchGrowth = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/growth`);
-      console.log('📈 Growth data received:', response.data);
       setGrowthData(response.data);
     } catch (error: any) {
-      console.error('Failed to load growth data:', error);
       // Silently fail if no data available
       setGrowthData(null);
     }
@@ -186,10 +181,8 @@ export default function TarantulaDetailScreen() {
   const fetchFeedingStats = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/feeding-stats`);
-      console.log('🍽️ Feeding stats received:', response.data);
       setFeedingStats(response.data);
     } catch (error: any) {
-      console.error('Failed to load feeding stats:', error);
       // Silently fail if no data available
       setFeedingStats(null);
     }
@@ -200,14 +193,11 @@ export default function TarantulaDetailScreen() {
     if (!url) return '';
     // If URL starts with http, it's already absolute (R2)
     if (url.startsWith('http')) {
-      console.log('✅ R2 URL:', url);
       return url;
     }
     // Otherwise it's local storage, prepend API base
     const apiBase = 'https://tarantuverse-api.onrender.com';
-    const fullUrl = `${apiBase}${url}`;
-    console.log('⚠️  Local URL converted:', fullUrl);
-    return fullUrl;
+    return `${apiBase}${url}`;
   };
 
   // Refetch logs when screen comes into focus (after adding a log)

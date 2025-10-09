@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(JSON.parse(storedUser));
       }
     } catch (error) {
-      console.error('Error loading auth:', error);
+      // Silent fail - user will see login screen
     } finally {
       setIsLoading(false);
     }
@@ -50,9 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      console.log('Logging in with:', { email, password: '***' });
       const response = await apiClient.post('/auth/login', { email, password });
-      console.log('Login response:', response.data);
       const { access_token, user: userData } = response.data;
       
       await AsyncStorage.setItem('auth_token', access_token);
@@ -61,7 +59,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(access_token);
       setUser(userData);
     } catch (error: any) {
-      console.error('Login error:', error.response?.data);
       throw new Error(error.response?.data?.detail || 'Login failed');
     }
   };
@@ -100,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await AsyncStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);
     } catch (error) {
-      console.error('Error refreshing user:', error);
+      // Silent fail - will use cached user data
     }
   };
 

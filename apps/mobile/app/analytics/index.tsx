@@ -72,7 +72,7 @@ export default function AnalyticsScreen() {
       const response = await apiClient.get('/analytics/collection');
       setAnalytics(response.data);
     } catch (error) {
-      console.error('Failed to fetch analytics:', error);
+      // Show empty state
     } finally {
       setLoading(false);
     }

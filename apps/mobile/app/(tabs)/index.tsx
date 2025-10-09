@@ -72,7 +72,7 @@ export default function CollectionScreen() {
       const response = await apiClient.get('/analytics/collection');
       setCollectionStats(response.data);
     } catch (error) {
-      console.error('Failed to fetch collection stats:', error);
+      // Silently fail - stats are optional
     }
   };
 
@@ -83,7 +83,6 @@ export default function CollectionScreen() {
       await fetchAllFeedingStatuses(response.data);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load tarantulas');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -102,7 +101,7 @@ export default function CollectionScreen() {
             acceptance_rate: response.data.acceptance_rate,
           });
         } catch (error) {
-          console.error(`Failed to fetch feeding stats for ${t.id}:`, error);
+          // Silently fail for individual tarantulas
         }
       })
     );
