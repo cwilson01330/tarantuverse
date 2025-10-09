@@ -12,6 +12,8 @@
     --text-primary: 15 23 42; /* slate-900 */
     --text-secondary: 71 85 105; /* slate-600 */
     --text-tertiary: 148 163 184; /* slate-400 */
+    --primary: 0 102 255; /* #0066ff - electric blue */
+    --primary-hover: 0 82 204; /* #0052cc */
   }
 
   .dark {
@@ -23,6 +25,8 @@
     --text-primary: 229 231 235; /* gray-200 */
     --text-secondary: 156 163 175; /* gray-400 */
     --text-tertiary: 107 114 128; /* gray-500 */
+    --primary: 0 102 255; /* #0066ff - electric blue (same in both themes) */
+    --primary-hover: 0 82 204; /* #0052cc */
   }
 
   * {
@@ -87,6 +91,18 @@
 
   .text-theme-tertiary {
     color: rgb(var(--text-tertiary));
+  }
+
+  .bg-primary {
+    background-color: rgb(var(--primary));
+  }
+
+  .hover\:bg-primary-hover:hover {
+    background-color: rgb(var(--primary-hover));
+  }
+
+  .text-primary {
+    color: rgb(var(--primary));
   }
 }
 
