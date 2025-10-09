@@ -47,8 +47,8 @@ class UserResponse(BaseModel):
     display_name: Optional[str]
     avatar_url: Optional[str]
     bio: Optional[str]
-    is_breeder: bool
-    is_active: bool
+    is_breeder: Optional[bool] = False
+    is_active: Optional[bool] = True
     created_at: datetime
     # Community fields
     profile_bio: Optional[str] = None
