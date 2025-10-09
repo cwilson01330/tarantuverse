@@ -169,7 +169,7 @@ export default function DashboardPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-white">Welcome back, {user.display_name || user.username}! 🕷️</h1>
-              <p className="text-blue-100 mt-1">Manage your tarantula collection</p>
+              <p className="text-white/90 mt-1">Manage your tarantula collection</p>
             </div>
             <div className="flex flex-wrap gap-3">
               <button
