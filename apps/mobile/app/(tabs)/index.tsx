@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface Tarantula {
   id: string;
@@ -45,6 +46,7 @@ interface CollectionStats {
 export default function CollectionScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
@@ -154,7 +156,7 @@ export default function CollectionScreen() {
           <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.image} />
         ) : (
           <View style={styles.placeholderImage}>
-            <MaterialCommunityIcons name="spider" size={40} color="#d1d5db" />
+            <MaterialCommunityIcons name="spider" size={40} color={colors.textTertiary} />
           </View>
         )}
         {item.sex && (
@@ -178,10 +180,231 @@ export default function CollectionScreen() {
     </TouchableOpacity>
   );
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    list: {
+      padding: 8,
+    },
+    statsCard: {
+      margin: 8,
+      marginBottom: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    statsHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    statsTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    viewAllLink: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.primary,
+    },
+    statsGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginBottom: 16,
+    },
+    statItem: {
+      alignItems: 'center',
+    },
+    statValue: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: colors.primary,
+      marginBottom: 4,
+    },
+    statLabel: {
+      fontSize: 12,
+      color: colors.textTertiary,
+    },
+    sexDistribution: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    sexItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    sexText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    card: {
+      flex: 1,
+      margin: 8,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    imageContainer: {
+      position: 'relative',
+    },
+    image: {
+      width: '100%',
+      height: 150,
+      borderTopLeftRadius: 12,
+      borderTopRightRadius: 12,
+    },
+    placeholderImage: {
+      width: '100%',
+      height: 150,
+      backgroundColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderTopLeftRadius: 12,
+      borderTopRightRadius: 12,
+    },
+    sexBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    maleBadge: {
+      backgroundColor: '#3b82f6',
+    },
+    femaleBadge: {
+      backgroundColor: '#ec4899',
+    },
+    feedingBadge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    feedingBadgeGreen: {
+      backgroundColor: 'rgba(34, 197, 94, 0.9)',
+    },
+    feedingBadgeYellow: {
+      backgroundColor: 'rgba(234, 179, 8, 0.9)',
+    },
+    feedingBadgeOrange: {
+      backgroundColor: 'rgba(249, 115, 22, 0.9)',
+    },
+    feedingBadgeRed: {
+      backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    },
+    feedingBadgeText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    cardContent: {
+      padding: 12,
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    scientificName: {
+      fontSize: 13,
+      fontStyle: 'italic',
+      color: colors.textTertiary,
+      marginBottom: 2,
+    },
+    commonName: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    empty: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 32,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.textTertiary,
+      textAlign: 'center',
+      marginBottom: 24,
+    },
+    addButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 8,
+    },
+    addButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      bottom: 20,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+  });
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#0066ff" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -190,7 +413,7 @@ export default function CollectionScreen() {
     <View style={styles.container}>
       {tarantulas.length === 0 ? (
         <View style={styles.empty}>
-          <MaterialCommunityIcons name="spider" size={64} color="#d1d5db" />
+          <MaterialCommunityIcons name="spider" size={64} color={colors.textTertiary} />
           <Text style={styles.emptyTitle}>No Tarantulas Yet</Text>
           <Text style={styles.emptyText}>
             Start building your collection by adding your first tarantula
@@ -248,7 +471,7 @@ export default function CollectionScreen() {
                       <Text style={styles.sexText}>{collectionStats.sex_distribution.female} ♀</Text>
                     </View>
                     <View style={styles.sexItem}>
-                      <MaterialCommunityIcons name="help-circle" size={16} color="#9ca3af" />
+                      <MaterialCommunityIcons name="help-circle" size={16} color={colors.textTertiary} />
                       <Text style={styles.sexText}>{collectionStats.sex_distribution.unknown} ?</Text>
                     </View>
                   </View>
@@ -256,7 +479,7 @@ export default function CollectionScreen() {
               ) : null
             }
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0066ff']} />
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
             }
           />
           <TouchableOpacity
@@ -270,223 +493,3 @@ export default function CollectionScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0a0a0f',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  list: {
-    padding: 8,
-  },
-  statsCard: {
-    margin: 8,
-    marginBottom: 16,
-    backgroundColor: '#1a1a24',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#2a2a3a',
-  },
-  statsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  statsTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#e5e7eb',
-  },
-  viewAllLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0066ff',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0066ff',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  sexDistribution: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#2a2a3a',
-  },
-  sexItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  sexText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#d1d5db',
-  },
-  card: {
-    flex: 1,
-    margin: 8,
-    backgroundColor: '#1a1a24',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#2a2a3a',
-  },
-  imageContainer: {
-    position: 'relative',
-  },
-  image: {
-    width: '100%',
-    height: 150,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  placeholderImage: {
-    width: '100%',
-    height: 150,
-    backgroundColor: '#2a2a3a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  sexBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  maleBadge: {
-    backgroundColor: '#3b82f6',
-  },
-  femaleBadge: {
-    backgroundColor: '#ec4899',
-  },
-  feedingBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  feedingBadgeGreen: {
-    backgroundColor: 'rgba(34, 197, 94, 0.9)',
-  },
-  feedingBadgeYellow: {
-    backgroundColor: 'rgba(234, 179, 8, 0.9)',
-  },
-  feedingBadgeOrange: {
-    backgroundColor: 'rgba(249, 115, 22, 0.9)',
-  },
-  feedingBadgeRed: {
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-  },
-  feedingBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  cardContent: {
-    padding: 12,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#e5e7eb',
-    marginBottom: 4,
-  },
-  scientificName: {
-    fontSize: 13,
-    fontStyle: 'italic',
-    color: '#9ca3af',
-    marginBottom: 2,
-  },
-  commonName: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  empty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#e5e7eb',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0066ff',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#0066ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-});

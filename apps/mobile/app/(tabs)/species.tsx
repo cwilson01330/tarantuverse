@@ -1,6 +1,28 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function SpeciesScreen() {
+  const { colors } = useTheme();
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: 'bold',
+      marginBottom: 8,
+      color: colors.textPrimary,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+    },
+  });
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>📚 Species Database</Text>
@@ -8,22 +30,3 @@ export default function SpeciesScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0a0a0f',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#e5e7eb',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#9ca3af',
-  },
-});

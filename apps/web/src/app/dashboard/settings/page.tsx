@@ -2,27 +2,67 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiClient } from '@/lib/api';
 import { useThemeStore } from '@/stores/themeStore';
-import { Moon, Sun, User, Bell, Lock, Mail, Globe } from 'lucide-react';
+import { Moon, Sun, User, Bell, Lock, Globe } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useThemeStore();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string>('');
 
   useEffect(() => {
-    fetchUser();
+    // Use setTimeout to ensure this runs after component mounts
+    const timer = setTimeout(() => {
+      fetchUser();
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchUser = async () => {
     try {
-      const response = await apiClient.get('/users/me');
-      setUser(response.data);
+      // Check if we're in the browser
+      if (typeof window === 'undefined') {
+        console.log('Settings - Not in browser yet');
+        return;
+      }
+
+      const token = localStorage.getItem('auth_token');
+      const userData = localStorage.getItem('user');
+
+      console.log('Settings - Auth check:', { 
+        hasToken: !!token, 
+        hasUserData: !!userData,
+        tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
+      });
+
+      if (!token || !userData) {
+        setAuthError('No authentication found. Please log in.');
+        console.log('Settings - No auth, redirecting to login');
+        // Give user a moment to see the error before redirect
+        setTimeout(() => {
+          router.push('/login');
+        }, 1000);
+        return;
+      }
+
+      try {
+        const parsedUser = JSON.parse(userData);
+        console.log('Settings - User loaded:', parsedUser);
+        setUser(parsedUser);
+        setAuthError('');
+      } catch (parseError) {
+        console.error('Settings - Failed to parse user data:', parseError);
+        setAuthError('Invalid user data. Please log in again.');
+        setTimeout(() => {
+          router.push('/login');
+        }, 1000);
+      }
     } catch (error) {
-      console.error('Failed to fetch user:', error);
-      router.push('/login');
+      console.error('Settings - Failed to fetch user:', error);
+      setAuthError('Authentication error: ' + (error as Error).message);
     } finally {
       setLoading(false);
     }
@@ -32,8 +72,19 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen bg-theme flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-theme-secondary">Loading settings...</p>
+          {authError ? (
+            <>
+              <div className="text-6xl mb-4">⚠️</div>
+              <p className="text-theme-primary text-xl mb-2">Authentication Error</p>
+              <p className="text-theme-secondary">{authError}</p>
+              <p className="text-theme-tertiary mt-4">Redirecting to login...</p>
+            </>
+          ) : (
+            <>
+              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-theme-secondary">Loading settings...</p>
+            </>
+          )}
         </div>
       </div>
     );
@@ -46,10 +97,10 @@ export default function SettingsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push('/dashboard')}
               className="text-white hover:text-gray-200 transition-colors"
             >
-              ← Back
+              ← Back to Dashboard
             </button>
             <h1 className="text-3xl font-bold text-white">Settings</h1>
           </div>
@@ -122,6 +173,12 @@ export default function SettingsPage() {
               <p className="text-sm text-theme-secondary mb-1">Email</p>
               <p className="font-semibold text-theme-primary">{user?.email}</p>
             </div>
+            <button
+              onClick={() => router.push('/dashboard/settings/profile')}
+              className="w-full px-4 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors font-medium"
+            >
+              Edit Profile Details
+            </button>
           </div>
         </section>
 

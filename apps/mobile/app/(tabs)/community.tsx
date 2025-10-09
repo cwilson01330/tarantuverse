@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface Keeper {
   id: number;
@@ -18,6 +19,7 @@ interface Keeper {
 
 export default function CommunityScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [keepers, setKeepers] = useState<Keeper[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,17 +73,17 @@ export default function CommunityScreen() {
 
   if (loading && keepers.length === 0) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.loadingEmoji}>🕷️</Text>
-        <Text style={styles.loadingText}>Loading community...</Text>
+        <Text style={[styles.loadingText, { color: colors.textPrimary }]}>Loading community...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
         <View>
           <Text style={styles.headerTitle}>🌐 Community</Text>
           <Text style={styles.headerSubtitle}>Connect with keepers</Text>
@@ -89,31 +91,31 @@ export default function CommunityScreen() {
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabs}>
+      <View style={[styles.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'keepers' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'keepers' && { ...styles.activeTab, borderBottomColor: colors.primary }]}
           onPress={() => setActiveTab('keepers')}
         >
           <MaterialCommunityIcons 
             name="account-group" 
             size={20} 
-            color={activeTab === 'keepers' ? '#0066ff' : '#6b7280'} 
+            color={activeTab === 'keepers' ? colors.primary : colors.textSecondary} 
           />
-          <Text style={[styles.tabText, activeTab === 'keepers' && styles.activeTabText]}>
+          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'keepers' && { color: colors.primary }]}>
             Keepers
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'board' && styles.activeTab]}
+          style={[styles.tab, activeTab === 'board' && { ...styles.activeTab, borderBottomColor: colors.primary }]}
           onPress={() => setActiveTab('board')}
         >
           <MaterialCommunityIcons 
             name="message-text" 
             size={20} 
-            color={activeTab === 'board' ? '#0066ff' : '#6b7280'} 
+            color={activeTab === 'board' ? colors.primary : colors.textSecondary} 
           />
-          <Text style={[styles.tabText, activeTab === 'board' && styles.activeTabText]}>
+          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'board' && { color: colors.primary }]}>
             Message Board
           </Text>
         </TouchableOpacity>
@@ -122,11 +124,12 @@ export default function CommunityScreen() {
       {activeTab === 'keepers' ? (
         <>
           {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <MaterialCommunityIcons name="magnify" size={24} color="#9ca3af" style={styles.searchIcon} />
+          <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <MaterialCommunityIcons name="magnify" size={24} color={colors.textTertiary} style={styles.searchIcon} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.textPrimary }]}
               placeholder="Search keepers..."
+              placeholderTextColor={colors.textTertiary}
               value={searchQuery}
               onChangeText={setSearchQuery}
               onSubmitEditing={handleSearch}
@@ -134,7 +137,7 @@ export default function CommunityScreen() {
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => { setSearchQuery(''); fetchKeepers(); }}>
-                <MaterialCommunityIcons name="close-circle" size={20} color="#9ca3af" />
+                <MaterialCommunityIcons name="close-circle" size={20} color={colors.textTertiary} />
               </TouchableOpacity>
             )}
           </View>
@@ -143,14 +146,14 @@ export default function CommunityScreen() {
           <ScrollView
             style={styles.scrollView}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#0066ff" />
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
             }
           >
             {keepers.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyEmoji}>🔍</Text>
-                <Text style={styles.emptyTitle}>No keepers found</Text>
-                <Text style={styles.emptySubtitle}>
+                <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No keepers found</Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
                   {searchQuery ? 'Try a different search' : 'Be the first to make your profile public!'}
                 </Text>
               </View>
@@ -161,7 +164,7 @@ export default function CommunityScreen() {
                   return (
                     <TouchableOpacity
                       key={keeper.id}
-                      style={styles.keeperCard}
+                      style={[styles.keeperCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                       onPress={() => router.push(`/community/${keeper.username}`)}
                     >
                       <View style={styles.keeperHeader}>
@@ -169,23 +172,23 @@ export default function CommunityScreen() {
                           {keeper.avatar_url ? (
                             <Image source={{ uri: keeper.avatar_url }} style={styles.avatar} />
                           ) : (
-                            <View style={styles.avatarPlaceholder}>
+                            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]}>
                               <Text style={styles.avatarEmoji}>🕷️</Text>
                             </View>
                           )}
                         </View>
 
                         <View style={styles.keeperInfo}>
-                          <Text style={styles.keeperName}>{keeper.display_name}</Text>
-                          <Text style={styles.keeperUsername}>@{keeper.username}</Text>
+                          <Text style={[styles.keeperName, { color: colors.textPrimary }]}>{keeper.display_name}</Text>
+                          <Text style={[styles.keeperUsername, { color: colors.textTertiary }]}>@{keeper.username}</Text>
                           {keeper.profile_location && (
-                            <Text style={styles.keeperLocation}>📍 {keeper.profile_location}</Text>
+                            <Text style={[styles.keeperLocation, { color: colors.textSecondary }]}>📍 {keeper.profile_location}</Text>
                           )}
                         </View>
                       </View>
 
                       {keeper.profile_bio && (
-                        <Text style={styles.keeperBio} numberOfLines={2}>
+                        <Text style={[styles.keeperBio, { color: colors.textSecondary }]} numberOfLines={2}>
                           {keeper.profile_bio}
                         </Text>
                       )}
@@ -199,8 +202,8 @@ export default function CommunityScreen() {
                           </View>
                         )}
                         {keeper.profile_years_keeping && keeper.profile_years_keeping > 0 && (
-                          <View style={styles.badge}>
-                            <Text style={styles.badgeText}>
+                          <View style={[styles.badge, { backgroundColor: colors.border }]}>
+                            <Text style={[styles.badgeText, { color: colors.textSecondary }]}>
                               {keeper.profile_years_keeping}yr{keeper.profile_years_keeping !== 1 ? 's' : ''}
                             </Text>
                           </View>
@@ -210,21 +213,21 @@ export default function CommunityScreen() {
                       {keeper.profile_specialties && keeper.profile_specialties.length > 0 && (
                         <View style={styles.specialties}>
                           {keeper.profile_specialties.slice(0, 3).map((specialty, index) => (
-                            <View key={index} style={styles.specialtyBadge}>
-                              <Text style={styles.specialtyText}>{formatSpecialty(specialty)}</Text>
+                            <View key={index} style={[styles.specialtyBadge, { backgroundColor: colors.border }]}>
+                              <Text style={[styles.specialtyText, { color: colors.textSecondary }]}>{formatSpecialty(specialty)}</Text>
                             </View>
                           ))}
                           {keeper.profile_specialties.length > 3 && (
-                            <View style={styles.specialtyBadge}>
-                              <Text style={styles.specialtyText}>+{keeper.profile_specialties.length - 3}</Text>
+                            <View style={[styles.specialtyBadge, { backgroundColor: colors.border }]}>
+                              <Text style={[styles.specialtyText, { color: colors.textSecondary }]}>+{keeper.profile_specialties.length - 3}</Text>
                             </View>
                           )}
                         </View>
                       )}
 
-                      <View style={styles.viewProfileButton}>
-                        <Text style={styles.viewProfileText}>View Profile</Text>
-                        <MaterialCommunityIcons name="chevron-right" size={20} color="#0066ff" />
+                      <View style={[styles.viewProfileButton, { borderTopColor: colors.border }]}>
+                        <Text style={[styles.viewProfileText, { color: colors.primary }]}>View Profile</Text>
+                        <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
                       </View>
                     </TouchableOpacity>
                   );
@@ -236,19 +239,19 @@ export default function CommunityScreen() {
       ) : (
         <View style={styles.comingSoon}>
           <Text style={styles.comingSoonEmoji}>💬</Text>
-          <Text style={styles.comingSoonTitle}>Message Board</Text>
-          <Text style={styles.comingSoonSubtitle}>Share your thoughts with the community!</Text>
+          <Text style={[styles.comingSoonTitle, { color: colors.textPrimary }]}>Message Board</Text>
+          <Text style={[styles.comingSoonSubtitle, { color: colors.textSecondary }]}>Share your thoughts with the community!</Text>
           <TouchableOpacity 
-            style={styles.openBoardButton}
+            style={[styles.openBoardButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/community/board')}
           >
             <Text style={styles.openBoardButtonText}>Open Message Board</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.backButton}
+            style={[styles.backButton, { borderColor: colors.border }]}
             onPress={() => setActiveTab('keepers')}
           >
-            <Text style={styles.backButtonText}>← Back to Keepers</Text>
+            <Text style={[styles.backButtonText, { color: colors.textSecondary }]}>← Back to Keepers</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -259,16 +262,13 @@ export default function CommunityScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0a0a0f',
   },
   header: {
-    backgroundColor: '#0066ff',
     padding: 20,
     paddingTop: 60,
     paddingBottom: 20,
@@ -285,9 +285,7 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: '#1a1a24',
     borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3a',
   },
   tab: {
     flex: 1,
@@ -299,25 +297,20 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#0066ff',
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#9ca3af',
   },
   activeTabText: {
-    color: '#0066ff',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1a1a24',
     margin: 16,
     paddingHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2a2a3a',
   },
   searchIcon: {
     marginRight: 8,
@@ -326,7 +319,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#e5e7eb',
   },
   scrollView: {
     flex: 1,
@@ -336,7 +328,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   keeperCard: {
-    backgroundColor: '#1a1a24',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -346,7 +337,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#2a2a3a',
   },
   keeperHeader: {
     flexDirection: 'row',
@@ -364,7 +354,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#0066ff',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -378,21 +367,17 @@ const styles = StyleSheet.create({
   keeperName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#e5e7eb',
     marginBottom: 2,
   },
   keeperUsername: {
     fontSize: 14,
-    color: '#9ca3af',
     marginBottom: 4,
   },
   keeperLocation: {
     fontSize: 12,
-    color: '#6b7280',
   },
   keeperBio: {
     fontSize: 14,
-    color: '#d1d5db',
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -406,12 +391,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#0066ff33',
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#60a5fa',
   },
   specialties: {
     flexDirection: 'row',
@@ -423,12 +406,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#ff009933',
   },
   specialtyText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#ff0099',
   },
   viewProfileButton: {
     flexDirection: 'row',
@@ -436,12 +417,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#2a2a3a',
   },
   viewProfileText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0066ff',
     marginRight: 4,
   },
   emptyState: {
@@ -455,12 +434,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#e5e7eb',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#9ca3af',
     textAlign: 'center',
   },
   loadingEmoji: {
@@ -469,7 +446,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 18,
-    color: '#9ca3af',
   },
   comingSoon: {
     flex: 1,
@@ -484,19 +460,16 @@ const styles = StyleSheet.create({
   comingSoonTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#e5e7eb',
     marginBottom: 8,
   },
   comingSoonSubtitle: {
     fontSize: 14,
-    color: '#9ca3af',
     textAlign: 'center',
     marginBottom: 24,
   },
   openBoardButton: {
     paddingHorizontal: 28,
     paddingVertical: 14,
-    backgroundColor: '#0066ff',
     borderRadius: 12,
     marginBottom: 16,
     shadowColor: '#000',
@@ -514,11 +487,10 @@ const styles = StyleSheet.create({
   backButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#0066ff',
     borderRadius: 12,
+    borderWidth: 1,
   },
   backButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
