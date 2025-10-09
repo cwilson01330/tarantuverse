@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
@@ -373,7 +374,6 @@ export default function CollectionScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      backgroundColor: colors.primary,
       paddingVertical: 12,
       paddingHorizontal: 24,
       borderRadius: 8,
@@ -390,14 +390,20 @@ export default function CollectionScreen() {
       width: 56,
       height: 56,
       borderRadius: 28,
-      backgroundColor: colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
       shadowRadius: 8,
       elevation: 8,
+      overflow: 'hidden',
+    },
+    fabGradient: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     },
   });
 
@@ -419,11 +425,18 @@ export default function CollectionScreen() {
             Start building your collection by adding your first tarantula
           </Text>
           <TouchableOpacity
-            style={styles.addButton}
             onPress={() => router.push('/add-tarantula')}
+            activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.addButtonText}>Add Tarantula</Text>
+            <LinearGradient
+              colors={['#0066ff', '#ff0099']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.addButton}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+              <Text style={styles.addButtonText}>Add Tarantula</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       ) : (
@@ -485,8 +498,16 @@ export default function CollectionScreen() {
           <TouchableOpacity
             style={styles.fab}
             onPress={() => router.push('/add-tarantula')}
+            activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+            <LinearGradient
+              colors={['#0066ff', '#ff0099']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.fabGradient}
+            >
+              <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+            </LinearGradient>
           </TouchableOpacity>
         </>
       )}

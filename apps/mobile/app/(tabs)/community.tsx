@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Image } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -83,12 +84,17 @@ export default function CommunityScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.primary }]}>
+      <LinearGradient
+        colors={['#0066ff', '#ff0099']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <View>
           <Text style={styles.headerTitle}>🌐 Community</Text>
           <Text style={styles.headerSubtitle}>Connect with keepers</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Tabs */}
       <View style={[styles.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -242,10 +248,17 @@ export default function CommunityScreen() {
           <Text style={[styles.comingSoonTitle, { color: colors.textPrimary }]}>Message Board</Text>
           <Text style={[styles.comingSoonSubtitle, { color: colors.textSecondary }]}>Share your thoughts with the community!</Text>
           <TouchableOpacity 
-            style={[styles.openBoardButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/community/board')}
+            activeOpacity={0.8}
           >
-            <Text style={styles.openBoardButtonText}>Open Message Board</Text>
+            <LinearGradient
+              colors={['#0066ff', '#ff0099']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.openBoardButton}
+            >
+              <Text style={styles.openBoardButtonText}>Open Message Board</Text>
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.backButton, { borderColor: colors.border }]}
