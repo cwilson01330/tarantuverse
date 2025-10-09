@@ -19,6 +19,7 @@ import app.routers.photos as photos
 import app.routers.analytics as analytics
 import app.routers.follows as follows
 import app.routers.direct_messages as direct_messages
+import app.routers.forums as forums
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -80,6 +81,9 @@ app.include_router(follows.router, tags=["follows", "community"])
 
 print("[STARTUP] Registering direct messages router...")
 app.include_router(direct_messages.router, tags=["direct_messages", "community"])
+
+print("[STARTUP] Registering forums router...")
+app.include_router(forums.router, tags=["forums", "community"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"
