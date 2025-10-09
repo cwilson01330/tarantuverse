@@ -33,9 +33,12 @@
 1. In R2 dashboard, click "Manage R2 API Tokens"
 2. Create token with "Object Read & Write" permissions
 3. Save these values:
-   - Account ID
-   - Access Key ID
-   - Secret Access Key
+   - Account ID:809935ae1f0e5bae17b468ef2475fc11
+   - Access Key ID:744ed65fc86f7f602f560c61e735722d
+   - Secret Access Key:a7e961a4e7aa891b0171eb1622b497d61e0cdbd275cab269af77da99cf59645a
+   - Token Value:o1PWDrEJbPklrTmZu5VedAO4Y63vePywAXm9H-aF
+   - Endpoint: https://809935ae1f0e5bae17b468ef2475fc11.r2.cloudflarestorage.com
+   
 ```
 
 ### 3️⃣ Configure Render (3 minutes)

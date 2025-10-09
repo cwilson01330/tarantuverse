@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import ActivityFeed from '@/components/ActivityFeed'
 
 interface Keeper {
   id: number
@@ -29,6 +30,7 @@ export default function CommunityPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [experienceFilter, setExperienceFilter] = useState('')
   const [specialtyFilter, setSpecialtyFilter] = useState('')
+  const [activeTab, setActiveTab] = useState<'keepers' | 'activity'>('keepers')
 
   useEffect(() => {
     fetchKeepers()
@@ -182,13 +184,43 @@ export default function CommunityPage() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setActiveTab('keepers')}
+              className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
+                activeTab === 'keepers'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              👥 Keepers
+            </button>
+            <button
+              onClick={() => setActiveTab('activity')}
+              className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
+                activeTab === 'activity'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              📊 Community Activity
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">
-            {error}
-          </div>
-        )}
+        {activeTab === 'keepers' ? (
+          <>
+            {error && (
+              <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">
+                {error}
+              </div>
+            )}
 
         {keepers.length === 0 ? (
           <div className="text-center py-16">
@@ -294,6 +326,14 @@ export default function CommunityPage() {
               ))}
             </div>
           </>
+        )}
+          </>
+        ) : (
+          // Activity Feed Tab
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Community Activity</h2>
+            <ActivityFeed feedType="global" showFilters={true} />
+          </div>
         )}
       </div>
     </div>

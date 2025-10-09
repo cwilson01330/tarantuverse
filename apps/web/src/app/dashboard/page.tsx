@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import ActivityFeed from '@/components/ActivityFeed'
 
 interface User {
   id: string
@@ -241,23 +242,27 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Search Bar */}
-        {tarantulas.length > 0 && (
-          <div className="mb-6">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search your collection..."
-                className="w-full px-6 py-4 pl-12 bg-white rounded-2xl shadow-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 placeholder-gray-400"
-              />
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">
-                🔍
+        {/* Two-column layout for collection and activity feed */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main content - Collection */}
+          <div className="lg:col-span-2">
+            {/* Search Bar */}
+            {tarantulas.length > 0 && (
+              <div className="mb-6">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search your collection..."
+                    className="w-full px-6 py-4 pl-12 bg-white rounded-2xl shadow-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                  />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">
+                    🔍
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
         {/* Collection Grid */}
         {tarantulas.length === 0 ? (
@@ -360,6 +365,16 @@ export default function DashboardPage() {
             )}
           </div>
         )}
+          </div>
+
+          {/* Sidebar - Activity Feed */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent Activity</h2>
+              <ActivityFeed feedType="personalized" showFilters={false} />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Floating Action Button (Mobile-friendly) */}

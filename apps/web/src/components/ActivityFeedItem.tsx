@@ -1,0 +1,248 @@
+import Link from "next/link";
+import {
+  User,
+  Bug,
+  Droplet,
+  UserPlus,
+  MessageSquare,
+  MessageCircle,
+} from "lucide-react";
+
+export type ActionType =
+  | "new_tarantula"
+  | "molt"
+  | "feeding"
+  | "follow"
+  | "forum_thread"
+  | "forum_post";
+
+export interface ActivityFeedItemData {
+  id: number;
+  user_id: string;
+  action_type: ActionType;
+  target_type: string;
+  target_id: number;
+  metadata: Record<string, any>;
+  created_at: string;
+  user: {
+    id: string;
+    username: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+}
+
+interface ActivityFeedItemProps {
+  activity: ActivityFeedItemData;
+}
+
+export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "just now";
+    if (diffInSeconds < 3600)
+      return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400)
+      return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800)
+      return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    if (diffInSeconds < 2592000)
+      return `${Math.floor(diffInSeconds / 604800)}w ago`;
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  const getActionIcon = () => {
+    switch (activity.action_type) {
+      case "new_tarantula":
+        return <Bug className="w-5 h-5 text-purple-600" />;
+      case "molt":
+        return <Bug className="w-5 h-5 text-blue-600" />;
+      case "feeding":
+        return <Droplet className="w-5 h-5 text-green-600" />;
+      case "follow":
+        return <UserPlus className="w-5 h-5 text-pink-600" />;
+      case "forum_thread":
+        return <MessageSquare className="w-5 h-5 text-orange-600" />;
+      case "forum_post":
+        return <MessageCircle className="w-5 h-5 text-teal-600" />;
+      default:
+        return <User className="w-5 h-5 text-gray-600" />;
+    }
+  };
+
+  const getActionText = () => {
+    const username = activity.user.display_name || activity.user.username;
+    const metadata = activity.metadata || {};
+
+    switch (activity.action_type) {
+      case "new_tarantula":
+        return (
+          <>
+            <Link
+              href={`/community/${activity.user.username}`}
+              className="font-semibold text-purple-600 hover:text-purple-800"
+            >
+              {username}
+            </Link>
+            <span className="text-gray-700"> added a new tarantula: </span>
+            <span className="font-semibold text-gray-900">
+              {metadata.name || "Unnamed"}
+            </span>
+            {metadata.scientific_name && (
+              <span className="text-gray-500 text-sm ml-1">
+                ({metadata.scientific_name})
+              </span>
+            )}
+          </>
+        );
+
+      case "molt":
+        return (
+          <>
+            <Link
+              href={`/community/${activity.user.username}`}
+              className="font-semibold text-blue-600 hover:text-blue-800"
+            >
+              {username}
+            </Link>
+            <span className="text-gray-700"> logged a molt for </span>
+            <span className="font-semibold text-gray-900">
+              {metadata.tarantula_name || "a tarantula"}
+            </span>
+          </>
+        );
+
+      case "feeding":
+        const accepted = metadata.accepted ? "accepted" : "refused";
+        const acceptedColor = metadata.accepted
+          ? "text-green-600"
+          : "text-red-600";
+        return (
+          <>
+            <Link
+              href={`/community/${activity.user.username}`}
+              className="font-semibold text-green-600 hover:text-green-800"
+            >
+              {username}
+            </Link>
+            <span className="text-gray-700"> fed </span>
+            <span className="font-semibold text-gray-900">
+              {metadata.tarantula_name || "a tarantula"}
+            </span>
+            {metadata.prey_type && (
+              <span className="text-gray-700">
+                {" "}
+                {metadata.prey_type} (
+                <span className={acceptedColor}>{accepted}</span>)
+              </span>
+            )}
+          </>
+        );
+
+      case "follow":
+        return (
+          <>
+            <Link
+              href={`/community/${activity.user.username}`}
+              className="font-semibold text-pink-600 hover:text-pink-800"
+            >
+              {username}
+            </Link>
+            <span className="text-gray-700"> started following </span>
+            <Link
+              href={`/community/${metadata.followed_username}`}
+              className="font-semibold text-pink-600 hover:text-pink-800"
+            >
+              {metadata.followed_display_name || metadata.followed_username}
+            </Link>
+          </>
+        );
+
+      case "forum_thread":
+        return (
+          <>
+            <Link
+              href={`/community/${activity.user.username}`}
+              className="font-semibold text-orange-600 hover:text-orange-800"
+            >
+              {username}
+            </Link>
+            <span className="text-gray-700"> created a thread: </span>
+            <Link
+              href={`/community/forums/thread/${activity.target_id}`}
+              className="font-semibold text-orange-600 hover:text-orange-800"
+            >
+              {metadata.title || "Untitled"}
+            </Link>
+            {metadata.category && (
+              <span className="text-gray-500 text-sm ml-1">
+                in {metadata.category}
+              </span>
+            )}
+          </>
+        );
+
+      case "forum_post":
+        return (
+          <>
+            <Link
+              href={`/community/${activity.user.username}`}
+              className="font-semibold text-teal-600 hover:text-teal-800"
+            >
+              {username}
+            </Link>
+            <span className="text-gray-700"> replied to </span>
+            <Link
+              href={`/community/forums/thread/${metadata.thread_id}`}
+              className="font-semibold text-teal-600 hover:text-teal-800"
+            >
+              {metadata.thread_title || "a thread"}
+            </Link>
+          </>
+        );
+
+      default:
+        return (
+          <>
+            <Link
+              href={`/community/${activity.user.username}`}
+              className="font-semibold text-gray-600 hover:text-gray-800"
+            >
+              {username}
+            </Link>
+            <span className="text-gray-700"> performed an action</span>
+          </>
+        );
+    }
+  };
+
+  return (
+    <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+      {/* Icon */}
+      <div className="flex-shrink-0 mt-1">{getActionIcon()}</div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm leading-relaxed">{getActionText()}</div>
+        <div className="text-xs text-gray-500 mt-1">
+          {formatRelativeTime(activity.created_at)}
+        </div>
+      </div>
+
+      {/* User Avatar */}
+      <div className="flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 text-white flex items-center justify-center font-semibold text-sm">
+          {(activity.user.display_name || activity.user.username)
+            .charAt(0)
+            .toUpperCase()}
+        </div>
+      </div>
+    </div>
+  );
+}
