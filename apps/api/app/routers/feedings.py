@@ -77,7 +77,7 @@ async def create_feeding_log(
         target_id=tarantula_id,
         metadata={
             "tarantula_name": tarantula.name,
-            "prey_type": feeding_data.prey_type,
+            "food_type": feeding_data.food_type,
             "accepted": feeding_data.accepted
         }
     )
