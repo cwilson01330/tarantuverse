@@ -53,8 +53,8 @@ async def list_public_keepers(
             )
         )
     
-    # Order by most recently updated profiles first
-    query = query.order_by(User.updated_at.desc())
+    # Order by most recently created/updated profiles first
+    query = query.order_by(User.created_at.desc())
     
     # Apply pagination
     keepers = query.offset(offset).limit(limit).all()
