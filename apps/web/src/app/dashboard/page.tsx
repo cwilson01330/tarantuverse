@@ -146,7 +146,12 @@ export default function DashboardPage() {
   }
 
   if (!user || loading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
+    return <div className="flex min-h-screen items-center justify-center bg-dark">
+      <div className="text-center">
+        <div className="text-6xl mb-4">🕷️</div>
+        <p className="text-xl text-gray-300">Loading...</p>
+      </div>
+    </div>
   }
 
   const filteredTarantulas = searchQuery
@@ -157,43 +162,43 @@ export default function DashboardPage() {
     : tarantulas
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-dark">
       {/* Header with gradient */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white shadow-lg">
+      <div className="bg-gradient-primary shadow-lg shadow-electric-blue-500/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold">Welcome back, {user.display_name || user.username}! 🕷️</h1>
-              <p className="text-purple-100 mt-1">Manage your tarantula collection</p>
+              <h1 className="text-3xl font-bold text-white">Welcome back, {user.display_name || user.username}! 🕷️</h1>
+              <p className="text-electric-blue-100 mt-1">Manage your tarantula collection</p>
             </div>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => router.push('/dashboard/analytics')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
               >
                 📊 Analytics
               </button>
               <button
                 onClick={() => router.push('/community')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
               >
                 🌐 Community
               </button>
               <button
-                onClick={() => router.push('/community/board')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+                onClick={() => router.push('/community/forums')}
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
               >
-                💬 Message Board
+                💬 Forums
               </button>
               <button
                 onClick={() => router.push('/dashboard/settings/profile')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
               >
                 ⚙️ Settings
               </button>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
               >
                 Logout
               </button>
@@ -205,38 +210,38 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-dark-50 rounded-2xl shadow-lg border border-electric-blue-500/20 p-6 hover:shadow-electric-blue-500/30 hover:border-electric-blue-500/40 transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-2xl">
+              <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center text-2xl shadow-lg shadow-electric-blue-500/30">
                 🕷️
               </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium">My Collection</p>
-                <p className="text-3xl font-bold text-gray-900">{tarantulas.length}</p>
+                <p className="text-sm text-gray-400 font-medium">My Collection</p>
+                <p className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">{tarantulas.length}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-dark-50 rounded-2xl shadow-lg border border-neon-pink-500/20 p-6 hover:shadow-neon-pink-500/30 hover:border-neon-pink-500/40 transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-2xl">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-neon-pink-500 to-neon-pink-600 flex items-center justify-center text-2xl shadow-lg shadow-neon-pink-500/30">
                 🍴
               </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium">Recent Feedings</p>
-                <p className="text-3xl font-bold text-gray-900">0</p>
+                <p className="text-sm text-gray-400 font-medium">Recent Feedings</p>
+                <p className="text-3xl font-bold text-neon-pink-400">0</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+          <div className="bg-dark-50 rounded-2xl shadow-lg border border-electric-blue-500/20 p-6 hover:shadow-electric-blue-500/30 hover:border-electric-blue-500/40 transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-2xl">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-electric-blue-400 to-electric-blue-600 flex items-center justify-center text-2xl shadow-lg shadow-electric-blue-500/30">
                 📊
               </div>
               <div>
-                <p className="text-sm text-gray-600 font-medium">Upcoming Molts</p>
-                <p className="text-3xl font-bold text-gray-900">0</p>
+                <p className="text-sm text-gray-400 font-medium">Upcoming Molts</p>
+                <p className="text-3xl font-bold text-electric-blue-400">0</p>
               </div>
             </div>
           </div>
@@ -255,9 +260,9 @@ export default function DashboardPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search your collection..."
-                    className="w-full px-6 py-4 pl-12 bg-white rounded-2xl shadow-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 placeholder-gray-400"
+                    className="w-full px-6 py-4 pl-12 bg-dark-50 rounded-2xl shadow-lg border border-electric-blue-500/20 focus:outline-none focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent text-gray-100 placeholder-gray-500"
                   />
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-xl">
                     🔍
                   </div>
                 </div>
@@ -266,15 +271,15 @@ export default function DashboardPage() {
 
         {/* Collection Grid */}
         {tarantulas.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+          <div className="bg-dark-50 rounded-2xl shadow-lg border border-electric-blue-500/20 p-12 text-center">
             <div className="text-6xl mb-4">🕷️</div>
-            <h2 className="text-2xl font-bold mb-3 text-gray-900">Your Collection is Empty</h2>
-            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            <h2 className="text-2xl font-bold mb-3 text-gray-100">Your Collection is Empty</h2>
+            <p className="text-gray-400 mb-8 max-w-md mx-auto">
               Start tracking your tarantulas by adding your first one! Keep detailed records of feedings, molts, and husbandry.
             </p>
             <button
               onClick={() => router.push('/dashboard/tarantulas/add')}
-              className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 font-semibold shadow-lg shadow-purple-500/30"
+              className="px-8 py-4 bg-gradient-primary text-white rounded-xl hover:bg-gradient-primary-hover transition-all duration-200 font-semibold shadow-lg shadow-electric-blue-500/30 hover:shadow-electric-blue-500/50"
             >
               ➕ Add First Tarantula
             </button>
@@ -282,21 +287,21 @@ export default function DashboardPage() {
         ) : (
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-gray-100">
                 {searchQuery ? `Search Results (${filteredTarantulas.length})` : 'My Collection'}
               </h2>
               <button
                 onClick={() => router.push('/dashboard/tarantulas/add')}
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-xl hover:from-purple-700 hover:to-purple-800 transition-all duration-200 font-semibold shadow-lg shadow-purple-500/20"
+                className="px-6 py-3 bg-gradient-primary text-white rounded-xl hover:bg-gradient-primary-hover transition-all duration-200 font-semibold shadow-lg shadow-electric-blue-500/30 hover:shadow-electric-blue-500/50"
               >
                 ➕ Add Tarantula
               </button>
             </div>
 
             {filteredTarantulas.length === 0 ? (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+              <div className="bg-dark-50 rounded-2xl shadow-lg border border-electric-blue-500/20 p-12 text-center">
                 <div className="text-4xl mb-3">🔍</div>
-                <p className="text-gray-600">No tarantulas match your search.</p>
+                <p className="text-gray-400">No tarantulas match your search.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -304,10 +309,10 @@ export default function DashboardPage() {
                   <div
                     key={tarantula.id}
                     onClick={() => router.push(`/dashboard/tarantulas/${tarantula.id}`)}
-                    className="group relative overflow-hidden rounded-2xl bg-white shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100"
+                    className="group relative overflow-hidden rounded-2xl bg-dark-50 shadow-lg hover:shadow-electric-blue-500/30 transition-all duration-300 cursor-pointer border border-electric-blue-500/20 hover:border-electric-blue-500/40"
                   >
                     {/* Image with gradient overlay */}
-                    <div className="relative h-48 overflow-hidden bg-gradient-to-br from-purple-100 to-blue-100">
+                    <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
                       {tarantula.photo_url ? (
                         <>
                           <img
@@ -315,10 +320,10 @@ export default function DashboardPage() {
                             alt={tarantula.common_name}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                         </>
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-7xl">
+                        <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
                           🕷️
                         </div>
                       )}
@@ -326,7 +331,7 @@ export default function DashboardPage() {
                       {/* Feeding status badge */}
                       <div className="absolute top-3 right-3">
                         {getFeedingStatusBadge(tarantula.id) || (
-                          <span className="px-3 py-1 rounded-full bg-gray-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
+                          <span className="px-3 py-1 rounded-full bg-gray-700/90 backdrop-blur-sm text-gray-300 text-xs font-semibold shadow-lg border border-gray-600/50">
                             No data
                           </span>
                         )}
@@ -335,22 +340,22 @@ export default function DashboardPage() {
 
                     {/* Content */}
                     <div className="p-5">
-                      <h3 className="font-bold text-lg text-gray-900 mb-1 line-clamp-1">
+                      <h3 className="font-bold text-lg text-gray-100 mb-1 line-clamp-1">
                         {tarantula.common_name}
                       </h3>
-                      <p className="text-sm italic text-gray-600 mb-3 line-clamp-1">
+                      <p className="text-sm italic text-gray-400 mb-3 line-clamp-1">
                         {tarantula.scientific_name}
                       </p>
 
                       {/* Quick stats */}
                       <div className="flex flex-wrap gap-2">
                         {tarantula.sex && (
-                          <span className="px-3 py-1 rounded-lg bg-purple-100 text-purple-700 text-xs font-semibold">
+                          <span className="px-3 py-1 rounded-lg bg-electric-blue-500/20 text-electric-blue-300 text-xs font-semibold border border-electric-blue-500/30">
                             {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
                           </span>
                         )}
                         {tarantula.date_acquired && (
-                          <span className="px-3 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold">
+                          <span className="px-3 py-1 rounded-lg bg-neon-pink-500/20 text-neon-pink-300 text-xs font-semibold border border-neon-pink-500/30">
                             📅 {new Date(tarantula.date_acquired).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
                           </span>
                         )}
@@ -358,7 +363,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-purple-600/0 to-purple-600/0 group-hover:from-purple-600/10 group-hover:to-transparent transition-all duration-300 pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-electric-blue-600/0 to-neon-pink-600/0 group-hover:from-electric-blue-600/10 group-hover:to-neon-pink-600/5 transition-all duration-300 pointer-events-none" />
                   </div>
                 ))}
               </div>
@@ -370,7 +375,7 @@ export default function DashboardPage() {
           {/* Sidebar - Activity Feed */}
           <div className="lg:col-span-1">
             <div className="sticky top-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent Activity</h2>
+              <h2 className="text-2xl font-bold text-gray-100 mb-4">Recent Activity</h2>
               <ActivityFeed feedType="personalized" showFilters={false} />
             </div>
           </div>
@@ -381,7 +386,7 @@ export default function DashboardPage() {
       {tarantulas.length > 0 && (
         <button
           onClick={() => router.push('/dashboard/tarantulas/add')}
-          className="fixed bottom-6 right-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-2xl hover:scale-110 transition-transform duration-200 flex items-center justify-center text-2xl sm:text-3xl z-50 shadow-purple-500/40"
+          className="fixed bottom-6 right-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-primary text-white shadow-2xl shadow-electric-blue-500/40 hover:scale-110 hover:shadow-electric-blue-500/60 transition-all duration-200 flex items-center justify-center text-2xl sm:text-3xl z-50"
           aria-label="Add tarantula"
         >
           ➕

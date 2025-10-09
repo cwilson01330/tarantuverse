@@ -60,19 +60,19 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
   const getActionIcon = () => {
     switch (activity.action_type) {
       case "new_tarantula":
-        return <Bug className="w-5 h-5 text-purple-600" />;
+        return <Bug className="w-5 h-5 text-neon-pink-400" />;
       case "molt":
-        return <Bug className="w-5 h-5 text-blue-600" />;
+        return <Bug className="w-5 h-5 text-electric-blue-400" />;
       case "feeding":
-        return <Droplet className="w-5 h-5 text-green-600" />;
+        return <Droplet className="w-5 h-5 text-green-400" />;
       case "follow":
-        return <UserPlus className="w-5 h-5 text-pink-600" />;
+        return <UserPlus className="w-5 h-5 text-neon-pink-400" />;
       case "forum_thread":
-        return <MessageSquare className="w-5 h-5 text-orange-600" />;
+        return <MessageSquare className="w-5 h-5 text-electric-blue-400" />;
       case "forum_post":
-        return <MessageCircle className="w-5 h-5 text-teal-600" />;
+        return <MessageCircle className="w-5 h-5 text-neon-pink-400" />;
       default:
-        return <User className="w-5 h-5 text-gray-600" />;
+        return <User className="w-5 h-5 text-gray-400" />;
     }
   };
 
@@ -86,12 +86,12 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
           <>
             <Link
               href={`/community/${activity.user.username}`}
-              className="font-semibold text-purple-600 hover:text-purple-800"
+              className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {username}
             </Link>
-            <span className="text-gray-700"> added a new tarantula: </span>
-            <span className="font-semibold text-gray-900">
+            <span className="text-gray-300"> added a new tarantula: </span>
+            <span className="font-semibold text-gray-100">
               {metadata.name || "Unnamed"}
             </span>
             {metadata.scientific_name && (
@@ -107,12 +107,12 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
           <>
             <Link
               href={`/community/${activity.user.username}`}
-              className="font-semibold text-blue-600 hover:text-blue-800"
+              className="font-semibold text-electric-blue-400 hover:text-electric-blue-300"
             >
               {username}
             </Link>
-            <span className="text-gray-700"> logged a molt for </span>
-            <span className="font-semibold text-gray-900">
+            <span className="text-gray-300"> logged a molt for </span>
+            <span className="font-semibold text-gray-100">
               {metadata.tarantula_name || "a tarantula"}
             </span>
           </>
@@ -121,22 +121,22 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
       case "feeding":
         const accepted = metadata.accepted ? "accepted" : "refused";
         const acceptedColor = metadata.accepted
-          ? "text-green-600"
-          : "text-red-600";
+          ? "text-green-400"
+          : "text-red-400";
         return (
           <>
             <Link
               href={`/community/${activity.user.username}`}
-              className="font-semibold text-green-600 hover:text-green-800"
+              className="font-semibold text-green-400 hover:text-green-300"
             >
               {username}
             </Link>
-            <span className="text-gray-700"> fed </span>
-            <span className="font-semibold text-gray-900">
+            <span className="text-gray-300"> fed </span>
+            <span className="font-semibold text-gray-100">
               {metadata.tarantula_name || "a tarantula"}
             </span>
             {metadata.prey_type && (
-              <span className="text-gray-700">
+              <span className="text-gray-300">
                 {" "}
                 {metadata.prey_type} (
                 <span className={acceptedColor}>{accepted}</span>)
@@ -150,14 +150,14 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
           <>
             <Link
               href={`/community/${activity.user.username}`}
-              className="font-semibold text-pink-600 hover:text-pink-800"
+              className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {username}
             </Link>
-            <span className="text-gray-700"> started following </span>
+            <span className="text-gray-300"> started following </span>
             <Link
               href={`/community/${metadata.followed_username}`}
-              className="font-semibold text-pink-600 hover:text-pink-800"
+              className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {metadata.followed_display_name || metadata.followed_username}
             </Link>
@@ -169,14 +169,14 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
           <>
             <Link
               href={`/community/${activity.user.username}`}
-              className="font-semibold text-orange-600 hover:text-orange-800"
+              className="font-semibold text-electric-blue-400 hover:text-electric-blue-300"
             >
               {username}
             </Link>
-            <span className="text-gray-700"> created a thread: </span>
+            <span className="text-gray-300"> created a thread: </span>
             <Link
               href={`/community/forums/thread/${activity.target_id}`}
-              className="font-semibold text-orange-600 hover:text-orange-800"
+              className="font-semibold text-electric-blue-400 hover:text-electric-blue-300"
             >
               {metadata.title || "Untitled"}
             </Link>
@@ -193,14 +193,14 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
           <>
             <Link
               href={`/community/${activity.user.username}`}
-              className="font-semibold text-teal-600 hover:text-teal-800"
+              className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {username}
             </Link>
-            <span className="text-gray-700"> replied to </span>
+            <span className="text-gray-300"> replied to </span>
             <Link
               href={`/community/forums/thread/${metadata.thread_id}`}
-              className="font-semibold text-teal-600 hover:text-teal-800"
+              className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {metadata.thread_title || "a thread"}
             </Link>
@@ -212,18 +212,18 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
           <>
             <Link
               href={`/community/${activity.user.username}`}
-              className="font-semibold text-gray-600 hover:text-gray-800"
+              className="font-semibold text-gray-400 hover:text-gray-300"
             >
               {username}
             </Link>
-            <span className="text-gray-700"> performed an action</span>
+            <span className="text-gray-300"> performed an action</span>
           </>
         );
     }
   };
 
   return (
-    <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow">
+    <div className="flex items-start gap-3 p-4 bg-dark-50 rounded-lg shadow-lg border border-electric-blue-500/20 hover:shadow-electric-blue-500/30 hover:border-electric-blue-500/30 transition-all">
       {/* Icon */}
       <div className="flex-shrink-0 mt-1">{getActionIcon()}</div>
 
@@ -237,7 +237,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
 
       {/* User Avatar */}
       <div className="flex-shrink-0">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 text-white flex items-center justify-center font-semibold text-sm">
+        <div className="w-10 h-10 rounded-full bg-gradient-primary text-white flex items-center justify-center font-semibold text-sm shadow-lg shadow-electric-blue-500/30">
           {(activity.user.display_name || activity.user.username)
             .charAt(0)
             .toUpperCase()}
