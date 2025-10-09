@@ -49,10 +49,10 @@ export default function ForumsPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="h-8 bg-dark-50 rounded w-1/4"></div>
+          <div className="h-32 bg-dark-50 rounded"></div>
+          <div className="h-32 bg-dark-50 rounded"></div>
+          <div className="h-32 bg-dark-50 rounded"></div>
         </div>
       </div>
     );
@@ -61,7 +61,7 @@ export default function ForumsPage() {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+        <div className="bg-red-900/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg">
           <p className="font-bold">Error</p>
           <p>{error}</p>
         </div>
@@ -72,19 +72,19 @@ export default function ForumsPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Community Forums</h1>
-        <p className="text-gray-600">
+      <div className="mb-8 bg-gradient-primary rounded-lg p-8 shadow-lg shadow-electric-blue-500/20">
+        <h1 className="text-3xl font-bold text-white mb-2">Community Forums</h1>
+        <p className="text-white/80">
           Connect with fellow tarantula keepers, share experiences, and learn from the community
         </p>
       </div>
 
       {/* Categories List */}
       {categories.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md p-8 text-center">
           <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">No Categories Yet</h3>
-          <p className="text-gray-500">Forum categories will appear here once created.</p>
+          <h3 className="text-xl font-semibold text-gray-100 mb-2">No Categories Yet</h3>
+          <p className="text-gray-400">Forum categories will appear here once created.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -92,7 +92,7 @@ export default function ForumsPage() {
             <Link
               key={category.id}
               href={`/community/forums/${category.slug}`}
-              className="block bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow"
+              className="block bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md hover:shadow-lg hover:shadow-electric-blue-500/20 hover:border-electric-blue-500/40 transition-all"
             >
               <div className="p-6">
                 <div className="flex items-start justify-between">
@@ -101,30 +101,30 @@ export default function ForumsPage() {
                       {category.icon && (
                         <span className="text-2xl">{category.icon}</span>
                       )}
-                      <h2 className="text-xl font-semibold text-gray-900">
+                      <h2 className="text-xl font-semibold text-gray-100">
                         {category.name}
                       </h2>
                     </div>
                     {category.description && (
-                      <p className="text-gray-600 mb-3">{category.description}</p>
+                      <p className="text-gray-300 mb-3">{category.description}</p>
                     )}
                   </div>
 
                   {/* Stats */}
-                  <div className="flex gap-6 ml-6 text-sm text-gray-500">
+                  <div className="flex gap-6 ml-6 text-sm text-gray-400">
                     <div className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4" />
+                      <MessageSquare className="w-4 h-4 text-electric-blue-400" />
                       <div className="text-center">
-                        <div className="font-semibold text-gray-900">
+                        <div className="font-semibold text-gray-100">
                           {category.thread_count}
                         </div>
                         <div>Threads</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
+                      <Users className="w-4 h-4 text-neon-pink-400" />
                       <div className="text-center">
-                        <div className="font-semibold text-gray-900">
+                        <div className="font-semibold text-gray-100">
                           {category.post_count}
                         </div>
                         <div>Posts</div>
@@ -139,9 +139,9 @@ export default function ForumsPage() {
       )}
 
       {/* Info Box */}
-      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="font-semibold text-blue-900 mb-2">Forum Guidelines</h3>
-        <ul className="text-blue-800 text-sm space-y-1 list-disc list-inside">
+      <div className="mt-8 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-lg p-6">
+        <h3 className="font-semibold text-electric-blue-300 mb-2">Forum Guidelines</h3>
+        <ul className="text-gray-300 text-sm space-y-1 list-disc list-inside">
           <li>Be respectful and courteous to all members</li>
           <li>Stay on topic within each category</li>
           <li>Search before posting to avoid duplicates</li>

@@ -71,32 +71,32 @@ export default function NewThreadPage() {
       <div className="mb-6">
         <Link
           href={`/community/forums/${categorySlug}`}
-          className="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-4"
+          className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to {categorySlug}
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900">Create New Thread</h1>
+        <h1 className="text-3xl font-bold text-gray-100">Create New Thread</h1>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-4">
+        <div className="bg-red-900/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg mb-4">
           <p className="font-bold">Error</p>
           <p>{error}</p>
         </div>
       )}
 
       {/* Form */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Title */}
           <div>
             <label
               htmlFor="title"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
-              Thread Title <span className="text-red-500">*</span>
+              Thread Title <span className="text-neon-pink-400">*</span>
             </label>
             <input
               type="text"
@@ -106,11 +106,11 @@ export default function NewThreadPage() {
                 setFormData({ ...formData, title: e.target.value })
               }
               placeholder="Enter a descriptive title for your thread"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent"
               required
               maxLength={200}
             />
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-400 mt-1">
               {formData.title.length}/200 characters
             </p>
           </div>
@@ -119,9 +119,9 @@ export default function NewThreadPage() {
           <div>
             <label
               htmlFor="content"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-gray-300 mb-2"
             >
-              Content <span className="text-red-500">*</span>
+              Content <span className="text-neon-pink-400">*</span>
             </label>
             <textarea
               id="content"
@@ -130,21 +130,21 @@ export default function NewThreadPage() {
                 setFormData({ ...formData, content: e.target.value })
               }
               placeholder="Write your message here..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent resize-none"
               rows={12}
               required
             />
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-400 mt-1">
               Be respectful and follow community guidelines
             </p>
           </div>
 
           {/* Guidelines Box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">
+          <div className="bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-lg p-4">
+            <h3 className="font-semibold text-electric-blue-300 mb-2">
               Posting Guidelines
             </h3>
-            <ul className="text-sm text-blue-800 space-y-1">
+            <ul className="text-sm text-gray-300 space-y-1">
               <li>• Be respectful and courteous to other members</li>
               <li>• Stay on topic and relevant to the category</li>
               <li>• No spam, advertising, or self-promotion</li>
@@ -159,14 +159,14 @@ export default function NewThreadPage() {
               type="button"
               onClick={handleCancel}
               disabled={submitting}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-dark-50 border border-electric-blue-500/20 text-gray-300 rounded-lg hover:border-electric-blue-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || !formData.title.trim() || !formData.content.trim()}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-gradient-primary text-white rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? "Creating Thread..." : "Create Thread"}
             </button>

@@ -99,10 +99,10 @@ export default function CategoryPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-20 bg-gray-200 rounded"></div>
-          <div className="h-20 bg-gray-200 rounded"></div>
-          <div className="h-20 bg-gray-200 rounded"></div>
+          <div className="h-8 bg-dark-50 rounded w-1/4"></div>
+          <div className="h-20 bg-dark-50 rounded"></div>
+          <div className="h-20 bg-dark-50 rounded"></div>
+          <div className="h-20 bg-dark-50 rounded"></div>
         </div>
       </div>
     );
@@ -111,13 +111,13 @@ export default function CategoryPage() {
   if (error) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-4">
+        <div className="bg-red-900/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg mb-4">
           <p className="font-bold">Error</p>
           <p>{error}</p>
         </div>
         <Link
           href="/community/forums"
-          className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
+          className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Forums
@@ -132,21 +132,21 @@ export default function CategoryPage() {
       <div className="mb-6">
         <Link
           href="/community/forums"
-          className="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-4"
+          className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Forums
         </Link>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2 capitalize">
+            <h1 className="text-3xl font-bold text-gray-100 mb-2 capitalize">
               {categorySlug.replace(/-/g, " ")}
             </h1>
-            <p className="text-gray-600">{total} threads</p>
+            <p className="text-gray-400">{total} threads</p>
           </div>
           <button
             onClick={() => router.push(`/community/forums/${categorySlug}/new`)}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="bg-gradient-primary text-white px-6 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all"
           >
             New Thread
           </button>
@@ -157,30 +157,30 @@ export default function CategoryPage() {
       <div className="mb-4 flex gap-2">
         <button
           onClick={() => setSortBy("recent")}
-          className={`px-4 py-2 rounded-lg transition-colors ${
+          className={`px-4 py-2 rounded-lg transition-all ${
             sortBy === "recent"
-              ? "bg-blue-600 text-white"
-              : "bg-white text-gray-700 hover:bg-gray-100"
+              ? "bg-electric-blue-500 text-white shadow-lg shadow-electric-blue-500/30"
+              : "bg-dark-50 border border-electric-blue-500/20 text-gray-300 hover:border-electric-blue-500/40"
           }`}
         >
           Recent
         </button>
         <button
           onClick={() => setSortBy("popular")}
-          className={`px-4 py-2 rounded-lg transition-colors ${
+          className={`px-4 py-2 rounded-lg transition-all ${
             sortBy === "popular"
-              ? "bg-blue-600 text-white"
-              : "bg-white text-gray-700 hover:bg-gray-100"
+              ? "bg-neon-pink-500 text-white shadow-lg shadow-neon-pink-500/30"
+              : "bg-dark-50 border border-electric-blue-500/20 text-gray-300 hover:border-electric-blue-500/40"
           }`}
         >
           Popular
         </button>
         <button
           onClick={() => setSortBy("pinned")}
-          className={`px-4 py-2 rounded-lg transition-colors ${
+          className={`px-4 py-2 rounded-lg transition-all ${
             sortBy === "pinned"
-              ? "bg-blue-600 text-white"
-              : "bg-white text-gray-700 hover:bg-gray-100"
+              ? "bg-gradient-primary text-white shadow-lg shadow-electric-blue-500/30"
+              : "bg-dark-50 border border-electric-blue-500/20 text-gray-300 hover:border-electric-blue-500/40"
           }`}
         >
           Pinned
@@ -189,13 +189,13 @@ export default function CategoryPage() {
 
       {/* Threads List */}
       {threads.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md p-8 text-center">
           <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">No Threads Yet</h3>
-          <p className="text-gray-500 mb-4">Be the first to start a discussion!</p>
+          <h3 className="text-xl font-semibold text-gray-100 mb-2">No Threads Yet</h3>
+          <p className="text-gray-400 mb-4">Be the first to start a discussion!</p>
           <button
             onClick={() => router.push(`/community/forums/${categorySlug}/new`)}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="bg-gradient-primary text-white px-6 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all"
           >
             Create Thread
           </button>
@@ -206,25 +206,25 @@ export default function CategoryPage() {
             <Link
               key={thread.id}
               href={`/community/forums/thread/${thread.id}`}
-              className="block bg-white rounded-lg shadow hover:shadow-md transition-shadow p-4"
+              className="block bg-dark-50 border border-electric-blue-500/20 rounded-lg hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition-all p-4"
             >
               <div className="flex items-start gap-4">
                 {/* Thread Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     {thread.is_pinned && (
-                      <Pin className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <Pin className="w-4 h-4 text-neon-pink-400 flex-shrink-0" />
                     )}
                     {thread.is_locked && (
                       <Lock className="w-4 h-4 text-gray-500 flex-shrink-0" />
                     )}
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    <h3 className="text-lg font-semibold text-gray-100 truncate">
                       {thread.title}
                     </h3>
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-400">
                     by{" "}
-                    <span className="font-medium">
+                    <span className="font-medium text-electric-blue-400">
                       {thread.author.display_name || thread.author.username}
                     </span>{" "}
                     • {formatRelativeTime(thread.created_at)}
@@ -232,20 +232,20 @@ export default function CategoryPage() {
                 </div>
 
                 {/* Stats */}
-                <div className="flex gap-4 text-sm text-gray-500">
+                <div className="flex gap-4 text-sm text-gray-400">
                   <div className="flex items-center gap-1">
-                    <MessageSquare className="w-4 h-4" />
+                    <MessageSquare className="w-4 h-4 text-electric-blue-400" />
                     <span>{thread.post_count}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-4 h-4 text-neon-pink-400" />
                     <span>{thread.view_count}</span>
                   </div>
                 </div>
 
                 {/* Last Activity */}
                 {thread.last_post_at && thread.last_post_user && (
-                  <div className="text-sm text-gray-500 min-w-[150px] text-right">
+                  <div className="text-sm text-gray-400 min-w-[150px] text-right">
                     <div className="flex items-center gap-1 justify-end">
                       <Clock className="w-4 h-4" />
                       <span>{formatRelativeTime(thread.last_post_at)}</span>
@@ -269,15 +269,15 @@ export default function CategoryPage() {
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="px-4 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg bg-dark-50 border border-electric-blue-500/20 text-gray-300 hover:border-electric-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Previous
           </button>
-          <span className="px-4 py-2 text-gray-700">Page {page}</span>
+          <span className="px-4 py-2 text-gray-300">Page {page}</span>
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={!hasMore}
-            className="px-4 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg bg-dark-50 border border-electric-blue-500/20 text-gray-300 hover:border-electric-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Next
           </button>

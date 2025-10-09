@@ -176,9 +176,9 @@ export default function ThreadPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="h-8 bg-dark-50 rounded w-1/2"></div>
+          <div className="h-32 bg-dark-50 rounded"></div>
+          <div className="h-32 bg-dark-50 rounded"></div>
         </div>
       </div>
     );
@@ -187,13 +187,13 @@ export default function ThreadPage() {
   if (error || !thread) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-4">
+        <div className="bg-red-900/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg mb-4">
           <p className="font-bold">Error</p>
           <p>{error || "Thread not found"}</p>
         </div>
         <Link
           href="/community/forums"
-          className="text-blue-600 hover:text-blue-800 flex items-center gap-2"
+          className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Forums
@@ -210,23 +210,23 @@ export default function ThreadPage() {
       <div className="mb-6">
         <Link
           href="/community/forums"
-          className="text-blue-600 hover:text-blue-800 flex items-center gap-2 mb-4"
+          className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Forums
         </Link>
         <div className="flex items-center gap-3 mb-2">
-          {thread.is_pinned && <Pin className="w-5 h-5 text-blue-600" />}
+          {thread.is_pinned && <Pin className="w-5 h-5 text-neon-pink-400" />}
           {thread.is_locked && <Lock className="w-5 h-5 text-gray-500" />}
-          <h1 className="text-3xl font-bold text-gray-900">{thread.title}</h1>
+          <h1 className="text-3xl font-bold text-gray-100">{thread.title}</h1>
         </div>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
+        <div className="flex items-center gap-4 text-sm text-gray-400">
           <div className="flex items-center gap-1">
-            <MessageSquare className="w-4 h-4" />
+            <MessageSquare className="w-4 h-4 text-electric-blue-400" />
             <span>{thread.post_count} posts</span>
           </div>
           <div className="flex items-center gap-1">
-            <Eye className="w-4 h-4" />
+            <Eye className="w-4 h-4 text-neon-pink-400" />
             <span>{thread.view_count} views</span>
           </div>
         </div>
@@ -237,25 +237,25 @@ export default function ThreadPage() {
         {allPosts.map((post, index) => (
           <div
             key={post.id}
-            className="bg-white rounded-lg shadow-md overflow-hidden"
+            className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md overflow-hidden"
           >
             <div className="flex">
               {/* Author sidebar */}
-              <div className="bg-gray-50 p-4 w-48 border-r border-gray-200">
+              <div className="bg-dark-500/50 p-4 w-48 border-r border-electric-blue-500/20">
                 <div className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mx-auto mb-2 text-2xl font-bold">
+                  <div className="w-16 h-16 rounded-full bg-gradient-primary shadow-lg shadow-electric-blue-500/30 flex items-center justify-center mx-auto mb-2 text-2xl font-bold text-white">
                     {(post.author.display_name || post.author.username)
                       .charAt(0)
                       .toUpperCase()}
                   </div>
-                  <div className="font-semibold text-gray-900">
+                  <div className="font-semibold text-gray-100">
                     {post.author.display_name || post.author.username}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-gray-400">
                     @{post.author.username}
                   </div>
                   {index === 0 && (
-                    <div className="mt-2 text-xs text-blue-600 font-semibold">
+                    <div className="mt-2 text-xs text-neon-pink-400 font-semibold">
                       Thread Author
                     </div>
                   )}
@@ -265,7 +265,7 @@ export default function ThreadPage() {
               {/* Post content */}
               <div className="flex-1 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-400">
                     {formatDate(post.created_at)}
                     {post.is_edited && post.edited_at && (
                       <span className="ml-2 text-xs italic">
@@ -274,8 +274,8 @@ export default function ThreadPage() {
                     )}
                   </div>
                 </div>
-                <div className="prose max-w-none">
-                  <p className="text-gray-800 whitespace-pre-wrap">
+                <div className="prose max-w-none prose-invert">
+                  <p className="text-gray-200 whitespace-pre-wrap">
                     {post.content}
                   </p>
                 </div>
@@ -290,7 +290,7 @@ export default function ThreadPage() {
         <div className="text-center mb-8">
           <button
             onClick={() => fetchPosts(page + 1)}
-            className="bg-white text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="bg-dark-50 border border-electric-blue-500/20 text-gray-300 px-6 py-2 rounded-lg hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition-all"
           >
             Load More Posts
           </button>
@@ -299,8 +299,8 @@ export default function ThreadPage() {
 
       {/* Reply Form */}
       {!thread.is_locked && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md p-6">
+          <h3 className="text-xl font-semibold text-gray-100 mb-4">
             Post a Reply
           </h3>
           <form onSubmit={handleSubmitReply}>
@@ -308,7 +308,7 @@ export default function ThreadPage() {
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
               placeholder="Write your reply..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent resize-none"
               rows={6}
               required
             />
@@ -316,7 +316,7 @@ export default function ThreadPage() {
               <button
                 type="submit"
                 disabled={submitting || !replyContent.trim()}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gradient-primary text-white px-6 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? "Posting..." : "Post Reply"}
               </button>
@@ -326,9 +326,9 @@ export default function ThreadPage() {
       )}
 
       {thread.is_locked && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg p-6 text-center">
           <Lock className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-600">
+          <p className="text-gray-400">
             This thread is locked. No more replies can be posted.
           </p>
         </div>
