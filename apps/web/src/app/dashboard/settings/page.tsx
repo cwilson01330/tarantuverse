@@ -93,12 +93,12 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-theme">
       {/* Header */}
-      <div className="bg-primary">
+      <div className="bg-gradient-brand shadow-lg shadow-gradient-brand">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/dashboard')}
-              className="text-white hover:text-gray-200 transition-colors"
+              className="text-white hover:text-white/80 transition-colors"
             >
               ← Back to Dashboard
             </button>
@@ -130,7 +130,7 @@ export default function SettingsPage() {
               <button
                 onClick={toggleTheme}
                 className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                  theme === 'dark' ? 'bg-primary' : 'bg-gray-300'
+                  theme === 'dark' ? 'bg-gradient-brand' : 'bg-gray-300'
                 }`}
               >
                 <span
@@ -175,7 +175,7 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => router.push('/dashboard/settings/profile')}
-              className="w-full px-4 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg transition-colors font-medium"
+              className="w-full px-4 py-3 bg-gradient-brand hover:bg-gradient-brand-hover text-white rounded-lg transition-all font-medium shadow-lg shadow-gradient-brand"
             >
               Edit Profile Details
             </button>
