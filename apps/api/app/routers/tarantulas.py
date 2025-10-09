@@ -23,6 +23,7 @@ from app.schemas.tarantula import (
     PreyTypeCount
 )
 from app.utils.dependencies import get_current_user
+from app.services.activity_service import create_activity
 
 router = APIRouter()
 
@@ -73,6 +74,20 @@ async def create_tarantula(
     db.refresh(new_tarantula)
 
     print(f"[DEBUG] Tarantula created successfully: {new_tarantula.id}")
+    
+    # Create activity feed entry
+    await create_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="new_tarantula",
+        target_type="tarantula",
+        target_id=new_tarantula.id,
+        metadata={
+            "name": new_tarantula.name,
+            "common_name": new_tarantula.common_name,
+            "scientific_name": new_tarantula.scientific_name
+        }
+    )
 
     return new_tarantula
 

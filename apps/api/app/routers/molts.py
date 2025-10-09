@@ -12,6 +12,7 @@ from app.models.tarantula import Tarantula
 from app.models.molt_log import MoltLog
 from app.schemas.molt import MoltLogCreate, MoltLogUpdate, MoltLogResponse
 from app.utils.dependencies import get_current_user
+from app.services.activity_service import create_activity
 
 router = APIRouter()
 
@@ -64,6 +65,19 @@ async def create_molt_log(
     db.add(new_molt)
     db.commit()
     db.refresh(new_molt)
+    
+    # Create activity feed entry
+    await create_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="molt",
+        target_type="tarantula",
+        target_id=tarantula_id,
+        metadata={
+            "tarantula_name": tarantula.name,
+            "molt_id": str(new_molt.id)
+        }
+    )
 
     return new_molt
 

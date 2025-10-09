@@ -12,6 +12,7 @@ from app.models.tarantula import Tarantula
 from app.models.feeding_log import FeedingLog
 from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate, FeedingLogResponse
 from app.utils.dependencies import get_current_user
+from app.services.activity_service import create_activity
 
 router = APIRouter()
 
@@ -66,6 +67,20 @@ async def create_feeding_log(
     db.add(new_feeding)
     db.commit()
     db.refresh(new_feeding)
+    
+    # Create activity feed entry
+    await create_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="feeding",
+        target_type="tarantula",
+        target_id=tarantula_id,
+        metadata={
+            "tarantula_name": tarantula.name,
+            "prey_type": feeding_data.prey_type,
+            "accepted": feeding_data.accepted
+        }
+    )
 
     return new_feeding
 

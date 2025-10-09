@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.follow import Follow
 from app.utils.dependencies import get_current_user
+from app.services.activity_service import create_activity
 
 router = APIRouter(prefix="/api/v1/follows", tags=["follows"])
 
@@ -47,6 +48,19 @@ async def follow_user(
     )
     db.add(follow)
     db.commit()
+    
+    # Create activity feed entry
+    await create_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="follow",
+        target_type="user",
+        target_id=user_to_follow.id,
+        metadata={
+            "followed_username": user_to_follow.username,
+            "followed_display_name": user_to_follow.display_name
+        }
+    )
     
     return {"message": "Successfully followed user", "username": username}
 

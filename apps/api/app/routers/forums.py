@@ -18,6 +18,7 @@ from app.schemas.forum import (
     ForumThreadList, ForumPostList
 )
 from app.routers.auth import get_current_user
+from app.services.activity_service import create_activity
 
 router = APIRouter(prefix="/api/v1/forums", tags=["forums"])
 
@@ -257,6 +258,19 @@ async def create_thread(
     db.commit()
     db.refresh(thread)
     
+    # Create activity feed entry
+    await create_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="forum_thread",
+        target_type="thread",
+        target_id=thread.id,
+        metadata={
+            "thread_title": thread.title,
+            "category_name": category.name
+        }
+    )
+    
     # Load relationships for response
     thread = db.query(ForumThread).filter(ForumThread.id == thread.id).options(
         joinedload(ForumThread.author),
@@ -409,6 +423,20 @@ async def create_post(
     
     db.commit()
     db.refresh(post)
+    
+    # Create activity feed entry (only for replies, not first post)
+    # First post is created with the thread itself
+    await create_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="forum_post",
+        target_type="post",
+        target_id=post.id,
+        metadata={
+            "thread_title": thread.title,
+            "thread_id": thread.id
+        }
+    )
     
     # Load author relationship
     post = db.query(ForumPost).filter(ForumPost.id == post.id).options(
