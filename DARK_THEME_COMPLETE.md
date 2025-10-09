@@ -1,17 +1,26 @@
 # 🌃 Dark Theme Implementation - Complete
 
-**Status:** ✅ **100% Complete**  
-**Commits:** 
+**Status:** ✅ **100% Complete (Web + Mobile)**  
+**Web Commits:** 
 - `47ed436` - Initial dark mode (Tailwind, layout, dashboard, activity)
 - `325a915` - Community page dark theme
 - `c3a69fe` - Dark mode documentation
 - `bc9237c` - Forum pages dark theme (final)
 
+**Mobile Commits:**
+- `cda2b00` - Mobile app dark theme (all screens)
+
 ---
 
 ## 🎨 Overview
 
-The entire Tarantuverse web application has been transformed with a stunning cyberpunk-inspired dark theme featuring an electric blue (#0066ff) to neon pink (#ff0099) color palette. Dark mode is now the default experience with no toggle option.
+The entire Tarantuverse application (web and mobile) has been transformed with a stunning cyberpunk-inspired dark theme featuring an electric blue (#0066ff) to neon pink (#ff0099) color palette. Dark mode is now the default experience across all platforms.
+
+### Platforms
+- ✅ **Web Application**: Complete (Next.js with Tailwind CSS)
+- ✅ **Mobile Application**: Complete (React Native/Expo)
+
+For detailed mobile implementation, see [MOBILE_DARK_THEME.md](./MOBILE_DARK_THEME.md)
 
 ---
 
