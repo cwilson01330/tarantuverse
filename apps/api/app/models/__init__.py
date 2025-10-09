@@ -9,6 +9,8 @@ from app.models.molt_log import MoltLog
 from app.models.photo import Photo
 from app.models.follow import Follow
 from app.models.direct_message import Conversation, DirectMessage
+from app.models.forum import ForumCategory, ForumThread, ForumPost
+from app.models.activity_feed import ActivityFeed
 
 __all__ = [
     "User",
@@ -20,4 +22,8 @@ __all__ = [
     "Follow",
     "Conversation",
     "DirectMessage",
+    "ForumCategory",
+    "ForumThread",
+    "ForumPost",
+    "ActivityFeed",
 ]
