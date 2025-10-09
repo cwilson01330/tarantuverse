@@ -17,7 +17,7 @@ class ActivityFeed(Base):
     # Action types: 'new_tarantula', 'molt', 'feeding', 'follow', 'forum_thread', 'forum_post'
     target_type = Column(String(50), nullable=True)
     # Target types: 'tarantula', 'user', 'thread', 'post'
-    target_id = Column(Integer, nullable=True)
+    target_id = Column(String, nullable=True)  # String to support both UUID and integer IDs
     activity_metadata = Column(JSONB, nullable=True)
     # Flexible storage for action-specific data (species name, thread title, etc.)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
