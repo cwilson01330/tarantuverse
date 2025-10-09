@@ -164,7 +164,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-theme">
       {/* Header with gradient */}
-      <div className="bg-primary shadow-lg">
+      <div className="bg-gradient-brand shadow-lg shadow-gradient-brand">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
@@ -212,7 +212,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6 hover:shadow-xl transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center text-2xl shadow-lg">
+              <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center text-2xl shadow-lg shadow-gradient-brand">
                 🕷️
               </div>
               <div>
@@ -224,24 +224,24 @@ export default function DashboardPage() {
 
           <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6 hover:shadow-xl transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-pink-500 flex items-center justify-center text-2xl shadow-lg">
+              <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center text-2xl shadow-lg shadow-gradient-brand">
                 🍴
               </div>
               <div>
                 <p className="text-sm text-theme-secondary font-medium">Recent Feedings</p>
-                <p className="text-3xl font-bold text-pink-500">0</p>
+                <p className="text-3xl font-bold text-gradient-brand">0</p>
               </div>
             </div>
           </div>
 
           <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6 hover:shadow-xl transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-blue-500 flex items-center justify-center text-2xl shadow-lg">
+              <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center text-2xl shadow-lg shadow-gradient-brand">
                 📊
               </div>
               <div>
                 <p className="text-sm text-theme-secondary font-medium">Upcoming Molts</p>
-                <p className="text-3xl font-bold text-blue-500">0</p>
+                <p className="text-3xl font-bold text-gradient-brand">0</p>
               </div>
             </div>
           </div>
@@ -279,7 +279,7 @@ export default function DashboardPage() {
             </p>
             <button
               onClick={() => router.push('/dashboard/tarantulas/add')}
-              className="px-8 py-4 bg-primary text-white rounded-xl hover:bg-primary-hover transition-all duration-200 font-semibold shadow-lg shadow-lg hover:shadow-2xl"
+              className="px-8 py-4 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
             >
               ➕ Add First Tarantula
             </button>
@@ -292,7 +292,7 @@ export default function DashboardPage() {
               </h2>
               <button
                 onClick={() => router.push('/dashboard/tarantulas/add')}
-                className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-hover transition-all duration-200 font-semibold shadow-lg shadow-lg hover:shadow-2xl"
+                className="px-6 py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
               >
                 ➕ Add Tarantula
               </button>
@@ -386,7 +386,7 @@ export default function DashboardPage() {
       {tarantulas.length > 0 && (
         <button
           onClick={() => router.push('/dashboard/tarantulas/add')}
-          className="fixed bottom-6 right-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-primary text-white shadow-2xl shadow-xl hover:scale-110 hover:shadow-2xl transition-all duration-200 flex items-center justify-center text-2xl sm:text-3xl z-50"
+          className="fixed bottom-6 right-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-brand text-white shadow-2xl shadow-gradient-brand hover:scale-110 hover:shadow-2xl transition-all duration-200 flex items-center justify-center text-2xl sm:text-3xl z-50"
           aria-label="Add tarantula"
         >
           ➕

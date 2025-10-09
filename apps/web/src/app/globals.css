@@ -104,5 +104,35 @@
   .text-primary {
     color: rgb(var(--primary));
   }
+
+  /* Brand gradient - electric blue to neon pink */
+  .bg-gradient-brand {
+    background: linear-gradient(135deg, #0066ff 0%, #ff0099 100%);
+  }
+
+  .hover\:bg-gradient-brand-hover:hover {
+    background: linear-gradient(135deg, #0052cc 0%, #cc007a 100%);
+  }
+
+  /* Text gradient for headings */
+  .text-gradient-brand {
+    background: linear-gradient(135deg, #0066ff 0%, #ff0099 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Gradient border effect */
+  .border-gradient-brand {
+    border: 2px solid transparent;
+    background: linear-gradient(rgb(var(--surface)), rgb(var(--surface))) padding-box,
+                linear-gradient(135deg, #0066ff 0%, #ff0099 100%) border-box;
+  }
+
+  /* Gradient shadow for depth */
+  .shadow-gradient-brand {
+    box-shadow: 0 10px 40px -10px rgba(0, 102, 255, 0.3),
+                0 0 20px rgba(255, 0, 153, 0.2);
+  }
 }
 
