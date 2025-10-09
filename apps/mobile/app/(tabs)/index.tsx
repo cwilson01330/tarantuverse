@@ -404,7 +404,6 @@ export default function CollectionScreen() {
       justifyContent: 'center',
       alignItems: 'center',
     },
-    },
   });
 
   if (loading) {

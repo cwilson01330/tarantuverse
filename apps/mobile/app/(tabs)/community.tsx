@@ -18,10 +18,24 @@ interface Keeper {
   collection_visibility: string;
 }
 
+interface ForumCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  icon: string | null;
+  display_order: number;
+  thread_count: number;
+  post_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function CommunityScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [keepers, setKeepers] = useState<Keeper[]>([]);
+  const [categories, setCategories] = useState<ForumCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +43,7 @@ export default function CommunityScreen() {
 
   useEffect(() => {
     fetchKeepers();
+    fetchCategories();
   }, []);
 
   const fetchKeepers = async () => {
@@ -47,9 +62,22 @@ export default function CommunityScreen() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
+      const response = await fetch(`${API_URL}/api/v1/forums/categories`);
+      if (!response.ok) throw new Error('Failed to fetch categories');
+      const data = await response.json();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     fetchKeepers();
+    fetchCategories();
   };
 
   const handleSearch = () => {
@@ -243,30 +271,56 @@ export default function CommunityScreen() {
           </ScrollView>
         </>
       ) : (
-        <View style={styles.comingSoon}>
-          <Text style={styles.comingSoonEmoji}>💬</Text>
-          <Text style={[styles.comingSoonTitle, { color: colors.textPrimary }]}>Message Board</Text>
-          <Text style={[styles.comingSoonSubtitle, { color: colors.textSecondary }]}>Share your thoughts with the community!</Text>
-          <TouchableOpacity 
-            onPress={() => router.push('/community/board')}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#0066ff', '#ff0099']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.openBoardButton}
-            >
-              <Text style={styles.openBoardButtonText}>Open Message Board</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.backButton, { borderColor: colors.border }]}
-            onPress={() => setActiveTab('keepers')}
-          >
-            <Text style={[styles.backButtonText, { color: colors.textSecondary }]}>← Back to Keepers</Text>
-          </TouchableOpacity>
-        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
+          }
+        >
+          {categories.length === 0 ? (
+            <View style={styles.comingSoon}>
+              <Text style={styles.comingSoonEmoji}>💬</Text>
+              <Text style={[styles.comingSoonTitle, { color: colors.textPrimary }]}>No Categories Yet</Text>
+              <Text style={[styles.comingSoonSubtitle, { color: colors.textSecondary }]}>Forum categories will appear here once created</Text>
+            </View>
+          ) : (
+            <View style={{ gap: 12 }}>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => router.push(`/community/forums/${category.slug}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.categoryHeader}>
+                    {category.icon && <Text style={styles.categoryIcon}>{category.icon}</Text>}
+                    <Text style={[styles.categoryName, { color: colors.textPrimary }]}>{category.name}</Text>
+                  </View>
+                  {category.description && (
+                    <Text style={[styles.categoryDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {category.description}
+                    </Text>
+                  )}
+                  <View style={styles.categoryStats}>
+                    <View style={styles.statItem}>
+                      <MaterialCommunityIcons name="message-text" size={16} color={colors.primary} />
+                      <Text style={[styles.statText, { color: colors.textTertiary }]}>
+                        {category.thread_count} threads
+                      </Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <MaterialCommunityIcons name="chat" size={16} color={colors.primary} />
+                      <Text style={[styles.statText, { color: colors.textTertiary }]}>
+                        {category.post_count} posts
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </ScrollView>
       )}
     </View>
   );
@@ -505,6 +559,48 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  categoryCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  categoryIcon: {
+    fontSize: 24,
+  },
+  categoryName: {
+    fontSize: 18,
+    fontWeight: '700',
+    flex: 1,
+  },
+  categoryDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  categoryStats: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: 12,
     fontWeight: '600',
   },
 });
