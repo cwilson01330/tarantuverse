@@ -1,10 +1,12 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Switch } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme, colors } = useTheme();
   const router = useRouter();
 
   const handleLogout = () => {
@@ -25,6 +27,69 @@ export default function ProfileScreen() {
     );
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      alignItems: 'center',
+      padding: 32,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    avatarContainer: {
+      marginBottom: 16,
+    },
+    avatar: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+    },
+    avatarPlaceholder: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: colors.primary + '33',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    displayName: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    username: {
+      fontSize: 16,
+      color: colors.textTertiary,
+    },
+    section: {
+      marginTop: 16,
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: colors.border,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    menuText: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginLeft: 12,
+    },
+    logoutText: {
+      color: colors.error,
+    },
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -33,7 +98,7 @@ export default function ProfileScreen() {
             <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarPlaceholder}>
-              <MaterialCommunityIcons name="account" size={48} color="#0066ff" />
+              <MaterialCommunityIcons name="account" size={48} color={colors.primary} />
             </View>
           )}
         </View>
@@ -42,87 +107,42 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
+        <View style={styles.menuItem}>
+          <MaterialCommunityIcons 
+            name={theme === 'dark' ? 'weather-night' : 'weather-sunny'} 
+            size={24} 
+            color={colors.primary} 
+          />
+          <Text style={styles.menuText}>
+            {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+          </Text>
+          <Switch
+            value={theme === 'dark'}
+            onValueChange={toggleTheme}
+            trackColor={{ false: '#767577', true: colors.primary }}
+            thumbColor="#ffffff"
+          />
+        </View>
+
         <TouchableOpacity style={styles.menuItem}>
-          <MaterialCommunityIcons name="cog" size={24} color="#6b7280" />
+          <MaterialCommunityIcons name="cog" size={24} color={colors.textTertiary} />
           <Text style={styles.menuText}>Settings</Text>
-          <MaterialCommunityIcons name="chevron-right" size={24} color="#d1d5db" />
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <MaterialCommunityIcons name="shield-account" size={24} color="#6b7280" />
+          <MaterialCommunityIcons name="shield-account" size={24} color={colors.textTertiary} />
           <Text style={styles.menuText}>Privacy</Text>
-          <MaterialCommunityIcons name="chevron-right" size={24} color="#d1d5db" />
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-          <MaterialCommunityIcons name="logout" size={24} color="#ef4444" />
+          <MaterialCommunityIcons name="logout" size={24} color={colors.error} />
           <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
-          <MaterialCommunityIcons name="chevron-right" size={24} color="#d1d5db" />
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0a0a0f',
-  },
-  header: {
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#1a1a24',
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3a',
-  },
-  avatarContainer: {
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#0066ff33',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  displayName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#e5e7eb',
-    marginBottom: 4,
-  },
-  username: {
-    fontSize: 16,
-    color: '#9ca3af',
-  },
-  section: {
-    marginTop: 16,
-    backgroundColor: '#1a1a24',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#2a2a3a',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2a2a3a',
-  },
-  menuText: {
-    flex: 1,
-    fontSize: 16,
-    color: '#d1d5db',
-    marginLeft: 12,
-  },
-  logoutText: {
-    color: '#ef4444',
-  },
-});
