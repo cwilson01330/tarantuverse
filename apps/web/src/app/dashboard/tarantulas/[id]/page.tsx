@@ -630,22 +630,22 @@ export default function TarantulaDetailPage() {
   }
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
+    return <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Loading...</div>
   }
 
   if (error && !tarantula) {
     return (
-      <div className="min-h-screen p-8">
+      <div className="min-h-screen p-8 bg-white dark:bg-gray-900">
         <div className="max-w-4xl mx-auto">
           <div className="mb-6">
             <button
               onClick={() => router.push('/dashboard')}
-              className="text-gray-600 hover:text-gray-900"
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             >
               ← Back to Dashboard
             </button>
           </div>
-          <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded">
             {error}
           </div>
         </div>
@@ -663,7 +663,7 @@ export default function TarantulaDetailPage() {
     : null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       {/* Hero Section with Image */}
       <div className="relative">
         {/* Background Image or Gradient */}
@@ -729,7 +729,7 @@ export default function TarantulaDetailPage() {
       </div>
 
       {/* Action Buttons Bar */}
-      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-wrap gap-3 items-center">
             {tarantula.species_id && (
@@ -757,8 +757,8 @@ export default function TarantulaDetailPage() {
             </button>
             
             {/* Visibility Toggle */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
-              <span className="text-sm font-medium text-gray-700">
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
                 {tarantula.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
               </span>
               <button
@@ -778,7 +778,7 @@ export default function TarantulaDetailPage() {
 
             <button
               onClick={() => setDeleteConfirm(true)}
-              className="ml-auto px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-all duration-200 font-medium border border-red-200"
+              className="ml-auto px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 font-medium border border-red-200 dark:border-red-800"
             >
               🗑️ Delete
             </button>
@@ -788,7 +788,7 @@ export default function TarantulaDetailPage() {
 
       {error && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">
+          <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl">
             {error}
           </div>
         </div>
@@ -796,13 +796,13 @@ export default function TarantulaDetailPage() {
 
       {/* Tabs Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
+        <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
             className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'overview'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
           >
             📊 Overview
@@ -811,8 +811,8 @@ export default function TarantulaDetailPage() {
             onClick={() => setActiveTab('growth')}
             className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'growth'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
           >
             📈 Growth
@@ -821,8 +821,8 @@ export default function TarantulaDetailPage() {
             onClick={() => setActiveTab('logs')}
             className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'logs'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
           >
             📝 Logs
@@ -831,8 +831,8 @@ export default function TarantulaDetailPage() {
             onClick={() => setActiveTab('husbandry')}
             className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'husbandry'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
           >
             🏠 Husbandry
@@ -841,8 +841,8 @@ export default function TarantulaDetailPage() {
             onClick={() => setActiveTab('photos')}
             className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
               activeTab === 'photos'
-                ? 'border-purple-600 text-purple-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
             }`}
           >
             📸 Photos ({photos.length})
@@ -858,30 +858,30 @@ export default function TarantulaDetailPage() {
             {/* Main Info Card */}
             <div className="lg:col-span-2 space-y-6">
               {/* Basic Info */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Basic Information</h2>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Basic Information</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   {tarantula.date_acquired && (
                     <div>
-                      <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Date Acquired</p>
-                      <p className="text-lg text-gray-900">{new Date(tarantula.date_acquired).toLocaleDateString()}</p>
+                      <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Date Acquired</p>
+                      <p className="text-lg text-gray-900 dark:text-white">{new Date(tarantula.date_acquired).toLocaleDateString()}</p>
                     </div>
                   )}
                   {tarantula.source && (
                     <div>
-                      <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Source</p>
-                      <p className="text-lg text-gray-900 capitalize">{tarantula.source.replace('_', ' ')}</p>
+                      <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Source</p>
+                      <p className="text-lg text-gray-900 dark:text-white capitalize">{tarantula.source.replace('_', ' ')}</p>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Recent Activity Timeline */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Recent Activity</h2>
                 <div className="space-y-4">
                   {feedings.length === 0 && molts.length === 0 && substrateChanges.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                       <div className="text-4xl mb-2">📋</div>
                       <p>No activity logged yet</p>
                     </div>
@@ -896,15 +896,15 @@ export default function TarantulaDetailPage() {
                           const isSubstrate = 'changed_at' in item
                           
                           return (
-                            <div key={index} className="flex gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition">
+                            <div key={index} className="flex gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition">
                               <div className="text-3xl">
                                 {isFeeding ? '🍴' : isMolt ? '🔄' : '💨'}
                               </div>
                               <div className="flex-1">
-                                <p className="font-semibold text-gray-900">
+                                <p className="font-semibold text-gray-900 dark:text-white">
                                   {isFeeding ? `Fed ${item.food_type || 'food'}` : isMolt ? 'Molted' : 'Substrate Changed'}
                                 </p>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
                                   {new Date(item.fed_at || item.molted_at || item.changed_at).toLocaleDateString()}
                                 </p>
                               </div>
@@ -917,9 +917,9 @@ export default function TarantulaDetailPage() {
               </div>
 
               {tarantula.notes && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Notes</h2>
-                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{tarantula.notes}</p>
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Notes</h2>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{tarantula.notes}</p>
                 </div>
               )}
             </div>
@@ -950,13 +950,13 @@ export default function TarantulaDetailPage() {
 
               {/* Quick Husbandry */}
               {(tarantula.target_temp_min || tarantula.target_humidity_min) && (
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Environment</h3>
+                <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Environment</h3>
                   <div className="space-y-4">
                     {(tarantula.target_temp_min || tarantula.target_temp_max) && (
                       <div>
-                        <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Temperature</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Temperature</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
                           {tarantula.target_temp_min && `${tarantula.target_temp_min}°F`}
                           {tarantula.target_temp_min && tarantula.target_temp_max && ' - '}
                           {tarantula.target_temp_max && `${tarantula.target_temp_max}°F`}
@@ -965,8 +965,8 @@ export default function TarantulaDetailPage() {
                     )}
                     {(tarantula.target_humidity_min || tarantula.target_humidity_max) && (
                       <div>
-                        <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Humidity</p>
-                        <p className="text-2xl font-bold text-gray-900">
+                        <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Humidity</p>
+                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
                           {tarantula.target_humidity_min && `${tarantula.target_humidity_min}%`}
                           {tarantula.target_humidity_min && tarantula.target_humidity_max && ' - '}
                           {tarantula.target_humidity_max && `${tarantula.target_humidity_max}%`}
@@ -986,8 +986,8 @@ export default function TarantulaDetailPage() {
             {growthData ? (
               <GrowthChart data={growthData} />
             ) : (
-              <div className="bg-white rounded-lg shadow p-6">
-                <p className="text-gray-500 text-center py-8">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">
                   Loading growth data...
                 </p>
               </div>
@@ -999,9 +999,9 @@ export default function TarantulaDetailPage() {
         {activeTab === 'logs' && (
           <div className="space-y-8">
             {/* Feeding Logs Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">🍴 Feeding Logs</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">🍴 Feeding Logs</h2>
                 <button
                   onClick={() => setShowFeedingForm(!showFeedingForm)}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium shadow-sm"
@@ -1011,36 +1011,36 @@ export default function TarantulaDetailPage() {
               </div>
 
               {showFeedingForm && (
-                <form onSubmit={handleAddFeeding} className="mb-6 p-6 border-2 border-purple-100 rounded-xl bg-purple-50/50">
+                <form onSubmit={handleAddFeeding} className="mb-6 p-6 border-2 border-purple-100 dark:border-purple-900 rounded-xl bg-purple-50/50 dark:bg-purple-900/20">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Date & Time *</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Date & Time *</label>
                       <input
                         type="datetime-local"
                         required
                         value={feedingFormData.fed_at}
                         onChange={(e) => setFeedingFormData({ ...feedingFormData, fed_at: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Food Type</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Food Type</label>
                       <input
                         type="text"
                         value={feedingFormData.food_type}
                         onChange={(e) => setFeedingFormData({ ...feedingFormData, food_type: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                         placeholder="e.g., Cricket, Roach"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Food Size</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Food Size</label>
                       <select
                         value={feedingFormData.food_size}
                         onChange={(e) => setFeedingFormData({ ...feedingFormData, food_size: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       >
                         <option value="">Select...</option>
                         <option value="small">Small</option>
@@ -1049,11 +1049,11 @@ export default function TarantulaDetailPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Accepted?</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Accepted?</label>
                       <select
                         value={feedingFormData.accepted ? 'true' : 'false'}
                         onChange={(e) => setFeedingFormData({ ...feedingFormData, accepted: e.target.value === 'true' })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       >
                         <option value="true">Yes</option>
                         <option value="false">No</option>
@@ -1061,12 +1061,12 @@ export default function TarantulaDetailPage() {
                     </div>
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Notes</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Notes</label>
                     <textarea
                       value={feedingFormData.notes}
                       onChange={(e) => setFeedingFormData({ ...feedingFormData, notes: e.target.value })}
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       placeholder="Optional notes..."
                     />
                   </div>
@@ -1081,39 +1081,39 @@ export default function TarantulaDetailPage() {
 
               <div className="space-y-3">
                 {feedings.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                     <div className="text-5xl mb-3">🍽️</div>
                     <p>No feeding logs yet</p>
                   </div>
                 ) : (
                   feedings.map((feeding) => (
-                    <div key={feeding.id} className="p-5 border border-gray-200 rounded-xl hover:shadow-md hover:border-purple-200 transition-all duration-200 bg-white">
+                    <div key={feeding.id} className="p-5 border border-gray-200 dark:border-gray-600 rounded-xl hover:shadow-md hover:border-purple-200 dark:hover:border-purple-700 transition-all duration-200 bg-white dark:bg-gray-700">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-2xl">🍴</span>
                             <div>
-                              <p className="font-bold text-gray-900">
+                              <p className="font-bold text-gray-900 dark:text-white">
                                 {new Date(feeding.fed_at).toLocaleDateString()} at {new Date(feeding.fed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </p>
                               {feeding.food_type && (
-                                <p className="text-sm text-gray-700">
+                                <p className="text-sm text-gray-700 dark:text-gray-300">
                                   {feeding.food_type}
                                   {feeding.food_size && ` (${feeding.food_size})`}
                                 </p>
                               )}
                             </div>
                           </div>
-                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${feeding.accepted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${feeding.accepted ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
                             {feeding.accepted ? '✓ Accepted' : '✗ Refused'}
                           </span>
                           {feeding.notes && (
-                            <p className="text-sm text-gray-600 mt-2 pl-11">{feeding.notes}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 pl-11">{feeding.notes}</p>
                           )}
                         </div>
                         <button
                           onClick={() => handleDeleteFeeding(feeding.id)}
-                          className="ml-4 px-3 py-1 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition"
+                          className="ml-4 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-sm font-medium transition"
                         >
                           Delete
                         </button>
@@ -1125,9 +1125,9 @@ export default function TarantulaDetailPage() {
             </div>
 
             {/* Molt Logs Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">🔄 Molt Logs</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">🔄 Molt Logs</h2>
                 <button
                   onClick={() => setShowMoltForm(!showMoltForm)}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm"
@@ -1137,93 +1137,93 @@ export default function TarantulaDetailPage() {
               </div>
 
               {showMoltForm && (
-                <form onSubmit={handleAddMolt} className="mb-6 p-6 border-2 border-blue-100 rounded-xl bg-blue-50/50">
+                <form onSubmit={handleAddMolt} className="mb-6 p-6 border-2 border-blue-100 dark:border-blue-900 rounded-xl bg-blue-50/50 dark:bg-blue-900/20">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Molt Date & Time *</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Molt Date & Time *</label>
                       <input
                         type="datetime-local"
                         required
                         value={moltFormData.molted_at}
                         onChange={(e) => setMoltFormData({ ...moltFormData, molted_at: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Premolt Started</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Premolt Started</label>
                       <input
                         type="datetime-local"
                         value={moltFormData.premolt_started_at}
                         onChange={(e) => setMoltFormData({ ...moltFormData, premolt_started_at: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Leg Span Before (inches)</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Leg Span Before (inches)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={moltFormData.leg_span_before}
                         onChange={(e) => setMoltFormData({ ...moltFormData, leg_span_before: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                         placeholder="0.00"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Leg Span After (inches)</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Leg Span After (inches)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={moltFormData.leg_span_after}
                         onChange={(e) => setMoltFormData({ ...moltFormData, leg_span_after: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                         placeholder="0.00"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Weight Before (grams)</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Weight Before (grams)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={moltFormData.weight_before}
                         onChange={(e) => setMoltFormData({ ...moltFormData, weight_before: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                         placeholder="0.00"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Weight After (grams)</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Weight After (grams)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={moltFormData.weight_after}
                         onChange={(e) => setMoltFormData({ ...moltFormData, weight_after: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                         placeholder="0.00"
                       />
                     </div>
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Molt Photo URL</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Molt Photo URL</label>
                     <input
                       type="url"
                       value={moltFormData.image_url}
                       onChange={(e) => setMoltFormData({ ...moltFormData, image_url: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       placeholder="https://example.com/molt-photo.jpg"
                     />
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Notes</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Notes</label>
                     <textarea
                       value={moltFormData.notes}
                       onChange={(e) => setMoltFormData({ ...moltFormData, notes: e.target.value })}
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       placeholder="Optional notes about the molt..."
                     />
                   </div>
@@ -1238,23 +1238,23 @@ export default function TarantulaDetailPage() {
 
               <div className="space-y-3">
                 {molts.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                     <div className="text-5xl mb-3">🔄</div>
                     <p>No molt logs yet</p>
                   </div>
                 ) : (
                   molts.map((molt) => (
-                    <div key={molt.id} className="p-5 border border-gray-200 rounded-xl hover:shadow-md hover:border-purple-200 transition-all duration-200 bg-white">
+                    <div key={molt.id} className="p-5 border border-gray-200 dark:border-gray-600 rounded-xl hover:shadow-md hover:border-purple-200 dark:hover:border-purple-700 transition-all duration-200 bg-white dark:bg-gray-700">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-2xl">🔄</span>
                             <div>
-                              <p className="font-bold text-gray-900">
+                              <p className="font-bold text-gray-900 dark:text-white">
                                 Molted: {new Date(molt.molted_at).toLocaleDateString()} at {new Date(molt.molted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </p>
                               {molt.premolt_started_at && (
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
                                   Premolt started: {new Date(molt.premolt_started_at).toLocaleDateString()}
                                 </p>
                               )}
@@ -1262,7 +1262,7 @@ export default function TarantulaDetailPage() {
                           </div>
                           <div className="pl-11 space-y-1">
                             {(molt.leg_span_before || molt.leg_span_after) && (
-                              <div className="text-sm text-gray-700">
+                              <div className="text-sm text-gray-700 dark:text-gray-300">
                                 <span className="font-medium">Leg span:</span>{' '}
                                 {molt.leg_span_before && `${molt.leg_span_before}"`}
                                 {molt.leg_span_before && molt.leg_span_after && ' → '}
@@ -1270,7 +1270,7 @@ export default function TarantulaDetailPage() {
                               </div>
                             )}
                             {(molt.weight_before || molt.weight_after) && (
-                              <div className="text-sm text-gray-700">
+                              <div className="text-sm text-gray-700 dark:text-gray-300">
                                 <span className="font-medium">Weight:</span>{' '}
                                 {molt.weight_before && `${molt.weight_before}g`}
                                 {molt.weight_before && molt.weight_after && ' → '}
@@ -1278,7 +1278,7 @@ export default function TarantulaDetailPage() {
                               </div>
                             )}
                             {molt.notes && (
-                              <p className="text-sm text-gray-600 mt-2">{molt.notes}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{molt.notes}</p>
                             )}
                             {molt.image_url && (
                               <img
@@ -1291,7 +1291,7 @@ export default function TarantulaDetailPage() {
                         </div>
                         <button
                           onClick={() => handleDeleteMolt(molt.id)}
-                          className="ml-4 px-3 py-1 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition"
+                          className="ml-4 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-sm font-medium transition"
                         >
                           Delete
                         </button>
@@ -1303,9 +1303,9 @@ export default function TarantulaDetailPage() {
             </div>
 
             {/* Substrate Change Logs Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">💨 Substrate Changes</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">💨 Substrate Changes</h2>
                 <button
                   onClick={() => setShowSubstrateForm(!showSubstrateForm)}
                   className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition text-sm font-medium shadow-sm"
@@ -1315,46 +1315,46 @@ export default function TarantulaDetailPage() {
               </div>
 
               {showSubstrateForm && (
-                <form onSubmit={handleAddSubstrateChange} className="mb-6 p-6 border-2 border-amber-100 rounded-xl bg-amber-50/50">
+                <form onSubmit={handleAddSubstrateChange} className="mb-6 p-6 border-2 border-amber-100 dark:border-amber-900 rounded-xl bg-amber-50/50 dark:bg-amber-900/20">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Date Changed *</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Date Changed *</label>
                       <input
                         type="date"
                         required
                         value={substrateFormData.changed_at}
                         onChange={(e) => setSubstrateFormData({ ...substrateFormData, changed_at: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Substrate Type</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Substrate Type</label>
                       <input
                         type="text"
                         value={substrateFormData.substrate_type}
                         onChange={(e) => setSubstrateFormData({ ...substrateFormData, substrate_type: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                         placeholder="e.g., coco fiber, peat moss"
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Substrate Depth</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Substrate Depth</label>
                       <input
                         type="text"
                         value={substrateFormData.substrate_depth}
                         onChange={(e) => setSubstrateFormData({ ...substrateFormData, substrate_depth: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                         placeholder="e.g., 3 inches"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold mb-2 text-gray-700">Reason</label>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Reason</label>
                       <select
                         value={substrateFormData.reason}
                         onChange={(e) => setSubstrateFormData({ ...substrateFormData, reason: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       >
                         <option value="">Select reason...</option>
                         <option value="routine maintenance">Routine Maintenance</option>
@@ -1367,12 +1367,12 @@ export default function TarantulaDetailPage() {
                     </div>
                   </div>
                   <div className="mb-4">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Notes</label>
+                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Notes</label>
                     <textarea
                       value={substrateFormData.notes}
                       onChange={(e) => setSubstrateFormData({ ...substrateFormData, notes: e.target.value })}
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 bg-white"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       placeholder="Optional notes about the substrate change..."
                     />
                   </div>
@@ -1387,46 +1387,46 @@ export default function TarantulaDetailPage() {
 
               <div className="space-y-3">
                 {substrateChanges.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                     <div className="text-5xl mb-3">💨</div>
                     <p>No substrate change logs yet</p>
                   </div>
                 ) : (
                   substrateChanges.map((change) => (
-                    <div key={change.id} className="p-5 border border-gray-200 rounded-xl hover:shadow-md hover:border-purple-200 transition-all duration-200 bg-white">
+                    <div key={change.id} className="p-5 border border-gray-200 dark:border-gray-600 rounded-xl hover:shadow-md hover:border-purple-200 dark:hover:border-purple-700 transition-all duration-200 bg-white dark:bg-gray-700">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-2xl">💨</span>
-                            <p className="font-bold text-gray-900">
+                            <p className="font-bold text-gray-900 dark:text-white">
                               Changed: {new Date(change.changed_at).toLocaleDateString()}
                             </p>
                           </div>
                           <div className="pl-11 space-y-1">
                             {change.substrate_type && (
-                              <div className="text-sm text-gray-700">
+                              <div className="text-sm text-gray-700 dark:text-gray-300">
                                 <span className="font-medium">Type:</span> {change.substrate_type}
                               </div>
                             )}
                             {change.substrate_depth && (
-                              <div className="text-sm text-gray-700">
+                              <div className="text-sm text-gray-700 dark:text-gray-300">
                                 <span className="font-medium">Depth:</span> {change.substrate_depth}
                               </div>
                             )}
                             {change.reason && (
-                              <div className="text-sm text-gray-700">
+                              <div className="text-sm text-gray-700 dark:text-gray-300">
                                 <span className="font-medium">Reason:</span>{' '}
                                 <span className="capitalize">{change.reason.replace('_', ' ')}</span>
                               </div>
                             )}
                             {change.notes && (
-                              <p className="text-sm text-gray-600 mt-2">{change.notes}</p>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{change.notes}</p>
                             )}
                           </div>
                         </div>
                         <button
                           onClick={() => handleDeleteSubstrateChange(change.id)}
-                          className="ml-4 px-3 py-1 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition"
+                          className="ml-4 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-sm font-medium transition"
                         >
                           Delete
                         </button>
@@ -1441,42 +1441,42 @@ export default function TarantulaDetailPage() {
 
         {/* Husbandry Tab */}
         {activeTab === 'husbandry' && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Husbandry Details</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Husbandry Details</h2>
             
             {(tarantula.enclosure_type || tarantula.enclosure_size || tarantula.substrate_type || tarantula.target_temp_min || tarantula.target_humidity_min) ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {tarantula.enclosure_type && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Enclosure Type</p>
-                    <p className="text-2xl font-bold text-gray-900 capitalize">{tarantula.enclosure_type}</p>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Enclosure Type</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white capitalize">{tarantula.enclosure_type}</p>
                   </div>
                 )}
                 {tarantula.enclosure_size && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Enclosure Size</p>
-                    <p className="text-2xl font-bold text-gray-900">{tarantula.enclosure_size}</p>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Enclosure Size</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{tarantula.enclosure_size}</p>
                   </div>
                 )}
                 {tarantula.substrate_type && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Substrate</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Substrate</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
                       {tarantula.substrate_type}
                       {tarantula.substrate_depth && ` (${tarantula.substrate_depth})`}
                     </p>
                   </div>
                 )}
                 {tarantula.last_substrate_change && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Last Substrate Change</p>
-                    <p className="text-2xl font-bold text-gray-900">{new Date(tarantula.last_substrate_change).toLocaleDateString()}</p>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Last Substrate Change</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{new Date(tarantula.last_substrate_change).toLocaleDateString()}</p>
                   </div>
                 )}
                 {(tarantula.target_temp_min || tarantula.target_temp_max) && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Target Temperature</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Target Temperature</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
                       {tarantula.target_temp_min && `${tarantula.target_temp_min}°F`}
                       {tarantula.target_temp_min && tarantula.target_temp_max && ' - '}
                       {tarantula.target_temp_max && `${tarantula.target_temp_max}°F`}
@@ -1484,9 +1484,9 @@ export default function TarantulaDetailPage() {
                   </div>
                 )}
                 {(tarantula.target_humidity_min || tarantula.target_humidity_max) && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Target Humidity</p>
-                    <p className="text-2xl font-bold text-gray-900">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Target Humidity</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
                       {tarantula.target_humidity_min && `${tarantula.target_humidity_min}%`}
                       {tarantula.target_humidity_min && tarantula.target_humidity_max && ' - '}
                       {tarantula.target_humidity_max && `${tarantula.target_humidity_max}%`}
@@ -1494,26 +1494,26 @@ export default function TarantulaDetailPage() {
                   </div>
                 )}
                 {tarantula.water_dish !== undefined && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Water Dish</p>
-                    <p className="text-2xl font-bold text-gray-900">{tarantula.water_dish ? '✓ Yes' : '✗ No'}</p>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Water Dish</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{tarantula.water_dish ? '✓ Yes' : '✗ No'}</p>
                   </div>
                 )}
                 {tarantula.misting_schedule && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Misting Schedule</p>
-                    <p className="text-2xl font-bold text-gray-900">{tarantula.misting_schedule}</p>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Misting Schedule</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{tarantula.misting_schedule}</p>
                   </div>
                 )}
                 {tarantula.last_enclosure_cleaning && (
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl">
-                    <p className="text-sm font-semibold text-gray-500 uppercase mb-1">Last Enclosure Cleaning</p>
-                    <p className="text-2xl font-bold text-gray-900">{new Date(tarantula.last_enclosure_cleaning).toLocaleDateString()}</p>
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
+                    <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Last Enclosure Cleaning</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{new Date(tarantula.last_enclosure_cleaning).toLocaleDateString()}</p>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 <div className="text-5xl mb-3">🏠</div>
                 <p>No husbandry information available</p>
                 <button
@@ -1526,9 +1526,9 @@ export default function TarantulaDetailPage() {
             )}
 
             {tarantula.enclosure_notes && (
-              <div className="mt-8 p-6 bg-purple-50 rounded-xl border-2 border-purple-100">
-                <h3 className="text-lg font-bold text-gray-900 mb-3">📝 Enclosure Notes</h3>
-                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{tarantula.enclosure_notes}</p>
+              <div className="mt-8 p-6 bg-purple-50 dark:bg-purple-900/20 rounded-xl border-2 border-purple-100 dark:border-purple-900">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">📝 Enclosure Notes</h3>
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{tarantula.enclosure_notes}</p>
               </div>
             )}
           </div>
@@ -1538,9 +1538,9 @@ export default function TarantulaDetailPage() {
         {activeTab === 'photos' && (
           <div className="space-y-6">
             {/* Photo Upload Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">📸 Photo Gallery</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">📸 Photo Gallery</h2>
                 <label className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium shadow-sm cursor-pointer inline-flex items-center gap-2">
                   {uploadingPhoto ? (
                     <>
@@ -1565,10 +1565,10 @@ export default function TarantulaDetailPage() {
               </div>
 
               {photos.length === 0 ? (
-                <div className="text-center py-16 text-gray-500">
+                <div className="text-center py-16 text-gray-500 dark:text-gray-400">
                   <div className="text-6xl mb-4">📷</div>
-                  <h3 className="text-xl font-bold text-gray-700 mb-2">No Photos Yet</h3>
-                  <p className="text-gray-500 mb-6">Start building your photo gallery by uploading your first photo</p>
+                  <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 mb-2">No Photos Yet</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">Start building your photo gallery by uploading your first photo</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -1576,7 +1576,7 @@ export default function TarantulaDetailPage() {
                     <div
                       key={photo.id}
                       onClick={() => setSelectedPhoto(photo)}
-                      className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-gray-100 hover:shadow-xl transition-all duration-300"
+                      className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer bg-gray-100 dark:bg-gray-700 hover:shadow-xl transition-all duration-300"
                     >
                       <img
                         src={getImageUrl(photo.thumbnail_url || photo.url)}
@@ -1684,11 +1684,11 @@ export default function TarantulaDetailPage() {
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8">
             <div className="text-center mb-6">
               <div className="text-6xl mb-4">⚠️</div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Delete Tarantula?</h2>
-              <p className="text-gray-600">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Delete Tarantula?</h2>
+              <p className="text-gray-600 dark:text-gray-300">
                 Are you sure you want to delete <strong>{tarantula.common_name}</strong>? 
                 This will also delete all associated logs and cannot be undone.
               </p>
@@ -1696,7 +1696,7 @@ export default function TarantulaDetailPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteConfirm(false)}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition font-semibold"
+                className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition font-semibold"
               >
                 Cancel
               </button>
