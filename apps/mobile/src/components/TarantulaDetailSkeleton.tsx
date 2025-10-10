@@ -1,12 +1,15 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import Skeleton from './Skeleton';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function TarantulaDetailSkeleton() {
+  const { colors } = useTheme();
+  
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Skeleton width={24} height={24} borderRadius={12} />
         <Skeleton width={100} height={20} borderRadius={4} style={styles.headerTitle} />
         <Skeleton width={24} height={24} borderRadius={12} />
@@ -48,14 +51,14 @@ export default function TarantulaDetailSkeleton() {
         {/* Logs Section */}
         <View style={styles.section}>
           <Skeleton width={120} height={22} borderRadius={4} style={styles.marginBottom16} />
-          <View style={styles.logItem}>
+          <View style={[styles.logItem, { backgroundColor: colors.surfaceElevated }]}>
             <Skeleton width={40} height={40} borderRadius={20} style={styles.marginRight12} />
             <View style={styles.flex1}>
               <Skeleton width="80%" height={16} borderRadius={4} style={styles.marginBottom4} />
               <Skeleton width="60%" height={14} borderRadius={4} />
             </View>
           </View>
-          <View style={styles.logItem}>
+          <View style={[styles.logItem, { backgroundColor: colors.surfaceElevated }]}>
             <Skeleton width={40} height={40} borderRadius={20} style={styles.marginRight12} />
             <View style={styles.flex1}>
               <Skeleton width="70%" height={16} borderRadius={4} style={styles.marginBottom4} />
@@ -77,7 +80,7 @@ export default function TarantulaDetailSkeleton() {
       </ScrollView>
 
       {/* Action Bar */}
-      <View style={styles.actionBar}>
+      <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <Skeleton width={100} height={48} borderRadius={12} />
         <Skeleton width={100} height={48} borderRadius={12} />
         <Skeleton width={60} height={60} borderRadius={30} />
@@ -89,7 +92,6 @@ export default function TarantulaDetailSkeleton() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
@@ -97,9 +99,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     paddingTop: 60,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   headerTitle: {
     marginHorizontal: 16,
@@ -125,7 +125,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderRadius: 8,
   },
   photoRow: {
@@ -140,9 +139,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     paddingBottom: 32,
-    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
   },
   marginBottom4: {
     marginBottom: 4,

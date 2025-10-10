@@ -17,6 +17,7 @@ import PhotoViewer from '../../src/components/PhotoViewer';
 import GrowthChart from '../../src/components/GrowthChart';
 import FeedingStatsCard from '../../src/components/FeedingStatsCard';
 import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface TarantulaDetail {
   id: string;
@@ -109,6 +110,7 @@ interface FeedingStats {
 export default function TarantulaDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { colors } = useTheme();
   const [tarantula, setTarantula] = useState<TarantulaDetail | null>(null);
   const [feedingLogs, setFeedingLogs] = useState<FeedingLog[]>([]);
   const [moltLogs, setMoltLogs] = useState<MoltLog[]>([]);
@@ -278,69 +280,69 @@ export default function TarantulaDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#1f2937" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Details</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Details</Text>
         <TouchableOpacity 
           style={styles.editButton}
           onPress={() => router.push(`/tarantula/edit?id=${id}`)}
         >
-          <MaterialCommunityIcons name="pencil" size={24} color="#7c3aed" />
+          <MaterialCommunityIcons name="pencil" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Hero Image */}
-        <View style={styles.heroImageContainer}>
+        <View style={[styles.heroImageContainer, { backgroundColor: colors.surfaceElevated }]}>
           {tarantula.photo_url ? (
             <Image source={{ uri: tarantula.photo_url }} style={styles.heroImage} />
           ) : (
-            <View style={styles.placeholderHero}>
-              <MaterialCommunityIcons name="spider" size={80} color="#d1d5db" />
+            <View style={[styles.placeholderHero, { backgroundColor: colors.surfaceElevated }]}>
+              <MaterialCommunityIcons name="spider" size={80} color={colors.border} />
             </View>
           )}
         </View>
 
         {/* Name and Species */}
-        <View style={styles.section}>
-          <Text style={styles.name}>{tarantula.name}</Text>
-          <Text style={styles.scientificName}>{tarantula.scientific_name}</Text>
-          <Text style={styles.commonName}>{tarantula.common_name}</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.name, { color: colors.textPrimary }]}>{tarantula.name}</Text>
+          <Text style={[styles.scientificName, { color: colors.textSecondary }]}>{tarantula.scientific_name}</Text>
+          <Text style={[styles.commonName, { color: colors.textTertiary }]}>{tarantula.common_name}</Text>
         </View>
 
         {/* Basic Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Basic Information</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Basic Information</Text>
           <View style={styles.infoGrid}>
             {tarantula.sex && (
               <View style={styles.infoItem}>
                 <MaterialCommunityIcons
                   name={tarantula.sex === 'female' ? 'gender-female' : 'gender-male'}
                   size={20}
-                  color="#7c3aed"
+                  color={colors.primary}
                 />
-                <Text style={styles.infoLabel}>Sex</Text>
-                <Text style={styles.infoValue}>
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Sex</Text>
+                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
                   {tarantula.sex.charAt(0).toUpperCase() + tarantula.sex.slice(1)}
                 </Text>
               </View>
             )}
             {tarantula.age_years !== undefined && (
               <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="calendar" size={20} color="#7c3aed" />
-                <Text style={styles.infoLabel}>Age</Text>
-                <Text style={styles.infoValue}>{tarantula.age_years} years</Text>
+                <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Age</Text>
+                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{tarantula.age_years} years</Text>
               </View>
             )}
             {tarantula.acquisition_date && (
               <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="calendar-plus" size={20} color="#7c3aed" />
-                <Text style={styles.infoLabel}>Acquired</Text>
-                <Text style={styles.infoValue}>
+                <MaterialCommunityIcons name="calendar-plus" size={20} color={colors.primary} />
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Acquired</Text>
+                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
                   {new Date(tarantula.acquisition_date).toLocaleDateString()}
                 </Text>
               </View>
@@ -349,37 +351,37 @@ export default function TarantulaDetailScreen() {
         </View>
 
         {/* Husbandry */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Husbandry</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Husbandry</Text>
           <View style={styles.infoGrid}>
             {tarantula.enclosure_size && (
               <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="cube-outline" size={20} color="#7c3aed" />
-                <Text style={styles.infoLabel}>Enclosure</Text>
-                <Text style={styles.infoValue}>{tarantula.enclosure_size}</Text>
+                <MaterialCommunityIcons name="cube-outline" size={20} color={colors.primary} />
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Enclosure</Text>
+                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{tarantula.enclosure_size}</Text>
               </View>
             )}
             {tarantula.substrate_type && (
               <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="layers" size={20} color="#7c3aed" />
-                <Text style={styles.infoLabel}>Substrate</Text>
-                <Text style={styles.infoValue}>{tarantula.substrate_type}</Text>
+                <MaterialCommunityIcons name="layers" size={20} color={colors.primary} />
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Substrate</Text>
+                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{tarantula.substrate_type}</Text>
               </View>
             )}
             {tarantula.last_fed && (
               <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="food" size={20} color="#7c3aed" />
-                <Text style={styles.infoLabel}>Last Fed</Text>
-                <Text style={styles.infoValue}>
+                <MaterialCommunityIcons name="food" size={20} color={colors.primary} />
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Last Fed</Text>
+                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
                   {new Date(tarantula.last_fed).toLocaleDateString()}
                 </Text>
               </View>
             )}
             {tarantula.last_molt && (
               <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="refresh" size={20} color="#7c3aed" />
-                <Text style={styles.infoLabel}>Last Molt</Text>
-                <Text style={styles.infoValue}>
+                <MaterialCommunityIcons name="refresh" size={20} color={colors.primary} />
+                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Last Molt</Text>
+                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
                   {new Date(tarantula.last_molt).toLocaleDateString()}
                 </Text>
               </View>
@@ -388,24 +390,24 @@ export default function TarantulaDetailScreen() {
         </View>
 
         {/* Feeding History */}
-        <View style={styles.section}>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Feeding History</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Feeding History</Text>
             {feedingLogs.length > 0 && (
               <TouchableOpacity>
-                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
               </TouchableOpacity>
             )}
           </View>
           {feedingLogs.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="food-off" size={32} color="#9ca3af" />
-              <Text style={styles.emptyStateText}>No feeding logs yet</Text>
+              <MaterialCommunityIcons name="food-off" size={32} color={colors.textTertiary} />
+              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No feeding logs yet</Text>
             </View>
           ) : (
             <View style={styles.logList}>
               {feedingLogs.map((log) => (
-                <View key={log.id} style={styles.logItem}>
+                <View key={log.id} style={[styles.logItem, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                   <View style={styles.logIcon}>
                     <MaterialCommunityIcons 
                       name={log.accepted ? "check-circle" : "close-circle"} 
@@ -414,13 +416,13 @@ export default function TarantulaDetailScreen() {
                     />
                   </View>
                   <View style={styles.logContent}>
-                    <Text style={styles.logTitle}>
+                    <Text style={[styles.logTitle, { color: colors.textPrimary }]}>
                       {log.food_type || 'Unknown food'} {log.food_size ? `(${log.food_size})` : ''}
                     </Text>
-                    <Text style={styles.logDate}>
+                    <Text style={[styles.logDate, { color: colors.textSecondary }]}>
                       {new Date(log.fed_at).toLocaleDateString()}
                     </Text>
-                    {log.notes && <Text style={styles.logNotes}>{log.notes}</Text>}
+                    {log.notes && <Text style={[styles.logNotes, { color: colors.textSecondary }]}>{log.notes}</Text>}
                   </View>
                 </View>
               ))}
@@ -429,37 +431,37 @@ export default function TarantulaDetailScreen() {
         </View>
 
         {/* Molt History */}
-        <View style={styles.section}>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Molt History</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Molt History</Text>
             {moltLogs.length > 0 && (
               <TouchableOpacity>
-                <Text style={styles.viewAllText}>View All</Text>
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
               </TouchableOpacity>
             )}
           </View>
           {moltLogs.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="refresh-circle" size={32} color="#9ca3af" />
-              <Text style={styles.emptyStateText}>No molt logs yet</Text>
+              <MaterialCommunityIcons name="refresh-circle" size={32} color={colors.textTertiary} />
+              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No molt logs yet</Text>
             </View>
           ) : (
             <View style={styles.logList}>
               {moltLogs.map((log) => (
-                <View key={log.id} style={styles.logItem}>
+                <View key={log.id} style={[styles.logItem, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                   <View style={styles.logIcon}>
-                    <MaterialCommunityIcons name="reload" size={20} color="#7c3aed" />
+                    <MaterialCommunityIcons name="reload" size={20} color={colors.primary} />
                   </View>
                   <View style={styles.logContent}>
-                    <Text style={styles.logTitle}>
+                    <Text style={[styles.logTitle, { color: colors.textPrimary }]}>
                       Molt on {new Date(log.molted_at).toLocaleDateString()}
                     </Text>
                     {(log.leg_span_before || log.leg_span_after) && (
-                      <Text style={styles.logDate}>
+                      <Text style={[styles.logDate, { color: colors.textSecondary }]}>
                         Leg span: {log.leg_span_before || '?'}" → {log.leg_span_after || '?'}"
                       </Text>
                     )}
-                    {log.notes && <Text style={styles.logNotes}>{log.notes}</Text>}
+                    {log.notes && <Text style={[styles.logNotes, { color: colors.textSecondary }]}>{log.notes}</Text>}
                   </View>
                 </View>
               ))}
@@ -482,9 +484,9 @@ export default function TarantulaDetailScreen() {
         )}
 
         {/* Photo Gallery */}
-        <View style={styles.section}>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Photos</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Photos</Text>
           </View>
           
           {photos.length > 0 ? (
@@ -496,7 +498,7 @@ export default function TarantulaDetailScreen() {
               {photos.map((photo, index) => (
                 <Pressable
                   key={photo.id}
-                  style={styles.photoThumbnail}
+                  style={[styles.photoThumbnail, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
                   onPress={() => {
                     setPhotoViewerIndex(index);
                     setPhotoViewerVisible(true);
@@ -515,7 +517,7 @@ export default function TarantulaDetailScreen() {
                     </View>
                   )}
                   {photo.caption && (
-                    <Text style={styles.photoCaption} numberOfLines={2}>
+                    <Text style={[styles.photoCaption, { color: colors.textSecondary }]} numberOfLines={2}>
                       {photo.caption}
                     </Text>
                   )}
@@ -528,9 +530,9 @@ export default function TarantulaDetailScreen() {
             </ScrollView>
           ) : (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="camera-off" size={48} color="#d1d5db" />
-              <Text style={styles.emptyStateText}>No photos yet</Text>
-              <Text style={styles.emptyStateSubtext}>
+              <MaterialCommunityIcons name="camera-off" size={48} color={colors.textTertiary} />
+              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No photos yet</Text>
+              <Text style={[styles.emptyStateSubtext, { color: colors.textTertiary }]}>
                 Tap the camera button below to add photos
               </Text>
             </View>
@@ -539,9 +541,9 @@ export default function TarantulaDetailScreen() {
 
         {/* Notes */}
         {tarantula.notes && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notes</Text>
-            <Text style={styles.notes}>{tarantula.notes}</Text>
+          <View style={[styles.section, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notes</Text>
+            <Text style={[styles.notes, { color: colors.textSecondary }]}>{tarantula.notes}</Text>
           </View>
         )}
 
@@ -550,23 +552,23 @@ export default function TarantulaDetailScreen() {
       </ScrollView>
 
       {/* Action Bar */}
-      <View style={styles.actionBar}>
+      <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <TouchableOpacity 
-          style={styles.actionButton}
+          style={[styles.actionButton, { backgroundColor: colors.primary }]}
           onPress={() => router.push(`/tarantula/add-feeding?id=${id}`)}
         >
           <MaterialCommunityIcons name="food-apple" size={24} color="#fff" />
           <Text style={styles.actionButtonText}>Feed</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={styles.actionButton}
+          style={[styles.actionButton, { backgroundColor: colors.primary }]}
           onPress={() => router.push(`/tarantula/add-molt?id=${id}`)}
         >
           <MaterialCommunityIcons name="reload" size={24} color="#fff" />
           <Text style={styles.actionButtonText}>Molt</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={styles.actionButton}
+          style={[styles.actionButton, { backgroundColor: colors.primary }]}
           onPress={() => router.push(`/tarantula/add-photo?id=${id}`)}
         >
           <MaterialCommunityIcons name="camera" size={24} color="#fff" />
