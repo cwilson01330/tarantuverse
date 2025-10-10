@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import ActivityFeed from '@/components/ActivityFeed'
+import { SkeletonList } from '@/components/ui/skeleton'
 
 interface Keeper {
   id: number
@@ -84,10 +85,20 @@ export default function CommunityPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🕷️</div>
-          <p className="text-xl text-gray-300">Discovering keepers...</p>
+      <div className="min-h-screen bg-gradient-dark">
+        {/* Header skeleton */}
+        <div className="bg-gradient-primary text-white shadow-lg shadow-electric-blue-500/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="animate-pulse">
+              <div className="h-10 w-64 bg-white/30 rounded mb-2"></div>
+              <div className="h-6 w-48 bg-white/20 rounded"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content skeleton */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <SkeletonList count={6} />
         </div>
       </div>
     )

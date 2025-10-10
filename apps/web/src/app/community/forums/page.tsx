@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MessageSquare, Users, Clock, Pin } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface ForumCategory {
   id: number;
@@ -48,11 +49,29 @@ export default function ForumsPage() {
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-dark-50 rounded w-1/4"></div>
-          <div className="h-32 bg-dark-50 rounded"></div>
-          <div className="h-32 bg-dark-50 rounded"></div>
-          <div className="h-32 bg-dark-50 rounded"></div>
+        {/* Header skeleton */}
+        <div className="mb-8 bg-gradient-primary rounded-lg p-8 shadow-lg shadow-electric-blue-500/20 animate-pulse">
+          <Skeleton height="h-8" width="w-1/3" className="mb-2 bg-white/30" />
+          <Skeleton height="h-4" width="w-2/3" className="bg-white/20" />
+        </div>
+
+        {/* Category skeletons */}
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="bg-surface p-6 rounded-lg border border-theme">
+              <div className="flex items-start gap-4">
+                <Skeleton width="w-12 h-12" rounded="lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton width="w-1/4" height="h-6" />
+                  <Skeleton width="w-3/4" height="h-4" />
+                  <div className="flex gap-4 pt-2">
+                    <Skeleton width="w-20" height="h-5" />
+                    <Skeleton width="w-20" height="h-5" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

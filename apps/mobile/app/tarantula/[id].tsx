@@ -192,7 +192,7 @@ export default function TarantulaDetailScreen() {
 
   const deletePhoto = async (photoId: string) => {
     try {
-      await apiClient.delete(`/tarantulas/${id}/photos/${photoId}`);
+      await apiClient.delete(`/photos/${photoId}`);
       // Remove photo from state
       setPhotos(photos.filter(p => p.id !== photoId));
       Alert.alert('Success', 'Photo deleted successfully');
@@ -201,16 +201,48 @@ export default function TarantulaDetailScreen() {
     }
   };
 
-  const handlePhotoLongPress = (photoId: string, photoCaption?: string) => {
+  const setMainPhoto = async (photoId: string, photoUrl: string) => {
+    try {
+      await apiClient.patch(`/photos/${photoId}/set-main`);
+      // Update tarantula state with new main photo
+      if (tarantula) {
+        setTarantula({ ...tarantula, photo_url: photoUrl });
+      }
+      Alert.alert('Success', 'Main photo updated successfully');
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to set main photo');
+    }
+  };
+
+  const handlePhotoLongPress = (photoId: string, photoUrl: string, photoCaption?: string) => {
+    const isMainPhoto = tarantula?.photo_url === photoUrl;
+    
     Alert.alert(
-      'Delete Photo',
-      photoCaption ? `Delete "${photoCaption}"?` : 'Delete this photo?',
+      'Photo Options',
+      photoCaption || 'Manage this photo',
       [
         { text: 'Cancel', style: 'cancel' },
+        ...(!isMainPhoto ? [{
+          text: 'Set as Main',
+          onPress: () => setMainPhoto(photoId, photoUrl)
+        }] : []),
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => deletePhoto(photoId)
+          onPress: () => {
+            Alert.alert(
+              'Delete Photo',
+              'Are you sure you want to delete this photo?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                  text: 'Delete', 
+                  style: 'destructive',
+                  onPress: () => deletePhoto(photoId)
+                },
+              ]
+            );
+          }
         },
       ]
     );
@@ -469,13 +501,19 @@ export default function TarantulaDetailScreen() {
                     setPhotoViewerIndex(index);
                     setPhotoViewerVisible(true);
                   }}
-                  onLongPress={() => handlePhotoLongPress(photo.id, photo.caption)}
+                  onLongPress={() => handlePhotoLongPress(photo.id, photo.url, photo.caption)}
                 >
                   <Image 
                     source={{ uri: getImageUrl(photo.thumbnail_url || photo.url) }} 
                     style={styles.thumbnailImage}
                     resizeMode="cover"
                   />
+                  {tarantula?.photo_url === photo.url && (
+                    <View style={styles.mainPhotoBadge}>
+                      <MaterialCommunityIcons name="star" size={16} color="#fbbf24" />
+                      <Text style={styles.mainPhotoText}>Main</Text>
+                    </View>
+                  )}
                   {photo.caption && (
                     <Text style={styles.photoCaption} numberOfLines={2}>
                       {photo.caption}
@@ -773,5 +811,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
+  },
+  mainPhotoBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  mainPhotoText: {
+    color: '#fbbf24',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
 });

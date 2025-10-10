@@ -169,3 +169,40 @@ async def delete_photo(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete photo: {str(e)}")
+
+
+@router.patch("/photos/{photo_id}/set-main")
+async def set_main_photo(
+    photo_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Set a photo as the main photo for its tarantula."""
+    # Get photo and verify ownership
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    
+    # Verify tarantula belongs to user
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == photo.tarantula_id,
+        Tarantula.user_id == current_user.id
+    ).first()
+    
+    if not tarantula:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this photo")
+    
+    try:
+        # Set the photo URL as the tarantula's main photo
+        tarantula.photo_url = photo.url
+        db.commit()
+        
+        return {
+            "message": "Main photo updated successfully",
+            "photo_url": photo.url
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to set main photo: {str(e)}")

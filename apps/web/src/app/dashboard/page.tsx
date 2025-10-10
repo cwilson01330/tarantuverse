@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import ActivityFeed from '@/components/ActivityFeed'
+import { SkeletonCard } from '@/components/ui/skeleton'
 
 interface User {
   id: string
@@ -146,12 +147,39 @@ export default function DashboardPage() {
   }
 
   if (!user || loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-theme">
-      <div className="text-center">
-        <div className="text-6xl mb-4">🕷️</div>
-        <p className="text-xl text-theme-secondary">Loading...</p>
+    return (
+      <div className="min-h-screen bg-theme">
+        {/* Header skeleton */}
+        <div className="bg-gradient-brand shadow-lg shadow-gradient-brand">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="animate-pulse">
+              <div className="h-8 w-48 bg-white/30 rounded mb-2"></div>
+              <div className="h-4 w-32 bg-white/20 rounded"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content skeleton */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-surface p-6 rounded-lg border border-theme animate-pulse">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+            ))}
+          </div>
+
+          {/* Collection skeleton */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
+    )
   }
 
   const filteredTarantulas = searchQuery
