@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { KeeperCardSkeleton, CategoryCardSkeleton } from '../../src/components/CommunitySkeletons';
 
 interface Keeper {
   id: number;
@@ -100,11 +101,38 @@ export default function CommunityScreen() {
     ).join(' ');
   };
 
-  if (loading && keepers.length === 0) {
+  if (loading && keepers.length === 0 && categories.length === 0) {
     return (
-      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
-        <Text style={styles.loadingEmoji}>🕷️</Text>
-        <Text style={[styles.loadingText, { color: colors.textPrimary }]}>Loading community...</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Header */}
+        <LinearGradient
+          colors={['#0066ff', '#ff0099']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <View>
+            <Text style={styles.headerTitle}>🌐 Community</Text>
+            <Text style={styles.headerSubtitle}>Connect with keepers</Text>
+          </View>
+        </LinearGradient>
+
+        {/* Skeleton loading */}
+        <View style={{ padding: 16 }}>
+          {activeTab === 'keepers' ? (
+            <>
+              <KeeperCardSkeleton />
+              <KeeperCardSkeleton />
+              <KeeperCardSkeleton />
+            </>
+          ) : (
+            <>
+              <CategoryCardSkeleton />
+              <CategoryCardSkeleton />
+              <CategoryCardSkeleton />
+            </>
+          )}
+        </View>
       </View>
     );
   }

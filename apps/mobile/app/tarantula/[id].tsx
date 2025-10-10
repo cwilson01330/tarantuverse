@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Alert,
+  Pressable,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { apiClient } from '../../src/services/api';
 import PhotoViewer from '../../src/components/PhotoViewer';
 import GrowthChart from '../../src/components/GrowthChart';
 import FeedingStatsCard from '../../src/components/FeedingStatsCard';
+import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
 
 interface TarantulaDetail {
   id: string;
@@ -188,6 +190,32 @@ export default function TarantulaDetailScreen() {
     }
   };
 
+  const deletePhoto = async (photoId: string) => {
+    try {
+      await apiClient.delete(`/tarantulas/${id}/photos/${photoId}`);
+      // Remove photo from state
+      setPhotos(photos.filter(p => p.id !== photoId));
+      Alert.alert('Success', 'Photo deleted successfully');
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to delete photo');
+    }
+  };
+
+  const handlePhotoLongPress = (photoId: string, photoCaption?: string) => {
+    Alert.alert(
+      'Delete Photo',
+      photoCaption ? `Delete "${photoCaption}"?` : 'Delete this photo?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: () => deletePhoto(photoId)
+        },
+      ]
+    );
+  };
+
   // Helper to get full image URL (handles both R2 and local storage URLs)
   const getImageUrl = (url: string | undefined): string => {
     if (!url) return '';
@@ -210,11 +238,7 @@ export default function TarantulaDetailScreen() {
   );
 
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7c3aed" />
-      </View>
-    );
+    return <TarantulaDetailSkeleton />;
   }
 
   if (!tarantula) {
@@ -438,13 +462,14 @@ export default function TarantulaDetailScreen() {
               style={styles.photoGallery}
             >
               {photos.map((photo, index) => (
-                <TouchableOpacity 
+                <Pressable
                   key={photo.id}
                   style={styles.photoThumbnail}
                   onPress={() => {
                     setPhotoViewerIndex(index);
                     setPhotoViewerVisible(true);
                   }}
+                  onLongPress={() => handlePhotoLongPress(photo.id, photo.caption)}
                 >
                   <Image 
                     source={{ uri: getImageUrl(photo.thumbnail_url || photo.url) }} 
@@ -456,7 +481,11 @@ export default function TarantulaDetailScreen() {
                       {photo.caption}
                     </Text>
                   )}
-                </TouchableOpacity>
+                  <View style={styles.deleteHint}>
+                    <MaterialCommunityIcons name="gesture-tap-hold" size={12} color="#fff" />
+                    <Text style={styles.deleteHintText}>Hold to delete</Text>
+                  </View>
+                </Pressable>
               ))}
             </ScrollView>
           ) : (
@@ -716,6 +745,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#f9fafb',
     overflow: 'hidden',
+    position: 'relative',
   },
   thumbnailImage: {
     width: 150,
@@ -726,5 +756,22 @@ const styles = StyleSheet.create({
     padding: 8,
     fontSize: 12,
     color: '#4b5563',
+  },
+  deleteHint: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+    gap: 3,
+  },
+  deleteHintText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
   },
 });

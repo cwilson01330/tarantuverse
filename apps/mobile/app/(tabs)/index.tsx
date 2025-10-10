@@ -16,6 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import TarantulaCardSkeleton from '../../src/components/TarantulaCardSkeleton';
 
 interface Tarantula {
   id: string;
@@ -408,8 +409,13 @@ export default function CollectionScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={styles.container}>
+        <View style={styles.list}>
+          <TarantulaCardSkeleton />
+          <TarantulaCardSkeleton />
+          <TarantulaCardSkeleton />
+          <TarantulaCardSkeleton />
+        </View>
       </View>
     );
   }
