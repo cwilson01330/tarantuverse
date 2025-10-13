@@ -72,3 +72,39 @@ def get_current_active_user(
             detail="Inactive user"
         )
     return current_user
+
+
+def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    Get the current authenticated user from JWT token, or None if not authenticated
+    
+    Usage in routes:
+        current_user: Optional[User] = Depends(get_current_user_optional)
+    """
+    if credentials is None:
+        return None
+    
+    token = credentials.credentials
+    
+    # Decode token
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+    
+    # Get user ID from token
+    user_id: str = payload.get("sub")
+    if user_id is None:
+        return None
+    
+    # Get user from database
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        return None
+    
+    if not user.is_active:
+        return None
+    
+    return user

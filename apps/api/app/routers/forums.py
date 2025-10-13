@@ -4,7 +4,7 @@ Forum API endpoints for community discussions
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, func
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 import re
 
@@ -18,6 +18,7 @@ from app.schemas.forum import (
     ForumThreadList, ForumPostList
 )
 from app.routers.auth import get_current_user
+from app.utils.dependencies import get_current_user_optional
 from app.services.activity_service import create_activity
 
 router = APIRouter(prefix="/api/v1/forums", tags=["forums"])
@@ -186,20 +187,22 @@ async def list_threads(
 @router.get("/threads/{thread_id}", response_model=ForumThreadDetail)
 async def get_thread(
     thread_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_optional)
 ):
     """Get thread details with first post"""
     thread = db.query(ForumThread).filter(ForumThread.id == thread_id).options(
         joinedload(ForumThread.author),
         joinedload(ForumThread.last_post_user)
     ).first()
-    
+
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
-    
-    # Increment view count
-    thread.view_count += 1
-    db.commit()
+
+    # Only increment view count if viewer is not the thread author
+    if not current_user or str(current_user.id) != str(thread.author_id):
+        thread.view_count += 1
+        db.commit()
     
     # Get first post
     first_post = db.query(ForumPost).filter(
