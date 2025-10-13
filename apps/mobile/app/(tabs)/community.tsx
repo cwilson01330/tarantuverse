@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { KeeperCardSkeleton, CategoryCardSkeleton } from '../../src/components/CommunitySkeletons';
+import ActivityFeedItem, { ActivityFeedItemData } from '../../src/components/ActivityFeedItem';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Keeper {
   id: number;
@@ -37,15 +39,25 @@ export default function CommunityScreen() {
   const { colors } = useTheme();
   const [keepers, setKeepers] = useState<Keeper[]>([]);
   const [categories, setCategories] = useState<ForumCategory[]>([]);
+  const [activities, setActivities] = useState<ActivityFeedItemData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activityLoading, setActivityLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'keepers' | 'board'>('keepers');
+  const [activeTab, setActiveTab] = useState<'keepers' | 'activity'>('keepers');
+  const [activityPage, setActivityPage] = useState(1);
+  const [hasMoreActivities, setHasMoreActivities] = useState(true);
 
   useEffect(() => {
     fetchKeepers();
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'activity' && activities.length === 0) {
+      fetchActivities(true);
+    }
+  }, [activeTab]);
 
   const fetchKeepers = async () => {
     try {
@@ -75,10 +87,57 @@ export default function CommunityScreen() {
     }
   };
 
+  const fetchActivities = async (reset = false) => {
+    try {
+      setActivityLoading(true);
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
+      const token = await AsyncStorage.getItem('token');
+      const currentPage = reset ? 1 : activityPage;
+      
+      // Use global feed for now - can switch to personalized if user is logged in
+      const endpoint = token ? '/api/v1/activity/feed' : '/api/v1/activity/global';
+      
+      const response = await fetch(
+        `${API_URL}${endpoint}?page=${currentPage}&limit=20`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to fetch activities');
+      
+      const data = await response.json();
+      
+      if (reset) {
+        setActivities(data.activities || []);
+        setActivityPage(1);
+      } else {
+        setActivities([...activities, ...(data.activities || [])]);
+      }
+      
+      setHasMoreActivities(data.has_more || false);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+    } finally {
+      setActivityLoading(false);
+    }
+  };
+
+  const loadMoreActivities = () => {
+    if (!activityLoading && hasMoreActivities) {
+      setActivityPage(activityPage + 1);
+      fetchActivities();
+    }
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchKeepers();
-    fetchCategories();
+    if (activeTab === 'keepers') {
+      fetchKeepers();
+    } else {
+      fetchActivities(true);
+    }
+    setRefreshing(false);
   };
 
   const handleSearch = () => {
@@ -169,16 +228,16 @@ export default function CommunityScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'board' && { ...styles.activeTab, borderBottomColor: colors.primary }]}
-          onPress={() => setActiveTab('board')}
+          style={[styles.tab, activeTab === 'activity' && { ...styles.activeTab, borderBottomColor: colors.primary }]}
+          onPress={() => setActiveTab('activity')}
         >
           <MaterialCommunityIcons 
-            name="message-text" 
+            name="pulse" 
             size={20} 
-            color={activeTab === 'board' ? colors.primary : colors.textSecondary} 
+            color={activeTab === 'activity' ? colors.primary : colors.textSecondary} 
           />
-          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'board' && { color: colors.primary }]}>
-            Message Board
+          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'activity' && { color: colors.primary }]}>
+            Activity Feed
           </Text>
         </TouchableOpacity>
       </View>
@@ -299,54 +358,52 @@ export default function CommunityScreen() {
           </ScrollView>
         </>
       ) : (
+        // Activity Feed Tab
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ padding: 16 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
           }
+          onScroll={({ nativeEvent }) => {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            const paddingToBottom = 20;
+            if (
+              layoutMeasurement.height + contentOffset.y >=
+              contentSize.height - paddingToBottom
+            ) {
+              loadMoreActivities();
+            }
+          }}
+          scrollEventThrottle={400}
         >
-          {categories.length === 0 ? (
-            <View style={styles.comingSoon}>
-              <Text style={styles.comingSoonEmoji}>💬</Text>
-              <Text style={[styles.comingSoonTitle, { color: colors.textPrimary }]}>No Categories Yet</Text>
-              <Text style={[styles.comingSoonSubtitle, { color: colors.textSecondary }]}>Forum categories will appear here once created</Text>
+          {activityLoading && activities.length === 0 ? (
+            <View style={styles.centerContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                Loading activity...
+              </Text>
+            </View>
+          ) : activities.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>📊</Text>
+              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Activity Yet</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                Activity from the community will appear here
+              </Text>
             </View>
           ) : (
-            <View style={{ gap: 12 }}>
-              {categories.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  onPress={() => router.push(`/community/forums/${category.slug}`)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.categoryHeader}>
-                    {category.icon && <Text style={styles.categoryIcon}>{category.icon}</Text>}
-                    <Text style={[styles.categoryName, { color: colors.textPrimary }]}>{category.name}</Text>
-                  </View>
-                  {category.description && (
-                    <Text style={[styles.categoryDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                      {category.description}
-                    </Text>
-                  )}
-                  <View style={styles.categoryStats}>
-                    <View style={styles.statItem}>
-                      <MaterialCommunityIcons name="message-text" size={16} color={colors.primary} />
-                      <Text style={[styles.statText, { color: colors.textTertiary }]}>
-                        {category.thread_count} threads
-                      </Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <MaterialCommunityIcons name="chat" size={16} color={colors.primary} />
-                      <Text style={[styles.statText, { color: colors.textTertiary }]}>
-                        {category.post_count} posts
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
+            <>
+              {activities.map((activity) => (
+                <ActivityFeedItem key={activity.id} activity={activity} />
               ))}
-            </View>
+
+              {hasMoreActivities && activityLoading && (
+                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
       )}
@@ -362,6 +419,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
   },
   header: {
     padding: 20,
@@ -538,9 +600,6 @@ const styles = StyleSheet.create({
   loadingEmoji: {
     fontSize: 64,
     marginBottom: 16,
-  },
-  loadingText: {
-    fontSize: 18,
   },
   comingSoon: {
     flex: 1,
