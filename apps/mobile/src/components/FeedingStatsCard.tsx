@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface PreyTypeCount {
   food_type: string;
@@ -27,6 +28,8 @@ interface FeedingStatsCardProps {
 }
 
 const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
+  const { colors } = useTheme();
+  
   // Determine feeding status color
   const getFeedingStatusColor = (days?: number) => {
     if (!days) return styles.statusGray;
@@ -44,11 +47,11 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
 
   if (data.total_feedings === 0) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>🍽️ Feeding Stats</Text>
+      <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>🍽️ Feeding Stats</Text>
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>🍴</Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             No feeding data yet.{'\n'}Add feeding logs to track patterns.
           </Text>
         </View>
@@ -59,8 +62,8 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
   const statusColorStyle = getFeedingStatusColor(data.days_since_last_feeding);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🍽️ Feeding Stats</Text>
+    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Text style={[styles.title, { color: colors.textPrimary }]}>🍽️ Feeding Stats</Text>
 
       {/* Status Banner */}
       {data.days_since_last_feeding !== undefined && (
@@ -86,43 +89,43 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
 
       {/* Key Metrics */}
       <View style={styles.metricsGrid}>
-        <View style={styles.metricCard}>
-          <Text style={styles.metricLabel}>ACCEPTANCE RATE</Text>
+        <View style={[styles.metricCard, { backgroundColor: colors.surfaceElevated }]}>
+          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>ACCEPTANCE RATE</Text>
           <Text style={[styles.metricValue, getAcceptanceColor(data.acceptance_rate)]}>
             {data.acceptance_rate}%
           </Text>
-          <Text style={styles.metricSubtext}>
+          <Text style={[styles.metricSubtext, { color: colors.textSecondary }]}>
             {data.total_accepted}/{data.total_feedings} accepted
           </Text>
         </View>
 
         {data.average_days_between_feedings != null && data.average_days_between_feedings > 0 && (
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>AVG INTERVAL</Text>
+          <View style={[styles.metricCard, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>AVG INTERVAL</Text>
             <Text style={[styles.metricValue, styles.metricBlue]}>
               {Math.round(data.average_days_between_feedings)}
             </Text>
-            <Text style={styles.metricSubtext}>days between</Text>
+            <Text style={[styles.metricSubtext, { color: colors.textSecondary }]}>days between</Text>
           </View>
         )}
 
         {data.current_streak_accepted != null && data.current_streak_accepted > 0 && (
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>CURRENT STREAK</Text>
+          <View style={[styles.metricCard, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>CURRENT STREAK</Text>
             <Text style={[styles.metricValue, styles.metricPurple]}>
               {data.current_streak_accepted}
             </Text>
-            <Text style={styles.metricSubtext}>accepted</Text>
+            <Text style={[styles.metricSubtext, { color: colors.textSecondary }]}>accepted</Text>
           </View>
         )}
 
         {data.longest_gap_days != null && data.longest_gap_days > 0 && (
-          <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>LONGEST GAP</Text>
-            <Text style={[styles.metricValue, styles.metricGray]}>
+          <View style={[styles.metricCard, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>LONGEST GAP</Text>
+            <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
               {data.longest_gap_days}
             </Text>
-            <Text style={styles.metricSubtext}>days</Text>
+            <Text style={[styles.metricSubtext, { color: colors.textSecondary }]}>days</Text>
           </View>
         )}
       </View>
@@ -130,16 +133,16 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
       {/* Prey Type Distribution */}
       {data.prey_type_distribution.length > 0 && (
         <View style={styles.preySection}>
-          <Text style={styles.preySectionTitle}>Prey Type Distribution</Text>
+          <Text style={[styles.preySectionTitle, { color: colors.textPrimary }]}>Prey Type Distribution</Text>
           {data.prey_type_distribution.map((prey, index) => (
             <View key={index} style={styles.preyItem}>
               <View style={styles.preyHeader}>
-                <Text style={styles.preyName}>{prey.food_type}</Text>
-                <Text style={styles.preyCount}>
+                <Text style={[styles.preyName, { color: colors.textPrimary }]}>{prey.food_type}</Text>
+                <Text style={[styles.preyCount, { color: colors.textSecondary }]}>
                   {prey.count} ({prey.percentage}%)
                 </Text>
               </View>
-              <View style={styles.progressBar}>
+              <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
                 <View
                   style={[
                     styles.progressFill,
@@ -157,7 +160,6 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
@@ -165,11 +167,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
     marginBottom: 16,
   },
   emptyState: {
@@ -182,7 +184,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#6b7280',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -246,7 +247,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   metricCard: {
-    backgroundColor: '#f9fafb',
     borderRadius: 12,
     padding: 12,
     minWidth: '47%',
@@ -255,7 +255,6 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#6b7280',
     marginBottom: 4,
     textTransform: 'uppercase',
   },
@@ -266,7 +265,6 @@ const styles = StyleSheet.create({
   },
   metricSubtext: {
     fontSize: 11,
-    color: '#6b7280',
   },
   acceptanceGreen: {
     color: '#10b981',
@@ -283,16 +281,12 @@ const styles = StyleSheet.create({
   metricPurple: {
     color: '#9333ea',
   },
-  metricGray: {
-    color: '#6b7280',
-  },
   preySection: {
     marginTop: 8,
   },
   preySectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
     marginBottom: 12,
   },
   preyItem: {
@@ -306,16 +300,13 @@ const styles = StyleSheet.create({
   preyName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#111827',
     textTransform: 'capitalize',
   },
   preyCount: {
     fontSize: 13,
-    color: '#6b7280',
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#e5e7eb',
     borderRadius: 4,
     overflow: 'hidden',
   },
