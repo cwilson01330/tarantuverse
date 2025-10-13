@@ -11,6 +11,7 @@ from app.models.follow import Follow
 from app.models.direct_message import Conversation, DirectMessage
 from app.models.forum import ForumCategory, ForumThread, ForumPost
 from app.models.activity_feed import ActivityFeed
+from app.models.subscription import SubscriptionPlan, UserSubscription
 
 __all__ = [
     "User",
@@ -26,4 +27,6 @@ __all__ = [
     "ForumThread",
     "ForumPost",
     "ActivityFeed",
+    "SubscriptionPlan",
+    "UserSubscription",
 ]
