@@ -35,6 +35,7 @@ interface Post {
 interface ThreadDetail {
   id: number;
   title: string;
+  author_id: string;
   is_pinned: boolean;
   is_locked: boolean;
   post_count: number;
@@ -57,6 +58,8 @@ export default function ThreadDetailScreen() {
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [editingThread, setEditingThread] = useState(false);
+  const [editThreadTitle, setEditThreadTitle] = useState('');
 
   useEffect(() => {
     fetchCurrentUser();
@@ -283,6 +286,98 @@ export default function ThreadDetailScreen() {
     setEditContent('');
   };
 
+  const startEditThread = () => {
+    if (thread) {
+      setEditingThread(true);
+      setEditThreadTitle(thread.title);
+    }
+  };
+
+  const cancelEditThread = () => {
+    setEditingThread(false);
+    setEditThreadTitle('');
+  };
+
+  const handleEditThread = async () => {
+    if (!editThreadTitle.trim()) {
+      Alert.alert('Error', 'Thread title cannot be empty');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const token = await AsyncStorage.getItem('token');
+
+      if (!token) {
+        Alert.alert('Error', 'You must be logged in');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/forums/threads/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ title: editThreadTitle }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update thread');
+      }
+
+      const updatedThread = await response.json();
+      setThread(updatedThread);
+      setEditingThread(false);
+      setEditThreadTitle('');
+      Alert.alert('Success', 'Thread title updated successfully');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update thread');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteThread = async () => {
+    Alert.alert(
+      'Delete Thread',
+      'Are you sure you want to delete this entire thread? This will delete all posts and cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('token');
+
+              if (!token) {
+                Alert.alert('Error', 'You must be logged in');
+                return;
+              }
+
+              const response = await fetch(`${API_URL}/api/v1/forums/threads/${id}`, {
+                method: 'DELETE',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to delete thread');
+              }
+
+              Alert.alert('Success', 'Thread deleted successfully');
+              router.back();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete thread');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -342,25 +437,78 @@ export default function ThreadDetailScreen() {
     >
       {/* Thread Header */}
       <View style={[styles.threadHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View style={styles.threadTitleRow}>
-          {thread.is_pinned && (
-            <MaterialCommunityIcons name="pin" size={20} color={colors.primary} style={styles.icon} />
-          )}
-          {thread.is_locked && (
-            <MaterialCommunityIcons name="lock" size={20} color={colors.textTertiary} style={styles.icon} />
-          )}
-          <Text style={[styles.threadTitle, { color: colors.textPrimary }]}>{thread.title}</Text>
-        </View>
-        <View style={styles.threadMeta}>
-          <View style={styles.metaStat}>
-            <MaterialCommunityIcons name="comment-multiple" size={16} color={colors.textTertiary} />
-            <Text style={[styles.metaText, { color: colors.textSecondary }]}>{thread.post_count} posts</Text>
+        {editingThread ? (
+          <View style={styles.editThreadContainer}>
+            <TextInput
+              style={[styles.editThreadInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
+              value={editThreadTitle}
+              onChangeText={setEditThreadTitle}
+              placeholder="Thread title..."
+              placeholderTextColor={colors.textTertiary}
+              maxLength={200}
+            />
+            <View style={styles.editThreadActions}>
+              <TouchableOpacity
+                style={[styles.editThreadButton, { backgroundColor: colors.primary }]}
+                onPress={handleEditThread}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.editThreadButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editThreadButton, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border }]}
+                onPress={cancelEditThread}
+                disabled={submitting}
+              >
+                <Text style={[styles.editThreadButtonText, { color: colors.textPrimary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={styles.metaStat}>
-            <MaterialCommunityIcons name="eye" size={16} color={colors.textTertiary} />
-            <Text style={[styles.metaText, { color: colors.textSecondary }]}>{thread.view_count} views</Text>
-          </View>
-        </View>
+        ) : (
+          <>
+            <View style={styles.threadTitleRow}>
+              {thread.is_pinned && (
+                <MaterialCommunityIcons name="pin" size={20} color={colors.primary} style={styles.icon} />
+              )}
+              {thread.is_locked && (
+                <MaterialCommunityIcons name="lock" size={20} color={colors.textTertiary} style={styles.icon} />
+              )}
+              <Text style={[styles.threadTitle, { color: colors.textPrimary }]}>{thread.title}</Text>
+              
+              {/* Edit/Delete Thread Buttons */}
+              {currentUserId && thread.author_id === currentUserId && (
+                <View style={styles.threadActions}>
+                  <TouchableOpacity
+                    onPress={startEditThread}
+                    style={styles.threadActionButton}
+                  >
+                    <MaterialCommunityIcons name="pencil" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleDeleteThread}
+                    style={styles.threadActionButton}
+                  >
+                    <MaterialCommunityIcons name="delete" size={20} color={colors.error} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+            <View style={styles.threadMeta}>
+              <View style={styles.metaStat}>
+                <MaterialCommunityIcons name="comment-multiple" size={16} color={colors.textTertiary} />
+                <Text style={[styles.metaText, { color: colors.textSecondary }]}>{thread.post_count} posts</Text>
+              </View>
+              <View style={styles.metaStat}>
+                <MaterialCommunityIcons name="eye" size={16} color={colors.textTertiary} />
+                <Text style={[styles.metaText, { color: colors.textSecondary }]}>{thread.view_count} views</Text>
+              </View>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Posts List */}
@@ -709,5 +857,42 @@ const styles = StyleSheet.create({
   lockedText: {
     flex: 1,
     fontSize: 14,
+  },
+  editThreadContainer: {
+    padding: 16,
+  },
+  editThreadInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  editThreadActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editThreadButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  editThreadButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  threadActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 'auto',
+  },
+  threadActionButton: {
+    padding: 6,
+    borderRadius: 6,
   },
 });

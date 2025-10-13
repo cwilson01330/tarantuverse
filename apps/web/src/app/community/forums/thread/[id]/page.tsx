@@ -74,6 +74,8 @@ export default function ThreadPage() {
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [editingThread, setEditingThread] = useState(false);
+  const [editThreadTitle, setEditThreadTitle] = useState("");
 
   useEffect(() => {
     // Get current user ID from token or API
@@ -279,6 +281,80 @@ export default function ThreadPage() {
     setEditContent("");
   };
 
+  const startEditThread = () => {
+    if (thread) {
+      setEditingThread(true);
+      setEditThreadTitle(thread.title);
+    }
+  };
+
+  const cancelEditThread = () => {
+    setEditingThread(false);
+    setEditThreadTitle("");
+  };
+
+  const handleEditThread = async () => {
+    if (!editThreadTitle.trim()) {
+      alert("Thread title cannot be empty");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/forums/threads/${threadId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+          body: JSON.stringify({ title: editThreadTitle }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update thread");
+      }
+
+      const updatedThread = await response.json();
+      setThread(updatedThread);
+      setEditingThread(false);
+      setEditThreadTitle("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update thread");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteThread = async () => {
+    if (!confirm("Are you sure you want to delete this entire thread? This will delete all posts and cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/forums/threads/${threadId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete thread");
+      }
+
+      // Redirect to forums page
+      router.push("/community/forums");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete thread");
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
@@ -333,11 +409,65 @@ export default function ThreadPage() {
           <ArrowLeft className="w-4 h-4" />
           Back to Forums
         </Link>
-        <div className="flex items-center gap-3 mb-2">
-          {thread.is_pinned && <Pin className="w-5 h-5 text-neon-pink-400" />}
-          {thread.is_locked && <Lock className="w-5 h-5 text-gray-500" />}
-          <h1 className="text-3xl font-bold text-gray-100">{thread.title}</h1>
-        </div>
+
+        {/* Thread Title Section */}
+        {editingThread ? (
+          <div className="space-y-3 mb-4">
+            <input
+              type="text"
+              value={editThreadTitle}
+              onChange={(e) => setEditThreadTitle(e.target.value)}
+              className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent text-2xl font-bold"
+              placeholder="Thread title..."
+              maxLength={200}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleEditThread}
+                disabled={submitting}
+                className="bg-gradient-primary text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={cancelEditThread}
+                disabled={submitting}
+                className="bg-dark-50 border border-electric-blue-500/20 text-gray-300 px-4 py-2 rounded-lg hover:border-electric-blue-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-3 flex-1">
+              {thread.is_pinned && <Pin className="w-5 h-5 text-neon-pink-400" />}
+              {thread.is_locked && <Lock className="w-5 h-5 text-gray-500" />}
+              <h1 className="text-3xl font-bold text-gray-100">{thread.title}</h1>
+            </div>
+            
+            {/* Edit/Delete Thread Buttons */}
+            {currentUserId && thread.author_id === currentUserId && (
+              <div className="flex items-center gap-2 ml-4">
+                <button
+                  onClick={startEditThread}
+                  className="text-electric-blue-400 hover:text-electric-blue-300 p-2 rounded hover:bg-electric-blue-500/10 transition-colors"
+                  title="Edit thread title"
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleDeleteThread}
+                  className="text-red-400 hover:text-red-300 p-2 rounded hover:bg-red-500/10 transition-colors"
+                  title="Delete thread"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-4 text-sm text-gray-400">
           <div className="flex items-center gap-1">
             <MessageSquare className="w-4 h-4 text-electric-blue-400" />

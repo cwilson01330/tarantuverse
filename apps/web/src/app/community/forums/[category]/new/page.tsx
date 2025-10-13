@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -10,17 +10,49 @@ interface NewThreadFormData {
   content: string;
 }
 
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 export default function NewThreadPage() {
   const params = useParams();
   const router = useRouter();
   const categorySlug = params?.category as string;
 
+  const [category, setCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState<NewThreadFormData>({
     title: "",
     content: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingCategory, setLoadingCategory] = useState(true);
+
+  // Fetch category info to get category ID
+  useEffect(() => {
+    const fetchCategory = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/forums/categories/${categorySlug}`
+        );
+        if (!response.ok) {
+          throw new Error("Category not found");
+        }
+        const data = await response.json();
+        setCategory(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load category");
+      } finally {
+        setLoadingCategory(false);
+      }
+    };
+
+    if (categorySlug) {
+      fetchCategory();
+    }
+  }, [categorySlug]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,12 +61,17 @@ export default function NewThreadPage() {
       return;
     }
 
+    if (!category) {
+      setError("Category not loaded");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/forums/categories/${categorySlug}/threads`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/forums/threads`,
         {
           method: "POST",
           headers: {
@@ -42,8 +79,9 @@ export default function NewThreadPage() {
             Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
           },
           body: JSON.stringify({
+            category_id: category.id,
             title: formData.title,
-            first_post_content: formData.content,
+            content: formData.content,
           }),
         }
       );
@@ -65,6 +103,22 @@ export default function NewThreadPage() {
     router.push(`/community/forums/${categorySlug}`);
   };
 
+  if (loadingCategory) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="text-center text-gray-400">Loading category...</div>
+      </div>
+    );
+  }
+
+  if (!category) {
+    return (
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <div className="text-center text-red-400">Category not found</div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header */}
@@ -74,7 +128,7 @@ export default function NewThreadPage() {
           className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2 mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to {categorySlug}
+          Back to {category.name}
         </Link>
         <h1 className="text-3xl font-bold text-gray-100">Create New Thread</h1>
       </div>
