@@ -4,7 +4,11 @@
 
 **Tarantuverse** is a comprehensive tarantula (and invertebrate) husbandry tracking platform designed to help keepers manage their collections, track feeding/molting/substrate changes, and access species care information.
 
-**Tech Stack:**
+**Te  ├── components/
+│   │   ├── SpeciesAutocomplete.tsx (reusable autocomplete)
+│   │   ├── FeedingStatsCard.tsx (analytics with Recharts)
+│   │   └── GrowthChart.tsx (growth visualization)
+  └── globals.css (Tailwind + global input/label styles)Stack:**
 - **Frontend**: Next.js 14 (React), TypeScript, Tailwind CSS
 - **Backend**: FastAPI (Python), SQLAlchemy 2.0, Pydantic v2
 - **Database**: PostgreSQL (Neon)
@@ -15,7 +19,7 @@
 
 ---
 
-## 🎯 Current Status (As of 2025-10-06)
+## 🎯 Current Status (As of 2025-10-13)
 
 ### ✅ Completed Features
 
@@ -144,6 +148,25 @@
   - Feeding logs with inline add/delete
   - Molt logs with inline add/delete
   - **NEW: Substrate change logs with inline add/delete** ✅
+  - **NEW: Feeding Stats Card** 🍽️📊 (as of 2025-10-13):
+    - Acceptance rate (percentage with color coding)
+    - Average days between feedings
+    - Current streak (consecutive accepted feedings)
+    - Longest gap between feedings
+    - Last fed indicator with color-coded status:
+      - Green: <7 days
+      - Yellow: 7-14 days
+      - Orange: 14-21 days
+      - Red: >21 days
+    - Next feeding prediction based on average interval
+    - Prey type distribution with visual bar chart
+    - Interactive charts using Recharts (pie chart for acceptance, bar chart for prey types)
+    - **Full dark mode support** on web and mobile
+  - **NEW: Growth Analytics Chart** 📈:
+    - Line chart showing weight and leg span over time
+    - Growth rate calculations
+    - Days between molts
+    - Visual tracking of tarantula development
   - Edit and Delete buttons (with confirmation)
 
 - **Add Tarantula Form**:
@@ -160,9 +183,56 @@
 - **Global Styling**:
   - Spider emoji (🕷️) favicon
   - Tailwind CSS with custom primary color
-  - Dark text on white backgrounds (fixed visibility issues)
+  - **Complete Dark Mode Support** 🌙 (as of 2025-10-13):
+    - Web: Tailwind dark: modifiers on all components
+    - Mobile: ThemeContext with dynamic color system
+    - All pages support light and dark themes:
+      - Backgrounds, surfaces, elevated surfaces
+      - Text colors (primary, secondary, tertiary)
+      - Borders, buttons, forms, cards
+      - Charts and visualizations
+      - Modals, loading states, empty states
+    - Smooth theme transitions
+    - System-wide theme consistency
   - Responsive grid layouts
   - Consistent button and form styling
+  - **Collection Cards with Feeding Status Badges**:
+    - Color-coded indicators showing days since last feeding
+    - Visual warnings for overdue feedings
+    - Available on both web and mobile platforms
+
+#### Mobile App (React Native + Expo) 📱 (NEW - as of 2025-10-13)
+- **Full feature parity with web app**
+- Built with React Native, Expo Router, TypeScript
+- **Authentication**: Login, registration, token management
+- **Collection Management**: 
+  - View all tarantulas in grid layout with photos
+  - Tarantula detail screen with all information
+  - Add new tarantulas with form
+  - Edit existing tarantulas
+  - Delete tarantulas
+- **Feeding & Molt Tracking**:
+  - View feeding history
+  - View molt history  
+  - Add feeding logs
+  - Add molt logs
+- **Photo Management**:
+  - Camera integration for taking photos
+  - Gallery picker for existing photos
+  - Photo viewer with swipe navigation
+  - Cloudflare R2 storage integration
+  - Automatic thumbnail generation
+- **Analytics & Stats**:
+  - Feeding stats card with visual indicators
+  - Growth chart component
+  - Collection statistics
+- **Complete Dark Mode Support**:
+  - ThemeContext with light/dark themes
+  - Dynamic color system (background, surface, text, borders, primary)
+  - All screens and components fully themed
+  - Smooth theme switching
+- **Platform**: iOS and Android via Expo
+- **Testing**: Expo Go for development, EAS Build for production
 
 ---
 
@@ -237,6 +307,48 @@ apps/web/
 └── tailwind.config.ts
 ```
 
+### Mobile Structure (`apps/mobile/`) (NEW)
+
+```
+apps/mobile/
+├── app/
+│   ├── _layout.tsx (root layout with theme provider)
+│   ├── index.tsx (redirect to tabs)
+│   ├── login.tsx
+│   ├── register.tsx
+│   ├── (tabs)/
+│   │   ├── _layout.tsx (tab navigation)
+│   │   ├── index.tsx (collection screen)
+│   │   ├── community.tsx
+│   │   └── profile.tsx
+│   ├── tarantula/
+│   │   ├── [id].tsx (detail screen with full dark mode)
+│   │   ├── add.tsx
+│   │   ├── edit.tsx
+│   │   ├── add-feeding.tsx
+│   │   ├── add-molt.tsx
+│   │   └── add-photo.tsx
+│   └── analytics/
+│       └── [id].tsx
+├── src/
+│   ├── components/
+│   │   ├── FeedingStatsCard.tsx (with dark mode)
+│   │   ├── GrowthChart.tsx
+│   │   ├── PhotoViewer.tsx
+│   │   ├── TarantulaDetailSkeleton.tsx (with dark mode)
+│   │   └── TarantulaCardSkeleton.tsx
+│   ├── contexts/
+│   │   ├── AuthContext.tsx
+│   │   └── ThemeContext.tsx (light/dark theme provider)
+│   └── services/
+│       └── api.ts (axios client with auth interceptors)
+├── assets/
+│   └── (images and icons)
+├── app.json (Expo configuration)
+├── eas.json (EAS Build configuration)
+└── package.json
+```
+
 ---
 
 ## 🔧 Key Technical Details
@@ -282,6 +394,15 @@ apps/web/
 - `POST /tarantulas/{id}/substrate-changes` - Create substrate change (auto-updates tarantula)
 - `PUT /substrate-changes/{id}` - Update substrate change
 - `DELETE /substrate-changes/{id}` - Delete substrate change
+
+**Analytics & Stats:** (NEW - as of 2025-10-13)
+- `GET /tarantulas/{id}/feeding-stats` - Get comprehensive feeding analytics
+  - Returns: acceptance rate, average days between feedings, last feeding date, 
+    days since last feeding, next feeding prediction, longest gap, current streak, 
+    prey type distribution
+- `GET /tarantulas/{id}/growth` - Get growth analytics
+  - Returns: weight/leg span data points, total molts, average days between molts,
+    growth rate calculations
 
 ### Database Models
 
@@ -767,37 +888,64 @@ The migration will run automatically on next deploy via `start.sh`.
 ## 🚧 Current Limitations & TODOs
 
 ### Limitations:
-- No image upload (using URLs only)
-- No mobile app (web only)
-- No offline mode
+- ~~No image upload (using URLs only)~~ ✅ **FIXED** - Cloudflare R2 integration complete
+- ~~No mobile app (web only)~~ ✅ **FIXED** - Mobile app built with React Native + Expo
+- ~~No dark mode~~ ✅ **FIXED** - Complete dark mode on web and mobile
+- No offline mode (requires internet connection)
 - No real-time notifications
 - No environmental sensor integration
 - No breeding tracking yet
-- No community features yet
+- Limited community features (profiles exist, no forums/messaging)
 
 ### Immediate TODOs:
 1. ~~Add substrate change log UI to tarantula detail page~~ ✅ DONE
-2. Test all Phase 1 features in development environment
-3. Deploy to Render and Vercel
-4. Add husbandry fields to add/edit tarantula forms
-5. Consider adding "Edit Husbandry" separate form for better UX
+2. ~~Add feeding analytics and stats~~ ✅ DONE
+3. ~~Implement dark mode~~ ✅ DONE
+4. Test all features end-to-end in production environment
+5. Add email notifications for feeding reminders
+6. Implement breeding tracking features
+7. Add community forums and activity feed
 
 ### Future Considerations:
-- Mobile app (React Native or native)
-- Image upload to cloud storage (Cloudinary, S3)
+- ~~Mobile app (React Native or native)~~ ✅ **DONE** - React Native + Expo
+- ~~Image upload to cloud storage (Cloudinary, S3)~~ ✅ **DONE** - Cloudflare R2
+- Offline mode with local storage and sync
 - WebSocket for real-time updates
 - Email notifications (feeding reminders, molt predictions)
+- Push notifications for mobile app
 - Export collection data (CSV, PDF)
-- Privacy controls (public profiles)
+- Privacy controls for public profiles (partially implemented)
 - Admin panel for species verification
+- Breeding tracking and lineage management
+- Temperature/humidity sensor integration (IoT)
+- QR code labels for enclosures
+- Multi-user collections (shared access)
+- Marketplace/classifieds integration
 
 ---
 
-**Last Updated**: 2025-10-06
-**Version**: 0.3.0 (Phase 1 Complete)
-**Status**: Development - All Phase 1 features implemented, ready for testing & deployment
+**Last Updated**: 2025-10-13
+**Version**: 0.5.0 (Phase 2C: Feeding Analytics Complete)
+**Status**: Active Development - Web + Mobile apps fully functional with analytics
 
-**Recent Changes**:
+**Recent Changes** (2025-10-13):
+- ✅ Added comprehensive feeding analytics system
+  - Backend: feeding-stats endpoint with full analytics
+  - Web: FeedingStatsCard with Recharts visualizations (pie + bar charts)
+  - Mobile: FeedingStatsCard with themed styling
+  - Collection cards show feeding status badges on both platforms
+- ✅ Completed dark mode implementation across entire platform
+  - Web: All pages, components, modals, charts with Tailwind dark: modifiers
+  - Mobile: Complete ThemeContext system with dynamic colors
+  - Tarantula detail screens fully themed on both platforms
+  - Loading states, skeletons, empty states all support dark mode
+- ✅ Mobile app feature parity with web
+  - Full CRUD operations for tarantulas
+  - Photo management with camera integration
+  - Feeding and molt tracking
+  - Analytics and stats display
+
+**Previous Updates** (2025-10-06):
 - ✅ Added substrate change log UI to tarantula detail page
 - ✅ Implemented inline form for logging substrate changes
 - ✅ Added display section showing substrate change history
