@@ -281,17 +281,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sortButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 18,
     borderWidth: 1,
   },
   sortButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   scrollContent: {
-    padding: 16,
+    padding: 12,
   },
   centerContent: {
     flex: 1,
@@ -342,31 +342,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   threadCard: {
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   threadHeader: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   threadTitleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   pinIcon: {
-    marginRight: 6,
+    marginRight: 5,
     marginTop: 2,
   },
   lockIcon: {
-    marginRight: 6,
+    marginRight: 5,
     marginTop: 2,
   },
   threadTitle: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    lineHeight: 22,
+    lineHeight: 20,
   },
   threadFooter: {
     flexDirection: 'row',
