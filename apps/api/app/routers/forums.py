@@ -53,6 +53,20 @@ async def list_categories(
     return categories
 
 
+@router.get("/categories/{category_slug}", response_model=ForumCategoryResponse)
+async def get_category(
+    category_slug: str,
+    db: Session = Depends(get_db)
+):
+    """Get a single category by slug"""
+    category = db.query(ForumCategory).filter(
+        ForumCategory.slug == category_slug
+    ).first()
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return category
+
+
 @router.post("/categories", response_model=ForumCategoryResponse)
 async def create_category(
     category_data: ForumCategoryCreate,
