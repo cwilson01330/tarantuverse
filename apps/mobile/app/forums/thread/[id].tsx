@@ -555,7 +555,7 @@ export default function ThreadDetailScreen() {
               </View>
               
               {/* Edit/Delete Buttons */}
-              {currentUserId && post.author_id === currentUserId && editingPostId !== post.id && (
+              {currentUserId && post.author.id === currentUserId && editingPostId !== post.id && (
                 <View style={styles.postActions}>
                   <TouchableOpacity
                     onPress={() => startEdit(post)}
