@@ -51,7 +51,7 @@ export default function CategoryScreen() {
   const fetchThreads = async (reset = false) => {
     try {
       const currentPage = reset ? 1 : page;
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
       const response = await fetch(
         `${API_URL}/api/v1/forums/categories/${category}/threads?page=${currentPage}&limit=20&sort=${sortBy}`,
         {

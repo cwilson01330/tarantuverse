@@ -40,7 +40,7 @@ export default function NewThreadScreen() {
 
   const fetchCategories = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
       const response = await fetch(`${API_URL}/api/v1/forums/categories`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -82,7 +82,7 @@ export default function NewThreadScreen() {
 
     try {
       setSubmitting(true);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
 
       if (!token) {
         Alert.alert('Error', 'You must be logged in to create a thread');

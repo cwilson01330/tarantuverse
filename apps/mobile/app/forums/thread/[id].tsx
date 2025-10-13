@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,
-  Text,
+  View,  const fetchCurrentUser = async () => {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      console.log('[Thread] Fetching current user, token exists:', !!token);
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -70,7 +77,7 @@ export default function ThreadDetailScreen() {
 
   const fetchCurrentUser = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
       console.log('[Thread] Fetching current user, token exists:', !!token);
       if (!token) return;
 
@@ -91,7 +98,7 @@ export default function ThreadDetailScreen() {
 
   const fetchThread = async () => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
       const response = await fetch(`${API_URL}/api/v1/forums/threads/${id}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
@@ -113,7 +120,7 @@ export default function ThreadDetailScreen() {
   const fetchPosts = async (reset = false) => {
     try {
       const currentPage = reset ? 1 : page;
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
       const response = await fetch(
         `${API_URL}/api/v1/forums/threads/${id}/posts?page=${currentPage}&limit=20`,
         {
@@ -158,7 +165,7 @@ export default function ThreadDetailScreen() {
 
     try {
       setSubmitting(true);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
 
       if (!token) {
         Alert.alert('Error', 'You must be logged in to reply');
@@ -198,7 +205,7 @@ export default function ThreadDetailScreen() {
 
     try {
       setSubmitting(true);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
 
       if (!token) {
         Alert.alert('Error', 'You must be logged in');
@@ -249,7 +256,7 @@ export default function ThreadDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const token = await AsyncStorage.getItem('token');
+              const token = await AsyncStorage.getItem('auth_token');
 
               if (!token) {
                 Alert.alert('Error', 'You must be logged in');
@@ -310,7 +317,7 @@ export default function ThreadDetailScreen() {
 
     try {
       setSubmitting(true);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('auth_token');
 
       if (!token) {
         Alert.alert('Error', 'You must be logged in');
@@ -353,7 +360,7 @@ export default function ThreadDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const token = await AsyncStorage.getItem('token');
+              const token = await AsyncStorage.getItem('auth_token');
 
               if (!token) {
                 Alert.alert('Error', 'You must be logged in');
