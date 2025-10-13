@@ -71,6 +71,35 @@ export default function ThreadPage() {
   const [error, setError] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get current user ID from token or API
+    const fetchCurrentUser = async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        if (!token) return;
+        
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/me`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        
+        if (response.ok) {
+          const user = await response.json();
+          setCurrentUserId(user.id);
+        }
+      } catch (err) {
+        console.error("Failed to fetch current user:", err);
+      }
+    };
+    
+    fetchCurrentUser();
+  }, []);
 
   useEffect(() => {
     if (threadId) {
@@ -159,6 +188,95 @@ export default function ThreadPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditPost = async (postId: number) => {
+    if (!editContent.trim() || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/forums/posts/${postId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+          body: JSON.stringify({ content: editContent }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update post");
+      }
+
+      const updatedPost: ForumPost = await response.json();
+      
+      // Update post in state
+      if (thread?.first_post?.id === postId) {
+        setThread({
+          ...thread,
+          first_post: updatedPost,
+        });
+      } else {
+        setPosts((prev) =>
+          prev.map((p) => (p.id === postId ? updatedPost : p))
+        );
+      }
+      
+      setEditingPostId(null);
+      setEditContent("");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update post");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeletePost = async (postId: number) => {
+    if (!confirm("Are you sure you want to delete this post? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/forums/posts/${postId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete post");
+      }
+
+      // Remove post from state
+      if (thread?.first_post?.id === postId) {
+        // Can't delete first post - should delete thread instead
+        alert("Cannot delete the first post. Delete the thread instead.");
+      } else {
+        setPosts((prev) => prev.filter((p) => p.id !== postId));
+      }
+      
+      // Refresh thread to update post count
+      fetchThread();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete post");
+    }
+  };
+
+  const startEdit = (post: ForumPost) => {
+    setEditingPostId(post.id);
+    setEditContent(post.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingPostId(null);
+    setEditContent("");
   };
 
   const formatDate = (dateString: string) => {
@@ -273,12 +391,66 @@ export default function ThreadPage() {
                       </span>
                     )}
                   </div>
+                  {/* Edit/Delete Buttons */}
+                  {currentUserId && post.author_id === currentUserId && (
+                    <div className="flex items-center gap-2">
+                      {editingPostId !== post.id && (
+                        <>
+                          <button
+                            onClick={() => startEdit(post)}
+                            className="text-electric-blue-400 hover:text-electric-blue-300 p-1 rounded hover:bg-electric-blue-500/10 transition-colors"
+                            title="Edit post"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          {index !== 0 && ( // Don't show delete for first post
+                            <button
+                              onClick={() => handleDeletePost(post.id)}
+                              className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10 transition-colors"
+                              title="Delete post"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div className="prose max-w-none prose-invert">
-                  <p className="text-gray-200 whitespace-pre-wrap">
-                    {post.content}
-                  </p>
-                </div>
+
+                {/* Edit Mode */}
+                {editingPostId === post.id ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent resize-none"
+                      rows={6}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditPost(post.id)}
+                        disabled={submitting}
+                        className="bg-gradient-primary text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {submitting ? "Saving..." : "Save"}
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        disabled={submitting}
+                        className="bg-dark-50 border border-electric-blue-500/20 text-gray-300 px-4 py-2 rounded-lg hover:border-electric-blue-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="prose max-w-none prose-invert">
+                    <p className="text-gray-200 whitespace-pre-wrap">
+                      {post.content}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

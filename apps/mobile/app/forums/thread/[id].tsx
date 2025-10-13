@@ -22,9 +22,11 @@ interface Post {
   id: number;
   content: string;
   author: {
+    id: string;
     username: string;
     display_name: string;
   };
+  author_id: string;
   created_at: string;
   is_edited: boolean;
   edited_at?: string;
@@ -52,11 +54,33 @@ export default function ThreadDetailScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [replyContent, setReplyContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchThread();
     fetchPosts(true);
   }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`${API_URL}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCurrentUserId(data.id);
+      }
+    } catch (err) {
+      console.error('Failed to fetch current user:', err);
+    }
+  };
 
   const fetchThread = async () => {
     try {
@@ -157,6 +181,106 @@ export default function ThreadDetailScreen() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleEditPost = async (postId: number) => {
+    if (!editContent.trim()) {
+      Alert.alert('Error', 'Post cannot be empty');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const token = await AsyncStorage.getItem('token');
+
+      if (!token) {
+        Alert.alert('Error', 'You must be logged in');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/forums/posts/${postId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: editContent }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update post');
+      }
+
+      const updatedPost = await response.json();
+
+      // Update post in state
+      setPosts(posts.map(p => p.id === postId ? { ...p, content: updatedPost.content, is_edited: true, edited_at: updatedPost.edited_at } : p));
+      
+      setEditingPostId(null);
+      setEditContent('');
+      Alert.alert('Success', 'Post updated successfully');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update post');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeletePost = async (postId: number, index: number) => {
+    if (index === 0) {
+      Alert.alert('Error', 'Cannot delete the first post. Delete the thread instead.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this post? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('token');
+
+              if (!token) {
+                Alert.alert('Error', 'You must be logged in');
+                return;
+              }
+
+              const response = await fetch(`${API_URL}/api/v1/forums/posts/${postId}`, {
+                method: 'DELETE',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (!response.ok) {
+                throw new Error('Failed to delete post');
+              }
+
+              // Remove post from state
+              setPosts(posts.filter(p => p.id !== postId));
+              fetchThread(); // Refresh to update post count
+              Alert.alert('Success', 'Post deleted successfully');
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Failed to delete post');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const startEdit = (post: Post) => {
+    setEditingPostId(post.id);
+    setEditContent(post.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingPostId(null);
+    setEditContent('');
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -279,8 +403,62 @@ export default function ThreadDetailScreen() {
                   {post.is_edited && ' (edited)'}
                 </Text>
               </View>
+              
+              {/* Edit/Delete Buttons */}
+              {currentUserId && post.author_id === currentUserId && editingPostId !== post.id && (
+                <View style={styles.postActions}>
+                  <TouchableOpacity
+                    onPress={() => startEdit(post)}
+                    style={styles.actionButton}
+                  >
+                    <MaterialCommunityIcons name="pencil" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                  {index !== 0 && (
+                    <TouchableOpacity
+                      onPress={() => handleDeletePost(post.id, index)}
+                      style={styles.actionButton}
+                    >
+                      <MaterialCommunityIcons name="delete" size={20} color={colors.error} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
             </View>
-            <Text style={[styles.postContent, { color: colors.textSecondary }]}>{post.content}</Text>
+
+            {/* Edit Mode */}
+            {editingPostId === post.id ? (
+              <View style={styles.editContainer}>
+                <TextInput
+                  style={[styles.editInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
+                  value={editContent}
+                  onChangeText={setEditContent}
+                  multiline
+                  maxLength={5000}
+                />
+                <View style={styles.editActions}>
+                  <TouchableOpacity
+                    style={[styles.editButton, { backgroundColor: colors.primary }]}
+                    onPress={() => handleEditPost(post.id)}
+                    disabled={submitting}
+                  >
+                    {submitting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.editButtonText}>Save</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.editButton, { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border }]}
+                    onPress={cancelEdit}
+                    disabled={submitting}
+                  >
+                    <Text style={[styles.editButtonText, { color: colors.textPrimary }]}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <Text style={[styles.postContent, { color: colors.textSecondary }]}>{post.content}</Text>
+            )}
           </View>
         ))}
 
@@ -448,6 +626,44 @@ const styles = StyleSheet.create({
   postTime: {
     fontSize: 12,
     marginTop: 2,
+  },
+  postActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 'auto',
+  },
+  actionButton: {
+    padding: 6,
+    borderRadius: 6,
+  },
+  editContainer: {
+    marginTop: 8,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  editButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
   postContent: {
     fontSize: 15,
