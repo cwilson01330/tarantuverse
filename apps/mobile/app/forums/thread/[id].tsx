@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View,  const fetchCurrentUser = async () => {
-    try {
-      const token = await AsyncStorage.getItem('auth_token');
-      console.log('[Thread] Fetching current user, token exists:', !!token);
-      if (!token) return;
-
-      const response = await fetch(`${API_URL}/api/v1/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+  View,
+  Text,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
