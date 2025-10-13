@@ -102,15 +102,15 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6">Collection Analytics</h1>
+        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse">
+            <Card key={i} className="animate-pulse bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
               <CardHeader>
-                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
               </CardHeader>
               <CardContent>
-                <div className="h-8 bg-gray-200 rounded"></div>
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
               </CardContent>
             </Card>
           ))}
@@ -122,10 +122,10 @@ export default function AnalyticsPage() {
   if (error || !analytics) {
     return (
       <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6">Collection Analytics</h1>
-        <Card>
+        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardContent className="p-6">
-            <p className="text-red-600">{error || "No data available"}</p>
+            <p className="text-red-600 dark:text-red-400">{error || "No data available"}</p>
           </CardContent>
         </Card>
       </div>
@@ -135,10 +135,10 @@ export default function AnalyticsPage() {
   if (analytics.total_tarantulas === 0) {
     return (
       <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6">Collection Analytics</h1>
-        <Card>
+        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardContent className="p-6 text-center">
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
               No tarantulas in your collection yet!
             </p>
             <button
@@ -159,61 +159,61 @@ export default function AnalyticsPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">📊 Collection Analytics</h1>
+      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">📊 Collection Analytics</h1>
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <Card>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
               Total Tarantulas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{analytics.total_tarantulas}</p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{analytics.total_tarantulas}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {analytics.unique_species} unique species
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
               Collection Value
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">${analytics.total_value.toFixed(2)}</p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">${analytics.total_value.toFixed(2)}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               Avg: ${(analytics.total_value / analytics.total_tarantulas).toFixed(2)} each
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
               Average Age
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{analytics.average_age_months}</p>
-            <p className="text-sm text-gray-500 mt-1">months in collection</p>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">{analytics.average_age_months}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">months in collection</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
               Total Activity
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">
               {analytics.total_feedings + analytics.total_molts + analytics.total_substrate_changes}
             </p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {analytics.total_feedings} feedings, {analytics.total_molts} molts
             </p>
           </CardContent>
@@ -223,19 +223,19 @@ export default function AnalyticsPage() {
       {/* Sex Distribution and Notable Tarantulas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Sex Distribution */}
-        <Card>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader>
-            <CardTitle>Sex Distribution</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white">Sex Distribution</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {/* Male Bar */}
               <div>
                 <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">♂️ Male</span>
-                  <span className="text-sm text-gray-600">{analytics.sex_distribution.male} ({malePercent}%)</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">♂️ Male</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{analytics.sex_distribution.male} ({malePercent}%)</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
                   <div
                     className="bg-blue-500 h-3 rounded-full transition-all"
                     style={{ width: `${malePercent}%` }}
@@ -246,10 +246,10 @@ export default function AnalyticsPage() {
               {/* Female Bar */}
               <div>
                 <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">♀️ Female</span>
-                  <span className="text-sm text-gray-600">{analytics.sex_distribution.female} ({femalePercent}%)</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">♀️ Female</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{analytics.sex_distribution.female} ({femalePercent}%)</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
                   <div
                     className="bg-pink-500 h-3 rounded-full transition-all"
                     style={{ width: `${femalePercent}%` }}
@@ -260,8 +260,8 @@ export default function AnalyticsPage() {
               {/* Unknown */}
               <div>
                 <div className="flex justify-between">
-                  <span className="text-sm font-medium">❓ Unknown</span>
-                  <span className="text-sm text-gray-600">{analytics.sex_distribution.unknown}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">❓ Unknown</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{analytics.sex_distribution.unknown}</span>
                 </div>
               </div>
             </div>
@@ -269,34 +269,34 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Notable Tarantulas */}
-        <Card>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader>
-            <CardTitle>Notable Tarantulas</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white">Notable Tarantulas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {analytics.most_active_molter && (
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-600">🦋 Most Active Molter</p>
-                <p className="text-lg font-semibold">{analytics.most_active_molter.name}</p>
-                <p className="text-sm text-gray-600">{analytics.most_active_molter.molt_count} molts</p>
+              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">🦋 Most Active Molter</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">{analytics.most_active_molter.name}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{analytics.most_active_molter.molt_count} molts</p>
               </div>
             )}
 
             {analytics.newest_acquisition && (
-              <div className="p-3 bg-green-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-600">🆕 Newest Addition</p>
-                <p className="text-lg font-semibold">{analytics.newest_acquisition.name}</p>
-                <p className="text-sm text-gray-600">
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">🆕 Newest Addition</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">{analytics.newest_acquisition.name}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   Added {formatDate(analytics.newest_acquisition.date)}
                 </p>
               </div>
             )}
 
             {analytics.oldest_acquisition && (
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-600">👴 Oldest in Collection</p>
-                <p className="text-lg font-semibold">{analytics.oldest_acquisition.name}</p>
-                <p className="text-sm text-gray-600">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">👴 Oldest in Collection</p>
+                <p className="text-lg font-semibold text-gray-900 dark:text-white">{analytics.oldest_acquisition.name}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   Since {formatDate(analytics.oldest_acquisition.date)}
                 </p>
               </div>
@@ -307,9 +307,9 @@ export default function AnalyticsPage() {
 
       {/* Species Distribution */}
       {analytics.species_counts.length > 0 && (
-        <Card className="mb-6">
+        <Card className="mb-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader>
-            <CardTitle>Species Distribution (Top 10)</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white">Species Distribution (Top 10)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -318,10 +318,10 @@ export default function AnalyticsPage() {
                 return (
                   <div key={index}>
                     <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium truncate">{species.species_name}</span>
-                      <span className="text-sm text-gray-600">{species.count} ({percentage}%)</span>
+                      <span className="text-sm font-medium truncate text-gray-900 dark:text-white">{species.species_name}</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">{species.count} ({percentage}%)</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-green-500 h-2 rounded-full transition-all"
                         style={{ width: `${percentage}%` }}
@@ -336,27 +336,27 @@ export default function AnalyticsPage() {
       )}
 
       {/* Feeding Statistics */}
-      <Card className="mb-6">
+      <Card className="mb-6 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
         <CardHeader>
-          <CardTitle>Feeding Statistics</CardTitle>
+          <CardTitle className="text-gray-900 dark:text-white">Feeding Statistics</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-3xl font-bold">{analytics.total_feedings}</p>
-              <p className="text-sm text-gray-600">Total Feedings</p>
+            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{analytics.total_feedings}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Feedings</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-3xl font-bold">{analytics.average_days_between_feedings}</p>
-              <p className="text-sm text-gray-600">Avg Days Between Feedings</p>
+            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{analytics.average_days_between_feedings}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Avg Days Between Feedings</p>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <p className="text-3xl font-bold">
+            <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">
                 {analytics.total_tarantulas > 0
                   ? (analytics.total_feedings / analytics.total_tarantulas).toFixed(1)
                   : 0}
               </p>
-              <p className="text-sm text-gray-600">Avg Feedings Per Tarantula</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Avg Feedings Per Tarantula</p>
             </div>
           </div>
         </CardContent>
@@ -364,23 +364,23 @@ export default function AnalyticsPage() {
 
       {/* Recent Activity */}
       {analytics.recent_activity.length > 0 && (
-        <Card>
+        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white">Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {analytics.recent_activity.map((activity, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-3 p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+                  className="flex items-start gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
                   onClick={() => router.push(`/dashboard/tarantulas/${activity.tarantula_id}`)}
                 >
                   <span className="text-2xl">{getActivityIcon(activity.type)}</span>
                   <div className="flex-1">
-                    <p className="font-medium">{activity.tarantula_name}</p>
-                    <p className="text-sm text-gray-600">{activity.description}</p>
-                    <p className="text-xs text-gray-500 mt-1">{formatDate(activity.date)}</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{activity.tarantula_name}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{activity.description}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{formatDate(activity.date)}</p>
                   </div>
                 </div>
               ))}
