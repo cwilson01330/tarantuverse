@@ -146,7 +146,7 @@ export default function Home() {
             <h3 className="text-xl font-bold mb-3 text-gray-100">Community</h3>
             <p className="text-gray-300">
               Connect with fellow keepers, share your collection, and learn from the community. 
-              Message boards and keeper profiles.
+              Forums, discussions, and keeper profiles.
             </p>
           </div>
         </div>
@@ -245,7 +245,7 @@ export default function Home() {
               <h4 className="text-white font-semibold mb-4">Community</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link href="/community" className="hover:text-neon-pink-400 transition">Keepers</Link></li>
-                <li><Link href="/community/board" className="hover:text-neon-pink-400 transition">Message Board</Link></li>
+                <li><Link href="/community/forums" className="hover:text-neon-pink-400 transition">Forums</Link></li>
                 <li><Link href="/blog" className="hover:text-neon-pink-400 transition">Blog</Link></li>
               </ul>
             </div>

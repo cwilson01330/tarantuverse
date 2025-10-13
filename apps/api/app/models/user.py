@@ -39,7 +39,7 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships (lazy loading to avoid circular imports)
-    # messages = relationship("Message", back_populates="user", lazy="select")  # Commented out - Message model not yet implemented
+    messages = relationship("Message", back_populates="user", lazy="select")  # Legacy message board (deprecated, keeping for data integrity)
 
     def __repr__(self):
         return f"<User {self.username}>"
