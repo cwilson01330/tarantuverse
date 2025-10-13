@@ -43,6 +43,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="forums"
+        options={{
+          title: 'Forums',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="forum" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="species"
         options={{
           title: 'Species Database',
