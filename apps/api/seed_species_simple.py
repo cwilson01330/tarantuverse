@@ -14,12 +14,11 @@ def seed():
         print(f"Current species in database: {count}")
         
         if count > 0:
-            response = input("Species exist. Clear and re-seed? (yes/no): ")
-            if response.lower() != 'yes':
+            response = input("Species exist. Add more or skip? (add/skip): ")
+            if response.lower() != 'add':
                 print("Skipping.")
                 return
-            db.query(Species).delete()
-            db.commit()
+            print(f"Adding to existing {count} species...")
         
         # 13 popular species
         species = [
@@ -155,21 +154,28 @@ def seed():
         ]
         
         print(f"\n🌱 Adding {len(species)} species...\n")
+        added = 0
+        skipped = 0
         for s in species:
+            # Check if species already exists
+            existing = db.query(Species).filter(Species.scientific_name == s.scientific_name).first()
+            if existing:
+                skipped += 1
+                print(f"  ⏭️  {s.scientific_name} (already exists)")
+                continue
+            
             db.add(s)
+            added += 1
             level = {"beginner": "🟢", "intermediate": "🟡", "advanced": "🔴"}.get(s.care_level, "⚪")
             print(f"  {level} {s.scientific_name} ({s.common_names[0]})")
         
         db.commit()
-        print(f"\n✅ Successfully seeded {len(species)} species!")
+        print(f"\n✅ Successfully added {added} species!")
+        if skipped > 0:
+            print(f"⏭️  Skipped {skipped} existing species")
         
-        beginner = sum(1 for s in species if s.care_level == 'beginner')
-        intermediate = sum(1 for s in species if s.care_level == 'intermediate')
-        advanced = sum(1 for s in species if s.care_level == 'advanced')
-        print(f"\n📊 Breakdown:")
-        print(f"  🟢 Beginner: {beginner}")
-        print(f"  🟡 Intermediate: {intermediate}")
-        print(f"  🔴 Advanced: {advanced}")
+        total = db.query(Species).count()
+        print(f"\n� Total species in database: {total}")
         
     except Exception as e:
         print(f"❌ Error: {e}")
