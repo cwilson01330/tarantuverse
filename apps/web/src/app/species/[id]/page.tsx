@@ -173,6 +173,31 @@ export default function EnhancedSpeciesDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Breadcrumb Navigation */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
+            >
+              Home
+            </button>
+            <span className="text-gray-400 dark:text-gray-600">/</span>
+            <button
+              onClick={() => router.push('/species')}
+              className="text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
+            >
+              Species Database
+            </button>
+            <span className="text-gray-400 dark:text-gray-600">/</span>
+            <span className="text-gray-900 dark:text-white font-medium">
+              {species.scientific_name}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <div className="relative h-96 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700">
         {species.image_url && (

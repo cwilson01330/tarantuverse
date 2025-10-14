@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Search, Filter, Grid3x3, List, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Search, Filter, Grid3x3, List, ChevronDown, ArrowLeft } from 'lucide-react';
 
 interface Species {
   id: string;
@@ -25,6 +26,7 @@ interface Species {
 }
 
 export default function SpeciesPage() {
+  const router = useRouter();
   const [species, setSpecies] = useState<Species[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -90,6 +92,19 @@ export default function SpeciesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Navigation Bar */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            <span>Back to Dashboard</span>
+          </button>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">

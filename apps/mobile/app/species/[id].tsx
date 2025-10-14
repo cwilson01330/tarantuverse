@@ -222,6 +222,18 @@ export default function SpeciesDetailScreen() {
       height: 300,
       position: 'relative',
     },
+    floatingBackButton: {
+      position: 'absolute',
+      top: 50,
+      left: 16,
+      zIndex: 10,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     heroGradient: {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: colors.primary,
@@ -445,6 +457,15 @@ export default function SpeciesDetailScreen() {
           {species.image_url && (
             <Image source={{ uri: species.image_url }} style={styles.heroImage} resizeMode="cover" />
           )}
+          
+          {/* Floating Back Button */}
+          <TouchableOpacity 
+            onPress={() => router.back()}
+            style={styles.floatingBackButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
+
           <View style={styles.heroContent}>
             <Text style={styles.speciesName}>{species.scientific_name}</Text>
             {species.common_names && species.common_names.length > 0 && (
