@@ -1,13 +1,47 @@
 """
 Simple seed script for tarantula species
 Run with: python seed_species_simple.py
+
+If you get connection errors with Neon:
+1. Go to Neon dashboard and click "Wake up" on your project
+2. Wait 30 seconds for database to activate
+3. Run this script again
 """
 from app.database import SessionLocal
 from app.models.species import Species
 import uuid
+import time
+import sys
 
 def seed():
-    db = SessionLocal()
+    print("🔌 Connecting to database...")
+    
+    # Try to connect with retries (Neon may need to wake up)
+    max_retries = 3
+    retry_delay = 10  # seconds
+    
+    for attempt in range(max_retries):
+        try:
+            db = SessionLocal()
+            # Test connection
+            count = db.query(Species).count()
+            print(f"✅ Connected! Current species in database: {count}")
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️  Connection attempt {attempt + 1} failed: {str(e)[:100]}")
+                print(f"⏳ Waiting {retry_delay} seconds for database to wake up...")
+                time.sleep(retry_delay)
+            else:
+                print(f"\n❌ Failed to connect after {max_retries} attempts.")
+                print("\n🔧 Troubleshooting steps:")
+                print("1. Go to https://console.neon.tech")
+                print("2. Select your 'tarantuverse' project")
+                print("3. Click the 'Wake up' button if project is suspended")
+                print("4. Wait 30 seconds and run this script again")
+                print(f"\nFull error: {e}")
+                sys.exit(1)
+    
     try:
         # Check existing
         count = db.query(Species).count()
