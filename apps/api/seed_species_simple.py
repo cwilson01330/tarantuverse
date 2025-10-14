@@ -20,7 +20,7 @@ def seed():
                 return
             print(f"Adding to existing {count} species...")
         
-        # 13 popular species
+        # 19 popular species (13 original + 6 new from Perplexity research)
         species = [
             Species(id=uuid.uuid4(), scientific_name="Grammostola rosea", scientific_name_lower="grammostola rosea",
                    genus="Grammostola", species="rosea", common_names=["Chilean Rose Hair"],
@@ -93,14 +93,14 @@ def seed():
                    typical_diet="Crickets, roaches", is_verified=True, times_kept=7000, average_rating=4.8),
             
             Species(id=uuid.uuid4(), scientific_name="Tliltocatl albopilosus", scientific_name_lower="tliltocatl albopilosus",
-                   genus="Tliltocatl", species="albopilosus", common_names=["Nicaraguan Curly Hair"],
-                   type="terrestrial", native_region="Nicaragua", care_level="beginner",
-                   min_temperature=24.0, max_temperature=28.0, min_humidity=70.0, max_humidity=80.0,
-                   substrate_type="Coconut fiber", substrate_depth_cm=7.0, enclosure_type="Terrestrial",
-                   adult_size_cm=15.0, growth_rate="medium", lifespan_years_min=8, lifespan_years_max=10,
+                   genus="Tliltocatl", species="albopilosus", common_names=["Curly Hair Tarantula", "Honduran Curly Hair", "Nicaraguan Curly Hair"],
+                   type="terrestrial", native_region="Central America (Honduras, Nicaragua, Costa Rica)", care_level="beginner",
+                   min_temperature=20.0, max_temperature=27.0, min_humidity=65.0, max_humidity=75.0,
+                   substrate_type="Coco fiber, bark, topsoil", substrate_depth_cm=12.0, enclosure_type="Terrestrial",
+                   adult_size_cm=17.0, growth_rate="medium", lifespan_years_min=10, lifespan_years_max=25,
                    temperament="docile", urticating_hairs=True,
-                   defensive_behavior="Calm, good for beginners.", feeding_frequency_days=5,
-                   typical_diet="Crickets, roaches", is_verified=True, times_kept=6000, average_rating=4.6),
+                   defensive_behavior="Flicks urticating hairs when threatened, otherwise calm and tolerant.", feeding_frequency_days=10,
+                   typical_diet="Crickets, roaches, locusts, mealworms", is_verified=True, times_kept=8000, average_rating=4.7),
             
             Species(id=uuid.uuid4(), scientific_name="Lasiodora parahybana", scientific_name_lower="lasiodora parahybana",
                    genus="Lasiodora", species="parahybana", common_names=["Brazilian Salmon Pink", "LP"],
@@ -151,6 +151,67 @@ def seed():
                    temperament="defensive", urticating_hairs=False,
                    defensive_behavior="Fast and defensive.", feeding_frequency_days=5,
                    typical_diet="Crickets, roaches", is_verified=True, times_kept=2000, average_rating=4.7),
+            
+            # New species added via Perplexity research
+            Species(id=uuid.uuid4(), scientific_name="Caribena versicolor", scientific_name_lower="caribena versicolor",
+                   genus="Caribena", species="versicolor", common_names=["Antilles Pink Toe", "Martinique Pink Toe", "Martinique Red Tree Spider"],
+                   type="arboreal", native_region="Caribbean (Martinique, Lesser Antilles)", care_level="beginner",
+                   min_temperature=21.0, max_temperature=26.0, min_humidity=70.0, max_humidity=80.0,
+                   substrate_type="Coco fiber (moist), sphagnum moss", substrate_depth_cm=10.0, enclosure_type="Arboreal",
+                   adult_size_cm=15.0, growth_rate="medium", lifespan_years_min=8, lifespan_years_max=12,
+                   temperament="docile", urticating_hairs=True,
+                   defensive_behavior="Skittish but not aggressive. May jump, flick hairs, or shoot feces when threatened.", feeding_frequency_days=5,
+                   typical_diet="Flying insects, crickets, roaches", is_verified=True, times_kept=11000, average_rating=4.8),
+            
+            Species(id=uuid.uuid4(), scientific_name="Psalmopoeus irminia", scientific_name_lower="psalmopoeus irminia",
+                   genus="Psalmopoeus", species="irminia", common_names=["Venezuelan Sun Tiger", "Suntiger Tarantula"],
+                   type="arboreal", native_region="Venezuela, Guyana", care_level="intermediate",
+                   min_temperature=24.0, max_temperature=27.0, min_humidity=75.0, max_humidity=85.0,
+                   substrate_type="Coco fiber (moist)", substrate_depth_cm=7.0, enclosure_type="Arboreal",
+                   adult_size_cm=14.0, growth_rate="fast", lifespan_years_min=10, lifespan_years_max=12,
+                   temperament="defensive", urticating_hairs=False,
+                   defensive_behavior="Lightning-fast and defensive. No urticating hairs but potent venom. Threat poses common.", feeding_frequency_days=5,
+                   typical_diet="Crickets, roaches, horn worms", is_verified=True, times_kept=6500, average_rating=4.7),
+            
+            Species(id=uuid.uuid4(), scientific_name="Brachypelma emilia", scientific_name_lower="brachypelma emilia",
+                   genus="Brachypelma", species="emilia", common_names=["Mexican Red Leg"],
+                   type="terrestrial", native_region="Mexico (Pacific coast)", care_level="beginner",
+                   min_temperature=21.0, max_temperature=26.0, min_humidity=65.0, max_humidity=75.0,
+                   substrate_type="Coco fiber, peat moss, potting soil", substrate_depth_cm=12.0, enclosure_type="Terrestrial",
+                   adult_size_cm=15.0, growth_rate="slow", lifespan_years_min=20, lifespan_years_max=30,
+                   temperament="docile", urticating_hairs=True,
+                   defensive_behavior="Very calm and docile. Distinguished by black triangle on carapace. Rarely kicks hairs.", feeding_frequency_days=7,
+                   typical_diet="Crickets, roaches, mealworms", is_verified=True, times_kept=9000, average_rating=4.8),
+            
+            Species(id=uuid.uuid4(), scientific_name="Grammostola pulchripes", scientific_name_lower="grammostola pulchripes",
+                   genus="Grammostola", species="pulchripes", common_names=["Chaco Golden Knee"],
+                   type="terrestrial", native_region="Argentina, Paraguay", care_level="beginner",
+                   min_temperature=20.0, max_temperature=24.0, min_humidity=60.0, max_humidity=70.0,
+                   substrate_type="Coco fiber, peat moss", substrate_depth_cm=10.0, enclosure_type="Terrestrial",
+                   adult_size_cm=18.0, growth_rate="slow", lifespan_years_min=20, lifespan_years_max=30,
+                   temperament="docile", urticating_hairs=True,
+                   defensive_behavior="Extremely docile and calm. One of the best for handling. Rarely defensive.", feeding_frequency_days=7,
+                   typical_diet="Crickets, roaches", is_verified=True, times_kept=7500, average_rating=4.9),
+            
+            Species(id=uuid.uuid4(), scientific_name="Davus fasciatus", scientific_name_lower="davus fasciatus",
+                   genus="Davus", species="fasciatus", common_names=["Costa Rican Tiger Rump"],
+                   type="terrestrial", native_region="Costa Rica", care_level="beginner",
+                   min_temperature=21.0, max_temperature=27.0, min_humidity=70.0, max_humidity=80.0,
+                   substrate_type="Coco fiber, peat moss, dirt", substrate_depth_cm=10.0, enclosure_type="Terrestrial",
+                   adult_size_cm=12.0, growth_rate="medium", lifespan_years_min=6, lifespan_years_max=10,
+                   temperament="skittish", urticating_hairs=True,
+                   defensive_behavior="Docile but skittish. Kicks hairs readily when disturbed. Prolific webber and burrower.", feeding_frequency_days=7,
+                   typical_diet="Crickets, roaches", is_verified=True, times_kept=4500, average_rating=4.6),
+            
+            Species(id=uuid.uuid4(), scientific_name="Acanthoscurria geniculata", scientific_name_lower="acanthoscurria geniculata",
+                   genus="Acanthoscurria", species="geniculata", common_names=["Brazilian Giant White Knee", "Brazilian White Knee"],
+                   type="terrestrial", native_region="Brazil (Northern forests)", care_level="beginner",
+                   min_temperature=22.0, max_temperature=26.0, min_humidity=70.0, max_humidity=80.0,
+                   substrate_type="Coco fiber, peat moss", substrate_depth_cm=10.0, enclosure_type="Terrestrial",
+                   adult_size_cm=21.0, growth_rate="fast", lifespan_years_min=12, lifespan_years_max=20,
+                   temperament="defensive", urticating_hairs=True,
+                   defensive_behavior="Bold but defensive. Readily kicks irritating hairs. Dramatic feeding response.", feeding_frequency_days=7,
+                   typical_diet="Crickets, roaches", is_verified=True, times_kept=8500, average_rating=4.8),
         ]
         
         print(f"\n🌱 Adding {len(species)} species...\n")
