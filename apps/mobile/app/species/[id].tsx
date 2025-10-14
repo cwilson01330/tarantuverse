@@ -56,184 +56,311 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
   errorText: {
     fontSize: 16,
     textAlign: 'center',
     marginBottom: 20,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  // Hero Section
+  heroContainer: {
+    position: 'relative',
+    height: 300,
+    backgroundColor: '#1e293b', // Fallback background
+  },
   heroImage: {
     width: '100%',
-    height: 250,
+    height: '100%',
   },
   heroGradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 120,
+    height: '60%',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     justifyContent: 'flex-end',
     padding: 20,
   },
-  heroTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    color: '#fff',
-    opacity: 0.9,
-  },
-  backButton: {
+  floatingBackButton: {
     position: 'absolute',
     top: 50,
     left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  content: {
-    padding: 16,
+  heroContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
   },
-  quickInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  quickInfoItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  quickInfoLabel: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  quickInfoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  tabs: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
+  speciesName: {
+    fontSize: 28,
     fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 6,
+    fontStyle: 'italic',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  commonNames: {
+    fontSize: 16,
+    color: '#ffffff',
     marginBottom: 12,
+    opacity: 0.95,
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  infoRow: {
+  badgeContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128, 128, 128, 0.2)',
-  },
-  infoLabel: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
+    borderRadius: 16,
+    gap: 6,
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#ffffff',
   },
-  gaugeContainer: {
-    marginVertical: 8,
+  backButton: {
+    padding: 4,
   },
-  gaugeLabel: {
-    fontSize: 14,
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  gaugeBar: {
-    height: 8,
-    backgroundColor: 'rgba(128, 128, 128, 0.2)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  gaugeFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  gaugeValue: {
-    fontSize: 12,
-    marginTop: 4,
-    opacity: 0.7,
-  },
-  statsCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
+  // Action Bar
   actionBar: {
     flexDirection: 'row',
+    padding: 16,
     gap: 12,
-    marginTop: 20,
-    paddingBottom: 16,
+    borderBottomWidth: 1,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 12,
     gap: 8,
   },
+  actionButtonPrimary: {
+    backgroundColor: '#3b82f6',
+  },
+  actionButtonSecondary: {
+    backgroundColor: '#374151',
+    borderWidth: 1,
+    borderColor: '#4b5563',
+  },
   actionButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  // Tabs
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: 2,
+    borderBottomColor: '#1f2937',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#3b82f6',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#9ca3af',
+  },
+  tabTextActive: {
+    color: '#3b82f6',
+  },
+  // Content
+  content: {
+    padding: 16,
+  },
+  section: {
+    marginBottom: 28,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  // Quick Facts
+  factGrid: {
+    gap: 16,
+  },
+  factItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    backgroundColor: '#1e293b',
+    padding: 14,
+    borderRadius: 12,
+  },
+  factIcon: {
+    fontSize: 28,
+  },
+  factContent: {
+    flex: 1,
+  },
+  factLabel: {
+    fontSize: 13,
+    color: '#9ca3af',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  factValue: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#ffffff',
+  },
+  // Info Rows
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1f2937',
+  },
+  infoLabel: {
+    fontSize: 15,
+    color: '#9ca3af',
+  },
+  infoValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ffffff',
+    fontStyle: 'italic',
+  },
+  // Gauges
+  gaugeContainer: {
+    marginBottom: 16,
+  },
+  gaugeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  gaugeLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#e5e7eb',
+  },
+  gaugeValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3b82f6',
+  },
+  gaugeTrack: {
+    height: 10,
+    backgroundColor: '#1f2937',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  gaugeFill: {
+    height: '100%',
+  },
+  gaugeLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  gaugeMinMax: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  // Stats
+  statsCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#1f2937',
+    alignItems: 'center',
+    backgroundColor: '#1e293b',
+  },
+  statValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#3b82f6',
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  // Taxonomy
+  taxonomyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  taxonomyLabel: {
+    fontSize: 14,
+    color: '#9ca3af',
+  },
+  taxonomyValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+    fontStyle: 'italic',
+  },
+  climateSection: {
+    gap: 16,
   },
 });
 
 export default function SpeciesDetailScreen() {
-  const { colors, isDarkMode } = useTheme();
+  const { colors } = useTheme();
   const { id } = useLocalSearchParams();
   const [species, setSpecies] = useState<Species | null>(null);
   const [loading, setLoading] = useState(true);
@@ -306,18 +433,18 @@ export default function SpeciesDetailScreen() {
     const percentage = ((value - min) / (max - min)) * 100;
     return (
       <View style={styles.gaugeContainer}>
-        <View style={styles.gaugeHeader}>
-          <Text style={[styles.gaugeLabel, { color: colors.textSecondary }]}>{label}</Text>
-          <Text style={[styles.gaugeValue, { color: colors.textPrimary }]}>{value}{unit}</Text>
+        <View style={[styles.gaugeHeader]}>
+          <Text style={[styles.gaugeLabel]}>{label}</Text>
+          <Text style={[styles.gaugeValue]}>{value}{unit}</Text>
         </View>
-        <View style={[styles.gaugeTrack, { backgroundColor: isDarkMode ? '#374151' : '#e5e7eb' }]}>
+        <View style={styles.gaugeTrack}>
           <View 
             style={[styles.gaugeFill, { width: `${percentage}%`, backgroundColor: colors.primary }]} 
           />
         </View>
         <View style={styles.gaugeLabels}>
-          <Text style={[styles.gaugeMinMax, { color: colors.textSecondary }]}>{min}{unit}</Text>
-          <Text style={[styles.gaugeMinMax, { color: colors.textSecondary }]}>{max}{unit}</Text>
+          <Text style={[styles.gaugeMinMax]}>{min}{unit}</Text>
+          <Text style={[styles.gaugeMinMax]}>{max}{unit}</Text>
         </View>
       </View>
     );
@@ -340,7 +467,7 @@ export default function SpeciesDetailScreen() {
   if (error || !species) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
@@ -405,10 +532,10 @@ export default function SpeciesDetailScreen() {
         </View>
 
         {/* Action Bar */}
-        <View style={styles.actionBar}>
+        <View style={[styles.actionBar, { borderBottomColor: colors.border }]}>
           <TouchableOpacity style={[styles.actionButton, styles.actionButtonSecondary]}>
-            <Ionicons name="add-circle-outline" size={20} color={colors.textPrimary} />
-            <Text style={[styles.actionButtonText, { color: colors.textPrimary }]}>
+            <Ionicons name="add-circle-outline" size={20} color="#ffffff" />
+            <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>
               Add to Collection
             </Text>
           </TouchableOpacity>

@@ -364,15 +364,15 @@ export default function SpeciesScreen() {
             style={[
               styles.filterChip,
               {
-                backgroundColor: selectedFilter === filter ? '#f97316' : 'transparent',
-                borderColor: selectedFilter === filter ? '#f97316' : colors.border,
+                backgroundColor: selectedFilter === filter ? '#f97316' : '#1e293b',
+                borderColor: selectedFilter === filter ? '#f97316' : '#374151',
               },
             ]}
           >
             <Text
               style={[
                 styles.filterChipText,
-                { color: selectedFilter === filter ? '#fff' : colors.textSecondary },
+                { color: selectedFilter === filter ? '#ffffff' : '#e5e7eb' },
               ]}
             >
               {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
