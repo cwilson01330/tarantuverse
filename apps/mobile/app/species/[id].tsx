@@ -210,19 +210,20 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: '#3b82f6',
+    borderBottomColor: '#60a5fa',
   },
   tabText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#9ca3af',
+    color: '#94a3b8',
   },
   tabTextActive: {
-    color: '#3b82f6',
+    color: '#60a5fa',
   },
   // Content
   content: {
     padding: 16,
+    backgroundColor: '#0f172a',
   },
   section: {
     marginBottom: 28,
@@ -231,6 +232,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: '#f1f5f9',
   },
   // Quick Facts
   factGrid: {
@@ -252,7 +254,7 @@ const styles = StyleSheet.create({
   },
   factLabel: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: '#cbd5e1',
     marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -260,7 +262,7 @@ const styles = StyleSheet.create({
   factValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#f1f5f9',
   },
   // Info Rows
   infoRow: {
@@ -272,12 +274,12 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 15,
-    color: '#9ca3af',
+    color: '#cbd5e1',
   },
   infoValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#f1f5f9',
     fontStyle: 'italic',
   },
   // Gauges
@@ -292,12 +294,12 @@ const styles = StyleSheet.create({
   gaugeLabel: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#e5e7eb',
+    color: '#f1f5f9',
   },
   gaugeValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#3b82f6',
+    color: '#60a5fa',
   },
   gaugeTrack: {
     height: 10,
@@ -315,7 +317,7 @@ const styles = StyleSheet.create({
   },
   gaugeMinMax: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#94a3b8',
   },
   // Stats
   statsCard: {
@@ -330,11 +332,11 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#3b82f6',
+    color: '#60a5fa',
   },
   statLabel: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#cbd5e1',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -346,12 +348,12 @@ const styles = StyleSheet.create({
   },
   taxonomyLabel: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#cbd5e1',
   },
   taxonomyValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#f1f5f9',
     fontStyle: 'italic',
   },
   climateSection: {

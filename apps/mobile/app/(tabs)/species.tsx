@@ -207,18 +207,18 @@ export default function SpeciesScreen() {
     filterContainer: {
       flexDirection: 'row',
       paddingHorizontal: 16,
-      gap: 8,
+      gap: 12,
       marginBottom: 16,
     },
     filterChip: {
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 20,
-      borderWidth: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 24,
+      borderWidth: 2,
     },
     filterChipText: {
-      fontSize: 14,
-      fontWeight: '600',
+      fontSize: 16,
+      fontWeight: '700',
     },
     resultCount: {
       paddingHorizontal: 16,
