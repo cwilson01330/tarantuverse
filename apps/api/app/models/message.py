@@ -16,7 +16,7 @@ class Message(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", back_populates="messages")
+    # user = relationship("User", back_populates="messages")  # Commented out - User.messages relationship removed
     replies = relationship("MessageReply", back_populates="message", cascade="all, delete-orphan")
     likes = relationship("MessageLike", back_populates="message", cascade="all, delete-orphan")
     reactions = relationship("MessageReaction", back_populates="message", cascade="all, delete-orphan")
