@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -61,6 +62,7 @@ export default function ThreadDetailScreen() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [editingThread, setEditingThread] = useState(false);
   const [editThreadTitle, setEditThreadTitle] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -139,6 +141,17 @@ export default function ThreadDetailScreen() {
       setError(err.message || 'Something went wrong');
     } finally {
       setPostsLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchCurrentUser();
+      await fetchThread();
+      await fetchPosts(true);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -435,13 +448,45 @@ export default function ThreadDetailScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      {/* Page Header with Back Button */}
+      <View style={[styles.pageHeader, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.pageTitle} numberOfLines={1}>
+          {thread?.title || 'Thread'}
+        </Text>
+        {/* Header Action Buttons */}
+        <View style={styles.headerActions}>
+          {currentUserId && thread && thread.author_id === currentUserId && !editingThread && (
+            <>
+              <TouchableOpacity
+                onPress={startEditThread}
+                style={styles.headerActionButton}
+              >
+                <MaterialCommunityIcons name="pencil" size={22} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDeleteThread}
+                style={styles.headerActionButton}
+              >
+                <MaterialCommunityIcons name="delete" size={22} color="#fff" />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
-      {/* Thread Header */}
-      <View style={[styles.threadHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      {/* Thread Info Bar */}
+      <View style={[styles.threadInfoBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         {editingThread ? (
           <View style={styles.editThreadContainer}>
             <TextInput
@@ -474,32 +519,13 @@ export default function ThreadDetailScreen() {
             </View>
           </View>
         ) : (
-          <>
-            <View style={styles.threadTitleRow}>
+          <View style={styles.threadMetaRow}>
+            <View style={styles.threadBadges}>
               {thread.is_pinned && (
-                <MaterialCommunityIcons name="pin" size={20} color={colors.primary} style={styles.icon} />
+                <MaterialCommunityIcons name="pin" size={16} color={colors.primary} style={styles.metaIcon} />
               )}
               {thread.is_locked && (
-                <MaterialCommunityIcons name="lock" size={20} color={colors.textTertiary} style={styles.icon} />
-              )}
-              <Text style={[styles.threadTitle, { color: colors.textPrimary }]}>{thread.title}</Text>
-              
-              {/* Edit/Delete Thread Buttons */}
-              {currentUserId && thread.author_id === currentUserId && (
-                <View style={styles.threadActions}>
-                  <TouchableOpacity
-                    onPress={startEditThread}
-                    style={styles.threadActionButton}
-                  >
-                    <MaterialCommunityIcons name="pencil" size={20} color={colors.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleDeleteThread}
-                    style={styles.threadActionButton}
-                  >
-                    <MaterialCommunityIcons name="delete" size={20} color={colors.error} />
-                  </TouchableOpacity>
-                </View>
+                <MaterialCommunityIcons name="lock" size={16} color={colors.textTertiary} style={styles.metaIcon} />
               )}
             </View>
             <View style={styles.threadMeta}>
@@ -512,7 +538,7 @@ export default function ThreadDetailScreen() {
                 <Text style={[styles.metaText, { color: colors.textSecondary }]}>{thread.view_count} views</Text>
               </View>
             </View>
-          </>
+          </View>
         )}
       </View>
 
@@ -520,6 +546,14 @@ export default function ThreadDetailScreen() {
       <ScrollView
         style={styles.postsContainer}
         contentContainerStyle={styles.postsContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
           const paddingToBottom = 20;
@@ -680,6 +714,47 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  backButton: {
+    padding: 4,
+  },
+  pageTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  headerActionButton: {
+    padding: 4,
+  },
+  threadInfoBar: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  threadMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  threadBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  metaIcon: {
+    marginRight: 4,
+  },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
@@ -741,13 +816,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   postsContent: {
-    padding: 16,
+    padding: 12,
   },
   postCard: {
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   postHeader: {
     flexDirection: 'row',

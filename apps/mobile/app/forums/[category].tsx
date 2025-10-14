@@ -142,30 +142,45 @@ export default function CategoryScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header with sort options */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View style={styles.sortButtons}>
-          {(['recent', 'popular', 'pinned'] as const).map((sort) => (
-            <TouchableOpacity
-              key={sort}
+      {/* Header with back button and title */}
+      <View style={[styles.pageHeader, { backgroundColor: colors.primary }]}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.pageTitle} numberOfLines={1}>
+          {categoryName || String(category).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        </Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      {/* Sort tabs */}
+      <View style={[styles.sortTabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        {(['recent', 'popular', 'pinned'] as const).map((sort) => (
+          <TouchableOpacity
+            key={sort}
+            style={[
+              styles.sortTab,
+              sortBy === sort && styles.sortTabActive,
+            ]}
+            onPress={() => setSortBy(sort)}
+          >
+            <Text
               style={[
-                styles.sortButton,
-                sortBy === sort && { backgroundColor: colors.primary },
-                { borderColor: colors.border },
+                styles.sortTabText,
+                { color: colors.textSecondary },
+                sortBy === sort && { color: colors.primary, fontWeight: '600' },
               ]}
-              onPress={() => setSortBy(sort)}
             >
-              <Text
-                style={[
-                  styles.sortButtonText,
-                  { color: sortBy === sort ? '#fff' : colors.textSecondary },
-                ]}
-              >
-                {sort.charAt(0).toUpperCase() + sort.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+              {sort.charAt(0).toUpperCase() + sort.slice(1)}
+            </Text>
+            {sortBy === sort && (
+              <View style={[styles.activeIndicator, { backgroundColor: colors.primary }]} />
+            )}
+          </TouchableOpacity>
+        ))}
       </View>
 
       <ScrollView
@@ -256,14 +271,12 @@ export default function CategoryScreen() {
       </ScrollView>
 
       {/* FAB for new thread */}
-      {threads.length > 0 && (
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary }]}
-          onPress={() => router.push(`/forums/new-thread?category=${category}`)}
-        >
-          <MaterialCommunityIcons name="plus" size={28} color="#fff" />
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: colors.primary }]}
+        onPress={() => router.push(`/forums/new-thread?category=${category}`)}
+      >
+        <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -271,6 +284,49 @@ export default function CategoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  pageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  backButton: {
+    padding: 4,
+  },
+  pageTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  headerSpacer: {
+    width: 32,
+  },
+  sortTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  sortTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    position: 'relative',
+  },
+  sortTabActive: {
+    // Active state handled by text color and indicator
+  },
+  sortTabText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
   },
   header: {
     paddingVertical: 12,

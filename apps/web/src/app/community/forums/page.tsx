@@ -89,84 +89,100 @@ export default function ForumsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8 bg-gradient-primary rounded-lg p-8 shadow-lg shadow-electric-blue-500/20">
-        <h1 className="text-3xl font-bold text-white mb-2">Community Forums</h1>
-        <p className="text-white/80">
-          Connect with fellow tarantula keepers, share experiences, and learn from the community
-        </p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Breadcrumb */}
+        <nav className="mb-6 text-sm">
+          <ol className="flex items-center gap-2 text-gray-400">
+            <li>
+              <Link href="/community" className="hover:text-electric-blue-400 transition-colors">
+                Community
+              </Link>
+            </li>
+            <li>/</li>
+            <li className="text-gray-100 font-medium">Forums</li>
+          </ol>
+        </nav>
 
-      {/* Categories List */}
-      {categories.length === 0 ? (
-        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md p-8 text-center">
-          <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-100 mb-2">No Categories Yet</h3>
-          <p className="text-gray-400">Forum categories will appear here once created.</p>
+        {/* Header */}
+        <div className="mb-8 bg-gradient-to-r from-electric-blue-600 to-neon-pink-600 rounded-xl p-8 shadow-xl shadow-electric-blue-500/20">
+          <h1 className="text-4xl font-bold text-white mb-3">Community Forums</h1>
+          <p className="text-white/90 text-lg">
+            Connect with fellow tarantula keepers, share experiences, and learn from the community
+          </p>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {categories.map((category) => (
-            <Link
-              key={category.id}
-              href={`/community/forums/${category.slug}`}
-              className="block bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md hover:shadow-lg hover:shadow-electric-blue-500/20 hover:border-electric-blue-500/40 transition-all"
-            >
-              <div className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      {category.icon && (
-                        <span className="text-2xl">{category.icon}</span>
-                      )}
-                      <h2 className="text-xl font-semibold text-gray-100">
-                        {category.name}
-                      </h2>
-                    </div>
-                    {category.description && (
-                      <p className="text-gray-300 mb-3">{category.description}</p>
-                    )}
-                  </div>
 
-                  {/* Stats */}
-                  <div className="flex gap-6 ml-6 text-sm text-gray-400">
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="w-4 h-4 text-electric-blue-400" />
-                      <div className="text-center">
-                        <div className="font-semibold text-gray-100">
-                          {category.thread_count}
-                        </div>
-                        <div>Threads</div>
+        {/* Guidelines Box - Move to top */}
+        <div className="mb-6 bg-dark-50 border border-electric-blue-500/30 rounded-lg p-5">
+          <div className="flex items-start gap-3">
+            <MessageSquare className="w-5 h-5 text-electric-blue-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-electric-blue-300 mb-2">Forum Guidelines</h3>
+              <p className="text-gray-300 text-sm">
+                Be respectful, share knowledge, and help fellow keepers. Search before posting duplicate questions.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Categories List */}
+        {categories.length === 0 ? (
+          <div className="bg-dark-50 border border-electric-blue-500/20 rounded-xl shadow-lg p-12 text-center">
+            <MessageSquare className="w-20 h-20 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-2xl font-semibold text-gray-100 mb-2">No Categories Yet</h3>
+            <p className="text-gray-400">Forum categories will appear here once created.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/community/forums/${category.slug}`}
+                className="group block bg-dark-50 border border-electric-blue-500/20 rounded-xl shadow-md hover:shadow-xl hover:shadow-electric-blue-500/20 hover:border-electric-blue-500/50 hover:scale-[1.01] transition-all duration-200"
+              >
+                <div className="p-6">
+                  <div className="flex items-start justify-between gap-6">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        {category.icon && (
+                          <span className="text-3xl">{category.icon}</span>
+                        )}
+                        <h2 className="text-xl font-semibold text-gray-100 group-hover:text-electric-blue-300 transition-colors">
+                          {category.name}
+                        </h2>
                       </div>
+                      {category.description && (
+                        <p className="text-gray-400 leading-relaxed">{category.description}</p>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-neon-pink-400" />
-                      <div className="text-center">
-                        <div className="font-semibold text-gray-100">
-                          {category.post_count}
+
+                    {/* Stats */}
+                    <div className="flex gap-8 text-sm">
+                      <div className="flex items-center gap-2 text-center">
+                        <MessageSquare className="w-5 h-5 text-electric-blue-400" />
+                        <div>
+                          <div className="font-bold text-lg text-gray-100">
+                            {category.thread_count}
+                          </div>
+                          <div className="text-gray-400 text-xs">Thread{category.thread_count !== 1 ? 's' : ''}</div>
                         </div>
-                        <div>Posts</div>
+                      </div>
+                      <div className="flex items-center gap-2 text-center">
+                        <Users className="w-5 h-5 text-neon-pink-400" />
+                        <div>
+                          <div className="font-bold text-lg text-gray-100">
+                            {category.post_count}
+                          </div>
+                          <div className="text-gray-400 text-xs">Post{category.post_count !== 1 ? 's' : ''}</div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* Info Box */}
-      <div className="mt-8 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-lg p-6">
-        <h3 className="font-semibold text-electric-blue-300 mb-2">Forum Guidelines</h3>
-        <ul className="text-gray-300 text-sm space-y-1 list-disc list-inside">
-          <li>Be respectful and courteous to all members</li>
-          <li>Stay on topic within each category</li>
-          <li>Search before posting to avoid duplicates</li>
-          <li>Share your knowledge and help others</li>
-          <li>Report any inappropriate content to moderators</li>
-        </ul>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

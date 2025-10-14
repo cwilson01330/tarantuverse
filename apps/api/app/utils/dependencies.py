@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from app.database import get_db
 from app.models.user import User
 from app.utils.auth import decode_access_token
@@ -108,3 +109,59 @@ def get_current_user_optional(
         return None
     
     return user
+
+
+def require_premium(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Require user to have an active premium subscription or be a verified contributor
+    
+    Usage in routes:
+        current_user: User = Depends(require_premium)
+    """
+    from app.models.subscription import UserSubscription, SubscriptionStatus
+    
+    # Check if user has active subscription
+    subscription = db.query(UserSubscription).filter(
+        and_(
+            UserSubscription.user_id == current_user.id,
+            UserSubscription.status == SubscriptionStatus.ACTIVE
+        )
+    ).first()
+    
+    if not subscription:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Premium subscription required"
+        )
+    
+    # Check if plan allows premium features
+    plan = subscription.plan
+    
+    # Allow if plan allows editing species OR user is verified contributor
+    if plan.can_edit_species or plan.name == "verified":
+        return current_user
+    
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Premium subscription required to access this feature"
+    )
+
+
+def get_current_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """
+    Require user to be an admin
+    
+    Usage in routes:
+        current_user: User = Depends(get_current_admin)
+    """
+    if not current_user.is_admin and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user

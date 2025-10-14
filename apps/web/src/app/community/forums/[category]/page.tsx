@@ -127,133 +127,159 @@ export default function CategoryPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          href="/community/forums"
-          className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Forums
-        </Link>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-100 mb-2 capitalize">
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Breadcrumb */}
+        <nav className="mb-6 text-sm">
+          <ol className="flex items-center gap-2 text-gray-400">
+            <li>
+              <Link href="/community" className="hover:text-electric-blue-400 transition-colors">
+                Community
+              </Link>
+            </li>
+            <li>/</li>
+            <li>
+              <Link href="/community/forums" className="hover:text-electric-blue-400 transition-colors">
+                Forums
+              </Link>
+            </li>
+            <li>/</li>
+            <li className="text-gray-100 font-medium capitalize">
               {categorySlug.replace(/-/g, " ")}
-            </h1>
-            <p className="text-gray-400">{total} threads</p>
+            </li>
+          </ol>
+        </nav>
+
+        {/* Header */}
+        <div className="mb-6 bg-gradient-to-r from-electric-blue-600 to-neon-pink-600 rounded-xl p-8 shadow-xl shadow-electric-blue-500/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2 capitalize">
+                {categorySlug.replace(/-/g, " ")}
+              </h1>
+              <p className="text-white/90">{total} thread{total !== 1 ? 's' : ''}</p>
+            </div>
+            <button
+              onClick={() => router.push(`/community/forums/${categorySlug}/new`)}
+              className="bg-white text-electric-blue-600 px-6 py-3 rounded-lg hover:bg-gray-100 transition-all font-semibold shadow-lg"
+            >
+              + New Thread
+            </button>
           </div>
-          <button
-            onClick={() => router.push(`/community/forums/${categorySlug}/new`)}
-            className="bg-gradient-primary text-white px-6 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all"
-          >
-            New Thread
-          </button>
         </div>
-      </div>
 
-      {/* Sort Options */}
-      <div className="mb-4 flex gap-2">
-        <button
-          onClick={() => setSortBy("recent")}
-          className={`px-4 py-2 rounded-lg transition-all ${
-            sortBy === "recent"
-              ? "bg-electric-blue-500 text-white shadow-lg shadow-electric-blue-500/30"
-              : "bg-dark-50 border border-electric-blue-500/20 text-gray-300 hover:border-electric-blue-500/40"
-          }`}
-        >
-          Recent
-        </button>
-        <button
-          onClick={() => setSortBy("popular")}
-          className={`px-4 py-2 rounded-lg transition-all ${
-            sortBy === "popular"
-              ? "bg-neon-pink-500 text-white shadow-lg shadow-neon-pink-500/30"
-              : "bg-dark-50 border border-electric-blue-500/20 text-gray-300 hover:border-electric-blue-500/40"
-          }`}
-        >
-          Popular
-        </button>
-        <button
-          onClick={() => setSortBy("pinned")}
-          className={`px-4 py-2 rounded-lg transition-all ${
-            sortBy === "pinned"
-              ? "bg-gradient-primary text-white shadow-lg shadow-electric-blue-500/30"
-              : "bg-dark-50 border border-electric-blue-500/20 text-gray-300 hover:border-electric-blue-500/40"
-          }`}
-        >
-          Pinned
-        </button>
-      </div>
+        {/* Sort Tabs */}
+        <div className="mb-6 bg-dark-50 border border-electric-blue-500/20 rounded-xl overflow-hidden">
+          <div className="flex">
+            <button
+              onClick={() => setSortBy("recent")}
+              className={`flex-1 px-6 py-4 font-medium transition-all relative ${
+                sortBy === "recent"
+                  ? "text-electric-blue-400 bg-electric-blue-500/10"
+                  : "text-gray-400 hover:text-gray-200 hover:bg-dark-100"
+              }`}
+            >
+              Recent
+              {sortBy === "recent" && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-electric-blue-400"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setSortBy("popular")}
+              className={`flex-1 px-6 py-4 font-medium transition-all relative ${
+                sortBy === "popular"
+                  ? "text-electric-blue-400 bg-electric-blue-500/10"
+                  : "text-gray-400 hover:text-gray-200 hover:bg-dark-100"
+              }`}
+            >
+              Popular
+              {sortBy === "popular" && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-electric-blue-400"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setSortBy("pinned")}
+              className={`flex-1 px-6 py-4 font-medium transition-all relative ${
+                sortBy === "pinned"
+                  ? "text-electric-blue-400 bg-electric-blue-500/10"
+                  : "text-gray-400 hover:text-gray-200 hover:bg-dark-100"
+              }`}
+            >
+              Pinned
+              {sortBy === "pinned" && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-electric-blue-400"></div>
+              )}
+            </button>
+          </div>
+        </div>
 
-      {/* Threads List */}
-      {threads.length === 0 ? (
-        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md p-8 text-center">
-          <MessageSquare className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-100 mb-2">No Threads Yet</h3>
-          <p className="text-gray-400 mb-4">Be the first to start a discussion!</p>
-          <button
-            onClick={() => router.push(`/community/forums/${categorySlug}/new`)}
-            className="bg-gradient-primary text-white px-6 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all"
-          >
-            Create Thread
+        {/* Threads List */}
+        {threads.length === 0 ? (
+          <div className="bg-dark-50 border border-electric-blue-500/20 rounded-xl shadow-lg p-12 text-center">
+            <MessageSquare className="w-20 h-20 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-2xl font-semibold text-gray-100 mb-2">No Threads Yet</h3>
+            <p className="text-gray-400 mb-6">Be the first to start a discussion!</p>
+            <button
+              onClick={() => router.push(`/community/forums/${categorySlug}/new`)}
+              className="bg-gradient-to-r from-electric-blue-600 to-neon-pink-600 text-white px-8 py-3 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all font-semibold"
+            >
+              Create Thread
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {threads.map((thread) => (
             <Link
               key={thread.id}
               href={`/community/forums/thread/${thread.id}`}
-              className="block bg-dark-50 border border-electric-blue-500/20 rounded-lg hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition-all p-4"
+              className="group block bg-dark-50 border border-electric-blue-500/20 rounded-xl hover:border-electric-blue-500/50 hover:shadow-lg hover:shadow-electric-blue-500/10 hover:scale-[1.005] transition-all p-5"
             >
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-6">
                 {/* Thread Info */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-2">
                     {thread.is_pinned && (
-                      <Pin className="w-4 h-4 text-neon-pink-400 flex-shrink-0" />
+                      <Pin className="w-5 h-5 text-neon-pink-400 flex-shrink-0" />
                     )}
                     {thread.is_locked && (
-                      <Lock className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                      <Lock className="w-5 h-5 text-gray-500 flex-shrink-0" />
                     )}
-                    <h3 className="text-lg font-semibold text-gray-100 truncate">
+                    <h3 className="text-lg font-semibold text-gray-100 group-hover:text-electric-blue-300 transition-colors line-clamp-2">
                       {thread.title}
                     </h3>
                   </div>
                   <div className="text-sm text-gray-400">
                     by{" "}
-                    <span className="font-medium text-electric-blue-400">
+                    <span className="font-medium text-electric-blue-400 hover:text-electric-blue-300">
                       {thread.author.display_name || thread.author.username}
                     </span>{" "}
-                    • {formatRelativeTime(thread.created_at)}
+                    <span className="text-gray-500">•</span> {formatRelativeTime(thread.created_at)}
                   </div>
                 </div>
 
                 {/* Stats */}
-                <div className="flex gap-4 text-sm text-gray-400">
-                  <div className="flex items-center gap-1">
-                    <MessageSquare className="w-4 h-4 text-electric-blue-400" />
-                    <span>{thread.post_count}</span>
+                <div className="flex gap-6 text-sm text-gray-400">
+                  <div className="flex flex-col items-center gap-1 min-w-[60px]">
+                    <MessageSquare className="w-5 h-5 text-electric-blue-400" />
+                    <span className="font-semibold text-gray-200">{thread.post_count}</span>
+                    <span className="text-xs">Post{thread.post_count !== 1 ? 's' : ''}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Eye className="w-4 h-4 text-neon-pink-400" />
-                    <span>{thread.view_count}</span>
+                  <div className="flex flex-col items-center gap-1 min-w-[60px]">
+                    <Eye className="w-5 h-5 text-neon-pink-400" />
+                    <span className="font-semibold text-gray-200">{thread.view_count}</span>
+                    <span className="text-xs">View{thread.view_count !== 1 ? 's' : ''}</span>
                   </div>
                 </div>
 
                 {/* Last Activity */}
                 {thread.last_post_at && thread.last_post_user && (
-                  <div className="text-sm text-gray-400 min-w-[150px] text-right">
-                    <div className="flex items-center gap-1 justify-end">
+                  <div className="text-sm text-gray-400 min-w-[160px] text-right border-l border-electric-blue-500/20 pl-6">
+                    <div className="flex items-center gap-1 justify-end mb-1">
                       <Clock className="w-4 h-4" />
-                      <span>{formatRelativeTime(thread.last_post_at)}</span>
+                      <span className="font-medium">{formatRelativeTime(thread.last_post_at)}</span>
                     </div>
-                    <div className="text-xs">
-                      by{" "}
-                      {thread.last_post_user.display_name ||
-                        thread.last_post_user.username}
+                    <div className="text-xs text-gray-500">
+                      by {thread.last_post_user.display_name || thread.last_post_user.username}
                     </div>
                   </div>
                 )}
@@ -283,6 +309,7 @@ export default function CategoryPage() {
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -8,38 +8,34 @@ interface Species {
   scientific_name: string
   common_names: string[]
   genus?: string
+  species?: string
   family?: string
   care_level?: string
   temperament?: string
   native_region?: string
-  adult_size?: string
+  adult_size_cm?: number
   growth_rate?: string
   type?: string
-  temperature_min?: number
-  temperature_max?: number
-  humidity_min?: number
-  humidity_max?: number
-  enclosure_size_sling?: string
-  enclosure_size_juvenile?: string
-  enclosure_size_adult?: string
-  substrate_depth?: string
+  min_temperature?: number
+  max_temperature?: number
+  min_humidity?: number
+  max_humidity?: number
+  enclosure_type?: string
+  substrate_depth_cm?: number
   substrate_type?: string
-  prey_size?: string
-  feeding_frequency_sling?: string
-  feeding_frequency_juvenile?: string
-  feeding_frequency_adult?: string
-  water_dish_required?: boolean
-  webbing_amount?: string
-  burrowing?: boolean
-  care_guide?: string
+  feeding_frequency_days?: number
+  typical_diet?: string
+  urticating_hairs?: boolean
+  defensive_behavior?: string
+  lifespan_years_min?: number
+  lifespan_years_max?: number
   image_url?: string
-  source_url?: string
   is_verified?: boolean
-  community_rating?: number
   times_kept?: number
+  average_rating?: number
 }
 
-export default function SpeciesCareSheetPage() {
+export default function EnhancedSpeciesDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -47,10 +43,32 @@ export default function SpeciesCareSheetPage() {
   const [species, setSpecies] = useState<Species | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [activeTab, setActiveTab] = useState('overview')
+  const [user, setUser] = useState<any>(null)
+  const [addingToCollection, setAddingToCollection] = useState(false)
 
   useEffect(() => {
     fetchSpecies()
+    fetchUser()
   }, [id])
+
+  const fetchUser = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch user:', err)
+    }
+  }
 
   const fetchSpecies = async () => {
     try {
@@ -70,256 +88,452 @@ export default function SpeciesCareSheetPage() {
     }
   }
 
+  const addToCollection = async () => {
+    // TODO: Implement add to collection
+    setAddingToCollection(true)
+    setTimeout(() => {
+      alert('Collection feature coming soon!')
+      setAddingToCollection(false)
+    }, 500)
+  }
+
+  const getCareLevel = (level?: string) => {
+    switch (level) {
+      case 'beginner': return { color: 'bg-green-500', text: 'Beginner Friendly', icon: '🟢' }
+      case 'intermediate': return { color: 'bg-yellow-500', text: 'Intermediate', icon: '🟡' }
+      case 'advanced': return { color: 'bg-red-500', text: 'Advanced', icon: '🔴' }
+      default: return { color: 'bg-gray-500', text: 'Unknown', icon: '⚪' }
+    }
+  }
+
+  const getTypeIcon = (type?: string) => {
+    switch (type) {
+      case 'terrestrial': return '🏜️'
+      case 'arboreal': return '🌳'
+      case 'fossorial': return '⛰️'
+      default: return '🕷️'
+    }
+  }
+
+  const renderGauge = (value: number, min: number, max: number, label: string, unit: string) => {
+    const percentage = ((value - min) / (max - min)) * 100
+    return (
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
+          <span className="text-sm font-bold text-gray-900 dark:text-white">{value}{unit}</span>
+        </div>
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+          <div 
+            className="bg-primary-600 h-2.5 rounded-full transition-all"
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <span>{min}{unit}</span>
+          <span>{max}{unit}</span>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-bounce">🕷️</div>
+          <p className="text-gray-600 dark:text-gray-400">Loading species details...</p>
+        </div>
+      </div>
+    )
   }
 
   if (error || !species) {
     return (
-      <div className="min-h-screen p-8">
+      <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900">
         <div className="max-w-4xl mx-auto">
           <button
             onClick={() => router.back()}
-            className="text-gray-600 hover:text-gray-900 mb-4"
+            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4 flex items-center gap-2"
           >
             ← Back
           </button>
-          <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error || 'Species not found'}
+          <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg">
+            <h2 className="text-lg font-semibold mb-2">Species Not Found</h2>
+            <p>{error || 'The requested species could not be found.'}</p>
           </div>
         </div>
       </div>
     )
   }
 
+  const careLevel = getCareLevel(species.care_level)
+  const typeIcon = getTypeIcon(species.type)
+  const canEdit = user && (user.is_admin || user.is_superuser) // TODO: Add premium check
+
   return (
-    <div className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-5xl mx-auto">
-        <button
-          onClick={() => router.back()}
-          className="text-gray-600 hover:text-gray-900 mb-6"
-        >
-          ← Back
-        </button>
-
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
-          <div className="flex items-start gap-6">
-            {species.image_url ? (
-              <img
-                src={species.image_url}
-                alt={species.scientific_name}
-                className="w-48 h-48 object-cover rounded-lg"
-              />
-            ) : (
-              <div className="w-48 h-48 bg-gray-100 rounded-lg flex items-center justify-center text-8xl">
-                🕷️
-              </div>
-            )}
-
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold mb-2 text-gray-900">{species.scientific_name}</h1>
-              {species.common_names.length > 0 && (
-                <p className="text-xl text-gray-600 mb-4">
-                  {species.common_names.join(', ')}
-                </p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Hero Section */}
+      <div className="relative h-96 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700">
+        {species.image_url && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center opacity-30"
+            style={{ backgroundImage: `url(${species.image_url})` }}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-end pb-12">
+          <div className="flex items-end gap-8 w-full">
+            {/* Species Image */}
+            <div className="flex-shrink-0 hidden sm:block">
+              {species.image_url ? (
+                <img
+                  src={species.image_url}
+                  alt={species.scientific_name}
+                  className="w-48 h-48 object-cover rounded-xl border-4 border-white dark:border-gray-800 shadow-2xl"
+                />
+              ) : (
+                <div className="w-48 h-48 bg-white dark:bg-gray-800 rounded-xl border-4 border-white dark:border-gray-800 shadow-2xl flex items-center justify-center text-8xl">
+                  {typeIcon}
+                </div>
               )}
+            </div>
 
-              <div className="flex flex-wrap gap-2 mb-4">
-                {species.care_level && (
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    species.care_level === 'beginner' ? 'bg-green-100 text-green-800' :
-                    species.care_level === 'intermediate' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {species.care_level}
-                  </span>
-                )}
-                {species.type && (
-                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 capitalize">
-                    {species.type}
-                  </span>
-                )}
+            {/* Title & Quick Info */}
+            <div className="flex-1 pb-4">
+              <div className="flex items-center gap-3 mb-3">
+                <h1 className="text-4xl sm:text-5xl font-bold text-white drop-shadow-lg">
+                  {species.scientific_name}
+                </h1>
                 {species.is_verified && (
-                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                  <span className="px-3 py-1 bg-purple-500/90 text-white rounded-full text-sm font-medium backdrop-blur-sm">
                     ✓ Verified
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              {species.common_names && species.common_names.length > 0 && (
+                <p className="text-xl text-white/90 mb-4 drop-shadow">
+                  {species.common_names.join(', ')}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                <span className={`px-4 py-2 ${careLevel.color} text-white rounded-full text-sm font-medium shadow-lg flex items-center gap-2`}>
+                  <span>{careLevel.icon}</span>
+                  <span>{careLevel.text}</span>
+                </span>
+                {species.type && (
+                  <span className="px-4 py-2 bg-blue-500/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm capitalize flex items-center gap-2">
+                    <span>{typeIcon}</span>
+                    <span>{species.type}</span>
+                  </span>
+                )}
                 {species.native_region && (
-                  <div className="text-gray-900">
-                    <span className="font-semibold">Native to:</span> {species.native_region}
-                  </div>
-                )}
-                {species.adult_size && (
-                  <div className="text-gray-900">
-                    <span className="font-semibold">Adult size:</span> {species.adult_size}
-                  </div>
-                )}
-                {species.temperament && (
-                  <div className="text-gray-900">
-                    <span className="font-semibold">Temperament:</span> {species.temperament}
-                  </div>
-                )}
-                {species.growth_rate && (
-                  <div className="text-gray-900">
-                    <span className="font-semibold">Growth rate:</span> {species.growth_rate}
-                  </div>
+                  <span className="px-4 py-2 bg-green-500/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2">
+                    <span>🌍</span>
+                    <span>{species.native_region}</span>
+                  </span>
                 )}
               </div>
+            </div>
 
-              {species.times_kept && species.times_kept > 0 && (
-                <p className="text-sm text-gray-500 mt-4">
-                  Kept by {species.times_kept} keeper{species.times_kept !== 1 ? 's' : ''} on Tarantuverse
-                </p>
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-2 pb-4">
+              <button
+                onClick={addToCollection}
+                disabled={addingToCollection}
+                className="px-6 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+              >
+                {addingToCollection ? 'Adding...' : '+ Add to Collection'}
+              </button>
+              
+              {canEdit && (
+                <button
+                  onClick={() => router.push(`/species/${id}/edit`)}
+                  className="px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold shadow-lg hover:bg-primary-700 transition-all"
+                >
+                  ✏️ Edit Species
+                </button>
               )}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Husbandry Requirements */}
-        <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
-          <h2 className="text-2xl font-bold mb-6 text-gray-900">Husbandry Requirements</h2>
+      {/* Navigation Tabs */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex gap-8 overflow-x-auto">
+            {['overview', 'husbandry', 'behavior', 'stats'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+                  activeTab === tab
+                    ? 'border-primary-600 text-primary-600'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Temperature & Humidity */}
-            <div>
-              <h3 className="font-semibold text-lg mb-3 text-gray-900">Climate</h3>
-              {(species.temperature_min || species.temperature_max) && (
-                <div className="mb-3">
-                  <p className="text-sm text-gray-600">Temperature</p>
-                  <p className="text-lg text-gray-900">
-                    {species.temperature_min}°F - {species.temperature_max}°F
-                  </p>
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Info */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Quick Facts */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Quick Facts</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {species.adult_size_cm && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">📏</span>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Adult Size</p>
+                        <p className="font-semibold text-gray-900 dark:text-white">{species.adult_size_cm} cm leg span</p>
+                      </div>
+                    </div>
+                  )}
+                  {species.growth_rate && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">📈</span>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Growth Rate</p>
+                        <p className="font-semibold text-gray-900 dark:text-white capitalize">{species.growth_rate}</p>
+                      </div>
+                    </div>
+                  )}
+                  {(species.lifespan_years_min || species.lifespan_years_max) && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">⏳</span>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Lifespan</p>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {species.lifespan_years_min}-{species.lifespan_years_max} years
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {species.temperament && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl">😊</span>
+                      <div>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Temperament</p>
+                        <p className="font-semibold text-gray-900 dark:text-white capitalize">{species.temperament}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Taxonomy */}
+              {(species.genus || species.family) && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                  <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Taxonomy</h2>
+                  <div className="space-y-2">
+                    {species.genus && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Genus:</span>
+                        <span className="font-medium text-gray-900 dark:text-white italic">{species.genus}</span>
+                      </div>
+                    )}
+                    {species.species && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Species:</span>
+                        <span className="font-medium text-gray-900 dark:text-white italic">{species.species}</span>
+                      </div>
+                    )}
+                    {species.family && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Family:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{species.family}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-              {(species.humidity_min || species.humidity_max) && (
-                <div>
-                  <p className="text-sm text-gray-600">Humidity</p>
-                  <p className="text-lg text-gray-900">
-                    {species.humidity_min}% - {species.humidity_max}%
-                  </p>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Community Stats */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Community</h3>
+                <div className="space-y-3">
+                  {species.times_kept !== undefined && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Keepers</span>
+                      <span className="text-2xl font-bold text-primary-600">{species.times_kept}</span>
+                    </div>
+                  )}
+                  {species.average_rating && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Rating</span>
+                      <span className="text-2xl font-bold text-yellow-500 flex items-center gap-1">
+                        ⭐ {species.average_rating.toFixed(1)}
+                      </span>
+                    </div>
+                  )}
                 </div>
+              </div>
+
+              {/* Care Level Indicator */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Experience Required</h3>
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-4xl">{careLevel.icon}</span>
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">{careLevel.text}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {species.care_level === 'beginner' && 'Great for first-time keepers'}
+                      {species.care_level === 'intermediate' && 'Some experience recommended'}
+                      {species.care_level === 'advanced' && 'Experienced keepers only'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Husbandry Tab */}
+        {activeTab === 'husbandry' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Temperature & Humidity */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                🌡️ Climate Requirements
+              </h2>
+              {species.min_temperature && species.max_temperature && (
+                renderGauge(
+                  (species.min_temperature + species.max_temperature) / 2,
+                  20,
+                  32,
+                  'Temperature Range',
+                  '°C'
+                )
+              )}
+              {species.min_humidity && species.max_humidity && (
+                renderGauge(
+                  (species.min_humidity + species.max_humidity) / 2,
+                  40,
+                  90,
+                  'Humidity Range',
+                  '%'
+                )
               )}
             </div>
 
             {/* Enclosure */}
-            <div>
-              <h3 className="font-semibold text-lg mb-3 text-gray-900">Enclosure</h3>
-              {species.enclosure_size_sling && (
-                <div className="mb-2">
-                  <p className="text-sm text-gray-600">Sling</p>
-                  <p className="text-gray-900">{species.enclosure_size_sling}</p>
-                </div>
-              )}
-              {species.enclosure_size_juvenile && (
-                <div className="mb-2">
-                  <p className="text-sm text-gray-600">Juvenile</p>
-                  <p className="text-gray-900">{species.enclosure_size_juvenile}</p>
-                </div>
-              )}
-              {species.enclosure_size_adult && (
-                <div>
-                  <p className="text-sm text-gray-600">Adult</p>
-                  <p className="text-gray-900">{species.enclosure_size_adult}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Substrate */}
-            <div>
-              <h3 className="font-semibold text-lg mb-3 text-gray-900">Substrate</h3>
-              {species.substrate_type && (
-                <div className="mb-2">
-                  <p className="text-sm text-gray-600">Type</p>
-                  <p className="text-gray-900">{species.substrate_type}</p>
-                </div>
-              )}
-              {species.substrate_depth && (
-                <div>
-                  <p className="text-sm text-gray-600">Depth</p>
-                  <p className="text-gray-900">{species.substrate_depth}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Additional Care */}
-            <div>
-              <h3 className="font-semibold text-lg mb-3 text-gray-900">Additional Care</h3>
-              <div className="space-y-2 text-gray-900">
-                <p className="flex items-center gap-2">
-                  {species.water_dish_required ? '✓' : '✗'}
-                  <span>Water dish {species.water_dish_required ? 'required' : 'optional'}</span>
-                </p>
-                {species.webbing_amount && (
-                  <p className="flex items-center gap-2">
-                    🕸️ <span className="capitalize">{species.webbing_amount} webbing</span>
-                  </p>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                🏠 Enclosure Setup
+              </h2>
+              <div className="space-y-4">
+                {species.enclosure_type && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Type</p>
+                    <p className="font-semibold text-gray-900 dark:text-white capitalize">{species.enclosure_type}</p>
+                  </div>
                 )}
-                <p className="flex items-center gap-2">
-                  {species.burrowing ? '⛏️' : '🏠'}
-                  <span>{species.burrowing ? 'Burrower' : 'Non-burrowing'}</span>
-                </p>
+                {species.substrate_type && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Substrate</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{species.substrate_type}</p>
+                  </div>
+                )}
+                {species.substrate_depth_cm && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Substrate Depth</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{species.substrate_depth_cm} cm</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Feeding */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                🍽️ Feeding Schedule
+              </h2>
+              <div className="space-y-4">
+                {species.feeding_frequency_days && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Frequency</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">Every {species.feeding_frequency_days} days</p>
+                  </div>
+                )}
+                {species.typical_diet && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Diet</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{species.typical_diet}</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Feeding Schedule */}
-        {(species.feeding_frequency_sling || species.feeding_frequency_juvenile || species.feeding_frequency_adult) && (
-          <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">Feeding Schedule</h2>
+        {/* Behavior Tab */}
+        {activeTab === 'behavior' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                🕷️ Behavior & Temperament
+              </h2>
+              <div className="space-y-4">
+                {species.temperament && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">General Temperament</p>
+                    <p className="font-semibold text-gray-900 dark:text-white capitalize">{species.temperament}</p>
+                  </div>
+                )}
+                {species.defensive_behavior && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Defensive Behavior</p>
+                    <p className="text-gray-900 dark:text-white">{species.defensive_behavior}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Urticating Hairs</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {species.urticating_hairs ? '✓ Yes' : '✗ No'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Tab */}
+        {activeTab === 'stats' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Species Statistics</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {species.feeding_frequency_sling && (
-                <div>
-                  <h3 className="font-semibold mb-2 text-gray-900">Sling</h3>
-                  <p className="text-gray-900">{species.feeding_frequency_sling}</p>
-                </div>
-              )}
-              {species.feeding_frequency_juvenile && (
-                <div>
-                  <h3 className="font-semibold mb-2 text-gray-900">Juvenile</h3>
-                  <p className="text-gray-900">{species.feeding_frequency_juvenile}</p>
-                </div>
-              )}
-              {species.feeding_frequency_adult && (
-                <div>
-                  <h3 className="font-semibold mb-2 text-gray-900">Adult</h3>
-                  <p className="text-gray-900">{species.feeding_frequency_adult}</p>
-                </div>
-              )}
+              <div className="text-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <p className="text-4xl font-bold text-primary-600 mb-2">{species.times_kept || 0}</p>
+                <p className="text-gray-600 dark:text-gray-400">Total Keepers</p>
+              </div>
+              <div className="text-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <p className="text-4xl font-bold text-yellow-500 mb-2">
+                  {species.average_rating ? species.average_rating.toFixed(1) : 'N/A'}
+                </p>
+                <p className="text-gray-600 dark:text-gray-400">Average Rating</p>
+              </div>
+              <div className="text-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <p className="text-4xl font-bold text-green-500 mb-2">{careLevel.text}</p>
+                <p className="text-gray-600 dark:text-gray-400">Care Level</p>
+              </div>
             </div>
-            {species.prey_size && (
-              <p className="mt-4 text-sm text-gray-600">
-                <span className="font-semibold">Prey size:</span> {species.prey_size}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Care Guide */}
-        {species.care_guide && (
-          <div className="bg-white rounded-lg shadow-sm p-8 mb-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900">Care Guide</h2>
-            <div className="prose max-w-none">
-              <p className="whitespace-pre-wrap text-gray-700">{species.care_guide}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Source */}
-        {species.source_url && (
-          <div className="text-center text-sm text-gray-500">
-            <a
-              href={species.source_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-primary-600"
-            >
-              View source →
-            </a>
           </div>
         )}
       </div>

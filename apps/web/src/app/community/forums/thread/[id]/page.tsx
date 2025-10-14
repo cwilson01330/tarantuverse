@@ -399,136 +399,151 @@ export default function ThreadPage() {
   const allPosts = thread.first_post ? [thread.first_post, ...posts] : posts;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          href="/community/forums"
-          className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2 mb-4"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Forums
-        </Link>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        {/* Breadcrumb */}
+        <nav className="mb-6 text-sm">
+          <ol className="flex items-center gap-2 text-gray-400">
+            <li>
+              <Link href="/community" className="hover:text-electric-blue-400 transition-colors">
+                Community
+              </Link>
+            </li>
+            <li>/</li>
+            <li>
+              <Link href="/community/forums" className="hover:text-electric-blue-400 transition-colors">
+                Forums
+              </Link>
+            </li>
+            <li>/</li>
+            <li className="text-gray-100 font-medium truncate max-w-md">{thread.title}</li>
+          </ol>
+        </nav>
 
-        {/* Thread Title Section */}
-        {editingThread ? (
-          <div className="space-y-3 mb-4">
-            <input
-              type="text"
-              value={editThreadTitle}
-              onChange={(e) => setEditThreadTitle(e.target.value)}
-              className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent text-2xl font-bold"
-              placeholder="Thread title..."
-              maxLength={200}
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={handleEditThread}
-                disabled={submitting}
-                className="bg-gradient-primary text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {submitting ? "Saving..." : "Save"}
-              </button>
-              <button
-                onClick={cancelEditThread}
-                disabled={submitting}
-                className="bg-dark-50 border border-electric-blue-500/20 text-gray-300 px-4 py-2 rounded-lg hover:border-electric-blue-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-3 flex-1">
-              {thread.is_pinned && <Pin className="w-5 h-5 text-neon-pink-400" />}
-              {thread.is_locked && <Lock className="w-5 h-5 text-gray-500" />}
-              <h1 className="text-3xl font-bold text-gray-100">{thread.title}</h1>
-            </div>
-            
-            {/* Edit/Delete Thread Buttons */}
-            {currentUserId && thread.author_id === currentUserId && (
-              <div className="flex items-center gap-2 ml-4">
+        {/* Thread Header */}
+        <div className="mb-6 bg-gradient-to-r from-electric-blue-600 to-neon-pink-600 rounded-xl p-8 shadow-xl shadow-electric-blue-500/20">
+          {editingThread ? (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={editThreadTitle}
+                onChange={(e) => setEditThreadTitle(e.target.value)}
+                className="w-full px-4 py-3 bg-white/10 backdrop-blur border border-white/20 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-white/50 focus:border-transparent text-2xl font-bold"
+                placeholder="Thread title..."
+                maxLength={200}
+              />
+              <div className="flex gap-2">
                 <button
-                  onClick={startEditThread}
-                  className="text-electric-blue-400 hover:text-electric-blue-300 p-2 rounded hover:bg-electric-blue-500/10 transition-colors"
-                  title="Edit thread title"
+                  onClick={handleEditThread}
+                  disabled={submitting}
+                  className="bg-white text-electric-blue-600 px-6 py-2 rounded-lg hover:bg-gray-100 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Edit className="w-5 h-5" />
+                  {submitting ? "Saving..." : "Save"}
                 </button>
                 <button
-                  onClick={handleDeleteThread}
-                  className="text-red-400 hover:text-red-300 p-2 rounded hover:bg-red-500/10 transition-colors"
-                  title="Delete thread"
+                  onClick={cancelEditThread}
+                  disabled={submitting}
+                  className="bg-white/10 border border-white/20 text-white px-6 py-2 rounded-lg hover:bg-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  Cancel
                 </button>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3 flex-1">
+                  {thread.is_pinned && <Pin className="w-6 h-6 text-white/90 flex-shrink-0" />}
+                  {thread.is_locked && <Lock className="w-6 h-6 text-white/70 flex-shrink-0" />}
+                  <h1 className="text-4xl font-bold text-white">{thread.title}</h1>
+                </div>
+                
+                {/* Edit/Delete Thread Buttons */}
+                {currentUserId && thread.author_id === currentUserId && (
+                  <div className="flex items-center gap-2 ml-4">
+                    <button
+                      onClick={startEditThread}
+                      className="text-white hover:bg-white/10 p-2.5 rounded-lg transition-all"
+                      title="Edit thread title"
+                    >
+                      <Edit className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={handleDeleteThread}
+                      className="text-white hover:bg-white/10 p-2.5 rounded-lg transition-all"
+                      title="Delete thread"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </div>
 
-        <div className="flex items-center gap-4 text-sm text-gray-400">
-          <div className="flex items-center gap-1">
-            <MessageSquare className="w-4 h-4 text-electric-blue-400" />
-            <span>{thread.post_count} posts</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Eye className="w-4 h-4 text-neon-pink-400" />
-            <span>{thread.view_count} views</span>
-          </div>
+              <div className="flex items-center gap-6 text-white/80">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5" />
+                  <span className="font-medium">{thread.post_count} post{thread.post_count !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Eye className="w-5 h-5" />
+                  <span className="font-medium">{thread.view_count} view{thread.view_count !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Posts */}
-      <div className="space-y-4 mb-8">
+      <div className="space-y-3 mb-8">
         {allPosts.map((post, index) => (
           <div
             key={post.id}
-            className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md overflow-hidden"
+            className="bg-dark-50 border border-electric-blue-500/20 rounded-xl shadow-md hover:border-electric-blue-500/30 transition-all overflow-hidden"
           >
             <div className="flex">
               {/* Author sidebar */}
-              <div className="bg-dark-500/50 p-4 w-48 border-r border-electric-blue-500/20">
+              <div className="bg-gradient-to-b from-dark-100 to-dark-50 p-5 w-52 border-r border-electric-blue-500/20">
                 <div className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-gradient-primary shadow-lg shadow-electric-blue-500/30 flex items-center justify-center mx-auto mb-2 text-2xl font-bold text-white">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-electric-blue-600 to-neon-pink-600 shadow-xl shadow-electric-blue-500/30 flex items-center justify-center mx-auto mb-3 text-2xl font-bold text-white ring-4 ring-dark-50">
                     {(post.author.display_name || post.author.username)
                       .charAt(0)
                       .toUpperCase()}
                   </div>
-                  <div className="font-semibold text-gray-100">
+                  <div className="font-bold text-gray-100 mb-1">
                     {post.author.display_name || post.author.username}
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-gray-500 mb-2">
                     @{post.author.username}
                   </div>
                   {index === 0 && (
-                    <div className="mt-2 text-xs text-neon-pink-400 font-semibold">
-                      Thread Author
+                    <div className="mt-3 inline-flex items-center gap-1 px-2 py-1 bg-neon-pink-500/20 border border-neon-pink-500/50 rounded text-xs text-neon-pink-400 font-semibold">
+                      <Pin className="w-3 h-3" />
+                      Original Poster
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Post content */}
-              <div className="flex-1 p-4">
-                <div className="flex items-center justify-between mb-3">
+              <div className="flex-1 p-5">
+                <div className="flex items-center justify-between mb-4">
                   <div className="text-sm text-gray-400">
-                    {formatDate(post.created_at)}
+                    <span className="font-medium">{formatDate(post.created_at)}</span>
                     {post.is_edited && post.edited_at && (
-                      <span className="ml-2 text-xs italic">
-                        (edited {formatDate(post.edited_at)})
+                      <span className="ml-2 text-xs italic text-gray-500">
+                        • edited {formatDate(post.edited_at)}
                       </span>
                     )}
                   </div>
                   {/* Edit/Delete Buttons */}
                   {currentUserId && post.author_id === currentUserId && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       {editingPostId !== post.id && (
                         <>
                           <button
                             onClick={() => startEdit(post)}
-                            className="text-electric-blue-400 hover:text-electric-blue-300 p-1 rounded hover:bg-electric-blue-500/10 transition-colors"
+                            className="text-electric-blue-400 hover:text-electric-blue-300 hover:bg-electric-blue-500/10 p-2 rounded-lg transition-all"
                             title="Edit post"
                           >
                             <Edit className="w-4 h-4" />
@@ -601,24 +616,28 @@ export default function ThreadPage() {
 
       {/* Reply Form */}
       {!thread.is_locked && (
-        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-100 mb-4">
+        <div className="bg-gradient-to-br from-dark-50 to-dark-100 border border-electric-blue-500/30 rounded-xl shadow-xl p-6">
+          <h3 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-electric-blue-400" />
             Post a Reply
           </h3>
           <form onSubmit={handleSubmitReply}>
             <textarea
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
-              placeholder="Write your reply..."
-              className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent resize-none"
+              placeholder="Share your thoughts..."
+              className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent resize-none hover:border-electric-blue-500/40 transition-colors"
               rows={6}
               required
             />
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex justify-between items-center">
+              <p className="text-sm text-gray-400">
+                Be respectful and constructive in your replies
+              </p>
               <button
                 type="submit"
                 disabled={submitting || !replyContent.trim()}
-                className="bg-gradient-primary text-white px-6 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-gradient-to-r from-electric-blue-600 to-neon-pink-600 text-white px-8 py-3 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? "Posting..." : "Post Reply"}
               </button>
