@@ -207,17 +207,19 @@ export default function SpeciesScreen() {
     filterContainer: {
       flexDirection: 'row',
       paddingHorizontal: 16,
-      gap: 12,
+      gap: 10,
       marginBottom: 16,
     },
     filterChip: {
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      borderRadius: 24,
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 22,
       borderWidth: 2,
+      minHeight: 44,
+      justifyContent: 'center',
     },
     filterChipText: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '700',
     },
     resultCount: {
@@ -356,7 +358,12 @@ export default function SpeciesScreen() {
       </View>
 
       {/* Filter Chips */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={styles.filterContainer}
+        contentContainerStyle={{ paddingRight: 16 }}
+      >
         {(['all', 'beginner', 'intermediate', 'advanced'] as const).map(filter => (
           <TouchableOpacity
             key={filter}
