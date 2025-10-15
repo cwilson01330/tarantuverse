@@ -170,13 +170,13 @@ export default function SpeciesScreen() {
     },
     header: {
       padding: 16,
-      paddingTop: 60,
+      paddingTop: 50,
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     title: {
-      fontSize: 28,
+      fontSize: 26,
       fontWeight: 'bold',
       marginBottom: 4,
       color: colors.textPrimary,
@@ -193,7 +193,7 @@ export default function SpeciesScreen() {
       paddingHorizontal: 12,
       marginBottom: 12,
       marginHorizontal: 16,
-      marginTop: 16,
+      marginTop: 12,
     },
     searchIcon: {
       marginRight: 8,
