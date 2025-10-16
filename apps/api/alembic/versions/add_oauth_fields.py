@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'oauth_fields_001'
-down_revision = None  # Update this with your latest migration ID
+down_revision = 'j1k2l3m4n5o6'  # After subscription tables migration
 branch_labels = None
 depends_on = None
 
