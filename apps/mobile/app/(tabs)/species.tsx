@@ -208,7 +208,7 @@ export default function SpeciesScreen() {
       flexDirection: 'row',
       paddingHorizontal: 16,
       gap: 8,
-      marginBottom: 12,
+      marginBottom: 20,
     },
     filterChip: {
       paddingVertical: 8,
