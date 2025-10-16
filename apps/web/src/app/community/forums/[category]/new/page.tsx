@@ -125,12 +125,9 @@ export default function NewThreadPage() {
       <div className="mb-6">
         <Link
           href={`/community/forums/${categorySlug}`}
-          className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2 mb-4"
+          className="text-electric-blue-400 hover:text-electric-blue-300 inline-block mb-4"
         >
-          <span className="flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to {category.name}
-          </span>
+          ← Back to {category.name}
         </Link>
         <h1 className="text-3xl font-bold text-gray-100">Create New Thread</h1>
       </div>
