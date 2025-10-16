@@ -3,7 +3,10 @@
     "allow": [
       "WebFetch(domain:expo.dev)",
       "Bash(git add:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git -C /mnt/c/Users/gwiza/Desktop/dev/tarantuverse log --oneline -10)",
+      "Bash(git config:*)",
+      "Bash(git -C /mnt/c/Users/gwiza/Desktop/dev/tarantuverse log --oneline -15)"
     ],
     "deny": [],
     "ask": []

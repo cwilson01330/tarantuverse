@@ -42,8 +42,9 @@
    - `https://tarantuverse.com/api/auth/callback/google` (production - add later)
 7. Click "Create"
 8. **IMPORTANT:** Copy your credentials:
-   - Client ID: `1234567890-abc...apps.googleusercontent.com`
-   - Client Secret: `GOCSPX-abc123...`
+   - Client ID: `YOUR_CLIENT_ID.apps.googleusercontent.com`
+   - Client Secret: `YOUR_CLIENT_SECRET`
+   - ⚠️ **Keep these private!** Never commit them to git.
 
 ### Step 5: Add Credentials to Web App
 1. Navigate to: `apps/web/`

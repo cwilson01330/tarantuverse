@@ -389,8 +389,10 @@ export default function ThreadPage() {
           href="/community/forums"
           className="text-electric-blue-400 hover:text-electric-blue-300 flex items-center gap-2"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Forums
+          <>
+            <ArrowLeft className="w-4 h-4" />
+            Back to Forums
+          </>
         </Link>
       </div>
     );
