@@ -225,13 +225,12 @@ export default function SpeciesScreen() {
     resultCount: {
       paddingHorizontal: 16,
       marginTop: 16,
-      marginBottom: 12,
+      marginBottom: 20,
       fontSize: 14,
       color: colors.textSecondary,
     },
     listContent: {
       paddingHorizontal: 16,
-      paddingTop: 28,
       paddingBottom: 24,
     },
     card: {
@@ -339,8 +338,8 @@ export default function SpeciesScreen() {
     );
   }
 
-  return (
-    <View style={styles.container}>
+  const ListHeader = () => (
+    <>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Species Database</Text>
@@ -394,19 +393,27 @@ export default function SpeciesScreen() {
       <Text style={styles.resultCount}>
         {filteredSpecies.length} species found
       </Text>
+    </>
+  );
 
+  return (
+    <View style={styles.container}>
       {/* Species List */}
       {filteredSpecies.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>🔍</Text>
-          <Text style={styles.emptyTitle}>No species found</Text>
-          <Text style={styles.emptyText}>Try adjusting your search or filters</Text>
-        </View>
+        <>
+          <ListHeader />
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyEmoji}>🔍</Text>
+            <Text style={styles.emptyTitle}>No species found</Text>
+            <Text style={styles.emptyText}>Try adjusting your search or filters</Text>
+          </View>
+        </>
       ) : (
         <FlatList
           data={filteredSpecies}
           renderItem={renderSpeciesCard}
           keyExtractor={item => item.id}
+          ListHeaderComponent={ListHeader}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
