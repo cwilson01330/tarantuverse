@@ -15,7 +15,13 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
-    hashed_password = Column(String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=True)  # Nullable for OAuth users
+    
+    # OAuth fields
+    oauth_provider = Column(String(50))  # 'google', 'apple', 'github'
+    oauth_id = Column(String(255))  # Provider's unique user ID
+    oauth_access_token = Column(Text)  # Store for API calls if needed
+    oauth_refresh_token = Column(Text)  # For token refresh
 
     display_name = Column(String(100))
     avatar_url = Column(String(500))

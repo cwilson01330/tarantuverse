@@ -6,8 +6,17 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate
+from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse
 from app.utils.auth import get_password_hash, verify_password, create_access_token
 from app.utils.dependencies import get_current_user
+from app.utils.oauth import (
+    exchange_google_code_for_token,
+    exchange_apple_code_for_token,
+    verify_apple_id_token,
+    generate_username_from_email,
+)
+from typing import Optional
+import uuid
 
 router = APIRouter()
 
@@ -171,3 +180,174 @@ async def update_visibility(
     db.refresh(current_user)
     
     return UserResponse.from_orm(current_user)
+
+
+# ============================================================================
+# OAuth Endpoints
+# ============================================================================
+
+@router.post("/oauth/google", response_model=OAuthLoginResponse)
+async def google_oauth_callback(
+    callback_data: GoogleOAuthCallback,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle Google OAuth callback
+    Exchange authorization code for user info and create/login user
+    """
+    try:
+        # Exchange code for Google user info
+        google_user = await exchange_google_code_for_token(callback_data.code)
+        
+        # Check if user exists with this email or Google OAuth ID
+        user = db.query(User).filter(
+            (User.email == google_user["email"]) |
+            ((User.oauth_provider == "google") & (User.oauth_id == google_user["provider_id"]))
+        ).first()
+        
+        is_new_user = False
+        
+        if not user:
+            # Create new user from Google data
+            is_new_user = True
+            
+            # Generate username from email (ensure uniqueness)
+            base_username = generate_username_from_email(google_user["email"])
+            username = base_username
+            counter = 1
+            while db.query(User).filter(User.username == username).first():
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            user = User(
+                id=uuid.uuid4(),
+                email=google_user["email"],
+                username=username,
+                display_name=google_user.get("name") or username,
+                avatar_url=google_user.get("picture"),
+                oauth_provider="google",
+                oauth_id=google_user["provider_id"],
+                oauth_access_token=google_user.get("access_token"),
+                oauth_refresh_token=google_user.get("refresh_token"),
+                hashed_password=None,  # OAuth users don't have passwords
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            # Update existing user's OAuth tokens
+            user.oauth_access_token = google_user.get("access_token")
+            user.oauth_refresh_token = google_user.get("refresh_token")
+            if not user.oauth_provider:
+                user.oauth_provider = "google"
+                user.oauth_id = google_user["provider_id"]
+            if not user.avatar_url and google_user.get("picture"):
+                user.avatar_url = google_user.get("picture")
+            db.commit()
+            db.refresh(user)
+        
+        # Create access token for our app
+        access_token = create_access_token(data={"sub": user.email})
+        
+        return OAuthLoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user={
+                "id": str(user.id),
+                "email": user.email,
+                "username": user.username,
+                "display_name": user.display_name,
+                "avatar_url": user.avatar_url,
+            },
+            is_new_user=is_new_user,
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Google OAuth failed: {str(e)}"
+        )
+
+
+@router.post("/oauth/apple", response_model=OAuthLoginResponse)
+async def apple_oauth_callback(
+    callback_data: AppleOAuthCallback,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle Apple OAuth callback
+    Exchange authorization code for user info and create/login user
+    """
+    try:
+        # Verify Apple ID token
+        apple_user = await verify_apple_id_token(callback_data.id_token)
+        
+        # Check if user exists with this email or Apple OAuth ID
+        user = db.query(User).filter(
+            (User.email == apple_user["email"]) |
+            ((User.oauth_provider == "apple") & (User.oauth_id == apple_user["provider_id"]))
+        ).first()
+        
+        is_new_user = False
+        
+        if not user:
+            # Create new user from Apple data
+            is_new_user = True
+            
+            # Apple sends user info only on first login
+            name = None
+            if callback_data.user:
+                first_name = callback_data.user.get("name", {}).get("firstName", "")
+                last_name = callback_data.user.get("name", {}).get("lastName", "")
+                name = f"{first_name} {last_name}".strip()
+            
+            # Generate username from email
+            base_username = generate_username_from_email(apple_user["email"])
+            username = base_username
+            counter = 1
+            while db.query(User).filter(User.username == username).first():
+                username = f"{base_username}{counter}"
+                counter += 1
+            
+            user = User(
+                id=uuid.uuid4(),
+                email=apple_user["email"],
+                username=username,
+                display_name=name or username,
+                oauth_provider="apple",
+                oauth_id=apple_user["provider_id"],
+                hashed_password=None,  # OAuth users don't have passwords
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            # Update existing user if needed
+            if not user.oauth_provider:
+                user.oauth_provider = "apple"
+                user.oauth_id = apple_user["provider_id"]
+            db.commit()
+            db.refresh(user)
+        
+        # Create access token for our app
+        access_token = create_access_token(data={"sub": user.email})
+        
+        return OAuthLoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user={
+                "id": str(user.id),
+                "email": user.email,
+                "username": user.username,
+                "display_name": user.display_name,
+                "avatar_url": user.avatar_url,
+            },
+            is_new_user=is_new_user,
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Apple OAuth failed: {str(e)}"
+        )
+
