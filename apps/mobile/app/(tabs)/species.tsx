@@ -224,6 +224,7 @@ export default function SpeciesScreen() {
     },
     resultCount: {
       paddingHorizontal: 16,
+      marginTop: 16,
       marginBottom: 12,
       fontSize: 14,
       color: colors.textSecondary,
