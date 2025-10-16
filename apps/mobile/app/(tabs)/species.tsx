@@ -208,7 +208,7 @@ export default function SpeciesScreen() {
       flexDirection: 'row',
       paddingHorizontal: 16,
       gap: 8,
-      marginBottom: 20,
+      marginBottom: 12,
     },
     filterChip: {
       paddingVertical: 8,
@@ -230,6 +230,7 @@ export default function SpeciesScreen() {
     },
     listContent: {
       paddingHorizontal: 16,
+      paddingTop: 20,
       paddingBottom: 24,
     },
     card: {
