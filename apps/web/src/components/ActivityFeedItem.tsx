@@ -1,12 +1,4 @@
 import Link from "next/link";
-import {
-  User,
-  Bug,
-  Droplet,
-  UserPlus,
-  MessageSquare,
-  MessageCircle,
-} from "lucide-react";
 
 export type ActionType =
   | "new_tarantula"
@@ -60,19 +52,19 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
   const getActionIcon = () => {
     switch (activity.action_type) {
       case "new_tarantula":
-        return <Bug className="w-5 h-5 text-neon-pink-400" />;
+        return <span className="text-xl text-neon-pink-400">🕷️</span>;
       case "molt":
-        return <Bug className="w-5 h-5 text-electric-blue-400" />;
+        return <span className="text-xl text-electric-blue-400">🦎</span>;
       case "feeding":
-        return <Droplet className="w-5 h-5 text-green-400" />;
+        return <span className="text-xl text-green-400">🍽️</span>;
       case "follow":
-        return <UserPlus className="w-5 h-5 text-neon-pink-400" />;
+        return <span className="text-xl text-neon-pink-400">👥</span>;
       case "forum_thread":
-        return <MessageSquare className="w-5 h-5 text-electric-blue-400" />;
+        return <span className="text-xl text-electric-blue-400">💬</span>;
       case "forum_post":
-        return <MessageCircle className="w-5 h-5 text-neon-pink-400" />;
+        return <span className="text-xl text-neon-pink-400">💭</span>;
       default:
-        return <User className="w-5 h-5 text-gray-400" />;
+        return <span className="text-xl text-gray-400">👤</span>;
     }
   };
 

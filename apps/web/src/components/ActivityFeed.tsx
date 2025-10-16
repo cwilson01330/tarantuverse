@@ -5,7 +5,6 @@ import ActivityFeedItem, {
   ActivityFeedItemData,
   ActionType,
 } from "./ActivityFeedItem";
-import { Filter } from "lucide-react";
 
 interface ActivityFeedProps {
   feedType: "personalized" | "global" | "user";
@@ -172,7 +171,7 @@ export default function ActivityFeed({
       {showFilters && (
         <div className="bg-dark-50 rounded-lg shadow-lg border border-electric-blue-500/20 p-4">
           <div className="flex items-center gap-3">
-            <Filter className="w-5 h-5 text-electric-blue-400" />
+            <span className="text-xl">🔧</span>
             <select
               value={actionTypeFilter}
               onChange={(e) =>

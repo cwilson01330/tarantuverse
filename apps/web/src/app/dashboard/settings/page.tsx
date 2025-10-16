@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useThemeStore } from '@/stores/themeStore';
-import { Moon, Sun, User, Bell, Lock, Globe } from 'lucide-react';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -111,11 +110,9 @@ export default function SettingsPage() {
         {/* Appearance Section */}
         <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
-            {theme === 'dark' ? (
-              <Moon className="w-6 h-6 text-primary" />
-            ) : (
-              <Sun className="w-6 h-6 text-primary" />
-            )}
+            <span className="text-2xl">
+              {theme === 'dark' ? '🌙' : '☀️'}
+            </span>
             <h2 className="text-xl font-bold text-theme-primary">Appearance</h2>
           </div>
 
@@ -134,15 +131,13 @@ export default function SettingsPage() {
                 }`}
               >
                 <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform flex items-center justify-center ${
                     theme === 'dark' ? 'translate-x-7' : 'translate-x-1'
                   }`}
                 >
-                  {theme === 'dark' ? (
-                    <Moon className="w-4 h-4 text-primary m-1" />
-                  ) : (
-                    <Sun className="w-4 h-4 text-yellow-500 m-1" />
-                  )}
+                  <span className="text-xs">
+                    {theme === 'dark' ? '🌙' : '☀️'}
+                  </span>
                 </span>
               </button>
             </div>
@@ -156,7 +151,7 @@ export default function SettingsPage() {
         {/* Profile Section */}
         <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
-            <User className="w-6 h-6 text-primary" />
+            <span className="text-2xl">👤</span>
             <h2 className="text-xl font-bold text-theme-primary">Profile</h2>
           </div>
 
@@ -185,7 +180,7 @@ export default function SettingsPage() {
         {/* Privacy Section */}
         <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
-            <Lock className="w-6 h-6 text-primary" />
+            <span className="text-2xl">🔒</span>
             <h2 className="text-xl font-bold text-theme-primary">Privacy</h2>
           </div>
 
@@ -211,7 +206,7 @@ export default function SettingsPage() {
         {/* Notifications Section */}
         <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
-            <Bell className="w-6 h-6 text-primary" />
+            <span className="text-2xl">🔔</span>
             <h2 className="text-xl font-bold text-theme-primary">Notifications</h2>
           </div>
 
@@ -223,7 +218,7 @@ export default function SettingsPage() {
         {/* About Section */}
         <section className="bg-surface rounded-xl border border-theme p-6">
           <div className="flex items-center gap-3 mb-6">
-            <Globe className="w-6 h-6 text-primary" />
+            <span className="text-2xl">🌐</span>
             <h2 className="text-xl font-bold text-theme-primary">About</h2>
           </div>
 

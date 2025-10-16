@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, Grid3x3, List, ChevronDown, ArrowLeft } from 'lucide-react';
 
 interface Species {
   id: string;
@@ -99,7 +98,7 @@ export default function SpeciesPage() {
             onClick={() => router.push('/dashboard')}
             className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
           >
-            <ArrowLeft size={20} />
+            ←
             <span>Back to Dashboard</span>
           </button>
         </div>
@@ -121,7 +120,7 @@ export default function SpeciesPage() {
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
               <input
                 type="text"
                 placeholder="Search species by scientific or common name..."
@@ -136,9 +135,9 @@ export default function SpeciesPage() {
               onClick={() => setShowFilters(!showFilters)}
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
             >
-              <Filter className="w-5 h-5" />
+              <span>🔧</span>
               Filters
-              <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              <span className={`transition-transform inline-block ${showFilters ? 'rotate-180' : ''}`}>▼</span>
             </button>
 
             {/* View Mode */}
@@ -151,7 +150,7 @@ export default function SpeciesPage() {
                     : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                <Grid3x3 className="w-5 h-5" />
+                <span>▦</span>
               </button>
               <button
                 onClick={() => setViewMode('list')}
@@ -161,7 +160,7 @@ export default function SpeciesPage() {
                     : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
-                <List className="w-5 h-5" />
+                <span>☰</span>
               </button>
             </div>
           </div>
