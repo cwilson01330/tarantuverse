@@ -230,7 +230,7 @@ export default function SpeciesScreen() {
     },
     listContent: {
       paddingHorizontal: 16,
-      paddingTop: 20,
+      paddingTop: 28,
       paddingBottom: 24,
     },
     card: {
