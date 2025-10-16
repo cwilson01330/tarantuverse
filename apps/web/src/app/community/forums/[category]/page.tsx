@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { MessageSquare, Eye, Clock, Pin, Lock, ArrowLeft } from "lucide-react";
 
 interface ThreadAuthor {
   id: string;
@@ -215,7 +214,7 @@ export default function CategoryPage() {
         {/* Threads List */}
         {threads.length === 0 ? (
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-xl shadow-lg p-12 text-center">
-            <MessageSquare className="w-20 h-20 text-gray-600 mx-auto mb-4" />
+            <div className="text-6xl mb-4">💬</div>
             <h3 className="text-2xl font-semibold text-gray-100 mb-2">No Threads Yet</h3>
             <p className="text-gray-400 mb-6">Be the first to start a discussion!</p>
             <button
@@ -238,10 +237,10 @@ export default function CategoryPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     {thread.is_pinned && (
-                      <Pin className="w-5 h-5 text-neon-pink-400 flex-shrink-0" />
+                      <span className="text-neon-pink-400 flex-shrink-0">📌</span>
                     )}
                     {thread.is_locked && (
-                      <Lock className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                      <span className="text-gray-500 flex-shrink-0">🔒</span>
                     )}
                     <h3 className="text-lg font-semibold text-gray-100 group-hover:text-electric-blue-300 transition-colors line-clamp-2">
                       {thread.title}
@@ -259,12 +258,12 @@ export default function CategoryPage() {
                 {/* Stats */}
                 <div className="flex gap-6 text-sm text-gray-400">
                   <div className="flex flex-col items-center gap-1 min-w-[60px]">
-                    <MessageSquare className="w-5 h-5 text-electric-blue-400" />
+                    <span className="text-electric-blue-400">💬</span>
                     <span className="font-semibold text-gray-200">{thread.post_count}</span>
                     <span className="text-xs">Post{thread.post_count !== 1 ? 's' : ''}</span>
                   </div>
                   <div className="flex flex-col items-center gap-1 min-w-[60px]">
-                    <Eye className="w-5 h-5 text-neon-pink-400" />
+                    <span className="text-neon-pink-400">👁️</span>
                     <span className="font-semibold text-gray-200">{thread.view_count}</span>
                     <span className="text-xs">View{thread.view_count !== 1 ? 's' : ''}</span>
                   </div>
@@ -274,7 +273,7 @@ export default function CategoryPage() {
                 {thread.last_post_at && thread.last_post_user && (
                   <div className="text-sm text-gray-400 min-w-[160px] text-right border-l border-electric-blue-500/20 pl-6">
                     <div className="flex items-center gap-1 justify-end mb-1">
-                      <Clock className="w-4 h-4" />
+                      <span>🕒</span>
                       <span className="font-medium">{formatRelativeTime(thread.last_post_at)}</span>
                     </div>
                     <div className="text-xs text-gray-500">

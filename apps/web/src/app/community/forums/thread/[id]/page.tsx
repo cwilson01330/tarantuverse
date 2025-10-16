@@ -3,15 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  MessageSquare,
-  Eye,
-  Pin,
-  Lock,
-  Edit,
-  Trash2,
-} from "lucide-react";
 
 interface ThreadAuthor {
   id: string;
@@ -452,8 +443,8 @@ export default function ThreadPage() {
             <>
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3 flex-1">
-                  {thread.is_pinned && <Pin className="w-6 h-6 text-white/90 flex-shrink-0" />}
-                  {thread.is_locked && <Lock className="w-6 h-6 text-white/70 flex-shrink-0" />}
+                  {thread.is_pinned && 📌}
+                  {thread.is_locked && 🔒}
                   <h1 className="text-4xl font-bold text-white">{thread.title}</h1>
                 </div>
                 
@@ -465,14 +456,14 @@ export default function ThreadPage() {
                       className="text-white hover:bg-white/10 p-2.5 rounded-lg transition-all"
                       title="Edit thread title"
                     >
-                      <Edit className="w-5 h-5" />
+                      ✏️
                     </button>
                     <button
                       onClick={handleDeleteThread}
                       className="text-white hover:bg-white/10 p-2.5 rounded-lg transition-all"
                       title="Delete thread"
                     >
-                      <Trash2 className="w-5 h-5" />
+                      🗑️
                     </button>
                   </div>
                 )}
@@ -480,11 +471,11 @@ export default function ThreadPage() {
 
               <div className="flex items-center gap-6 text-white/80">
                 <div className="flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5" />
+                  💬
                   <span className="font-medium">{thread.post_count} post{thread.post_count !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Eye className="w-5 h-5" />
+                  👁️
                   <span className="font-medium">{thread.view_count} view{thread.view_count !== 1 ? 's' : ''}</span>
                 </div>
               </div>
@@ -517,7 +508,7 @@ export default function ThreadPage() {
                   </div>
                   {index === 0 && (
                     <div className="mt-3 inline-flex items-center gap-1 px-2 py-1 bg-neon-pink-500/20 border border-neon-pink-500/50 rounded text-xs text-neon-pink-400 font-semibold">
-                      <Pin className="w-3 h-3" />
+                      📌
                       Original Poster
                     </div>
                   )}
@@ -545,7 +536,7 @@ export default function ThreadPage() {
                             className="text-electric-blue-400 hover:text-electric-blue-300 hover:bg-electric-blue-500/10 p-2 rounded-lg transition-all"
                             title="Edit post"
                           >
-                            <Edit className="w-4 h-4" />
+                            ✏️
                           </button>
                           {index !== 0 && ( // Don't show delete for first post
                             <button
@@ -553,7 +544,7 @@ export default function ThreadPage() {
                               className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10 transition-colors"
                               title="Delete post"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              🗑️
                             </button>
                           )}
                         </>
@@ -617,7 +608,7 @@ export default function ThreadPage() {
       {!thread.is_locked && (
         <div className="bg-gradient-to-br from-dark-50 to-dark-100 border border-electric-blue-500/30 rounded-xl shadow-xl p-6">
           <h3 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-electric-blue-400" />
+            💬
             Post a Reply
           </h3>
           <form onSubmit={handleSubmitReply}>
@@ -647,7 +638,7 @@ export default function ThreadPage() {
 
       {thread.is_locked && (
         <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg p-6 text-center">
-          <Lock className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+          🔒
           <p className="text-gray-400">
             This thread is locked. No more replies can be posted.
           </p>

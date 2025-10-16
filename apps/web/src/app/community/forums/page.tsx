@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MessageSquare, Users, Clock, Pin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ForumCategory {
@@ -115,7 +114,7 @@ export default function ForumsPage() {
         {/* Guidelines Box - Move to top */}
         <div className="mb-6 bg-dark-50 border border-electric-blue-500/30 rounded-lg p-5">
           <div className="flex items-start gap-3">
-            <MessageSquare className="w-5 h-5 text-electric-blue-400 mt-0.5 flex-shrink-0" />
+            <span className="text-electric-blue-400 mt-0.5 flex-shrink-0">💬</span>
             <div>
               <h3 className="font-semibold text-electric-blue-300 mb-2">Forum Guidelines</h3>
               <p className="text-gray-300 text-sm">
@@ -128,7 +127,7 @@ export default function ForumsPage() {
         {/* Categories List */}
         {categories.length === 0 ? (
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-xl shadow-lg p-12 text-center">
-            <MessageSquare className="w-20 h-20 text-gray-600 mx-auto mb-4" />
+            <div className="text-6xl mb-4">💬</div>
             <h3 className="text-2xl font-semibold text-gray-100 mb-2">No Categories Yet</h3>
             <p className="text-gray-400">Forum categories will appear here once created.</p>
           </div>
@@ -159,7 +158,7 @@ export default function ForumsPage() {
                     {/* Stats */}
                     <div className="flex gap-8 text-sm">
                       <div className="flex items-center gap-2 text-center">
-                        <MessageSquare className="w-5 h-5 text-electric-blue-400" />
+                        <span className="text-electric-blue-400">💬</span>
                         <div>
                           <div className="font-bold text-lg text-gray-100">
                             {category.thread_count}
@@ -168,7 +167,7 @@ export default function ForumsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 text-center">
-                        <Users className="w-5 h-5 text-neon-pink-400" />
+                        <span className="text-neon-pink-400">👥</span>
                         <div>
                           <div className="font-bold text-lg text-gray-100">
                             {category.post_count}
