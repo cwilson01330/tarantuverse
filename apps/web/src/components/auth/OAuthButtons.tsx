@@ -78,13 +78,6 @@ export default function OAuthButtons() {
           {loading === "apple" ? "Signing in..." : "Continue with Apple"}
         </span>
       </button>
-
-      {/* Divider */}
-      <div className="relative flex items-center my-2">
-        <div className="flex-grow border-t border-gray-700"></div>
-        <span className="flex-shrink mx-4 text-gray-400 text-sm">or</span>
-        <div className="flex-grow border-t border-gray-700"></div>
-      </div>
     </div>
   )
 }
