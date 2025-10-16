@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 type Theme = 'dark' | 'light';
 
@@ -23,6 +23,18 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: 'theme-storage',
+      storage: createJSONStorage(() => {
+        // Check if we're in the browser
+        if (typeof window !== 'undefined') {
+          return localStorage;
+        }
+        // Return a no-op storage for SSR
+        return {
+          getItem: () => null,
+          setItem: () => {},
+          removeItem: () => {},
+        };
+      }),
     }
   )
 );
