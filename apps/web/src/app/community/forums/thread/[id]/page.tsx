@@ -443,8 +443,8 @@ export default function ThreadPage() {
             <>
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3 flex-1">
-                  {thread.is_pinned && 📌}
-                  {thread.is_locked && 🔒}
+                  {thread.is_pinned && <span>📌</span>}
+                  {thread.is_locked && <span>🔒</span>}
                   <h1 className="text-4xl font-bold text-white">{thread.title}</h1>
                 </div>
                 
@@ -471,11 +471,11 @@ export default function ThreadPage() {
 
               <div className="flex items-center gap-6 text-white/80">
                 <div className="flex items-center gap-2">
-                  💬
+                  <span>💬</span>
                   <span className="font-medium">{thread.post_count} post{thread.post_count !== 1 ? 's' : ''}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  👁️
+                  <span>👁️</span>
                   <span className="font-medium">{thread.view_count} view{thread.view_count !== 1 ? 's' : ''}</span>
                 </div>
               </div>
@@ -508,8 +508,8 @@ export default function ThreadPage() {
                   </div>
                   {index === 0 && (
                     <div className="mt-3 inline-flex items-center gap-1 px-2 py-1 bg-neon-pink-500/20 border border-neon-pink-500/50 rounded text-xs text-neon-pink-400 font-semibold">
-                      📌
-                      Original Poster
+                      <span>📌</span>
+                      <span>Original Poster</span>
                     </div>
                   )}
                 </div>
@@ -608,8 +608,8 @@ export default function ThreadPage() {
       {!thread.is_locked && (
         <div className="bg-gradient-to-br from-dark-50 to-dark-100 border border-electric-blue-500/30 rounded-xl shadow-xl p-6">
           <h3 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
-            💬
-            Post a Reply
+            <span>💬</span>
+            <span>Post a Reply</span>
           </h3>
           <form onSubmit={handleSubmitReply}>
             <textarea
@@ -638,7 +638,7 @@ export default function ThreadPage() {
 
       {thread.is_locked && (
         <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg p-6 text-center">
-          🔒
+          <div className="text-4xl mb-2">🔒</div>
           <p className="text-gray-400">
             This thread is locked. No more replies can be posted.
           </p>
