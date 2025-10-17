@@ -128,7 +128,7 @@ interface FeedingStats {
 export default function TarantulaDetailPage() {
   const router = useRouter()
   const params = useParams()
-  const id = params.id as string
+  const id = params?.id as string
 
   const [tarantula, setTarantula] = useState<Tarantula | null>(null)
   const [feedings, setFeedings] = useState<FeedingLog[]>([])

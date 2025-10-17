@@ -38,7 +38,7 @@ interface Species {
 export default function EnhancedSpeciesDetailPage() {
   const router = useRouter()
   const params = useParams()
-  const id = params.id as string
+  const id = params?.id as string
 
   const [species, setSpecies] = useState<Species | null>(null)
   const [loading, setLoading] = useState(true)

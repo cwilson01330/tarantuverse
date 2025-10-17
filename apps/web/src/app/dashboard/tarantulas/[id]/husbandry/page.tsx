@@ -28,7 +28,7 @@ interface Tarantula {
 export default function EditHusbandryPage() {
   const router = useRouter()
   const params = useParams()
-  const id = params.id as string
+  const id = params?.id as string
 
   const [tarantula, setTarantula] = useState<Tarantula | null>(null)
   const [loading, setLoading] = useState(true)

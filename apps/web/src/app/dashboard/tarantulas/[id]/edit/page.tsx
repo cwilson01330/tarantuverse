@@ -16,7 +16,7 @@ interface SelectedSpecies {
 export default function EditTarantulaPage() {
   const router = useRouter()
   const params = useParams()
-  const id = params.id as string
+  const id = params?.id as string
 
   const [formData, setFormData] = useState({
     common_name: '',
