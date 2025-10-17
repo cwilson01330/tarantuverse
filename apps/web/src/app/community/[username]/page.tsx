@@ -53,7 +53,7 @@ interface FollowStats {
 export default function KeeperProfilePage() {
   const params = useParams()
   const router = useRouter()
-  const username = params.username as string
+  const username = params?.username as string
   
   const [profile, setProfile] = useState<KeeperProfile | null>(null)
   const [collection, setCollection] = useState<Tarantula[]>([])

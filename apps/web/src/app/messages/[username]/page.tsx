@@ -27,7 +27,7 @@ interface ConversationData {
 export default function ConversationPage() {
   const params = useParams()
   const router = useRouter()
-  const username = params.username as string
+  const username = params?.username as string
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const [conversation, setConversation] = useState<ConversationData | null>(null)

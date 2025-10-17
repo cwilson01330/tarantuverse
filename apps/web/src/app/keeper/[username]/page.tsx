@@ -46,7 +46,7 @@ export default function KeeperProfilePage() {
   const [stats, setStats] = useState<KeeperStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const username = params.username as string
+  const username = params?.username as string
 
   useEffect(() => {
     if (!username) return
