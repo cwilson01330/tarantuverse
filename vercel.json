@@ -1,7 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "cd apps/web && pnpm install --frozen-lockfile=false && pnpm run build",
+  "functions": {
+    "apps/web/**": {
+      "runtime": "nodejs20.x"
+    }
+  },
+  "buildCommand": "cd apps/web && rm -rf .next node_modules && pnpm install --no-frozen-lockfile && pnpm run build",
   "outputDirectory": "apps/web/.next",
-  "installCommand": "npm install -g pnpm@9.14.4",
+  "installCommand": "npm install -g pnpm@latest",
   "framework": null
 }
