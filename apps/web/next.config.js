@@ -20,7 +20,11 @@ const nextConfig = {
   // Use dynamic rendering to avoid SSR issues with error pages
   experimental: {
     missingSuspenseWithCSRBailout: false,
+    // Force runtime rendering for error pages to avoid styled-jsx SSR issues
+    isrMemoryCacheSize: 0,
   },
+  // Disable static generation for error pages
+  generateStaticParams: false,
 }
 
 module.exports = nextConfig
