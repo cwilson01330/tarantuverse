@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd apps/web && pnpm install --frozen-lockfile=false && pnpm run build || exit 0",
+  "buildCommand": "cd apps/web && pnpm install --frozen-lockfile=false && NODE_ENV=production pnpm run build",
   "outputDirectory": "apps/web/.next",
   "installCommand": "npm install -g pnpm@9.14.4",
   "framework": null
