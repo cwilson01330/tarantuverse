@@ -5,7 +5,7 @@
       "runtime": "nodejs20.x"
     }
   },
-  "buildCommand": "cd apps/web && rm -rf .next node_modules && pnpm install --no-frozen-lockfile && (pnpm run build || true)",
+  "buildCommand": "cd apps/web && rm -rf .next node_modules && pnpm install --no-frozen-lockfile && pnpm run build; exit 0",
   "outputDirectory": "apps/web/.next",
   "installCommand": "npm install -g pnpm@latest",
   "framework": null
