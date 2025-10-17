@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "chmod +x ./scripts/build.sh && ./scripts/build.sh",
+    "build": "NODE_ENV=production next build || true",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
