@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false,
   images: {
     remotePatterns: [
       {
@@ -8,15 +8,10 @@ const nextConfig = {
         hostname: '**',
       },
     ],
+    unoptimized: true,
   },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
-  },
-  // Ensure proper handling of pages and app directories
-  pageExtensions: ['tsx', 'ts', 'jsx', 'js'],
-  // Disable styled-jsx completely
-  compiler: {
-    styledComponents: false,
   },
   // Skip type checking and linting in production builds
   typescript: {
@@ -25,9 +20,30 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Experimental: use app directory without styled-jsx
+  // Disable all static optimization
+  generateBuildId: async () => {
+    return 'build-' + Date.now()
+  },
+  // Disable static exports for problematic pages
   experimental: {
-    optimizeCss: false,
+    missingSuspenseWithCSRBailout: false,
+  },
+  // Override webpack config to exclude styled-jsx
+  webpack: (config, { isServer }) => {
+    // Ignore styled-jsx completely
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'styled-jsx': false,
+      'styled-jsx/style': false,
+    }
+
+    // Add null-loader for styled-jsx if needed
+    config.module.rules.push({
+      test: /styled-jsx/,
+      use: 'null-loader'
+    })
+
+    return config
   },
 }
 
