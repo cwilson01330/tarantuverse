@@ -1,12 +1,19 @@
 {
   "version": 2,
-  "functions": {
-    "apps/web/**": {
-      "runtime": "nodejs20.x"
-    }
-  },
-  "buildCommand": "cd apps/web && rm -rf .next node_modules && pnpm install --no-frozen-lockfile && node build-workaround.js",
+  "buildCommand": "cd apps/web && pnpm install --no-frozen-lockfile && pnpm run build",
   "outputDirectory": "apps/web/.next",
-  "installCommand": "npm install -g pnpm@latest && cd apps/web && pnpm install --no-frozen-lockfile",
-  "framework": null
+  "installCommand": "npm install -g pnpm@latest",
+  "framework": null,
+  "routes": [
+    {
+      "src": "/404",
+      "status": 404,
+      "dest": "/404.html"
+    },
+    {
+      "src": "/500",
+      "status": 500,
+      "dest": "/500.html"
+    }
+  ]
 }
