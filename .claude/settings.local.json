@@ -15,7 +15,9 @@
       "Bash(npm ls:*)",
       "Bash(pnpm install:*)",
       "Bash(git restore:*)",
-      "Bash(pnpm ls:*)"
+      "Bash(pnpm ls:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(npm view:*)"
     ],
     "deny": [],
     "ask": []
