@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // Disable to avoid double rendering issues
+  swcMinify: false, // Disable SWC minification to avoid styled-jsx issues
   images: {
     remotePatterns: [
       {
@@ -12,7 +13,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
-  // Skip type checking in production builds to speed up deployment
+  // Skip type checking in production builds
   typescript: {
     ignoreBuildErrors: true,
   },

@@ -14,7 +14,8 @@
       "WebFetch(domain:github.com)",
       "Bash(npm ls:*)",
       "Bash(pnpm install:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(pnpm ls:*)"
     ],
     "deny": [],
     "ask": []
