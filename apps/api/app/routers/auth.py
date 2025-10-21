@@ -252,7 +252,7 @@ async def oauth_login(
             db.refresh(user)
 
         # Create access token for our app
-        access_token = create_access_token(data={"sub": user.email})
+        access_token = create_access_token(data={"sub": str(user.id)})
 
         return OAuthLoginResponse(
             access_token=access_token,
@@ -335,7 +335,7 @@ async def google_oauth_callback(
             db.refresh(user)
         
         # Create access token for our app
-        access_token = create_access_token(data={"sub": user.email})
+        access_token = create_access_token(data={"sub": str(user.id)})
         
         return OAuthLoginResponse(
             access_token=access_token,
@@ -418,7 +418,7 @@ async def apple_oauth_callback(
             db.refresh(user)
         
         # Create access token for our app
-        access_token = create_access_token(data={"sub": user.email})
+        access_token = create_access_token(data={"sub": str(user.id)})
         
         return OAuthLoginResponse(
             access_token=access_token,
