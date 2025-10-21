@@ -1,22 +1,6 @@
 {
-  "version": 2,
-  "buildCommand": "cd apps/web && rm -rf .next && NODE_ENV=production pnpm run build",
-  "outputDirectory": "apps/web/.next",
-  "installCommand": "npm install -g pnpm@latest && pnpm install --frozen-lockfile",
-  "framework": null,
-  "routes": [
-    {
-      "src": "/404",
-      "status": 404,
-      "dest": "/404.html"
-    },
-    {
-      "src": "/500",
-      "status": 500,
-      "dest": "/500.html"
-    }
-  ],
-  "github": {
-    "silent": true
-  }
+  "buildCommand": "cd apps/web && pnpm build",
+  "devCommand": "cd apps/web && pnpm dev",
+  "installCommand": "pnpm install",
+  "outputDirectory": "apps/web/.next"
 }
