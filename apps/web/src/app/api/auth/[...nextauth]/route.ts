@@ -82,8 +82,8 @@ const authOptions: AuthOptions = {
               provider: account.provider,
               email: profile?.email || user.email,
               name: profile?.name || user.name,
-              picture: profile?.picture || profile?.image || user.image,
-              id: profile?.sub || profile?.id,
+              picture: (profile as any)?.picture || user.image,
+              id: (profile as any)?.sub || (profile as any)?.id,
             }
           )
 
