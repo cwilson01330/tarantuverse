@@ -72,16 +72,21 @@ const authOptions: AuthOptions = {
       // Handle OAuth providers
       if (account?.provider === "google" || account?.provider === "apple") {
         try {
-          // Send OAuth code to our backend
+          console.log("[OAuth Debug] Provider:", account.provider)
+          console.log("[OAuth Debug] Profile data:", JSON.stringify(profile, null, 2))
+
+          // Send user info to our backend (NextAuth has already completed OAuth)
           const response = await axios.post(
-            `${API_URL}/auth/oauth/${account.provider}`,
+            `${API_URL}/api/v1/auth/oauth-login`,
             {
-              code: account.access_token,  // For Google
-              id_token: account.id_token,  // For Apple
-              state: account.state
+              provider: account.provider,
+              email: profile?.email || user.email,
+              name: profile?.name || user.name,
+              picture: profile?.picture || profile?.image || user.image,
+              id: profile?.sub || profile?.id,
             }
           )
-          
+
           if (response.data.access_token) {
             // Store our backend token
             user.accessToken = response.data.access_token
@@ -93,8 +98,9 @@ const authOptions: AuthOptions = {
             return true
           }
           return false
-        } catch (error) {
+        } catch (error: any) {
           console.error(`${account.provider} OAuth error:`, error)
+          console.error("Error details:", error.response?.data)
           return false
         }
       }

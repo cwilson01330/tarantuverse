@@ -186,6 +186,94 @@ async def update_visibility(
 # OAuth Endpoints
 # ============================================================================
 
+@router.post("/oauth-login", response_model=OAuthLoginResponse)
+async def oauth_login(
+    oauth_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle OAuth login from NextAuth (after NextAuth has completed OAuth flow)
+    Accepts user info from Google/Apple after NextAuth exchanges tokens
+    """
+    try:
+        provider = oauth_data.get("provider")  # 'google' or 'apple'
+        email = oauth_data.get("email")
+        name = oauth_data.get("name")
+        picture = oauth_data.get("picture")
+        provider_id = oauth_data.get("id") or oauth_data.get("sub")
+
+        if not email or not provider:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email and provider are required"
+            )
+
+        # Check if user exists with this email or OAuth ID
+        user = db.query(User).filter(
+            (User.email == email) |
+            ((User.oauth_provider == provider) & (User.oauth_id == provider_id))
+        ).first()
+
+        is_new_user = False
+
+        if not user:
+            # Create new user from OAuth data
+            is_new_user = True
+
+            # Generate username from email
+            base_username = generate_username_from_email(email)
+            username = base_username
+            counter = 1
+            while db.query(User).filter(User.username == username).first():
+                username = f"{base_username}{counter}"
+                counter += 1
+
+            user = User(
+                id=uuid.uuid4(),
+                email=email,
+                username=username,
+                display_name=name or username,
+                avatar_url=picture,
+                oauth_provider=provider,
+                oauth_id=provider_id,
+                hashed_password=None,  # OAuth users don't have passwords
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            # Update existing user's OAuth info if needed
+            if not user.oauth_provider:
+                user.oauth_provider = provider
+                user.oauth_id = provider_id
+            if not user.avatar_url and picture:
+                user.avatar_url = picture
+            db.commit()
+            db.refresh(user)
+
+        # Create access token for our app
+        access_token = create_access_token(data={"sub": user.email})
+
+        return OAuthLoginResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user={
+                "id": str(user.id),
+                "email": user.email,
+                "username": user.username,
+                "display_name": user.display_name,
+                "avatar_url": user.avatar_url,
+            },
+            is_new_user=is_new_user,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"OAuth login failed: {str(e)}"
+        )
+
+
 @router.post("/oauth/google", response_model=OAuthLoginResponse)
 async def google_oauth_callback(
     callback_data: GoogleOAuthCallback,
