@@ -2,5 +2,18 @@
   "buildCommand": "cd apps/web && pnpm build",
   "devCommand": "cd apps/web && pnpm dev",
   "installCommand": "pnpm install --frozen-lockfile",
-  "outputDirectory": "apps/web/.next"
+  "outputDirectory": "apps/web/.next",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.tarantuverse.com"
+        }
+      ],
+      "destination": "https://tarantuverse.com/:path*",
+      "permanent": true
+    }
+  ]
 }
