@@ -9,7 +9,7 @@ export default function OAuthButtons() {
   const handleGoogleSignIn = async () => {
     setLoading("google")
     try {
-      await signIn("google", { callbackUrl: "/" })
+      await signIn("google", { callbackUrl: "/dashboard" })
     } catch (error) {
       console.error("Google sign in error:", error)
       setLoading(null)
@@ -19,7 +19,7 @@ export default function OAuthButtons() {
   const handleAppleSignIn = async () => {
     setLoading("apple")
     try {
-      await signIn("apple", { callbackUrl: "/" })
+      await signIn("apple", { callbackUrl: "/dashboard" })
     } catch (error) {
       console.error("Apple sign in error:", error)
       setLoading(null)
