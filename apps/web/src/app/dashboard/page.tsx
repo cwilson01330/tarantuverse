@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonCard } from '@/components/ui/skeleton'
 
@@ -29,6 +30,7 @@ interface FeedingStatus {
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [user, setUser] = useState<User | null>(null)
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
@@ -48,18 +50,37 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    // Check if user is logged in
+    // Wait for session to load
+    if (status === 'loading') return
+
+    // Check for NextAuth session (OAuth login)
+    if (session?.accessToken) {
+      console.log('[Dashboard] Using NextAuth session')
+      const oauthUser: User = {
+        id: session.user?.id || '',
+        email: session.user?.email || '',
+        username: session.user?.email?.split('@')[0] || '',
+        display_name: session.user?.name || session.user?.email || ''
+      }
+      setUser(oauthUser)
+      fetchTarantulas(session.accessToken as string)
+      return
+    }
+
+    // Fall back to localStorage token (email/password login)
     const token = localStorage.getItem('auth_token')
     const userData = localStorage.getItem('user')
 
     if (!token || !userData) {
+      console.log('[Dashboard] No auth found, redirecting to login')
       router.push('/login')
       return
     }
 
+    console.log('[Dashboard] Using localStorage token')
     setUser(JSON.parse(userData))
     fetchTarantulas(token)
-  }, [router])
+  }, [router, session, status])
 
   const fetchTarantulas = async (token: string) => {
     try {
