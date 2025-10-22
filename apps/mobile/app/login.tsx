@@ -16,16 +16,17 @@ import { useTheme } from '../src/contexts/ThemeContext';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginWithGoogle, loginWithApple } = useAuth();
   const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
 
   const handleLogin = async () => {
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
-    
+
     if (!trimmedEmail || !trimmedPassword) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -39,6 +40,30 @@ export default function LoginScreen() {
       Alert.alert('Login Failed', error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setOauthLoading('google');
+    try {
+      await loginWithGoogle();
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Google Login Failed', error.message);
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    setOauthLoading('apple');
+    try {
+      await loginWithApple();
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Apple Login Failed', error.message);
+    } finally {
+      setOauthLoading(null);
     }
   };
 
@@ -105,6 +130,41 @@ export default function LoginScreen() {
       color: colors.primary,
       fontSize: 14,
     },
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 24,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    dividerText: {
+      marginHorizontal: 16,
+      color: colors.textTertiary,
+      fontSize: 14,
+    },
+    oauthButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 14,
+      marginBottom: 12,
+    },
+    oauthButtonText: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 12,
+    },
+    oauthIcon: {
+      fontSize: 24,
+    },
   });
 
   return (
@@ -149,6 +209,47 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>Login</Text>
             )}
           </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Google Sign In */}
+          <TouchableOpacity
+            style={styles.oauthButton}
+            onPress={handleGoogleLogin}
+            disabled={loading || oauthLoading !== null}
+          >
+            {oauthLoading === 'google' ? (
+              <ActivityIndicator color={colors.textPrimary} />
+            ) : (
+              <>
+                <Text style={styles.oauthIcon}>🔍</Text>
+                <Text style={styles.oauthButtonText}>Continue with Google</Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Apple Sign In (iOS only) */}
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={styles.oauthButton}
+              onPress={handleAppleLogin}
+              disabled={loading || oauthLoading !== null}
+            >
+              {oauthLoading === 'apple' ? (
+                <ActivityIndicator color={colors.textPrimary} />
+              ) : (
+                <>
+                  <Text style={styles.oauthIcon}>🍎</Text>
+                  <Text style={styles.oauthButtonText}>Continue with Apple</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.linkButton}

@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../services/api';
+import { signInWithGoogle, signInWithApple } from '../services/oauth';
 
 interface User {
   id: string;
@@ -16,6 +17,8 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  loginWithApple: () => Promise<void>;
   register: (email: string, username: string, password: string, display_name?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -90,6 +93,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const loginWithGoogle = async () => {
+    try {
+      const { accessToken, user: userData } = await signInWithGoogle();
+
+      await AsyncStorage.setItem('auth_token', accessToken);
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+
+      setToken(accessToken);
+      setUser(userData);
+    } catch (error: any) {
+      throw new Error(error.message || 'Google login failed');
+    }
+  };
+
+  const loginWithApple = async () => {
+    try {
+      const { accessToken, user: userData } = await signInWithApple();
+
+      await AsyncStorage.setItem('auth_token', accessToken);
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+
+      setToken(accessToken);
+      setUser(userData);
+    } catch (error: any) {
+      throw new Error(error.message || 'Apple login failed');
+    }
+  };
+
   const refreshUser = async () => {
     try {
       const response = await apiClient.get('/auth/me');
@@ -102,7 +133,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
