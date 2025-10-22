@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import ActivityFeedItem, {
   ActivityFeedItemData,
   ActionType,
@@ -25,6 +26,7 @@ export default function ActivityFeed({
   username,
   showFilters = true,
 }: ActivityFeedProps) {
+  const { data: session } = useSession();
   const [activities, setActivities] = useState<ActivityFeedItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export default function ActivityFeed({
 
   useEffect(() => {
     fetchActivities();
-  }, [feedType, username, actionTypeFilter]);
+  }, [feedType, username, actionTypeFilter, session]);
 
   const fetchActivities = async (pageNum: number = 1) => {
     try {
@@ -54,12 +56,13 @@ export default function ActivityFeed({
       }
 
       if (feedType === "personalized") {
-        const token = localStorage.getItem("auth_token");
+        // Check for NextAuth session token (OAuth) first, then localStorage (email/password)
+        const token = (session?.accessToken as string) || localStorage.getItem("auth_token");
         if (!token) {
           throw new Error("Authentication required");
         }
         url = `${API_URL}/api/v1/activity/feed?${params.toString()}`;
-        
+
         const response = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,
