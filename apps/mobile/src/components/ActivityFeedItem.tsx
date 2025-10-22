@@ -17,15 +17,12 @@ export interface ActivityFeedItemData {
   user_id: string;
   action_type: ActionType;
   target_type: string;
-  target_id: number;
-  metadata: Record<string, any>;
+  target_id: string | null; // Changed to string to support UUIDs
+  activity_metadata: Record<string, any> | null; // Renamed from metadata to match backend
   created_at: string;
-  user: {
-    id: string;
-    username: string;
-    display_name: string | null;
-    avatar_url: string | null;
-  };
+  username: string; // From backend response
+  display_name: string | null; // From backend response
+  avatar_url: string | null; // From backend response
 }
 
 interface Props {
@@ -77,57 +74,57 @@ export default function ActivityFeedItem({ activity }: Props) {
   };
 
   const getActivityContent = () => {
-    const displayName = activity.user.display_name || activity.user.username;
+    const displayName = activity.display_name || activity.username;
 
     switch (activity.action_type) {
       case 'new_tarantula':
         return {
           title: `${displayName} added a new tarantula`,
-          description: activity.metadata.tarantula_name,
-          subtitle: activity.metadata.species_name || undefined,
+          description: activity.activity_metadata.tarantula_name,
+          subtitle: activity.activity_metadata.species_name || undefined,
           onPress: () => router.push(`/tarantula/${activity.target_id}`),
         };
 
       case 'molt':
         return {
           title: `${displayName} logged a molt`,
-          description: activity.metadata.tarantula_name,
-          subtitle: activity.metadata.leg_span_after
-            ? `New leg span: ${activity.metadata.leg_span_after}"`
+          description: activity.activity_metadata.tarantula_name,
+          subtitle: activity.activity_metadata.leg_span_after
+            ? `New leg span: ${activity.activity_metadata.leg_span_after}"`
             : undefined,
-          onPress: () => router.push(`/tarantula/${activity.metadata.tarantula_id}`),
+          onPress: () => router.push(`/tarantula/${activity.activity_metadata.tarantula_id}`),
         };
 
       case 'feeding':
-        const accepted = activity.metadata.accepted;
+        const accepted = activity.activity_metadata.accepted;
         return {
           title: `${displayName} logged a feeding`,
-          description: activity.metadata.tarantula_name,
-          subtitle: `${activity.metadata.food_type} - ${accepted ? '✓ Accepted' : '✗ Rejected'}`,
+          description: activity.activity_metadata.tarantula_name,
+          subtitle: `${activity.activity_metadata.food_type} - ${accepted ? '✓ Accepted' : '✗ Rejected'}`,
           subtitleColor: accepted ? '#10b981' : '#ef4444',
-          onPress: () => router.push(`/tarantula/${activity.metadata.tarantula_id}`),
+          onPress: () => router.push(`/tarantula/${activity.activity_metadata.tarantula_id}`),
         };
 
       case 'follow':
         return {
-          title: `${displayName} followed ${activity.metadata.followed_username}`,
+          title: `${displayName} followed ${activity.activity_metadata.followed_username}`,
           description: undefined,
-          onPress: () => router.push(`/keeper/${activity.metadata.followed_username}`),
+          onPress: () => router.push(`/keeper/${activity.activity_metadata.followed_username}`),
         };
 
       case 'forum_thread':
         return {
           title: `${displayName} started a new thread`,
-          description: activity.metadata.thread_title,
-          subtitle: `in ${activity.metadata.category_name}`,
+          description: activity.activity_metadata.thread_title,
+          subtitle: `in ${activity.activity_metadata.category_name}`,
           onPress: () => router.push(`/forums/thread/${activity.target_id}`),
         };
 
       case 'forum_post':
         return {
           title: `${displayName} replied to a thread`,
-          description: activity.metadata.thread_title,
-          onPress: () => router.push(`/forums/thread/${activity.metadata.thread_id}`),
+          description: activity.activity_metadata.thread_title,
+          onPress: () => router.push(`/forums/thread/${activity.activity_metadata.thread_id}`),
         };
 
       default:
@@ -184,7 +181,7 @@ export default function ActivityFeedItem({ activity }: Props) {
 
         {/* User Avatar */}
         <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-          <Text style={styles.avatarText}>{getInitials(activity.user.display_name || activity.user.username)}</Text>
+          <Text style={styles.avatarText}>{getInitials(activity.display_name || activity.username)}</Text>
         </View>
       </View>
     </TouchableOpacity>
