@@ -15,7 +15,7 @@ class ActivityFeedItemResponse(BaseModel):
     avatar_url: Optional[str] = None
     action_type: str  # 'new_tarantula', 'molt', 'feeding', 'follow', 'forum_thread', 'forum_post'
     target_type: Optional[str] = None  # 'tarantula', 'user', 'thread', 'post'
-    target_id: Optional[int] = None
+    target_id: Optional[str] = None  # Changed to str to support UUIDs
     activity_metadata: Optional[Dict[str, Any]] = None
     created_at: datetime
 
