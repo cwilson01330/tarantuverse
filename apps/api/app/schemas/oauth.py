@@ -17,6 +17,7 @@ class OAuthUserInfo(BaseModel):
 class GoogleOAuthCallback(BaseModel):
     """Google OAuth callback data"""
     code: str
+    redirect_uri: Optional[str] = None  # Mobile apps need to send their redirect_uri
     state: Optional[str] = None
 
 

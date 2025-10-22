@@ -285,7 +285,11 @@ async def google_oauth_callback(
     """
     try:
         # Exchange code for Google user info
-        google_user = await exchange_google_code_for_token(callback_data.code)
+        # Pass redirect_uri if provided (for mobile apps)
+        google_user = await exchange_google_code_for_token(
+            callback_data.code,
+            callback_data.redirect_uri
+        )
         
         # Check if user exists with this email or Google OAuth ID
         user = db.query(User).filter(

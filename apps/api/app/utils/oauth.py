@@ -21,10 +21,13 @@ APPLE_PRIVATE_KEY = os.getenv("APPLE_PRIVATE_KEY", "")
 APPLE_REDIRECT_URI = os.getenv("APPLE_REDIRECT_URI", "http://localhost:3000/api/auth/callback/apple")
 
 
-async def exchange_google_code_for_token(code: str) -> Dict[str, Any]:
+async def exchange_google_code_for_token(code: str, redirect_uri: Optional[str] = None) -> Dict[str, Any]:
     """
     Exchange Google authorization code for access token and user info
     """
+    # Use provided redirect_uri (for mobile) or fallback to environment variable (for web)
+    redirect_uri_to_use = redirect_uri or GOOGLE_REDIRECT_URI
+
     async with httpx.AsyncClient() as client:
         # Exchange code for access token
         token_response = await client.post(
@@ -33,7 +36,7 @@ async def exchange_google_code_for_token(code: str) -> Dict[str, Any]:
                 "code": code,
                 "client_id": GOOGLE_CLIENT_ID,
                 "client_secret": GOOGLE_CLIENT_SECRET,
-                "redirect_uri": GOOGLE_REDIRECT_URI,
+                "redirect_uri": redirect_uri_to_use,
                 "grant_type": "authorization_code",
             },
         )
