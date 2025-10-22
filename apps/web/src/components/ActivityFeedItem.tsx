@@ -13,15 +13,12 @@ export interface ActivityFeedItemData {
   user_id: string;
   action_type: ActionType;
   target_type: string;
-  target_id: number;
-  metadata: Record<string, any>;
+  target_id: string | null; // Changed to string to support UUIDs
+  activity_metadata: Record<string, any> | null; // Renamed from metadata to match backend
   created_at: string;
-  user: {
-    id: string;
-    username: string;
-    display_name: string | null;
-    avatar_url: string | null;
-  };
+  username: string; // From backend response
+  display_name: string | null; // From backend response
+  avatar_url: string | null; // From backend response
 }
 
 interface ActivityFeedItemProps {
@@ -69,15 +66,15 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
   };
 
   const getActionText = () => {
-    const username = activity.user.display_name || activity.user.username;
-    const metadata = activity.metadata || {};
+    const username = activity.display_name || activity.username;
+    const metadata = activity.activity_metadata || {};
 
     switch (activity.action_type) {
       case "new_tarantula":
         return (
           <>
             <Link
-              href={`/community/${activity.user.username}`}
+              href={`/community/${activity.username}`}
               className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {username}
@@ -98,7 +95,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         return (
           <>
             <Link
-              href={`/community/${activity.user.username}`}
+              href={`/community/${activity.username}`}
               className="font-semibold text-electric-blue-400 hover:text-electric-blue-300"
             >
               {username}
@@ -118,7 +115,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         return (
           <>
             <Link
-              href={`/community/${activity.user.username}`}
+              href={`/community/${activity.username}`}
               className="font-semibold text-green-400 hover:text-green-300"
             >
               {username}
@@ -141,7 +138,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         return (
           <>
             <Link
-              href={`/community/${activity.user.username}`}
+              href={`/community/${activity.username}`}
               className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {username}
@@ -160,7 +157,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         return (
           <>
             <Link
-              href={`/community/${activity.user.username}`}
+              href={`/community/${activity.username}`}
               className="font-semibold text-electric-blue-400 hover:text-electric-blue-300"
             >
               {username}
@@ -184,7 +181,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         return (
           <>
             <Link
-              href={`/community/${activity.user.username}`}
+              href={`/community/${activity.username}`}
               className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {username}
@@ -203,7 +200,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         return (
           <>
             <Link
-              href={`/community/${activity.user.username}`}
+              href={`/community/${activity.username}`}
               className="font-semibold text-gray-400 hover:text-gray-300"
             >
               {username}
@@ -230,7 +227,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
       {/* User Avatar */}
       <div className="flex-shrink-0">
         <div className="w-10 h-10 rounded-full bg-gradient-primary text-white flex items-center justify-center font-semibold text-sm shadow-lg shadow-electric-blue-500/30">
-          {(activity.user.display_name || activity.user.username)
+          {(activity.display_name || activity.username)
             .charAt(0)
             .toUpperCase()}
         </div>
