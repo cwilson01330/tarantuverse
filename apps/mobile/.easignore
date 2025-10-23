@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.expo/
+dist/
+build/
+android/
+ios/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+.jest/
+
+# Misc
+.env.local
+.env.*.local
+*.orig
+*.rej
+*.sw?
+
+# Git
+.git/
+.github/
+
+# Root workspace files (don't need these in mobile build)
+../../node_modules/
+../../apps/web/
+../../apps/api/
