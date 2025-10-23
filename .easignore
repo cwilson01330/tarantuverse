@@ -10,9 +10,10 @@ yarn.lock
 apps/web/
 apps/api/
 
-# Exclude all node_modules (CRITICAL)
-node_modules/
-**/node_modules/
+# Exclude specific node_modules, but keep root and mobile
+apps/web/node_modules/
+apps/api/node_modules/
+packages/**/node_modules/
 .pnpm-store/
 **/.pnpm-store/
 
