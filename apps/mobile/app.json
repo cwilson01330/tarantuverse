@@ -28,8 +28,7 @@
           "launchMode": "most-recent"
         }
       ],
-      "expo-web-browser",
-      "react-native-reanimated/plugin"
+      "expo-web-browser"
     ],
     "extra": {
       "router": {
