@@ -76,3 +76,7 @@ postgres-data/
 *.tsbuildinfo
 
 .vercel
+
+# pnpm store
+.pnpm-store/
+C:\Users\*\AppData\Local\pnpm\store\*
