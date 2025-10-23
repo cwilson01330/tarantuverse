@@ -1,6 +1,14 @@
-# Dependencies
+# Dependencies (EAS installs fresh)
 node_modules/
 .pnpm-store/
+**/node_modules/
+../../node_modules/
+
+# Lock files (EAS generates its own)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+../../pnpm-lock.yaml
 
 # Build outputs
 .expo/
@@ -40,3 +48,5 @@ coverage/
 ../../node_modules/
 ../../apps/web/
 ../../apps/api/
+../../packages/
+../../.turbo/
