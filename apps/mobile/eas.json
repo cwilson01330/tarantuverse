@@ -8,6 +8,10 @@
       "developmentClient": true,
       "distribution": "internal",
       "node": "20.0.0",
+      "env": {
+        "NO_FLIPPER": "1",
+        "YARN_ENABLE_IMMUTABLE_INSTALLS": "false"
+      },
       "ios": {
         "simulator": true
       }
