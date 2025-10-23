@@ -10,11 +10,9 @@ yarn.lock
 apps/web/
 apps/api/
 
-# Exclude ALL node_modules (EAS installs fresh)
-node_modules/
-**/node_modules/
-.pnpm-store/
-**/.pnpm-store/
+# Exclude ALL node_modules (using recommended pattern)
+**/node_modules
+**/.pnpm-store
 
 # Exclude packages directory entirely
 packages/
