@@ -10,12 +10,14 @@ yarn.lock
 apps/web/
 apps/api/
 
-# Exclude specific node_modules, but keep root and mobile
-apps/web/node_modules/
-apps/api/node_modules/
-packages/**/node_modules/
+# Exclude ALL node_modules (EAS installs fresh)
+node_modules/
+**/node_modules/
 .pnpm-store/
 **/.pnpm-store/
+
+# Exclude packages directory entirely
+packages/
 
 # Build outputs
 .expo/
@@ -51,6 +53,10 @@ coverage/
 
 # Git (EAS already excludes .git by default)
 .github/
+
+# Turbo cache
+.turbo/
+**/.turbo/
 
 # Development files
 .env.local
