@@ -1,0 +1,46 @@
+# Mobile app .easignore
+# Exclude everything from parent directories we don't need
+
+# Exclude sibling apps
+../../apps/web/
+../../apps/api/
+
+# Exclude packages
+../../packages/
+
+# Exclude docs
+../../docs/
+
+# Exclude config directories
+../../.claude/
+../../.vercel/
+../../.github/
+../../scripts/
+
+# Exclude git
+../../.git/
+
+# Lock files
+../../pnpm-lock.yaml
+../../package-lock.yaml
+../../yarn.lock
+
+# Build outputs
+../../.turbo/
+../../dist/
+../../build/
+../../.next/
+
+# Test files
+../../**/__tests__/
+../../**/__mocks__/
+../../**/*.test.ts
+../../**/*.test.tsx
+../../**/*.test.js
+../../**/*.spec.ts
+../../**/*.spec.tsx
+../../**/*.spec.js
+
+# Docs
+../../*.md
+!../../apps/mobile/README.md
