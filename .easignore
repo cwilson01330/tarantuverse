@@ -1,0 +1,58 @@
+# Root monorepo .easignore
+# Exclude everything except the mobile app
+
+# CRITICAL: Exclude massive files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Exclude other workspace apps
+apps/web/
+apps/api/
+
+# Exclude all node_modules (CRITICAL)
+node_modules/
+**/node_modules/
+.pnpm-store/
+**/.pnpm-store/
+
+# Build outputs
+.expo/
+**/.expo/
+dist/
+**/dist/
+build/
+**/build/
+android/
+**/android/
+ios/
+**/ios/
+
+# OS files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
+
+# IDE
+.vscode/
+**/.vscode/
+.idea/
+**/.idea/
+
+# Logs
+*.log
+**/*.log
+
+# Testing
+coverage/
+**/coverage/
+
+# Git (EAS already excludes .git by default)
+.github/
+
+# Development files
+.env.local
+**/.env.local
+*.orig
+**/*.orig
