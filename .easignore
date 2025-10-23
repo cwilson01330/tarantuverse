@@ -1,63 +1,121 @@
 # Root monorepo .easignore
-# Exclude everything except the mobile app
+# AGGRESSIVE optimization for monorepo
 
-# CRITICAL: Exclude massive files
+# ===== CRITICAL: Exclude Git (can save 100s of MB) =====
+.git/
+
+# ===== Lock files (pnpm-lock.yaml alone can be 50MB+) =====
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+**/pnpm-lock.yaml
+**/package-lock.json
+**/yarn.lock
 
-# Exclude other workspace apps
+# ===== Exclude other workspace apps entirely =====
 apps/web/
+apps/web/**
 apps/api/
+apps/api/**
 
-# Exclude ALL node_modules (using recommended pattern)
+# ===== Exclude packages directory =====
+packages/
+packages/**
+
+# ===== ALL node_modules (EAS installs fresh anyway) =====
+node_modules
 **/node_modules
+
+# ===== pnpm store =====
+.pnpm-store
 **/.pnpm-store
 
-# Exclude packages directory entirely
-packages/
+# ===== Build outputs =====
+.expo
+**/.expo
+dist
+**/dist
+build
+**/build
+android
+**/android
+ios
+**/ios
+.next
+**/.next
 
-# Build outputs
-.expo/
-**/.expo/
-dist/
-**/dist/
-build/
-**/build/
-android/
-**/android/
-ios/
-**/ios/
+# ===== Turbo cache =====
+.turbo
+**/.turbo
 
-# OS files
+# ===== Git and GitHub =====
+.git
+.github
+**/.git
+**/.github
+
+# ===== IDE =====
+.vscode
+.idea
+**/.vscode
+**/.idea
+*.sublime-*
+*.swp
+*.swo
+*~
+
+# ===== Logs =====
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+**/*.log
+
+# ===== Testing =====
+coverage
+**/coverage
+.jest
+**/.jest
+.nyc_output
+**/.nyc_output
+
+# ===== OS files =====
 .DS_Store
 **/.DS_Store
 Thumbs.db
 **/Thumbs.db
+desktop.ini
 
-# IDE
-.vscode/
-**/.vscode/
-.idea/
-**/.idea/
-
-# Logs
-*.log
-**/*.log
-
-# Testing
-coverage/
-**/coverage/
-
-# Git (EAS already excludes .git by default)
-.github/
-
-# Turbo cache
-.turbo/
-**/.turbo/
-
-# Development files
+# ===== Environment files =====
 .env.local
+.env.*.local
 **/.env.local
+**/.env.*.local
+
+# ===== Temporary/cache files =====
+*.tmp
+*.temp
+.cache
+**/.cache
 *.orig
+*.rej
 **/*.orig
+**/*.rej
+
+# ===== Documentation and examples =====
+docs/
+**/docs/
+examples/
+**/examples/
+*.md
+!apps/mobile/README.md
+
+# ===== Test files =====
+**/__tests__/
+**/__mocks__/
+**/*.test.ts
+**/*.test.tsx
+**/*.test.js
+**/*.spec.ts
+**/*.spec.tsx
+**/*.spec.js
