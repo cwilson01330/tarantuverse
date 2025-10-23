@@ -23,12 +23,13 @@ const getGoogleClientId = () => {
 };
 
 // OAuth redirect URI (handled by Expo)
-const useProxy = !__DEV__; // Use Expo proxy in production, direct in development
+// IMPORTANT: Always use proxy because Google OAuth requires HTTPS redirect URIs
+// Custom schemes (exp://, tarantuverse://) are not accepted by Google
+const useProxy = true; // Always use Expo proxy for OAuth compatibility
 
 const redirectUri = AuthSession.makeRedirectUri({
   useProxy,
-  // For Expo Go in development
-  native: 'tarantuverse://auth',
+  // Don't specify 'native' - let Expo use the proxy URL for OAuth compatibility
 });
 
 console.log('[OAuth] Redirect URI:', redirectUri);

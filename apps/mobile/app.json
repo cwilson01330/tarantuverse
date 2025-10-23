@@ -21,7 +21,13 @@
     },
     "scheme": "tarantuverse",
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ]
     ],
     "extra": {
       "router": {
