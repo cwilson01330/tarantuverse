@@ -22,18 +22,16 @@ const getGoogleClientId = () => {
   return GOOGLE_CLIENT_ID_WEB;
 };
 
-// OAuth redirect URI (handled by Expo)
-// IMPORTANT: Always use proxy because Google OAuth requires HTTPS redirect URIs
-// Custom schemes (exp://, tarantuverse://) are not accepted by Google
-const useProxy = true; // Always use Expo proxy for OAuth compatibility
-
+// OAuth redirect URI
+// For standalone builds, we MUST use the native scheme (tarantuverse://)
+// Google OAuth will accept this for mobile apps
 const redirectUri = AuthSession.makeRedirectUri({
-  useProxy,
-  // Don't specify 'native' - let Expo use the proxy URL for OAuth compatibility
+  scheme: 'tarantuverse',
+  path: 'auth',
 });
 
 console.log('[OAuth] Redirect URI:', redirectUri);
-console.log('[OAuth] Using proxy:', useProxy);
+console.log('[OAuth] Platform:', Platform.OS);
 
 /**
  * Initiate Google OAuth flow
@@ -73,7 +71,7 @@ export const signInWithGoogle = async (): Promise<{
     });
 
     // Prompt user for authorization
-    const result = await request.promptAsync(discovery, { useProxy });
+    const result = await request.promptAsync(discovery);
 
     console.log('[OAuth] Auth result:', result.type);
 
