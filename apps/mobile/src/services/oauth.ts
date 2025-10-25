@@ -23,15 +23,27 @@ const getGoogleClientId = () => {
 };
 
 // OAuth redirect URI
-// For standalone builds, we MUST use the native scheme (tarantuverse://)
-// Google OAuth will accept this for mobile apps
-const redirectUri = AuthSession.makeRedirectUri({
-  scheme: 'tarantuverse',
-  path: 'auth',
-});
+// For Android, Google uses the reverse client ID format
+// Format: com.googleusercontent.apps.REVERSED_CLIENT_ID:/oauth2redirect
+const getRedirectUri = () => {
+  if (Platform.OS === 'android') {
+    // Use reverse client ID format for Android
+    const androidClientId = GOOGLE_CLIENT_ID_ANDROID;
+    const reversedClientId = androidClientId.split('.').reverse().join('.');
+    return `${reversedClientId}:/oauth2redirect`;
+  }
+  // For iOS and web, use custom scheme
+  return AuthSession.makeRedirectUri({
+    scheme: 'tarantuverse',
+    path: 'auth',
+  });
+};
+
+const redirectUri = getRedirectUri();
 
 console.log('[OAuth] Redirect URI:', redirectUri);
 console.log('[OAuth] Platform:', Platform.OS);
+console.log('[OAuth] Client ID:', getGoogleClientId());
 
 /**
  * Initiate Google OAuth flow
