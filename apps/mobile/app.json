@@ -14,22 +14,7 @@
       "bundleIdentifier": "com.tarantuverse.app"
     },
     "android": {
-      "package": "com.tarantuverse.app",
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "tarantuverse"
-            },
-            {
-              "scheme": "com.googleusercontent.apps.628209648097-sv5s79os54b9kplju6l2k394kaio91f5"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      "package": "com.tarantuverse.app"
     },
     "web": {
       "bundler": "metro"
