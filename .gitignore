@@ -80,3 +80,9 @@ postgres-data/
 # pnpm store
 .pnpm-store/
 C:\Users\*\AppData\Local\pnpm\store\*
+
+# EAS build inspection output
+inspect-output/
+inspect-outpu/
+**/inspect-output/
+**/inspect-outpu/
