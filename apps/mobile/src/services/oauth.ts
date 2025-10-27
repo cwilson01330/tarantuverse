@@ -22,10 +22,10 @@ const getGoogleClientId = () => {
   return GOOGLE_CLIENT_ID_WEB;
 };
 
-// OAuth redirect URI - use native property for explicit control
-// This should match the redirect URI configured in Google Cloud Console
+// OAuth redirect URI - use just the scheme without path
+// Expo will add the path automatically
 const redirectUri = AuthSession.makeRedirectUri({
-  native: 'tarantuverse://auth',
+  scheme: 'tarantuverse',
 });
 
 console.log('[OAuth] Redirect URI:', redirectUri);
