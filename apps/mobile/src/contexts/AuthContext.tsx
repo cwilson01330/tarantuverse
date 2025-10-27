@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../services/api';
-import { signInWithGoogle, signInWithApple } from '../services/oauth';
+import { signInWithGoogle, signInWithApple } from '../services/google-signin';
 
 interface User {
   id: string;
