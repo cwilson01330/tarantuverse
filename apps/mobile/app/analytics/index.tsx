@@ -10,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface SpeciesCount {
   species_name: string;
@@ -59,6 +60,7 @@ interface CollectionAnalytics {
 
 export default function AnalyticsScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [analytics, setAnalytics] = useState<CollectionAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -99,10 +101,260 @@ export default function AnalyticsScreen() {
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      marginRight: 12,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 32,
+      marginTop: 100,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.textTertiary,
+      textAlign: 'center',
+    },
+    section: {
+      padding: 8,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 8,
+    },
+    statCard: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      padding: 20,
+      borderRadius: 12,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    statValue: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: colors.primary,
+      marginBottom: 4,
+    },
+    statLabel: {
+      fontSize: 13,
+      color: colors.textTertiary,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      margin: 8,
+      padding: 16,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: 16,
+    },
+    sexBar: {
+      flexDirection: 'row',
+      height: 40,
+      borderRadius: 8,
+      overflow: 'hidden',
+    },
+    sexSegment: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    maleSegment: {
+      backgroundColor: '#3b82f6',
+    },
+    femaleSegment: {
+      backgroundColor: '#ec4899',
+    },
+    sexSegmentText: {
+      color: '#fff',
+      fontWeight: '600',
+      fontSize: 14,
+    },
+    unknownText: {
+      marginTop: 8,
+      fontSize: 13,
+      color: colors.textTertiary,
+      textAlign: 'center',
+    },
+    activityGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      marginBottom: 16,
+    },
+    activityItem: {
+      alignItems: 'center',
+    },
+    activityValue: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: colors.primary,
+      marginBottom: 4,
+    },
+    activityLabel: {
+      fontSize: 12,
+      color: colors.textTertiary,
+    },
+    avgStat: {
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      alignItems: 'center',
+    },
+    avgLabel: {
+      fontSize: 13,
+      color: colors.textTertiary,
+      marginBottom: 4,
+    },
+    avgValue: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    notableItem: {
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 8,
+    },
+    purpleBg: {
+      backgroundColor: '#f3e8ff',
+    },
+    greenBg: {
+      backgroundColor: '#dcfce7',
+    },
+    blueBg: {
+      backgroundColor: '#dbeafe',
+    },
+    notableLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#374151',
+      marginBottom: 4,
+    },
+    notableName: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: '#111827',
+      marginBottom: 2,
+    },
+    notableDetail: {
+      fontSize: 13,
+      color: '#6b7280',
+    },
+    speciesItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    speciesName: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginRight: 8,
+    },
+    speciesBar: {
+      flex: 2,
+      height: 8,
+      backgroundColor: colors.border,
+      borderRadius: 4,
+      marginRight: 8,
+      overflow: 'hidden',
+    },
+    speciesBarFill: {
+      height: '100%',
+      backgroundColor: '#10b981',
+    },
+    speciesCount: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      width: 30,
+      textAlign: 'right',
+    },
+    activityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    activityIcon: {
+      fontSize: 24,
+      marginRight: 12,
+    },
+    activityContent: {
+      flex: 1,
+    },
+    activityName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    activityDesc: {
+      fontSize: 13,
+      color: colors.textTertiary,
+      marginBottom: 2,
+    },
+    activityDate: {
+      fontSize: 11,
+      color: colors.textTertiary,
+    },
+  });
+
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#7c3aed" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -112,12 +364,12 @@ export default function AnalyticsScreen() {
       <ScrollView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
+            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Collection Analytics</Text>
         </View>
         <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="chart-bar" size={64} color="#d1d5db" />
+          <MaterialCommunityIcons name="chart-bar" size={64} color={colors.textTertiary} />
           <Text style={styles.emptyTitle}>No Analytics Available</Text>
           <Text style={styles.emptyText}>
             Add tarantulas to your collection to see analytics
@@ -136,7 +388,7 @@ export default function AnalyticsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>📊 Analytics</Text>
       </View>
@@ -214,7 +466,7 @@ export default function AnalyticsScreen() {
       {(analytics.most_active_molter || analytics.newest_acquisition || analytics.oldest_acquisition) && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Notable Tarantulas</Text>
-          
+
           {analytics.most_active_molter && (
             <View style={[styles.notableItem, styles.purpleBg]}>
               <Text style={styles.notableLabel}>🦋 Most Active Molter</Text>
@@ -222,7 +474,7 @@ export default function AnalyticsScreen() {
               <Text style={styles.notableDetail}>{analytics.most_active_molter.molt_count} molts</Text>
             </View>
           )}
-          
+
           {analytics.newest_acquisition && (
             <View style={[styles.notableItem, styles.greenBg]}>
               <Text style={styles.notableLabel}>🆕 Newest Addition</Text>
@@ -230,7 +482,7 @@ export default function AnalyticsScreen() {
               <Text style={styles.notableDetail}>Added {formatDate(analytics.newest_acquisition.date)}</Text>
             </View>
           )}
-          
+
           {analytics.oldest_acquisition && (
             <View style={[styles.notableItem, styles.blueBg]}>
               <Text style={styles.notableLabel}>👴 Oldest in Collection</Text>
@@ -276,7 +528,7 @@ export default function AnalyticsScreen() {
                 <Text style={styles.activityDesc}>{activity.description}</Text>
                 <Text style={styles.activityDate}>{formatDate(activity.date)}</Text>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={24} color="#9ca3af" />
+              <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
             </TouchableOpacity>
           ))}
         </View>
@@ -286,248 +538,3 @@ export default function AnalyticsScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  backButton: {
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    marginTop: 100,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#111827',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  section: {
-    padding: 8,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#7c3aed',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
-  card: {
-    backgroundColor: '#fff',
-    margin: 8,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  sexBar: {
-    flexDirection: 'row',
-    height: 40,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  sexSegment: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  maleSegment: {
-    backgroundColor: '#3b82f6',
-  },
-  femaleSegment: {
-    backgroundColor: '#ec4899',
-  },
-  sexSegmentText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  unknownText: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-  activityGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
-  },
-  activityItem: {
-    alignItems: 'center',
-  },
-  activityValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#7c3aed',
-    marginBottom: 4,
-  },
-  activityLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  avgStat: {
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    alignItems: 'center',
-  },
-  avgLabel: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginBottom: 4,
-  },
-  avgValue: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  notableItem: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  purpleBg: {
-    backgroundColor: '#f3e8ff',
-  },
-  greenBg: {
-    backgroundColor: '#dcfce7',
-  },
-  blueBg: {
-    backgroundColor: '#dbeafe',
-  },
-  notableLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
-  },
-  notableName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  notableDetail: {
-    fontSize: 13,
-    color: '#6b7280',
-  },
-  speciesItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  speciesName: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    marginRight: 8,
-  },
-  speciesBar: {
-    flex: 2,
-    height: 8,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 4,
-    marginRight: 8,
-    overflow: 'hidden',
-  },
-  speciesBarFill: {
-    height: '100%',
-    backgroundColor: '#10b981',
-  },
-  speciesCount: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#111827',
-    width: 30,
-    textAlign: 'right',
-  },
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  activityIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  activityDesc: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
-  activityDate: {
-    fontSize: 11,
-    color: '#9ca3af',
-  },
-});

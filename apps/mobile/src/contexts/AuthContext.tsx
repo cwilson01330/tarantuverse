@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../services/api';
-import { signInWithGoogle, signInWithApple } from '../services/google-signin';
+import { signInWithGoogle, signInWithApple, signOutFromGoogle } from '../services/google-signin';
 
 interface User {
   id: string;
@@ -87,6 +87,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    // Sign out from Google if user was signed in with OAuth
+    try {
+      await signOutFromGoogle();
+    } catch (error) {
+      // Ignore errors - user might not have been signed in with Google
+    }
+
     await AsyncStorage.removeItem('auth_token');
     await AsyncStorage.removeItem('user');
     setToken(null);
