@@ -51,18 +51,20 @@ export const signInWithGoogle = async (): Promise<{
     const tokens = await GoogleSignin.getTokens();
 
     console.log('[GoogleSignIn] Got tokens, exchanging with backend...');
+    console.log('[GoogleSignIn] User info:', userInfo.data);
 
-    // Exchange tokens with our backend
-    const response = await fetch(`${API_URL}/api/v1/auth/oauth/google`, {
+    // Send user info directly to backend (no code exchange needed)
+    const response = await fetch(`${API_URL}/api/v1/auth/oauth-login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        // Send the ID token which contains user info
-        id_token: userInfo.data?.idToken,
-        // Or send server auth code for backend to exchange
-        code: tokens.accessToken,
+        provider: 'google',
+        email: userInfo.data?.user?.email,
+        name: userInfo.data?.user?.name,
+        picture: userInfo.data?.user?.photo,
+        id: userInfo.data?.user?.id,
       }),
     });
 
