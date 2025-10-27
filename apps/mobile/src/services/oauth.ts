@@ -22,11 +22,12 @@ const getGoogleClientId = () => {
   return GOOGLE_CLIENT_ID_WEB;
 };
 
-// OAuth redirect URI - use just the scheme without path
-// Expo will add the path automatically
-const redirectUri = AuthSession.makeRedirectUri({
-  scheme: 'tarantuverse',
-});
+// OAuth redirect URI
+// For Android, use out-of-band (urn:ietf:wg:oauth:2.0:oob) since Android OAuth uses package name + SHA-1
+// For iOS/web, use custom scheme
+const redirectUri = Platform.OS === 'android'
+  ? 'urn:ietf:wg:oauth:2.0:oob'
+  : AuthSession.makeRedirectUri({ scheme: 'tarantuverse' });
 
 console.log('[OAuth] Redirect URI:', redirectUri);
 console.log('[OAuth] Platform:', Platform.OS);
@@ -66,7 +67,7 @@ export const signInWithGoogle = async (): Promise<{
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
       responseType: AuthSession.ResponseType.Code,
-      usePKCE: true, // Proof Key for Code Exchange (more secure)
+      usePKCE: Platform.OS !== 'android', // PKCE doesn't work with out-of-band on Android
     });
 
     // Prompt user for authorization
