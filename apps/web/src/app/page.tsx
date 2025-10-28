@@ -34,107 +34,401 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-        <div className="mb-8">
-          <span className="inline-block px-4 py-2 bg-electric-blue-500/10 border border-electric-blue-500/30 text-electric-blue-300 rounded-full text-sm font-semibold mb-6">
-            The Ultimate Tarantula Management Platform
-          </span>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          {/* Left: Copy */}
+          <div>
+            <div className="mb-6">
+              <span className="inline-block px-4 py-2 bg-electric-blue-500/10 border border-electric-blue-500/30 text-electric-blue-300 rounded-full text-sm font-semibold">
+                Built by Keepers, for Keepers
+              </span>
+            </div>
+            <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-primary bg-clip-text text-transparent">
+              Never Forget to Feed Again
+            </h1>
+            <p className="text-xl text-gray-300 mb-8 leading-relaxed">
+              Stop juggling spreadsheets and notebooks. Track feedings, predict molts,
+              and watch your collection thrive with smart analytics built specifically
+              for tarantula keepers.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <Link
+                href="/register"
+                className="px-8 py-4 bg-gradient-primary text-white rounded-xl hover:shadow-2xl hover:shadow-electric-blue-500/30 transform hover:scale-105 transition font-semibold text-lg text-center"
+              >
+                Start Tracking Free 🚀
+              </Link>
+              <Link
+                href="#how-it-works"
+                className="px-8 py-4 bg-dark-50 border-2 border-electric-blue-500/30 text-electric-blue-300 rounded-xl hover:border-electric-blue-500/50 hover:shadow-lg hover:shadow-electric-blue-500/20 transition font-semibold text-lg text-center"
+              >
+                See How It Works
+              </Link>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-6 text-sm text-gray-400">
+              <div className="flex items-center gap-2">
+                <span className="text-green-400">✓</span>
+                <span>No credit card required</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-green-400">✓</span>
+                <span>Unlimited tarantulas</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-green-400">✓</span>
+                <span>Free forever</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Visual */}
+          <div className="relative">
+            <div className="bg-dark-50 border-2 border-electric-blue-500/20 rounded-2xl p-8 shadow-2xl shadow-electric-blue-500/10">
+              <div className="space-y-4">
+                {/* Preview Card 1 */}
+                <div className="bg-dark border border-neon-pink-500/30 rounded-xl p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-neon-pink-500 to-electric-blue-500 rounded-lg flex items-center justify-center text-2xl">
+                      🕷️
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-100">Chilean Rose Hair</div>
+                      <div className="text-sm text-gray-400">Last fed 4 days ago</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="flex-1 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2 text-center">
+                      <div className="text-xs text-gray-400">Acceptance</div>
+                      <div className="font-bold text-green-400">94%</div>
+                    </div>
+                    <div className="flex-1 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-lg px-3 py-2 text-center">
+                      <div className="text-xs text-gray-400">Molts</div>
+                      <div className="font-bold text-electric-blue-400">7</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preview Card 2 */}
+                <div className="bg-dark border border-electric-blue-500/30 rounded-xl p-4">
+                  <div className="text-sm text-gray-400 mb-2">Next Feeding Prediction</div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold text-gray-100">Mexican Red Knee</div>
+                      <div className="text-sm text-electric-blue-400">Feed in 2 days</div>
+                    </div>
+                    <div className="px-4 py-2 bg-electric-blue-500/20 text-electric-blue-300 rounded-lg text-sm font-medium">
+                      📅 Remind Me
+                    </div>
+                  </div>
+                </div>
+
+                {/* Preview Card 3 */}
+                <div className="bg-gradient-to-r from-neon-pink-500/10 to-electric-blue-500/10 border border-neon-pink-500/30 rounded-xl p-4">
+                  <div className="text-sm text-gray-400 mb-2">Growth Tracking</div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-3xl">📈</div>
+                    <div className="flex-1">
+                      <div className="text-xs text-gray-400 mb-1">Leg Span Growth</div>
+                      <div className="h-2 bg-dark rounded-full overflow-hidden">
+                        <div className="h-full w-3/4 bg-gradient-primary"></div>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">2.5cm → 7.8cm</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Floating badge */}
+            <div className="absolute -top-4 -right-4 bg-neon-pink-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg shadow-neon-pink-500/50 transform rotate-12">
+              100% Free
+            </div>
+          </div>
         </div>
-        <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-primary bg-clip-text text-transparent">
-          Your Complete Tarantula
-          <br />
-          Husbandry Companion
-        </h1>
-        <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto">
-          Track feedings, log molts, manage your collection, and connect with fellow enthusiasts. 
-          Everything you need to be a successful tarantula keeper in one beautiful platform.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/register"
-            className="px-8 py-4 bg-gradient-primary text-white rounded-xl hover:shadow-2xl hover:shadow-electric-blue-500/30 transform hover:scale-105 transition font-semibold text-lg"
-          >
-            Start Free Today 🚀
-          </Link>
-          <Link
-            href="/community"
-            className="px-8 py-4 bg-dark-50 border-2 border-electric-blue-500/30 text-electric-blue-300 rounded-xl hover:border-electric-blue-500/50 hover:shadow-lg hover:shadow-electric-blue-500/20 transition font-semibold text-lg"
-          >
-            Explore Community
-          </Link>
-        </div>
-        <p className="mt-6 text-sm text-gray-400">
-          ✨ No credit card required • Free forever plan available
-        </p>
       </section>
 
-      {/* Features Grid */}
+      {/* Honest Stats Section */}
+      <section className="bg-gradient-primary py-16 shadow-lg shadow-electric-blue-500/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-4xl font-bold mb-2 text-white">100% Free</div>
+              <div className="text-white/80">Core Features Forever</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold mb-2 text-white">Unlimited</div>
+              <div className="text-white/80">Tarantulas & Photos</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold mb-2 text-white">Web + Mobile</div>
+              <div className="text-white/80">Track Anywhere</div>
+            </div>
+            <div>
+              <div className="text-4xl font-bold mb-2 text-white">Open Source</div>
+              <div className="text-white/80">Built by Keepers</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold mb-4 text-gray-100">
+            How It Works
+          </h2>
+          <p className="text-xl text-gray-300">
+            Get started in 3 simple steps
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Step 1 */}
+          <div className="relative">
+            <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center font-bold text-white text-xl shadow-lg">
+              1
+            </div>
+            <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 pt-12 h-full">
+              <div className="text-4xl mb-4">➕</div>
+              <h3 className="text-xl font-bold mb-3 text-gray-100">Add Your Collection</h3>
+              <p className="text-gray-300 mb-4">
+                Create profiles for each tarantula with photos, species info, and acquisition details.
+                Link to our species database for instant care requirements.
+              </p>
+              <div className="bg-dark border border-electric-blue-500/20 rounded-lg p-3 text-sm text-gray-400">
+                <div className="flex justify-between mb-2">
+                  <span>Name:</span>
+                  <span className="text-gray-200">Rosie</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span>Species:</span>
+                  <span className="text-gray-200">G. rosea</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Sex:</span>
+                  <span className="text-gray-200">Female</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div className="relative">
+            <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center font-bold text-white text-xl shadow-lg">
+              2
+            </div>
+            <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 pt-12 h-full">
+              <div className="text-4xl mb-4">📝</div>
+              <h3 className="text-xl font-bold mb-3 text-gray-100">Log Daily Care</h3>
+              <p className="text-gray-300 mb-4">
+                Quick-log feedings, molts, and substrate changes. Track acceptance rates and get
+                smart predictions for when to feed next.
+              </p>
+              <div className="space-y-2">
+                <div className="bg-green-900/20 border border-green-500/30 rounded-lg p-3 flex items-center gap-3">
+                  <span className="text-green-400">✓</span>
+                  <div className="text-sm">
+                    <div className="text-gray-200">Fed cricket (medium)</div>
+                    <div className="text-gray-400 text-xs">2 days ago</div>
+                  </div>
+                </div>
+                <div className="bg-electric-blue-900/20 border border-electric-blue-500/30 rounded-lg p-3 flex items-center gap-3">
+                  <span className="text-electric-blue-400">🦋</span>
+                  <div className="text-sm">
+                    <div className="text-gray-200">Molted successfully</div>
+                    <div className="text-gray-400 text-xs">1 week ago</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div className="relative">
+            <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center font-bold text-white text-xl shadow-lg">
+              3
+            </div>
+            <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 pt-12 h-full">
+              <div className="text-4xl mb-4">📊</div>
+              <h3 className="text-xl font-bold mb-3 text-gray-100">Watch Them Thrive</h3>
+              <p className="text-gray-300 mb-4">
+                Visualize growth with beautiful charts. See feeding patterns, track molting cycles,
+                and share your collection with the community.
+              </p>
+              <div className="bg-dark border border-neon-pink-500/20 rounded-lg p-3">
+                <div className="text-xs text-gray-400 mb-2">Feeding Acceptance Rate</div>
+                <div className="flex items-end gap-1 h-16">
+                  <div className="flex-1 bg-gradient-to-t from-neon-pink-500 to-electric-blue-500 rounded opacity-60" style={{height: '40%'}}></div>
+                  <div className="flex-1 bg-gradient-to-t from-neon-pink-500 to-electric-blue-500 rounded opacity-70" style={{height: '60%'}}></div>
+                  <div className="flex-1 bg-gradient-to-t from-neon-pink-500 to-electric-blue-500 rounded opacity-90" style={{height: '80%'}}></div>
+                  <div className="flex-1 bg-gradient-to-t from-neon-pink-500 to-electric-blue-500 rounded" style={{height: '100%'}}></div>
+                </div>
+                <div className="text-center mt-2 text-sm font-bold text-neon-pink-400">94% Success</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Why Choose Tarantuverse */}
+      <section className="bg-dark-50 py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold mb-4 text-gray-100">
+              Why Choose Tarantuverse?
+            </h2>
+            <p className="text-xl text-gray-300">
+              Built specifically for tarantula keepers, not adapted from generic pet trackers
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Spreadsheets */}
+            <div className="bg-red-900/10 border-2 border-red-500/30 rounded-2xl p-8">
+              <h3 className="font-bold text-gray-100 mb-6 text-xl flex items-center gap-2">
+                <span className="text-2xl">📊</span>
+                Spreadsheets & Notebooks
+              </h3>
+              <ul className="space-y-3 text-gray-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400 flex-shrink-0">✗</span>
+                  <span>Manual date calculations</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400 flex-shrink-0">✗</span>
+                  <span>No photo storage or organization</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400 flex-shrink-0">✗</span>
+                  <span>Can't predict feeding schedules</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400 flex-shrink-0">✗</span>
+                  <span>Lost when your phone dies</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400 flex-shrink-0">✗</span>
+                  <span>No mobile access</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-red-400 flex-shrink-0">✗</span>
+                  <span>Difficult to share collection</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Tarantuverse */}
+            <div className="bg-green-900/10 border-2 border-green-500/30 rounded-2xl p-8 relative overflow-hidden">
+              <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                BETTER
+              </div>
+              <h3 className="font-bold text-gray-100 mb-6 text-xl flex items-center gap-2">
+                <span className="text-2xl">🕷️</span>
+                Tarantuverse
+              </h3>
+              <ul className="space-y-3 text-gray-300">
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400 flex-shrink-0">✓</span>
+                  <span>Automatic analytics & predictions</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400 flex-shrink-0">✓</span>
+                  <span>Unlimited cloud photo storage</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400 flex-shrink-0">✓</span>
+                  <span>Smart feeding schedules & reminders</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400 flex-shrink-0">✓</span>
+                  <span>Cloud backup - never lose your data</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400 flex-shrink-0">✓</span>
+                  <span>Web + mobile apps</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-400 flex-shrink-0">✓</span>
+                  <span>Share with keeper community</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid - Benefits Focused */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <h2 className="text-4xl font-bold text-center mb-4 text-gray-100">
           Everything You Need in One Place
         </h2>
         <p className="text-xl text-gray-300 text-center mb-16">
-          Powerful features designed for passionate tarantula keepers
+          Powerful features designed by keepers who understand your needs
         </p>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Feature 1 */}
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition">
             <div className="w-12 h-12 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-xl flex items-center justify-center mb-4">
-              <span className="text-2xl">📊</span>
+              <span className="text-2xl">🍴</span>
             </div>
-            <h3 className="text-xl font-bold mb-3 text-gray-100">Collection Management</h3>
+            <h3 className="text-xl font-bold mb-3 text-gray-100">Never Miss a Feeding</h3>
             <p className="text-gray-300">
-              Track all your tarantulas with detailed profiles, photos, and acquisition history. 
-              Never forget important details about your collection.
+              Smart predictions learn from your data and tell you exactly when each T is ready to eat.
+              Track acceptance rates to spot premolt behavior early.
             </p>
           </div>
 
-          {/* Feature 2 */}
-          <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition">
-            <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center mb-4">
-              <span className="text-2xl">🍴</span>
+          {/* Feature 2 - UNIQUE */}
+          <div className="bg-dark-50 border-2 border-neon-pink-500/40 rounded-2xl p-8 hover:border-neon-pink-500/60 hover:shadow-lg hover:shadow-neon-pink-500/20 transition relative">
+            <div className="absolute top-4 right-4 bg-neon-pink-500/20 text-neon-pink-300 px-2 py-1 rounded-full text-xs font-bold">
+              UNIQUE
             </div>
-            <h3 className="text-xl font-bold mb-3 text-gray-100">Feeding Tracking</h3>
+            <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center mb-4">
+              <span className="text-2xl">🏜️</span>
+            </div>
+            <h3 className="text-xl font-bold mb-3 text-gray-100">Substrate Change Tracking</h3>
             <p className="text-gray-300">
-              Log every feeding with acceptance rates and schedules. Get smart predictions 
-              for when to feed next based on your data.
+              The only platform with dedicated substrate logs. Track maintenance schedules,
+              monitor for mold, and never forget when you last rehoused.
             </p>
           </div>
 
           {/* Feature 3 */}
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition">
             <div className="w-12 h-12 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-xl flex items-center justify-center mb-4">
-              <span className="text-2xl">🦋</span>
+              <span className="text-2xl">📈</span>
             </div>
-            <h3 className="text-xl font-bold mb-3 text-gray-100">Molt Logs & Growth</h3>
+            <h3 className="text-xl font-bold mb-3 text-gray-100">Watch Your Slings Grow</h3>
             <p className="text-gray-300">
-              Record molts with weight and size measurements. Visualize growth patterns 
-              with beautiful charts over time.
+              Beautiful growth charts show weight and size progression over time.
+              Track molting patterns and see exactly how fast your babies are growing.
             </p>
           </div>
 
           {/* Feature 4 */}
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition">
             <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center mb-4">
-              <span className="text-2xl">📈</span>
+              <span className="text-2xl">📸</span>
             </div>
-            <h3 className="text-xl font-bold mb-3 text-gray-100">Analytics Dashboard</h3>
+            <h3 className="text-xl font-bold mb-3 text-gray-100">Document Every Molt</h3>
             <p className="text-gray-300">
-              Get insights into your collection with comprehensive analytics. Track species diversity, 
-              activity patterns, and more.
+              Upload unlimited photos to track color changes and growth. Cloud storage keeps
+              your memories safe even if you lose your phone.
             </p>
           </div>
 
           {/* Feature 5 */}
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition">
             <div className="w-12 h-12 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-xl flex items-center justify-center mb-4">
-              <span className="text-2xl">📸</span>
+              <span className="text-2xl">📚</span>
             </div>
-            <h3 className="text-xl font-bold mb-3 text-gray-100">Photo Gallery</h3>
+            <h3 className="text-xl font-bold mb-3 text-gray-100">Species Care Database</h3>
             <p className="text-gray-300">
-              Upload unlimited photos to document your tarantulas' growth and beauty. 
-              Cloud storage keeps them safe forever.
+              Link your tarantulas to comprehensive care sheets. Get instant access to temperature,
+              humidity, and enclosure requirements for any species.
             </p>
           </div>
 
@@ -143,73 +437,76 @@ export default function Home() {
             <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center mb-4">
               <span className="text-2xl">🌐</span>
             </div>
-            <h3 className="text-xl font-bold mb-3 text-gray-100">Community</h3>
+            <h3 className="text-xl font-bold mb-3 text-gray-100">Connect with Keepers</h3>
             <p className="text-gray-300">
-              Connect with fellow keepers, share your collection, and learn from the community. 
-              Forums, discussions, and keeper profiles.
+              Share your collection, join discussions, and learn from experienced keepers.
+              Public profiles make it easy to show off your beauties.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="bg-gradient-primary py-16 shadow-lg shadow-electric-blue-500/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold mb-2 text-white">Growing</div>
-              <div className="text-white/80">Active Keepers</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2 text-white">New</div>
-              <div className="text-white/80">Community Platform</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2 text-white">Track</div>
-              <div className="text-white/80">Your Collection</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2 text-white">Connect</div>
-              <div className="text-white/80">With Keepers</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Mobile App Section */}
+      {/* Early Access Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-3xl p-12 text-center shadow-lg shadow-electric-blue-500/10">
-          <span className="text-5xl mb-4 block">📱</span>
-          <h2 className="text-4xl font-bold mb-4 text-gray-100">Mobile App Available</h2>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Track your collection on the go with our beautiful mobile app. 
-            Available for iOS and Android with offline support.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-6 py-3 bg-dark border border-electric-blue-500/30 text-gray-100 rounded-xl hover:border-electric-blue-500/50 hover:shadow-lg hover:shadow-electric-blue-500/20 transition font-medium">
-              📱 Download for iOS
-            </button>
-            <button className="px-6 py-3 bg-dark border border-neon-pink-500/30 text-gray-100 rounded-xl hover:border-neon-pink-500/50 hover:shadow-lg hover:shadow-neon-pink-500/20 transition font-medium">
-              🤖 Download for Android
-            </button>
+        <div className="bg-gradient-to-r from-electric-blue-500/10 to-neon-pink-500/10 border-2 border-electric-blue-500/30 rounded-3xl p-12 text-center">
+          <div className="inline-block px-4 py-2 bg-electric-blue-500/20 text-electric-blue-300 rounded-full text-sm font-bold mb-6">
+            🚀 EARLY ACCESS
           </div>
+          <h2 className="text-4xl font-bold text-gray-100 mb-6">
+            Join as a Founding Member
+          </h2>
+          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+            Built by tarantula keepers, for tarantula keepers. We're just getting started
+            and we'd love your feedback to make this the best platform possible.
+          </p>
+          <Link
+            href="/register"
+            className="inline-block px-10 py-5 bg-gradient-primary text-white rounded-xl hover:shadow-2xl hover:shadow-electric-blue-500/30 transform hover:scale-105 transition font-bold text-lg"
+          >
+            Create Free Account
+          </Link>
+          <p className="text-sm text-gray-400 mt-6">
+            Early users get lifetime access to all premium features when they launch 🎁
+          </p>
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* Mobile App Section - Honest */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-3xl p-12 text-center">
+          <span className="text-5xl mb-4 block">📱</span>
+          <h2 className="text-4xl font-bold mb-4 text-gray-100">Track on the Go</h2>
+          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+            Native mobile apps for iOS and Android. Log feedings right at the enclosure,
+            upload photos instantly, and sync across all your devices.
+          </p>
+          <div className="inline-flex items-center gap-3 px-6 py-3 bg-dark border border-electric-blue-500/30 text-gray-300 rounded-xl">
+            <span className="text-2xl">🚧</span>
+            <div className="text-left">
+              <div className="font-semibold">Mobile Apps in Beta</div>
+              <div className="text-sm text-gray-400">Coming to App Store & Play Store soon</div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-400 mt-6">
+            Sign up now and we'll notify you when apps are ready for download
+          </p>
+        </div>
+      </section>
+
+      {/* Final CTA */}
       <section className="bg-gradient-primary py-20 shadow-lg shadow-electric-blue-500/20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white">
             Ready to Level Up Your Tarantula Keeping?
           </h2>
           <p className="text-xl text-white/80 mb-10">
-            Join thousands of keepers who trust Tarantuverse to manage their collections
+            Join the community of keepers who are done with messy spreadsheets
           </p>
           <Link
             href="/register"
             className="inline-block px-10 py-5 bg-white text-electric-blue-600 rounded-xl hover:shadow-2xl transform hover:scale-105 transition font-bold text-lg"
           >
-            Create Your Free Account
+            Start Tracking Free Today
           </Link>
           <p className="mt-6 text-white/70 text-sm">
             Already have an account?{' '}
@@ -236,9 +533,9 @@ export default function Home() {
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/features" className="hover:text-electric-blue-400 transition">Features</Link></li>
-                <li><Link href="/pricing" className="hover:text-electric-blue-400 transition">Pricing</Link></li>
+                <li><Link href="/#how-it-works" className="hover:text-electric-blue-400 transition">How It Works</Link></li>
                 <li><Link href="/species" className="hover:text-electric-blue-400 transition">Species Database</Link></li>
+                <li><Link href="/register" className="hover:text-electric-blue-400 transition">Sign Up Free</Link></li>
               </ul>
             </div>
             <div>
@@ -246,20 +543,20 @@ export default function Home() {
               <ul className="space-y-2 text-sm">
                 <li><Link href="/community" className="hover:text-neon-pink-400 transition">Keepers</Link></li>
                 <li><Link href="/community/forums" className="hover:text-neon-pink-400 transition">Forums</Link></li>
-                <li><Link href="/blog" className="hover:text-neon-pink-400 transition">Blog</Link></li>
+                <li><Link href="/community/board" className="hover:text-neon-pink-400 transition">Message Board</Link></li>
               </ul>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link href="/help" className="hover:text-electric-blue-400 transition">Help Center</Link></li>
-                <li><Link href="/contact" className="hover:text-electric-blue-400 transition">Contact</Link></li>
+                <li><a href="https://github.com/yourusername/tarantuverse" className="hover:text-electric-blue-400 transition">GitHub</a></li>
                 <li><Link href="/privacy" className="hover:text-electric-blue-400 transition">Privacy</Link></li>
+                <li><Link href="/terms" className="hover:text-electric-blue-400 transition">Terms</Link></li>
               </ul>
             </div>
           </div>
           <div className="border-t border-electric-blue-500/10 pt-8 text-center text-sm">
-            <p>&copy; 2025 Tarantuverse. Made with ❤️ for tarantula keepers everywhere.</p>
+            <p>&copy; 2025 Tarantuverse. Made with ❤️ by tarantula keepers, for tarantula keepers.</p>
           </div>
         </div>
       </footer>
