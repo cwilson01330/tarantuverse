@@ -48,5 +48,10 @@ class User(Base):
     # messages = relationship("Message", back_populates="user", lazy="select")  # Legacy message board (deprecated, commented out to avoid circular import)
     # subscriptions = relationship("UserSubscription", back_populates="user", lazy="select")  # Temporarily commented out to fix deployment
 
+    # Breeding relationships
+    pairings = relationship("Pairing", back_populates="user", lazy="select")
+    egg_sacs = relationship("EggSac", back_populates="user", lazy="select")
+    offspring = relationship("Offspring", back_populates="user", lazy="select")
+
     def __repr__(self):
         return f"<User {self.username}>"

@@ -79,5 +79,10 @@ class Tarantula(Base):
     user = relationship("User", backref="tarantulas")
     species = relationship("Species", backref="tarantulas")
 
+    # Breeding relationships
+    pairings_as_male = relationship("Pairing", foreign_keys="Pairing.male_id", back_populates="male")
+    pairings_as_female = relationship("Pairing", foreign_keys="Pairing.female_id", back_populates="female")
+    offspring_record = relationship("Offspring", back_populates="tarantula", uselist=False)  # One-to-one if kept
+
     def __repr__(self):
         return f"<Tarantula {self.name or self.scientific_name}>"
