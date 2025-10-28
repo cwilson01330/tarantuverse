@@ -33,5 +33,40 @@
     "source": "Wikimedia Commons",
     "license": "CC BY-SA 4.0",
     "url": "https://commons.wikimedia.org/wiki/File:Curlyhair_tarantula_(Tliltocatl_albopilosus),_Entomica.jpg"
+  },
+  "grammostola_pulchra": {
+    "filename": "grammostola_pulchra.jpg",
+    "credit": "DigitalLem0n",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Female_Grammostola_pulchra.jpg"
+  },
+  "avicularia_avicularia": {
+    "filename": "avicularia_avicularia.jpg",
+    "credit": "BhaalPriestess",
+    "source": "Wikimedia Commons",
+    "license": "CC BY 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Avicularia_avicularia.jpg"
+  },
+  "chromatopelma_cyaneopubescens": {
+    "filename": "chromatopelma_cyaneopubescens.jpg",
+    "credit": "DigitalLem0n",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Chromatopelma_cyaneopubescens_spiderling.jpg"
+  },
+  "lasiodora_parahybana": {
+    "filename": "lasiodora_parahybana.jpg",
+    "credit": "Fungus Guy",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Brazilian_salmon_pink_bird-eating_tarantula_(Lasiodora_parahybana),_Entomica_1.jpg"
+  },
+  "nhandu_chromatus": {
+    "filename": "nhandu_chromatus.jpg",
+    "credit": "Fungus Guy",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Brazilian_red_and_white_tarantula_(Nhandu_chromatus),_Entomica.jpg"
   }
 }
