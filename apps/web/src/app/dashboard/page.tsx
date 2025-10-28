@@ -348,8 +348,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      </div>
-
       {/* Floating Action Button (Mobile-friendly) */}
       {tarantulas.length > 0 && (
         <button
