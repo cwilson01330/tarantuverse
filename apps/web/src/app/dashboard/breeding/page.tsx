@@ -68,46 +68,64 @@ export default function BreedingPage() {
   const fetchBreedingData = async () => {
     if (!token) return
 
-    try {
-      setLoading(true)
-      setError('')
+    setLoading(true)
+    setError('')
 
+    try {
       // Fetch pairings
-      const pairingsRes = await fetch(`${API_URL}/api/v1/pairings/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (pairingsRes.ok) {
-        const pairingsData = await pairingsRes.json()
-        setPairings(pairingsData)
+      try {
+        const pairingsRes = await fetch(`${API_URL}/api/v1/pairings/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (pairingsRes.ok) {
+          const pairingsData = await pairingsRes.json()
+          setPairings(pairingsData)
+        } else if (pairingsRes.status !== 404) {
+          console.warn('Pairings endpoint returned:', pairingsRes.status)
+        }
+      } catch (err) {
+        console.warn('Pairings endpoint not available:', err)
       }
 
       // Fetch egg sacs
-      const eggSacsRes = await fetch(`${API_URL}/api/v1/egg-sacs/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (eggSacsRes.ok) {
-        const eggSacsData = await eggSacsRes.json()
-        setEggSacs(eggSacsData)
+      try {
+        const eggSacsRes = await fetch(`${API_URL}/api/v1/egg-sacs/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (eggSacsRes.ok) {
+          const eggSacsData = await eggSacsRes.json()
+          setEggSacs(eggSacsData)
+        } else if (eggSacsRes.status !== 404) {
+          console.warn('Egg sacs endpoint returned:', eggSacsRes.status)
+        }
+      } catch (err) {
+        console.warn('Egg sacs endpoint not available:', err)
       }
 
       // Fetch offspring
-      const offspringRes = await fetch(`${API_URL}/api/v1/offspring/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (offspringRes.ok) {
-        const offspringData = await offspringRes.json()
-        setOffspring(offspringData)
+      try {
+        const offspringRes = await fetch(`${API_URL}/api/v1/offspring/`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (offspringRes.ok) {
+          const offspringData = await offspringRes.json()
+          setOffspring(offspringData)
+        } else if (offspringRes.status !== 404) {
+          console.warn('Offspring endpoint returned:', offspringRes.status)
+        }
+      } catch (err) {
+        console.warn('Offspring endpoint not available:', err)
       }
 
     } catch (err) {
-      console.error('Error fetching breeding data:', err)
-      setError('Failed to load breeding data')
+      console.error('Unexpected error fetching breeding data:', err)
+      setError('Unable to connect to the server. Please try again later.')
     } finally {
       setLoading(false)
     }
