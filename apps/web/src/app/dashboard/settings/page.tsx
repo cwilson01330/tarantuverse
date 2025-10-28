@@ -211,13 +211,19 @@ export default function SettingsPage() {
                 </p>
               </div>
               <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                user?.profile_visibility === 'public' 
-                  ? 'bg-green-500/20 text-green-400' 
+                user?.collection_visibility === 'public'
+                  ? 'bg-green-500/20 text-green-400'
                   : 'bg-gray-500/20 text-gray-400'
               }`}>
-                {user?.profile_visibility === 'public' ? 'Public' : 'Private'}
+                {user?.collection_visibility === 'public' ? 'Public' : 'Private'}
               </div>
             </div>
+            <button
+              onClick={() => router.push('/dashboard/settings/profile')}
+              className="w-full px-4 py-3 bg-gradient-brand hover:bg-gradient-brand-hover text-white rounded-lg transition-all font-medium shadow-lg shadow-gradient-brand"
+            >
+              Change Privacy Settings
+            </button>
           </div>
         </section>
 

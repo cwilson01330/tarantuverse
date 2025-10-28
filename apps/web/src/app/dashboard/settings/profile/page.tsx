@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 
 export default function ProfileSettingsPage() {
   const router = useRouter()
+  const { data: session } = useSession()
   const [formData, setFormData] = useState({
     display_name: '',
     avatar_url: '',
@@ -37,7 +39,14 @@ export default function ProfileSettingsPage() {
   ]
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
+    // Try localStorage first (email/password auth)
+    let token = localStorage.getItem('auth_token')
+
+    // If not in localStorage, check NextAuth session (OAuth)
+    if (!token && session?.accessToken) {
+      token = session.accessToken as string
+    }
+
     if (!token) {
       router.push('/login')
       return
@@ -45,7 +54,7 @@ export default function ProfileSettingsPage() {
 
     fetchProfile(token)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [session])
 
   const fetchProfile = async (token: string) => {
     try {
@@ -104,7 +113,20 @@ export default function ProfileSettingsPage() {
     setSubmitting(true)
 
     try {
-      const token = localStorage.getItem('auth_token')
+      // Try localStorage first (email/password auth)
+      let token = localStorage.getItem('auth_token')
+
+      // If not in localStorage, check NextAuth session (OAuth)
+      if (!token && session?.accessToken) {
+        token = session.accessToken as string
+      }
+
+      if (!token) {
+        setError('No authentication token found. Please log in again.')
+        router.push('/login')
+        return
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       // Build social links object only if at least one link is provided
