@@ -17,14 +17,38 @@ depends_on = None
 
 
 def upgrade():
-    # Create enum types
-    pairing_outcome_enum = postgresql.ENUM('successful', 'unsuccessful', 'unknown', 'in_progress', name='pairingoutcome')
-    pairing_type_enum = postgresql.ENUM('natural', 'assisted', 'forced', name='pairingtype')
-    offspring_status_enum = postgresql.ENUM('kept', 'sold', 'traded', 'given_away', 'died', 'unknown', name='offspringstatus')
+    # Create enum types - use raw SQL to avoid issues with checkfirst
+    connection = op.get_bind()
 
-    pairing_outcome_enum.create(op.get_bind(), checkfirst=True)
-    pairing_type_enum.create(op.get_bind(), checkfirst=True)
-    offspring_status_enum.create(op.get_bind(), checkfirst=True)
+    # Create enums only if they don't exist
+    connection.execute(sa.text("""
+        DO $$ BEGIN
+            CREATE TYPE pairingoutcome AS ENUM ('successful', 'unsuccessful', 'unknown', 'in_progress');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """))
+
+    connection.execute(sa.text("""
+        DO $$ BEGIN
+            CREATE TYPE pairingtype AS ENUM ('natural', 'assisted', 'forced');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """))
+
+    connection.execute(sa.text("""
+        DO $$ BEGIN
+            CREATE TYPE offspringstatus AS ENUM ('kept', 'sold', 'traded', 'given_away', 'died', 'unknown');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """))
+
+    # Define the enum types for SQLAlchemy to reference
+    pairing_outcome_enum = postgresql.ENUM('successful', 'unsuccessful', 'unknown', 'in_progress', name='pairingoutcome', create_type=False)
+    pairing_type_enum = postgresql.ENUM('natural', 'assisted', 'forced', name='pairingtype', create_type=False)
+    offspring_status_enum = postgresql.ENUM('kept', 'sold', 'traded', 'given_away', 'died', 'unknown', name='offspringstatus', create_type=False)
 
     # Create pairings table
     op.create_table('pairings',
