@@ -219,10 +219,10 @@ export default function KeeperProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4 animate-bounce">🕷️</div>
-          <p className="text-xl text-gray-600">Loading keeper profile...</p>
+          <p className="text-xl text-gray-600 dark:text-gray-400">Loading keeper profile...</p>
         </div>
       </div>
     )
@@ -230,11 +230,11 @@ export default function KeeperProfilePage() {
 
   if (error || !profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
         <div className="text-center max-w-md">
           <div className="text-6xl mb-4">🔒</div>
-          <h1 className="text-2xl font-bold mb-4">Profile Not Available</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <h1 className="text-2xl font-bold mb-4 dark:text-white">Profile Not Available</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
           <Link
             href="/community"
             className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:shadow-lg transition"
@@ -249,11 +249,11 @@ export default function KeeperProfilePage() {
   const badge = getExperienceBadge(profile.profile_experience_level)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white shadow-lg">
+      <div className="bg-gradient-to-r from-purple-600 to-purple-800 dark:from-purple-900 dark:to-gray-900 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <Link href="/community" className="inline-flex items-center text-purple-200 hover:text-white mb-4">
+          <Link href="/community" className="inline-flex items-center text-purple-200 dark:text-purple-300 hover:text-white mb-4">
             <span className="mr-2">←</span>
             Back to Community
           </Link>
@@ -262,8 +262,8 @@ export default function KeeperProfilePage() {
 
       {/* Profile Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-100 to-blue-100 h-32"></div>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 h-32"></div>
           <div className="px-8 pb-8">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between -mt-16 mb-6">
               <div className="flex items-end gap-6 mb-4 md:mb-0">
@@ -271,16 +271,16 @@ export default function KeeperProfilePage() {
                   <img
                     src={profile.avatar_url}
                     alt={profile.display_name}
-                    className="w-32 h-32 rounded-full border-4 border-white shadow-lg object-cover"
+                    className="w-32 h-32 rounded-full border-4 border-white dark:border-gray-800 shadow-lg object-cover"
                   />
                 ) : (
-                  <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center">
+                  <div className="w-32 h-32 rounded-full border-4 border-white dark:border-gray-800 shadow-lg bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center">
                     <span className="text-5xl">🕷️</span>
                   </div>
                 )}
                 <div className="pb-2">
-                  <h1 className="text-3xl font-bold text-gray-900">{profile.display_name}</h1>
-                  <p className="text-gray-600">@{profile.username}</p>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{profile.display_name}</h1>
+                  <p className="text-gray-600 dark:text-gray-400">@{profile.username}</p>
                 </div>
               </div>
               
@@ -290,7 +290,7 @@ export default function KeeperProfilePage() {
                     onClick={handleFollowToggle}
                     className={`px-6 py-2 rounded-lg hover:shadow-lg transition font-semibold ${
                       isFollowing
-                        ? 'border-2 border-purple-600 text-purple-600 hover:bg-purple-50'
+                        ? 'border-2 border-purple-600 dark:border-purple-400 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20'
                         : 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
                     }`}
                   >
@@ -298,7 +298,7 @@ export default function KeeperProfilePage() {
                   </button>
                   <button
                     onClick={handleMessage}
-                    className="px-6 py-2 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition font-semibold"
+                    className="px-6 py-2 border-2 border-purple-600 dark:border-purple-400 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition font-semibold"
                   >
                     Message
                   </button>
@@ -308,18 +308,18 @@ export default function KeeperProfilePage() {
 
             {/* Profile Info */}
             <div className="flex flex-wrap gap-4 mb-6">
-              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${badge.color}`}>
+              <span className={`px-4 py-2 rounded-full text-sm font-semibold ${badge.color} dark:bg-opacity-20`}>
                 {badge.label}
               </span>
-              
+
               {profile.profile_location && (
-                <span className="px-4 py-2 bg-gray-100 rounded-full text-sm font-semibold text-gray-700">
+                <span className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-full text-sm font-semibold text-gray-700 dark:text-gray-300">
                   📍 {profile.profile_location}
                 </span>
               )}
-              
+
               {profile.profile_years_keeping && (
-                <span className="px-4 py-2 bg-gray-100 rounded-full text-sm font-semibold text-gray-700">
+                <span className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-full text-sm font-semibold text-gray-700 dark:text-gray-300">
                   🕰️ {profile.profile_years_keeping} {profile.profile_years_keeping === 1 ? 'year' : 'years'} keeping
                 </span>
               )}
@@ -328,12 +328,12 @@ export default function KeeperProfilePage() {
             {/* Specialties */}
             {profile.profile_specialties && profile.profile_specialties.length > 0 && (
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-500 mb-2">SPECIALTIES</h3>
+                <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">SPECIALTIES</h3>
                 <div className="flex flex-wrap gap-2">
                   {profile.profile_specialties.map((specialty) => (
                     <span
                       key={specialty}
-                      className="px-3 py-1 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium"
+                      className="px-3 py-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-sm font-medium"
                     >
                       {specialty.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                     </span>
@@ -344,13 +344,13 @@ export default function KeeperProfilePage() {
 
             {/* Social Links */}
             {profile.social_links && Object.keys(profile.social_links).length > 0 && (
-              <div className="flex gap-4 pt-4 border-t">
+              <div className="flex gap-4 pt-4 border-t dark:border-gray-700">
                 {profile.social_links.instagram && (
                   <a
                     href={profile.social_links.instagram}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-purple-600 hover:text-purple-800 transition"
+                    className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition"
                   >
                     📷 Instagram
                   </a>
@@ -360,7 +360,7 @@ export default function KeeperProfilePage() {
                     href={profile.social_links.youtube}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-purple-600 hover:text-purple-800 transition"
+                    className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition"
                   >
                     🎥 YouTube
                   </a>
@@ -370,7 +370,7 @@ export default function KeeperProfilePage() {
                     href={profile.social_links.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-purple-600 hover:text-purple-800 transition"
+                    className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition"
                   >
                     🌐 Website
                   </a>
@@ -383,31 +383,31 @@ export default function KeeperProfilePage() {
         {/* Stats */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-8">
-            <div className="bg-white rounded-xl p-6 shadow text-center">
-              <div className="text-3xl font-bold text-purple-600">{stats.total_public}</div>
-              <div className="text-sm text-gray-600">Tarantulas</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow text-center">
+              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.total_public}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Tarantulas</div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow text-center">
-              <div className="text-3xl font-bold text-blue-600">{stats.unique_species}</div>
-              <div className="text-sm text-gray-600">Species</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow text-center">
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.unique_species}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Species</div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow text-center">
-              <div className="text-3xl font-bold text-pink-600">{stats.sex_distribution.female}</div>
-              <div className="text-sm text-gray-600">Females</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow text-center">
+              <div className="text-3xl font-bold text-pink-600 dark:text-pink-400">{stats.sex_distribution.female}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Females</div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow text-center">
-              <div className="text-3xl font-bold text-cyan-600">{stats.sex_distribution.male}</div>
-              <div className="text-sm text-gray-600">Males</div>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow text-center">
+              <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">{stats.sex_distribution.male}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Males</div>
             </div>
             {followStats && (
               <>
-                <div className="bg-white rounded-xl p-6 shadow text-center">
-                  <div className="text-3xl font-bold text-indigo-600">{followStats.followers_count}</div>
-                  <div className="text-sm text-gray-600">Followers</div>
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow text-center">
+                  <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{followStats.followers_count}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Followers</div>
                 </div>
-                <div className="bg-white rounded-xl p-6 shadow text-center">
-                  <div className="text-3xl font-bold text-teal-600">{followStats.following_count}</div>
-                  <div className="text-sm text-gray-600">Following</div>
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow text-center">
+                  <div className="text-3xl font-bold text-teal-600 dark:text-teal-400">{followStats.following_count}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Following</div>
                 </div>
               </>
             )}
@@ -415,14 +415,14 @@ export default function KeeperProfilePage() {
         )}
 
         {/* Tabs */}
-        <div className="mt-8 border-b border-gray-200">
+        <div className="mt-8 border-b border-gray-200 dark:border-gray-700">
           <nav className="flex gap-8">
             <button
               onClick={() => setActiveTab('collection')}
               className={`pb-4 px-2 font-semibold transition ${
                 activeTab === 'collection'
-                  ? 'text-purple-600 border-b-2 border-purple-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
               Collection ({collection.length})
@@ -431,8 +431,8 @@ export default function KeeperProfilePage() {
               onClick={() => setActiveTab('about')}
               className={`pb-4 px-2 font-semibold transition ${
                 activeTab === 'about'
-                  ? 'text-purple-600 border-b-2 border-purple-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
               About
@@ -446,7 +446,7 @@ export default function KeeperProfilePage() {
             collection.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {collection.map((tarantula) => (
-                  <div key={tarantula.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                  <div key={tarantula.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
                     {tarantula.photo_url ? (
                       <img
                         src={tarantula.photo_url}
@@ -454,27 +454,27 @@ export default function KeeperProfilePage() {
                         className="w-full h-48 object-cover"
                       />
                     ) : (
-                      <div className="w-full h-48 bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center">
+                      <div className="w-full h-48 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/30 dark:to-blue-900/30 flex items-center justify-center">
                         <span className="text-6xl">🕷️</span>
                       </div>
                     )}
                     <div className="p-4">
-                      <h3 className="font-bold text-lg mb-1">{tarantula.name}</h3>
+                      <h3 className="font-bold text-lg mb-1 dark:text-white">{tarantula.name}</h3>
                       {tarantula.species_name && (
-                        <p className="text-sm text-gray-600 italic mb-2">{tarantula.species_name}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 italic mb-2">{tarantula.species_name}</p>
                       )}
                       <div className="flex gap-2">
                         {tarantula.sex && (
                           <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                            tarantula.sex === 'female' ? 'bg-pink-100 text-pink-800' :
-                            tarantula.sex === 'male' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
+                            tarantula.sex === 'female' ? 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' :
+                            tarantula.sex === 'male' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                           }`}>
                             {tarantula.sex === 'female' ? '♀' : tarantula.sex === 'male' ? '♂' : '?'} {tarantula.sex}
                           </span>
                         )}
                         {tarantula.age_months !== undefined && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-semibold">
+                          <span className="px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded text-xs font-semibold">
                             {tarantula.age_months}mo
                           </span>
                         )}
@@ -486,19 +486,19 @@ export default function KeeperProfilePage() {
             ) : (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">📦</div>
-                <p className="text-gray-600">No public tarantulas in this collection</p>
+                <p className="text-gray-600 dark:text-gray-400">No public tarantulas in this collection</p>
               </div>
             )
           ) : (
-            <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
               {profile.profile_bio ? (
                 <div>
-                  <h3 className="text-xl font-bold mb-4">Bio</h3>
-                  <p className="text-gray-700 whitespace-pre-wrap">{profile.profile_bio}</p>
+                  <h3 className="text-xl font-bold mb-4 dark:text-white">Bio</h3>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{profile.profile_bio}</p>
                 </div>
               ) : (
                 <div className="text-center py-12">
-                  <p className="text-gray-600">No bio added yet</p>
+                  <p className="text-gray-600 dark:text-gray-400">No bio added yet</p>
                 </div>
               )}
             </div>

@@ -793,6 +793,18 @@ allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
 5. **Form inputs**: Global styles apply `text-gray-900 bg-white`, but be explicit in complex components
 
+6. **⚠️ CRITICAL - Dark Mode Conformance**: ALL new features, pages, and components MUST support both light and dark modes
+   - **Web**: Use Tailwind `dark:` modifiers on ALL styled elements
+     - Backgrounds: `bg-white dark:bg-gray-800`
+     - Text: `text-gray-900 dark:text-white`
+     - Borders: `border-gray-200 dark:border-gray-700`
+     - Buttons, cards, inputs, modals - everything needs dark variants
+   - **Mobile**: Use ThemeContext colors for ALL styled elements
+     - Use `theme.background`, `theme.surface`, `theme.text`, etc.
+     - Never use hardcoded colors like `#FFFFFF` or `black`
+   - **Testing**: Test BOTH themes before considering a feature complete
+   - **No Exceptions**: Even small UI tweaks must maintain dark mode support
+
 ### API Route Patterns
 
 ```python
@@ -898,16 +910,34 @@ The migration will run automatically on next deploy via `start.sh`.
 
 ## 💡 Tips for Continuing Development
 
+### ⚠️ CRITICAL: Web & Mobile Feature Parity
+
+**IMPORTANT**: When adding a new feature to the web app, it **MUST** also be added to the mobile app to maintain feature parity.
+
+This includes:
+- New log types (feeding, molt, substrate changes, etc.)
+- New pages or screens
+- New functionality on existing pages
+- Analytics and statistics features
+- UI improvements and components
+- Dark mode support for all new components
+
+**Exception**: Features that are web-specific (like certain admin panels) or mobile-specific (like camera integration) are the only exclusions.
+
 ### When Adding New Log Types (like substrate changes):
 1. Create model in `models/`
 2. Create schema in `schemas/` (Base, Create, Update, Response)
 3. Create router in `routers/` with CRUD endpoints
 4. Add router to `main.py` imports and `include_router()`
 5. Create migration
-6. Add interface to frontend detail page
-7. Add state and fetch function
-8. Create inline form (similar to feeding/molt forms)
-9. Display logs in list with delete buttons
+6. **WEB**: Add interface to frontend detail page
+7. **WEB**: Add state and fetch function
+8. **WEB**: Create inline form (similar to feeding/molt forms)
+9. **WEB**: Display logs in list with delete buttons
+10. **MOBILE**: Add interface to mobile detail screen
+11. **MOBILE**: Add state and fetch function
+12. **MOBILE**: Create form screen or inline form
+13. **MOBILE**: Display logs in list with delete buttons
 
 ### When Adding New Fields to Existing Models:
 1. Update model in `models/`

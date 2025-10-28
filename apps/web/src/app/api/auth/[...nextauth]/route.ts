@@ -44,7 +44,7 @@ const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
         try {
-          const response = await axios.post(`${API_URL}/auth/login`, {
+          const response = await axios.post(`${API_URL}/api/v1/auth/login`, {
             email: credentials?.email,
             password: credentials?.password
           })
