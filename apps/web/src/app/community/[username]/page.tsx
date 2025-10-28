@@ -158,7 +158,15 @@ export default function KeeperProfilePage() {
   const fetchProfile = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}`)
+      const token = localStorage.getItem('auth_token')
+      const headers: HeadersInit = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/`, {
+        headers
+      })
       if (!response.ok) {
         if (response.status === 404) {
           setError('Keeper not found or profile is private')
@@ -177,7 +185,15 @@ export default function KeeperProfilePage() {
   const fetchCollection = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/collection`)
+      const token = localStorage.getItem('auth_token')
+      const headers: HeadersInit = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/collection/`, {
+        headers
+      })
       if (response.ok) {
         const data = await response.json()
         setCollection(data)
@@ -190,7 +206,15 @@ export default function KeeperProfilePage() {
   const fetchStats = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/stats`)
+      const token = localStorage.getItem('auth_token')
+      const headers: HeadersInit = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/stats/`, {
+        headers
+      })
       if (response.ok) {
         const data = await response.json()
         setStats(data)

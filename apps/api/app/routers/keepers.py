@@ -248,7 +248,9 @@ async def get_keeper_stats(
         "username": username,
         "total_public": total_count,  # Note: This is "total" when viewing own profile
         "unique_species": unique_species,
-        "males": males,
-        "females": females,
-        "unsexed": total_count - males - females
+        "sex_distribution": {
+            "male": males,
+            "female": females,
+            "unknown": total_count - males - females
+        }
     }
