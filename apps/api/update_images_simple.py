@@ -18,11 +18,19 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
 species_images = {
+    # Original 5 beginner species
     "Grammostola rosea": "/species-images/grammostola_rosea.jpg",
     "Brachypelma hamorii": "/species-images/brachypelma_hamorii.jpg",
     "Aphonopelma chalcodes": "/species-images/aphonopelma_chalcodes.jpg",
     "Caribena versicolor": "/species-images/caribena_versicolor.jpg",
     "Tliltocatl albopilosus": "/species-images/tliltocatl_albopilosus.jpg",
+
+    # Additional 5 species (added 2025-10-28)
+    "Grammostola pulchra": "/species-images/grammostola_pulchra.jpg",
+    "Avicularia avicularia": "/species-images/avicularia_avicularia.jpg",
+    "Chromatopelma cyaneopubescens": "/species-images/chromatopelma_cyaneopubescens.jpg",
+    "Lasiodora parahybana": "/species-images/lasiodora_parahybana.jpg",
+    "Nhandu chromatus": "/species-images/nhandu_chromatus.jpg",
 }
 
 def update_images():
