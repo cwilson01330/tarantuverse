@@ -23,6 +23,9 @@ import app.routers.direct_messages as direct_messages
 import app.routers.forums as forums
 import app.routers.activity as activity
 import app.routers.subscriptions as subscriptions
+import app.routers.pairings as pairings
+import app.routers.egg_sacs as egg_sacs
+import app.routers.offspring as offspring
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -109,6 +112,15 @@ app.include_router(activity.router, tags=["activity", "community"])
 
 print("[STARTUP] Registering subscriptions router...")
 app.include_router(subscriptions.router, prefix="/api/v1", tags=["subscriptions"])
+
+print("[STARTUP] Registering pairings router...")
+app.include_router(pairings.router, prefix="/api/v1", tags=["pairings", "breeding"])
+
+print("[STARTUP] Registering egg sacs router...")
+app.include_router(egg_sacs.router, prefix="/api/v1", tags=["egg_sacs", "breeding"])
+
+print("[STARTUP] Registering offspring router...")
+app.include_router(offspring.router, prefix="/api/v1", tags=["offspring", "breeding"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"
