@@ -182,19 +182,19 @@ export default function ProfileSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen p-8">
+    <div className="min-h-screen bg-theme p-8">
       <div className="max-w-3xl mx-auto">
         <div className="mb-6">
           <button
             onClick={() => router.push('/dashboard')}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-theme-secondary hover:text-theme-primary"
           >
             ← Back to Dashboard
           </button>
         </div>
 
-        <h1 className="text-4xl font-bold mb-2 text-gray-900">Profile Settings</h1>
-        <p className="text-gray-600 mb-8">Manage your public profile and privacy settings</p>
+        <h1 className="text-4xl font-bold mb-2 text-theme-primary">Profile Settings</h1>
+        <p className="text-theme-secondary mb-8">Manage your public profile and privacy settings</p>
 
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -210,8 +210,8 @@ export default function ProfileSettingsPage() {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Info */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900">Basic Information</h2>
+          <div className="bg-surface border border-theme rounded-lg p-6">
+            <h2 className="text-2xl font-bold mb-4 text-theme-primary">Basic Information</h2>
 
             <div className="space-y-4">
               <div>
@@ -220,7 +220,7 @@ export default function ProfileSettingsPage() {
                   type="text"
                   value={formData.display_name}
                   onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="How you want to be known"
                 />
               </div>
@@ -231,7 +231,7 @@ export default function ProfileSettingsPage() {
                   type="url"
                   value={formData.avatar_url}
                   onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="https://example.com/avatar.jpg"
                 />
               </div>
@@ -242,7 +242,7 @@ export default function ProfileSettingsPage() {
                   value={formData.profile_bio}
                   onChange={(e) => setFormData({ ...formData, profile_bio: e.target.value })}
                   rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="Tell us about yourself and your tarantula keeping journey..."
                 />
               </div>
@@ -253,7 +253,7 @@ export default function ProfileSettingsPage() {
                   type="text"
                   value={formData.profile_location}
                   onChange={(e) => setFormData({ ...formData, profile_location: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="City, Country"
                 />
               </div>
@@ -261,8 +261,8 @@ export default function ProfileSettingsPage() {
           </div>
 
           {/* Experience */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900">Experience</h2>
+          <div className="bg-surface border border-theme rounded-lg p-6">
+            <h2 className="text-2xl font-bold mb-4 text-theme-primary">Experience</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -270,7 +270,7 @@ export default function ProfileSettingsPage() {
                 <select
                   value={formData.profile_experience_level}
                   onChange={(e) => setFormData({ ...formData, profile_experience_level: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                 >
                   <option value="">Select...</option>
                   <option value="beginner">Beginner</option>
@@ -287,7 +287,7 @@ export default function ProfileSettingsPage() {
                   min="0"
                   value={formData.profile_years_keeping}
                   onChange={(e) => setFormData({ ...formData, profile_years_keeping: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="0"
                 />
               </div>
@@ -302,9 +302,9 @@ export default function ProfileSettingsPage() {
                       type="checkbox"
                       checked={formData.profile_specialties.includes(specialty)}
                       onChange={() => handleSpecialtyToggle(specialty)}
-                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      className="w-4 h-4 text-primary-600 border-theme rounded focus:ring-primary-500"
                     />
-                    <span className="text-sm text-gray-700 capitalize">{specialty.replace('_', ' ')}</span>
+                    <span className="text-sm text-theme-secondary capitalize">{specialty.replace('_', ' ')}</span>
                   </label>
                 ))}
               </div>
@@ -312,8 +312,8 @@ export default function ProfileSettingsPage() {
           </div>
 
           {/* Social Links */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900">Social Links</h2>
+          <div className="bg-surface border border-theme rounded-lg p-6">
+            <h2 className="text-2xl font-bold mb-4 text-theme-primary">Social Links</h2>
 
             <div className="space-y-4">
               <div>
@@ -325,7 +325,7 @@ export default function ProfileSettingsPage() {
                     ...formData,
                     social_links: { ...formData.social_links, instagram: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="https://instagram.com/username"
                 />
               </div>
@@ -339,7 +339,7 @@ export default function ProfileSettingsPage() {
                     ...formData,
                     social_links: { ...formData.social_links, youtube: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="https://youtube.com/@channel"
                 />
               </div>
@@ -353,7 +353,7 @@ export default function ProfileSettingsPage() {
                     ...formData,
                     social_links: { ...formData.social_links, website: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="https://yourwebsite.com"
                 />
               </div>
@@ -361,18 +361,18 @@ export default function ProfileSettingsPage() {
           </div>
 
           {/* Privacy */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900">Privacy Settings</h2>
-            
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-800">
-                <strong>Collection Visibility:</strong> When your collection is public, other keepers can view your profile and your tarantulas. 
+          <div className="bg-surface border border-theme rounded-lg p-6">
+            <h2 className="text-2xl font-bold mb-4 text-theme-primary">Privacy Settings</h2>
+
+            <div className="bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-900 dark:text-blue-200">
+                <strong>Collection Visibility:</strong> When your collection is public, other keepers can view your profile and your tarantulas.
                 Your email, prices paid, and private notes will never be shared.
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+              <label className="flex items-center gap-3 p-4 border-2 border-theme rounded-lg cursor-pointer hover:bg-surface-elevated transition">
                 <input
                   type="radio"
                   name="visibility"
@@ -382,12 +382,12 @@ export default function ProfileSettingsPage() {
                   className="w-5 h-5 text-primary-600"
                 />
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-900">🔒 Private</div>
-                  <div className="text-sm text-gray-600">Only you can see your collection</div>
+                  <div className="font-semibold text-theme-primary">🔒 Private</div>
+                  <div className="text-sm text-theme-secondary">Only you can see your collection</div>
                 </div>
               </label>
 
-              <label className="flex items-center gap-3 p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition">
+              <label className="flex items-center gap-3 p-4 border-2 border-theme rounded-lg cursor-pointer hover:bg-surface-elevated transition">
                 <input
                   type="radio"
                   name="visibility"
@@ -397,8 +397,8 @@ export default function ProfileSettingsPage() {
                   className="w-5 h-5 text-primary-600"
                 />
                 <div className="flex-1">
-                  <div className="font-semibold text-gray-900">🌍 Public</div>
-                  <div className="text-sm text-gray-600">Share your collection with the community</div>
+                  <div className="font-semibold text-theme-primary">🌍 Public</div>
+                  <div className="text-sm text-theme-secondary">Share your collection with the community</div>
                 </div>
               </label>
             </div>
@@ -416,7 +416,7 @@ export default function ProfileSettingsPage() {
             <button
               type="button"
               onClick={() => router.push('/dashboard')}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-semibold"
+              className="px-6 py-3 border border-theme rounded-lg hover:bg-surface-elevated transition font-semibold text-theme-primary"
             >
               Cancel
             </button>

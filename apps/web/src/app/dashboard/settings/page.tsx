@@ -32,30 +32,20 @@ export default function SettingsPage() {
 
       // Try localStorage first (email/password auth)
       let token = localStorage.getItem('auth_token');
-      let userData = localStorage.getItem('user');
 
       // If not in localStorage, check NextAuth session (OAuth)
       if (!token && session?.accessToken) {
         console.log('Settings - Using NextAuth session');
         token = session.accessToken as string;
-        // Build user data from session
-        userData = JSON.stringify({
-          id: session.user.id,
-          email: session.user.email,
-          username: session.user.email?.split('@')[0], // Extract from email for display
-          display_name: session.user.name,
-          avatar_url: session.user.image,
-        });
       }
 
       console.log('Settings - Auth check:', {
         hasToken: !!token,
-        hasUserData: !!userData,
         isOAuth: !!session,
         tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
       });
 
-      if (!token || !userData) {
+      if (!token) {
         setAuthError('No authentication found. Please log in.');
         console.log('Settings - No auth, redirecting to login');
         // Give user a moment to see the error before redirect
@@ -65,17 +55,26 @@ export default function SettingsPage() {
         return;
       }
 
+      // Fetch fresh user data from API to ensure accuracy
       try {
-        const parsedUser = JSON.parse(userData);
-        console.log('Settings - User loaded:', parsedUser);
-        setUser(parsedUser);
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const response = await fetch(`${API_URL}/api/v1/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch user profile');
+        }
+
+        const userData = await response.json();
+        console.log('Settings - User loaded from API:', userData);
+        setUser(userData);
         setAuthError('');
-      } catch (parseError) {
-        console.error('Settings - Failed to parse user data:', parseError);
-        setAuthError('Invalid user data. Please log in again.');
-        setTimeout(() => {
-          router.push('/login');
-        }, 1000);
+      } catch (apiError) {
+        console.error('Settings - API fetch failed:', apiError);
+        setAuthError('Failed to load user data. Please try again.');
       }
     } catch (error) {
       console.error('Settings - Failed to fetch user:', error);
