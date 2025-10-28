@@ -1,0 +1,37 @@
+{
+  "grammostola_rosea": {
+    "filename": "grammostola_rosea.jpg",
+    "credit": "Ryan",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Chilean_Rose.jpg"
+  },
+  "brachypelma_hamorii": {
+    "filename": "brachypelma_hamorii.jpg",
+    "credit": "BhaalPriestess",
+    "source": "Wikimedia Commons",
+    "license": "CC BY 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Brachypelma_Hamorii_Spiderling_2025.jpg"
+  },
+  "aphonopelma_chalcodes": {
+    "filename": "aphonopelma_chalcodes.jpg",
+    "credit": "Marc BRETHES",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Couple_aphonopelma_chalcodes.jpg"
+  },
+  "caribena_versicolor": {
+    "filename": "caribena_versicolor.jpg",
+    "credit": "Unknown",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Caribena_versicolor_Martinique.jpg"
+  },
+  "tliltocatl_albopilosus": {
+    "filename": "tliltocatl_albopilosus.jpg",
+    "credit": "Fungus Guy",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Curlyhair_tarantula_(Tliltocatl_albopilosus),_Entomica.jpg"
+  }
+}

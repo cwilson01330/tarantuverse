@@ -43,7 +43,8 @@ species_data = [
         "defensive_behavior": "Very calm, rarely defensive.",
         "feeding_frequency_days": 7,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/grammostola_rosea.jpg"
     },
     {
         "scientific_name": "Brachypelma hamorii",
@@ -69,7 +70,8 @@ species_data = [
         "defensive_behavior": "Calm and predictable.",
         "feeding_frequency_days": 7,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/brachypelma_hamorii.jpg"
     },
     {
         "scientific_name": "Brachypelma albopilosum",
@@ -95,7 +97,8 @@ species_data = [
         "defensive_behavior": "Very calm and hardy.",
         "feeding_frequency_days": 5,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/tliltocatl_albopilosus.jpg"
     },
     {
         "scientific_name": "Aphonopelma chalcodes",
@@ -121,7 +124,8 @@ species_data = [
         "defensive_behavior": "Very docile.",
         "feeding_frequency_days": 7,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/aphonopelma_chalcodes.jpg"
     },
     {
         "scientific_name": "Grammostola pulchra",
@@ -225,7 +229,8 @@ species_data = [
         "defensive_behavior": "Calm, good for beginners.",
         "feeding_frequency_days": 5,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/tliltocatl_albopilosus.jpg"
     },
     {
         "scientific_name": "Lasiodora parahybana",
