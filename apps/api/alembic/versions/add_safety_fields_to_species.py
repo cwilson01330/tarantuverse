@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_safety_fields'
-down_revision = 'k2l3m4n5o6p7'  # After breeding module
+down_revision = 'oauth_fields_001'  # After OAuth fields
 branch_labels = None
 depends_on = None
 
