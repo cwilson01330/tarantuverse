@@ -35,9 +35,11 @@ interface Stats {
   username: string;
   total_public: number;
   unique_species: number;
-  males: number;
-  females: number;
-  unsexed: number;
+  sex_distribution: {
+    male: number;
+    female: number;
+    unknown: number;
+  };
 }
 
 interface FollowStats {
@@ -111,7 +113,15 @@ export default function KeeperProfileScreen() {
   const fetchProfile = async () => {
     try {
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/`);
+      const token = await AsyncStorage.getItem('auth_token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/`, {
+        headers
+      });
       if (!response.ok) {
         throw new Error('Profile not found or private');
       }
@@ -125,7 +135,15 @@ export default function KeeperProfileScreen() {
   const fetchCollection = async () => {
     try {
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/collection/`);
+      const token = await AsyncStorage.getItem('auth_token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/collection/`, {
+        headers
+      });
       if (response.ok) {
         const data = await response.json();
         setCollection(data);
@@ -138,7 +156,15 @@ export default function KeeperProfileScreen() {
   const fetchStats = async () => {
     try {
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/stats/`);
+      const token = await AsyncStorage.getItem('auth_token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/stats/`, {
+        headers
+      });
       if (response.ok) {
         const data = await response.json();
         setStats(data);
@@ -389,11 +415,11 @@ export default function KeeperProfileScreen() {
                   <Text style={styles.statLabel}>Species</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: '#ec4899' }]}>{stats.females}</Text>
+                  <Text style={[styles.statValue, { color: '#ec4899' }]}>{stats.sex_distribution.female}</Text>
                   <Text style={styles.statLabel}>Females</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: '#06b6d4' }]}>{stats.males}</Text>
+                  <Text style={[styles.statValue, { color: '#06b6d4' }]}>{stats.sex_distribution.male}</Text>
                   <Text style={styles.statLabel}>Males</Text>
                 </View>
               </>
