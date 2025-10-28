@@ -158,7 +158,7 @@ export default function EnhancedSpeciesDetailPage() {
 
   const careLevel = getCareLevel(species.care_level)
   const typeIcon = getTypeIcon(species.type)
-  const canEdit = authUser && (authUser.is_admin || authUser.is_superuser) // TODO: Add premium check
+  const canEdit = false // TODO: Add admin/superuser check when roles are implemented
 
   return (
     <DashboardLayout
