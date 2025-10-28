@@ -38,21 +38,55 @@ interface KeeperStats {
   unsexed: number
 }
 
+interface FollowStats {
+  followers_count: number
+  following_count: number
+}
+
 export default function KeeperProfilePage() {
   const params = useParams()
   const router = useRouter()
   const [keeper, setKeeper] = useState<Keeper | null>(null)
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [stats, setStats] = useState<KeeperStats | null>(null)
+  const [followStats, setFollowStats] = useState<FollowStats | null>(null)
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const username = params?.username as string
 
   useEffect(() => {
     if (!username) return
+    checkAuth()
     fetchKeeperData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username])
+
+  const checkAuth = () => {
+    const token = localStorage.getItem('auth_token')
+    const userJson = localStorage.getItem('user')
+    if (token && userJson) {
+      const userData = JSON.parse(userJson)
+      setCurrentUser(userData)
+      checkFollowingStatus(token)
+    }
+  }
+
+  const checkFollowingStatus = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/follows/${username}/is-following`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setIsFollowing(data.is_following)
+      }
+    } catch (error) {
+      // Silent fail - follow status will default to false
+    }
+  }
 
   const fetchKeeperData = async () => {
     try {
@@ -83,10 +117,46 @@ export default function KeeperProfilePage() {
         const statsData = await statsResponse.json()
         setStats(statsData)
       }
+
+      // Fetch follow stats
+      const followStatsResponse = await fetch(`${API_URL}/api/v1/follows/${username}/stats`)
+      if (followStatsResponse.ok) {
+        const followStatsData = await followStatsResponse.json()
+        setFollowStats(followStatsData)
+      }
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleFollowToggle = async () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const method = isFollowing ? 'DELETE' : 'POST'
+      const response = await fetch(`${API_URL}/api/v1/follows/${username}`, {
+        method,
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        setIsFollowing(!isFollowing)
+        // Refresh follow stats
+        const followStatsResponse = await fetch(`${API_URL}/api/v1/follows/${username}/stats`)
+        if (followStatsResponse.ok) {
+          const followStatsData = await followStatsResponse.json()
+          setFollowStats(followStatsData)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to toggle follow status')
     }
   }
 
@@ -196,6 +266,34 @@ export default function KeeperProfilePage() {
                   </span>
                 )}
               </div>
+
+              {/* Follow Button and Stats */}
+              {currentUser && currentUser.username !== username && (
+                <div className="flex gap-3 mb-4">
+                  <button
+                    onClick={handleFollowToggle}
+                    className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                      isFollowing
+                        ? 'bg-white/20 text-white border-2 border-white/40 hover:bg-white/30'
+                        : 'bg-white text-purple-700 hover:bg-purple-50'
+                    }`}
+                  >
+                    {isFollowing ? '✓ Following' : '+ Follow'}
+                  </button>
+                </div>
+              )}
+
+              {/* Followers/Following Stats */}
+              {followStats && (
+                <div className="flex gap-4 mb-4 text-purple-100">
+                  <div>
+                    <span className="font-bold text-white">{followStats.followers_count}</span> Followers
+                  </div>
+                  <div>
+                    <span className="font-bold text-white">{followStats.following_count}</span> Following
+                  </div>
+                </div>
+              )}
 
               {/* Social Links */}
               {keeper.social_links && (Object.values(keeper.social_links).some(link => link)) && (
