@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 
 export default function RegisterPage() {
@@ -21,6 +22,7 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
+      // Step 1: Register the user via API
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_URL}/api/v1/auth/register`, {
         method: 'POST',
@@ -36,12 +38,22 @@ export default function RegisterPage() {
         throw new Error(data.detail || 'Registration failed')
       }
 
-      // Save token
-      localStorage.setItem('auth_token', data.access_token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      // Step 2: Auto-login via NextAuth to establish session
+      const result = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      })
 
-      // Redirect to dashboard
-      router.push('/dashboard')
+      if (result?.error) {
+        throw new Error('Registration successful but login failed. Please try logging in.')
+      }
+
+      if (result?.ok) {
+        // Redirect to dashboard on success
+        router.push('/dashboard')
+        router.refresh() // Refresh to update session
+      }
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
     } finally {

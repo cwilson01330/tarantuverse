@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 
 export default function LoginPage() {
@@ -19,27 +20,22 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_URL}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
+      // Use NextAuth signIn with credentials provider
+      const result = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false, // Handle redirect manually to show errors
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Login failed')
+      if (result?.error) {
+        throw new Error('Invalid email or password')
       }
 
-      // Save token
-      localStorage.setItem('auth_token', data.access_token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-
-      // Redirect to dashboard
-      router.push('/dashboard')
+      if (result?.ok) {
+        // Redirect to dashboard on success
+        router.push('/dashboard')
+        router.refresh() // Refresh to update session
+      }
     } catch (err: any) {
       setError(err.message || 'Invalid email or password')
     } finally {
