@@ -28,6 +28,7 @@ interface Species {
   feeding_frequency_days?: number
   typical_diet?: string
   urticating_hairs?: boolean
+  medically_significant_venom?: boolean
   defensive_behavior?: string
   lifespan_years_min?: number
   lifespan_years_max?: number
@@ -229,6 +230,18 @@ export default function EnhancedSpeciesDetailPage() {
                   <span className="px-4 py-2 bg-green-500/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2">
                     <span>🌍</span>
                     <span>{species.native_region}</span>
+                  </span>
+                )}
+                {species.urticating_hairs && (
+                  <span className="px-4 py-2 bg-orange-500/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2">
+                    <span>🪮</span>
+                    <span>Urticating Hairs</span>
+                  </span>
+                )}
+                {species.medically_significant_venom && (
+                  <span className="px-4 py-2 bg-red-600/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2 animate-pulse">
+                    <span>⚠️</span>
+                    <span>Medically Significant Venom</span>
                   </span>
                 )}
               </div>
@@ -498,10 +511,36 @@ export default function EnhancedSpeciesDetailPage() {
                     <p className="text-gray-900 dark:text-white">{species.defensive_behavior}</p>
                   </div>
                 )}
-                <div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Urticating Hairs</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">
-                    {species.urticating_hairs ? '✓ Yes' : '✗ No'}
+              </div>
+            </div>
+
+            {/* Safety Information */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
+                ⚠️ Safety Information
+              </h2>
+              <div className="space-y-4">
+                <div className={`p-4 rounded-lg ${species.urticating_hairs ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🪮</span>
+                    <p className="font-semibold text-gray-900 dark:text-white">Urticating Hairs</p>
+                  </div>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {species.urticating_hairs
+                      ? 'This species has urticating hairs that can cause irritation if handled. Use caution during maintenance.'
+                      : 'This species does not have urticating hairs (Old World species).'}
+                  </p>
+                </div>
+
+                <div className={`p-4 rounded-lg ${species.medically_significant_venom ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-500' : 'bg-gray-50 dark:bg-gray-700/50'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">{species.medically_significant_venom ? '⚠️' : '✓'}</span>
+                    <p className="font-semibold text-gray-900 dark:text-white">Venom Potency</p>
+                  </div>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {species.medically_significant_venom
+                      ? '⚠️ WARNING: This species has medically significant venom. Bites can cause severe pain and systemic effects. Only for experienced keepers. Seek immediate medical attention if bitten.'
+                      : 'Venom is not considered medically significant to humans, though reactions may vary.'}
                   </p>
                 </div>
               </div>
