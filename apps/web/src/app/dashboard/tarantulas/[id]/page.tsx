@@ -126,6 +126,18 @@ interface FeedingStats {
   prey_type_distribution: PreyTypeCount[]
 }
 
+interface Pairing {
+  id: string
+  male_id: string
+  female_id: string
+  paired_date: string
+  separated_date?: string
+  pairing_type: string
+  outcome: string
+  notes?: string
+  created_at: string
+}
+
 export default function TarantulaDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -139,10 +151,11 @@ export default function TarantulaDetailPage() {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null)
   const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null)
+  const [pairings, setPairings] = useState<Pairing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'husbandry' | 'photos' | 'growth'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'husbandry' | 'photos' | 'growth' | 'breeding'>('overview')
   const [showFeedingForm, setShowFeedingForm] = useState(false)
   const [showMoltForm, setShowMoltForm] = useState(false)
   const [showSubstrateForm, setShowSubstrateForm] = useState(false)
@@ -201,6 +214,7 @@ export default function TarantulaDetailPage() {
     fetchPhotos(token)
     fetchGrowth(token)
     fetchFeedingStats(token)
+    fetchPairings(token)
   }, [id, router, session, status])
 
   const fetchTarantula = async (token: string) => {
@@ -590,6 +604,24 @@ export default function TarantulaDetailPage() {
     }
   }
 
+  const fetchPairings = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/pairings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPairings(data)
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch pairings:', err)
+    }
+  }
+
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -871,6 +903,16 @@ export default function TarantulaDetailPage() {
             }`}
           >
             📸 Photos ({photos.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('breeding')}
+            className={`px-6 py-3 font-semibold transition-all duration-200 border-b-2 whitespace-nowrap ${
+              activeTab === 'breeding'
+                ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            🥚 Breeding ({pairings.length})
           </button>
         </div>
       </div>
@@ -1620,6 +1662,119 @@ export default function TarantulaDetailPage() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Breeding Tab */}
+        {activeTab === 'breeding' && (
+          <div className="space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">🥚 Breeding History</h2>
+                <button
+                  onClick={() => router.push('/dashboard/breeding')}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm font-medium shadow-sm"
+                >
+                  View All Breeding
+                </button>
+              </div>
+
+              {pairings.length === 0 ? (
+                <div className="text-center py-16 text-gray-500 dark:text-gray-400">
+                  <div className="text-6xl mb-4">🥚</div>
+                  <h3 className="text-xl font-bold text-gray-700 dark:text-gray-300 mb-2">No Breeding History</h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6">
+                    This tarantula hasn't been involved in any pairings yet
+                  </p>
+                  <button
+                    onClick={() => router.push('/dashboard/breeding/pairings/add')}
+                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium"
+                  >
+                    + Record Pairing
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pairings.map((pairing) => (
+                    <div
+                      key={pairing.id}
+                      className="p-6 border border-gray-200 dark:border-gray-600 rounded-xl hover:shadow-lg hover:border-purple-200 dark:hover:border-purple-700 transition-all duration-200 bg-white dark:bg-gray-700"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-3">
+                            <span className="text-3xl">
+                              {pairing.outcome === 'successful' ? '✅' :
+                               pairing.outcome === 'unsuccessful' ? '❌' :
+                               pairing.outcome === 'in_progress' ? '⏳' : '❓'}
+                            </span>
+                            <div>
+                              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                Pairing - {new Date(pairing.paired_date).toLocaleDateString()}
+                              </h3>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Type: <span className="capitalize">{pairing.pairing_type.replace('_', ' ')}</span>
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-12">
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Paired Date</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{new Date(pairing.paired_date).toLocaleDateString()}</p>
+                            </div>
+
+                            {pairing.separated_date && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Separated Date</p>
+                                <p className="text-sm text-gray-900 dark:text-white">{new Date(pairing.separated_date).toLocaleDateString()}</p>
+                              </div>
+                            )}
+
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Outcome</p>
+                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold capitalize ${
+                                pairing.outcome === 'successful' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                pairing.outcome === 'unsuccessful' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                                pairing.outcome === 'in_progress' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                                'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                              }`}>
+                                {pairing.outcome.replace('_', ' ')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {pairing.notes && (
+                            <div className="mt-4 pl-12 p-4 bg-gray-50 dark:bg-gray-600 rounded-lg">
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Notes</p>
+                              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{pairing.notes}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => router.push('/dashboard/breeding')}
+                          className="ml-4 px-3 py-1 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded-lg text-sm font-medium transition"
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Link to full breeding module */}
+                  <div className="mt-6 text-center">
+                    <button
+                      onClick={() => router.push('/dashboard/breeding')}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition font-medium shadow-sm"
+                    >
+                      <span>View Full Breeding Module</span>
+                      <span>→</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
