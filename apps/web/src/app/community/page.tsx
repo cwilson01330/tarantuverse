@@ -47,7 +47,7 @@ export default function CommunityPage() {
       if (specialtyFilter) params.append('specialty', specialtyFilter)
       if (searchQuery) params.append('search', searchQuery)
       
-      const response = await fetch(`${API_URL}/api/v1/keepers?${params.toString()}`)
+      const response = await fetch(`${API_URL}/api/v1/keepers/?${params.toString()}`)
       
       if (!response.ok) {
         throw new Error('Failed to fetch keepers')

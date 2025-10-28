@@ -111,7 +111,7 @@ export default function KeeperProfileScreen() {
   const fetchProfile = async () => {
     try {
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}`);
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/`);
       if (!response.ok) {
         throw new Error('Profile not found or private');
       }
@@ -125,7 +125,7 @@ export default function KeeperProfileScreen() {
   const fetchCollection = async () => {
     try {
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/collection`);
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/collection/`);
       if (response.ok) {
         const data = await response.json();
         setCollection(data);
@@ -138,7 +138,7 @@ export default function KeeperProfileScreen() {
   const fetchStats = async () => {
     try {
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/stats`);
+      const response = await fetch(`${API_URL}/api/v1/keepers/${username}/stats/`);
       if (response.ok) {
         const data = await response.json();
         setStats(data);
