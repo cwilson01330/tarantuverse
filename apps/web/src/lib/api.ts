@@ -2,6 +2,7 @@
  * API Client
  */
 import axios from 'axios'
+import { getSession } from 'next-auth/react'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -14,8 +15,18 @@ export const apiClient = axios.create({
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('auth_token')
+  async (config) => {
+    // First try localStorage (for email/password login)
+    let token = localStorage.getItem('auth_token')
+
+    // If not found, check NextAuth session (for OAuth login)
+    if (!token) {
+      const session = await getSession()
+      if (session?.accessToken) {
+        token = session.accessToken as string
+      }
+    }
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
