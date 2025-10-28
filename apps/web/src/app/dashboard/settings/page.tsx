@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useThemeStore } from '@/stores/themeStore';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useThemeStore();
+  const { data: session } = useSession();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string>('');
@@ -18,7 +20,7 @@ export default function SettingsPage() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [session]);
 
   const fetchUser = async () => {
     try {
@@ -28,12 +30,28 @@ export default function SettingsPage() {
         return;
       }
 
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user');
+      // Try localStorage first (email/password auth)
+      let token = localStorage.getItem('auth_token');
+      let userData = localStorage.getItem('user');
 
-      console.log('Settings - Auth check:', { 
-        hasToken: !!token, 
+      // If not in localStorage, check NextAuth session (OAuth)
+      if (!token && session?.accessToken) {
+        console.log('Settings - Using NextAuth session');
+        token = session.accessToken as string;
+        // Build user data from session
+        userData = JSON.stringify({
+          id: session.user.id,
+          email: session.user.email,
+          username: session.user.email?.split('@')[0], // Extract from email for display
+          display_name: session.user.name,
+          avatar_url: session.user.image,
+        });
+      }
+
+      console.log('Settings - Auth check:', {
+        hasToken: !!token,
         hasUserData: !!userData,
+        isOAuth: !!session,
         tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
       });
 
