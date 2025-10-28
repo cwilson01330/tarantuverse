@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
+import DashboardLayout from '@/components/DashboardLayout'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -45,7 +46,7 @@ interface Offspring {
 
 export default function BreedingPage() {
   const router = useRouter()
-  const { token, isAuthenticated, isLoading } = useAuth()
+  const { user, token, isAuthenticated, isLoading } = useAuth()
   const [activeTab, setActiveTab] = useState<'pairings' | 'egg-sacs' | 'offspring'>('pairings')
   const [pairings, setPairings] = useState<Pairing[]>([])
   const [eggSacs, setEggSacs] = useState<EggSac[]>([])
@@ -114,17 +115,21 @@ export default function BreedingPage() {
 
   if (isLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
-        <div className="max-w-7xl mx-auto">
+      <DashboardLayout userName="Loading..." userEmail="">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <p className="text-gray-900 dark:text-white">Loading breeding data...</p>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
-      <div className="max-w-7xl mx-auto">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Breeding Records</h1>
@@ -285,6 +290,6 @@ export default function BreedingPage() {
           )}
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

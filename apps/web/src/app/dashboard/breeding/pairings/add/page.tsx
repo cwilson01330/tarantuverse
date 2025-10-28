@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
+import DashboardLayout from '@/components/DashboardLayout'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -17,7 +18,7 @@ interface Tarantula {
 
 export default function AddPairingPage() {
   const router = useRouter()
-  const { token, isAuthenticated, isLoading } = useAuth()
+  const { user, token, isAuthenticated, isLoading } = useAuth()
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -116,17 +117,21 @@ export default function AddPairingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
-        <div className="max-w-3xl mx-auto">
+      <DashboardLayout userName="Loading..." userEmail="">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <p className="text-gray-900 dark:text-white">Loading...</p>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
-      <div className="max-w-3xl mx-auto">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
           <Link
@@ -300,6 +305,6 @@ export default function AddPairingPage() {
           </form>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

@@ -86,3 +86,6 @@ inspect-output/
 inspect-outpu/
 **/inspect-output/
 **/inspect-outpu/
+
+# Project documentation (internal use)
+CLAUDE.md
