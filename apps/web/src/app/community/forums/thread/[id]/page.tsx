@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import DashboardLayout from "@/components/DashboardLayout";
 
 interface ThreadAuthor {
   id: string;
@@ -53,6 +55,7 @@ export default function ThreadPage() {
   const params = useParams();
   const router = useRouter();
   const threadId = params?.id as string;
+  const { user, token } = useAuth();
 
   const [thread, setThread] = useState<ForumThread | null>(null);
   const [posts, setPosts] = useState<ForumPost[]>([]);
@@ -64,35 +67,8 @@ export default function ThreadPage() {
   const [submitting, setSubmitting] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [editingThread, setEditingThread] = useState(false);
   const [editThreadTitle, setEditThreadTitle] = useState("");
-
-  useEffect(() => {
-    // Get current user ID from token or API
-    const fetchCurrentUser = async () => {
-      try {
-        const token = localStorage.getItem("auth_token");
-        if (!token) return;
-        
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/me`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        
-        if (response.ok) {
-          const user = await response.json();
-          setCurrentUserId(user.id);
-        }
-      } catch (err) {
-        console.error("Failed to fetch current user:", err);
-      }
-    };
-    
-    fetchCurrentUser();
-  }, []);
 
   useEffect(() => {
     if (threadId) {
@@ -107,7 +83,7 @@ export default function ThreadPage() {
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/forums/threads/${threadId}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -160,7 +136,7 @@ export default function ThreadPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ content: replyContent }),
         }
@@ -194,7 +170,7 @@ export default function ThreadPage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ content: editContent }),
         }
@@ -238,7 +214,7 @@ export default function ThreadPage() {
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -298,7 +274,7 @@ export default function ThreadPage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ title: editThreadTitle }),
         }
@@ -330,7 +306,7 @@ export default function ThreadPage() {
         {
           method: "DELETE",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -359,66 +335,82 @@ export default function ThreadPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-dark-50 rounded w-1/2"></div>
-          <div className="h-32 bg-dark-50 rounded"></div>
-          <div className="h-32 bg-dark-50 rounded"></div>
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+            <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   if (error || !thread) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-900/20 border border-red-500/50 text-red-300 px-4 py-3 rounded-lg mb-4">
-          <p className="font-bold">Error</p>
-          <p>{error || "Thread not found"}</p>
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-red-900/20 border border-red-500/50 text-red-300 dark:text-red-400 px-4 py-3 rounded-lg mb-4">
+            <p className="font-bold">Error</p>
+            <p>{error || "Thread not found"}</p>
+          </div>
+          <Link
+            href="/community/forums"
+            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 inline-block"
+          >
+            ← Back to Forums
+          </Link>
         </div>
-        <Link
-          href="/community/forums"
-          className="text-electric-blue-400 hover:text-electric-blue-300 inline-block"
-        >
-          ← Back to Forums
-        </Link>
-      </div>
+      </DashboardLayout>
     );
   }
 
   const allPosts = thread.first_post ? [thread.first_post, ...posts] : posts;
 
   return (
-    <div className="min-h-screen bg-background">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Breadcrumb */}
         <nav className="mb-6 text-sm">
-          <ol className="flex items-center gap-2 text-gray-400">
+          <ol className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
             <li>
-              <Link href="/community" className="hover:text-electric-blue-400 transition-colors">
+              <Link href="/community" className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
                 Community
               </Link>
             </li>
             <li>/</li>
             <li>
-              <Link href="/community/forums" className="hover:text-electric-blue-400 transition-colors">
+              <Link href="/community/forums" className="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
                 Forums
               </Link>
             </li>
             <li>/</li>
-            <li className="text-gray-100 font-medium truncate max-w-md">{thread.title}</li>
+            <li className="text-gray-900 dark:text-white font-medium truncate max-w-md">{thread.title}</li>
           </ol>
         </nav>
 
         {/* Thread Header */}
-        <div className="mb-6 bg-gradient-to-r from-electric-blue-600 to-neon-pink-600 rounded-xl p-8 shadow-xl shadow-electric-blue-500/20">
+        <div className="mb-6 bg-primary-600 dark:bg-primary-700 rounded-xl p-8 shadow-xl">
           {editingThread ? (
             <div className="space-y-3">
               <input
                 type="text"
                 value={editThreadTitle}
                 onChange={(e) => setEditThreadTitle(e.target.value)}
-                className="w-full px-4 py-3 bg-white/10 backdrop-blur border border-white/20 text-white placeholder-white/50 rounded-lg focus:ring-2 focus:ring-white/50 focus:border-transparent text-2xl font-bold"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-2xl font-bold"
                 placeholder="Thread title..."
                 maxLength={200}
               />
@@ -426,7 +418,7 @@ export default function ThreadPage() {
                 <button
                   onClick={handleEditThread}
                   disabled={submitting}
-                  className="bg-white text-electric-blue-600 px-6 py-2 rounded-lg hover:bg-gray-100 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-white text-primary-600 px-6 py-2 rounded-lg hover:bg-gray-100 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? "Saving..." : "Save"}
                 </button>
@@ -447,9 +439,9 @@ export default function ThreadPage() {
                   {thread.is_locked && <span>🔒</span>}
                   <h1 className="text-4xl font-bold text-white">{thread.title}</h1>
                 </div>
-                
+
                 {/* Edit/Delete Thread Buttons */}
-                {currentUserId && thread.author_id === currentUserId && (
+                {user?.id && thread.author_id === user?.id && (
                   <div className="flex items-center gap-2 ml-4">
                     <button
                       onClick={startEditThread}
@@ -469,7 +461,7 @@ export default function ThreadPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-6 text-white/80">
+              <div className="flex items-center gap-6 text-white/90">
                 <div className="flex items-center gap-2">
                   <span>💬</span>
                   <span className="font-medium">{thread.post_count} post{thread.post_count !== 1 ? 's' : ''}</span>
@@ -489,25 +481,25 @@ export default function ThreadPage() {
         {allPosts.map((post, index) => (
           <div
             key={post.id}
-            className="bg-dark-50 border border-electric-blue-500/20 rounded-xl shadow-md hover:border-electric-blue-500/30 transition-all overflow-hidden"
+            className="bg-surface border border-theme rounded-xl shadow-md hover:border-primary-600 dark:hover:border-primary-400 transition-all overflow-hidden"
           >
             <div className="flex">
               {/* Author sidebar */}
-              <div className="bg-gradient-to-b from-dark-100 to-dark-50 p-5 w-52 border-r border-electric-blue-500/20">
+              <div className="bg-surface-elevated p-5 w-52 border-r border-theme">
                 <div className="text-center">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-electric-blue-600 to-neon-pink-600 shadow-xl shadow-electric-blue-500/30 flex items-center justify-center mx-auto mb-3 text-2xl font-bold text-white ring-4 ring-dark-50">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 shadow-xl flex items-center justify-center mx-auto mb-3 text-2xl font-bold text-white ring-4 ring-surface">
                     {(post.author.display_name || post.author.username)
                       .charAt(0)
                       .toUpperCase()}
                   </div>
-                  <div className="font-bold text-gray-100 mb-1">
+                  <div className="font-bold text-gray-900 dark:text-white mb-1">
                     {post.author.display_name || post.author.username}
                   </div>
-                  <div className="text-xs text-gray-500 mb-2">
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
                     @{post.author.username}
                   </div>
                   {index === 0 && (
-                    <div className="mt-3 inline-flex items-center gap-1 px-2 py-1 bg-neon-pink-500/20 border border-neon-pink-500/50 rounded text-xs text-neon-pink-400 font-semibold">
+                    <div className="mt-3 inline-flex items-center gap-1 px-2 py-1 bg-primary-100 dark:bg-primary-900/20 border border-primary-300 dark:border-primary-500/50 rounded text-xs text-primary-700 dark:text-primary-400 font-semibold">
                       <span>📌</span>
                       <span>Original Poster</span>
                     </div>
@@ -518,22 +510,22 @@ export default function ThreadPage() {
               {/* Post content */}
               <div className="flex-1 p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm text-gray-400">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     <span className="font-medium">{formatDate(post.created_at)}</span>
                     {post.is_edited && post.edited_at && (
-                      <span className="ml-2 text-xs italic text-gray-500">
+                      <span className="ml-2 text-xs italic text-gray-500 dark:text-gray-500">
                         • edited {formatDate(post.edited_at)}
                       </span>
                     )}
                   </div>
                   {/* Edit/Delete Buttons */}
-                  {currentUserId && post.author_id === currentUserId && (
+                  {user?.id && post.author_id === user?.id && (
                     <div className="flex items-center gap-1">
                       {editingPostId !== post.id && (
                         <>
                           <button
                             onClick={() => startEdit(post)}
-                            className="text-electric-blue-400 hover:text-electric-blue-300 hover:bg-electric-blue-500/10 p-2 rounded-lg transition-all"
+                            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 p-2 rounded-lg transition-all"
                             title="Edit post"
                           >
                             ✏️
@@ -541,7 +533,7 @@ export default function ThreadPage() {
                           {index !== 0 && ( // Don't show delete for first post
                             <button
                               onClick={() => handleDeletePost(post.id)}
-                              className="text-red-400 hover:text-red-300 p-1 rounded hover:bg-red-500/10 transition-colors"
+                              className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                               title="Delete post"
                             >
                               🗑️
@@ -559,29 +551,29 @@ export default function ThreadPage() {
                     <textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
-                      className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent resize-none"
+                      className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
                       rows={6}
                     />
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleEditPost(post.id)}
                         disabled={submitting}
-                        className="bg-gradient-primary text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {submitting ? "Saving..." : "Save"}
                       </button>
                       <button
                         onClick={cancelEdit}
                         disabled={submitting}
-                        className="bg-dark-50 border border-electric-blue-500/20 text-gray-300 px-4 py-2 rounded-lg hover:border-electric-blue-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-surface-elevated border border-theme text-theme-primary px-4 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Cancel
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="prose max-w-none prose-invert">
-                    <p className="text-gray-200 whitespace-pre-wrap">
+                  <div className="prose max-w-none dark:prose-invert">
+                    <p className="text-gray-900 dark:text-gray-200 whitespace-pre-wrap">
                       {post.content}
                     </p>
                   </div>
@@ -597,7 +589,7 @@ export default function ThreadPage() {
         <div className="text-center mb-8">
           <button
             onClick={() => fetchPosts(page + 1)}
-            className="bg-dark-50 border border-electric-blue-500/20 text-gray-300 px-6 py-2 rounded-lg hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/20 transition-all"
+            className="bg-surface-elevated border border-theme text-theme-primary px-6 py-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 hover:shadow-lg transition-all"
           >
             Load More Posts
           </button>
@@ -606,8 +598,8 @@ export default function ThreadPage() {
 
       {/* Reply Form */}
       {!thread.is_locked && (
-        <div className="bg-gradient-to-br from-dark-50 to-dark-100 border border-electric-blue-500/30 rounded-xl shadow-xl p-6">
-          <h3 className="text-xl font-bold text-gray-100 mb-4 flex items-center gap-2">
+        <div className="bg-surface border border-theme rounded-xl shadow-xl p-6">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <span>💬</span>
             <span>Post a Reply</span>
           </h3>
@@ -616,18 +608,18 @@ export default function ThreadPage() {
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
               placeholder="Share your thoughts..."
-              className="w-full px-4 py-3 bg-dark border border-electric-blue-500/20 text-gray-100 placeholder-gray-500 rounded-lg focus:ring-2 focus:ring-electric-blue-500 focus:border-transparent resize-none hover:border-electric-blue-500/40 transition-colors"
+              className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
               rows={6}
               required
             />
             <div className="mt-4 flex justify-between items-center">
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Be respectful and constructive in your replies
               </p>
               <button
                 type="submit"
                 disabled={submitting || !replyContent.trim()}
-                className="bg-gradient-to-r from-electric-blue-600 to-neon-pink-600 text-white px-8 py-3 rounded-lg hover:shadow-lg hover:shadow-electric-blue-500/30 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-lg hover:shadow-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? "Posting..." : "Post Reply"}
               </button>
@@ -637,13 +629,13 @@ export default function ThreadPage() {
       )}
 
       {thread.is_locked && (
-        <div className="bg-dark-50 border border-electric-blue-500/20 rounded-lg p-6 text-center">
+        <div className="bg-surface border border-theme rounded-lg p-6 text-center">
           <div className="text-4xl mb-2">🔒</div>
-          <p className="text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400">
             This thread is locked. No more replies can be posted.
           </p>
         </div>
       )}
-    </div>
+    </DashboardLayout>
   );
 }

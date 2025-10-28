@@ -532,6 +532,7 @@ export default function EnhancedSpeciesDetailPage() {
           </div>
         )}
       </div>
+      </div>
     </DashboardLayout>
   )
 }

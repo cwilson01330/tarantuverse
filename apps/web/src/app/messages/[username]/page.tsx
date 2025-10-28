@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/hooks/useAuth'
+import DashboardLayout from '@/components/DashboardLayout'
 
 interface Message {
   id: string
@@ -28,6 +30,7 @@ export default function ConversationPage() {
   const params = useParams()
   const router = useRouter()
   const username = params?.username as string
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const [conversation, setConversation] = useState<ConversationData | null>(null)
@@ -37,32 +40,30 @@ export default function ConversationPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    checkAuth()
+    if (authLoading) return
+
+    if (!isAuthenticated || !token) {
+      router.push('/login')
+      return
+    }
+
     if (username) {
       fetchConversation()
     }
-  }, [username])
+  }, [username, authLoading, isAuthenticated, token])
 
   useEffect(() => {
     scrollToBottom()
   }, [conversation?.messages])
-
-  const checkAuth = () => {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
-      router.push('/login')
-    }
-  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   const fetchConversation = async () => {
-    try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) return
+    if (!token) return
 
+    try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_URL}/api/v1/messages/direct/conversation/${username}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -80,13 +81,10 @@ export default function ConversationPage() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() || sending) return
+    if (!newMessage.trim() || sending || !token) return
 
     setSending(true)
     try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) return
-
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_URL}/api/v1/messages/direct/send`, {
         method: 'POST',
@@ -131,129 +129,147 @@ export default function ConversationPage() {
     }
   }
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-pulse">💬</div>
-          <p className="text-xl text-gray-600">Loading conversation...</p>
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="text-6xl mb-4 animate-pulse">💬</div>
+            <p className="text-xl text-gray-600 dark:text-gray-400">Loading conversation...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   if (!conversation) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">❌</div>
-          <h1 className="text-2xl font-bold mb-4">Error loading conversation</h1>
-          <Link href="/messages" className="text-purple-600 hover:underline">← Back to Messages</Link>
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="flex items-center justify-center h-screen">
+          <div className="text-center">
+            <div className="text-6xl mb-4">❌</div>
+            <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">Error loading conversation</h1>
+            <Link href="/messages" className="text-primary-600 dark:text-primary-400 hover:underline">← Back to Messages</Link>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white shadow-lg">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link href="/messages" className="text-purple-200 hover:text-white transition">
-                ←
-              </Link>
-              {conversation.other_user.avatar_url ? (
-                <img
-                  src={conversation.other_user.avatar_url}
-                  alt={conversation.other_user.display_name}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                  <span className="text-2xl">🕷️</span>
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="flex flex-col h-screen">
+        {/* Header */}
+        <div className="border-b border-gray-200 dark:border-gray-700 bg-surface">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/messages" className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition">
+                  ←
+                </Link>
+                {conversation.other_user.avatar_url ? (
+                  <img
+                    src={conversation.other_user.avatar_url}
+                    alt={conversation.other_user.display_name}
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center">
+                    <span className="text-2xl">🕷️</span>
+                  </div>
+                )}
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">{conversation.other_user.display_name}</h1>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm">@{conversation.other_user.username}</p>
                 </div>
-              )}
-              <div>
-                <h1 className="text-xl font-bold">{conversation.other_user.display_name}</h1>
-                <p className="text-purple-200 text-sm">@{conversation.other_user.username}</p>
               </div>
+              <Link
+                href={`/community/${conversation.other_user.username}`}
+                className="px-4 py-2 bg-surface-elevated hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 font-medium text-sm text-theme-primary"
+              >
+                View Profile
+              </Link>
             </div>
-            <Link
-              href={`/community/${conversation.other_user.username}`}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-sm"
-            >
-              View Profile
-            </Link>
           </div>
         </div>
-      </div>
 
-      {/* Messages */}
-      <div className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
-        {error && <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">{error}</div>}
+        {/* Messages */}
+        <div className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-y-auto">
+          {error && <div className="mb-4 p-4 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-500/50 text-red-700 dark:text-red-300 rounded-xl">{error}</div>}
 
-        {conversation.messages.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">👋</div>
-            <p className="text-xl text-gray-600">Start the conversation!</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {conversation.messages.map((msg, index) => {
-              const showDate = index === 0 || formatDate(msg.created_at) !== formatDate(conversation.messages[index - 1].created_at)
-              
-              return (
-                <div key={msg.id}>
-                  {showDate && (
-                    <div className="text-center text-sm text-gray-500 my-4">
-                      {formatDate(msg.created_at)}
-                    </div>
-                  )}
-                  <div className={`flex ${msg.is_own ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-lg ${msg.is_own ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' : 'bg-white text-gray-900'} rounded-2xl px-4 py-3 shadow`}>
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                      <p className={`text-xs mt-1 ${msg.is_own ? 'text-purple-200' : 'text-gray-500'}`}>
-                        {formatTime(msg.created_at)}
-                      </p>
+          {conversation.messages.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">👋</div>
+              <p className="text-xl text-gray-600 dark:text-gray-400">Start the conversation!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {conversation.messages.map((msg, index) => {
+                const showDate = index === 0 || formatDate(msg.created_at) !== formatDate(conversation.messages[index - 1].created_at)
+
+                return (
+                  <div key={msg.id}>
+                    {showDate && (
+                      <div className="text-center text-sm text-gray-500 dark:text-gray-400 my-4">
+                        {formatDate(msg.created_at)}
+                      </div>
+                    )}
+                    <div className={`flex ${msg.is_own ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-lg ${msg.is_own ? 'bg-primary-600 text-white' : 'bg-surface-elevated text-gray-900 dark:text-white'} rounded-2xl px-4 py-3 shadow`}>
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        <p className={`text-xs mt-1 ${msg.is_own ? 'text-primary-200' : 'text-gray-500 dark:text-gray-400'}`}>
+                          {formatTime(msg.created_at)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </div>
+                )
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
 
-      {/* Message Input */}
-      <div className="border-t border-gray-200 bg-white">
-        <form onSubmit={handleSend} className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex gap-3">
-            <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-              rows={1}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSend(e)
-                }
-              }}
-            />
-            <button
-              type="submit"
-              disabled={!newMessage.trim() || sending}
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl hover:shadow-lg transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {sending ? '...' : 'Send'}
-            </button>
-          </div>
-        </form>
+        {/* Message Input */}
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-surface">
+          <form onSubmit={handleSend} className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex gap-3">
+              <textarea
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none bg-surface-elevated text-theme-primary"
+                rows={1}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSend(e)
+                  }
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!newMessage.trim() || sending}
+                className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sending ? '...' : 'Send'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }
