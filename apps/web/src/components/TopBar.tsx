@@ -1,9 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { useTheme } from 'next-themes'
 
 interface TopBarProps {
   userName?: string
@@ -15,7 +14,23 @@ interface TopBarProps {
 export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }: TopBarProps) {
   const router = useRouter()
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const { theme, setTheme } = useTheme()
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  // Initialize theme from localStorage and system preference
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme')
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    const initialTheme = (savedTheme as 'light' | 'dark') || systemTheme
+    setTheme(initialTheme)
+    document.documentElement.classList.toggle('dark', initialTheme === 'dark')
+  }, [])
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(newTheme)
+    localStorage.setItem('theme', newTheme)
+    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+  }
 
   const handleLogout = async () => {
     await signOut({ redirect: false })
@@ -49,7 +64,7 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
         <div className="flex items-center gap-3">
           {/* Theme toggle */}
           <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            onClick={toggleTheme}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
