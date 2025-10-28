@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import GrowthChart from '@/components/GrowthChart'
 import FeedingStatsCard from '@/components/FeedingStatsCard'
 
@@ -129,6 +130,7 @@ export default function TarantulaDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
+  const { data: session, status } = useSession()
 
   const [tarantula, setTarantula] = useState<Tarantula | null>(null)
   const [feedings, setFeedings] = useState<FeedingLog[]>([])
@@ -172,8 +174,21 @@ export default function TarantulaDetailPage() {
     notes: '',
   })
 
+  // Helper function to get auth token from either NextAuth or localStorage
+  const getAuthToken = (): string | null => {
+    let token = localStorage.getItem('auth_token')
+    if (!token && session?.accessToken) {
+      token = session.accessToken as string
+    }
+    return token
+  }
+
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
+    // Wait for session to load
+    if (status === 'loading') return
+
+    const token = getAuthToken()
+
     if (!token) {
       router.push('/login')
       return
@@ -186,7 +201,7 @@ export default function TarantulaDetailPage() {
     fetchPhotos(token)
     fetchGrowth(token)
     fetchFeedingStats(token)
-  }, [id, router])
+  }, [id, router, session, status])
 
   const fetchTarantula = async (token: string) => {
     try {
@@ -231,7 +246,8 @@ export default function TarantulaDetailPage() {
   const handleAddFeeding = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/feedings`, {
@@ -256,7 +272,7 @@ export default function TarantulaDetailPage() {
         notes: '',
       })
       setShowFeedingForm(false)
-      fetchFeedings(token!)
+      fetchFeedings(token)
     } catch (err: any) {
       setError(err.message || 'Failed to add feeding')
     }
@@ -264,7 +280,8 @@ export default function TarantulaDetailPage() {
 
   const handleDeleteFeeding = async (feedingId: string) => {
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const response = await fetch(`${API_URL}/api/v1/feedings/${feedingId}`, {
@@ -278,7 +295,7 @@ export default function TarantulaDetailPage() {
         throw new Error('Failed to delete feeding log')
       }
 
-      fetchFeedings(token!)
+      fetchFeedings(token)
     } catch (err: any) {
       setError(err.message || 'Failed to delete feeding')
     }
@@ -305,7 +322,8 @@ export default function TarantulaDetailPage() {
   const handleAddMolt = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       // Prepare data - convert empty strings to null
@@ -345,7 +363,7 @@ export default function TarantulaDetailPage() {
         image_url: '',
       })
       setShowMoltForm(false)
-      fetchMolts(token!)
+      fetchMolts(token)
     } catch (err: any) {
       setError(err.message || 'Failed to add molt')
     }
@@ -353,7 +371,8 @@ export default function TarantulaDetailPage() {
 
   const handleDeleteMolt = async (moltId: string) => {
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const response = await fetch(`${API_URL}/api/v1/molts/${moltId}`, {
@@ -367,7 +386,7 @@ export default function TarantulaDetailPage() {
         throw new Error('Failed to delete molt log')
       }
 
-      fetchMolts(token!)
+      fetchMolts(token)
     } catch (err: any) {
       setError(err.message || 'Failed to delete molt')
     }
@@ -394,7 +413,8 @@ export default function TarantulaDetailPage() {
   const handleAddSubstrateChange = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/substrate-changes`, {
@@ -419,9 +439,9 @@ export default function TarantulaDetailPage() {
         notes: '',
       })
       setShowSubstrateForm(false)
-      fetchSubstrateChanges(token!)
+      fetchSubstrateChanges(token)
       // Also refresh tarantula to update last_substrate_change
-      fetchTarantula(token!)
+      fetchTarantula(token)
     } catch (err: any) {
       setError(err.message || 'Failed to add substrate change')
     }
@@ -429,7 +449,8 @@ export default function TarantulaDetailPage() {
 
   const handleDeleteSubstrateChange = async (changeId: string) => {
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const response = await fetch(`${API_URL}/api/v1/substrate-changes/${changeId}`, {
@@ -443,7 +464,7 @@ export default function TarantulaDetailPage() {
         throw new Error('Failed to delete substrate change log')
       }
 
-      fetchSubstrateChanges(token!)
+      fetchSubstrateChanges(token)
     } catch (err: any) {
       setError(err.message || 'Failed to delete substrate change')
     }
@@ -451,7 +472,8 @@ export default function TarantulaDetailPage() {
 
   const handleDelete = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
@@ -473,7 +495,8 @@ export default function TarantulaDetailPage() {
 
   const handleVisibilityToggle = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       
       const newVisibility = tarantula?.visibility === 'public' ? 'private' : 'public'
@@ -573,7 +596,8 @@ export default function TarantulaDetailPage() {
 
     try {
       setUploadingPhoto(true)
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const formData = new FormData()
@@ -592,8 +616,8 @@ export default function TarantulaDetailPage() {
       }
 
       // Refresh photos and tarantula (to get updated photo_url)
-      await fetchPhotos(token!)
-      await fetchTarantula(token!)
+      await fetchPhotos(token)
+      await fetchTarantula(token)
       setShowPhotoUpload(false)
     } catch (err: any) {
       setError(err.message || 'Failed to upload photo')
@@ -606,7 +630,8 @@ export default function TarantulaDetailPage() {
     if (!confirm('Are you sure you want to delete this photo?')) return
 
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
+      if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const response = await fetch(`${API_URL}/api/v1/photos/${photoId}`, {
@@ -621,8 +646,8 @@ export default function TarantulaDetailPage() {
       }
 
       // Refresh photos and tarantula
-      await fetchPhotos(token!)
-      await fetchTarantula(token!)
+      await fetchPhotos(token)
+      await fetchTarantula(token)
       setSelectedPhoto(null)
     } catch (err: any) {
       setError(err.message || 'Failed to delete photo')

@@ -159,7 +159,15 @@ export default function AnalyticsPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">📊 Collection Analytics</h1>
+      <div className="mb-6">
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-2 transition-colors"
+        >
+          ← Back to Dashboard
+        </button>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">📊 Collection Analytics</h1>
+      </div>
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
