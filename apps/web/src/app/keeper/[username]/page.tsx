@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
+import DashboardLayout from '@/components/DashboardLayout'
 
 interface Keeper {
   id: number
@@ -46,34 +48,26 @@ interface FollowStats {
 export default function KeeperProfilePage() {
   const params = useParams()
   const router = useRouter()
+  const { user, token } = useAuth()
   const [keeper, setKeeper] = useState<Keeper | null>(null)
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [stats, setStats] = useState<KeeperStats | null>(null)
   const [followStats, setFollowStats] = useState<FollowStats | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
-  const [currentUser, setCurrentUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const username = params?.username as string
 
   useEffect(() => {
     if (!username) return
-    checkAuth()
     fetchKeeperData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [username])
-
-  const checkAuth = () => {
-    const token = localStorage.getItem('auth_token')
-    const userJson = localStorage.getItem('user')
-    if (token && userJson) {
-      const userData = JSON.parse(userJson)
-      setCurrentUser(userData)
-      checkFollowingStatus(token)
+    if (token) {
+      checkFollowingStatus()
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username, token])
 
-  const checkFollowingStatus = async (token: string) => {
+  const checkFollowingStatus = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_URL}/api/v1/follows/${username}/is-following`, {
@@ -132,7 +126,6 @@ export default function KeeperProfilePage() {
   }
 
   const handleFollowToggle = async () => {
-    const token = localStorage.getItem('auth_token')
     if (!token) {
       router.push('/login')
       return
@@ -178,58 +171,66 @@ export default function KeeperProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🕷️</div>
-          <p className="text-xl text-gray-600">Loading keeper profile...</p>
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-6xl mb-4">🕷️</div>
+            <p className="text-xl text-gray-600 dark:text-gray-400">Loading keeper profile...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   if (error || !keeper) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
             <div className="text-6xl mb-4">🚫</div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Keeper Not Found</h1>
-            <p className="text-gray-600 mb-6">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Keeper Not Found</h1>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
               {error || 'This keeper does not exist or their profile is private.'}
             </p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => router.push('/community')}
-                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
+                className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition font-semibold"
               >
                 Browse Community
               </button>
               <button
                 onClick={() => router.push('/dashboard')}
-                className="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-semibold"
+                className="px-6 py-3 bg-surface-elevated text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-700 transition font-semibold"
               >
                 Dashboard
               </button>
             </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <button
-            onClick={() => router.push('/community')}
-            className="mb-6 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition font-medium inline-flex items-center gap-2"
-          >
-            ← Back to Community
-          </button>
-
-          <div className="flex flex-col md:flex-row items-start gap-6">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Hero Section */}
+        <div className="bg-primary-600 dark:bg-primary-700 text-white rounded-xl mb-8 shadow-lg">
+          <div className="px-6 lg:px-8 py-12">
+            <div className="flex flex-col md:flex-row items-start gap-6">
             {/* Avatar */}
             <div className="w-32 h-32 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-6xl flex-shrink-0 shadow-xl">
               {keeper.avatar_url ? (
@@ -246,10 +247,10 @@ export default function KeeperProfilePage() {
             {/* Info */}
             <div className="flex-1">
               <h1 className="text-4xl font-bold mb-2">{keeper.display_name}</h1>
-              <p className="text-xl text-purple-100 mb-4">@{keeper.username}</p>
-              
+              <p className="text-xl text-primary-100 mb-4">@{keeper.username}</p>
+
               {keeper.profile_location && (
-                <p className="text-purple-100 mb-4 flex items-center gap-2">
+                <p className="text-primary-100 mb-4 flex items-center gap-2">
                   <span>📍</span> {keeper.profile_location}
                 </p>
               )}
@@ -261,21 +262,21 @@ export default function KeeperProfilePage() {
                   </span>
                 )}
                 {keeper.profile_years_keeping && keeper.profile_years_keeping > 0 && (
-                  <span className="px-4 py-2 rounded-full font-semibold bg-white/90 text-purple-900">
+                  <span className="px-4 py-2 rounded-full font-semibold bg-white/90 text-primary-900">
                     {keeper.profile_years_keeping} {keeper.profile_years_keeping === 1 ? 'year' : 'years'} keeping
                   </span>
                 )}
               </div>
 
               {/* Follow Button and Stats */}
-              {currentUser && currentUser.username !== username && (
+              {user && user.username !== username && (
                 <div className="flex gap-3 mb-4">
                   <button
                     onClick={handleFollowToggle}
                     className={`px-6 py-2 rounded-lg font-semibold transition-all ${
                       isFollowing
                         ? 'bg-white/20 text-white border-2 border-white/40 hover:bg-white/30'
-                        : 'bg-white text-purple-700 hover:bg-purple-50'
+                        : 'bg-white text-primary-700 hover:bg-primary-50'
                     }`}
                   >
                     {isFollowing ? '✓ Following' : '+ Follow'}
@@ -285,7 +286,7 @@ export default function KeeperProfilePage() {
 
               {/* Followers/Following Stats */}
               {followStats && (
-                <div className="flex gap-4 mb-4 text-purple-100">
+                <div className="flex gap-4 mb-4 text-primary-100">
                   <div>
                     <span className="font-bold text-white">{followStats.followers_count}</span> Followers
                   </div>
@@ -333,83 +334,83 @@ export default function KeeperProfilePage() {
             </div>
           </div>
         </div>
+        </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - About & Stats */}
-          <div className="space-y-6">
-            {/* About */}
-            {keeper.profile_bio && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-3">About</h2>
-                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{keeper.profile_bio}</p>
-              </div>
-            )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column - About & Stats */}
+        <div className="space-y-6">
+          {/* About */}
+          {keeper.profile_bio && (
+            <div className="bg-surface border border-theme rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3">About</h2>
+              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">{keeper.profile_bio}</p>
+            </div>
+          )}
 
-            {/* Specialties */}
-            {keeper.profile_specialties && keeper.profile_specialties.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-3">Specialties</h2>
-                <div className="flex flex-wrap gap-2">
-                  {keeper.profile_specialties.map((specialty) => (
-                    <span
-                      key={specialty}
-                      className="px-3 py-2 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium"
-                    >
-                      {formatSpecialty(specialty)}
-                    </span>
-                  ))}
+          {/* Specialties */}
+          {keeper.profile_specialties && keeper.profile_specialties.length > 0 && (
+            <div className="bg-surface border border-theme rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Specialties</h2>
+              <div className="flex flex-wrap gap-2">
+                {keeper.profile_specialties.map((specialty) => (
+                  <span
+                    key={specialty}
+                    className="px-3 py-2 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-lg text-sm font-medium"
+                  >
+                    {formatSpecialty(specialty)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Stats */}
+          {stats && (
+            <div className="bg-primary-600 dark:bg-primary-700 rounded-xl shadow-lg p-6 text-white">
+              <h2 className="text-xl font-bold mb-4">Collection Stats</h2>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-primary-100">Public Tarantulas</span>
+                  <span className="text-2xl font-bold">{stats.total_public}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-primary-100">Unique Species</span>
+                  <span className="text-2xl font-bold">{stats.unique_species}</span>
+                </div>
+                <div className="flex justify-between items-center pt-3 border-t border-white/20">
+                  <span className="text-primary-100">♂️ Males</span>
+                  <span className="text-lg font-bold">{stats.males}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-primary-100">♀️ Females</span>
+                  <span className="text-lg font-bold">{stats.females}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-primary-100">⚧ Unsexed</span>
+                  <span className="text-lg font-bold">{stats.unsexed}</span>
                 </div>
               </div>
-            )}
+            </div>
+          )}
+        </div>
 
-            {/* Stats */}
-            {stats && (
-              <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl shadow-lg p-6 text-white">
-                <h2 className="text-xl font-bold mb-4">Collection Stats</h2>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-purple-100">Public Tarantulas</span>
-                    <span className="text-2xl font-bold">{stats.total_public}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-purple-100">Unique Species</span>
-                    <span className="text-2xl font-bold">{stats.unique_species}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-white/20">
-                    <span className="text-purple-100">♂️ Males</span>
-                    <span className="text-lg font-bold">{stats.males}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-purple-100">♀️ Females</span>
-                    <span className="text-lg font-bold">{stats.females}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-purple-100">⚧ Unsexed</span>
-                    <span className="text-lg font-bold">{stats.unsexed}</span>
-                  </div>
-                </div>
+        {/* Right Column - Collection */}
+        <div className="lg:col-span-2">
+          <div className="bg-surface border border-theme rounded-xl shadow-sm p-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Public Collection</h2>
+
+            {tarantulas.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                <div className="text-5xl mb-3">🕷️</div>
+                <p>No public tarantulas yet</p>
               </div>
-            )}
-          </div>
-
-          {/* Right Column - Collection */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Public Collection</h2>
-              
-              {tarantulas.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <div className="text-5xl mb-3">🕷️</div>
-                  <p>No public tarantulas yet</p>
-                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {tarantulas.map((tarantula) => (
                     <div
                       key={tarantula.id}
-                      className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 border border-gray-200"
+                      className="bg-surface-elevated rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 border border-theme"
                     >
                       {tarantula.photo_url ? (
                         <div className="relative h-48">
@@ -427,20 +428,20 @@ export default function KeeperProfilePage() {
                       ) : (
                         <div className="p-4">
                           <div className="text-4xl mb-2 text-center">🕷️</div>
-                          <h3 className="font-bold text-gray-900">{tarantula.common_name}</h3>
-                          <p className="text-sm italic text-gray-600">{tarantula.scientific_name}</p>
+                          <h3 className="font-bold text-gray-900 dark:text-white">{tarantula.common_name}</h3>
+                          <p className="text-sm italic text-gray-600 dark:text-gray-400">{tarantula.scientific_name}</p>
                         </div>
                       )}
-                      
+
                       <div className="p-4">
                         <div className="flex gap-2">
                           {tarantula.sex && (
-                            <span className="px-2 py-1 bg-white rounded text-xs font-semibold text-gray-700">
+                            <span className="px-2 py-1 bg-surface rounded text-xs font-semibold text-gray-700 dark:text-gray-300">
                               {tarantula.sex === 'male' ? '♂️ Male' : tarantula.sex === 'female' ? '♀️ Female' : '⚧ Unsexed'}
                             </span>
                           )}
                           {tarantula.date_acquired && (
-                            <span className="px-2 py-1 bg-white rounded text-xs font-semibold text-gray-700">
+                            <span className="px-2 py-1 bg-surface rounded text-xs font-semibold text-gray-700 dark:text-gray-300">
                               {new Date(tarantula.date_acquired).toLocaleDateString()}
                             </span>
                           )}
@@ -454,6 +455,6 @@ export default function KeeperProfilePage() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }
