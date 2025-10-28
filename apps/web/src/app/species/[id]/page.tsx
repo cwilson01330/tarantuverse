@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
+import DashboardLayout from '@/components/DashboardLayout'
 
 interface Species {
   id: string
@@ -39,36 +41,17 @@ export default function EnhancedSpeciesDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
+  const { user: authUser } = useAuth()
 
   const [species, setSpecies] = useState<Species | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
-  const [user, setUser] = useState<any>(null)
   const [addingToCollection, setAddingToCollection] = useState(false)
 
   useEffect(() => {
     fetchSpecies()
-    fetchUser()
   }, [id])
-
-  const fetchUser = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) return
-
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_URL}/api/v1/auth/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setUser(data)
-      }
-    } catch (err) {
-      console.error('Failed to fetch user:', err)
-    }
-  }
 
   const fetchSpecies = async () => {
     try {
@@ -139,64 +122,51 @@ export default function EnhancedSpeciesDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="text-6xl mb-4 animate-bounce">🕷️</div>
-          <p className="text-gray-600 dark:text-gray-400">Loading species details...</p>
+      <DashboardLayout
+        userName={authUser?.name ?? undefined}
+        userEmail={authUser?.email ?? undefined}
+        userAvatar={authUser?.image ?? undefined}
+      >
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="text-center">
+            <div className="text-6xl mb-4 animate-bounce">🕷️</div>
+            <p className="text-gray-600 dark:text-gray-400">Loading species details...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   if (error || !species) {
     return (
-      <div className="min-h-screen p-8 bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-4xl mx-auto">
-          <button
-            onClick={() => router.back()}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4 flex items-center gap-2"
-          >
-            ← Back
-          </button>
-          <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg">
-            <h2 className="text-lg font-semibold mb-2">Species Not Found</h2>
-            <p>{error || 'The requested species could not be found.'}</p>
+      <DashboardLayout
+        userName={authUser?.name ?? undefined}
+        userEmail={authUser?.email ?? undefined}
+        userAvatar={authUser?.image ?? undefined}
+      >
+        <div className="p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg">
+              <h2 className="text-lg font-semibold mb-2">Species Not Found</h2>
+              <p>{error || 'The requested species could not be found.'}</p>
+            </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   const careLevel = getCareLevel(species.care_level)
   const typeIcon = getTypeIcon(species.type)
-  const canEdit = user && (user.is_admin || user.is_superuser) // TODO: Add premium check
+  const canEdit = authUser && (authUser.is_admin || authUser.is_superuser) // TODO: Add premium check
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Breadcrumb Navigation */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-2 text-sm">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
-            >
-              Home
-            </button>
-            <span className="text-gray-400 dark:text-gray-600">/</span>
-            <button
-              onClick={() => router.push('/species')}
-              className="text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
-            >
-              Species Database
-            </button>
-            <span className="text-gray-400 dark:text-gray-600">/</span>
-            <span className="text-gray-900 dark:text-white font-medium">
-              {species.scientific_name}
-            </span>
-          </div>
-        </div>
-      </div>
+    <DashboardLayout
+      userName={authUser?.name ?? undefined}
+      userEmail={authUser?.email ?? undefined}
+      userAvatar={authUser?.image ?? undefined}
+    >
+      <div>
 
       {/* Hero Section */}
       <div className="relative h-96 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700">
@@ -562,6 +532,6 @@ export default function EnhancedSpeciesDetailPage() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

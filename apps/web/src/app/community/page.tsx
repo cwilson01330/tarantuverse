@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
+import DashboardLayout from '@/components/DashboardLayout'
 import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonList } from '@/components/ui/skeleton'
 
@@ -25,6 +27,7 @@ interface Keeper {
 
 export default function CommunityPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [keepers, setKeepers] = useState<Keeper[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -85,64 +88,53 @@ export default function CommunityPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-dark">
-        {/* Header skeleton */}
-        <div className="bg-gradient-primary text-white shadow-lg shadow-electric-blue-500/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="animate-pulse">
-              <div className="h-10 w-64 bg-white/30 rounded mb-2"></div>
-              <div className="h-6 w-48 bg-white/20 rounded"></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content skeleton */}
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <SkeletonList count={6} />
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
-      {/* Header */}
-      <div className="bg-gradient-primary text-white shadow-lg shadow-electric-blue-500/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between mb-4">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-4xl font-bold mb-2">🌐 Keeper Community</h1>
-              <p className="text-electric-blue-100 text-lg">Discover fellow tarantula enthusiasts</p>
+              <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">🌐 Keeper Community</h1>
+              <p className="text-gray-600 dark:text-gray-400 text-lg">Discover fellow tarantula enthusiasts</p>
             </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => router.push('/community/forums')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium border border-white/20"
-              >
-                💬 Forums
-              </button>
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium border border-white/20"
-              >
-                ← Dashboard
-              </button>
-            </div>
+            <button
+              onClick={() => router.push('/community/forums')}
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-all duration-200 font-medium"
+            >
+              💬 Forums
+            </button>
           </div>
 
           {/* Search and Filters */}
-          <div className="mt-6 space-y-3">
+          <div className="space-y-3">
             <form onSubmit={handleSearch} className="flex gap-2">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by username, name, or location..."
-                className="flex-1 px-4 py-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder-electric-blue-200 focus:outline-none focus:ring-2 focus:ring-white/30"
+                className="flex-1 px-4 py-3 rounded-lg bg-surface-elevated border border-theme text-theme-primary placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600"
               />
               <button
                 type="submit"
-                className="px-6 py-3 bg-white text-electric-blue-600 rounded-lg hover:bg-electric-blue-50 transition font-semibold"
+                className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-semibold"
               >
                 Search
               </button>
@@ -152,29 +144,29 @@ export default function CommunityPage() {
               <select
                 value={experienceFilter}
                 onChange={(e) => setExperienceFilter(e.target.value)}
-                className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                className="px-4 py-2 rounded-lg bg-surface-elevated border border-theme text-theme-primary focus:outline-none focus:ring-2 focus:ring-primary-600"
               >
-                <option value="" className="bg-dark text-gray-100">All Experience Levels</option>
-                <option value="beginner" className="bg-dark text-gray-100">Beginner</option>
-                <option value="intermediate" className="bg-dark text-gray-100">Intermediate</option>
-                <option value="advanced" className="bg-dark text-gray-100">Advanced</option>
-                <option value="expert" className="bg-dark text-gray-100">Expert</option>
+                <option value="">All Experience Levels</option>
+                <option value="beginner">Beginner</option>
+                <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
+                <option value="expert">Expert</option>
               </select>
 
               <select
                 value={specialtyFilter}
                 onChange={(e) => setSpecialtyFilter(e.target.value)}
-                className="px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                className="px-4 py-2 rounded-lg bg-surface-elevated border border-theme text-theme-primary focus:outline-none focus:ring-2 focus:ring-primary-600"
               >
-                <option value="" className="bg-dark text-gray-100">All Specialties</option>
-                <option value="terrestrial" className="bg-dark text-gray-100">Terrestrial</option>
-                <option value="arboreal" className="bg-dark text-gray-100">Arboreal</option>
-                <option value="fossorial" className="bg-dark text-gray-100">Fossorial</option>
-                <option value="new_world" className="bg-dark text-gray-100">New World</option>
-                <option value="old_world" className="bg-dark text-gray-100">Old World</option>
-                <option value="breeding" className="bg-dark text-gray-100">Breeding</option>
-                <option value="slings" className="bg-dark text-gray-100">Slings</option>
-                <option value="large_species" className="bg-dark text-gray-100">Large Species</option>
+                <option value="">All Specialties</option>
+                <option value="terrestrial">Terrestrial</option>
+                <option value="arboreal">Arboreal</option>
+                <option value="fossorial">Fossorial</option>
+                <option value="new_world">New World</option>
+                <option value="old_world">Old World</option>
+                <option value="breeding">Breeding</option>
+                <option value="slings">Slings</option>
+                <option value="large_species">Large Species</option>
               </select>
 
               {(experienceFilter || specialtyFilter || searchQuery) && (
@@ -185,7 +177,7 @@ export default function CommunityPage() {
                     setSearchQuery('')
                     fetchKeepers()
                   }}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition font-medium border border-white/20"
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg transition font-medium text-theme-primary"
                 >
                   Clear Filters
                 </button>
@@ -193,18 +185,16 @@ export default function CommunityPage() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="bg-dark-50 border-b border-electric-blue-500/20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Tabs */}
+        <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
           <div className="flex gap-1">
             <button
               onClick={() => setActiveTab('keepers')}
               className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
                 activeTab === 'keepers'
-                  ? 'border-electric-blue-500 text-electric-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
+                  ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
               👥 Keepers
@@ -213,22 +203,21 @@ export default function CommunityPage() {
               onClick={() => setActiveTab('activity')}
               className={`px-6 py-4 font-semibold border-b-2 transition-colors ${
                 activeTab === 'activity'
-                  ? 'border-neon-pink-500 text-neon-pink-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-300'
+                  ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
               📊 Community Activity
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Content */}
+        <div>
         {activeTab === 'keepers' ? (
           <>
             {error && (
-              <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-xl">
+              <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/20 border border-red-400 dark:border-red-500/50 text-red-700 dark:text-red-300 rounded-xl">
                 {error}
               </div>
             )}
@@ -236,15 +225,15 @@ export default function CommunityPage() {
         {keepers.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-6xl mb-4">🔍</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">No keepers found</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">No keepers found</h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
               {searchQuery || experienceFilter || specialtyFilter
                 ? 'Try adjusting your filters or search query'
                 : 'Be the first to make your collection public!'}
             </p>
             <button
               onClick={() => router.push('/dashboard/settings/profile')}
-              className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
+              className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-semibold"
             >
               Update Your Profile
             </button>
@@ -252,7 +241,7 @@ export default function CommunityPage() {
         ) : (
           <>
             <div className="mb-6">
-              <p className="text-gray-600">
+              <p className="text-gray-600 dark:text-gray-400">
                 Found <strong>{keepers.length}</strong> keeper{keepers.length !== 1 ? 's' : ''}
               </p>
             </div>
@@ -262,7 +251,7 @@ export default function CommunityPage() {
                 <div
                   key={keeper.id}
                   onClick={() => router.push(`/community/${keeper.username}`)}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-xl hover:border-purple-200 transition-all duration-200 cursor-pointer group"
+                  className="bg-surface rounded-2xl shadow-sm border border-theme p-6 hover:shadow-xl hover:border-primary-600 dark:hover:border-primary-400 transition-all duration-200 cursor-pointer group"
                 >
                   <div className="flex items-start gap-4 mb-4">
                     <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-3xl flex-shrink-0 group-hover:scale-110 transition-transform">
@@ -277,18 +266,18 @@ export default function CommunityPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-xl font-bold text-gray-900 truncate group-hover:text-purple-600 transition">
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition">
                         {keeper.display_name}
                       </h3>
-                      <p className="text-sm text-gray-500">@{keeper.username}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">@{keeper.username}</p>
                       {keeper.profile_location && (
-                        <p className="text-sm text-gray-600 mt-1">📍 {keeper.profile_location}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">📍 {keeper.profile_location}</p>
                       )}
                     </div>
                   </div>
 
                   {keeper.profile_bio && (
-                    <p className="text-gray-700 text-sm mb-4 line-clamp-3">
+                    <p className="text-gray-700 dark:text-gray-300 text-sm mb-4 line-clamp-3">
                       {keeper.profile_bio}
                     </p>
                   )}
@@ -308,18 +297,18 @@ export default function CommunityPage() {
 
                   {keeper.profile_specialties && keeper.profile_specialties.length > 0 && (
                     <div className="mb-4">
-                      <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Specialties</p>
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Specialties</p>
                       <div className="flex flex-wrap gap-1">
                         {keeper.profile_specialties.slice(0, 3).map((specialty) => (
                           <span
                             key={specialty}
-                            className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs"
+                            className="px-2 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded text-xs"
                           >
                             {formatSpecialty(specialty)}
                           </span>
                         ))}
                         {keeper.profile_specialties.length > 3 && (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                          <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">
                             +{keeper.profile_specialties.length - 3} more
                           </span>
                         )}
@@ -327,8 +316,8 @@ export default function CommunityPage() {
                     </div>
                   )}
 
-                  <div className="pt-4 border-t border-gray-100">
-                    <button className="w-full py-2 text-purple-600 font-semibold hover:text-purple-700 transition flex items-center justify-center gap-2">
+                  <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <button className="w-full py-2 text-primary-600 dark:text-primary-400 font-semibold hover:text-primary-700 dark:hover:text-primary-300 transition flex items-center justify-center gap-2">
                       View Collection
                       <span className="group-hover:translate-x-1 transition-transform">→</span>
                     </button>
@@ -342,11 +331,12 @@ export default function CommunityPage() {
         ) : (
           // Activity Feed Tab
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">Community Activity</h2>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">Community Activity</h2>
             <ActivityFeed feedType="global" showFilters={true} />
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

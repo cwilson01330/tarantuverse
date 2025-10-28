@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
+import DashboardLayout from '@/components/DashboardLayout';
 
 interface Species {
   id: string;
@@ -26,6 +28,7 @@ interface Species {
 
 export default function SpeciesPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [species, setSpecies] = useState<Species[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -90,31 +93,19 @@ export default function SpeciesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Navigation Bar */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-          >
-            ←
-            <span>Back to Dashboard</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Header */}
-      <div className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <h1 className="text-4xl font-bold mb-3">Species Database</h1>
-          <p className="text-white/90 text-lg">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-3 text-gray-900 dark:text-white">Species Database</h1>
+          <p className="text-gray-600 dark:text-gray-400 text-lg">
             Comprehensive care guides for tarantula species
           </p>
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search and Filter Bar */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -381,6 +372,6 @@ export default function SpeciesPage() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
