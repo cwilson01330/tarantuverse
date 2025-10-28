@@ -44,7 +44,9 @@ species_data = [
         "feeding_frequency_days": 7,
         "typical_diet": "Crickets, roaches",
         "is_verified": True,
-        "image_url": "/species-images/grammostola_rosea.jpg"
+        "image_url": "/species-images/grammostola_rosea.jpg",
+        "urticating_hairs": True,
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Brachypelma hamorii",
@@ -71,7 +73,9 @@ species_data = [
         "feeding_frequency_days": 7,
         "typical_diet": "Crickets, roaches",
         "is_verified": True,
-        "image_url": "/species-images/brachypelma_hamorii.jpg"
+        "image_url": "/species-images/brachypelma_hamorii.jpg",
+        "urticating_hairs": True,
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Brachypelma albopilosum",
@@ -98,7 +102,9 @@ species_data = [
         "feeding_frequency_days": 5,
         "typical_diet": "Crickets, roaches",
         "is_verified": True,
-        "image_url": "/species-images/tliltocatl_albopilosus.jpg"
+        "image_url": "/species-images/tliltocatl_albopilosus.jpg",
+        "urticating_hairs": True,
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Aphonopelma chalcodes",
@@ -125,7 +131,9 @@ species_data = [
         "feeding_frequency_days": 7,
         "typical_diet": "Crickets, roaches",
         "is_verified": True,
-        "image_url": "/species-images/aphonopelma_chalcodes.jpg"
+        "image_url": "/species-images/aphonopelma_chalcodes.jpg",
+        "urticating_hairs": True,
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Grammostola pulchra",
@@ -230,7 +238,9 @@ species_data = [
         "feeding_frequency_days": 5,
         "typical_diet": "Crickets, roaches",
         "is_verified": True,
-        "image_url": "/species-images/tliltocatl_albopilosus.jpg"
+        "image_url": "/species-images/tliltocatl_albopilosus.jpg",
+        "urticating_hairs": True,
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Lasiodora parahybana",

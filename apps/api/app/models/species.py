@@ -58,6 +58,10 @@ class Species(Base):
     webbing_amount = Column(String(50))  # "light", "moderate", "heavy"
     burrowing = Column(Boolean, default=False)
 
+    # Safety Information
+    urticating_hairs = Column(Boolean, default=True)  # New World tarantulas
+    medically_significant_venom = Column(Boolean, default=False)  # Old World arboreals (Poecilotheria, etc.)
+
     # Documentation
     care_guide = Column(Text)  # Markdown formatted care guide
     image_url = Column(String(500))

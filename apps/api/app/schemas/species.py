@@ -43,6 +43,10 @@ class SpeciesBase(BaseModel):
     webbing_amount: Optional[str] = None
     burrowing: bool = False
 
+    # Safety Information
+    urticating_hairs: bool = True  # New World tarantulas
+    medically_significant_venom: bool = False  # Old World arboreals
+
     # Documentation
     care_guide: Optional[str] = None
     image_url: Optional[str] = None
@@ -82,6 +86,8 @@ class SpeciesUpdate(BaseModel):
     water_dish_required: Optional[bool] = None
     webbing_amount: Optional[str] = None
     burrowing: Optional[bool] = None
+    urticating_hairs: Optional[bool] = None
+    medically_significant_venom: Optional[bool] = None
     care_guide: Optional[str] = None
     image_url: Optional[str] = None
     source_url: Optional[str] = None
