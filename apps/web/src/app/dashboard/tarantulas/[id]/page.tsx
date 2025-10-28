@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuth } from '@/hooks/useAuth'
 import GrowthChart from '@/components/GrowthChart'
 import FeedingStatsCard from '@/components/FeedingStatsCard'
+import DashboardLayout from '@/components/DashboardLayout'
 
 interface Tarantula {
   id: string
@@ -142,7 +143,7 @@ export default function TarantulaDetailPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
-  const { data: session, status } = useSession()
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
 
   const [tarantula, setTarantula] = useState<Tarantula | null>(null)
   const [feedings, setFeedings] = useState<FeedingLog[]>([])
@@ -187,22 +188,11 @@ export default function TarantulaDetailPage() {
     notes: '',
   })
 
-  // Helper function to get auth token from either NextAuth or localStorage
-  const getAuthToken = (): string | null => {
-    let token = localStorage.getItem('auth_token')
-    if (!token && session?.accessToken) {
-      token = session.accessToken as string
-    }
-    return token
-  }
-
   useEffect(() => {
-    // Wait for session to load
-    if (status === 'loading') return
+    // Wait for auth to load
+    if (authLoading) return
 
-    const token = getAuthToken()
-
-    if (!token) {
+    if (!isAuthenticated || !token) {
       router.push('/login')
       return
     }
@@ -215,7 +205,7 @@ export default function TarantulaDetailPage() {
     fetchGrowth(token)
     fetchFeedingStats(token)
     fetchPairings(token)
-  }, [id, router, session, status])
+  }, [id, router, isAuthenticated, authLoading, token])
 
   const fetchTarantula = async (token: string) => {
     try {
@@ -260,7 +250,6 @@ export default function TarantulaDetailPage() {
   const handleAddFeeding = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -294,7 +283,6 @@ export default function TarantulaDetailPage() {
 
   const handleDeleteFeeding = async (feedingId: string) => {
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -336,7 +324,6 @@ export default function TarantulaDetailPage() {
   const handleAddMolt = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -385,7 +372,6 @@ export default function TarantulaDetailPage() {
 
   const handleDeleteMolt = async (moltId: string) => {
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -427,7 +413,6 @@ export default function TarantulaDetailPage() {
   const handleAddSubstrateChange = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -463,7 +448,6 @@ export default function TarantulaDetailPage() {
 
   const handleDeleteSubstrateChange = async (changeId: string) => {
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -486,7 +470,6 @@ export default function TarantulaDetailPage() {
 
   const handleDelete = async () => {
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -509,7 +492,6 @@ export default function TarantulaDetailPage() {
 
   const handleVisibilityToggle = async () => {
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       
@@ -628,7 +610,6 @@ export default function TarantulaDetailPage() {
 
     try {
       setUploadingPhoto(true)
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -662,7 +643,6 @@ export default function TarantulaDetailPage() {
     if (!confirm('Are you sure you want to delete this photo?')) return
 
     try {
-      const token = getAuthToken()
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -686,27 +666,29 @@ export default function TarantulaDetailPage() {
     }
   }
 
-  if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Loading...</div>
+  if (loading || authLoading) {
+    return (
+      <DashboardLayout userName="Loading..." userEmail="">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-gray-900 dark:text-white">Loading...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   if (error && !tarantula) {
     return (
-      <div className="min-h-screen p-8 bg-white dark:bg-gray-900">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-6">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            >
-              ← Back to Dashboard
-            </button>
-          </div>
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded">
             {error}
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
@@ -720,7 +702,12 @@ export default function TarantulaDetailPage() {
     : null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       {/* Hero Section with Image */}
       <div className="relative">
         {/* Background Image or Gradient */}
@@ -1890,6 +1877,7 @@ export default function TarantulaDetailPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

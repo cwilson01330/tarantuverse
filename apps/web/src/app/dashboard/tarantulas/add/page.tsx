@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
+import DashboardLayout from '@/components/DashboardLayout'
 
 interface SelectedSpecies {
   id: string
@@ -16,7 +17,7 @@ interface SelectedSpecies {
 
 export default function AddTarantulaPage() {
   const router = useRouter()
-  const { token, isAuthenticated, isLoading } = useAuth()
+  const { user, token, isAuthenticated, isLoading } = useAuth()
   const [formData, setFormData] = useState({
     common_name: '',
     scientific_name: '',
@@ -133,8 +134,12 @@ export default function AddTarantulaPage() {
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-2xl mx-auto">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <button
             onClick={() => router.push('/dashboard')}
@@ -450,6 +455,6 @@ export default function AddTarantulaPage() {
           </div>
         </form>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

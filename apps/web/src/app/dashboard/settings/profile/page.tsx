@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useAuth } from '@/hooks/useAuth'
+import DashboardLayout from '@/components/DashboardLayout'
 
 export default function ProfileSettingsPage() {
   const router = useRouter()
-  const { data: session } = useSession()
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
   const [formData, setFormData] = useState({
     display_name: '',
     avatar_url: '',
@@ -39,22 +40,15 @@ export default function ProfileSettingsPage() {
   ]
 
   useEffect(() => {
-    // Try localStorage first (email/password auth)
-    let token = localStorage.getItem('auth_token')
+    if (authLoading) return
 
-    // If not in localStorage, check NextAuth session (OAuth)
-    if (!token && session?.accessToken) {
-      token = session.accessToken as string
-    }
-
-    if (!token) {
+    if (!isAuthenticated || !token) {
       router.push('/login')
       return
     }
 
     fetchProfile(token)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session])
+  }, [authLoading, isAuthenticated, token])
 
   const fetchProfile = async (token: string) => {
     try {
@@ -113,14 +107,6 @@ export default function ProfileSettingsPage() {
     setSubmitting(true)
 
     try {
-      // Try localStorage first (email/password auth)
-      let token = localStorage.getItem('auth_token')
-
-      // If not in localStorage, check NextAuth session (OAuth)
-      if (!token && session?.accessToken) {
-        token = session.accessToken as string
-      }
-
       if (!token) {
         setError('No authentication token found. Please log in again.')
         router.push('/login')
@@ -177,24 +163,29 @@ export default function ProfileSettingsPage() {
     }
   }
 
-  if (loading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
+  if (loading || authLoading) {
+    return (
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="flex items-center justify-center py-12">
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-theme p-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="mb-6">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="text-theme-secondary hover:text-theme-primary"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
-
-        <h1 className="text-4xl font-bold mb-2 text-theme-primary">Profile Settings</h1>
-        <p className="text-theme-secondary mb-8">Manage your public profile and privacy settings</p>
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">👤 Profile Settings</h1>
+        <p className="text-gray-600 dark:text-gray-400 mb-8">Manage your public profile and privacy settings</p>
 
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -423,6 +414,6 @@ export default function ProfileSettingsPage() {
           </div>
         </form>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

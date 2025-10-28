@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
+import DashboardLayout from '@/components/DashboardLayout'
 
 interface Tarantula {
   id: string
@@ -29,6 +31,7 @@ export default function EditHusbandryPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
 
   const [tarantula, setTarantula] = useState<Tarantula | null>(null)
   const [loading, setLoading] = useState(true)
@@ -50,14 +53,15 @@ export default function EditHusbandryPage() {
   })
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
+    if (authLoading) return
+
+    if (!isAuthenticated || !token) {
       router.push('/login')
       return
     }
 
     fetchTarantula(token)
-  }, [id, router])
+  }, [id, router, isAuthenticated, authLoading, token])
 
   const fetchTarantula = async (token: string) => {
     try {
@@ -103,8 +107,13 @@ export default function EditHusbandryPage() {
     setError('')
     setLoading(true)
 
+    if (!token) {
+      setError('Not authenticated')
+      setLoading(false)
+      return
+    }
+
     try {
-      const token = localStorage.getItem('auth_token')
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       // Prepare data - convert empty strings to null
@@ -148,33 +157,47 @@ export default function EditHusbandryPage() {
     }
   }
 
-  if (loading && !tarantula) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
+  if (loading && !tarantula || authLoading) {
+    return (
+      <DashboardLayout userName="Loading..." userEmail="">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-gray-900 dark:text-white">Loading...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   if (error && !tarantula) {
     return (
-      <div className="min-h-screen p-8">
-        <div className="max-w-2xl mx-auto">
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="mb-6">
             <button
               onClick={() => router.push(`/dashboard/tarantulas/${id}`)}
-              className="text-gray-600 hover:text-gray-900"
+              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             >
               ← Back to Tarantula
             </button>
           </div>
-          <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded">
             {error}
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-2xl mx-auto">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <button
             onClick={() => router.push(`/dashboard/tarantulas/${id}`)}
@@ -401,6 +424,6 @@ export default function EditHusbandryPage() {
           </div>
         </form>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

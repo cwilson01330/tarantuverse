@@ -2,56 +2,34 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/hooks/useAuth';
 import { useThemeStore } from '@/stores/themeStore';
+import DashboardLayout from '@/components/DashboardLayout';
 
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useThemeStore();
-  const { data: session } = useSession();
+  const { user: authUser, token, isAuthenticated, isLoading: authLoading } = useAuth();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string>('');
 
   useEffect(() => {
-    // Use setTimeout to ensure this runs after component mounts
-    const timer = setTimeout(() => {
-      fetchUser();
-    }, 0);
+    if (authLoading) return;
 
-    return () => clearTimeout(timer);
-  }, [session]);
+    if (!isAuthenticated || !token) {
+      router.push('/login');
+      return;
+    }
+
+    fetchUser();
+  }, [authLoading, isAuthenticated, token]);
 
   const fetchUser = async () => {
     try {
-      // Check if we're in the browser
-      if (typeof window === 'undefined') {
-        console.log('Settings - Not in browser yet');
-        return;
-      }
-
-      // Try localStorage first (email/password auth)
-      let token = localStorage.getItem('auth_token');
-
-      // If not in localStorage, check NextAuth session (OAuth)
-      if (!token && session?.accessToken) {
-        console.log('Settings - Using NextAuth session');
-        token = session.accessToken as string;
-      }
-
-      console.log('Settings - Auth check:', {
-        hasToken: !!token,
-        isOAuth: !!session,
-        tokenPreview: token ? token.substring(0, 20) + '...' : 'none'
-      });
-
       if (!token) {
         setAuthError('No authentication found. Please log in.');
-        console.log('Settings - No auth, redirecting to login');
-        // Give user a moment to see the error before redirect
-        setTimeout(() => {
-          router.push('/login');
-        }, 1000);
+        router.push('/login');
         return;
       }
 
@@ -69,7 +47,6 @@ export default function SettingsPage() {
         }
 
         const userData = await response.json();
-        console.log('Settings - User loaded from API:', userData);
         setUser(userData);
         setAuthError('');
       } catch (apiError) {
@@ -84,46 +61,42 @@ export default function SettingsPage() {
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
-      <div className="min-h-screen bg-theme flex items-center justify-center">
-        <div className="text-center">
-          {authError ? (
-            <>
-              <div className="text-6xl mb-4">⚠️</div>
-              <p className="text-theme-primary text-xl mb-2">Authentication Error</p>
-              <p className="text-theme-secondary">{authError}</p>
-              <p className="text-theme-tertiary mt-4">Redirecting to login...</p>
-            </>
-          ) : (
-            <>
-              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-theme-secondary">Loading settings...</p>
-            </>
-          )}
+      <DashboardLayout
+        userName={authUser?.name ?? undefined}
+        userEmail={authUser?.email ?? undefined}
+        userAvatar={authUser?.image ?? undefined}
+      >
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            {authError ? (
+              <>
+                <div className="text-6xl mb-4">⚠️</div>
+                <p className="text-gray-900 dark:text-white text-xl mb-2">Authentication Error</p>
+                <p className="text-gray-600 dark:text-gray-400">{authError}</p>
+                <p className="text-gray-500 dark:text-gray-500 mt-4">Redirecting to login...</p>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">Loading settings...</p>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-theme">
-      {/* Header */}
-      <div className="bg-gradient-brand shadow-lg shadow-gradient-brand">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="text-white hover:text-white/80 transition-colors"
-            >
-              ← Back to Dashboard
-            </button>
-            <h1 className="text-3xl font-bold text-white">Settings</h1>
-          </div>
-        </div>
-      </div>
-
+    <DashboardLayout
+      userName={authUser?.name ?? undefined}
+      userEmail={authUser?.email ?? undefined}
+      userAvatar={authUser?.image ?? undefined}
+    >
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">⚙️ Settings</h1>
         {/* Appearance Section */}
         <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
@@ -252,6 +225,6 @@ export default function SettingsPage() {
           </div>
         </section>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

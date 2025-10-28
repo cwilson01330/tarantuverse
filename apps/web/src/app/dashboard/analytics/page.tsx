@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import DashboardLayout from "@/components/DashboardLayout";
 import apiClient from "@/lib/api";
 
 interface SpeciesCount {
@@ -53,6 +55,7 @@ interface CollectionAnalytics {
 
 export default function AnalyticsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [analytics, setAnalytics] = useState<CollectionAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,55 +104,73 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i} className="animate-pulse bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-              <CardHeader>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              </CardContent>
-            </Card>
-          ))}
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="container mx-auto p-6">
+          <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="animate-pulse bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                <CardHeader>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   if (error || !analytics) {
     return (
-      <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardContent className="p-6">
-            <p className="text-red-600 dark:text-red-400">{error || "No data available"}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="container mx-auto p-6">
+          <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <CardContent className="p-6">
+              <p className="text-red-600 dark:text-red-400">{error || "No data available"}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (analytics.total_tarantulas === 0) {
     return (
-      <div className="container mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-          <CardContent className="p-6 text-center">
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              No tarantulas in your collection yet!
-            </p>
-            <button
-              onClick={() => router.push("/dashboard/tarantulas/new")}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Add Your First Tarantula
-            </button>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="container mx-auto p-6">
+          <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">Collection Analytics</h1>
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <CardContent className="p-6 text-center">
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                No tarantulas in your collection yet!
+              </p>
+              <button
+                onClick={() => router.push("/dashboard/tarantulas/new")}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Add Your First Tarantula
+              </button>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     );
   }
 
@@ -158,7 +179,12 @@ export default function AnalyticsPage() {
   const femalePercent = totalSexed > 0 ? (analytics.sex_distribution.female / totalSexed * 100).toFixed(1) : 0;
 
   return (
-    <div className="container mx-auto p-6">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="container mx-auto p-6">
       <div className="mb-6">
         <button
           onClick={() => router.push('/dashboard')}
@@ -396,6 +422,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

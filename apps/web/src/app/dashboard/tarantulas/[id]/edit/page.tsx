@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
+import DashboardLayout from '@/components/DashboardLayout'
 
 interface SelectedSpecies {
   id: string
@@ -17,6 +19,7 @@ export default function EditTarantulaPage() {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
+  const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
 
   const [formData, setFormData] = useState({
     common_name: '',
@@ -49,14 +52,15 @@ export default function EditTarantulaPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
+    if (authLoading) return
+
+    if (!isAuthenticated || !token) {
       router.push('/login')
       return
     }
 
     fetchTarantula(token)
-  }, [id, router])
+  }, [id, router, isAuthenticated, authLoading, token])
 
   const fetchTarantula = async (token: string) => {
     try {
@@ -122,8 +126,13 @@ export default function EditTarantulaPage() {
     setError('')
     setSubmitting(true)
 
+    if (!token) {
+      setError('Not authenticated')
+      setSubmitting(false)
+      return
+    }
+
     try {
-      const token = localStorage.getItem('auth_token')
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const submitData = {
@@ -175,13 +184,23 @@ export default function EditTarantulaPage() {
     }
   }
 
-  if (loading) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>
+  if (loading || authLoading) {
+    return (
+      <DashboardLayout userName="Loading..." userEmail="">
+        <div className="flex items-center justify-center py-12">
+          <p className="text-gray-900 dark:text-white">Loading...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="max-w-2xl mx-auto">
+    <DashboardLayout
+      userName={user?.name ?? undefined}
+      userEmail={user?.email ?? undefined}
+      userAvatar={user?.image ?? undefined}
+    >
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <button
             onClick={() => router.push(`/dashboard/tarantulas/${id}`)}
@@ -494,6 +513,6 @@ export default function EditTarantulaPage() {
           </div>
         </form>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }
