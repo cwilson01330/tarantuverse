@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import apiClient from '@/lib/api'
 
@@ -54,7 +55,8 @@ export default function KeeperProfilePage() {
   const params = useParams()
   const router = useRouter()
   const username = params?.username as string
-  
+  const { data: session } = useSession()
+
   const [profile, setProfile] = useState<KeeperProfile | null>(null)
   const [collection, setCollection] = useState<Tarantula[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -65,6 +67,16 @@ export default function KeeperProfilePage() {
   const [activeTab, setActiveTab] = useState<'collection' | 'about'>('collection')
   const [currentUser, setCurrentUser] = useState<any>(null)
 
+  // Helper function to get auth token from either OAuth session or localStorage
+  const getAuthToken = (): string | null => {
+    // First try OAuth session (for Google/Apple login)
+    if (session?.accessToken) {
+      return session.accessToken
+    }
+    // Fall back to localStorage (for email/password login)
+    return localStorage.getItem('auth_token')
+  }
+
   useEffect(() => {
     checkAuth()
     if (username) {
@@ -73,15 +85,21 @@ export default function KeeperProfilePage() {
       fetchStats()
       fetchFollowStats()
     }
-  }, [username])
+  }, [username, session])
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
       if (token) {
         const payload = JSON.parse(atob(token.split('.')[1]))
         setCurrentUser({ id: payload.sub, username: payload.username })
         // Check if following
+        if (username) {
+          checkFollowingStatus()
+        }
+      } else if (session?.user) {
+        // For OAuth users, use session data
+        setCurrentUser({ id: session.user.id, username: session.user.name })
         if (username) {
           checkFollowingStatus()
         }
@@ -93,7 +111,7 @@ export default function KeeperProfilePage() {
 
   const checkFollowingStatus = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
       if (!token) return
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -123,7 +141,7 @@ export default function KeeperProfilePage() {
   }
 
   const handleFollowToggle = async () => {
-    const token = localStorage.getItem('auth_token')
+    const token = getAuthToken()
     if (!token) {
       router.push('/login')
       return
@@ -147,7 +165,7 @@ export default function KeeperProfilePage() {
   }
 
   const handleMessage = () => {
-    const token = localStorage.getItem('auth_token')
+    const token = getAuthToken()
     if (!token) {
       router.push('/login')
       return
@@ -158,7 +176,7 @@ export default function KeeperProfilePage() {
   const fetchProfile = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
       const headers: HeadersInit = {}
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
@@ -185,7 +203,7 @@ export default function KeeperProfilePage() {
   const fetchCollection = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
       const headers: HeadersInit = {}
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
@@ -206,7 +224,7 @@ export default function KeeperProfilePage() {
   const fetchStats = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const token = localStorage.getItem('auth_token')
+      const token = getAuthToken()
       const headers: HeadersInit = {}
       if (token) {
         headers['Authorization'] = `Bearer ${token}`
