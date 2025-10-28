@@ -2,16 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
+import { useAuth } from '@/hooks/useAuth'
 import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonCard } from '@/components/ui/skeleton'
-
-interface User {
-  id: string
-  email: string
-  username: string
-  display_name: string
-}
 
 interface Tarantula {
   id: string
@@ -30,8 +24,7 @@ interface FeedingStatus {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
-  const [user, setUser] = useState<User | null>(null)
+  const { user, token, isAuthenticated, isLoading } = useAuth()
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
   const [searchQuery, setSearchQuery] = useState('')
@@ -50,37 +43,18 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    // Wait for session to load
-    if (status === 'loading') return
+    // Wait for auth to load
+    if (isLoading) return
 
-    // Check for NextAuth session (OAuth login)
-    if (session?.accessToken) {
-      console.log('[Dashboard] Using NextAuth session')
-      const oauthUser: User = {
-        id: session.user?.id || '',
-        email: session.user?.email || '',
-        username: session.user?.email?.split('@')[0] || '',
-        display_name: session.user?.name || session.user?.email || ''
-      }
-      setUser(oauthUser)
-      fetchTarantulas(session.accessToken as string)
-      return
-    }
-
-    // Fall back to localStorage token (email/password login)
-    const token = localStorage.getItem('auth_token')
-    const userData = localStorage.getItem('user')
-
-    if (!token || !userData) {
-      console.log('[Dashboard] No auth found, redirecting to login')
+    // Check authentication
+    if (!isAuthenticated || !token) {
       router.push('/login')
       return
     }
 
-    console.log('[Dashboard] Using localStorage token')
-    setUser(JSON.parse(userData))
+    // Fetch data with token
     fetchTarantulas(token)
-  }, [router, session, status])
+  }, [router, isAuthenticated, isLoading, token])
 
   const fetchTarantulas = async (token: string) => {
     try {
@@ -161,13 +135,12 @@ export default function DashboardPage() {
     )
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('user')
+  const handleLogout = async () => {
+    await signOut({ redirect: false })
     router.push('/')
   }
 
-  if (!user || loading) {
+  if (!user || loading || isLoading) {
     return (
       <div className="min-h-screen bg-theme">
         {/* Header skeleton */}
@@ -217,7 +190,7 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-white">Welcome back, {user.display_name || user.username}! 🕷️</h1>
+              <h1 className="text-3xl font-bold text-white">Welcome back, {user.name || user.email}! 🕷️</h1>
               <p className="text-white/90 mt-1">Manage your tarantula collection</p>
             </div>
             <div className="flex flex-wrap gap-3">

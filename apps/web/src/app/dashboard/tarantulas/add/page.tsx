@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/hooks/useAuth'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
 
 interface SelectedSpecies {
@@ -15,6 +16,7 @@ interface SelectedSpecies {
 
 export default function AddTarantulaPage() {
   const router = useRouter()
+  const { token, isAuthenticated, isLoading } = useAuth()
   const [formData, setFormData] = useState({
     common_name: '',
     scientific_name: '',
@@ -45,12 +47,14 @@ export default function AddTarantulaPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    // Wait for auth to load
+    if (isLoading) return
+
     // Check if user is logged in
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
+    if (!isAuthenticated) {
       router.push('/login')
     }
-  }, [router])
+  }, [router, isAuthenticated, isLoading])
 
   const handleSpeciesSelect = (species: SelectedSpecies) => {
     setSelectedSpecies(species)
@@ -68,8 +72,13 @@ export default function AddTarantulaPage() {
     setError('')
     setLoading(true)
 
+    if (!token) {
+      setError('Not authenticated')
+      setLoading(false)
+      return
+    }
+
     try {
-      const token = localStorage.getItem('auth_token')
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       // Prepare data - convert empty strings to null for optional fields
