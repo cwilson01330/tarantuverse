@@ -169,9 +169,9 @@ export default function DashboardPage() {
 
   return (
     <DashboardLayout
-      userName={user.name}
-      userEmail={user.email}
-      userAvatar={user.avatar_url}
+      userName={user.name ?? undefined}
+      userEmail={user.email ?? undefined}
+      userAvatar={user.avatar_url ?? undefined}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
