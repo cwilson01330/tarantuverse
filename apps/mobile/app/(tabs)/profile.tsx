@@ -3,11 +3,20 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const { theme, toggleTheme, colors } = useTheme();
   const router = useRouter();
+
+  // Refresh user data when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+    }, [])
+  );
 
   const handleLogout = () => {
     Alert.alert(
@@ -124,15 +133,15 @@ export default function ProfileScreen() {
           />
         </View>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
           <MaterialCommunityIcons name="cog" size={24} color={colors.textTertiary} />
-          <Text style={styles.menuText}>Settings</Text>
+          <Text style={styles.menuText}>Edit Profile</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy')}>
           <MaterialCommunityIcons name="shield-account" size={24} color={colors.textTertiary} />
-          <Text style={styles.menuText}>Privacy</Text>
+          <Text style={styles.menuText}>Privacy Settings</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
