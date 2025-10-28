@@ -1,5 +1,5 @@
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/app/api/auth/[...nextauth]/auth-options"
+import { getToken } from "next-auth/jwt"
+import { NextRequest } from "next/server"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -11,20 +11,20 @@ const species_images = {
   "Tliltocatl albopilosus": "/species-images/tliltocatl_albopilosus.jpg",
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
-    // Get the session (includes access token)
-    const session = await getServerSession(authOptions)
+    // Get the JWT token (includes access token)
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
 
-    if (!session?.accessToken) {
+    if (!token?.accessToken) {
       return Response.json(
-        { error: "Not authenticated" },
+        { error: "Not authenticated. Please login first." },
         { status: 401 }
       )
     }
 
     const headers = {
-      "Authorization": `Bearer ${session.accessToken}`,
+      "Authorization": `Bearer ${token.accessToken}`,
       "Content-Type": "application/json",
     }
 
