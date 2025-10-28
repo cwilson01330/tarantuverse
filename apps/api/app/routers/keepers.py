@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.schemas.user import UserResponse
 from app.schemas.tarantula import TarantulaResponse
+from app.utils.dependencies import get_current_user_optional
 
 router = APIRouter()
 
@@ -62,144 +63,192 @@ async def list_public_keepers(
     return [UserResponse.from_orm(keeper) for keeper in keepers]
 
 
-@router.get("/{username}", response_model=UserResponse)
+@router.get("/{username}/", response_model=UserResponse)
 async def get_keeper_profile(
     username: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get a keeper's public profile
-    
+
     - **username**: The keeper's username
-    
-    Returns 404 if user doesn't exist or collection is private
+
+    Returns 404 if user doesn't exist or collection is private (unless viewing own profile)
     """
     # Find user by username
     user = db.query(User).filter(User.username == username).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=404,
             detail="Keeper not found"
         )
-    
-    # Check if collection is public
-    if user.collection_visibility != 'public':
+
+    # Allow access if user is viewing their own profile OR collection is public
+    is_own_profile = current_user and current_user.id == user.id
+    if not is_own_profile and user.collection_visibility != 'public':
         raise HTTPException(
             status_code=404,
             detail="This keeper's profile is private"
         )
-    
+
     return UserResponse.from_orm(user)
 
 
-@router.get("/{username}/collection", response_model=List[TarantulaResponse])
+@router.get("/{username}/collection/", response_model=List[TarantulaResponse])
 async def get_keeper_collection(
     username: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
-    Get a keeper's public tarantula collection
-    
+    Get a keeper's tarantula collection
+
     - **username**: The keeper's username
-    
-    Returns only tarantulas where visibility = 'public' AND user's collection_visibility = 'public'
-    Returns 404 if user doesn't exist or collection is private
+
+    If viewing own profile: Returns ALL tarantulas (public and private)
+    If viewing other's profile: Returns only public tarantulas if collection_visibility = 'public'
+    Returns 404 if user doesn't exist or collection is private (unless viewing own profile)
     """
     # Find user by username
     user = db.query(User).filter(User.username == username).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=404,
             detail="Keeper not found"
         )
-    
-    # Check if collection is public
-    if user.collection_visibility != 'public':
+
+    # Check if user is viewing their own profile
+    is_own_profile = current_user and current_user.id == user.id
+
+    # If not own profile, check if collection is public
+    if not is_own_profile and user.collection_visibility != 'public':
         raise HTTPException(
             status_code=404,
             detail="This keeper's collection is private"
         )
-    
-    # Get public tarantulas for this user
-    tarantulas = db.query(Tarantula).filter(
-        and_(
-            Tarantula.user_id == user.id,
-            Tarantula.visibility == 'public'
-        )
-    ).order_by(Tarantula.created_at.desc()).all()
-    
+
+    # If viewing own profile, return ALL tarantulas; otherwise only public ones
+    if is_own_profile:
+        tarantulas = db.query(Tarantula).filter(
+            Tarantula.user_id == user.id
+        ).order_by(Tarantula.created_at.desc()).all()
+    else:
+        tarantulas = db.query(Tarantula).filter(
+            and_(
+                Tarantula.user_id == user.id,
+                Tarantula.visibility == 'public'
+            )
+        ).order_by(Tarantula.created_at.desc()).all()
+
     return [TarantulaResponse.from_orm(t) for t in tarantulas]
 
 
-@router.get("/{username}/stats")
+@router.get("/{username}/stats/")
 async def get_keeper_stats(
     username: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Get statistics about a keeper's collection
-    
+
     - **username**: The keeper's username
-    
-    Returns collection stats (total count, public count, species diversity)
+
+    If viewing own profile: Returns stats for ALL tarantulas
+    If viewing other's profile: Returns stats for public tarantulas only (if collection is public)
+    Returns 404 if user doesn't exist or collection is private (unless viewing own profile)
     """
     # Find user by username
     user = db.query(User).filter(User.username == username).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=404,
             detail="Keeper not found"
         )
-    
-    # Check if collection is public
-    if user.collection_visibility != 'public':
+
+    # Check if user is viewing their own profile
+    is_own_profile = current_user and current_user.id == user.id
+
+    # If not own profile, check if collection is public
+    if not is_own_profile and user.collection_visibility != 'public':
         raise HTTPException(
             status_code=404,
             detail="This keeper's collection is private"
         )
-    
-    # Count public tarantulas
-    public_count = db.query(Tarantula).filter(
-        and_(
-            Tarantula.user_id == user.id,
-            Tarantula.visibility == 'public'
-        )
-    ).count()
-    
-    # Get unique species count
-    unique_species = db.query(Tarantula.species_id).filter(
-        and_(
-            Tarantula.user_id == user.id,
-            Tarantula.visibility == 'public',
-            Tarantula.species_id.isnot(None)
-        )
-    ).distinct().count()
-    
-    # Count by sex
-    males = db.query(Tarantula).filter(
-        and_(
-            Tarantula.user_id == user.id,
-            Tarantula.visibility == 'public',
-            Tarantula.sex == 'male'
-        )
-    ).count()
-    
-    females = db.query(Tarantula).filter(
-        and_(
-            Tarantula.user_id == user.id,
-            Tarantula.visibility == 'public',
-            Tarantula.sex == 'female'
-        )
-    ).count()
-    
+
+    # Build queries based on whether viewing own profile
+    if is_own_profile:
+        # Count ALL tarantulas
+        total_count = db.query(Tarantula).filter(
+            Tarantula.user_id == user.id
+        ).count()
+
+        # Get unique species count
+        unique_species = db.query(Tarantula.species_id).filter(
+            and_(
+                Tarantula.user_id == user.id,
+                Tarantula.species_id.isnot(None)
+            )
+        ).distinct().count()
+
+        # Count by sex
+        males = db.query(Tarantula).filter(
+            and_(
+                Tarantula.user_id == user.id,
+                Tarantula.sex == 'male'
+            )
+        ).count()
+
+        females = db.query(Tarantula).filter(
+            and_(
+                Tarantula.user_id == user.id,
+                Tarantula.sex == 'female'
+            )
+        ).count()
+    else:
+        # Count only public tarantulas
+        total_count = db.query(Tarantula).filter(
+            and_(
+                Tarantula.user_id == user.id,
+                Tarantula.visibility == 'public'
+            )
+        ).count()
+
+        # Get unique species count
+        unique_species = db.query(Tarantula.species_id).filter(
+            and_(
+                Tarantula.user_id == user.id,
+                Tarantula.visibility == 'public',
+                Tarantula.species_id.isnot(None)
+            )
+        ).distinct().count()
+
+        # Count by sex
+        males = db.query(Tarantula).filter(
+            and_(
+                Tarantula.user_id == user.id,
+                Tarantula.visibility == 'public',
+                Tarantula.sex == 'male'
+            )
+        ).count()
+
+        females = db.query(Tarantula).filter(
+            and_(
+                Tarantula.user_id == user.id,
+                Tarantula.visibility == 'public',
+                Tarantula.sex == 'female'
+            )
+        ).count()
+
     return {
         "username": username,
-        "total_public": public_count,
+        "total_public": total_count,  # Note: This is "total" when viewing own profile
         "unique_species": unique_species,
         "males": males,
         "females": females,
-        "unsexed": public_count - males - females
+        "unsexed": total_count - males - females
     }
