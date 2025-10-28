@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signOut } from 'next-auth/react'
 import { useAuth } from '@/hooks/useAuth'
 import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonCard } from '@/components/ui/skeleton'
+import DashboardLayout from '@/components/DashboardLayout'
 
 interface Tarantula {
   id: string
@@ -135,29 +135,13 @@ export default function DashboardPage() {
     )
   }
 
-  const handleLogout = async () => {
-    await signOut({ redirect: false })
-    router.push('/')
-  }
-
   if (!user || loading || isLoading) {
     return (
-      <div className="min-h-screen bg-theme">
-        {/* Header skeleton */}
-        <div className="bg-gradient-brand shadow-lg shadow-gradient-brand">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div className="animate-pulse">
-              <div className="h-8 w-48 bg-white/30 rounded mb-2"></div>
-              <div className="h-4 w-32 bg-white/20 rounded"></div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content skeleton */}
+      <DashboardLayout userName="Loading..." userEmail="">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Stats skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            {[...Array(4)].map((_, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="bg-surface p-6 rounded-lg border border-theme animate-pulse">
                 <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
                 <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
@@ -172,7 +156,7 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     )
   }
 
@@ -184,63 +168,11 @@ export default function DashboardPage() {
     : tarantulas
 
   return (
-    <div className="min-h-screen bg-theme">
-      {/* Header with gradient */}
-      <div className="bg-gradient-brand shadow-lg shadow-gradient-brand">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-white">Welcome back, {user.name || user.email}! 🕷️</h1>
-              <p className="text-white/90 mt-1">Manage your tarantula collection</p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => router.push('/species')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
-              >
-                🕷️ Species
-              </button>
-              <button
-                onClick={() => router.push('/dashboard/analytics')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
-              >
-                📊 Analytics
-              </button>
-              <button
-                onClick={() => router.push('/dashboard/breeding')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
-              >
-                🥚 Breeding
-              </button>
-              <button
-                onClick={() => router.push('/community')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
-              >
-                🌐 Community
-              </button>
-              <button
-                onClick={() => router.push('/community/forums')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
-              >
-                💬 Forums
-              </button>
-              <button
-                onClick={() => router.push('/dashboard/settings')}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
-              >
-                ⚙️ Settings
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition-all duration-200 font-medium text-white border border-white/20"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <DashboardLayout
+      userName={user.name}
+      userEmail={user.email}
+      userAvatar={user.avatar_url}
+    >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -416,6 +348,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      </div>
+
       {/* Floating Action Button (Mobile-friendly) */}
       {tarantulas.length > 0 && (
         <button
@@ -426,7 +360,7 @@ export default function DashboardPage() {
           ➕
         </button>
       )}
-    </div>
+    </DashboardLayout>
   )
 }
 
