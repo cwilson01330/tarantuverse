@@ -211,7 +211,7 @@ export default function SpeciesScreen() {
       marginBottom: 12,
     },
     filterChip: {
-      paddingVertical: 8,
+      height: 36,
       paddingHorizontal: 16,
       borderRadius: 20,
       borderWidth: 2,
@@ -222,7 +222,9 @@ export default function SpeciesScreen() {
     filterChipText: {
       fontSize: 14,
       fontWeight: '700',
-      lineHeight: 20,
+      lineHeight: 16,
+      includeFontPadding: false,
+      textAlignVertical: 'center',
     },
     resultCount: {
       paddingHorizontal: 16,
