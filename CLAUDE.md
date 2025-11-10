@@ -2,37 +2,47 @@
 
 ## Project Overview
 
-**Tarantuverse** is a comprehensive tarantula (and invertebrate) husbandry tracking platform designed to help keepers manage their collections, track feeding/molting/substrate changes, and access species care information.
+**Tarantuverse** is a comprehensive tarantula (and invertebrate) husbandry tracking platform designed to help keepers manage their collections, track feeding/molting/substrate changes, access species care information, connect with other keepers, and manage breeding projects.
 
-**Te  ├── components/
-│   │   ├── SpeciesAutocomplete.tsx (reusable autocomplete)
-│   │   ├── FeedingStatsCard.tsx (analytics with Recharts)
-│   │   └── GrowthChart.tsx (growth visualization)
-  └── globals.css (Tailwind + global input/label styles)Stack:**
-- **Frontend**: Next.js 14 (React), TypeScript, Tailwind CSS
+**Tech Stack:**
+- **Frontend**: Next.js 14 (React 19), TypeScript, Tailwind CSS, next-themes
+- **Mobile**: React Native, Expo Router, TypeScript
 - **Backend**: FastAPI (Python), SQLAlchemy 2.0, Pydantic v2
 - **Database**: PostgreSQL (Neon)
+- **Storage**: Cloudflare R2 (photos and thumbnails)
 - **Deployment**:
   - API: Render (https://tarantuverse-api.onrender.com)
   - Web: Vercel
-- **Monorepo**: Turborepo structure
+- **Monorepo**: pnpm workspaces with Turborepo
 
 ---
 
-## 🎯 Current Status (As of 2025-10-13)
+## 🎯 Current Status (As of 2025-11-10)
 
 ### ✅ Completed Features
 
 #### Authentication & User Management
-- User registration with email, username, password
-- JWT token-based authentication
-- Login/logout functionality
-- Password hashing with bcrypt (truncated to 72 chars)
-- User profiles with display_name, avatar_url, bio
-- Active user status tracking
+- **Traditional Authentication**:
+  - User registration with email, username, password
+  - JWT token-based authentication
+  - Login/logout functionality
+  - Password hashing with bcrypt (truncated to 72 chars)
+
+- **OAuth Authentication** 🆕:
+  - OAuth provider support (Google, Apple, GitHub)
+  - OAuth fields: `oauth_provider`, `oauth_id`, `oauth_access_token`, `oauth_refresh_token`
+  - `hashed_password` nullable for OAuth-only users
+  - Index for fast OAuth provider lookups
+
+- **User Profiles**:
+  - Basic: `display_name`, `avatar_url`, `bio`
+  - Community: `profile_bio`, `profile_location`, `profile_experience_level`
+  - Experience: `profile_years_keeping`, `profile_specialties` (array)
+  - Social: `social_links` (JSONB), `collection_visibility` (private/public)
+  - Roles: `is_active`, `is_superuser`, `is_breeder`, `is_admin`
 
 #### Tarantula Collection Management (CRUD)
-- Add tarantulas with basic info:
+- **Basic Information**:
   - Common name, scientific name
   - Sex (male/female/unknown)
   - Date acquired, source (bred/bought/wild_caught), price paid
@@ -40,7 +50,7 @@
   - Notes
   - Species linkage (optional `species_id`)
 
-- **NEW: Comprehensive Husbandry Fields**:
+- **Comprehensive Husbandry Fields**:
   - `enclosure_type`: terrestrial, arboreal, fossorial
   - `enclosure_size`: e.g., "10x10x10 inches"
   - `substrate_type`: e.g., "coco fiber"
@@ -53,16 +63,35 @@
   - `last_enclosure_cleaning`: date
   - `enclosure_notes`: text for modifications, decor
 
-- View individual tarantula details
-- Edit tarantula information
-- Delete tarantulas (with confirmation)
-- Dashboard collection grid display
-- Collection count statistics
+- **CRUD Operations**:
+  - View individual tarantula details
+  - Edit tarantula information
+  - Delete tarantulas (with confirmation)
+  - Dashboard collection grid display
+  - Collection count statistics
+  - Dedicated husbandry page: `/dashboard/tarantulas/[id]/husbandry`
+
+#### Photo Management System 📸 (✅ COMPLETE)
+- **Database**: `photos` table
+  - Fields: `id`, `tarantula_id`, `url`, `thumbnail_url`, `caption`, `taken_at`, `created_at`
+  - Relationship to tarantulas
+
+- **Storage**: Cloudflare R2 integration
+  - Automatic thumbnail generation
+  - Upload endpoints with authentication
+
+- **Mobile**:
+  - Camera integration for taking photos
+  - Gallery picker for existing photos
+  - PhotoViewer component with swipe navigation
+
+- **Web**: Photo upload and display
+- **API**: Complete CRUD endpoints in `photos.py` router
 
 #### Feeding Log Tracking
 - Add feeding logs with:
   - Date & time fed
-  - Food type (cricket, roach, etc.)
+  - Food type (cricket, roach, mealworm, etc.)
   - Food size (small/medium/large)
   - Accepted (yes/no)
   - Notes
@@ -84,7 +113,7 @@
 - Inline form on tarantula detail page
 
 #### Substrate Change Tracking (✅ COMPLETE)
-- **Model Created**: `substrate_changes` table
+- **Model**: `substrate_changes` table
 - Track substrate changes over time:
   - Date changed
   - Substrate type
@@ -93,10 +122,10 @@
   - Notes
 - API endpoints ready (GET, POST, PUT, DELETE)
 - **Automatically updates** tarantula's `last_substrate_change`, `substrate_type`, and `substrate_depth` when logged
-- **UI: IMPLEMENTED** - Inline form and log display on tarantula detail page
+- **UI**: Inline form and log display on tarantula detail page
 
 #### Species Database & Care Sheets
-- Comprehensive species model with 35+ fields:
+- **Comprehensive species model with 40+ fields**:
   - Taxonomy: scientific_name, common_names, genus, family
   - Care level (beginner/intermediate/advanced)
   - Temperament, native region, adult size, growth rate
@@ -105,134 +134,383 @@
   - **Enclosure**: sizes for sling/juvenile/adult, substrate depth/type
   - **Feeding**: frequencies for each life stage, prey size
   - **Behavior**: water dish required, webbing amount, burrowing
+  - **Safety** 🆕:
+    - `urticating_hairs` (Boolean) - New World species
+    - `medically_significant_venom` (Boolean) - Old World arboreals (Poecilotheria, etc.)
   - Care guide (long-form text)
   - Image URL, source URL
   - **Community**: `is_verified`, `submitted_by`, `community_rating`, `times_kept`
 
-- **Case-insensitive search** using `scientific_name_lower` field
-- Search by scientific or common name (autocomplete)
-- Species detail page (care sheet viewer) with full husbandry info
+- **Features**:
+  - Case-insensitive search using `scientific_name_lower` field
+  - Search by scientific or common name (autocomplete)
+  - Species detail page (care sheet viewer) with full husbandry info
+  - Safety badges and warnings displayed prominently
+  - Species list/search page: `/species`
+
 - **Species Autocomplete Component**:
   - Debounced search (300ms)
   - Dropdown with species results
   - Click outside to close
   - Shows species image/emoji and care level badges
 
-- Seeded with 5 common beginner species:
-  - Grammostola rosea (Chilean Rose Hair)
-  - Brachypelma hamorii (Mexican Red Knee)
-  - Aphonopelma chalcodes (Desert Blonde)
-  - Caribena versicolor (Antilles Pinktoe)
-  - Tliltocatl albopilosus (Curly Hair)
+- **Data Management**:
+  - Seeded with 10+ species (beginner to advanced)
+  - Species images sourced and added
+  - **Obsidian Vault Import Tool**: `import_obsidian_species.py` can parse markdown files and bulk import species
+  - Admin tools for updating species data
 
-- **Obsidian Vault Import Tool**: `import_obsidian_species.py` can parse markdown files and bulk import species
+#### Breeding Module 🧬 (✅ COMPLETE)
+**Full breeding tracking system for serious breeders**
+
+- **Pairing Management**:
+  - Database: `pairings` table
+  - Track male/female pairing attempts
+  - Fields: `paired_date`, `separated_date`, `pairing_type` (natural/assisted/forced)
+  - Outcome tracking: successful, unsuccessful, in_progress, unknown
+  - Notes for each pairing
+  - Relationships to both male and female tarantulas
+
+- **Egg Sac Tracking**:
+  - Database: `egg_sacs` table
+  - Link to parent pairing
+  - Track incubation conditions
+  - Monitor development stages
+  - Record hatch dates and success rates
+
+- **Offspring Management**:
+  - Database: `offspring` table
+  - Individual offspring records
+  - Track sales/trades/retention
+  - Status tracking (available, sold, kept, deceased)
+  - Link back to parent pairing
+
+- **UI**:
+  - `/dashboard/breeding` - Overview page with all breeding projects
+  - `/dashboard/breeding/pairings/add` - Record new pairing
+  - `/dashboard/breeding/egg-sacs/add` - Log egg sac
+  - `/dashboard/breeding/offspring/add` - Record offspring
+  - Breeding tab on individual tarantula detail pages
+  - Activity feed integration for breeding events
+
+- **API**: Complete CRUD endpoints
+  - `pairings.py` router
+  - `egg_sacs.py` router
+  - `offspring.py` router
+
+#### Community Features 🌐 (✅ COMPLETE)
+**Full social networking and community engagement platform**
+
+##### Forums System
+- **Database**: `forum.py` models
+  - Message (threads)
+  - MessageReply (comments)
+  - MessageLike (likes)
+  - MessageReaction (emoji reactions)
+
+- **Features**:
+  - Create discussion threads by category
+  - Reply to threads
+  - Like and react to posts
+  - Forum moderation (`is_admin` role)
+  - Category-based organization
+
+- **Web Pages**:
+  - `/community/forums` - Forum list
+  - `/community/forums/[category]` - Category view
+  - `/community/forums/[category]/new` - Create thread
+  - `/community/forums/thread/[id]` - Thread detail with replies
+
+- **Mobile**: Full forum navigation in tabs
+
+##### Activity Feed
+- **Database**: `activity_feed.py` model
+- Track all user activities:
+  - New tarantulas added
+  - Feeding logs
+  - Molt events
+  - Breeding activities
+  - Forum posts
+  - Collection updates
+
+- **Components**:
+  - `ActivityFeed.tsx` - Feed display
+  - `ActivityFeedItem.tsx` - Individual activity rendering
+
+- **Pages**:
+  - `/community/board` - Community activity board
+  - Integrated into keeper profiles
+
+##### Follow System
+- **Database**: `follow.py` model
+- Follow other keepers
+- See followers/following lists
+- Activity feed filtered by followed users
+- API endpoints for follow/unfollow actions
+
+##### Direct Messaging
+- **Database**: `direct_message.py` model
+- Private messaging between users
+- **Web Pages**:
+  - `/messages` - Message inbox
+  - `/messages/[username]` - Conversation view
+- **Mobile**: DM screens implemented
+- Real-time conversation threads
+
+##### Keeper Profiles
+- **Public Profile Pages**:
+  - `/keeper/[username]` - Public keeper profile
+  - `/community/[username]` - Alternative route
+
+- **Profile Content**:
+  - Bio and experience level
+  - Years keeping
+  - Specialties (arboreal, old world, breeding, etc.)
+  - Social links (Instagram, YouTube, website)
+  - Public collection (if `collection_visibility` = 'public')
+  - Activity history
+  - Follower/following counts
+
+- **API**: `keepers.py` router with profile endpoints
+
+##### Community Board
+- **Page**: `/community/board`
+- Aggregated community activity
+- Recent discussions
+- Popular species
+- Active keepers
+
+#### Analytics & Statistics 📊 (✅ COMPLETE)
+- **Feeding Statistics**:
+  - Acceptance rate with color coding
+  - Average days between feedings
+  - Current streak (consecutive accepted feedings)
+  - Longest gap between feedings
+  - Last fed indicator with status colors:
+    - Green: <7 days
+    - Yellow: 7-14 days
+    - Orange: 14-21 days
+    - Red: >21 days
+  - Next feeding prediction
+  - Prey type distribution (visual bar chart)
+  - Interactive Recharts visualizations
+
+- **Growth Analytics**:
+  - Line chart showing weight and leg span over time
+  - Growth rate calculations
+  - Days between molts
+  - Visual tracking of development
+  - Molt history timeline
+
+- **Collection Statistics**:
+  - Total tarantulas
+  - Breakdown by species
+  - Sex distribution
+  - Age distribution
+  - Feeding status overview
+
+- **Dedicated Analytics Pages**:
+  - Web: `/dashboard/analytics`
+  - Mobile: `/analytics/index.tsx`
+
+- **API**: Dedicated `analytics.py` router with endpoints:
+  - `GET /tarantulas/{id}/feeding-stats`
+  - `GET /tarantulas/{id}/growth`
+
+#### Subscription/Premium System 💎 (Backend Ready)
+- **Database**: `subscription.py` model
+- Backend infrastructure complete
+- API: `subscriptions.py` router
+- Migration: `j1k2l3m4n5o6_add_subscription_tables.py`
+- **Web Page**: `/pricing` - Pricing tiers page
+- User relationship ready (temporarily commented for deployment)
 
 #### User Interface Features
-- **Dashboard**: Collection overview with statistics
-- **Tarantula Detail Page**:
-  - Photo or spider emoji (🕷️) display
-  - Basic info grid (sex, acquired date, source, price)
-  - **NEW: Husbandry Information Section** (conditionally shown):
-    - Enclosure type, size
-    - Substrate type & depth
-    - Last substrate change date
-    - Target temperature and humidity ranges
-    - Water dish status
-    - Misting schedule
-    - Last enclosure cleaning date
-    - Enclosure notes
-  - **NEW: "View Care Sheet" button** (📖):
-    - Links to species care sheet when `species_id` is present
-    - Allows keepers to compare their setup vs recommended care
-  - Notes section
+
+##### Modern Navigation System 🧭 (✅ COMPLETE)
+**2025 best practices - persistent sidebar design**
+
+- **Components**:
+  - `Sidebar.tsx` - Persistent left sidebar
+    - Icon + label navigation
+    - Collapsible for desktop (saves screen space)
+    - Active route highlighting with gradients
+    - Smooth transitions
+  - `TopBar.tsx` - Compact top bar
+    - Theme toggle (light/dark)
+    - Notifications icon
+    - User menu with avatar
+    - Minimal and clean
+  - `DashboardLayout.tsx` - Wrapper combining both
+
+- **Mobile**:
+  - Hamburger menu
+  - Slide-in sidebar drawer
+  - Touch-friendly navigation
+
+- **Features**:
+  - No more top-spanning button clutter
+  - Space-efficient design
+  - Professional UX patterns
+  - Consistent across all dashboard pages
+
+##### Dashboard & Collection Display
+- **Main Dashboard**: Collection overview with statistics
+- **Collection Cards**:
+  - Grid layout with photos
+  - Feeding status badges (color-coded):
+    - Days since last feeding
+    - Visual warnings for overdue feedings
+    - Available on both web and mobile
+  - Quick access to tarantula details
+
+##### Tarantula Detail Page
+- Photo or spider emoji (🕷️) display
+- Basic info grid (sex, acquired date, source, price)
+- **Husbandry Information Section** (conditionally shown):
+  - Enclosure type, size
+  - Substrate type & depth
+  - Last substrate change date
+  - Target temperature and humidity ranges
+  - Water dish status
+  - Misting schedule
+  - Last enclosure cleaning date
+  - Enclosure notes
+- **"View Care Sheet" button** (📖):
+  - Links to species care sheet when `species_id` is present
+  - Allows keepers to compare their setup vs recommended care
+- **Feeding Stats Card** 🍽️📊:
+  - All feeding analytics in visual cards
+  - Interactive charts (Recharts)
+  - Full dark mode support
+- **Growth Analytics Chart** 📈:
+  - Weight and leg span progression
+  - Growth rate insights
+- **Logs & History**:
   - Feeding logs with inline add/delete
   - Molt logs with inline add/delete
-  - **NEW: Substrate change logs with inline add/delete** ✅
-  - **NEW: Feeding Stats Card** 🍽️📊 (as of 2025-10-13):
-    - Acceptance rate (percentage with color coding)
-    - Average days between feedings
-    - Current streak (consecutive accepted feedings)
-    - Longest gap between feedings
-    - Last fed indicator with color-coded status:
-      - Green: <7 days
-      - Yellow: 7-14 days
-      - Orange: 14-21 days
-      - Red: >21 days
-    - Next feeding prediction based on average interval
-    - Prey type distribution with visual bar chart
-    - Interactive charts using Recharts (pie chart for acceptance, bar chart for prey types)
-    - **Full dark mode support** on web and mobile
-  - **NEW: Growth Analytics Chart** 📈:
-    - Line chart showing weight and leg span over time
-    - Growth rate calculations
-    - Days between molts
-    - Visual tracking of tarantula development
-  - Edit and Delete buttons (with confirmation)
+  - Substrate change logs with inline add/delete
+  - Breeding tab (if used in breeding)
+- Edit and Delete buttons (with confirmation)
 
+##### Forms & Input
 - **Add Tarantula Form**:
   - Species autocomplete integration
   - Auto-fill scientific/common name from species selection
-  - All basic fields
+  - All basic and husbandry fields
+  - Photo upload support
 
-- **Species Care Sheet Page**:
-  - Beautiful display of all care requirements
-  - Organized sections: Climate, Enclosure, Substrate, Feeding Schedule
-  - Shows community stats (times kept)
-  - Link to source
+- **Add Feeding/Molt/Substrate Logs**:
+  - Inline forms on detail pages
+  - Date/time pickers
+  - Validation
 
-- **Global Styling**:
-  - Spider emoji (🕷️) favicon
-  - Tailwind CSS with custom primary color
-  - **Complete Dark Mode Support** 🌙 (as of 2025-10-13):
-    - Web: Tailwind dark: modifiers on all components
-    - Mobile: ThemeContext with dynamic color system
-    - All pages support light and dark themes:
-      - Backgrounds, surfaces, elevated surfaces
-      - Text colors (primary, secondary, tertiary)
-      - Borders, buttons, forms, cards
-      - Charts and visualizations
-      - Modals, loading states, empty states
+##### Species Care Sheet Page
+- Beautiful display of all care requirements
+- Organized sections:
+  - Taxonomy
+  - Climate requirements
+  - Enclosure specifications
+  - Substrate recommendations
+  - Feeding schedule by life stage
+  - Behavioral traits
+  - Safety information (urticating hairs, venom)
+- Shows community stats (times kept, rating)
+- Link to source
+- Prominent safety badges for dangerous species
+
+##### Global Styling & Theme System 🌙
+- **Spider emoji (🕷️) favicon**
+- **Tailwind CSS** with custom primary color (`#8B4513` - brown/earth tones)
+- **Complete Dark Mode Support** (Web & Mobile):
+  - **Web**: Tailwind `dark:` modifiers on all components
+    - Backgrounds: `bg-white dark:bg-gray-800`
+    - Text: `text-gray-900 dark:text-white`
+    - Borders: `border-gray-200 dark:border-gray-700`
+    - All buttons, cards, inputs, modals, charts
+  - **Mobile**: ThemeContext with dynamic color system
+    - Colors: `theme.background`, `theme.surface`, `theme.text`, etc.
+    - Never hardcoded colors
+  - **Features**:
     - Smooth theme transitions
-    - System-wide theme consistency
-  - Responsive grid layouts
-  - Consistent button and form styling
-  - **Collection Cards with Feeding Status Badges**:
-    - Color-coded indicators showing days since last feeding
-    - Visual warnings for overdue feedings
-    - Available on both web and mobile platforms
+    - System-wide consistency
+    - next-themes integration on web
+    - ThemeContext on mobile
+  - **Coverage**: All pages, components, modals, charts, loading states, skeletons
+- Responsive grid layouts
+- Consistent button and form styling
 
-#### Mobile App (React Native + Expo) 📱 (NEW - as of 2025-10-13)
-- **Full feature parity with web app**
-- Built with React Native, Expo Router, TypeScript
-- **Authentication**: Login, registration, token management
-- **Collection Management**: 
+##### Additional Pages
+**Marketing/Info**:
+- `/` - Landing page (redesigned with 2025 best practices)
+- `/features` - Feature showcase
+- `/pricing` - Pricing tiers
+- `/help` - Help center
+- `/contact` - Contact form
+- `/blog` - Blog framework
+- `/privacy` - Privacy policy
+
+**Settings**:
+- `/dashboard/settings` - Main settings page
+- `/dashboard/settings/profile` - Profile editor
+
+#### Mobile App (React Native + Expo) 📱 (✅ COMPLETE)
+**Full feature parity with web app**
+
+- **Tech Stack**:
+  - React Native
+  - Expo Router for navigation
+  - TypeScript
+  - Expo Go for development
+  - EAS Build for production
+
+- **Authentication**:
+  - Login, registration
+  - JWT token management
+  - AuthContext for state
+
+- **Collection Management**:
   - View all tarantulas in grid layout with photos
   - Tarantula detail screen with all information
   - Add new tarantulas with form
   - Edit existing tarantulas
   - Delete tarantulas
-- **Feeding & Molt Tracking**:
-  - View feeding history
-  - View molt history  
-  - Add feeding logs
-  - Add molt logs
-- **Photo Management**:
-  - Camera integration for taking photos
-  - Gallery picker for existing photos
-  - Photo viewer with swipe navigation
-  - Cloudflare R2 storage integration
-  - Automatic thumbnail generation
+
+- **Tracking**:
+  - View/add feeding logs
+  - View/add molt logs
+  - View/add substrate changes
+  - Photo management
+
+- **Photo Features**:
+  - Camera integration
+  - Gallery picker
+  - PhotoViewer with swipe navigation
+  - Cloudflare R2 upload
+  - Thumbnail display
+
+- **Community** 🆕:
+  - Forums integration
+  - Community board
+  - Direct messaging
+  - Keeper profiles
+  - Activity feed
+
 - **Analytics & Stats**:
-  - Feeding stats card with visual indicators
-  - Growth chart component
+  - FeedingStatsCard with themed styling
+  - GrowthChart component
   - Collection statistics
-- **Complete Dark Mode Support**:
-  - ThemeContext with light/dark themes
-  - Dynamic color system (background, surface, text, borders, primary)
-  - All screens and components fully themed
+  - Dedicated analytics screen
+
+- **Dark Mode**:
+  - Complete ThemeContext system
+  - All screens and components themed
   - Smooth theme switching
-- **Platform**: iOS and Android via Expo
-- **Testing**: Expo Go for development, EAS Build for production
+
+- **Additional Screens**:
+  - Species browser and care sheets
+  - Settings
+  - Privacy policy
 
 ---
 
@@ -244,39 +522,83 @@
 apps/api/
 ├── alembic/
 │   └── versions/
+│       ├── 9588b399ad54_initial_migration.py
 │       ├── a1b2c3d4e5f6_add_photo_url_to_tarantulas.py
 │       ├── b2c3d4e5f6g7_expand_species_model.py
-│       └── c3d4e5f6g7h8_add_husbandry_and_substrate_changes.py (NEW - PENDING)
+│       ├── c3d4e5f6g7h8_add_husbandry_and_substrate_changes.py
+│       ├── d1e2f3g4h5i6_add_community_features.py
+│       ├── e2f3g4h5i6j7_add_messages_table.py
+│       ├── f3g4h5i6j7k8_add_message_interactions.py
+│       ├── g4h5i6j7k8l9_add_follow_and_direct_messaging_models.py
+│       ├── h5i6j7k8l9m0_add_forums_and_activity_feed.py
+│       ├── i6j7k8l9m0n1_change_activity_target_id_to_string.py
+│       ├── j1k2l3m4n5o6_add_subscription_tables.py
+│       ├── add_oauth_fields.py (oauth_fields_001)
+│       ├── add_safety_fields_to_species.py
+│       └── k2l3m4n5o6p7_add_breeding_module.py
 ├── app/
 │   ├── models/
-│   │   ├── user.py
-│   │   ├── tarantula.py (UPDATED with husbandry fields)
-│   │   ├── species.py
+│   │   ├── __init__.py
+│   │   ├── user.py (UPDATED: OAuth, profile fields, breeding relationships)
+│   │   ├── tarantula.py (UPDATED: husbandry fields, breeding relationships)
+│   │   ├── species.py (UPDATED: safety fields)
 │   │   ├── feeding_log.py
 │   │   ├── molt_log.py
-│   │   └── substrate_change.py (NEW)
+│   │   ├── substrate_change.py
+│   │   ├── photo.py (NEW)
+│   │   ├── pairing.py (NEW - breeding)
+│   │   ├── egg_sac.py (NEW - breeding)
+│   │   ├── offspring.py (NEW - breeding)
+│   │   ├── message.py (NEW - community board, legacy)
+│   │   ├── message_reply.py (NEW - community)
+│   │   ├── message_like.py (NEW - community)
+│   │   ├── message_reaction.py (NEW - community)
+│   │   ├── follow.py (NEW - community)
+│   │   ├── direct_message.py (NEW - community)
+│   │   ├── forum.py (NEW - community)
+│   │   ├── activity_feed.py (NEW - community)
+│   │   └── subscription.py (NEW - premium)
 │   ├── schemas/
 │   │   ├── user.py
-│   │   ├── tarantula.py (UPDATED with husbandry fields)
-│   │   ├── species.py
+│   │   ├── tarantula.py (UPDATED: husbandry fields)
+│   │   ├── species.py (UPDATED: safety fields)
 │   │   ├── feeding_log.py
 │   │   ├── molt.py
-│   │   └── substrate_change.py (NEW)
+│   │   ├── substrate_change.py
+│   │   └── [schemas for all new models]
 │   ├── routers/
-│   │   ├── auth.py
-│   │   ├── tarantulas.py (FIXED: trailing slash issue, model_dump() for Pydantic v2)
+│   │   ├── __init__.py
+│   │   ├── auth.py (JWT authentication)
+│   │   ├── tarantulas.py (FIXED: trailing slash, model_dump())
 │   │   ├── species.py
 │   │   ├── feedings.py
-│   │   ├── molts.py (IMPLEMENTED)
-│   │   └── substrate_changes.py (NEW)
+│   │   ├── molts.py
+│   │   ├── substrate_changes.py
+│   │   ├── photos.py (NEW)
+│   │   ├── analytics.py (NEW - dedicated analytics)
+│   │   ├── pairings.py (NEW - breeding)
+│   │   ├── egg_sacs.py (NEW - breeding)
+│   │   ├── offspring.py (NEW - breeding)
+│   │   ├── keepers.py (NEW - community)
+│   │   ├── messages.py (NEW - community board)
+│   │   ├── follows.py (NEW - community)
+│   │   ├── direct_messages.py (NEW - community)
+│   │   ├── forums.py (NEW - community)
+│   │   ├── activity.py (NEW - community)
+│   │   └── subscriptions.py (NEW - premium)
 │   ├── utils/
 │   │   ├── auth.py (JWT token creation, password hashing)
 │   │   └── dependencies.py (get_current_user with HTTPBearer)
 │   ├── config.py (settings from environment)
 │   ├── database.py (SQLAlchemy setup)
-│   └── main.py (FastAPI app with CORS, router registration, debug logging)
-├── seed_species.py (seed 5 common species)
-├── import_obsidian_species.py (parse Obsidian markdown for species)
+│   └── main.py (FastAPI app with CORS, all routers registered, /uploads mount)
+├── uploads/
+│   ├── photos/
+│   └── thumbnails/
+├── seed_species.py (seed species)
+├── seed_via_api.py (seed via API)
+├── import_obsidian_species.py (parse Obsidian markdown)
+├── make_admin.py (user management script)
 └── start.sh (runs migrations, starts uvicorn)
 ```
 
@@ -285,29 +607,75 @@ apps/api/
 ```
 apps/web/
 ├── public/
-│   └── favicon.svg (spider emoji 🕷️)
+│   ├── favicon.svg (spider emoji 🕷️)
+│   ├── 404.html (static error page)
+│   └── 500.html (static error page)
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx (metadata, favicon config)
-│   │   ├── page.tsx (landing page)
+│   │   ├── layout.tsx (metadata, favicon, theme provider)
+│   │   ├── page.tsx (landing page - redesigned)
+│   │   ├── not-found.tsx (404 handler)
+│   │   ├── error.tsx (error handler)
 │   │   ├── login/page.tsx
 │   │   ├── register/page.tsx
 │   │   ├── dashboard/
 │   │   │   ├── page.tsx (collection overview)
+│   │   │   ├── analytics/page.tsx (NEW)
+│   │   │   ├── settings/
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── profile/page.tsx
+│   │   │   ├── breeding/ (NEW)
+│   │   │   │   ├── page.tsx (overview)
+│   │   │   │   ├── pairings/add/page.tsx
+│   │   │   │   ├── egg-sacs/add/page.tsx
+│   │   │   │   └── offspring/add/page.tsx
 │   │   │   └── tarantulas/
-│   │   │       ├── add/page.tsx (add form with species autocomplete)
+│   │   │       ├── add/page.tsx
 │   │   │       └── [id]/
-│   │   │           ├── page.tsx (detail page - UPDATED with husbandry section)
-│   │   │           └── edit/page.tsx
-│   │   └── species/
-│   │       └── [id]/page.tsx (care sheet viewer)
+│   │   │           ├── page.tsx (detail - with breeding tab)
+│   │   │           ├── edit/page.tsx
+│   │   │           └── husbandry/page.tsx (NEW)
+│   │   ├── species/
+│   │   │   ├── page.tsx (NEW - species list)
+│   │   │   └── [id]/page.tsx (care sheet)
+│   │   ├── community/ (NEW)
+│   │   │   ├── page.tsx
+│   │   │   ├── board/page.tsx
+│   │   │   ├── [username]/page.tsx (keeper profile)
+│   │   │   └── forums/
+│   │   │       ├── page.tsx
+│   │   │       ├── [category]/page.tsx
+│   │   │       ├── [category]/new/page.tsx
+│   │   │       └── thread/[id]/page.tsx
+│   │   ├── keeper/[username]/page.tsx (NEW)
+│   │   ├── messages/ (NEW)
+│   │   │   ├── page.tsx
+│   │   │   └── [username]/page.tsx
+│   │   ├── features/page.tsx (NEW)
+│   │   ├── pricing/page.tsx (NEW)
+│   │   ├── help/page.tsx (NEW)
+│   │   ├── contact/page.tsx (NEW)
+│   │   ├── blog/page.tsx (NEW)
+│   │   └── privacy/page.tsx (NEW)
 │   ├── components/
-│   │   └── SpeciesAutocomplete.tsx (reusable autocomplete)
-│   └── globals.css (Tailwind + global input/label styles)
-└── tailwind.config.ts
+│   │   ├── SpeciesAutocomplete.tsx
+│   │   ├── FeedingStatsCard.tsx (with Recharts)
+│   │   ├── GrowthChart.tsx
+│   │   ├── Sidebar.tsx (NEW - modern navigation)
+│   │   ├── TopBar.tsx (NEW - compact top bar)
+│   │   ├── DashboardLayout.tsx (NEW - layout wrapper)
+│   │   ├── ThemeProvider.tsx (NEW - next-themes)
+│   │   ├── Providers.tsx (NEW)
+│   │   ├── ActivityFeed.tsx (NEW)
+│   │   └── ActivityFeedItem.tsx (NEW)
+│   └── globals.css (Tailwind + dark mode + global styles)
+├── next.config.js (with workarounds for styled-jsx)
+├── tailwind.config.ts (with dark mode)
+├── vercel.json (deployment config)
+└── package.json
 ```
 
-### Mobile Structure (`apps/mobile/`) (NEW)
+### Mobile Structure (`apps/mobile/`)
 
 ```
 apps/mobile/
@@ -319,24 +687,46 @@ apps/mobile/
 │   ├── (tabs)/
 │   │   ├── _layout.tsx (tab navigation)
 │   │   ├── index.tsx (collection screen)
+│   │   ├── forums.tsx (NEW)
+│   │   ├── species.tsx (NEW)
 │   │   ├── community.tsx
 │   │   └── profile.tsx
 │   ├── tarantula/
-│   │   ├── [id].tsx (detail screen with full dark mode)
+│   │   ├── [id].tsx (detail screen)
 │   │   ├── add.tsx
 │   │   ├── edit.tsx
 │   │   ├── add-feeding.tsx
 │   │   ├── add-molt.tsx
 │   │   └── add-photo.tsx
-│   └── analytics/
-│       └── [id].tsx
+│   ├── analytics/
+│   │   └── index.tsx
+│   ├── species/
+│   │   └── [id].tsx (NEW)
+│   ├── forums/ (NEW)
+│   │   ├── [category].tsx
+│   │   ├── thread/[id].tsx
+│   │   └── new-thread.tsx
+│   ├── community/ (NEW)
+│   │   ├── board.tsx
+│   │   ├── [username].tsx
+│   │   └── forums/
+│   │       ├── [slug].tsx
+│   │       └── [slug]/[threadId].tsx
+│   ├── messages/ (NEW)
+│   │   ├── index.tsx
+│   │   └── [username].tsx
+│   ├── settings.tsx (NEW)
+│   └── privacy.tsx (NEW)
 ├── src/
 │   ├── components/
 │   │   ├── FeedingStatsCard.tsx (with dark mode)
 │   │   ├── GrowthChart.tsx
 │   │   ├── PhotoViewer.tsx
-│   │   ├── TarantulaDetailSkeleton.tsx (with dark mode)
-│   │   └── TarantulaCardSkeleton.tsx
+│   │   ├── TarantulaDetailSkeleton.tsx
+│   │   ├── TarantulaCardSkeleton.tsx
+│   │   ├── CommunitySkeletons.tsx (NEW)
+│   │   ├── Skeleton.tsx (NEW)
+│   │   └── ActivityFeedItem.tsx (NEW)
 │   ├── contexts/
 │   │   ├── AuthContext.tsx
 │   │   └── ThemeContext.tsx (light/dark theme provider)
@@ -366,7 +756,6 @@ apps/mobile/
 - `GET /tarantulas/{id}` - Get single tarantula (requires auth)
 - `PUT /tarantulas/{id}` - Update tarantula (requires auth)
 - `DELETE /tarantulas/{id}` - Delete tarantula (requires auth)
-- `GET /tarantulas/{id}/stats` - Get stats (placeholder)
 
 **Species:**
 - `GET /species/search?q={query}` - Search species (public, autocomplete)
@@ -389,20 +778,68 @@ apps/mobile/
 - `PUT /molts/{id}` - Update molt log
 - `DELETE /molts/{id}` - Delete molt log
 
-**Substrate Changes:** (NEW)
+**Substrate Changes:**
 - `GET /tarantulas/{id}/substrate-changes` - List substrate changes
 - `POST /tarantulas/{id}/substrate-changes` - Create substrate change (auto-updates tarantula)
 - `PUT /substrate-changes/{id}` - Update substrate change
 - `DELETE /substrate-changes/{id}` - Delete substrate change
 
-**Analytics & Stats:** (NEW - as of 2025-10-13)
-- `GET /tarantulas/{id}/feeding-stats` - Get comprehensive feeding analytics
-  - Returns: acceptance rate, average days between feedings, last feeding date, 
-    days since last feeding, next feeding prediction, longest gap, current streak, 
-    prey type distribution
-- `GET /tarantulas/{id}/growth` - Get growth analytics
-  - Returns: weight/leg span data points, total molts, average days between molts,
-    growth rate calculations
+**Photos:** (NEW)
+- `GET /photos/{tarantula_id}` - List photos for tarantula
+- `POST /photos/` - Upload photo (multipart/form-data)
+- `DELETE /photos/{id}` - Delete photo
+
+**Analytics:** (NEW)
+- `GET /analytics/tarantulas/{id}/feeding-stats` - Comprehensive feeding analytics
+- `GET /analytics/tarantulas/{id}/growth` - Growth analytics
+
+**Breeding:** (NEW)
+- `GET /pairings/` - List user's pairings
+- `POST /pairings/` - Create pairing
+- `GET /pairings/{id}` - Get pairing detail
+- `PUT /pairings/{id}` - Update pairing
+- `DELETE /pairings/{id}` - Delete pairing
+- `GET /egg-sacs/` - List egg sacs
+- `POST /egg-sacs/` - Create egg sac
+- `PUT /egg-sacs/{id}` - Update egg sac
+- `DELETE /egg-sacs/{id}` - Delete egg sac
+- `GET /offspring/` - List offspring
+- `POST /offspring/` - Create offspring record
+- `PUT /offspring/{id}` - Update offspring
+- `DELETE /offspring/{id}` - Delete offspring
+
+**Community - Keepers:** (NEW)
+- `GET /keepers/` - List public keepers
+- `GET /keepers/{username}` - Get keeper profile
+- `PUT /keepers/profile` - Update own profile
+
+**Community - Forums:** (NEW)
+- `GET /forums/threads` - List forum threads
+- `POST /forums/threads` - Create thread
+- `GET /forums/threads/{id}` - Get thread with replies
+- `POST /forums/threads/{id}/reply` - Reply to thread
+- `POST /forums/posts/{id}/like` - Like post
+- `POST /forums/posts/{id}/react` - React to post
+
+**Community - Follows:** (NEW)
+- `POST /follows/{user_id}` - Follow user
+- `DELETE /follows/{user_id}` - Unfollow user
+- `GET /follows/followers` - Get followers
+- `GET /follows/following` - Get following
+
+**Community - Direct Messages:** (NEW)
+- `GET /direct-messages/` - List conversations
+- `GET /direct-messages/{username}` - Get conversation
+- `POST /direct-messages/` - Send message
+
+**Community - Activity:** (NEW)
+- `GET /activity/feed` - Get activity feed
+- `GET /activity/user/{user_id}` - Get user's activity
+
+**Subscriptions:** (NEW)
+- `GET /subscriptions/plans` - List subscription plans
+- `POST /subscriptions/subscribe` - Subscribe to plan
+- `GET /subscriptions/status` - Get subscription status
 
 ### Database Models
 
@@ -410,19 +847,20 @@ apps/mobile/
 - `id` (UUID, PK)
 - `email` (unique, indexed)
 - `username` (unique, indexed)
-- `hashed_password`
-- `display_name`
-- `avatar_url`
-- `bio`
-- `is_breeder`, `is_active`, `is_superuser`
-- `created_at`, `updated_at`
+- `hashed_password` (nullable for OAuth users)
+- **OAuth fields**: `oauth_provider`, `oauth_id`, `oauth_access_token`, `oauth_refresh_token`
+- Basic: `display_name`, `avatar_url`, `bio`
+- **Community**: `profile_bio`, `profile_location`, `profile_experience_level`, `profile_years_keeping`, `profile_specialties` (array), `social_links` (JSONB), `collection_visibility`
+- Flags: `is_breeder`, `is_active`, `is_superuser`, `is_admin`
+- Timestamps: `created_at`, `updated_at`
+- **Relationships**: `pairings`, `egg_sacs`, `offspring`
 
 **Tarantulas Table:**
 - `id` (UUID, PK)
 - `user_id` (FK → users, CASCADE delete)
 - `species_id` (FK → species, nullable)
 - Basic: `name`, `common_name`, `scientific_name`, `sex`, `date_acquired`, `source`, `price_paid`, `notes`, `photo_url`
-- **Husbandry** (NEW):
+- **Husbandry**:
   - `enclosure_type` (ENUM: terrestrial/arboreal/fossorial)
   - `enclosure_size`
   - `substrate_type`, `substrate_depth`
@@ -433,7 +871,9 @@ apps/mobile/
   - `misting_schedule`
   - `last_enclosure_cleaning`
   - `enclosure_notes`
-- `is_public`, `created_at`, `updated_at`
+- Flags: `is_public`
+- Timestamps: `created_at`, `updated_at`
+- **Relationships**: `photos`, `feeding_logs`, `molt_logs`, `substrate_changes`, `pairings_as_male`, `pairings_as_female`
 
 **Species Table:**
 - `id` (UUID, PK)
@@ -446,9 +886,11 @@ apps/mobile/
 - Enclosure: `enclosure_size_sling`, `enclosure_size_juvenile`, `enclosure_size_adult`, `substrate_depth`, `substrate_type`
 - Feeding: `prey_size`, `feeding_frequency_sling`, `feeding_frequency_juvenile`, `feeding_frequency_adult`
 - Behavior: `water_dish_required`, `webbing_amount`, `burrowing`
-- `care_guide` (long text), `image_url`, `source_url`
+- **Safety**: `urticating_hairs`, `medically_significant_venom`
+- Documentation: `care_guide` (long text), `image_url`, `source_url`
 - Community: `is_verified`, `submitted_by`, `community_rating`, `times_kept`
-- `searchable` (for search indexing), `created_at`, `updated_at`
+- Search: `searchable` (TSVECTOR for full-text search)
+- Timestamps: `created_at`, `updated_at`
 
 **Feeding Logs Table:**
 - `id` (UUID, PK)
@@ -469,7 +911,7 @@ apps/mobile/
 - `notes`, `image_url`
 - `created_at`
 
-**Substrate Changes Table:** (NEW)
+**Substrate Changes Table:**
 - `id` (UUID, PK)
 - `tarantula_id` (FK → tarantulas, CASCADE delete)
 - `changed_at` (date)
@@ -479,80 +921,70 @@ apps/mobile/
 - `notes`
 - `created_at`
 
----
+**Photos Table:** (NEW)
+- `id` (UUID, PK)
+- `tarantula_id` (FK → tarantulas, CASCADE delete)
+- `url`, `thumbnail_url`
+- `caption`
+- `taken_at` (datetime, optional)
+- `created_at`
 
-## 🔴 CRITICAL: Vercel Deployment Blocked by styled-jsx Error
+**Pairings Table:** (NEW)
+- `id` (UUID, PK)
+- `user_id` (FK → users, CASCADE delete)
+- `male_id` (FK → tarantulas, CASCADE delete)
+- `female_id` (FK → tarantulas, CASCADE delete)
+- `paired_date`, `separated_date`
+- `pairing_type` (ENUM: natural/assisted/forced)
+- `outcome` (ENUM: successful/unsuccessful/in_progress/unknown)
+- `notes`
+- `created_at`
+- **Relationships**: `egg_sacs`
 
-### Current Status (2025-10-18)
-**BLOCKING ISSUE**: Production deployment to Vercel is failing due to a persistent styled-jsx SSR error in Next.js 14. This prevents OAuth authentication from being deployed to production at tarantuverse.com.
+**Egg Sacs Table:** (NEW)
+- `id` (UUID, PK)
+- `user_id` (FK → users, CASCADE delete)
+- `pairing_id` (FK → pairings, CASCADE delete)
+- Date fields, incubation conditions, hatch info
+- **Relationships**: `offspring`
 
-### The Error
-```
-TypeError: Cannot read properties of null (reading 'useContext')
-    at exports.useContext (/vercel/path0/node_modules/react/cjs/react.production.js:489:33)
-    at StyleRegistry (/vercel/path0/node_modules/styled-jsx/dist/index/index.js:450:30)
-```
-This error occurs during static page generation for /404 and /500 error pages.
+**Offspring Table:** (NEW)
+- `id` (UUID, PK)
+- `user_id` (FK → users, CASCADE delete)
+- `egg_sac_id` (FK → egg_sacs, CASCADE delete)
+- Status, sale info, tracking fields
 
-### Attempted Fixes (All Have Failed)
-1. **TypeScript null safety fixes** - Fixed all `params?.id` issues ✅ (Resolved compilation errors but not styled-jsx)
-2. **React version alignment** - Ensured consistent React 18.3.1 across monorepo
-3. **Created .npmrc** - Prevented React and styled-jsx hoisting
-4. **Static HTML error pages** - Created 404.html and 500.html in public/
-5. **Minimal React error components** - not-found.tsx and error.tsx that redirect to static HTML
-6. **Next.js configuration changes**:
-   - `swcMinify: false` - Disabled SWC minification
-   - `reactStrictMode: false` - Disabled strict mode
-   - `typescript.ignoreBuildErrors: true`
-   - `eslint.ignoreDuringBuilds: true`
-7. **Build command modifications**:
-   - Added `NODE_ENV=production`
-   - Clear `.next` and `node_modules` before build
-   - Force success with `|| true` and `; exit 0`
-8. **Updated Next.js** - From 14.2.16 to 14.2.33 (latest patch)
-9. **Vercel configuration**:
-   - Routes to serve static error pages
-   - Custom build commands
-   - Clear cache directives
+**Activity Feed Table:** (NEW)
+- `id` (UUID, PK)
+- `user_id` (FK → users)
+- `activity_type` (string)
+- `target_id` (string - polymorphic)
+- `data` (JSONB)
+- `created_at`
 
-### Root Cause
-This is a **known bug in Next.js 14.2.x** with styled-jsx during SSR/static generation. Multiple GitHub issues confirm this:
-- [#43577](https://github.com/vercel/next.js/discussions/43577)
-- [#64887](https://github.com/vercel/next.js/discussions/64887)
-- [#67697](https://github.com/vercel/next.js/issues/67697)
+**Follow Table:** (NEW)
+- `follower_id` (FK → users)
+- `following_id` (FK → users)
+- `created_at`
+- Composite PK on (follower_id, following_id)
 
-The error appears to be deeply embedded in how Next.js handles styled-jsx during the build process, particularly for error pages.
+**Direct Message Table:** (NEW)
+- `id` (UUID, PK)
+- `sender_id` (FK → users)
+- `recipient_id` (FK → users)
+- `message_text`
+- `read` (boolean)
+- `created_at`
 
-### Current Workarounds in Place
-- **vercel.json**: Forces build success, clears cache, uses NODE_ENV=production
-- **next.config.js**: Disables problematic optimizations
-- **Static HTML fallbacks**: 404.html and 500.html in public/
-- **Minimal error components**: Return null or redirect to static pages
+**Forum/Message Tables:** (NEW)
+- `messages` (threads)
+- `message_replies`
+- `message_likes`
+- `message_reactions`
 
-### Next Steps to Try
-1. **Clear Vercel build cache** - Redeploy without "Use existing Build Cache" checked
-2. **Consider Next.js 15.5.6** - Latest stable version might have fix
-3. **Use MCP servers** - For better deployment monitoring and control
-4. **Alternative deployment** - Consider Railway, Netlify, or self-hosted as Vercel alternatives
-
-### MCP Server Setup (For Next Session)
-When Claude is restarted with MCP servers configured, the following capabilities may be available:
-- Direct Vercel deployment management
-- Build log access and monitoring
-- Environment variable configuration
-- Cache clearing capabilities
-- Alternative deployment strategies
-
-### Latest Commits
-- `e6e9c36` - Update Next.js from 14.2.16 to 14.2.33
-- `d43a373` - Apply Next.js 14 styled-jsx workarounds based on known issues
-- `5af2cbc` - Simple fix: Use static HTML for error pages
-
-### Important Notes
-- All fixes are committed and pushed to GitHub
-- Vercel auto-deploys on push to main
-- The issue is NOT with our code but with Next.js itself
-- OAuth implementation is complete and works locally
+**Subscriptions Table:** (NEW)
+- User subscription management
+- Plan details, status, billing
 
 ---
 
@@ -576,13 +1008,13 @@ When Claude is restarted with MCP servers configured, the following capabilities
 1. Global CSS for form elements: `apps/web/src/app/globals.css`
    ```css
    input, textarea, select {
-     @apply text-gray-900 bg-white;
+     @apply text-gray-900 bg-white dark:bg-gray-100 dark:text-gray-900;
    }
    label {
-     @apply text-gray-700;
+     @apply text-gray-700 dark:text-gray-300;
    }
    ```
-2. Added `text-gray-900` to all data display paragraphs in detail pages
+2. Added `text-gray-900 dark:text-white` to all data display paragraphs in detail pages
 
 ### Issue: Pydantic v2 compatibility
 **Cause**: Using `.dict()` method which was deprecated in Pydantic v2.
@@ -592,6 +1024,7 @@ When Claude is restarted with MCP servers configured, the following capabilities
 - `apps/api/app/routers/feedings.py`
 - `apps/api/app/routers/molts.py`
 - `apps/api/app/routers/substrate_changes.py`
+- All other routers
 
 ### Issue: Bcrypt password hash error (longer than 72 bytes)
 **Cause**: Bcrypt has a 72-character limit.
@@ -608,14 +1041,14 @@ def get_password_hash(password: str) -> str:
 
 **Fix**: Added OPTIONS to CORS middleware in `main.py`:
 ```python
-allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 ```
 
 ---
 
 ## 🚀 Deployment & Environment
 
-### Environment Variables (Render)
+### Environment Variables (Render - API)
 
 **Required:**
 - `DATABASE_URL` - PostgreSQL connection string (Neon)
@@ -624,6 +1057,10 @@ allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 
 **Optional:**
 - `PORT` - Default 8000
+- `CLOUDFLARE_R2_ACCESS_KEY_ID` - For photo uploads
+- `CLOUDFLARE_R2_SECRET_ACCESS_KEY` - For photo uploads
+- `CLOUDFLARE_R2_BUCKET_NAME` - Photo storage bucket
+- `CLOUDFLARE_R2_ENDPOINT` - R2 endpoint URL
 
 ### Render Configuration
 - **Build Command**: (none needed)
@@ -636,139 +1073,107 @@ allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 2. `alembic upgrade head` (runs pending migrations)
 3. `uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}`
 
-### Vercel Configuration
+### Vercel Configuration (Web)
 - Auto-deploys on push to main
-- Next.js 14 app
-- Environment variable: `NEXT_PUBLIC_API_URL` = https://tarantuverse-api.onrender.com
+- Next.js 14 app with React 19
+- **Environment Variables**:
+  - `NEXT_PUBLIC_API_URL` = https://tarantuverse-api.onrender.com
+- **Build Workarounds**:
+  - `vercel.json` with custom configuration
+  - `next.config.js` with styled-jsx workarounds
+  - Static error pages (404.html, 500.html)
 
----
-
-## 📊 Market Research & Competitive Analysis
-
-### Existing Tarantula/Invertebrate Apps
-
-**Arachnifiles** (Most Popular):
-- Tracks tarantulas, scorpions, isopods, mantis, centipedes, beetles, millipedes
-- Feeding notifications
-- Molt tracking
-- 40+ care guides (partnership with The Tarantula Collective)
-- Pro features: profile images, custom groups, spreadsheet view
-
-**ExotiKeeper**:
-- Multi-species (tarantulas, spiders, scorpions, centipedes, reptiles, etc.)
-- Track feeding, watering, molting
-- Customizable complexity
-- Backup/import from older "Tarantulas App"
-
-**TrazyCarantulas** (iOS):
-- 900+ species database
-- Track feed and molt dates
-
-**Reptile Apps** (Husbandry Pro, SnekLog, etc.):
-- QR/NFC codes for quick access
-- Morph calculators (breeding)
-- AI shed prediction
-- Growth graphs
-- Rack/cage management
-
-### What's MISSING in the Market (Opportunities)
-
-**Community & Social:**
-- No robust social networking
-- No keeper forums/discussions integrated
-- No collection sharing
-- No breeder marketplace integration
-- No keeper profiles with experience levels
-
-**Advanced Husbandry:**
-- **No environmental monitoring** (temp/humidity sensors)
-- **No substrate change tracking** ✅ WE HAVE THIS!
-- No enclosure modification history
-- No water dish refill schedules
-
-**Breeding & Genetics:**
-- No pairing history
-- No egg sac tracking
-- No lineage tracking
-- No inbreeding coefficient calculator
-
-**Health & Medical:**
-- No DKS (dyskinetic syndrome) tracking
-- No injury/medical logs
-- No vet visit records
-- No parasite treatment tracking
-
-**Analytics & Insights:**
-- No feeding cost calculator
-- No growth rate predictions
-- **No "premolt detector"** based on behavior
-- No collection value estimator
-- No feeding refusal pattern analysis
-
-**Unique Features Nobody Has:**
-- Tarantula "personality profiles" (temperament over time)
-- Feeding refusal predictor (ML model)
-- Collection insurance value tracker
-- Keeper experience system (gamification)
-- Species difficulty rating (based on actual community data)
-- "Ask the Community" feature
-- Collection planning tool
-- Expo wishlist tracker
+### Expo/EAS Configuration (Mobile)
+- Development: Expo Go
+- Production: EAS Build
+- **Configuration**: `eas.json`
+- **Environment**: API URL configured in app.json
 
 ---
 
 ## 🎯 Roadmap & Next Steps
 
-### Immediate Next Steps (Phase 1 - ✅ COMPLETED)
+### Phase 1 - Core Features (✅ COMPLETED)
+1. ✅ Basic collection management (CRUD)
+2. ✅ Feeding/molt/substrate tracking
+3. ✅ Species database and care sheets
+4. ✅ User authentication (traditional + OAuth)
+5. ✅ Photo management with cloud storage
+6. ✅ Analytics and statistics
+7. ✅ Dark mode (web + mobile)
+8. ✅ Mobile app with feature parity
 
-1. **✅ COMPLETED**: Add basic husbandry fields to tarantula model
-2. **✅ COMPLETED**: Link species care sheets to individual tarantulas ("View Care Sheet" button)
-3. **✅ COMPLETED**: Add substrate change tracking (backend)
-4. **✅ COMPLETED**: Add substrate change log UI (similar to feeding/molt logs)
-5. **✅ READY FOR DEPLOYMENT**: Phase 1 features complete and tested locally
+### Phase 2 - Community & Social (✅ COMPLETED)
+1. ✅ Keeper profiles with experience levels
+2. ✅ Follow system
+3. ✅ Activity feed
+4. ✅ Direct messaging
+5. ✅ Forums system with categories
+6. ✅ Community board
+7. ✅ Public collections
 
-### Phase 2 - Differentiators (Future)
+### Phase 3 - Breeding Module (✅ COMPLETED)
+1. ✅ Pairing logs and tracking
+2. ✅ Egg sac monitoring
+3. ✅ Offspring management
+4. ✅ Breeding tab on tarantula details
+5. ✅ Activity feed integration
 
-1. **Community Features**:
-   - Public collections
-   - Keeper profiles
-   - Collection sharing
-   - Comments/discussions on species
+### Phase 4 - Premium & Monetization (In Progress)
+1. ✅ Backend infrastructure complete
+2. ✅ Pricing page created
+3. 🚧 Payment integration (Stripe/PayPal)
+4. 🚧 Premium feature gating
+5. 🚧 Subscription management dashboard
 
-2. **Breeding Module**:
-   - Pairing logs
-   - Egg sac tracking
-   - Offspring management
-   - Lineage visualization
+### Phase 5 - Advanced Features (Future)
 
-3. **Health Tracking**:
-   - Medical logs
-   - Injury tracking
-   - DKS monitoring
-   - Treatment records
+**Health Tracking:**
+- Medical logs
+- Injury tracking
+- DKS (dyskinetic syndrome) monitoring
+- Treatment records
+- Vet visit logs
 
-4. **Smart Insights**:
-   - Feeding cost calculator
-   - Premolt predictor (ML based on feeding refusals + time since last molt)
-   - Growth charts
-   - Collection statistics dashboard
+**Smart Insights & ML:**
+- Feeding cost calculator
+- Premolt predictor (ML based on feeding refusals + time since last molt)
+- Growth predictions
+- Feeding refusal pattern analysis
+- Collection value estimator
+- Personality profiles (temperament over time)
 
-### Phase 3 - Advanced Features (Future)
+**IoT Integration:**
+- Environmental monitoring (temp/humidity sensors)
+- Alerts for out-of-range conditions
+- Automated logging
+- Smart enclosure controls
 
-1. **Marketplace Integration**:
-   - Link to MorphMarket
-   - Or build our own breeder marketplace
-   - Integrate with collection tracking
+**Advanced Breeding:**
+- Lineage tracking and visualization
+- Inbreeding coefficient calculator
+- Morph calculator (for color morphs)
+- Breeding project planner
 
-2. **Environmental Monitoring**:
-   - Integrate with smart temp/humidity sensors
-   - Alerts for out-of-range conditions
+**Enhanced Mobile:**
+- Push notifications
+- Offline mode with sync
+- QR code scanning for enclosure labels
+- NFC tag support
+- Widget support
 
-3. **Mobile App**:
-   - Native iOS/Android
-   - Camera integration (photos without URLs)
-   - Push notifications
-   - Offline mode
+**Marketplace:**
+- Integrated breeder marketplace
+- Classified ads
+- Collection insurance value tracker
+- Expo wishlist tracker
+- MorphMarket integration
+
+**Gamification:**
+- Keeper experience system (levels, badges)
+- Collection achievements
+- Community challenges
+- Leaderboards
 
 ---
 
@@ -785,13 +1190,16 @@ allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 3. **Database changes**: Always create Alembic migrations
    - Run `alembic revision -m "description"` (in Render shell or manually create file)
    - Follow naming: `{hash}_{snake_case_description}.py`
+   - Set `down_revision` to previous migration hash
+   - Test both `upgrade()` and `downgrade()`
 
-4. **Text visibility**: Always add explicit color classes:
-   - Data display: `text-gray-900`
-   - Labels: `text-gray-700`
-   - Muted text: `text-gray-500` or `text-gray-600`
+4. **Text visibility**: Always add explicit color classes with dark mode support:
+   - Data display: `text-gray-900 dark:text-white`
+   - Labels: `text-gray-700 dark:text-gray-300`
+   - Muted text: `text-gray-500 dark:text-gray-400`
 
-5. **Form inputs**: Global styles apply `text-gray-900 bg-white`, but be explicit in complex components
+5. **Form inputs**: Use global styles but add dark mode variants:
+   - `text-gray-900 bg-white dark:bg-gray-800 dark:text-white`
 
 6. **⚠️ CRITICAL - Dark Mode Conformance**: ALL new features, pages, and components MUST support both light and dark modes
    - **Web**: Use Tailwind `dark:` modifiers on ALL styled elements
@@ -804,6 +1212,8 @@ allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
      - Never use hardcoded colors like `#FFFFFF` or `black`
    - **Testing**: Test BOTH themes before considering a feature complete
    - **No Exceptions**: Even small UI tweaks must maintain dark mode support
+
+7. **React 19**: Project uses React 19.1.0 with overrides in root package.json
 
 ### API Route Patterns
 
@@ -866,33 +1276,46 @@ const data = await response.json()
 
 ## 🔍 Database Migration Status
 
-### Applied Migrations:
-1. Initial schema (users, tarantulas, species)
-2. `a1b2c3d4e5f6_add_photo_url_to_tarantulas.py`
-3. `b2c3d4e5f6g7_expand_species_model.py`
+### Complete Migration Chain (14 migrations):
+1. `9588b399ad54_initial_migration.py` - Initial schema
+2. `a1b2c3d4e5f6_add_photo_url_to_tarantulas.py` - Photo URL field
+3. `b2c3d4e5f6g7_expand_species_model.py` - Expanded species fields
+4. `c3d4e5f6g7h8_add_husbandry_and_substrate_changes.py` - Husbandry + substrate changes
+5. `d1e2f3g4h5i6_add_community_features.py` - Community base
+6. `e2f3g4h5i6j7_add_messages_table.py` - Message board
+7. `f3g4h5i6j7k8_add_message_interactions.py` - Likes/reactions
+8. `g4h5i6j7k8l9_add_follow_and_direct_messaging_models.py` - Follow + DM
+9. `h5i6j7k8l9m0_add_forums_and_activity_feed.py` - Forums + activity
+10. `i6j7k8l9m0n1_change_activity_target_id_to_string.py` - Activity target fix
+11. `j1k2l3m4n5o6_add_subscription_tables.py` - Subscriptions
+12. `add_oauth_fields.py` (oauth_fields_001) - OAuth authentication
+13. `add_safety_fields_to_species.py` - Safety information
+14. `k2l3m4n5o6p7_add_breeding_module.py` - Breeding module
 
-### Pending Migration (needs to run on Render):
-- `c3d4e5f6g7h8_add_husbandry_and_substrate_changes.py`
-  - Adds husbandry fields to `tarantulas` table
-  - Creates `substrate_changes` table
-  - Creates `enclosuretype` enum
-
-**To apply on Render**:
-The migration will run automatically on next deploy via `start.sh`.
+**All migrations applied to production database**
 
 ---
 
 ## 🎨 Design System
 
 ### Colors
-- Primary: `#8B4513` (brown/earth tones for tarantulas)
-- Text: `gray-900` (nearly black)
-- Labels: `gray-700` (medium gray)
-- Muted: `gray-500` or `gray-600`
-- Backgrounds: `white`, `gray-50`
-- Success: `green-100` (bg), `green-800` (text)
-- Error: `red-100` (bg), `red-700` (text)
-- Info: `blue-600` (buttons)
+- **Primary**: `#8B4513` (brown/earth tones for tarantulas)
+- **Text**:
+  - Light mode: `gray-900` (nearly black)
+  - Dark mode: `white` or `gray-100`
+- **Labels**:
+  - Light mode: `gray-700` (medium gray)
+  - Dark mode: `gray-300`
+- **Muted**:
+  - Light mode: `gray-500` or `gray-600`
+  - Dark mode: `gray-400`
+- **Backgrounds**:
+  - Light mode: `white`, `gray-50`
+  - Dark mode: `gray-900`, `gray-800`
+- **Success**: `green-100` (bg), `green-800` (text)
+- **Error**: `red-100` (bg), `red-700` (text)
+- **Info**: `blue-600` (buttons)
+- **Warning**: `yellow-100` (bg), `yellow-800` (text)
 
 ### Typography
 - Headings: Bold, varying sizes (4xl, 2xl, xl, lg)
@@ -900,11 +1323,11 @@ The migration will run automatically on next deploy via `start.sh`.
 - Monospace font rendering (Next.js default)
 
 ### Components
-- **Cards**: `border border-gray-200 rounded-lg p-4 hover:shadow-lg transition`
+- **Cards**: `border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg transition bg-white dark:bg-gray-800`
 - **Buttons**: `px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition`
 - **Forms**:
-  - Inputs: `w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white`
-  - Labels: `block text-sm font-medium mb-1`
+  - Inputs: `w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 dark:text-white bg-white dark:bg-gray-800`
+  - Labels: `block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300`
 
 ---
 
@@ -921,147 +1344,173 @@ This includes:
 - Analytics and statistics features
 - UI improvements and components
 - Dark mode support for all new components
+- Community features
 
 **Exception**: Features that are web-specific (like certain admin panels) or mobile-specific (like camera integration) are the only exclusions.
 
-### When Adding New Log Types (like substrate changes):
+### When Adding New Log Types:
 1. Create model in `models/`
 2. Create schema in `schemas/` (Base, Create, Update, Response)
 3. Create router in `routers/` with CRUD endpoints
 4. Add router to `main.py` imports and `include_router()`
-5. Create migration
+5. Create migration with proper `down_revision`
 6. **WEB**: Add interface to frontend detail page
 7. **WEB**: Add state and fetch function
 8. **WEB**: Create inline form (similar to feeding/molt forms)
 9. **WEB**: Display logs in list with delete buttons
-10. **MOBILE**: Add interface to mobile detail screen
-11. **MOBILE**: Add state and fetch function
-12. **MOBILE**: Create form screen or inline form
-13. **MOBILE**: Display logs in list with delete buttons
+10. **WEB**: Ensure dark mode support
+11. **MOBILE**: Add interface to mobile detail screen
+12. **MOBILE**: Add state and fetch function
+13. **MOBILE**: Create form screen or inline form
+14. **MOBILE**: Display logs in list with delete buttons
+15. **MOBILE**: Ensure dark mode support with ThemeContext
 
 ### When Adding New Fields to Existing Models:
 1. Update model in `models/`
 2. Update schema in `schemas/` (add to Base class)
 3. Create migration with `op.add_column()`
-4. Update frontend interface
+4. Update frontend interface (TypeScript types)
 5. Update frontend forms (add/edit pages)
 6. Update detail page display
+7. Update mobile screens
+8. Test on both platforms
+9. Test both light and dark modes
 
 ### Testing Checklist:
+**Functionality:**
 - [ ] Registration works
-- [ ] Login works
+- [ ] Login works (traditional + OAuth if implemented)
 - [ ] Add tarantula (with trailing slash!)
 - [ ] View tarantula detail
 - [ ] Edit tarantula
 - [ ] Delete tarantula
 - [ ] Add feeding log
 - [ ] Add molt log
+- [ ] Add substrate change log
+- [ ] Upload photos (mobile + web)
 - [ ] Species autocomplete works
 - [ ] View Care Sheet button appears and works
 - [ ] Husbandry section displays when data exists
+- [ ] Breeding module (pairings, egg sacs, offspring)
+- [ ] Community features (forums, DMs, follows)
+- [ ] Analytics displays correctly
+
+**UI/UX:**
+- [ ] Test on web (desktop + mobile viewport)
+- [ ] Test on mobile app (iOS + Android)
+- [ ] Test light mode on all screens
+- [ ] Test dark mode on all screens
+- [ ] Verify theme toggle works
+- [ ] Check responsive layouts
+- [ ] Test navigation (sidebar, tabs)
 
 ---
 
 ## 📞 Important Contacts & Resources
 
-**Arachnoboards**: https://arachnoboards.com - Community forum for keeper feedback
-**Species Data Source**: Obsidian vault at `C:\Users\gwiza\Documents\Obscuravault`
-**GitHub Repo**: (add your repo URL here)
+- **Arachnoboards**: https://arachnoboards.com - Community forum for keeper feedback
+- **Species Data Source**: Obsidian vault at `C:\Users\gwiza\Documents\Obscuravault`
+- **API Documentation**: https://tarantuverse-api.onrender.com/docs (FastAPI auto-generated)
+- **GitHub Repo**: (add your repo URL here)
 
 ---
 
 ## 🎓 Learning from This Project
 
 ### Key Architectural Decisions:
-1. **Monorepo with Turborepo**: Allows shared types/configs between web and API
-2. **FastAPI + SQLAlchemy**: Fast, type-safe Python backend with async support
-3. **PostgreSQL**: Robust relational database with array types, JSON support
-4. **JWT Authentication**: Stateless, scalable auth
-5. **Pydantic for validation**: Type safety and automatic API docs
-6. **Next.js 14**: Modern React framework with server components (though we use client components)
-7. **Tailwind CSS**: Utility-first styling, rapid development
+1. **Monorepo with pnpm workspaces**: Allows shared types/configs between web, mobile, and API
+2. **FastAPI + SQLAlchemy 2.0**: Fast, type-safe Python backend with async support
+3. **PostgreSQL with advanced features**: Array types, JSONB, full-text search (TSVECTOR)
+4. **JWT Authentication + OAuth**: Stateless, scalable auth with social login support
+5. **Pydantic v2 for validation**: Type safety and automatic API documentation
+6. **Next.js 14 with React 19**: Modern React framework with latest features
+7. **React Native + Expo**: Cross-platform mobile with single codebase
+8. **Tailwind CSS + next-themes**: Utility-first styling with built-in dark mode
+9. **Cloudflare R2**: Cost-effective S3-compatible object storage
 
 ### What Makes This Special:
-- **Niche focus**: Tarantula/invertebrate keepers are underserved
-- **Comprehensive tracking**: Feeding, molting, substrate changes, husbandry
-- **Species integration**: Link individual animals to care sheets
-- **Community potential**: Built for future social features
-- **Data-driven**: Track everything to enable future analytics/ML
+- **Niche focus**: Tarantula/invertebrate keepers are underserved by existing apps
+- **Comprehensive tracking**: Goes beyond basic feeding/molt logs to include substrate, husbandry, breeding
+- **Species integration**: Link individual animals to comprehensive care sheets
+- **Community-first**: Built-in social features from day one
+- **Data-driven**: Track everything to enable future analytics/ML features
+- **Cross-platform**: True feature parity between web and mobile
+- **Modern UX**: Dark mode, modern navigation patterns, professional design
+
+### Technical Achievements:
+- Successfully implemented OAuth alongside traditional auth
+- Built complex many-to-many relationships (follows, breeding lineage)
+- Integrated photo storage with automatic thumbnail generation
+- Real-time activity feed with polymorphic relationships
+- Comprehensive analytics with charting
+- Full dark mode implementation across entire stack
+- Modern persistent sidebar navigation (2025 best practices)
 
 ---
 
-## 🚧 Current Limitations & TODOs
+## 🚧 Current Limitations & Future Work
 
-### Limitations:
-- ~~No image upload (using URLs only)~~ ✅ **FIXED** - Cloudflare R2 integration complete
-- ~~No mobile app (web only)~~ ✅ **FIXED** - Mobile app built with React Native + Expo
-- ~~No dark mode~~ ✅ **FIXED** - Complete dark mode on web and mobile
+### Current Limitations:
 - No offline mode (requires internet connection)
-- No real-time notifications
-- No environmental sensor integration
-- No breeding tracking yet
-- Limited community features (profiles exist, no forums/messaging)
+- No real-time notifications (push/email)
+- No environmental sensor integration (IoT)
+- Payment integration not complete
+- No export functionality (CSV, PDF)
 
 ### Immediate TODOs:
-1. ~~Add substrate change log UI to tarantula detail page~~ ✅ DONE
-2. ~~Add feeding analytics and stats~~ ✅ DONE
-3. ~~Implement dark mode~~ ✅ DONE
-4. Test all features end-to-end in production environment
-5. Add email notifications for feeding reminders
-6. Implement breeding tracking features
-7. Add community forums and activity feed
+1. Complete payment integration (Stripe/PayPal)
+2. Implement email notifications for feeding reminders
+3. Add push notifications for mobile app
+4. Implement data export (CSV, PDF)
+5. Add bulk operations (bulk feeding logs, etc.)
+6. Implement search functionality across platform
+7. Add admin panel for species verification
+8. Complete OAuth provider setup (Google, Apple, GitHub)
 
-### Future Considerations:
-- ~~Mobile app (React Native or native)~~ ✅ **DONE** - React Native + Expo
-- ~~Image upload to cloud storage (Cloudinary, S3)~~ ✅ **DONE** - Cloudflare R2
+### Future Enhancements:
 - Offline mode with local storage and sync
 - WebSocket for real-time updates
-- Email notifications (feeding reminders, molt predictions)
-- Push notifications for mobile app
-- Export collection data (CSV, PDF)
-- Privacy controls for public profiles (partially implemented)
-- Admin panel for species verification
-- Breeding tracking and lineage management
+- Email/SMS notifications (feeding reminders, molt predictions)
 - Temperature/humidity sensor integration (IoT)
 - QR code labels for enclosures
 - Multi-user collections (shared access)
 - Marketplace/classifieds integration
+- ML-based premolt predictor
+- Feeding cost calculator
+- Collection insurance value tracker
+- Expo wishlist tracker
+- Video uploads
+- Tarantula "personality profiles"
+- Breeder network and marketplace
 
 ---
 
-**Last Updated**: 2025-10-18
-**Version**: 0.5.1 (Deployment Issues - styled-jsx blocking production)
-**Status**: Development Complete, Production Deployment Blocked
+**Last Updated**: 2025-11-10
+**Version**: 0.8.0 (Community + Breeding Complete)
+**Status**: Active Development
 
-**Recent Changes** (2025-10-18):
-- 🔴 **CRITICAL**: Vercel deployment blocked by styled-jsx SSR error
-- Applied multiple workarounds for Next.js 14.2.x bug
-- Updated Next.js from 14.2.16 to 14.2.33
-- Created static HTML error pages as fallbacks
-- OAuth implementation complete but not deployed to production
-- Investigating MCP servers for better deployment management
+**Recent Changes** (2025-11-10):
+- 📝 **DOCUMENTATION OVERHAUL**: Complete CLAUDE.md update
+  - Added all missing features (community, breeding, photos, OAuth, safety)
+  - Documented 14 migrations (was only showing 3)
+  - Added all new API routes and models
+  - Updated tech stack (React 19)
+  - Moved completed features out of "Future" roadmap
+  - Comprehensive file structure documentation
 
-**Previous Changes** (2025-10-13):
-- ✅ Added comprehensive feeding analytics system
-  - Backend: feeding-stats endpoint with full analytics
-  - Web: FeedingStatsCard with Recharts visualizations (pie + bar charts)
-  - Mobile: FeedingStatsCard with themed styling
-  - Collection cards show feeding status badges on both platforms
-- ✅ Completed dark mode implementation across entire platform
-  - Web: All pages, components, modals, charts with Tailwind dark: modifiers
-  - Mobile: Complete ThemeContext system with dynamic colors
-  - Tarantula detail screens fully themed on both platforms
-  - Loading states, skeletons, empty states all support dark mode
-- ✅ Mobile app feature parity with web
-  - Full CRUD operations for tarantulas
-  - Photo management with camera integration
-  - Feeding and molt tracking
-  - Analytics and stats display
+**Changes from 2025-10-28**:
+- ✅ **BREEDING MODULE COMPLETE**: Full breeding tracking system
+- ✅ **NAVIGATION REWRITE**: Modern persistent sidebar navigation
+- ✅ **SAFETY INFORMATION**: urticating_hairs and medically_significant_venom fields
+- ✅ Fixed build errors and TypeScript issues
 
-**Previous Updates** (2025-10-06):
-- ✅ Added substrate change log UI to tarantula detail page
-- ✅ Implemented inline form for logging substrate changes
-- ✅ Added display section showing substrate change history
-- ✅ Delete functionality for substrate change logs
-- ✅ Auto-updates tarantula's substrate info when changes are logged
+**Changes from 2025-10-13**:
+- ✅ **ANALYTICS SYSTEM**: Comprehensive feeding and growth analytics
+- ✅ **DARK MODE**: Complete implementation across web and mobile
+- ✅ **MOBILE APP**: Feature parity with web application
+- ✅ **PHOTO MANAGEMENT**: Cloudflare R2 integration with camera support
 
+**Changes from 2025-10-06**:
+- ✅ Substrate change tracking with UI
+- ✅ Inline forms for all log types
+- ✅ Auto-updating tarantula husbandry fields
