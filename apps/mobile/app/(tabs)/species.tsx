@@ -215,12 +215,14 @@ export default function SpeciesScreen() {
       paddingHorizontal: 16,
       borderRadius: 20,
       borderWidth: 2,
-      minHeight: 40,
+      flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'center',
     },
     filterChipText: {
       fontSize: 14,
       fontWeight: '700',
+      lineHeight: 20,
     },
     resultCount: {
       paddingHorizontal: 16,
@@ -378,6 +380,7 @@ export default function SpeciesScreen() {
             ]}
           >
             <Text
+              numberOfLines={1}
               style={[
                 styles.filterChipText,
                 { color: selectedFilter === filter ? '#ffffff' : '#e5e7eb' },
