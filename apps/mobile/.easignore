@@ -1,29 +1,20 @@
 # Mobile app .easignore
-# Exclude everything from parent directories we don't need
-
-# Exclude sibling apps
+# Exclude sibling apps from the build
 ../../apps/web/
 ../../apps/api/
 
-# Exclude packages
+# Exclude packages we don't need
 ../../packages/
 
-# Exclude docs
-../../docs/
-
-# Exclude config directories
+# Exclude config/docs we don't need
 ../../.claude/
 ../../.vercel/
 ../../.github/
 ../../scripts/
+../../docs/
 
-# Exclude git
+# Git
 ../../.git/
-
-# Lock files
-../../pnpm-lock.yaml
-../../package-lock.yaml
-../../yarn.lock
 
 # Build outputs
 ../../.turbo/
@@ -34,12 +25,8 @@
 # Test files
 ../../**/__tests__/
 ../../**/__mocks__/
-../../**/*.test.ts
-../../**/*.test.tsx
-../../**/*.test.js
-../../**/*.spec.ts
-../../**/*.spec.tsx
-../../**/*.spec.js
+../../**/*.test.*
+../../**/*.spec.*
 
 # Docs
 ../../*.md

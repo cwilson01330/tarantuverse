@@ -9,8 +9,7 @@
       "distribution": "internal",
       "node": "20.19.4",
       "env": {
-        "NO_FLIPPER": "1",
-        "YARN_ENABLE_IMMUTABLE_INSTALLS": "false"
+        "NO_FLIPPER": "1"
       },
       "ios": {
         "simulator": true
