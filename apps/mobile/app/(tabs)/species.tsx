@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, RefreshControl, Image, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, RefreshControl, Image, FlatList, Modal, Pressable } from 'react-native';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
@@ -32,6 +32,7 @@ export default function SpeciesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced'>('all');
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   useEffect(() => {
     fetchSpecies();
@@ -204,26 +205,57 @@ export default function SpeciesScreen() {
       fontSize: 15,
       color: colors.textPrimary,
     },
-    filterContainer: {
-      paddingHorizontal: 16,
+    filterSelector: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginHorizontal: 16,
       marginBottom: 12,
+      padding: 12,
+      borderRadius: 10,
+      borderWidth: 1,
     },
-    filterChip: {
-      height: 36,
-      paddingHorizontal: 16,
-      borderRadius: 20,
-      borderWidth: 2,
+    filterLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    filterValueContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 8,
+      gap: 4,
     },
-    filterChipText: {
+    filterValue: {
       fontSize: 14,
+      fontWeight: '600',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalContent: {
+      width: '80%',
+      borderRadius: 12,
+      padding: 16,
+      maxWidth: 400,
+    },
+    modalTitle: {
+      fontSize: 18,
       fontWeight: '700',
-      lineHeight: 16,
-      includeFontPadding: false,
-      textAlignVertical: 'center',
+      marginBottom: 16,
+      textAlign: 'center',
+    },
+    modalOption: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 12,
+      borderBottomWidth: 1,
+    },
+    modalOptionText: {
+      fontSize: 16,
     },
     resultCount: {
       paddingHorizontal: 16,
@@ -361,37 +393,19 @@ export default function SpeciesScreen() {
         />
       </View>
 
-      {/* Filter Chips */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        style={styles.filterContainer}
-        contentContainerStyle={{ paddingRight: 16 }}
+      {/* Filter Selector */}
+      <TouchableOpacity
+        style={[styles.filterSelector, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={() => setShowFilterModal(true)}
       >
-        {(['all', 'beginner', 'intermediate', 'advanced'] as const).map(filter => (
-          <TouchableOpacity
-            key={filter}
-            onPress={() => setSelectedFilter(filter)}
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor: selectedFilter === filter ? '#f97316' : '#1e293b',
-                borderColor: selectedFilter === filter ? '#f97316' : '#374151',
-              },
-            ]}
-          >
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.filterChipText,
-                { color: selectedFilter === filter ? '#ffffff' : '#e5e7eb' },
-              ]}
-            >
-              {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+        <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Care Level:</Text>
+        <View style={styles.filterValueContainer}>
+          <Text style={[styles.filterValue, { color: colors.textPrimary }]}>
+            {selectedFilter === 'all' ? 'All Levels' : selectedFilter.charAt(0).toUpperCase() + selectedFilter.slice(1)}
+          </Text>
+          <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+        </View>
+      </TouchableOpacity>
 
       {/* Results Count */}
       <Text style={styles.resultCount}>
@@ -422,6 +436,45 @@ export default function SpeciesScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
       )}
+
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowFilterModal(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Select Care Level</Text>
+
+            {(['all', 'beginner', 'intermediate', 'advanced'] as const).map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[
+                  styles.modalOption,
+                  { borderBottomColor: colors.border },
+                  selectedFilter === filter && { backgroundColor: colors.border }
+                ]}
+                onPress={() => {
+                  setSelectedFilter(filter);
+                  setShowFilterModal(false);
+                }}
+              >
+                <Text style={[styles.modalOptionText, { color: colors.textPrimary }]}>
+                  {filter === 'all' ? 'All Levels' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </Text>
+                {selectedFilter === filter && (
+                  <Ionicons name="checkmark" size={24} color="#f97316" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
