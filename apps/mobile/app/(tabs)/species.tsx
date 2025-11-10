@@ -205,9 +205,7 @@ export default function SpeciesScreen() {
       color: colors.textPrimary,
     },
     filterContainer: {
-      flexDirection: 'row',
       paddingHorizontal: 16,
-      gap: 8,
       marginBottom: 12,
     },
     filterChip: {
@@ -218,6 +216,7 @@ export default function SpeciesScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      marginRight: 8,
     },
     filterChipText: {
       fontSize: 14,
