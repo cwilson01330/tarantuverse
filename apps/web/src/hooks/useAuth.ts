@@ -6,6 +6,7 @@ export interface AuthUser {
   name: string | null
   image: string | null
   username?: string
+  is_superuser?: boolean
 }
 
 export interface UseAuthReturn {
@@ -42,6 +43,7 @@ export function useAuth(): UseAuthReturn {
       email: session.user.email || null,
       name: session.user.name || null,
       image: session.user.image || null,
+      is_superuser: session.user.is_superuser || false,
     } : null,
     token: session?.accessToken || null,
     isAuthenticated: !!session?.user,

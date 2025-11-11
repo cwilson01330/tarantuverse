@@ -55,7 +55,8 @@ const authOptions: AuthOptions = {
               email: response.data.user?.email || credentials?.email || "",
               name: response.data.user?.display_name || credentials?.email || "",
               image: response.data.user?.avatar_url,
-              accessToken: response.data.access_token
+              accessToken: response.data.access_token,
+              is_superuser: response.data.user?.is_superuser || false
             }
           }
           return null
@@ -95,6 +96,7 @@ const authOptions: AuthOptions = {
             user.name = response.data.user.display_name
             user.image = response.data.user.avatar_url
             user.isNewUser = response.data.is_new_user
+            user.is_superuser = response.data.user.is_superuser || false
             return true
           }
           return false
@@ -114,15 +116,17 @@ const authOptions: AuthOptions = {
         token.accessToken = user.accessToken
         token.id = user.id
         token.isNewUser = user.isNewUser
+        token.is_superuser = user.is_superuser
       }
       return token
     },
-    
+
     async session({ session, token }) {
       // Add access token and user ID to session
       session.accessToken = token.accessToken as string
       session.user.id = token.id as string
       session.isNewUser = token.isNewUser as boolean
+      session.user.is_superuser = token.is_superuser as boolean
       return session
     }
   },

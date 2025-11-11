@@ -105,11 +105,17 @@ async def create_species(
         )
 
     # Create new species
+    # Admins can create verified species, regular users cannot
+    is_verified = species_data.is_verified if current_user.is_superuser else False
+
+    species_dict = species_data.model_dump()
+    species_dict.pop('is_verified', None)  # Remove to set explicitly below
+
     new_species = Species(
-        **species_data.model_dump(),
+        **species_dict,
         scientific_name_lower=species_data.scientific_name.lower().strip(),
         submitted_by=current_user.id,
-        is_verified=False  # Requires admin approval
+        is_verified=is_verified
     )
 
     db.add(new_species)

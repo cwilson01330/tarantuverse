@@ -36,7 +36,8 @@
       "Bash(find:*)",
       "Bash(alembic:*)",
       "Bash(git diff:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

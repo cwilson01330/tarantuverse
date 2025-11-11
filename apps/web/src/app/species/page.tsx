@@ -127,11 +127,24 @@ export default function SpeciesPage() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-3 text-gray-900 dark:text-white">Species Database</h1>
-          <p className="text-gray-600 dark:text-gray-400 text-lg">
-            Browse comprehensive care guides for {species.length} tarantula species
-          </p>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-bold mb-3 text-gray-900 dark:text-white">Species Database</h1>
+            <p className="text-gray-600 dark:text-gray-400 text-lg">
+              Browse comprehensive care guides for {species.length} tarantula species
+            </p>
+          </div>
+
+          {/* Admin Add Species Button */}
+          {user?.is_superuser && (
+            <Link
+              href="/dashboard/admin/species/add"
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+            >
+              <span>➕</span>
+              <span>Add Species</span>
+            </Link>
+          )}
         </div>
 
         {/* Search Bar */}

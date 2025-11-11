@@ -55,7 +55,7 @@ class SpeciesBase(BaseModel):
 
 class SpeciesCreate(SpeciesBase):
     """Schema for creating a new species"""
-    pass
+    is_verified: bool = False  # Can be set to True by admins
 
 
 class SpeciesUpdate(BaseModel):
