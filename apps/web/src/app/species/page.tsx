@@ -31,12 +31,6 @@ export default function SpeciesPage() {
   const { user } = useAuth();
   const [species, setSpecies] = useState<Species[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // DEBUG: Log user data
-  useEffect(() => {
-    console.log('🐛 DEBUG - User data:', user);
-    console.log('🐛 DEBUG - is_superuser:', user?.is_superuser);
-  }, [user]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
@@ -132,12 +126,6 @@ export default function SpeciesPage() {
       userAvatar={user?.image ?? undefined}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* DEBUG PANEL - Remove after testing */}
-        <div className="mb-4 p-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded-lg">
-          <p className="font-bold text-yellow-900 dark:text-yellow-100">🐛 DEBUG INFO:</p>
-          <pre className="text-xs mt-2 text-yellow-900 dark:text-yellow-100">{JSON.stringify(user, null, 2)}</pre>
-        </div>
-
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
           <div>
