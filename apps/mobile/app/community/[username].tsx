@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, I
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface KeeperProfile {
   id: number;
@@ -51,6 +52,7 @@ export default function KeeperProfileScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const username = params.username as string;
+  const { colors } = useTheme();
 
   const [profile, setProfile] = useState<KeeperProfile | null>(null);
   const [collection, setCollection] = useState<Tarantula[]>([]);
@@ -241,6 +243,354 @@ export default function KeeperProfileScreen() {
     ).join(' ');
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    centerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      padding: 32,
+    },
+    profileHeader: {
+      backgroundColor: colors.surface,
+      marginBottom: 16,
+    },
+    headerBackground: {
+      height: 120,
+      backgroundColor: colors.primary,
+    },
+    profileContent: {
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingBottom: 24,
+    },
+    avatarSection: {
+      marginTop: -56,
+      marginBottom: 16,
+    },
+    avatar: {
+      width: 112,
+      height: 112,
+      borderRadius: 56,
+      borderWidth: 4,
+      borderColor: colors.surface,
+    },
+    avatarPlaceholder: {
+      width: 112,
+      height: 112,
+      borderRadius: 56,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 4,
+      borderColor: colors.surface,
+    },
+    avatarEmoji: {
+      fontSize: 48,
+    },
+    displayName: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    username: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginBottom: 16,
+    },
+    actionButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 16,
+      width: '100%',
+      paddingHorizontal: 20,
+    },
+    followButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    followButtonText: {
+      color: '#ffffff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    followingButton: {
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    followingButtonText: {
+      color: colors.primary,
+    },
+    messageButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      paddingVertical: 12,
+      borderRadius: 12,
+    },
+    messageButtonText: {
+      color: colors.primary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    profileInfo: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: 8,
+      marginBottom: 16,
+    },
+    infoBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.border,
+    },
+    infoBadgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    specialtiesSection: {
+      width: '100%',
+      marginBottom: 16,
+    },
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textTertiary,
+      marginBottom: 8,
+      letterSpacing: 0.5,
+    },
+    specialties: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    specialtyBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      backgroundColor: colors.primary + '33',
+    },
+    specialtyText: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: colors.primary,
+    },
+    socialLinks: {
+      flexDirection: 'row',
+      gap: 16,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      width: '100%',
+      justifyContent: 'center',
+    },
+    socialLink: {
+      padding: 8,
+    },
+    statsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      paddingHorizontal: 16,
+      marginBottom: 16,
+    },
+    statCard: {
+      minWidth: '30%',
+      maxWidth: '48%',
+      backgroundColor: colors.surface,
+      padding: 16,
+      borderRadius: 12,
+      alignItems: 'center',
+    },
+    statValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.primary,
+      marginBottom: 4,
+    },
+    statLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    tabs: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    activeTab: {
+      borderBottomWidth: 2,
+      borderBottomColor: colors.primary,
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    activeTabText: {
+      color: colors.primary,
+    },
+    tabContent: {
+      padding: 16,
+    },
+    collectionGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    tarantulaCard: {
+      width: '48%',
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    tarantulaImage: {
+      width: '100%',
+      height: 120,
+    },
+    tarantulaPlaceholder: {
+      width: '100%',
+      height: 120,
+      backgroundColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tarantulaEmoji: {
+      fontSize: 40,
+    },
+    tarantulaInfo: {
+      padding: 12,
+    },
+    tarantulaName: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    tarantulaSpecies: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontStyle: 'italic',
+      marginBottom: 8,
+    },
+    tarantulaMeta: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    tarantulaBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    femaleBadge: {
+      backgroundColor: '#fce7f3',
+    },
+    maleBadge: {
+      backgroundColor: '#dbeafe',
+    },
+    unknownBadge: {
+      backgroundColor: colors.border,
+    },
+    ageBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      backgroundColor: colors.border,
+    },
+    badgeTextSmall: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    aboutContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+    },
+    bioText: {
+      fontSize: 14,
+      color: colors.textPrimary,
+      lineHeight: 22,
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: 48,
+    },
+    emptyEmoji: {
+      fontSize: 48,
+      marginBottom: 12,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    loadingEmoji: {
+      fontSize: 64,
+      marginBottom: 16,
+    },
+    loadingText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+    },
+    errorEmoji: {
+      fontSize: 64,
+      marginBottom: 16,
+    },
+    errorTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: 8,
+    },
+    errorText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 24,
+      textAlign: 'center',
+    },
+    backButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+    },
+    backButtonText: {
+      color: '#ffffff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -279,7 +629,7 @@ export default function KeeperProfileScreen() {
       <ScrollView
         style={styles.container}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7c3aed" />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
         }
       >
         {/* Profile Header */}
@@ -302,21 +652,21 @@ export default function KeeperProfileScreen() {
             {/* Action Buttons */}
             {currentUser && currentUser.username !== username && (
               <View style={styles.actionButtons}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.followButton, isFollowing && styles.followingButton]}
                   onPress={handleFollowToggle}
                 >
-                  <MaterialCommunityIcons 
-                    name={isFollowing ? "account-check" : "account-plus"} 
-                    size={20} 
-                    color={isFollowing ? "#7c3aed" : "white"} 
+                  <MaterialCommunityIcons
+                    name={isFollowing ? "account-check" : "account-plus"}
+                    size={20}
+                    color={isFollowing ? colors.primary : "#ffffff"}
                   />
                   <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
                     {isFollowing ? 'Following' : 'Follow'}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
-                  <MaterialCommunityIcons name="message" size={20} color="#7c3aed" />
+                  <MaterialCommunityIcons name="message" size={20} color={colors.primary} />
                   <Text style={styles.messageButtonText}>Message</Text>
                 </TouchableOpacity>
               </View>
@@ -365,7 +715,7 @@ export default function KeeperProfileScreen() {
                     style={styles.socialLink}
                     onPress={() => Linking.openURL(profile.social_links!.instagram!)}
                   >
-                    <MaterialCommunityIcons name="instagram" size={24} color="#7c3aed" />
+                    <MaterialCommunityIcons name="instagram" size={24} color={colors.primary} />
                   </TouchableOpacity>
                 )}
                 {profile.social_links.youtube && (
@@ -373,7 +723,7 @@ export default function KeeperProfileScreen() {
                     style={styles.socialLink}
                     onPress={() => Linking.openURL(profile.social_links!.youtube!)}
                   >
-                    <MaterialCommunityIcons name="youtube" size={24} color="#7c3aed" />
+                    <MaterialCommunityIcons name="youtube" size={24} color={colors.primary} />
                   </TouchableOpacity>
                 )}
                 {profile.social_links.website && (
@@ -381,7 +731,7 @@ export default function KeeperProfileScreen() {
                     style={styles.socialLink}
                     onPress={() => Linking.openURL(profile.social_links!.website!)}
                   >
-                    <MaterialCommunityIcons name="web" size={24} color="#7c3aed" />
+                    <MaterialCommunityIcons name="web" size={24} color={colors.primary} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -395,11 +745,11 @@ export default function KeeperProfileScreen() {
             {followStats && (
               <>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: '#7c3aed' }]}>{followStats.followers_count}</Text>
+                  <Text style={styles.statValue}>{followStats.followers_count}</Text>
                   <Text style={styles.statLabel}>Followers</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: '#3b82f6' }]}>{followStats.following_count}</Text>
+                  <Text style={styles.statValue}>{followStats.following_count}</Text>
                   <Text style={styles.statLabel}>Following</Text>
                 </View>
               </>
@@ -415,11 +765,11 @@ export default function KeeperProfileScreen() {
                   <Text style={styles.statLabel}>Species</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: '#ec4899' }]}>{stats.sex_distribution.female}</Text>
+                  <Text style={styles.statValue}>{stats.sex_distribution.female}</Text>
                   <Text style={styles.statLabel}>Females</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={[styles.statValue, { color: '#06b6d4' }]}>{stats.sex_distribution.male}</Text>
+                  <Text style={styles.statValue}>{stats.sex_distribution.male}</Text>
                   <Text style={styles.statLabel}>Males</Text>
                 </View>
               </>
@@ -510,351 +860,3 @@ export default function KeeperProfileScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 32,
-  },
-  profileHeader: {
-    backgroundColor: 'white',
-    marginBottom: 16,
-  },
-  headerBackground: {
-    height: 120,
-    backgroundColor: '#7c3aed',
-  },
-  profileContent: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  avatarSection: {
-    marginTop: -56,
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-    borderWidth: 4,
-    borderColor: 'white',
-  },
-  avatarPlaceholder: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-    backgroundColor: '#7c3aed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: 'white',
-  },
-  avatarEmoji: {
-    fontSize: 48,
-  },
-  displayName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  username: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginBottom: 16,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-    width: '100%',
-    paddingHorizontal: 20,
-  },
-  followButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#7c3aed',
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  followButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  followingButton: {
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: '#7c3aed',
-  },
-  followingButtonText: {
-    color: '#7c3aed',
-  },
-  messageButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: '#7c3aed',
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  messageButtonText: {
-    color: '#7c3aed',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  profileInfo: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  infoBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f3f4f6',
-  },
-  infoBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  specialtiesSection: {
-    width: '100%',
-    marginBottom: 16,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#9ca3af',
-    marginBottom: 8,
-    letterSpacing: 0.5,
-  },
-  specialties: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  specialtyBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: '#f3e8ff',
-  },
-  specialtyText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#7c3aed',
-  },
-  socialLinks: {
-    flexDirection: 'row',
-    gap: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
-    width: '100%',
-    justifyContent: 'center',
-  },
-  socialLink: {
-    padding: 8,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  statCard: {
-    minWidth: '30%',
-    maxWidth: '48%',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#7c3aed',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#7c3aed',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-  },
-  activeTabText: {
-    color: '#7c3aed',
-  },
-  tabContent: {
-    padding: 16,
-  },
-  collectionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  tarantulaCard: {
-    width: '48%',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  tarantulaImage: {
-    width: '100%',
-    height: 120,
-  },
-  tarantulaPlaceholder: {
-    width: '100%',
-    height: 120,
-    backgroundColor: '#f3e8ff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tarantulaEmoji: {
-    fontSize: 40,
-  },
-  tarantulaInfo: {
-    padding: 12,
-  },
-  tarantulaName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  tarantulaSpecies: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
-    marginBottom: 8,
-  },
-  tarantulaMeta: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  tarantulaBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  femaleBadge: {
-    backgroundColor: '#fce7f3',
-  },
-  maleBadge: {
-    backgroundColor: '#dbeafe',
-  },
-  unknownBadge: {
-    backgroundColor: '#f3f4f6',
-  },
-  ageBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: '#f3f4f6',
-  },
-  badgeTextSmall: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  aboutContent: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-  },
-  bioText: {
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 22,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  loadingEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  errorEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  errorText: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  backButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#7c3aed',
-    borderRadius: 12,
-  },
-  backButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
