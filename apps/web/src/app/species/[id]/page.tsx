@@ -375,11 +375,11 @@ export default function EnhancedSpeciesDetailPage() {
                       <span className="text-2xl font-bold text-primary-600">{species.times_kept}</span>
                     </div>
                   )}
-                  {species.average_rating && (
+                  {species.community_rating && (
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600 dark:text-gray-400">Rating</span>
                       <span className="text-2xl font-bold text-yellow-500 flex items-center gap-1">
-                        ⭐ {species.average_rating.toFixed(1)}
+                        ⭐ {species.community_rating.toFixed(1)}
                       </span>
                     </div>
                   )}
@@ -627,9 +627,9 @@ export default function EnhancedSpeciesDetailPage() {
               </div>
               <div className="text-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                 <p className="text-4xl font-bold text-yellow-500 mb-2">
-                  {species.average_rating ? species.average_rating.toFixed(1) : 'N/A'}
+                  {species.community_rating ? species.community_rating.toFixed(1) : 'N/A'}
                 </p>
-                <p className="text-gray-600 dark:text-gray-400">Average Rating</p>
+                <p className="text-gray-600 dark:text-gray-400">Community Rating</p>
               </div>
               <div className="text-center p-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                 <p className="text-4xl font-bold text-green-500 mb-2">{careLevel.text}</p>
