@@ -263,6 +263,7 @@ async def oauth_login(
                 "username": user.username,
                 "display_name": user.display_name,
                 "avatar_url": user.avatar_url,
+                "is_superuser": user.is_superuser,
             },
             is_new_user=is_new_user,
         )
@@ -350,10 +351,11 @@ async def google_oauth_callback(
                 "username": user.username,
                 "display_name": user.display_name,
                 "avatar_url": user.avatar_url,
+                "is_superuser": user.is_superuser,
             },
             is_new_user=is_new_user,
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -433,10 +435,11 @@ async def apple_oauth_callback(
                 "username": user.username,
                 "display_name": user.display_name,
                 "avatar_url": user.avatar_url,
+                "is_superuser": user.is_superuser,
             },
             is_new_user=is_new_user,
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
