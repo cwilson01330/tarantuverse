@@ -107,6 +107,25 @@ interface FeedingStats {
   prey_type_distribution: PreyTypeCount[];
 }
 
+interface PremoltIndicator {
+  name: string;
+  description: string;
+  score_contribution: number;
+  confidence: string;
+}
+
+interface PremoltPrediction {
+  tarantula_id: string;
+  probability: number;
+  confidence_level: string;
+  status_text: string;
+  indicators: PremoltIndicator[];
+  days_since_last_molt?: number;
+  consecutive_refusals: number;
+  recent_refusal_rate: number;
+  expected_molt_window?: string;
+}
+
 export default function TarantulaDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -117,6 +136,7 @@ export default function TarantulaDetailScreen() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null);
   const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null);
+  const [premoltPrediction, setPremoltPrediction] = useState<PremoltPrediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
@@ -128,6 +148,7 @@ export default function TarantulaDetailScreen() {
     fetchPhotos();
     fetchGrowth();
     fetchFeedingStats();
+    fetchPremoltPrediction();
   }, [id]);
 
   const fetchTarantula = async () => {
@@ -189,6 +210,16 @@ export default function TarantulaDetailScreen() {
     } catch (error: any) {
       // Silently fail if no data available
       setFeedingStats(null);
+    }
+  };
+
+  const fetchPremoltPrediction = async () => {
+    try {
+      const response = await apiClient.get(`/tarantulas/${id}/premolt-prediction`);
+      setPremoltPrediction(response.data);
+    } catch (error: any) {
+      // Silently fail if no data available
+      setPremoltPrediction(null);
     }
   };
 
@@ -468,6 +499,66 @@ export default function TarantulaDetailScreen() {
             </View>
           )}
         </View>
+
+        {/* Premolt Prediction */}
+        {premoltPrediction && (
+          <View style={styles.section}>
+            <View style={[
+              styles.premoltCard,
+              {
+                backgroundColor:
+                  premoltPrediction.confidence_level === 'very_high' ? '#ef4444' :
+                  premoltPrediction.confidence_level === 'high' ? '#f97316' :
+                  premoltPrediction.confidence_level === 'medium' ? '#eab308' :
+                  colors.textTertiary
+              }
+            ]}>
+              <View style={styles.premoltHeader}>
+                <Text style={styles.premoltTitle}>🦋 Premolt Predictor</Text>
+                <Text style={styles.premoltPercentage}>{premoltPrediction.probability}%</Text>
+              </View>
+
+              <Text style={styles.premoltStatus}>{premoltPrediction.status_text}</Text>
+
+              {/* Progress Bar */}
+              <View style={styles.premoltProgressBg}>
+                <View style={[styles.premoltProgressFill, { width: `${premoltPrediction.probability}%` }]} />
+              </View>
+
+              {/* Indicators */}
+              {premoltPrediction.indicators.length > 0 && (
+                <View style={styles.premoltIndicators}>
+                  <Text style={styles.premoltIndicatorsTitle}>WHY THIS SCORE?</Text>
+                  {premoltPrediction.indicators.map((indicator, idx) => (
+                    <View key={idx} style={styles.premoltIndicator}>
+                      <View style={styles.premoltIndicatorHeader}>
+                        <Text style={styles.premoltIndicatorName}>{indicator.name}</Text>
+                        <Text style={styles.premoltIndicatorScore}>+{indicator.score_contribution}</Text>
+                      </View>
+                      <Text style={styles.premoltIndicatorDesc}>{indicator.description}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Stats */}
+              {premoltPrediction.days_since_last_molt !== null && premoltPrediction.days_since_last_molt !== undefined && (
+                <View style={styles.premoltStats}>
+                  <View style={styles.premoltStat}>
+                    <Text style={styles.premoltStatLabel}>Days since last molt:</Text>
+                    <Text style={styles.premoltStatValue}>{premoltPrediction.days_since_last_molt}</Text>
+                  </View>
+                  {premoltPrediction.expected_molt_window && (
+                    <View style={styles.premoltStat}>
+                      <Text style={styles.premoltStatLabel}>Expected window:</Text>
+                      <Text style={styles.premoltStatValue}>{premoltPrediction.expected_molt_window}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* Feeding Stats */}
         {feedingStats && (
@@ -830,5 +921,104 @@ const styles = StyleSheet.create({
     color: '#fbbf24',
     fontSize: 11,
     fontWeight: 'bold',
+  },
+  // Premolt Prediction Card Styles
+  premoltCard: {
+    borderRadius: 16,
+    padding: 20,
+  },
+  premoltHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  premoltTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  premoltPercentage: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+  premoltStatus: {
+    fontSize: 15,
+    color: '#ffffff',
+    marginBottom: 16,
+    opacity: 0.95,
+  },
+  premoltProgressBg: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  premoltProgressFill: {
+    height: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 4,
+  },
+  premoltIndicators: {
+    marginTop: 4,
+  },
+  premoltIndicatorsTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+    opacity: 0.9,
+  },
+  premoltIndicator: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  premoltIndicatorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  premoltIndicatorName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  premoltIndicatorScore: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  premoltIndicatorDesc: {
+    fontSize: 13,
+    color: '#ffffff',
+    opacity: 0.85,
+    lineHeight: 18,
+  },
+  premoltStats: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  premoltStat: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  premoltStatLabel: {
+    fontSize: 13,
+    color: '#ffffff',
+    opacity: 0.9,
+  },
+  premoltStatValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
   },
 });

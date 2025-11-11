@@ -22,11 +22,19 @@ interface FeedingStatus {
   acceptance_rate: number
 }
 
+interface PremoltPrediction {
+  tarantula_id: string
+  probability: number
+  confidence_level: string
+  status_text: string
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, token, isAuthenticated, isLoading } = useAuth()
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
+  const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -68,9 +76,10 @@ export default function DashboardPage() {
       if (response.ok) {
         const data = await response.json()
         setTarantulas(data)
-        
-        // Fetch feeding stats for each tarantula
+
+        // Fetch feeding stats and premolt predictions for each tarantula
         fetchAllFeedingStatuses(token, data)
+        fetchAllPremoltPredictions(token, data)
       }
     } catch (error) {
       console.error('Failed to fetch tarantulas:', error)
@@ -108,6 +117,36 @@ export default function DashboardPage() {
     setFeedingStatuses(statusMap)
   }
 
+  const fetchAllPremoltPredictions = async (token: string, tarantulasList: Tarantula[]) => {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const predictionMap = new Map<string, PremoltPrediction>()
+
+    await Promise.all(
+      tarantulasList.map(async (t) => {
+        try {
+          const response = await fetch(`${API_URL}/api/v1/tarantulas/${t.id}/premolt-prediction`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          })
+          if (response.ok) {
+            const data = await response.json()
+            predictionMap.set(t.id, {
+              tarantula_id: t.id,
+              probability: data.probability,
+              confidence_level: data.confidence_level,
+              status_text: data.status_text,
+            })
+          }
+        } catch (error) {
+          console.error(`Failed to fetch premolt prediction for ${t.id}:`, error)
+        }
+      })
+    )
+
+    setPremoltPredictions(predictionMap)
+  }
+
   const getFeedingStatusBadge = (tarantulaId: string) => {
     const status = feedingStatuses.get(tarantulaId)
     if (!status || status.days_since_last_feeding === undefined) return null
@@ -116,7 +155,7 @@ export default function DashboardPage() {
     let bgColor = 'bg-green-500/90'
     let textColor = 'text-white'
     let emoji = '✓'
-    
+
     if (days >= 21) {
       bgColor = 'bg-red-500/90'
       emoji = '⚠️'
@@ -131,6 +170,31 @@ export default function DashboardPage() {
     return (
       <span className={`px-3 py-1 rounded-full ${bgColor} backdrop-blur-sm ${textColor} text-xs font-semibold shadow-lg`}>
         {emoji} Fed {days}d ago
+      </span>
+    )
+  }
+
+  const getPremoltBadge = (tarantulaId: string) => {
+    const prediction = premoltPredictions.get(tarantulaId)
+    if (!prediction) return null
+
+    // Only show badge for medium or higher confidence
+    if (prediction.confidence_level === 'low') return null
+
+    let bgColor = 'bg-gray-500/90'
+    let emoji = '🦋'
+
+    if (prediction.confidence_level === 'very_high') {
+      bgColor = 'bg-red-500/90'
+    } else if (prediction.confidence_level === 'high') {
+      bgColor = 'bg-orange-500/90'
+    } else if (prediction.confidence_level === 'medium') {
+      bgColor = 'bg-yellow-500/90'
+    }
+
+    return (
+      <span className={`px-3 py-1 rounded-full ${bgColor} backdrop-blur-sm text-white text-xs font-semibold shadow-lg`}>
+        {emoji} {prediction.probability}% Premolt
       </span>
     )
   }
@@ -294,13 +358,23 @@ export default function DashboardPage() {
                         </div>
                       )}
 
-                      {/* Feeding status badge */}
-                      <div className="absolute top-3 right-3">
-                        {getFeedingStatusBadge(tarantula.id) || (
-                          <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
-                            No data
-                          </span>
-                        )}
+                      {/* Status badges */}
+                      <div className="absolute top-3 left-3 right-3 flex flex-col gap-2">
+                        <div className="flex justify-between items-start">
+                          {/* Premolt badge (left) */}
+                          <div>
+                            {getPremoltBadge(tarantula.id)}
+                          </div>
+
+                          {/* Feeding status badge (right) */}
+                          <div>
+                            {getFeedingStatusBadge(tarantula.id) || (
+                              <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
+                                No data
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
 

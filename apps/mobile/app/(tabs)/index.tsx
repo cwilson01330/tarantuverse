@@ -33,6 +33,13 @@ interface FeedingStatus {
   acceptance_rate: number;
 }
 
+interface PremoltPrediction {
+  tarantula_id: string;
+  probability: number;
+  confidence_level: string;
+  status_text: string;
+}
+
 interface CollectionStats {
   total_tarantulas: number;
   unique_species: number;
@@ -51,6 +58,7 @@ export default function CollectionScreen() {
   const { colors } = useTheme();
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
+  const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -85,6 +93,7 @@ export default function CollectionScreen() {
       const response = await apiClient.get('/tarantulas/');
       setTarantulas(response.data);
       await fetchAllFeedingStatuses(response.data);
+      await fetchAllPremoltPredictions(response.data);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load tarantulas');
     } finally {
@@ -113,6 +122,28 @@ export default function CollectionScreen() {
     setFeedingStatuses(statusMap);
   };
 
+  const fetchAllPremoltPredictions = async (tarantulasList: Tarantula[]) => {
+    const predictionMap = new Map<string, PremoltPrediction>();
+
+    await Promise.all(
+      tarantulasList.map(async (t) => {
+        try {
+          const response = await apiClient.get(`/tarantulas/${t.id}/premolt-prediction`);
+          predictionMap.set(t.id, {
+            tarantula_id: t.id,
+            probability: response.data.probability,
+            confidence_level: response.data.confidence_level,
+            status_text: response.data.status_text,
+          });
+        } catch (error) {
+          // Silently fail for individual tarantulas
+        }
+      })
+    );
+
+    setPremoltPredictions(predictionMap);
+  };
+
   const getFeedingStatusBadge = (tarantulaId: string) => {
     const status = feedingStatuses.get(tarantulaId);
     if (!status || status.days_since_last_feeding === undefined) return null;
@@ -120,7 +151,7 @@ export default function CollectionScreen() {
     const days = status.days_since_last_feeding;
     let badgeStyle = styles.feedingBadgeGreen;
     let emoji = '✓';
-    
+
     if (days >= 21) {
       badgeStyle = styles.feedingBadgeRed;
       emoji = '⚠️';
@@ -136,6 +167,32 @@ export default function CollectionScreen() {
       <View style={[styles.feedingBadge, badgeStyle]}>
         <Text style={styles.feedingBadgeText}>
           {emoji} {days}d
+        </Text>
+      </View>
+    );
+  };
+
+  const getPremoltBadge = (tarantulaId: string) => {
+    const prediction = premoltPredictions.get(tarantulaId);
+    if (!prediction) return null;
+
+    // Only show badge for medium or higher confidence
+    if (prediction.confidence_level === 'low') return null;
+
+    let badgeStyle = styles.premoltBadgeGray;
+
+    if (prediction.confidence_level === 'very_high') {
+      badgeStyle = styles.premoltBadgeRed;
+    } else if (prediction.confidence_level === 'high') {
+      badgeStyle = styles.premoltBadgeOrange;
+    } else if (prediction.confidence_level === 'medium') {
+      badgeStyle = styles.premoltBadgeYellow;
+    }
+
+    return (
+      <View style={[styles.premoltBadge, badgeStyle]}>
+        <Text style={styles.premoltBadgeText}>
+          🦋 {prediction.probability}%
         </Text>
       </View>
     );
@@ -171,6 +228,7 @@ export default function CollectionScreen() {
           </View>
         )}
         {getFeedingStatusBadge(item.id)}
+        {getPremoltBadge(item.id)}
       </View>
       <View style={styles.cardContent}>
         <Text style={styles.name}>{item.name}</Text>
@@ -329,6 +387,31 @@ export default function CollectionScreen() {
       backgroundColor: 'rgba(239, 68, 68, 0.9)',
     },
     feedingBadgeText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    premoltBadge: {
+      position: 'absolute',
+      bottom: 8,
+      left: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    premoltBadgeRed: {
+      backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    },
+    premoltBadgeOrange: {
+      backgroundColor: 'rgba(249, 115, 22, 0.9)',
+    },
+    premoltBadgeYellow: {
+      backgroundColor: 'rgba(234, 179, 8, 0.9)',
+    },
+    premoltBadgeGray: {
+      backgroundColor: 'rgba(107, 114, 128, 0.9)',
+    },
+    premoltBadgeText: {
       color: '#fff',
       fontSize: 11,
       fontWeight: '600',

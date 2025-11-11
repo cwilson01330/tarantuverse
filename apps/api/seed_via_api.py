@@ -159,7 +159,9 @@ species_data = [
         "defensive_behavior": "Extremely calm.",
         "feeding_frequency_days": 7,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/grammostola_pulchra.jpg",
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Avicularia avicularia",
@@ -185,7 +187,9 @@ species_data = [
         "defensive_behavior": "Skittish but not aggressive.",
         "feeding_frequency_days": 5,
         "typical_diet": "Flying insects, crickets",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/avicularia_avicularia.jpg",
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Chromatopelma cyaneopubescens",
@@ -211,7 +215,9 @@ species_data = [
         "defensive_behavior": "Fast and defensive.",
         "feeding_frequency_days": 5,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/chromatopelma_cyaneopubescens.jpg",
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Tliltocatl albopilosus",
@@ -266,7 +272,9 @@ species_data = [
         "defensive_behavior": "Generally calm but can be defensive.",
         "feeding_frequency_days": 5,
         "typical_diet": "Large crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/lasiodora_parahybana.jpg",
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Nhandu chromatus",
@@ -292,7 +300,9 @@ species_data = [
         "defensive_behavior": "Can be defensive and fast.",
         "feeding_frequency_days": 5,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "image_url": "/species-images/nhandu_chromatus.jpg",
+        "medically_significant_venom": False
     },
     {
         "scientific_name": "Poecilotheria metallica",
@@ -318,7 +328,8 @@ species_data = [
         "defensive_behavior": "EXTREMELY fast and defensive. Experts only.",
         "feeding_frequency_days": 5,
         "typical_diet": "Large crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "medically_significant_venom": True
     },
     {
         "scientific_name": "Pterinochilus murinus",
@@ -344,7 +355,8 @@ species_data = [
         "defensive_behavior": "HIGHLY aggressive. Experts only.",
         "feeding_frequency_days": 5,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "medically_significant_venom": True
     },
     {
         "scientific_name": "Heteroscodra maculata",
@@ -370,7 +382,8 @@ species_data = [
         "defensive_behavior": "Fast and defensive.",
         "feeding_frequency_days": 5,
         "typical_diet": "Crickets, roaches",
-        "is_verified": True
+        "is_verified": True,
+        "medically_significant_venom": True
     }
 ]
 
