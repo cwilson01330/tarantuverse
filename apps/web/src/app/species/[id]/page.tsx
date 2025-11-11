@@ -573,10 +573,14 @@ export default function EnhancedSpeciesDetailPage() {
                     <p className="font-semibold text-gray-900 dark:text-white capitalize">{species.temperament}</p>
                   </div>
                 )}
-                {species.defensive_behavior && (
+                {species.care_guide && (
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Defensive Behavior</p>
-                    <p className="text-gray-900 dark:text-white">{species.defensive_behavior}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Care Guide</p>
+                    <div className="text-gray-900 dark:text-white prose dark:prose-invert max-w-none">
+                      {species.care_guide.split('\n').map((paragraph, idx) => (
+                        <p key={idx} className="mb-2">{paragraph}</p>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
