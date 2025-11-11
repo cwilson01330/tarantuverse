@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
@@ -349,33 +350,40 @@ export default function AnalyticsScreen() {
       fontSize: 11,
       color: colors.textTertiary,
     },
+    scrollContent: {
+      flex: 1,
+    },
   });
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!analytics || analytics.total_tarantulas === 0) {
     return (
-      <ScrollView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Collection Analytics</Text>
         </View>
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="chart-bar" size={64} color={colors.textTertiary} />
-          <Text style={styles.emptyTitle}>No Analytics Available</Text>
-          <Text style={styles.emptyText}>
-            Add tarantulas to your collection to see analytics
-          </Text>
-        </View>
-      </ScrollView>
+        <ScrollView style={styles.container}>
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons name="chart-bar" size={64} color={colors.textTertiary} />
+            <Text style={styles.emptyTitle}>No Analytics Available</Text>
+            <Text style={styles.emptyText}>
+              Add tarantulas to your collection to see analytics
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -384,7 +392,7 @@ export default function AnalyticsScreen() {
   const femalePercent = totalSexed > 0 ? (analytics.sex_distribution.female / totalSexed * 100) : 0;
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
@@ -392,6 +400,8 @@ export default function AnalyticsScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>📊 Analytics</Text>
       </View>
+
+      <ScrollView style={styles.scrollContent}>
 
       {/* Overview Stats */}
       <View style={styles.section}>
@@ -535,6 +545,7 @@ export default function AnalyticsScreen() {
       )}
 
       <View style={{ height: 32 }} />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

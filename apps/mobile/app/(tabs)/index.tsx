@@ -430,7 +430,7 @@ export default function CollectionScreen() {
             Start building your collection by adding your first tarantula
           </Text>
           <TouchableOpacity
-            onPress={() => router.push('/add-tarantula')}
+            onPress={() => router.push('/tarantula/add')}
             activeOpacity={0.8}
           >
             <LinearGradient
@@ -502,7 +502,7 @@ export default function CollectionScreen() {
           />
           <TouchableOpacity
             style={styles.fab}
-            onPress={() => router.push('/add-tarantula')}
+            onPress={() => router.push('/tarantula/add')}
             activeOpacity={0.8}
           >
             <LinearGradient
