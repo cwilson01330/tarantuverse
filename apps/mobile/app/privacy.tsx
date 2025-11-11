@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../src/contexts/AuthContext';
@@ -45,6 +46,9 @@ export default function PrivacyScreen() {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    scrollContainer: {
+      flex: 1,
     },
     content: {
       padding: 16,
@@ -138,7 +142,7 @@ export default function PrivacyScreen() {
   });
 
   return (
-    <>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen
         options={{
           title: 'Privacy Settings',
@@ -146,7 +150,7 @@ export default function PrivacyScreen() {
           headerTintColor: colors.textPrimary,
         }}
       />
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.scrollContainer}>
         <View style={styles.content}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Collection Visibility</Text>
@@ -204,6 +208,6 @@ export default function PrivacyScreen() {
           </View>
         </View>
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }

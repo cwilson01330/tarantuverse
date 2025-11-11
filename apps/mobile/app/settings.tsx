@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
@@ -124,6 +125,9 @@ export default function SettingsScreen() {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    scrollContainer: {
+      flex: 1,
     },
     scrollContent: {
       padding: 16,
@@ -263,7 +267,7 @@ export default function SettingsScreen() {
   });
 
   return (
-    <>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen
         options={{
           title: 'Edit Profile',
@@ -271,7 +275,7 @@ export default function SettingsScreen() {
           headerTintColor: colors.textPrimary,
         }}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
         {/* Basic Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basic Information</Text>
@@ -449,6 +453,6 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
