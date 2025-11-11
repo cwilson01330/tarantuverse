@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import { useThemeStore } from '@/stores/themeStore'
 
 interface TopBarProps {
   userName?: string
@@ -14,23 +15,7 @@ interface TopBarProps {
 export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }: TopBarProps) {
   const router = useRouter()
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
-
-  // Initialize theme from localStorage and system preference
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme')
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    const initialTheme = (savedTheme as 'light' | 'dark') || systemTheme
-    setTheme(initialTheme)
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark')
-  }, [])
-
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark'
-    setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-    document.documentElement.classList.toggle('dark', newTheme === 'dark')
-  }
+  const { theme, toggleTheme } = useThemeStore()
 
   const handleLogout = async () => {
     await signOut({ redirect: false })
