@@ -20,7 +20,9 @@ from app.schemas.tarantula import (
     GrowthAnalytics,
     GrowthDataPoint,
     FeedingStats,
-    PreyTypeCount
+    PreyTypeCount,
+    PremoltPrediction,
+    PremoltIndicator
 )
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
@@ -401,4 +403,196 @@ async def get_feeding_stats(
         longest_gap_days=longest_gap,
         current_streak_accepted=current_streak,
         prey_type_distribution=prey_distribution
+    )
+
+
+@router.get("/{tarantula_id}/premolt-prediction", response_model=PremoltPrediction)
+async def get_premolt_prediction(
+    tarantula_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Predict if a tarantula is approaching a molt
+
+    Analyzes feeding patterns, molt history, and species characteristics
+    to calculate the probability of an imminent molt.
+
+    Returns:
+    - probability: 0-100 score
+    - confidence_level: low, medium, high, very_high
+    - indicators: breakdown of contributing factors
+    - helpful context about molt patterns
+    """
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == tarantula_id,
+        Tarantula.user_id == current_user.id
+    ).first()
+
+    if not tarantula:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tarantula not found"
+        )
+
+    # Get feeding logs (last 30 days and all refusals)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    feeding_logs = db.query(FeedingLog).filter(
+        FeedingLog.tarantula_id == tarantula_id,
+        FeedingLog.fed_at >= thirty_days_ago
+    ).order_by(FeedingLog.fed_at.desc()).all()
+
+    # Get molt history
+    molt_logs = db.query(MoltLog).filter(
+        MoltLog.tarantula_id == tarantula_id
+    ).order_by(MoltLog.molted_at.desc()).all()
+
+    # Initialize prediction variables
+    probability_score = 0
+    indicators = []
+    days_since_last_molt = None
+    expected_molt_window = None
+
+    # 1. CALCULATE CONSECUTIVE REFUSALS
+    consecutive_refusals = 0
+    for log in feeding_logs:
+        if not log.accepted:
+            consecutive_refusals += 1
+        else:
+            break
+
+    if consecutive_refusals >= 3:
+        score = 50
+        indicators.append(PremoltIndicator(
+            name="Multiple Feeding Refusals",
+            description=f"{consecutive_refusals} consecutive refusals",
+            score_contribution=score,
+            confidence="high"
+        ))
+        probability_score += score
+    elif consecutive_refusals == 2:
+        score = 30
+        indicators.append(PremoltIndicator(
+            name="Recent Feeding Refusals",
+            description=f"{consecutive_refusals} consecutive refusals",
+            score_contribution=score,
+            confidence="medium"
+        ))
+        probability_score += score
+    elif consecutive_refusals == 1:
+        score = 15
+        indicators.append(PremoltIndicator(
+            name="Single Feeding Refusal",
+            description="Latest feeding was refused",
+            score_contribution=score,
+            confidence="low"
+        ))
+        probability_score += score
+
+    # 2. ANALYZE RECENT REFUSAL RATE (last 14 days)
+    fourteen_days_ago = datetime.now(timezone.utc) - timedelta(days=14)
+    recent_feedings = [log for log in feeding_logs if log.fed_at >= fourteen_days_ago]
+
+    recent_refusal_rate = 0.0
+    if recent_feedings:
+        recent_refused = sum(1 for log in recent_feedings if not log.accepted)
+        recent_refusal_rate = (recent_refused / len(recent_feedings)) * 100
+
+        if recent_refusal_rate > 50:
+            score = 20
+            indicators.append(PremoltIndicator(
+                name="High Recent Refusal Rate",
+                description=f"{recent_refusal_rate:.0f}% of recent feedings refused",
+                score_contribution=score,
+                confidence="medium"
+            ))
+            probability_score += score
+
+    # 3. DAYS SINCE LAST MOLT
+    if molt_logs:
+        last_molt = molt_logs[0]
+        days_since_last_molt = (datetime.now(timezone.utc) - last_molt.molted_at).days
+
+        # Calculate average molt interval if we have multiple molts
+        if len(molt_logs) > 1:
+            intervals = []
+            for i in range(len(molt_logs) - 1):
+                interval = (molt_logs[i].molted_at - molt_logs[i+1].molted_at).days
+                intervals.append(interval)
+            average_interval = sum(intervals) / len(intervals)
+
+            # Set expected molt window based on average
+            expected_molt_window = f"{int(average_interval * 0.8)}-{int(average_interval * 1.2)} days"
+
+            # Check if we're in the expected window
+            if days_since_last_molt >= average_interval * 0.8:
+                if days_since_last_molt >= average_interval * 1.2:
+                    # Overdue for molt
+                    score = 40
+                    indicators.append(PremoltIndicator(
+                        name="Overdue for Molt",
+                        description=f"{days_since_last_molt} days since last molt (expected ~{int(average_interval)} days)",
+                        score_contribution=score,
+                        confidence="high"
+                    ))
+                    probability_score += score
+                else:
+                    # Within expected window
+                    score = 20
+                    indicators.append(PremoltIndicator(
+                        name="In Expected Molt Window",
+                        description=f"{days_since_last_molt} days since last molt",
+                        score_contribution=score,
+                        confidence="medium"
+                    ))
+                    probability_score += score
+        else:
+            # Only one molt recorded - use general heuristics
+            if days_since_last_molt > 180:
+                expected_molt_window = "120-240 days (estimated)"
+                score = 15
+                indicators.append(PremoltIndicator(
+                    name="Extended Time Since Molt",
+                    description=f"{days_since_last_molt} days since last molt",
+                    score_contribution=score,
+                    confidence="low"
+                ))
+                probability_score += score
+
+    # 4. NO DATA AVAILABLE
+    if not feeding_logs and not molt_logs:
+        indicators.append(PremoltIndicator(
+            name="Insufficient Data",
+            description="No feeding or molt logs available for analysis",
+            score_contribution=0,
+            confidence="low"
+        ))
+
+    # 5. CAP PROBABILITY AT 100
+    probability_score = min(probability_score, 100)
+
+    # 6. DETERMINE CONFIDENCE LEVEL AND STATUS TEXT
+    if probability_score >= 76:
+        confidence_level = "very_high"
+        status_text = "Premolt Imminent - Monitor closely"
+    elif probability_score >= 51:
+        confidence_level = "high"
+        status_text = "Likely in Premolt"
+    elif probability_score >= 26:
+        confidence_level = "medium"
+        status_text = "Possible Premolt Signs"
+    else:
+        confidence_level = "low"
+        status_text = "Not Showing Premolt Signs"
+
+    return PremoltPrediction(
+        tarantula_id=tarantula_id,
+        probability=probability_score,
+        confidence_level=confidence_level,
+        status_text=status_text,
+        indicators=indicators,
+        days_since_last_molt=days_since_last_molt,
+        consecutive_refusals=consecutive_refusals,
+        recent_refusal_rate=round(recent_refusal_rate, 1),
+        expected_molt_window=expected_molt_window
     )

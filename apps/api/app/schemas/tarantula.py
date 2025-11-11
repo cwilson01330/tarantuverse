@@ -111,6 +111,30 @@ class FeedingStats(BaseModel):
     longest_gap_days: Optional[int] = None
     current_streak_accepted: int = 0
     prey_type_distribution: list[PreyTypeCount] = []
-    
+
+    class Config:
+        from_attributes = True
+
+
+class PremoltIndicator(BaseModel):
+    """Individual premolt indicator with score contribution"""
+    name: str
+    description: str
+    score_contribution: int
+    confidence: str  # "low", "medium", "high"
+
+
+class PremoltPrediction(BaseModel):
+    """Premolt prediction with probability score and reasoning"""
+    tarantula_id: uuid.UUID
+    probability: int  # 0-100
+    confidence_level: str  # "low", "medium", "high", "very_high"
+    status_text: str  # User-friendly status message
+    indicators: list[PremoltIndicator]
+    days_since_last_molt: Optional[int] = None
+    consecutive_refusals: int = 0
+    recent_refusal_rate: float = 0.0  # percentage in last 14 days
+    expected_molt_window: Optional[str] = None  # e.g., "30-60 days"
+
     class Config:
         from_attributes = True
