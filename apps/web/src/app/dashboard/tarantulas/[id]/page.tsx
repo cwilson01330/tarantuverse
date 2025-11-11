@@ -93,6 +93,25 @@ interface GrowthDataPoint {
   leg_span_change?: number
 }
 
+interface PremoltIndicator {
+  name: string
+  description: string
+  score_contribution: number
+  confidence: string
+}
+
+interface PremoltPrediction {
+  tarantula_id: string
+  probability: number
+  confidence_level: string
+  status_text: string
+  indicators: PremoltIndicator[]
+  days_since_last_molt?: number
+  consecutive_refusals: number
+  recent_refusal_rate: number
+  expected_molt_window?: string
+}
+
 interface GrowthAnalytics {
   tarantula_id: string
   data_points: GrowthDataPoint[]
@@ -152,6 +171,7 @@ export default function TarantulaDetailPage() {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null)
   const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null)
+  const [premoltPrediction, setPremoltPrediction] = useState<PremoltPrediction | null>(null)
   const [pairings, setPairings] = useState<Pairing[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -204,6 +224,7 @@ export default function TarantulaDetailPage() {
     fetchPhotos(token)
     fetchGrowth(token)
     fetchFeedingStats(token)
+    fetchPremoltPrediction(token)
     fetchPairings(token)
   }, [id, router, isAuthenticated, authLoading, token])
 
@@ -583,6 +604,24 @@ export default function TarantulaDetailPage() {
       }
     } catch (err: any) {
       console.error('Failed to fetch feeding stats:', err)
+    }
+  }
+
+  const fetchPremoltPrediction = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/premolt-prediction`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setPremoltPrediction(data)
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch premolt prediction:', err)
     }
   }
 
@@ -980,9 +1019,64 @@ export default function TarantulaDetailPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Premolt Prediction Card */}
+              {premoltPrediction && (
+                <div className={`rounded-2xl shadow-lg p-6 text-white ${
+                  premoltPrediction.confidence_level === 'very_high' ? 'bg-gradient-to-br from-red-600 to-red-700' :
+                  premoltPrediction.confidence_level === 'high' ? 'bg-gradient-to-br from-orange-600 to-orange-700' :
+                  premoltPrediction.confidence_level === 'medium' ? 'bg-gradient-to-br from-yellow-600 to-yellow-700' :
+                  'bg-gradient-to-br from-gray-600 to-gray-700'
+                }`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold">🦋 Premolt Predictor</h3>
+                    <div className="text-3xl font-bold">{premoltPrediction.probability}%</div>
+                  </div>
+
+                  <div className="mb-4">
+                    <p className="text-sm font-semibold mb-2">{premoltPrediction.status_text}</p>
+                    <div className="w-full bg-white bg-opacity-20 rounded-full h-2.5">
+                      <div
+                        className="bg-white h-2.5 rounded-full"
+                        style={{ width: `${premoltPrediction.probability}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {premoltPrediction.indicators.length > 0 && (
+                    <div className="space-y-2 mt-4 pt-4 border-t border-white border-opacity-20">
+                      <p className="text-xs font-semibold uppercase tracking-wide opacity-90">Why This Score?</p>
+                      {premoltPrediction.indicators.map((indicator, idx) => (
+                        <div key={idx} className="text-sm">
+                          <div className="flex justify-between items-start gap-2">
+                            <span className="font-medium">{indicator.name}</span>
+                            <span className="text-xs opacity-75">+{indicator.score_contribution}</span>
+                          </div>
+                          <p className="text-xs opacity-90 mt-0.5">{indicator.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {premoltPrediction.days_since_last_molt !== null && premoltPrediction.days_since_last_molt !== undefined && (
+                    <div className="mt-4 pt-4 border-t border-white border-opacity-20 text-xs opacity-90">
+                      <div className="flex justify-between">
+                        <span>Days since last molt:</span>
+                        <span className="font-semibold">{premoltPrediction.days_since_last_molt}</span>
+                      </div>
+                      {premoltPrediction.expected_molt_window && (
+                        <div className="flex justify-between mt-1">
+                          <span>Expected window:</span>
+                          <span className="font-semibold">{premoltPrediction.expected_molt_window}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Feeding Stats Card */}
               {feedingStats && <FeedingStatsCard data={feedingStats} />}
-              
+
               {/* Stats Card */}
               <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl shadow-lg p-6 text-white">
                 <h3 className="text-lg font-bold mb-4">Statistics</h3>
