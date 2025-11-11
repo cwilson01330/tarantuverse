@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { apiClient } from '../src/services/api';
@@ -125,6 +126,22 @@ export default function SettingsScreen() {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      marginRight: 12,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.textPrimary,
     },
     scrollContainer: {
       flex: 1,
@@ -267,14 +284,15 @@ export default function SettingsScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Stack.Screen
-        options={{
-          title: 'Edit Profile',
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.textPrimary,
-        }}
-      />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Profile</Text>
+      </View>
+
       <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
         {/* Basic Information */}
         <View style={styles.section}>
