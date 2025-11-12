@@ -135,15 +135,24 @@ export default function SpeciesPage() {
             </p>
           </div>
 
-          {/* Admin Add Species Button */}
+          {/* Admin Buttons */}
           {user?.is_superuser && (
-            <Link
-              href="/dashboard/admin/species/add"
-              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
-            >
-              <span>➕</span>
-              <span>Add Species</span>
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href="/dashboard/admin/species/bulk-import"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <span>📥</span>
+                <span>Bulk Import</span>
+              </Link>
+              <Link
+                href="/dashboard/admin/species/add"
+                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <span>➕</span>
+                <span>Add Species</span>
+              </Link>
+            </div>
           )}
         </div>
 

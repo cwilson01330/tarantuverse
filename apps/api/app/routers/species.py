@@ -125,6 +125,78 @@ async def create_species(
     return new_species
 
 
+@router.post("/bulk-import", status_code=status.HTTP_201_CREATED)
+async def bulk_import_species(
+    species_list: List[SpeciesCreate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Bulk import multiple species at once (admin only)
+    Returns summary of successful and failed imports
+    """
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    results = {
+        "total": len(species_list),
+        "successful": 0,
+        "failed": 0,
+        "skipped": 0,
+        "errors": [],
+        "imported_species": []
+    }
+
+    for idx, species_data in enumerate(species_list):
+        try:
+            # Check if species already exists
+            existing = db.query(Species).filter(
+                Species.scientific_name_lower == species_data.scientific_name.lower().strip()
+            ).first()
+
+            if existing:
+                results["skipped"] += 1
+                results["errors"].append({
+                    "index": idx,
+                    "scientific_name": species_data.scientific_name,
+                    "error": "Species already exists"
+                })
+                continue
+
+            # Create new species
+            is_verified = species_data.is_verified if current_user.is_superuser else False
+            species_dict = species_data.model_dump()
+            species_dict.pop('is_verified', None)
+
+            new_species = Species(
+                **species_dict,
+                scientific_name_lower=species_data.scientific_name.lower().strip(),
+                submitted_by=current_user.id,
+                is_verified=is_verified
+            )
+
+            db.add(new_species)
+            db.commit()
+            db.refresh(new_species)
+
+            results["successful"] += 1
+            results["imported_species"].append({
+                "scientific_name": new_species.scientific_name,
+                "common_names": new_species.common_names
+            })
+
+        except Exception as e:
+            db.rollback()
+            results["failed"] += 1
+            results["errors"].append({
+                "index": idx,
+                "scientific_name": species_data.scientific_name if hasattr(species_data, 'scientific_name') else f"Item {idx}",
+                "error": str(e)
+            })
+
+    return results
+
+
 @router.put("/{species_id}", response_model=SpeciesResponse)
 async def update_species(
     species_id: uuid.UUID,
