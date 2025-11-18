@@ -11,7 +11,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tarantuverse.app"
+      "bundleIdentifier": "com.tarantuverse.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.tarantuverse.app"
@@ -28,7 +31,12 @@
           "launchMode": "most-recent"
         }
       ],
-      "@react-native-google-signin/google-signin"
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.628209648097-qt596g5efb603ar3ml254qp1n0d3he1b"
+        }
+      ]
     ],
     "extra": {
       "router": {
