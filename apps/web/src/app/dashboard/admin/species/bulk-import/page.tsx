@@ -60,6 +60,19 @@ export default function BulkImportPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('API Error:', errorData);
+
+        // Handle validation errors
+        if (response.status === 422 && errorData.detail) {
+          if (Array.isArray(errorData.detail)) {
+            const validationErrors = errorData.detail.map((err: any) =>
+              `${err.loc?.join(' → ') || 'Field'}: ${err.msg}`
+            ).join('\n');
+            throw new Error(`Validation errors:\n${validationErrors}`);
+          }
+          throw new Error(JSON.stringify(errorData.detail, null, 2));
+        }
+
         throw new Error(errorData.detail || 'Failed to import species');
       }
 
@@ -197,7 +210,7 @@ export default function BulkImportPage() {
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6 mb-6">
             <h3 className="text-lg font-bold text-red-900 dark:text-red-100 mb-2">❌ Error</h3>
-            <p className="text-red-800 dark:text-red-200">{error}</p>
+            <pre className="text-red-800 dark:text-red-200 whitespace-pre-wrap font-mono text-sm">{error}</pre>
           </div>
         )}
 
