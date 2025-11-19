@@ -24,6 +24,8 @@ interface Species {
   temperament: string | null;
   is_verified: boolean;
   image_url: string | null;
+  urticating_hairs?: boolean;
+  medically_significant_venom?: boolean;
 }
 
 export default function SpeciesPage() {
@@ -386,11 +388,19 @@ export default function SpeciesPage() {
                       {getTypeIcon(s.type)}
                     </div>
                   )}
-                  {s.is_verified && (
-                    <div className="absolute top-2 right-2 bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded-full shadow-md">
-                      ✓
-                    </div>
-                  )}
+                  {/* Top-right badges */}
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    {s.medically_significant_venom && (
+                      <div className="bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow-md animate-pulse" title="Medically Significant Venom">
+                        ⚠️
+                      </div>
+                    )}
+                    {s.is_verified && (
+                      <div className="bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded-full shadow-md" title="Verified Species">
+                        ✓
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Content */}
