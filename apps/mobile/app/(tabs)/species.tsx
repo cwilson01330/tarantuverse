@@ -1,8 +1,11 @@
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, RefreshControl, Image, FlatList, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, RefreshControl, Image, FlatList, Dimensions } from 'react-native';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 48) / 2; // 2 columns with padding
 
 interface Species {
   id: string;
@@ -22,6 +25,8 @@ interface Species {
   temperament: string | null;
   is_verified: boolean;
   image_url: string | null;
+  urticating_hairs?: boolean;
+  medically_significant_venom?: boolean;
 }
 
 export default function SpeciesScreen() {
@@ -32,7 +37,6 @@ export default function SpeciesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'beginner' | 'intermediate' | 'advanced'>('all');
-  const [showFilterModal, setShowFilterModal] = useState(false);
 
   useEffect(() => {
     fetchSpecies();
@@ -81,349 +85,214 @@ export default function SpeciesScreen() {
     setFilteredSpecies(filtered);
   };
 
-  const getCareColor = (level: string) => {
+  const getCareLevel = (level: string) => {
     switch (level) {
       case 'beginner':
-        return { bg: '#10b98120', text: '#10b981' };
+        return { color: '#22c55e', text: 'Beginner', icon: '✓' };
       case 'intermediate':
-        return { bg: '#f59e0b20', text: '#f59e0b' };
+        return { color: '#eab308', text: 'Intermediate', icon: '⚠' };
       case 'advanced':
-        return { bg: '#ef444420', text: '#ef4444' };
+        return { color: '#f97316', text: 'Advanced', icon: '⚡' };
+      case 'expert':
+        return { color: '#ef4444', text: 'Expert', icon: '☠' };
       default:
-        return { bg: colors.border, text: colors.textSecondary };
+        return { color: colors.textSecondary, text: 'Unknown', icon: '?' };
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'terrestrial':
-        return '🏜️';
-      case 'arboreal':
-        return '🌳';
-      case 'fossorial':
-        return '⛰️';
-      default:
-        return '🕷️';
+      case 'terrestrial': return '🏜️';
+      case 'arboreal': return '🌳';
+      case 'fossorial': return '⛰️';
+      default: return '🕷️';
     }
   };
 
-  const renderSpeciesCard = ({ item }: { item: Species }) => {
-    const careColors = getCareColor(item.care_level);
+  const renderSpeciesCard = ({ item, index }: { item: Species; index: number }) => {
+    const careLevel = getCareLevel(item.care_level);
+    const typeIcon = getTypeIcon(item.type);
 
     return (
       <TouchableOpacity
         onPress={() => router.push(`/species/${item.id}` as any)}
-        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[
+          styles.card,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+          index % 2 === 0 ? { marginRight: 8 } : { marginLeft: 8 }
+        ]}
+        activeOpacity={0.8}
       >
-        {/* Image */}
-        <View style={[styles.imageContainer, { backgroundColor: colors.border }]}>
+        {/* Image with Gradient Overlay */}
+        <View style={styles.imageContainer}>
           {item.image_url ? (
-            <Image source={{ uri: item.image_url }} style={styles.image} />
+            <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
           ) : (
-            <View style={styles.placeholderImage}>
-              <Text style={styles.placeholderEmoji}>{getTypeIcon(item.type)}</Text>
+            <View style={[styles.placeholderImage, { backgroundColor: colors.surfaceElevated }]}>
+              <Text style={styles.placeholderEmoji}>{typeIcon}</Text>
             </View>
           )}
-          {item.is_verified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-              <Text style={styles.verifiedText}>Verified</Text>
-            </View>
-          )}
+
+          {/* Gradient overlay for better badge visibility */}
+          <View style={styles.imageGradient} />
+
+          {/* Top Badges */}
+          <View style={styles.topBadges}>
+            {item.is_verified && (
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#ffffff" />
+              </View>
+            )}
+            {item.medically_significant_venom && (
+              <View style={[styles.warningBadge, { backgroundColor: '#ef4444' }]}>
+                <MaterialCommunityIcons name="alert" size={14} color="#ffffff" />
+              </View>
+            )}
+          </View>
+
+          {/* Care Level Badge */}
+          <View style={[styles.careLevelBadge, { backgroundColor: careLevel.color }]}>
+            <Text style={styles.careLevelText}>{careLevel.icon}</Text>
+          </View>
         </View>
 
         {/* Content */}
         <View style={styles.cardContent}>
-          <Text style={[styles.scientificName, { color: colors.textPrimary }]} numberOfLines={1}>
+          <Text style={[styles.commonName, { color: colors.textPrimary }]} numberOfLines={1}>
+            {item.common_names && item.common_names.length > 0 ? item.common_names[0] : item.scientific_name.split(' ')[1]}
+          </Text>
+          <Text style={[styles.scientificName, { color: colors.textSecondary }]} numberOfLines={1}>
             {item.scientific_name}
           </Text>
-          {item.common_names && item.common_names.length > 0 && (
-            <Text style={[styles.commonName, { color: colors.textSecondary }]} numberOfLines={1}>
-              {item.common_names[0]}
-            </Text>
-          )}
 
-          <View style={styles.tags}>
-            <View style={[styles.tag, { backgroundColor: careColors.bg }]}>
-              <Text style={[styles.tagText, { color: careColors.text }]}>{item.care_level}</Text>
-            </View>
-            <View style={[styles.tag, { backgroundColor: colors.border }]}>
-              <Text style={[styles.tagText, { color: colors.textSecondary }]}>
-                {getTypeIcon(item.type)} {item.type}
+          {/* Quick Info */}
+          <View style={styles.quickInfo}>
+            <View style={[styles.infoChip, { backgroundColor: colors.surfaceElevated }]}>
+              <Text style={[styles.infoChipText, { color: colors.textSecondary }]}>
+                {typeIcon}
               </Text>
             </View>
+            {item.adult_size_cm && (
+              <View style={[styles.infoChip, { backgroundColor: colors.surfaceElevated }]}>
+                <Text style={[styles.infoChipText, { color: colors.textSecondary }]}>
+                  {item.adult_size_cm}cm
+                </Text>
+              </View>
+            )}
           </View>
-
-          {item.adult_size_cm && (
-            <Text style={[styles.sizeText, { color: colors.textSecondary }]}>
-              Size: {item.adult_size_cm} cm
-            </Text>
-          )}
         </View>
       </TouchableOpacity>
     );
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      padding: 16,
-      paddingTop: 50,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    title: {
-      fontSize: 26,
-      fontWeight: 'bold',
-      marginBottom: 4,
-      color: colors.textPrimary,
-    },
-    subtitle: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    searchContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.border,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      marginBottom: 10,
-      marginHorizontal: 16,
-      marginTop: 10,
-    },
-    searchIcon: {
-      marginRight: 8,
-    },
-    searchInput: {
-      flex: 1,
-      paddingVertical: 10,
-      fontSize: 15,
-      color: colors.textPrimary,
-    },
-    filterSelector: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginHorizontal: 16,
-      marginBottom: 12,
-      padding: 12,
-      borderRadius: 10,
-      borderWidth: 1,
-    },
-    filterLabel: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    filterValueContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    filterValue: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    modalContent: {
-      width: '80%',
-      borderRadius: 12,
-      padding: 16,
-      maxWidth: 400,
-    },
-    modalTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      marginBottom: 16,
-      textAlign: 'center',
-    },
-    modalOption: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 16,
-      paddingHorizontal: 12,
-      borderBottomWidth: 1,
-    },
-    modalOptionText: {
-      fontSize: 16,
-    },
-    resultCount: {
-      paddingHorizontal: 16,
-      marginTop: 16,
-      marginBottom: 20,
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    listContent: {
-      paddingHorizontal: 16,
-      paddingBottom: 24,
-    },
-    card: {
-      borderRadius: 12,
-      marginBottom: 16,
-      overflow: 'hidden',
-      borderWidth: 1,
-    },
-    imageContainer: {
-      height: 180,
-      position: 'relative',
-    },
-    image: {
-      width: '100%',
-      height: '100%',
-    },
-    placeholderImage: {
-      width: '100%',
-      height: '100%',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    placeholderEmoji: {
-      fontSize: 64,
-    },
-    verifiedBadge: {
-      position: 'absolute',
-      top: 8,
-      right: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#10b98140',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
-      gap: 4,
-    },
-    verifiedText: {
-      color: '#10b981',
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    cardContent: {
-      padding: 12,
-    },
-    scientificName: {
-      fontSize: 18,
-      fontWeight: '600',
-      fontStyle: 'italic',
-      marginBottom: 4,
-    },
-    commonName: {
-      fontSize: 14,
-      marginBottom: 8,
-    },
-    tags: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 6,
-      marginBottom: 8,
-    },
-    tag: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    tagText: {
-      fontSize: 12,
-      fontWeight: '600',
-    },
-    sizeText: {
-      fontSize: 12,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    emptyContainer: {
-      padding: 48,
-      alignItems: 'center',
-    },
-    emptyEmoji: {
-      fontSize: 64,
-      marginBottom: 16,
-    },
-    emptyTitle: {
-      fontSize: 20,
-      fontWeight: '600',
-      marginBottom: 8,
-      color: colors.textPrimary,
-    },
-    emptyText: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      textAlign: 'center',
-    },
-  });
+  const FilterChip = ({ label, value, isActive, onPress }: { label: string; value: string; isActive: boolean; onPress: () => void }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.filterChip,
+        {
+          backgroundColor: isActive ? colors.primary : colors.surfaceElevated,
+          borderColor: isActive ? colors.primary : colors.border,
+        }
+      ]}
+      activeOpacity={0.7}
+    >
+      <Text style={[
+        styles.filterChipText,
+        { color: isActive ? '#ffffff' : colors.textPrimary }
+      ]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
 
   if (loading) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Loading...</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <Text style={{ fontSize: 60, marginBottom: 16 }}>🕷️</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Loading species...</Text>
+        </View>
       </View>
     );
   }
 
   const ListHeader = () => (
-    <>
+    <View>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Species Database</Text>
-        <Text style={styles.subtitle}>Browse care guides for tarantula species</Text>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Species Database</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          {species.length} tarantula species
+        </Text>
       </View>
 
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.surfaceElevated }]}>
         <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.textPrimary }]}
           placeholder="Search species..."
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textTertiary}
           value={searchTerm}
           onChangeText={setSearchTerm}
         />
+        {searchTerm.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchTerm('')}>
+            <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Filter Selector */}
-      <TouchableOpacity
-        style={[styles.filterSelector, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        onPress={() => setShowFilterModal(true)}
-      >
+      {/* Filter Chips */}
+      <View style={styles.filterContainer}>
         <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Care Level:</Text>
-        <View style={styles.filterValueContainer}>
-          <Text style={[styles.filterValue, { color: colors.textPrimary }]}>
-            {selectedFilter === 'all' ? 'All Levels' : selectedFilter.charAt(0).toUpperCase() + selectedFilter.slice(1)}
-          </Text>
-          <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+        <View style={styles.filterChips}>
+          <FilterChip
+            label="All"
+            value="all"
+            isActive={selectedFilter === 'all'}
+            onPress={() => setSelectedFilter('all')}
+          />
+          <FilterChip
+            label="Beginner"
+            value="beginner"
+            isActive={selectedFilter === 'beginner'}
+            onPress={() => setSelectedFilter('beginner')}
+          />
+          <FilterChip
+            label="Intermediate"
+            value="intermediate"
+            isActive={selectedFilter === 'intermediate'}
+            onPress={() => setSelectedFilter('intermediate')}
+          />
+          <FilterChip
+            label="Advanced"
+            value="advanced"
+            isActive={selectedFilter === 'advanced'}
+            onPress={() => setSelectedFilter('advanced')}
+          />
         </View>
-      </TouchableOpacity>
+      </View>
 
       {/* Results Count */}
-      <Text style={styles.resultCount}>
-        {filteredSpecies.length} species found
+      <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
+        {filteredSpecies.length} {filteredSpecies.length === 1 ? 'species' : 'species'} found
       </Text>
-    </>
+    </View>
   );
 
   return (
-    <View style={styles.container}>
-      {/* Species List */}
-      {filteredSpecies.length === 0 ? (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {filteredSpecies.length === 0 && !loading ? (
         <>
           <ListHeader />
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyEmoji}>🔍</Text>
-            <Text style={styles.emptyTitle}>No species found</Text>
-            <Text style={styles.emptyText}>Try adjusting your search or filters</Text>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No species found</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              Try adjusting your search or filters
+            </Text>
           </View>
         </>
       ) : (
@@ -432,49 +301,215 @@ export default function SpeciesScreen() {
           renderItem={renderSpeciesCard}
           keyExtractor={item => item.id}
           ListHeaderComponent={ListHeader}
+          numColumns={2}
           contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+            />
+          }
+          columnWrapperStyle={styles.row}
+          showsVerticalScrollIndicator={false}
         />
       )}
-
-      {/* Filter Modal */}
-      <Modal
-        visible={showFilterModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowFilterModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowFilterModal(false)}
-        >
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Select Care Level</Text>
-
-            {(['all', 'beginner', 'intermediate', 'advanced'] as const).map((filter) => (
-              <TouchableOpacity
-                key={filter}
-                style={[
-                  styles.modalOption,
-                  { borderBottomColor: colors.border },
-                  selectedFilter === filter && { backgroundColor: colors.border }
-                ]}
-                onPress={() => {
-                  setSelectedFilter(filter);
-                  setShowFilterModal(false);
-                }}
-              >
-                <Text style={[styles.modalOptionText, { color: colors.textPrimary }]}>
-                  {filter === 'all' ? 'All Levels' : filter.charAt(0).toUpperCase() + filter.slice(1)}
-                </Text>
-                {selectedFilter === filter && (
-                  <Ionicons name="checkmark" size={24} color="#f97316" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    padding: 16,
+    paddingTop: 50,
+    borderBottomWidth: 1,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 15,
+  },
+  filterContainer: {
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  filterLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  filterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  resultCount: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 12,
+    fontSize: 13,
+  },
+  listContent: {
+    paddingHorizontal: 8,
+    paddingBottom: 24,
+  },
+  row: {
+    justifyContent: 'flex-start',
+  },
+  card: {
+    width: CARD_WIDTH,
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  imageContainer: {
+    height: 160,
+    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholderImage: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderEmoji: {
+    fontSize: 48,
+  },
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '30%',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  topBadges: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  verifiedBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#22c55e',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  warningBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  careLevelBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  careLevelText: {
+    fontSize: 14,
+    color: '#ffffff',
+  },
+  cardContent: {
+    padding: 12,
+  },
+  commonName: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  scientificName: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginBottom: 8,
+  },
+  quickInfo: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  infoChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  infoChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    padding: 48,
+    alignItems: 'center',
+  },
+  emptyEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+});
