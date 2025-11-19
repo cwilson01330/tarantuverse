@@ -1,11 +1,8 @@
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const { width } = Dimensions.get('window');
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface Species {
   id: string;
@@ -30,6 +27,7 @@ interface Species {
   feeding_frequency_days?: number;
   typical_diet?: string;
   urticating_hairs?: boolean;
+  medically_significant_venom?: boolean;
   defensive_behavior?: string;
   lifespan_years_min?: number;
   lifespan_years_max?: number;
@@ -39,13 +37,407 @@ interface Species {
   average_rating?: number;
 }
 
-interface User {
-  is_admin?: boolean;
-  is_superuser?: boolean;
-  subscription_tier?: string;
+export default function SpeciesDetailScreen() {
+  const { colors } = useTheme();
+  const { id } = useLocalSearchParams();
+  const [species, setSpecies] = useState<Species | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
+    overview: true, // Start with overview expanded
+  });
+
+  useEffect(() => {
+    fetchSpecies();
+  }, [id]);
+
+  const fetchSpecies = async () => {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/species/${id}`);
+
+      if (!response.ok) {
+        throw new Error('Species not found');
+      }
+
+      const data = await response.json();
+      setSpecies(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load species');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const getCareLevel = (level?: string) => {
+    switch (level) {
+      case 'beginner':
+        return { color: '#22c55e', text: 'Beginner', icon: '✓', badge: 'Friendly' };
+      case 'intermediate':
+        return { color: '#eab308', text: 'Intermediate', icon: '⚠', badge: 'Moderate' };
+      case 'advanced':
+        return { color: '#f97316', text: 'Advanced', icon: '⚡', badge: 'Challenging' };
+      case 'expert':
+        return { color: '#ef4444', text: 'Expert Only', icon: '☠', badge: 'Difficult' };
+      default:
+        return { color: colors.textSecondary, text: 'Unknown', icon: '?', badge: 'Unknown' };
+    }
+  };
+
+  const getTypeIcon = (type?: string) => {
+    switch (type) {
+      case 'terrestrial': return { emoji: '🏜️', label: 'Ground Dweller' };
+      case 'arboreal': return { emoji: '🌳', label: 'Tree Dweller' };
+      case 'fossorial': return { emoji: '⛰️', label: 'Burrower' };
+      default: return { emoji: '🕷️', label: 'Tarantula' };
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <Text style={{ fontSize: 60, marginBottom: 16 }}>🕷️</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading species...
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error || !species) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Species</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorTitle, { color: colors.error }]}>Species Not Found</Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+            {error || 'The requested species could not be found.'}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const careLevel = getCareLevel(species.care_level);
+  const typeInfo = getTypeIcon(species.type);
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView>
+        {/* Hero Section */}
+        <View style={styles.heroContainer}>
+          {species.image_url && (
+            <Image source={{ uri: species.image_url }} style={styles.heroImage} resizeMode="cover" />
+          )}
+          <View style={styles.heroGradient} />
+
+          {/* Floating Back Button */}
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.floatingBackButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
+
+          {/* Hero Content */}
+          <View style={styles.heroContent}>
+            <Text style={styles.speciesName}>{species.scientific_name}</Text>
+            {species.common_names && species.common_names.length > 0 && (
+              <Text style={styles.commonNames}>{species.common_names.join(', ')}</Text>
+            )}
+
+            {/* Badges */}
+            <View style={styles.badgeContainer}>
+              <View style={[styles.badge, { backgroundColor: careLevel.color }]}>
+                <Text style={styles.badgeText}>{careLevel.icon} {careLevel.text}</Text>
+              </View>
+              {species.type && (
+                <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.badgeText}>{typeInfo.emoji} {species.type}</Text>
+                </View>
+              )}
+              {species.is_verified && (
+                <View style={[styles.badge, { backgroundColor: '#8b5cf6' }]}>
+                  <Text style={styles.badgeText}>✓ Verified</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Content */}
+        <View style={{ padding: 16 }}>
+
+          {/* Safety Warnings (if applicable) */}
+          {(species.urticating_hairs || species.medically_significant_venom) && (
+            <View style={{ marginBottom: 20 }}>
+              {species.medically_significant_venom && (
+                <View style={[styles.dangerWarning, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <MaterialCommunityIcons name="alert" size={28} color={colors.error} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.warningTitle, { color: colors.error }]}>
+                        ⚠️ MEDICALLY SIGNIFICANT VENOM
+                      </Text>
+                      <Text style={[styles.warningText, { color: colors.textPrimary }]}>
+                        This species has potent venom. For experienced keepers only.
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+              {species.urticating_hairs && (
+                <View style={[styles.cautionWarning, { backgroundColor: '#f97316' + '20', borderColor: '#f97316', marginTop: 12 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <MaterialCommunityIcons name="alert-circle" size={24} color="#f97316" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.warningTitle, { color: '#f97316' }]}>
+                        Urticating Hairs
+                      </Text>
+                      <Text style={[styles.warningText, { color: colors.textSecondary }]}>
+                        Can cause skin/eye irritation
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Quick Stats Card */}
+          <View style={[styles.quickStatsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Quick Stats</Text>
+            <View style={styles.statsGrid}>
+              {species.adult_size_cm && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statIcon}>📏</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Adult Size</Text>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.adult_size_cm} cm</Text>
+                </View>
+              )}
+              {species.growth_rate && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statIcon}>📈</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Growth</Text>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.growth_rate}</Text>
+                </View>
+              )}
+              {(species.min_temperature && species.max_temperature) && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statIcon}>🌡️</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Temp</Text>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.min_temperature}-{species.max_temperature}°C</Text>
+                </View>
+              )}
+              {(species.min_humidity && species.max_humidity) && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statIcon}>💧</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Humidity</Text>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.min_humidity}-{species.max_humidity}%</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Accordion Sections */}
+
+          {/* Overview */}
+          <AccordionSection
+            title="Overview"
+            icon="information-circle"
+            isExpanded={expandedSections.overview}
+            onToggle={() => toggleSection('overview')}
+            colors={colors}
+          >
+            {species.temperament && (
+              <InfoRow label="Temperament" value={species.temperament} colors={colors} />
+            )}
+            {(species.lifespan_years_min || species.lifespan_years_max) && (
+              <InfoRow
+                label="Lifespan"
+                value={`${species.lifespan_years_min}-${species.lifespan_years_max} years`}
+                colors={colors}
+              />
+            )}
+            {species.native_region && (
+              <InfoRow label="Native Region" value={species.native_region} colors={colors} />
+            )}
+            {species.genus && (
+              <InfoRow label="Genus" value={species.genus} colors={colors} italic />
+            )}
+            {species.family && (
+              <InfoRow label="Family" value={species.family} colors={colors} />
+            )}
+          </AccordionSection>
+
+          {/* Enclosure Setup */}
+          <AccordionSection
+            title="Enclosure Setup"
+            icon="home"
+            isExpanded={expandedSections.enclosure}
+            onToggle={() => toggleSection('enclosure')}
+            colors={colors}
+          >
+            {species.enclosure_type && (
+              <InfoRow label="Type" value={species.enclosure_type} colors={colors} />
+            )}
+            {species.substrate_type && (
+              <InfoRow label="Substrate" value={species.substrate_type} colors={colors} />
+            )}
+            {species.substrate_depth_cm && (
+              <InfoRow label="Substrate Depth" value={`${species.substrate_depth_cm} cm`} colors={colors} />
+            )}
+          </AccordionSection>
+
+          {/* Feeding */}
+          <AccordionSection
+            title="Feeding"
+            icon="restaurant"
+            isExpanded={expandedSections.feeding}
+            onToggle={() => toggleSection('feeding')}
+            colors={colors}
+          >
+            {species.feeding_frequency_days && (
+              <InfoRow label="Frequency" value={`Every ${species.feeding_frequency_days} days`} colors={colors} />
+            )}
+            {species.typical_diet && (
+              <InfoRow label="Diet" value={species.typical_diet} colors={colors} />
+            )}
+          </AccordionSection>
+
+          {/* Behavior */}
+          <AccordionSection
+            title="Behavior & Safety"
+            icon="shield-checkmark"
+            isExpanded={expandedSections.behavior}
+            onToggle={() => toggleSection('behavior')}
+            colors={colors}
+          >
+            {species.defensive_behavior && (
+              <InfoRow label="Defensive Behavior" value={species.defensive_behavior} colors={colors} />
+            )}
+            <InfoRow
+              label="Urticating Hairs"
+              value={species.urticating_hairs ? 'Yes (New World)' : 'No (Old World)'}
+              colors={colors}
+            />
+            <InfoRow
+              label="Venom"
+              value={species.medically_significant_venom ? 'Medically Significant ⚠️' : 'Not significant'}
+              colors={colors}
+            />
+          </AccordionSection>
+
+          {/* Community Stats */}
+          <AccordionSection
+            title="Community"
+            icon="people"
+            isExpanded={expandedSections.community}
+            onToggle={() => toggleSection('community')}
+            colors={colors}
+          >
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {species.times_kept !== undefined && (
+                <View style={[styles.communityStatCard, { backgroundColor: colors.surfaceElevated, flex: 1 }]}>
+                  <Text style={[styles.communityStatValue, { color: colors.primary }]}>{species.times_kept}</Text>
+                  <Text style={[styles.communityStatLabel, { color: colors.textSecondary }]}>Keepers</Text>
+                </View>
+              )}
+              {species.average_rating && (
+                <View style={[styles.communityStatCard, { backgroundColor: colors.surfaceElevated, flex: 1 }]}>
+                  <Text style={[styles.communityStatValue, { color: '#eab308' }]}>⭐ {species.average_rating.toFixed(1)}</Text>
+                  <Text style={[styles.communityStatLabel, { color: colors.textSecondary }]}>Rating</Text>
+                </View>
+              )}
+            </View>
+          </AccordionSection>
+
+          {/* Bottom Spacing */}
+          <View style={{ height: 40 }} />
+        </View>
+      </ScrollView>
+    </View>
+  );
 }
 
-type TabType = 'overview' | 'husbandry' | 'behavior' | 'stats';
+// Accordion Section Component
+function AccordionSection({
+  title,
+  icon,
+  isExpanded,
+  onToggle,
+  colors,
+  children
+}: {
+  title: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  isExpanded: boolean;
+  onToggle: () => void;
+  colors: any;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={[styles.accordionContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <TouchableOpacity
+        onPress={onToggle}
+        style={styles.accordionHeader}
+        activeOpacity={0.7}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Ionicons name={icon} size={24} color={colors.primary} />
+          <Text style={[styles.accordionTitle, { color: colors.textPrimary }]}>{title}</Text>
+        </View>
+        <Ionicons
+          name={isExpanded ? "chevron-up" : "chevron-down"}
+          size={24}
+          color={colors.textSecondary}
+        />
+      </TouchableOpacity>
+
+      {isExpanded && (
+        <View style={styles.accordionContent}>
+          {children}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// Info Row Component
+function InfoRow({
+  label,
+  value,
+  colors,
+  italic = false
+}: {
+  label: string;
+  value: string;
+  colors: any;
+  italic?: boolean;
+}) {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: colors.textPrimary, fontStyle: italic ? 'italic' : 'normal' }]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -74,7 +466,6 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 20,
   },
   header: {
     flexDirection: 'row',
@@ -84,6 +475,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 12,
   },
+  backButton: {
+    padding: 4,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -92,7 +486,7 @@ const styles = StyleSheet.create({
   heroContainer: {
     position: 'relative',
     height: 300,
-    backgroundColor: '#1e293b', // Fallback background
+    backgroundColor: '#1e293b',
   },
   heroImage: {
     width: '100%',
@@ -103,10 +497,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: '60%',
+    height: '70%',
     backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'flex-end',
-    padding: 20,
   },
   floatingBackButton: {
     position: 'absolute',
@@ -158,635 +550,119 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
-    gap: 6,
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#ffffff',
   },
-  backButton: {
-    padding: 4,
-  },
-  // Action Bar
-  actionBar: {
-    flexDirection: 'row',
+  // Warnings
+  dangerWarning: {
     padding: 16,
-    gap: 12,
-    borderBottomWidth: 1,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
     borderRadius: 12,
-    gap: 8,
+    borderWidth: 2,
   },
-  actionButtonPrimary: {
-    backgroundColor: '#3b82f6',
-  },
-  actionButtonSecondary: {
-    backgroundColor: '#374151',
+  cautionWarning: {
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#4b5563',
   },
-  actionButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
+  warningTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
   },
-  // Tabs
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 2,
-    borderBottomColor: '#1f2937',
+  warningText: {
+    fontSize: 13,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: '#60a5fa',
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  tabTextActive: {
-    color: '#60a5fa',
-  },
-  // Content
-  content: {
-    padding: 16,
-    backgroundColor: '#0f172a',
-  },
-  section: {
-    marginBottom: 28,
+  // Quick Stats Card
+  quickStatsCard: {
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
     marginBottom: 16,
-    color: '#f1f5f9',
   },
-  // Quick Facts
-  factGrid: {
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 16,
   },
-  factItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    backgroundColor: '#1e293b',
-    padding: 14,
-    borderRadius: 12,
+  statItem: {
+    alignItems: 'center',
+    minWidth: '40%',
   },
-  factIcon: {
-    fontSize: 28,
+  statIcon: {
+    fontSize: 32,
+    marginBottom: 8,
   },
-  factContent: {
-    flex: 1,
-  },
-  factLabel: {
-    fontSize: 13,
-    color: '#cbd5e1',
-    marginBottom: 4,
+  statLabel: {
+    fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginBottom: 4,
   },
-  factValue: {
+  statValue: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  // Accordion
+  accordionContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  accordionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#f1f5f9',
   },
-  // Info Rows
+  accordionContent: {
+    padding: 16,
+    paddingTop: 0,
+  },
+  // Info Row
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#1f2937',
+    borderBottomColor: 'rgba(128, 128, 128, 0.1)',
   },
   infoLabel: {
-    fontSize: 15,
-    color: '#cbd5e1',
+    fontSize: 14,
   },
   infoValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#f1f5f9',
-    fontStyle: 'italic',
-  },
-  // Gauges
-  gaugeContainer: {
-    marginBottom: 16,
-  },
-  gaugeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  gaugeLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#f1f5f9',
-  },
-  gaugeValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#60a5fa',
-  },
-  gaugeTrack: {
-    height: 10,
-    backgroundColor: '#1f2937',
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  gaugeFill: {
-    height: '100%',
-  },
-  gaugeLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  gaugeMinMax: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  // Stats
-  statsCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#1f2937',
-    alignItems: 'center',
-    backgroundColor: '#1e293b',
-  },
-  statValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#60a5fa',
-  },
-  statLabel: {
     fontSize: 14,
-    color: '#cbd5e1',
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: 16,
+  },
+  // Community Stats
+  communityStatCard: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  communityStatValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  communityStatLabel: {
+    fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  // Taxonomy
-  taxonomyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  taxonomyLabel: {
-    fontSize: 14,
-    color: '#cbd5e1',
-  },
-  taxonomyValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#f1f5f9',
-    fontStyle: 'italic',
-  },
-  climateSection: {
-    gap: 16,
-  },
 });
-
-export default function SpeciesDetailScreen() {
-  const { colors } = useTheme();
-  const { id } = useLocalSearchParams();
-  const [species, setSpecies] = useState<Species | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    fetchSpecies();
-    fetchUser();
-  }, [id]);
-
-  const fetchUser = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) return;
-
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data);
-      }
-    } catch (err) {
-      console.error('Failed to fetch user:', err);
-    }
-  };
-
-  const fetchSpecies = async () => {
-    try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/species/${id}`);
-      
-      if (!response.ok) {
-        throw new Error('Species not found');
-      }
-
-      const data = await response.json();
-      setSpecies(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load species');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getCareLevel = (level?: string) => {
-    switch (level) {
-      case 'beginner':
-        return { color: '#10b981', text: 'Beginner Friendly', icon: '🟢' };
-      case 'intermediate':
-        return { color: '#f59e0b', text: 'Intermediate', icon: '🟡' };
-      case 'advanced':
-        return { color: '#ef4444', text: 'Advanced', icon: '🔴' };
-      default:
-        return { color: colors.textSecondary, text: 'Unknown', icon: '⚪' };
-    }
-  };
-
-  const getTypeIcon = (type?: string) => {
-    switch (type) {
-      case 'terrestrial': return '🏜️';
-      case 'arboreal': return '🌳';
-      case 'fossorial': return '⛰️';
-      default: return '🕷️';
-    }
-  };
-
-  const renderGauge = (value: number, min: number, max: number, label: string, unit: string) => {
-    const percentage = ((value - min) / (max - min)) * 100;
-    return (
-      <View style={styles.gaugeContainer}>
-        <View style={[styles.gaugeHeader]}>
-          <Text style={[styles.gaugeLabel]}>{label}</Text>
-          <Text style={[styles.gaugeValue]}>{value}{unit}</Text>
-        </View>
-        <View style={styles.gaugeTrack}>
-          <View 
-            style={[styles.gaugeFill, { width: `${percentage}%`, backgroundColor: colors.primary }]} 
-          />
-        </View>
-        <View style={styles.gaugeLabels}>
-          <Text style={[styles.gaugeMinMax]}>{min}{unit}</Text>
-          <Text style={[styles.gaugeMinMax]}>{max}{unit}</Text>
-        </View>
-      </View>
-    );
-  };
-
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.loadingContainer}>
-          <Text style={{ fontSize: 60, marginBottom: 16 }}>🕷️</Text>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Loading species details...
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (error || !species) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Species</Text>
-        </View>
-        <View style={styles.errorContainer}>
-          <Text style={[styles.errorTitle, { color: colors.error }]}>Species Not Found</Text>
-          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-            {error || 'The requested species could not be found.'}
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  const careLevel = getCareLevel(species.care_level);
-  const typeIcon = getTypeIcon(species.type);
-  const canEdit = user && (user.is_admin || user.is_superuser);
-
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView>
-        {/* Hero Section */}
-        <View style={styles.heroContainer}>
-          <View style={styles.heroGradient} />
-          {species.image_url && (
-            <Image source={{ uri: species.image_url }} style={styles.heroImage} resizeMode="cover" />
-          )}
-          
-          {/* Floating Back Button */}
-          <TouchableOpacity 
-            onPress={() => router.back()}
-            style={styles.floatingBackButton}
-          >
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
-          </TouchableOpacity>
-
-          <View style={styles.heroContent}>
-            <Text style={styles.speciesName}>{species.scientific_name}</Text>
-            {species.common_names && species.common_names.length > 0 && (
-              <Text style={styles.commonNames}>{species.common_names.join(', ')}</Text>
-            )}
-            <View style={styles.badgeContainer}>
-              <View style={[styles.badge, { backgroundColor: careLevel.color }]}>
-                <Text>{careLevel.icon}</Text>
-                <Text style={styles.badgeText}>{careLevel.text}</Text>
-              </View>
-              {species.type && (
-                <View style={[styles.badge, { backgroundColor: '#3b82f6' }]}>
-                  <Text>{typeIcon}</Text>
-                  <Text style={styles.badgeText}>{species.type}</Text>
-                </View>
-              )}
-              {species.is_verified && (
-                <View style={[styles.badge, { backgroundColor: '#8b5cf6' }]}>
-                  <Text style={styles.badgeText}>✓ Verified</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Action Bar */}
-        <View style={[styles.actionBar, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity style={[styles.actionButton, styles.actionButtonSecondary]}>
-            <Ionicons name="add-circle-outline" size={20} color="#ffffff" />
-            <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>
-              Add to Collection
-            </Text>
-          </TouchableOpacity>
-          {canEdit && (
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.actionButtonPrimary]}
-              onPress={() => router.push(`/species/${id}/edit` as any)}
-            >
-              <Ionicons name="pencil-outline" size={20} color="#ffffff" />
-              <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>Edit</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Tab Bar */}
-        <View style={styles.tabBar}>
-          {(['overview', 'husbandry', 'behavior', 'stats'] as TabType[]).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Tab Content */}
-        <View style={styles.content}>
-          {activeTab === 'overview' && (
-            <>
-              {/* Quick Facts */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Quick Facts</Text>
-                <View style={styles.factGrid}>
-                  {species.adult_size_cm && (
-                    <View style={styles.factItem}>
-                      <Text style={styles.factIcon}>📏</Text>
-                      <View style={styles.factContent}>
-                        <Text style={styles.factLabel}>Adult Size</Text>
-                        <Text style={styles.factValue}>{species.adult_size_cm} cm leg span</Text>
-                      </View>
-                    </View>
-                  )}
-                  {species.growth_rate && (
-                    <View style={styles.factItem}>
-                      <Text style={styles.factIcon}>📈</Text>
-                      <View style={styles.factContent}>
-                        <Text style={styles.factLabel}>Growth Rate</Text>
-                        <Text style={styles.factValue}>{species.growth_rate}</Text>
-                      </View>
-                    </View>
-                  )}
-                  {(species.lifespan_years_min || species.lifespan_years_max) && (
-                    <View style={styles.factItem}>
-                      <Text style={styles.factIcon}>⏳</Text>
-                      <View style={styles.factContent}>
-                        <Text style={styles.factLabel}>Lifespan</Text>
-                        <Text style={styles.factValue}>
-                          {species.lifespan_years_min}-{species.lifespan_years_max} years
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                  {species.temperament && (
-                    <View style={styles.factItem}>
-                      <Text style={styles.factIcon}>😊</Text>
-                      <View style={styles.factContent}>
-                        <Text style={styles.factLabel}>Temperament</Text>
-                        <Text style={styles.factValue}>{species.temperament}</Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              {/* Taxonomy */}
-              {(species.genus || species.family) && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Taxonomy</Text>
-                  {species.genus && (
-                    <View style={styles.taxonomyRow}>
-                      <Text style={styles.taxonomyLabel}>Genus:</Text>
-                      <Text style={styles.taxonomyValue}>{species.genus}</Text>
-                    </View>
-                  )}
-                  {species.species && (
-                    <View style={styles.taxonomyRow}>
-                      <Text style={styles.taxonomyLabel}>Species:</Text>
-                      <Text style={styles.taxonomyValue}>{species.species}</Text>
-                    </View>
-                  )}
-                  {species.family && (
-                    <View style={styles.taxonomyRow}>
-                      <Text style={styles.taxonomyLabel}>Family:</Text>
-                      <Text style={styles.taxonomyValue}>{species.family}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {/* Community Stats */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Community</Text>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  {species.times_kept !== undefined && (
-                    <View style={[styles.statsCard, { flex: 1 }]}>
-                      <Text style={[styles.statValue, { color: colors.primary }]}>
-                        {species.times_kept}
-                      </Text>
-                      <Text style={styles.statLabel}>Keepers</Text>
-                    </View>
-                  )}
-                  {species.average_rating && (
-                    <View style={[styles.statsCard, { flex: 1 }]}>
-                      <Text style={[styles.statValue, { color: '#f59e0b' }]}>
-                        ⭐ {species.average_rating.toFixed(1)}
-                      </Text>
-                      <Text style={styles.statLabel}>Rating</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            </>
-          )}
-
-          {activeTab === 'husbandry' && (
-            <>
-              {/* Climate Requirements */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🌡️ Climate Requirements</Text>
-                <View style={styles.climateSection}>
-                  {species.min_temperature && species.max_temperature && (
-                    renderGauge(
-                      (species.min_temperature + species.max_temperature) / 2,
-                      20,
-                      32,
-                      'Temperature Range',
-                      '°C'
-                    )
-                  )}
-                  {species.min_humidity && species.max_humidity && (
-                    renderGauge(
-                      (species.min_humidity + species.max_humidity) / 2,
-                      40,
-                      90,
-                      'Humidity Range',
-                      '%'
-                    )
-                  )}
-                </View>
-              </View>
-
-              {/* Enclosure Setup */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🏠 Enclosure Setup</Text>
-                {species.enclosure_type && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Type</Text>
-                    <Text style={styles.infoValue}>{species.enclosure_type}</Text>
-                  </View>
-                )}
-                {species.substrate_type && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Substrate</Text>
-                    <Text style={styles.infoValue}>{species.substrate_type}</Text>
-                  </View>
-                )}
-                {species.substrate_depth_cm && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Substrate Depth</Text>
-                    <Text style={styles.infoValue}>{species.substrate_depth_cm} cm</Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Feeding Schedule */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🍽️ Feeding Schedule</Text>
-                {species.feeding_frequency_days && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Frequency</Text>
-                    <Text style={styles.infoValue}>Every {species.feeding_frequency_days} days</Text>
-                  </View>
-                )}
-                {species.typical_diet && (
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Diet</Text>
-                    <Text style={styles.infoValue}>{species.typical_diet}</Text>
-                  </View>
-                )}
-              </View>
-            </>
-          )}
-
-          {activeTab === 'behavior' && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>🕷️ Behavior & Temperament</Text>
-              {species.temperament && (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>General Temperament</Text>
-                  <Text style={styles.infoValue}>{species.temperament}</Text>
-                </View>
-              )}
-              {species.defensive_behavior && (
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Defensive Behavior</Text>
-                  <Text style={styles.infoValue}>{species.defensive_behavior}</Text>
-                </View>
-              )}
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Urticating Hairs</Text>
-                <Text style={styles.infoValue}>
-                  {species.urticating_hairs ? '✓ Yes' : '✗ No'}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {activeTab === 'stats' && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Species Statistics</Text>
-              <View style={{ gap: 12 }}>
-                <View style={styles.statsCard}>
-                  <Text style={[styles.statValue, { color: colors.primary }]}>
-                    {species.times_kept || 0}
-                  </Text>
-                  <Text style={styles.statLabel}>Total Keepers</Text>
-                </View>
-                <View style={styles.statsCard}>
-                  <Text style={[styles.statValue, { color: '#f59e0b' }]}>
-                    {species.average_rating ? species.average_rating.toFixed(1) : 'N/A'}
-                  </Text>
-                  <Text style={styles.statLabel}>Average Rating</Text>
-                </View>
-                <View style={styles.statsCard}>
-                  <Text style={[styles.statValue, { color: '#10b981' }]}>
-                    {careLevel.text}
-                  </Text>
-                  <Text style={styles.statLabel}>Care Level</Text>
-                </View>
-              </View>
-            </View>
-          )}
-        </View>
-      </ScrollView>
-    </View>
-  );
-}
-
