@@ -14,27 +14,47 @@ interface Species {
   care_level?: string;
   temperament?: string;
   native_region?: string;
-  adult_size_cm?: number;
+  adult_size?: string; // "7-8 inches"
   growth_rate?: string;
   type?: string;
-  min_temperature?: number;
-  max_temperature?: number;
-  min_humidity?: number;
-  max_humidity?: number;
-  enclosure_type?: string;
-  substrate_depth_cm?: number;
+
+  // Temperature/Humidity (matches API field names)
+  temperature_min?: number;
+  temperature_max?: number;
+  humidity_min?: number;
+  humidity_max?: number;
+
+  // Enclosure sizes by life stage
+  enclosure_size_sling?: string;
+  enclosure_size_juvenile?: string;
+  enclosure_size_adult?: string;
+
+  // Substrate
+  substrate_depth?: string;
   substrate_type?: string;
-  feeding_frequency_days?: number;
-  typical_diet?: string;
+
+  // Feeding by life stage
+  prey_size?: string;
+  feeding_frequency_sling?: string;
+  feeding_frequency_juvenile?: string;
+  feeding_frequency_adult?: string;
+
+  // Additional care
+  water_dish_required?: boolean;
+  webbing_amount?: string;
+  burrowing?: boolean;
+
+  // Safety
   urticating_hairs?: boolean;
   medically_significant_venom?: boolean;
-  defensive_behavior?: string;
-  lifespan_years_min?: number;
-  lifespan_years_max?: number;
+
+  // Documentation
+  care_guide?: string;
   image_url?: string;
+  source_url?: string;
   is_verified?: boolean;
   times_kept?: number;
-  average_rating?: number;
+  community_rating?: number;
 }
 
 export default function SpeciesDetailScreen() {
@@ -222,11 +242,11 @@ export default function SpeciesDetailScreen() {
           <View style={[styles.quickStatsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Quick Stats</Text>
             <View style={styles.statsGrid}>
-              {species.adult_size_cm && (
+              {species.adult_size && (
                 <View style={styles.statItem}>
                   <Text style={styles.statIcon}>📏</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Adult Size</Text>
-                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.adult_size_cm} cm</Text>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.adult_size}</Text>
                 </View>
               )}
               {species.growth_rate && (
@@ -236,18 +256,18 @@ export default function SpeciesDetailScreen() {
                   <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.growth_rate}</Text>
                 </View>
               )}
-              {(species.min_temperature && species.max_temperature) && (
+              {(species.temperature_min && species.temperature_max) && (
                 <View style={styles.statItem}>
                   <Text style={styles.statIcon}>🌡️</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Temp</Text>
-                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.min_temperature}-{species.max_temperature}°C</Text>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.temperature_min}-{species.temperature_max}°F</Text>
                 </View>
               )}
-              {(species.min_humidity && species.max_humidity) && (
+              {(species.humidity_min && species.humidity_max) && (
                 <View style={styles.statItem}>
                   <Text style={styles.statIcon}>💧</Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Humidity</Text>
-                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.min_humidity}-{species.max_humidity}%</Text>
+                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.humidity_min}-{species.humidity_max}%</Text>
                 </View>
               )}
             </View>
@@ -265,13 +285,6 @@ export default function SpeciesDetailScreen() {
           >
             {species.temperament && (
               <InfoRow label="Temperament" value={species.temperament} colors={colors} />
-            )}
-            {(species.lifespan_years_min || species.lifespan_years_max) && (
-              <InfoRow
-                label="Lifespan"
-                value={`${species.lifespan_years_min}-${species.lifespan_years_max} years`}
-                colors={colors}
-              />
             )}
             {species.native_region && (
               <InfoRow label="Native Region" value={species.native_region} colors={colors} />
@@ -292,14 +305,32 @@ export default function SpeciesDetailScreen() {
             onToggle={() => toggleSection('enclosure')}
             colors={colors}
           >
-            {species.enclosure_type && (
-              <InfoRow label="Type" value={species.enclosure_type} colors={colors} />
+            {species.type && (
+              <InfoRow label="Type" value={species.type} colors={colors} />
+            )}
+            {species.enclosure_size_sling && (
+              <InfoRow label="Sling Enclosure" value={species.enclosure_size_sling} colors={colors} />
+            )}
+            {species.enclosure_size_juvenile && (
+              <InfoRow label="Juvenile Enclosure" value={species.enclosure_size_juvenile} colors={colors} />
+            )}
+            {species.enclosure_size_adult && (
+              <InfoRow label="Adult Enclosure" value={species.enclosure_size_adult} colors={colors} />
             )}
             {species.substrate_type && (
               <InfoRow label="Substrate" value={species.substrate_type} colors={colors} />
             )}
-            {species.substrate_depth_cm && (
-              <InfoRow label="Substrate Depth" value={`${species.substrate_depth_cm} cm`} colors={colors} />
+            {species.substrate_depth && (
+              <InfoRow label="Substrate Depth" value={species.substrate_depth} colors={colors} />
+            )}
+            {species.water_dish_required !== undefined && (
+              <InfoRow label="Water Dish" value={species.water_dish_required ? 'Required' : 'Optional'} colors={colors} />
+            )}
+            {species.webbing_amount && (
+              <InfoRow label="Webbing Amount" value={species.webbing_amount} colors={colors} />
+            )}
+            {species.burrowing !== undefined && (
+              <InfoRow label="Burrowing" value={species.burrowing ? 'Yes' : 'No'} colors={colors} />
             )}
           </AccordionSection>
 
@@ -311,11 +342,17 @@ export default function SpeciesDetailScreen() {
             onToggle={() => toggleSection('feeding')}
             colors={colors}
           >
-            {species.feeding_frequency_days && (
-              <InfoRow label="Frequency" value={`Every ${species.feeding_frequency_days} days`} colors={colors} />
+            {species.prey_size && (
+              <InfoRow label="Prey Size" value={species.prey_size} colors={colors} />
             )}
-            {species.typical_diet && (
-              <InfoRow label="Diet" value={species.typical_diet} colors={colors} />
+            {species.feeding_frequency_sling && (
+              <InfoRow label="Sling Frequency" value={species.feeding_frequency_sling} colors={colors} />
+            )}
+            {species.feeding_frequency_juvenile && (
+              <InfoRow label="Juvenile Frequency" value={species.feeding_frequency_juvenile} colors={colors} />
+            )}
+            {species.feeding_frequency_adult && (
+              <InfoRow label="Adult Frequency" value={species.feeding_frequency_adult} colors={colors} />
             )}
           </AccordionSection>
 
@@ -327,9 +364,6 @@ export default function SpeciesDetailScreen() {
             onToggle={() => toggleSection('behavior')}
             colors={colors}
           >
-            {species.defensive_behavior && (
-              <InfoRow label="Defensive Behavior" value={species.defensive_behavior} colors={colors} />
-            )}
             <InfoRow
               label="Urticating Hairs"
               value={species.urticating_hairs ? 'Yes (New World)' : 'No (Old World)'}
@@ -357,9 +391,9 @@ export default function SpeciesDetailScreen() {
                   <Text style={[styles.communityStatLabel, { color: colors.textSecondary }]}>Keepers</Text>
                 </View>
               )}
-              {species.average_rating && (
+              {species.community_rating !== undefined && (
                 <View style={[styles.communityStatCard, { backgroundColor: colors.surfaceElevated, flex: 1 }]}>
-                  <Text style={[styles.communityStatValue, { color: '#eab308' }]}>⭐ {species.average_rating.toFixed(1)}</Text>
+                  <Text style={[styles.communityStatValue, { color: '#eab308' }]}>⭐ {species.community_rating.toFixed(1)}</Text>
                   <Text style={[styles.communityStatLabel, { color: colors.textSecondary }]}>Rating</Text>
                 </View>
               )}
