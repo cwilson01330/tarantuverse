@@ -85,24 +85,46 @@ export default function NotificationSettingsPage() {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+      // Only send the fields that can be updated (exclude id, user_id, expo_push_token)
+      const updatePayload = {
+        feeding_reminders_enabled: preferences.feeding_reminders_enabled,
+        feeding_reminder_hours: preferences.feeding_reminder_hours,
+        substrate_reminders_enabled: preferences.substrate_reminders_enabled,
+        substrate_reminder_days: preferences.substrate_reminder_days,
+        molt_predictions_enabled: preferences.molt_predictions_enabled,
+        maintenance_reminders_enabled: preferences.maintenance_reminders_enabled,
+        maintenance_reminder_days: preferences.maintenance_reminder_days,
+        push_notifications_enabled: preferences.push_notifications_enabled,
+        direct_messages_enabled: preferences.direct_messages_enabled,
+        forum_replies_enabled: preferences.forum_replies_enabled,
+        new_followers_enabled: preferences.new_followers_enabled,
+        community_activity_enabled: preferences.community_activity_enabled,
+        quiet_hours_enabled: preferences.quiet_hours_enabled,
+        quiet_hours_start: preferences.quiet_hours_start,
+        quiet_hours_end: preferences.quiet_hours_end,
+      };
+
       const response = await fetch(`${API_URL}/api/v1/notification-preferences/`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(preferences),
+        body: JSON.stringify(updatePayload),
       });
 
       if (response.ok) {
         setSuccessMessage('Notification preferences saved successfully!');
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
-        alert('Failed to save preferences');
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        console.error('Save failed:', response.status, errorData);
+        alert(`Failed to save preferences: ${errorData.detail || response.statusText}`);
       }
     } catch (error) {
       console.error('Failed to save preferences:', error);
-      alert('Failed to save preferences');
+      alert(`Failed to save preferences: ${error instanceof Error ? error.message : 'Network error'}`);
     } finally {
       setSaving(false);
     }
