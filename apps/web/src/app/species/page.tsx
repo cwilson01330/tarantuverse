@@ -11,15 +11,14 @@ interface Species {
   scientific_name: string;
   common_names: string[];
   genus: string;
-  species: string;
   type: string;
   native_region: string;
   care_level: string;
-  min_temperature: number | null;
-  max_temperature: number | null;
-  min_humidity: number | null;
-  max_humidity: number | null;
-  adult_size_cm: number | null;
+  temperature_min: number | null;
+  temperature_max: number | null;
+  humidity_min: number | null;
+  humidity_max: number | null;
+  adult_size: string | null;
   growth_rate: string | null;
   temperament: string | null;
   is_verified: boolean;
@@ -431,9 +430,9 @@ export default function SpeciesPage() {
                   </div>
 
                   {/* Only show adult size if available */}
-                  {s.adult_size_cm && (
+                  {s.adult_size && (
                     <p className="text-xs text-gray-600 dark:text-gray-400">
-                      <span className="font-medium">Adult Size:</span> ~{s.adult_size_cm} cm
+                      <span className="font-medium">Adult Size:</span> {s.adult_size}
                     </p>
                   )}
                 </div>
@@ -501,10 +500,10 @@ export default function SpeciesPage() {
                         {s.native_region}
                       </span>
                     )}
-                    {s.adult_size_cm && (
+                    {s.adult_size && (
                       <span className="inline-flex items-center text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-3 py-1 rounded-full">
                         <span className="mr-1">📏</span>
-                        {s.adult_size_cm} cm
+                        {s.adult_size}
                       </span>
                     )}
                   </div>
