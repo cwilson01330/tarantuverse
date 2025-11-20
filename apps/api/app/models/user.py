@@ -53,5 +53,8 @@ class User(Base):
     egg_sacs = relationship("EggSac", back_populates="user", lazy="select")
     offspring = relationship("Offspring", back_populates="user", lazy="select")
 
+    # Notification preferences
+    notification_preferences = relationship("NotificationPreferences", back_populates="user", uselist=False, lazy="select")
+
     def __repr__(self):
         return f"<User {self.username}>"

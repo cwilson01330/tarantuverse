@@ -26,6 +26,7 @@ import app.routers.subscriptions as subscriptions
 import app.routers.pairings as pairings
 import app.routers.egg_sacs as egg_sacs
 import app.routers.offspring as offspring
+import app.routers.notification_preferences as notification_preferences
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -121,6 +122,9 @@ app.include_router(egg_sacs.router, prefix="/api/v1", tags=["egg_sacs", "breedin
 
 print("[STARTUP] Registering offspring router...")
 app.include_router(offspring.router, prefix="/api/v1", tags=["offspring", "breeding"])
+
+print("[STARTUP] Registering notification preferences router...")
+app.include_router(notification_preferences.router, prefix="/api/v1", tags=["notifications"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"
