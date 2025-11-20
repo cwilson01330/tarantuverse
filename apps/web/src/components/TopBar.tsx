@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useThemeStore } from '@/stores/themeStore'
+import { useAuth } from '@/hooks/useAuth'
 
 interface TopBarProps {
   userName?: string
@@ -16,11 +17,42 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
   const router = useRouter()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const { theme, toggleTheme } = useThemeStore()
+  const { token } = useAuth()
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const handleLogout = async () => {
     await signOut({ redirect: false })
     router.push('/')
   }
+
+  // Fetch unread message count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!token) return
+
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        const response = await fetch(`${API_URL}/api/v1/messages/direct/unread-count`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setUnreadCount(data.unread_count || 0)
+        }
+      } catch (error) {
+        console.error('Failed to fetch unread count:', error)
+      }
+    }
+
+    fetchUnreadCount()
+
+    // Poll every 30 seconds for new messages
+    const interval = setInterval(fetchUnreadCount, 30000)
+    return () => clearInterval(interval)
+  }, [token])
 
   return (
     <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
@@ -64,16 +96,21 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
             )}
           </button>
 
-          {/* Notifications (placeholder) */}
+          {/* Messages/Notifications */}
           <button
+            onClick={() => router.push('/messages')}
             className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            title="Notifications"
+            title={unreadCount > 0 ? `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}` : 'Messages'}
           >
             <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            {/* Notification badge */}
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+            {/* Notification badge with count */}
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
 
           {/* User menu dropdown */}
