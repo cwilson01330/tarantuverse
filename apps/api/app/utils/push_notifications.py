@@ -2,7 +2,7 @@
 Push Notification Service
 Handles sending push notifications via Expo Push Notification Service
 """
-import requests
+import httpx
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -58,29 +58,30 @@ class PushNotificationService:
             message["badge"] = badge
 
         try:
-            response = requests.post(
-                EXPO_PUSH_URL,
-                json=message,
-                headers={
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                }
-            )
+            with httpx.Client() as client:
+                response = client.post(
+                    EXPO_PUSH_URL,
+                    json=message,
+                    headers={
+                        "Accept": "application/json",
+                        "Content-Type": "application/json",
+                    }
+                )
 
-            response.raise_for_status()
-            result = response.json()
+                response.raise_for_status()
+                result = response.json()
 
-            # Check if there were any errors in the response
-            if "data" in result and len(result["data"]) > 0:
-                ticket = result["data"][0]
-                if ticket.get("status") == "error":
-                    logger.error(f"Expo push notification error: {ticket.get('message')}")
-                    return False
+                # Check if there were any errors in the response
+                if "data" in result and len(result["data"]) > 0:
+                    ticket = result["data"][0]
+                    if ticket.get("status") == "error":
+                        logger.error(f"Expo push notification error: {ticket.get('message')}")
+                        return False
 
-            logger.info(f"Push notification sent successfully to {expo_push_token[:20]}...")
-            return True
+                logger.info(f"Push notification sent successfully to {expo_push_token[:20]}...")
+                return True
 
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error(f"Failed to send push notification: {str(e)}")
             return False
 
@@ -109,34 +110,35 @@ class PushNotificationService:
             return {"success": 0, "failed": len(messages)}
 
         try:
-            response = requests.post(
-                EXPO_PUSH_URL,
-                json=valid_messages,
-                headers={
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                }
-            )
+            with httpx.Client() as client:
+                response = client.post(
+                    EXPO_PUSH_URL,
+                    json=valid_messages,
+                    headers={
+                        "Accept": "application/json",
+                        "Content-Type": "application/json",
+                    }
+                )
 
-            response.raise_for_status()
-            result = response.json()
+                response.raise_for_status()
+                result = response.json()
 
-            # Count successes and failures
-            success_count = 0
-            failed_count = 0
+                # Count successes and failures
+                success_count = 0
+                failed_count = 0
 
-            if "data" in result:
-                for ticket in result["data"]:
-                    if ticket.get("status") == "ok":
-                        success_count += 1
-                    else:
-                        failed_count += 1
-                        logger.error(f"Batch notification error: {ticket.get('message')}")
+                if "data" in result:
+                    for ticket in result["data"]:
+                        if ticket.get("status") == "ok":
+                            success_count += 1
+                        else:
+                            failed_count += 1
+                            logger.error(f"Batch notification error: {ticket.get('message')}")
 
-            logger.info(f"Batch push sent: {success_count} success, {failed_count} failed")
-            return {"success": success_count, "failed": failed_count}
+                logger.info(f"Batch push sent: {success_count} success, {failed_count} failed")
+                return {"success": success_count, "failed": failed_count}
 
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error(f"Failed to send batch push notifications: {str(e)}")
             return {"success": 0, "failed": len(valid_messages)}
 
