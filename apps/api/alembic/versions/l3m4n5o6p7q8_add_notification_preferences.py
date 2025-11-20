@@ -1,7 +1,7 @@
 """add notification preferences
 
 Revision ID: l3m4n5o6p7q8
-Revises: k2l3m4n5o6p7
+Revises: add_safety_fields
 Create Date: 2025-11-19
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'l3m4n5o6p7q8'
-down_revision = 'k2l3m4n5o6p7'
+down_revision = 'add_safety_fields'
 branch_labels = None
 depends_on = None
 
