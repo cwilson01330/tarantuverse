@@ -206,8 +206,19 @@ export default function SettingsPage() {
             <h2 className="text-xl font-bold text-theme-primary">Notifications</h2>
           </div>
 
-          <div className="p-4 bg-surface-elevated rounded-lg text-center">
-            <p className="text-theme-secondary">Notification preferences coming soon</p>
+          <div className="space-y-4">
+            <div className="p-4 bg-surface-elevated rounded-lg">
+              <h3 className="font-semibold text-theme-primary mb-1">Notification Preferences</h3>
+              <p className="text-sm text-theme-secondary">
+                Manage feeding reminders, molt predictions, maintenance alerts, and community notifications
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard/settings/notifications')}
+              className="w-full px-4 py-3 bg-gradient-brand hover:bg-gradient-brand-hover text-white rounded-lg transition-all font-medium shadow-lg shadow-gradient-brand"
+            >
+              Configure Notifications
+            </button>
           </div>
         </section>
 
