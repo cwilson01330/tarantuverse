@@ -185,6 +185,115 @@ export async function cancelSubstrateReminder(tarantulaId: string): Promise<void
 }
 
 /**
+ * Schedule molt prediction notification
+ * Triggered when premolt probability is high
+ */
+export async function scheduleMoltPredictionNotification(
+  tarantulaId: string,
+  tarantulaName: string,
+  probability: number,
+  daysUntilCheck: number = 3
+): Promise<string | null> {
+  try {
+    // Cancel existing molt prediction for this tarantula
+    await cancelMoltPredictionNotification(tarantulaId);
+
+    const notificationId = await scheduleLocalNotification(
+      `${tarantulaName} may be in premolt! 🦋`,
+      `${probability}% chance of premolt. Watch for signs: darker abdomen, webbing, refusing food. Check again in ${daysUntilCheck} days.`,
+      {
+        seconds: daysUntilCheck * 86400, // Convert days to seconds
+      },
+      {
+        type: 'molt_prediction',
+        tarantulaId,
+      }
+    );
+
+    // Store notification ID for later cancellation
+    await AsyncStorage.setItem(`molt_prediction_${tarantulaId}`, notificationId);
+
+    return notificationId;
+  } catch (error) {
+    console.error('Error scheduling molt prediction notification:', error);
+    return null;
+  }
+}
+
+/**
+ * Cancel molt prediction notification
+ */
+export async function cancelMoltPredictionNotification(tarantulaId: string): Promise<void> {
+  try {
+    const notificationId = await AsyncStorage.getItem(`molt_prediction_${tarantulaId}`);
+    if (notificationId) {
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      await AsyncStorage.removeItem(`molt_prediction_${tarantulaId}`);
+    }
+  } catch (error) {
+    console.error('Error canceling molt prediction notification:', error);
+  }
+}
+
+/**
+ * Schedule maintenance reminder for a tarantula
+ * General reminders for water dish, enclosure cleaning, etc.
+ */
+export async function scheduleMaintenanceReminder(
+  tarantulaId: string,
+  tarantulaName: string,
+  maintenanceType: string,
+  daysUntilReminder: number
+): Promise<string | null> {
+  try {
+    // Cancel existing maintenance reminder for this tarantula and type
+    await cancelMaintenanceReminder(tarantulaId, maintenanceType);
+
+    const messages: { [key: string]: string } = {
+      water_dish: `Time to refill ${tarantulaName}'s water dish`,
+      enclosure_cleaning: `Time to clean ${tarantulaName}'s enclosure`,
+      general: `Maintenance reminder for ${tarantulaName}`,
+    };
+
+    const notificationId = await scheduleLocalNotification(
+      `Maintenance: ${tarantulaName}`,
+      messages[maintenanceType] || messages.general,
+      {
+        seconds: daysUntilReminder * 86400, // Convert days to seconds
+      },
+      {
+        type: 'maintenance_reminder',
+        tarantulaId,
+        maintenanceType,
+      }
+    );
+
+    // Store notification ID for later cancellation
+    await AsyncStorage.setItem(`maintenance_${tarantulaId}_${maintenanceType}`, notificationId);
+
+    return notificationId;
+  } catch (error) {
+    console.error('Error scheduling maintenance reminder:', error);
+    return null;
+  }
+}
+
+/**
+ * Cancel maintenance reminder
+ */
+export async function cancelMaintenanceReminder(tarantulaId: string, maintenanceType: string): Promise<void> {
+  try {
+    const notificationId = await AsyncStorage.getItem(`maintenance_${tarantulaId}_${maintenanceType}`);
+    if (notificationId) {
+      await Notifications.cancelScheduledNotificationAsync(notificationId);
+      await AsyncStorage.removeItem(`maintenance_${tarantulaId}_${maintenanceType}`);
+    }
+  } catch (error) {
+    console.error('Error canceling maintenance reminder:', error);
+  }
+}
+
+/**
  * Check if current time is within quiet hours
  */
 export function isWithinQuietHours(start: string, end: string): boolean {

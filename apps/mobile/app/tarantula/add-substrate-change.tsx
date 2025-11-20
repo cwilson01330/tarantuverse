@@ -13,36 +13,41 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { apiClient } from '../../src/services/api';
-import { scheduleFeedingReminder } from '../../src/services/notifications';
+import { scheduleSubstrateReminder } from '../../src/services/notifications';
 
-const FOOD_TYPES = [
-  'Cricket',
-  'Dubia Roach',
-  'Red Runner',
-  'Mealworm',
-  'Superworm',
-  'Hornworm',
-  'Waxworm',
+const SUBSTRATE_TYPES = [
+  'Coco Fiber',
+  'Peat Moss',
+  'Vermiculite',
+  'Reptile Sand',
+  'Topsoil Mix',
+  'Sphagnum Moss',
   'Other',
 ];
 
-const FOOD_SIZES = ['Small', 'Medium', 'Large'];
+const CHANGE_REASONS = [
+  'Routine Maintenance',
+  'Mold Growth',
+  'Excessive Moisture',
+  'Rehousing',
+  'Cleaning',
+  'Other',
+];
 
-export default function AddFeedingScreen() {
+export default function AddSubstrateChangeScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [foodType, setFoodType] = useState('');
-  const [foodSize, setFoodSize] = useState('');
-  const [accepted, setAccepted] = useState(true);
+  const [substrateType, setSubstrateType] = useState('');
+  const [substrateDepth, setSubstrateDepth] = useState('');
+  const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [tarantulaName, setTarantulaName] = useState('');
   const [notificationPreferences, setNotificationPreferences] = useState<any>(null);
 
   useEffect(() => {
-    // Load tarantula details and notification preferences
     loadTarantulaDetails();
     loadNotificationPreferences();
   }, [id]);
@@ -51,6 +56,14 @@ export default function AddFeedingScreen() {
     try {
       const response = await apiClient.get(`/tarantulas/${id}`);
       setTarantulaName(response.data.name || response.data.common_name || 'Tarantula');
+
+      // Pre-fill with current substrate type if available
+      if (response.data.substrate_type) {
+        setSubstrateType(response.data.substrate_type);
+      }
+      if (response.data.substrate_depth) {
+        setSubstrateDepth(response.data.substrate_depth);
+      }
     } catch (error) {
       console.error('Failed to load tarantula details:', error);
     }
@@ -66,36 +79,36 @@ export default function AddFeedingScreen() {
   };
 
   const handleSave = async () => {
-    if (!foodType) {
-      Alert.alert('Required Field', 'Please select a food type');
+    if (!substrateType) {
+      Alert.alert('Required Field', 'Please select a substrate type');
       return;
     }
 
     setSaving(true);
     try {
-      await apiClient.post(`/tarantulas/${id}/feedings`, {
-        fed_at: date.toISOString(),
-        food_type: foodType,
-        food_size: foodSize || undefined,
-        accepted,
+      await apiClient.post(`/tarantulas/${id}/substrate-changes`, {
+        changed_at: date.toISOString().split('T')[0],
+        substrate_type: substrateType,
+        substrate_depth: substrateDepth || undefined,
+        reason: reason || undefined,
         notes: notes.trim() || undefined,
       });
 
-      // Schedule feeding reminder if enabled
-      if (notificationPreferences?.feeding_reminders_enabled && accepted && tarantulaName) {
-        const hours = notificationPreferences.feeding_reminder_hours || 24;
-        await scheduleFeedingReminder(
+      // Schedule substrate change reminder if enabled
+      if (notificationPreferences?.substrate_reminders_enabled && tarantulaName) {
+        const days = notificationPreferences.substrate_reminder_days || 90;
+        await scheduleSubstrateReminder(
           id as string,
           tarantulaName,
-          hours
+          days
         );
       }
 
-      Alert.alert('Success', 'Feeding log added successfully');
+      Alert.alert('Success', 'Substrate change logged successfully');
       router.back();
     } catch (error: any) {
-      console.error('Failed to save feeding log:', error);
-      Alert.alert('Error', 'Failed to save feeding log');
+      console.error('Failed to save substrate change:', error);
+      Alert.alert('Error', 'Failed to log substrate change');
     } finally {
       setSaving(false);
     }
@@ -115,7 +128,7 @@ export default function AddFeedingScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <MaterialCommunityIcons name="close" size={24} color="#1f2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Log Feeding</Text>
+        <Text style={styles.headerTitle}>Log Substrate Change</Text>
         <TouchableOpacity
           onPress={handleSave}
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
@@ -128,7 +141,7 @@ export default function AddFeedingScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Date */}
         <View style={styles.section}>
-          <Text style={styles.label}>Date</Text>
+          <Text style={styles.label}>Date Changed</Text>
           <TouchableOpacity
             style={styles.input}
             onPress={() => setShowDatePicker(true)}
@@ -147,23 +160,23 @@ export default function AddFeedingScreen() {
           )}
         </View>
 
-        {/* Food Type */}
+        {/* Substrate Type */}
         <View style={styles.section}>
-          <Text style={styles.label}>Food Type *</Text>
+          <Text style={styles.label}>Substrate Type *</Text>
           <View style={styles.chipContainer}>
-            {FOOD_TYPES.map((type) => (
+            {SUBSTRATE_TYPES.map((type) => (
               <TouchableOpacity
                 key={type}
                 style={[
                   styles.chip,
-                  foodType === type && styles.chipSelected,
+                  substrateType === type && styles.chipSelected,
                 ]}
-                onPress={() => setFoodType(type)}
+                onPress={() => setSubstrateType(type)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    foodType === type && styles.chipTextSelected,
+                    substrateType === type && styles.chipTextSelected,
                   ]}
                 >
                   {type}
@@ -173,78 +186,41 @@ export default function AddFeedingScreen() {
           </View>
         </View>
 
-        {/* Food Size */}
+        {/* Substrate Depth */}
         <View style={styles.section}>
-          <Text style={styles.label}>Food Size</Text>
+          <Text style={styles.label}>Substrate Depth</Text>
+          <TextInput
+            style={styles.textInput}
+            value={substrateDepth}
+            onChangeText={setSubstrateDepth}
+            placeholder="e.g., 3 inches"
+            placeholderTextColor="#9ca3af"
+          />
+        </View>
+
+        {/* Reason */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Reason for Change</Text>
           <View style={styles.chipContainer}>
-            {FOOD_SIZES.map((size) => (
+            {CHANGE_REASONS.map((r) => (
               <TouchableOpacity
-                key={size}
+                key={r}
                 style={[
                   styles.chip,
-                  foodSize === size && styles.chipSelected,
+                  reason === r && styles.chipSelected,
                 ]}
-                onPress={() => setFoodSize(foodSize === size ? '' : size)}
+                onPress={() => setReason(reason === r ? '' : r)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    foodSize === size && styles.chipTextSelected,
+                    reason === r && styles.chipTextSelected,
                   ]}
                 >
-                  {size}
+                  {r}
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
-        </View>
-
-        {/* Accepted */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Did they accept the food?</Text>
-          <View style={styles.toggleContainer}>
-            <TouchableOpacity
-              style={[
-                styles.toggleButton,
-                accepted && styles.toggleButtonActive,
-              ]}
-              onPress={() => setAccepted(true)}
-            >
-              <MaterialCommunityIcons
-                name="check-circle"
-                size={20}
-                color={accepted ? '#fff' : '#10b981'}
-              />
-              <Text
-                style={[
-                  styles.toggleButtonText,
-                  accepted && styles.toggleButtonTextActive,
-                ]}
-              >
-                Yes
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.toggleButton,
-                !accepted && styles.toggleButtonActive,
-              ]}
-              onPress={() => setAccepted(false)}
-            >
-              <MaterialCommunityIcons
-                name="close-circle"
-                size={20}
-                color={!accepted ? '#fff' : '#ef4444'}
-              />
-              <Text
-                style={[
-                  styles.toggleButtonText,
-                  !accepted && styles.toggleButtonTextActive,
-                ]}
-              >
-                No
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -335,6 +311,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1f2937',
   },
+  textInput: {
+    padding: 12,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 8,
+    fontSize: 15,
+    color: '#1f2937',
+  },
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -358,34 +343,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   chipTextSelected: {
-    color: '#fff',
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  toggleButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    gap: 8,
-  },
-  toggleButtonActive: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
-  },
-  toggleButtonText: {
-    fontSize: 16,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  toggleButtonTextActive: {
     color: '#fff',
   },
   textArea: {

@@ -139,6 +139,12 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/notifications')}>
+          <MaterialCommunityIcons name="bell" size={24} color={colors.primary} />
+          <Text style={styles.menuText}>Notifications</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy')}>
           <MaterialCommunityIcons name="shield-account" size={24} color={colors.textTertiary} />
           <Text style={styles.menuText}>Privacy Settings</Text>

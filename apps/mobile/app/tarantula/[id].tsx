@@ -18,6 +18,7 @@ import GrowthChart from '../../src/components/GrowthChart';
 import FeedingStatsCard from '../../src/components/FeedingStatsCard';
 import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { scheduleMoltPredictionNotification, scheduleMaintenanceReminder } from '../../src/services/notifications';
 
 interface TarantulaDetail {
   id: string;
@@ -52,6 +53,15 @@ interface MoltLog {
   leg_span_after?: number;
   weight_before?: number;
   weight_after?: number;
+  notes?: string;
+}
+
+interface SubstrateChange {
+  id: string;
+  changed_at: string;
+  substrate_type?: string;
+  substrate_depth?: string;
+  reason?: string;
   notes?: string;
 }
 
@@ -133,6 +143,7 @@ export default function TarantulaDetailScreen() {
   const [tarantula, setTarantula] = useState<TarantulaDetail | null>(null);
   const [feedingLogs, setFeedingLogs] = useState<FeedingLog[]>([]);
   const [moltLogs, setMoltLogs] = useState<MoltLog[]>([]);
+  const [substrateChanges, setSubstrateChanges] = useState<SubstrateChange[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null);
   const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null);
@@ -145,6 +156,7 @@ export default function TarantulaDetailScreen() {
     fetchTarantula();
     fetchFeedingLogs();
     fetchMoltLogs();
+    fetchSubstrateChanges();
     fetchPhotos();
     fetchGrowth();
     fetchFeedingStats();
@@ -183,6 +195,16 @@ export default function TarantulaDetailScreen() {
     }
   };
 
+  const fetchSubstrateChanges = async () => {
+    try {
+      const response = await apiClient.get(`/tarantulas/${id}/substrate-changes`);
+      // Get only the 5 most recent logs
+      setSubstrateChanges(response.data.slice(0, 5));
+    } catch (error: any) {
+      // Silently fail - substrate changes are optional
+    }
+  };
+
   const fetchPhotos = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/photos`);
@@ -216,7 +238,26 @@ export default function TarantulaDetailScreen() {
   const fetchPremoltPrediction = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/premolt-prediction`);
-      setPremoltPrediction(response.data);
+      const prediction = response.data;
+      setPremoltPrediction(prediction);
+
+      // Schedule molt prediction notification if probability is high
+      if (prediction && prediction.probability >= 70) {
+        // Check if molt predictions are enabled
+        try {
+          const prefsResponse = await apiClient.get('/notification-preferences/');
+          if (prefsResponse.data.molt_predictions_enabled && tarantula) {
+            await scheduleMoltPredictionNotification(
+              id as string,
+              tarantula.name || tarantula.common_name || 'Tarantula',
+              prediction.probability,
+              3 // Check again in 3 days
+            );
+          }
+        } catch (error) {
+          console.error('Error scheduling molt prediction notification:', error);
+        }
+      }
     } catch (error: any) {
       // Silently fail if no data available
       setPremoltPrediction(null);
@@ -249,7 +290,7 @@ export default function TarantulaDetailScreen() {
 
   const handlePhotoLongPress = (photoId: string, photoUrl: string, photoCaption?: string) => {
     const isMainPhoto = tarantula?.photo_url === photoUrl;
-    
+
     Alert.alert(
       'Photo Options',
       photoCaption || 'Manage this photo',
@@ -259,8 +300,8 @@ export default function TarantulaDetailScreen() {
           text: 'Set as Main',
           onPress: () => setMainPhoto(photoId, photoUrl)
         }] : []),
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: () => {
             Alert.alert(
@@ -268,13 +309,68 @@ export default function TarantulaDetailScreen() {
               'Are you sure you want to delete this photo?',
               [
                 { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Delete', 
+                {
+                  text: 'Delete',
                   style: 'destructive',
                   onPress: () => deletePhoto(photoId)
                 },
               ]
             );
+          }
+        },
+      ]
+    );
+  };
+
+  const handleScheduleMaintenanceReminder = async () => {
+    if (!tarantula) return;
+
+    Alert.alert(
+      'Schedule Maintenance Reminder',
+      'What type of maintenance reminder would you like to set?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Water Dish (Weekly)',
+          onPress: async () => {
+            try {
+              const prefsResponse = await apiClient.get('/notification-preferences/');
+              if (prefsResponse.data.maintenance_reminders_enabled) {
+                await scheduleMaintenanceReminder(
+                  id as string,
+                  tarantula.name || tarantula.common_name || 'Tarantula',
+                  'water_dish',
+                  7 // 7 days
+                );
+                Alert.alert('Success', 'Water dish reminder set for 7 days from now');
+              } else {
+                Alert.alert('Notifications Disabled', 'Please enable maintenance reminders in notification settings');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to schedule reminder');
+            }
+          }
+        },
+        {
+          text: 'Enclosure Cleaning (Monthly)',
+          onPress: async () => {
+            try {
+              const prefsResponse = await apiClient.get('/notification-preferences/');
+              const days = prefsResponse.data.maintenance_reminder_days || 30;
+              if (prefsResponse.data.maintenance_reminders_enabled) {
+                await scheduleMaintenanceReminder(
+                  id as string,
+                  tarantula.name || tarantula.common_name || 'Tarantula',
+                  'enclosure_cleaning',
+                  days
+                );
+                Alert.alert('Success', `Enclosure cleaning reminder set for ${days} days from now`);
+              } else {
+                Alert.alert('Notifications Disabled', 'Please enable maintenance reminders in notification settings');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to schedule reminder');
+            }
           }
         },
       ]
@@ -298,6 +394,7 @@ export default function TarantulaDetailScreen() {
     React.useCallback(() => {
       fetchFeedingLogs();
       fetchMoltLogs();
+      fetchSubstrateChanges();
       fetchPhotos();
     }, [id])
   );
@@ -318,12 +415,20 @@ export default function TarantulaDetailScreen() {
           <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Details</Text>
-        <TouchableOpacity 
-          style={styles.editButton}
-          onPress={() => router.push(`/tarantula/edit?id=${id}`)}
-        >
-          <MaterialCommunityIcons name="pencil" size={24} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={handleScheduleMaintenanceReminder}
+          >
+            <MaterialCommunityIcons name="bell-plus" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={() => router.push(`/tarantula/edit?id=${id}`)}
+          >
+            <MaterialCommunityIcons name="pencil" size={24} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -500,6 +605,49 @@ export default function TarantulaDetailScreen() {
           )}
         </View>
 
+        {/* Substrate Change History */}
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Substrate Changes</Text>
+            {substrateChanges.length > 0 && (
+              <TouchableOpacity>
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {substrateChanges.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="layers-off" size={32} color={colors.textTertiary} />
+              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No substrate changes logged yet</Text>
+            </View>
+          ) : (
+            <View style={styles.logList}>
+              {substrateChanges.map((change) => (
+                <View key={change.id} style={[styles.logItem, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={styles.logIcon}>
+                    <MaterialCommunityIcons name="layers" size={20} color={colors.primary} />
+                  </View>
+                  <View style={styles.logContent}>
+                    <Text style={[styles.logTitle, { color: colors.textPrimary }]}>
+                      {change.substrate_type || 'Substrate changed'}
+                    </Text>
+                    <Text style={[styles.logDate, { color: colors.textSecondary }]}>
+                      {new Date(change.changed_at).toLocaleDateString()}
+                      {change.substrate_depth ? ` • ${change.substrate_depth}` : ''}
+                    </Text>
+                    {change.reason && (
+                      <Text style={[styles.logDate, { color: colors.textSecondary }]}>
+                        Reason: {change.reason}
+                      </Text>
+                    )}
+                    {change.notes && <Text style={[styles.logNotes, { color: colors.textSecondary }]}>{change.notes}</Text>}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Premolt Prediction */}
         {premoltPrediction && (
           <View style={styles.section}>
@@ -644,25 +792,32 @@ export default function TarantulaDetailScreen() {
 
       {/* Action Bar */}
       <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: colors.primary }]}
           onPress={() => router.push(`/tarantula/add-feeding?id=${id}`)}
         >
-          <MaterialCommunityIcons name="food-apple" size={24} color="#fff" />
+          <MaterialCommunityIcons name="food-apple" size={20} color="#fff" />
           <Text style={styles.actionButtonText}>Feed</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: colors.primary }]}
           onPress={() => router.push(`/tarantula/add-molt?id=${id}`)}
         >
-          <MaterialCommunityIcons name="reload" size={24} color="#fff" />
+          <MaterialCommunityIcons name="reload" size={20} color="#fff" />
           <Text style={styles.actionButtonText}>Molt</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: colors.primary }]}
+          onPress={() => router.push(`/tarantula/add-substrate-change?id=${id}`)}
+        >
+          <MaterialCommunityIcons name="layers" size={20} color="#fff" />
+          <Text style={styles.actionButtonText}>Substrate</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.actionButton, { backgroundColor: colors.primary }]}
           onPress={() => router.push(`/tarantula/add-photo?id=${id}`)}
         >
-          <MaterialCommunityIcons name="camera" size={24} color="#fff" />
+          <MaterialCommunityIcons name="camera" size={20} color="#fff" />
           <Text style={styles.actionButtonText}>Photo</Text>
         </TouchableOpacity>
       </View>
@@ -708,7 +863,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
   },
-  editButton: {
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  headerActionButton: {
     padding: 8,
   },
   content: {
@@ -797,9 +956,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#7c3aed',
     paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     borderRadius: 12,
-    minWidth: 100,
+    minWidth: 70,
+    flex: 1,
   },
   actionButtonText: {
     color: '#fff',
