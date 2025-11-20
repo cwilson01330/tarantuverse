@@ -84,6 +84,12 @@ export default function NotificationSettingsPage() {
     setSuccessMessage('');
 
     try {
+      if (!token) {
+        alert('You must be logged in to save preferences');
+        setSaving(false);
+        return;
+      }
+
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
       // Only send the fields that can be updated (exclude id, user_id, expo_push_token)
@@ -104,6 +110,10 @@ export default function NotificationSettingsPage() {
         quiet_hours_start: preferences.quiet_hours_start,
         quiet_hours_end: preferences.quiet_hours_end,
       };
+
+      console.log('Saving to:', `${API_URL}/api/v1/notification-preferences/`);
+      console.log('Token present:', !!token);
+      console.log('Payload:', updatePayload);
 
       const response = await fetch(`${API_URL}/api/v1/notification-preferences/`, {
         method: 'PUT',
