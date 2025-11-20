@@ -9,7 +9,6 @@ interface Species {
   scientific_name: string;
   common_names: string[];
   genus?: string;
-  species?: string;
   family?: string;
   care_level?: string;
   temperament?: string;

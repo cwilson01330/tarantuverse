@@ -12,15 +12,14 @@ interface Species {
   scientific_name: string;
   common_names: string[];
   genus: string;
-  species: string;
   type: string;
   native_region: string | null;
   care_level: string;
-  min_temperature: number | null;
-  max_temperature: number | null;
-  min_humidity: number | null;
-  max_humidity: number | null;
-  adult_size_cm: number | null;
+  temperature_min: number | null;
+  temperature_max: number | null;
+  humidity_min: number | null;
+  humidity_max: number | null;
+  adult_size: string | null;
   growth_rate: string | null;
   temperament: string | null;
   is_verified: boolean;
@@ -172,10 +171,10 @@ export default function SpeciesScreen() {
                 {typeIcon}
               </Text>
             </View>
-            {item.adult_size_cm && (
+            {item.adult_size && (
               <View style={[styles.infoChip, { backgroundColor: colors.surfaceElevated }]}>
                 <Text style={[styles.infoChipText, { color: colors.textSecondary }]}>
-                  {item.adult_size_cm}cm
+                  {item.adult_size}
                 </Text>
               </View>
             )}
