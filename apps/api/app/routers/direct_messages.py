@@ -11,7 +11,9 @@ import uuid
 from app.database import get_db
 from app.models.user import User
 from app.models.direct_message import Conversation, DirectMessage
+from app.models.notification_preferences import NotificationPreferences
 from app.utils.dependencies import get_current_user
+from app.utils.push_notifications import send_direct_message_notification
 
 router = APIRouter(prefix="/api/v1/messages/direct", tags=["direct_messages"])
 
@@ -130,10 +132,33 @@ async def send_message(
     # Update conversation timestamp
     from sqlalchemy import func as sa_func
     conversation.updated_at = sa_func.now()
-    
+
     db.commit()
     db.refresh(message)
-    
+
+    # Send push notification to recipient if enabled
+    try:
+        recipient_prefs = db.query(NotificationPreferences).filter(
+            NotificationPreferences.user_id == recipient.id
+        ).first()
+
+        if (recipient_prefs and
+            recipient_prefs.push_notifications_enabled and
+            recipient_prefs.direct_messages_enabled and
+            recipient_prefs.expo_push_token):
+
+            # Truncate message for preview
+            preview = request.content[:100] + "..." if len(request.content) > 100 else request.content
+
+            send_direct_message_notification(
+                expo_push_token=recipient_prefs.expo_push_token,
+                sender_username=current_user.username,
+                message_preview=preview
+            )
+    except Exception as e:
+        # Log error but don't fail the request
+        print(f"Failed to send push notification: {str(e)}")
+
     return {
         "id": str(message.id),
         "conversation_id": str(conversation.id),

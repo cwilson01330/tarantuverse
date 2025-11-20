@@ -11,6 +11,7 @@ import re
 from app.database import get_db
 from app.models.user import User
 from app.models.forum import ForumCategory, ForumThread, ForumPost
+from app.models.notification_preferences import NotificationPreferences
 from app.schemas.forum import (
     ForumCategoryResponse, ForumCategoryCreate, ForumCategoryUpdate,
     ForumThreadResponse, ForumThreadCreate, ForumThreadUpdate, ForumThreadDetail,
@@ -20,6 +21,7 @@ from app.schemas.forum import (
 from app.routers.auth import get_current_user
 from app.utils.dependencies import get_current_user_optional
 from app.services.activity_service import create_activity
+from app.utils.push_notifications import send_forum_reply_notification
 
 router = APIRouter(prefix="/api/v1/forums", tags=["forums"])
 
@@ -454,12 +456,34 @@ async def create_post(
             "thread_id": thread.id
         }
     )
-    
+
+    # Send push notification to thread author (if not replying to own thread)
+    try:
+        if thread.author_id != current_user.id:
+            author_prefs = db.query(NotificationPreferences).filter(
+                NotificationPreferences.user_id == thread.author_id
+            ).first()
+
+            if (author_prefs and
+                author_prefs.push_notifications_enabled and
+                author_prefs.forum_replies_enabled and
+                author_prefs.expo_push_token):
+
+                send_forum_reply_notification(
+                    expo_push_token=author_prefs.expo_push_token,
+                    replier_username=current_user.username,
+                    thread_title=thread.title,
+                    thread_id=str(thread.id)
+                )
+    except Exception as e:
+        # Log error but don't fail the request
+        print(f"Failed to send forum reply push notification: {str(e)}")
+
     # Load author relationship
     post = db.query(ForumPost).filter(ForumPost.id == post.id).options(
         joinedload(ForumPost.author)
     ).first()
-    
+
     return post
 
 

@@ -10,8 +10,10 @@ import uuid
 from app.database import get_db
 from app.models.user import User
 from app.models.follow import Follow
+from app.models.notification_preferences import NotificationPreferences
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
+from app.utils.push_notifications import send_new_follower_notification
 
 router = APIRouter(prefix="/api/v1/follows", tags=["follows"])
 
@@ -61,7 +63,26 @@ async def follow_user(
             "followed_display_name": user_to_follow.display_name
         }
     )
-    
+
+    # Send push notification to the followed user
+    try:
+        followed_prefs = db.query(NotificationPreferences).filter(
+            NotificationPreferences.user_id == user_to_follow.id
+        ).first()
+
+        if (followed_prefs and
+            followed_prefs.push_notifications_enabled and
+            followed_prefs.new_followers_enabled and
+            followed_prefs.expo_push_token):
+
+            send_new_follower_notification(
+                expo_push_token=followed_prefs.expo_push_token,
+                follower_username=current_user.username
+            )
+    except Exception as e:
+        # Log error but don't fail the request
+        print(f"Failed to send new follower push notification: {str(e)}")
+
     return {"message": "Successfully followed user", "username": username}
 
 
