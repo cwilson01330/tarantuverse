@@ -38,11 +38,25 @@ app = FastAPI(
 )
 
 # Configure CORS
-# Allow all origins that include vercel.app or localhost
+# Automatically include both www and non-www versions of each origin
 cors_origins = settings.CORS_ORIGINS if settings.CORS_ORIGINS else ["*"]
+expanded_cors_origins = []
+for origin in cors_origins:
+    expanded_cors_origins.append(origin)
+    # Add www version if not present
+    if origin.startswith("https://") and not origin.startswith("https://www."):
+        www_version = origin.replace("https://", "https://www.")
+        expanded_cors_origins.append(www_version)
+    # Add non-www version if www is present
+    elif origin.startswith("https://www."):
+        non_www_version = origin.replace("https://www.", "https://")
+        expanded_cors_origins.append(non_www_version)
+
+print(f"[STARTUP] CORS Origins configured: {expanded_cors_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=expanded_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
