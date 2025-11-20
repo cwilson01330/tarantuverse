@@ -4,10 +4,13 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "base": {
+      "node": "20.19.4"
+    },
     "development": {
+      "extends": "base",
       "developmentClient": true,
       "distribution": "internal",
-      "node": "20.19.4",
       "env": {
         "NO_FLIPPER": "1"
       },
@@ -16,6 +19,7 @@
       }
     },
     "preview": {
+      "extends": "base",
       "distribution": "internal",
       "ios": {
         "simulator": false,
@@ -26,6 +30,7 @@
       }
     },
     "production": {
+      "extends": "base",
       "autoIncrement": true,
       "ios": {
         "buildConfiguration": "Release",
