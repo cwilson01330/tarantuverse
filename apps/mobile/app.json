@@ -4,6 +4,7 @@
     "slug": "tarantuverse",
     "version": "0.1.4",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "sdkVersion": "54.0.0",
     "assetBundlePatterns": [
@@ -17,7 +18,11 @@
       }
     },
     "android": {
-      "package": "com.tarantuverse.app"
+      "package": "com.tarantuverse.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "web": {
       "bundler": "metro"

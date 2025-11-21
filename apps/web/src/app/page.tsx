@@ -9,8 +9,12 @@ export default function Home() {
       <nav className="bg-dark-50/50 backdrop-blur-md border-b border-electric-blue-500/20 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <span className="text-3xl">🕷️</span>
+            <div className="flex items-center gap-3">
+              <img
+                src="/logo-transparent.png"
+                alt="Tarantuverse"
+                className="w-10 h-10 object-contain"
+              />
               <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 Tarantuverse
               </span>
@@ -522,8 +526,12 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-2xl">🕷️</span>
+              <div className="flex items-center gap-3 mb-4">
+                <img
+                  src="/logo-transparent.png"
+                  alt="Tarantuverse"
+                  className="w-8 h-8 object-contain"
+                />
                 <span className="text-white font-bold text-lg">Tarantuverse</span>
               </div>
               <p className="text-sm">
