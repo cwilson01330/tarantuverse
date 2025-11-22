@@ -17,7 +17,7 @@
 
 ---
 
-## 🎯 Current Status (As of 2025-11-10)
+## 🎯 Current Status (As of 2025-11-22)
 
 ### ✅ Completed Features
 
@@ -325,6 +325,88 @@
 - **Web Page**: `/pricing` - Pricing tiers page
 - User relationship ready (temporarily commented for deployment)
 
+#### Notification System 🔔 (✅ COMPLETE)
+**Comprehensive notification system across mobile and web platforms**
+
+- **Database**: `notification_preferences` table
+  - User-specific notification settings
+  - Per-user Expo push token storage
+  - Quiet hours configuration
+  - Individual toggles for each notification type
+
+- **Local Notifications (Mobile)**:
+  - Feeding reminders (customizable hours)
+  - Substrate change reminders (customizable days)
+  - Molt prediction notifications (≥70% probability)
+  - Maintenance reminders (manual scheduling)
+  - Auto-scheduling based on user preferences
+
+- **Push Notifications (Mobile & Web)**:
+  - Direct message notifications
+  - Forum reply notifications
+  - New follower notifications
+  - Community activity alerts
+  - Expo Push Notification Service integration
+  - Real-time delivery via httpx
+
+- **Web Features**:
+  - `/dashboard/settings/notifications` - Full settings page
+  - Notification bell icon with unread count
+  - Auto-refreshing message counter (30s polling)
+  - Navigate to messages on bell click
+  - Dark mode support
+
+- **Mobile Features**:
+  - Complete notification settings screen
+  - Permission requests for notifications
+  - Expo push token registration
+  - Notification scheduling service
+  - AsyncStorage for notification IDs
+
+- **API**:
+  - `notification_preferences.py` router
+  - Push notification utility (`push_notifications.py`)
+  - Integrated into DMs, forums, and follows routers
+  - GET/PUT endpoints for preferences
+
+#### Admin Tools 👨‍💼 (✅ COMPLETE)
+**Administrative interfaces for platform management**
+
+- **Species Management**:
+  - `/dashboard/admin/species/manage` - Complete CRUD interface
+  - Searchable species table with inline editing
+  - Edit scientific name, common names, genus, type
+  - Verification status toggle
+  - Delete functionality with confirmation
+  - Filter by verification status
+  - Admin-only access control
+
+- **User Management**:
+  - `make_admin.py` script for role assignment
+  - Command-line user promotion/demotion
+
+#### Branding & Assets 🎨 (✅ COMPLETE)
+**Professional branding implementation**
+
+- **Logo Design**: Purple-to-pink gradient tarantula silhouette
+- **Web Implementation**:
+  - Sidebar logo (expanded and collapsed states)
+  - Favicon (`/logo-transparent.png`)
+  - Landing page navigation and footer
+  - Replaced spider emoji throughout
+
+- **Mobile Implementation**:
+  - App icon (`icon.png` - dark background)
+  - Adaptive icon for Android (`adaptive-icon.png`)
+  - iOS app icon configuration
+  - Consistent branding across all screens
+
+- **File Locations**:
+  - `/apps/web/public/logo.png` (solid background)
+  - `/apps/web/public/logo-transparent.png` (transparent)
+  - `/apps/mobile/assets/icon.png` (dark background)
+  - `/apps/mobile/assets/adaptive-icon.png` (transparent)
+
 #### User Interface Features
 
 ##### Modern Navigation System 🧭 (✅ COMPLETE)
@@ -420,7 +502,7 @@
 - Prominent safety badges for dangerous species
 
 ##### Global Styling & Theme System 🌙
-- **Spider emoji (🕷️) favicon**
+- **Professional branding** with purple-to-pink gradient tarantula logo
 - **Tailwind CSS** with custom primary color (`#8B4513` - brown/earth tones)
 - **Complete Dark Mode Support** (Web & Mobile):
   - **Web**: Tailwind `dark:` modifiers on all components
@@ -535,7 +617,8 @@ apps/api/
 │       ├── j1k2l3m4n5o6_add_subscription_tables.py
 │       ├── add_oauth_fields.py (oauth_fields_001)
 │       ├── add_safety_fields_to_species.py
-│       └── k2l3m4n5o6p7_add_breeding_module.py
+│       ├── k2l3m4n5o6p7_add_breeding_module.py
+│       └── l3m4n5o6p7q8_add_notification_preferences.py
 ├── app/
 │   ├── models/
 │   │   ├── __init__.py
@@ -557,7 +640,8 @@ apps/api/
 │   │   ├── direct_message.py (NEW - community)
 │   │   ├── forum.py (NEW - community)
 │   │   ├── activity_feed.py (NEW - community)
-│   │   └── subscription.py (NEW - premium)
+│   │   ├── subscription.py (NEW - premium)
+│   │   └── notification_preference.py (NEW - notifications)
 │   ├── schemas/
 │   │   ├── user.py
 │   │   ├── tarantula.py (UPDATED: husbandry fields)
@@ -581,14 +665,16 @@ apps/api/
 │   │   ├── offspring.py (NEW - breeding)
 │   │   ├── keepers.py (NEW - community)
 │   │   ├── messages.py (NEW - community board)
-│   │   ├── follows.py (NEW - community)
-│   │   ├── direct_messages.py (NEW - community)
-│   │   ├── forums.py (NEW - community)
+│   │   ├── follows.py (NEW - community, UPDATED: push notifications)
+│   │   ├── direct_messages.py (NEW - community, UPDATED: push notifications)
+│   │   ├── forums.py (NEW - community, UPDATED: push notifications)
 │   │   ├── activity.py (NEW - community)
-│   │   └── subscriptions.py (NEW - premium)
+│   │   ├── subscriptions.py (NEW - premium)
+│   │   └── notification_preferences.py (NEW - notifications)
 │   ├── utils/
 │   │   ├── auth.py (JWT token creation, password hashing)
-│   │   └── dependencies.py (get_current_user with HTTPBearer)
+│   │   ├── dependencies.py (get_current_user with HTTPBearer)
+│   │   └── push_notifications.py (NEW - Expo push notification service)
 │   ├── config.py (settings from environment)
 │   ├── database.py (SQLAlchemy setup)
 │   └── main.py (FastAPI app with CORS, all routers registered, /uploads mount)
@@ -607,7 +693,8 @@ apps/api/
 ```
 apps/web/
 ├── public/
-│   ├── favicon.svg (spider emoji 🕷️)
+│   ├── logo.png (professional tarantula logo - solid background)
+│   ├── logo-transparent.png (favicon and brand assets)
 │   ├── 404.html (static error page)
 │   └── 500.html (static error page)
 ├── src/
@@ -623,7 +710,11 @@ apps/web/
 │   │   │   ├── analytics/page.tsx (NEW)
 │   │   │   ├── settings/
 │   │   │   │   ├── page.tsx
-│   │   │   │   └── profile/page.tsx
+│   │   │   │   ├── profile/page.tsx
+│   │   │   │   └── notifications/page.tsx (NEW - notification settings)
+│   │   │   ├── admin/ (NEW - admin tools)
+│   │   │   │   └── species/
+│   │   │   │       └── manage/page.tsx (NEW - species CRUD)
 │   │   │   ├── breeding/ (NEW)
 │   │   │   │   ├── page.tsx (overview)
 │   │   │   │   ├── pairings/add/page.tsx
@@ -661,8 +752,8 @@ apps/web/
 │   │   ├── SpeciesAutocomplete.tsx
 │   │   ├── FeedingStatsCard.tsx (with Recharts)
 │   │   ├── GrowthChart.tsx
-│   │   ├── Sidebar.tsx (NEW - modern navigation)
-│   │   ├── TopBar.tsx (NEW - compact top bar)
+│   │   ├── Sidebar.tsx (NEW - modern navigation with logo)
+│   │   ├── TopBar.tsx (NEW - compact top bar with notification bell)
 │   │   ├── DashboardLayout.tsx (NEW - layout wrapper)
 │   │   ├── ThemeProvider.tsx (NEW - next-themes)
 │   │   ├── Providers.tsx (NEW)
@@ -716,6 +807,7 @@ apps/mobile/
 │   │   ├── index.tsx
 │   │   └── [username].tsx
 │   ├── settings.tsx (NEW)
+│   ├── notifications.tsx (NEW - notification settings)
 │   └── privacy.tsx (NEW)
 ├── src/
 │   ├── components/
@@ -731,10 +823,13 @@ apps/mobile/
 │   │   ├── AuthContext.tsx
 │   │   └── ThemeContext.tsx (light/dark theme provider)
 │   └── services/
-│       └── api.ts (axios client with auth interceptors)
+│       ├── api.ts (axios client with auth interceptors)
+│       └── notifications.ts (NEW - local & push notification service)
 ├── assets/
-│   └── (images and icons)
-├── app.json (Expo configuration)
+│   ├── icon.png (app icon - dark background)
+│   ├── adaptive-icon.png (Android adaptive icon - transparent)
+│   └── (other images and icons)
+├── app.json (Expo configuration with icon paths)
 ├── eas.json (EAS Build configuration)
 └── package.json
 ```
@@ -840,6 +935,12 @@ apps/mobile/
 - `GET /subscriptions/plans` - List subscription plans
 - `POST /subscriptions/subscribe` - Subscribe to plan
 - `GET /subscriptions/status` - Get subscription status
+
+**Notifications:** (NEW)
+- `GET /notification-preferences/` - Get user's notification preferences
+- `PUT /notification-preferences/` - Update notification preferences
+- `POST /notification-preferences/register-token` - Register Expo push token
+- `GET /messages/direct/unread-count` - Get unread message count (for bell icon)
 
 ### Database Models
 
@@ -985,6 +1086,26 @@ apps/mobile/
 **Subscriptions Table:** (NEW)
 - User subscription management
 - Plan details, status, billing
+
+**Notification Preferences Table:** (NEW)
+- `id` (UUID, PK)
+- `user_id` (FK → users, CASCADE delete, unique)
+- **Local Notification Settings**:
+  - `feeding_reminders_enabled`, `feeding_reminder_hours`
+  - `substrate_reminders_enabled`, `substrate_reminder_days`
+  - `molt_predictions_enabled`
+  - `maintenance_reminders_enabled`, `maintenance_reminder_days`
+- **Push Notification Settings**:
+  - `push_notifications_enabled`
+  - `direct_messages_enabled`
+  - `forum_replies_enabled`
+  - `new_followers_enabled`
+  - `community_activity_enabled`
+- **Quiet Hours**:
+  - `quiet_hours_enabled`
+  - `quiet_hours_start`, `quiet_hours_end`
+- **Device**: `expo_push_token`
+- Timestamps: `created_at`, `updated_at`
 
 ---
 
@@ -1276,7 +1397,7 @@ const data = await response.json()
 
 ## 🔍 Database Migration Status
 
-### Complete Migration Chain (14 migrations):
+### Complete Migration Chain (15 migrations):
 1. `9588b399ad54_initial_migration.py` - Initial schema
 2. `a1b2c3d4e5f6_add_photo_url_to_tarantulas.py` - Photo URL field
 3. `b2c3d4e5f6g7_expand_species_model.py` - Expanded species fields
@@ -1291,6 +1412,7 @@ const data = await response.json()
 12. `add_oauth_fields.py` (oauth_fields_001) - OAuth authentication
 13. `add_safety_fields_to_species.py` - Safety information
 14. `k2l3m4n5o6p7_add_breeding_module.py` - Breeding module
+15. `l3m4n5o6p7q8_add_notification_preferences.py` - Notification system
 
 **All migrations applied to production database**
 
@@ -1452,7 +1574,7 @@ This includes:
 
 ### Current Limitations:
 - No offline mode (requires internet connection)
-- No real-time notifications (push/email)
+- No email notifications (only push notifications implemented)
 - No environmental sensor integration (IoT)
 - Payment integration not complete
 - No export functionality (CSV, PDF)
@@ -1460,16 +1582,14 @@ This includes:
 ### Immediate TODOs:
 1. Complete payment integration (Stripe/PayPal)
 2. Implement email notifications for feeding reminders
-3. Add push notifications for mobile app
-4. Implement data export (CSV, PDF)
-5. Add bulk operations (bulk feeding logs, etc.)
-6. Implement search functionality across platform
-7. Add admin panel for species verification
-8. Complete OAuth provider setup (Google, Apple, GitHub)
+3. Implement data export (CSV, PDF)
+4. Add bulk operations (bulk feeding logs, etc.)
+5. Implement search functionality across platform
+6. Complete OAuth provider setup (Google, Apple, GitHub)
+7. Add WebSocket for real-time updates
 
 ### Future Enhancements:
 - Offline mode with local storage and sync
-- WebSocket for real-time updates
 - Email/SMS notifications (feeding reminders, molt predictions)
 - Temperature/humidity sensor integration (IoT)
 - QR code labels for enclosures
@@ -1485,11 +1605,39 @@ This includes:
 
 ---
 
-**Last Updated**: 2025-11-10
-**Version**: 0.8.0 (Community + Breeding Complete)
+**Last Updated**: 2025-11-22
+**Version**: 0.9.0 (Notifications, Admin Tools & Branding Complete)
 **Status**: Active Development
 
-**Recent Changes** (2025-11-10):
+**Recent Changes** (2025-11-22):
+- 🔔 **NOTIFICATION SYSTEM COMPLETE**: Comprehensive notification infrastructure
+  - Local notifications (mobile): Feeding reminders, substrate reminders, molt predictions, maintenance
+  - Push notifications: Direct messages, forum replies, new followers, community activity
+  - Web notification settings page with full configuration UI
+  - Functional notification bell icon with unread message count (auto-refreshing)
+  - Expo Push Notification Service integration via httpx
+  - Database migration for `notification_preferences` table
+  - Complete mobile notification settings screen
+
+- 👨‍💼 **ADMIN TOOLS**: Species management interface
+  - `/dashboard/admin/species/manage` - Complete CRUD interface
+  - Searchable species table with inline editing
+  - Verification status toggle
+  - Delete functionality with confirmation
+  - Admin-only access control
+
+- 🎨 **PROFESSIONAL BRANDING**: Logo implementation
+  - Purple-to-pink gradient tarantula silhouette
+  - Web: Sidebar logo, favicon, landing page
+  - Mobile: App icon and adaptive icon for Android
+  - Replaced spider emoji throughout platform
+
+- 📚 **DOCUMENTATION REORGANIZATION**: Clean project structure
+  - Organized 60+ markdown files into `/docs/archive`, `/docs/setup`, `/docs/planning`
+  - Root directory cleaned to 4 essential files
+  - Complete git history preserved with `git mv`
+
+**Changes from 2025-11-10**:
 - 📝 **DOCUMENTATION OVERHAUL**: Complete CLAUDE.md update
   - Added all missing features (community, breeding, photos, OAuth, safety)
   - Documented 14 migrations (was only showing 3)
@@ -1503,14 +1651,3 @@ This includes:
 - ✅ **NAVIGATION REWRITE**: Modern persistent sidebar navigation
 - ✅ **SAFETY INFORMATION**: urticating_hairs and medically_significant_venom fields
 - ✅ Fixed build errors and TypeScript issues
-
-**Changes from 2025-10-13**:
-- ✅ **ANALYTICS SYSTEM**: Comprehensive feeding and growth analytics
-- ✅ **DARK MODE**: Complete implementation across web and mobile
-- ✅ **MOBILE APP**: Feature parity with web application
-- ✅ **PHOTO MANAGEMENT**: Cloudflare R2 integration with camera support
-
-**Changes from 2025-10-06**:
-- ✅ Substrate change tracking with UI
-- ✅ Inline forms for all log types
-- ✅ Auto-updating tarantula husbandry fields
