@@ -91,7 +91,7 @@ export default function DashboardPage() {
   const fetchAllFeedingStatuses = async (token: string, tarantulasList: Tarantula[]) => {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     const statusMap = new Map<string, FeedingStatus>()
-    
+
     await Promise.all(
       tarantulasList.map(async (t) => {
         try {
@@ -113,7 +113,7 @@ export default function DashboardPage() {
         }
       })
     )
-    
+
     setFeedingStatuses(statusMap)
   }
 
@@ -226,9 +226,9 @@ export default function DashboardPage() {
 
   const filteredTarantulas = searchQuery
     ? tarantulas.filter(t =>
-        t.common_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.scientific_name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      t.common_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.scientific_name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : tarantulas
 
   return (
@@ -299,117 +299,129 @@ export default function DashboardPage() {
               </div>
             )}
 
-        {/* Collection Grid */}
-        {tarantulas.length === 0 ? (
-          <div className="bg-surface rounded-2xl shadow-lg border border-theme p-12 text-center">
-            <div className="text-6xl mb-4">🕷️</div>
-            <h2 className="text-2xl font-bold mb-3 text-theme-primary">Your Collection is Empty</h2>
-            <p className="text-theme-secondary mb-8 max-w-md mx-auto">
-              Start tracking your tarantulas by adding your first one! Keep detailed records of feedings, molts, and husbandry.
-            </p>
-            <button
-              onClick={() => router.push('/dashboard/tarantulas/add')}
-              className="px-8 py-4 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
-            >
-              ➕ Add First Tarantula
-            </button>
-          </div>
-        ) : (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-theme-primary">
-                {searchQuery ? `Search Results (${filteredTarantulas.length})` : 'My Collection'}
-              </h2>
-              <button
-                onClick={() => router.push('/dashboard/tarantulas/add')}
-                className="px-6 py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
-              >
-                ➕ Add Tarantula
-              </button>
-            </div>
-
-            {filteredTarantulas.length === 0 ? (
+            {/* Collection Grid */}
+            {tarantulas.length === 0 ? (
               <div className="bg-surface rounded-2xl shadow-lg border border-theme p-12 text-center">
-                <div className="text-4xl mb-3">🔍</div>
-                <p className="text-theme-secondary">No tarantulas match your search.</p>
+                <div className="text-6xl mb-4">🕷️</div>
+                <h2 className="text-2xl font-bold mb-3 text-theme-primary">Your Collection is Empty</h2>
+                <p className="text-theme-secondary mb-8 max-w-md mx-auto">
+                  Start tracking your tarantulas by adding your first one! Keep detailed records of feedings, molts, and husbandry.
+                </p>
+                <button
+                  onClick={() => router.push('/dashboard/tarantulas/add')}
+                  className="px-8 py-4 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
+                >
+                  ➕ Add First Tarantula
+                </button>
+                <button
+                  onClick={() => router.push('/dashboard/tarantulas/import')}
+                  className="ml-4 px-8 py-4 bg-surface border border-theme text-theme-primary rounded-xl hover:bg-surface-elevated transition-all duration-200 font-semibold shadow-lg"
+                >
+                  📥 Import Collection
+                </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredTarantulas.map((tarantula) => (
-                  <div
-                    key={tarantula.id}
-                    onClick={() => router.push(`/dashboard/tarantulas/${tarantula.id}`)}
-                    className="group relative overflow-hidden rounded-2xl bg-surface shadow-lg hover:shadow-lg transition-all duration-300 cursor-pointer border border-theme hover:border-electric-blue-500/40"
+              <div>
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-theme-primary">
+                    {searchQuery ? `Search Results (${filteredTarantulas.length})` : 'My Collection'}
+                  </h2>
+                  <button
+                    onClick={() => router.push('/dashboard/tarantulas/add')}
+                    className="px-6 py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
                   >
-                    {/* Image with gradient overlay */}
-                    <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
-                      {tarantula.photo_url ? (
-                        <>
-                          <img
-                            src={getImageUrl(tarantula.photo_url)}
-                            alt={tarantula.common_name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                        </>
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
-                          🕷️
-                        </div>
-                      )}
+                    ➕ Add Tarantula
+                  </button>
+                  <button
+                    onClick={() => router.push('/dashboard/tarantulas/import')}
+                    className="ml-3 px-6 py-3 bg-surface border border-theme text-theme-primary rounded-xl hover:bg-surface-elevated transition-all duration-200 font-semibold shadow-lg"
+                  >
+                    📥 Import
+                  </button>
+                </div>
 
-                      {/* Status badges */}
-                      <div className="absolute top-3 left-3 right-3 flex flex-col gap-2">
-                        <div className="flex justify-between items-start">
-                          {/* Premolt badge (left) */}
-                          <div>
-                            {getPremoltBadge(tarantula.id)}
+                {filteredTarantulas.length === 0 ? (
+                  <div className="bg-surface rounded-2xl shadow-lg border border-theme p-12 text-center">
+                    <div className="text-4xl mb-3">🔍</div>
+                    <p className="text-theme-secondary">No tarantulas match your search.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredTarantulas.map((tarantula) => (
+                      <div
+                        key={tarantula.id}
+                        onClick={() => router.push(`/dashboard/tarantulas/${tarantula.id}`)}
+                        className="group relative overflow-hidden rounded-2xl bg-surface shadow-lg hover:shadow-lg transition-all duration-300 cursor-pointer border border-theme hover:border-electric-blue-500/40"
+                      >
+                        {/* Image with gradient overlay */}
+                        <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
+                          {tarantula.photo_url ? (
+                            <>
+                              <img
+                                src={getImageUrl(tarantula.photo_url)}
+                                alt={tarantula.common_name}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                            </>
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
+                              🕷️
+                            </div>
+                          )}
+
+                          {/* Status badges */}
+                          <div className="absolute top-3 left-3 right-3 flex flex-col gap-2">
+                            <div className="flex justify-between items-start">
+                              {/* Premolt badge (left) */}
+                              <div>
+                                {getPremoltBadge(tarantula.id)}
+                              </div>
+
+                              {/* Feeding status badge (right) */}
+                              <div>
+                                {getFeedingStatusBadge(tarantula.id) || (
+                                  <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
+                                    No data
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
+                        </div>
 
-                          {/* Feeding status badge (right) */}
-                          <div>
-                            {getFeedingStatusBadge(tarantula.id) || (
-                              <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
-                                No data
+                        {/* Content */}
+                        <div className="p-5">
+                          <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
+                            {tarantula.common_name}
+                          </h3>
+                          <p className="text-sm italic text-theme-secondary mb-3 line-clamp-1">
+                            {tarantula.scientific_name}
+                          </p>
+
+                          {/* Quick stats */}
+                          <div className="flex flex-wrap gap-2">
+                            {tarantula.sex && (
+                              <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
+                                {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
+                              </span>
+                            )}
+                            {tarantula.date_acquired && (
+                              <span className="px-3 py-1 rounded-lg bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-xs font-semibold border border-pink-200 dark:border-pink-500/30">
+                                📅 {new Date(tarantula.date_acquired).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
                               </span>
                             )}
                           </div>
                         </div>
+
+                        {/* Hover overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-electric-blue-600/0 to-neon-pink-600/0 group-hover:from-electric-blue-600/10 group-hover:to-neon-pink-600/5 transition-all duration-300 pointer-events-none" />
                       </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-5">
-                      <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
-                        {tarantula.common_name}
-                      </h3>
-                      <p className="text-sm italic text-theme-secondary mb-3 line-clamp-1">
-                        {tarantula.scientific_name}
-                      </p>
-
-                      {/* Quick stats */}
-                      <div className="flex flex-wrap gap-2">
-                        {tarantula.sex && (
-                          <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
-                            {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
-                          </span>
-                        )}
-                        {tarantula.date_acquired && (
-                          <span className="px-3 py-1 rounded-lg bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-xs font-semibold border border-pink-200 dark:border-pink-500/30">
-                            📅 {new Date(tarantula.date_acquired).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-electric-blue-600/0 to-neon-pink-600/0 group-hover:from-electric-blue-600/10 group-hover:to-neon-pink-600/5 transition-all duration-300 pointer-events-none" />
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
-          </div>
-        )}
           </div>
 
           {/* Sidebar - Activity Feed */}
