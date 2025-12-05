@@ -39,6 +39,11 @@ class UserVisibilityUpdate(BaseModel):
     collection_visibility: str = Field(..., pattern="^(private|public)$")
 
 
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+
 class UserResponse(BaseModel):
     """Schema for user response (without password)"""
     id: uuid.UUID

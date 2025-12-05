@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate
+from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest
 from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse
 from app.utils.auth import get_password_hash, verify_password, create_access_token
 from app.utils.dependencies import get_current_user
@@ -445,4 +445,41 @@ async def apple_oauth_callback(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Apple OAuth failed: {str(e)}"
         )
+
+
+@router.post("/reset-password")
+async def reset_password(
+    reset_data: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Reset password using a valid token
+    """
+    # Find user by token
+    user = db.query(User).filter(User.reset_token == reset_data.token).first()
+    
+    if not user or not user.reset_token_expires_at:
+         raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+        
+    # Check expiry
+    # Use UTC for comparison as we set it with timezone.utc
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    if user.reset_token_expires_at < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired"
+        )
+        
+    # Update password
+    user.hashed_password = get_password_hash(reset_data.new_password)
+    user.reset_token = None
+    user.reset_token_expires_at = None
+    
+    db.commit()
+    
+    return {"message": "Password has been reset successfully"}
 
