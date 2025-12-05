@@ -21,6 +21,7 @@ export default function ManageUsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [resetLoading, setResetLoading] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         if (authLoading) return;
@@ -38,10 +39,26 @@ export default function ManageUsersPage() {
         fetchUsers();
     }, [authLoading, isAuthenticated, token]);
 
-    const fetchUsers = async () => {
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (isAuthenticated && authUser?.is_superuser) {
+                fetchUsers(searchQuery);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    const fetchUsers = async (search?: string) => {
         try {
             const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-            const response = await fetch(`${API_URL}/api/v1/admin/users`, {
+            let url = `${API_URL}/api/v1/admin/users?limit=1000`;
+            if (search) {
+                url += `&search=${encodeURIComponent(search)}`;
+            }
+
+            const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 },
@@ -114,6 +131,16 @@ export default function ManageUsersPage() {
                     <p className="text-gray-600 dark:text-gray-400">
                         View users and manage account security
                     </p>
+                </div>
+
+                <div className="mb-6">
+                    <input
+                        type="text"
+                        placeholder="Search users by email, username, or name..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full sm:w-96 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
                 </div>
 
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">

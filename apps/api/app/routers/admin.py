@@ -15,13 +15,24 @@ router = APIRouter(
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 1000,
+    search: str = None,
     db: Session = Depends(get_db)
 ):
     """
     List users (Superuser only)
     """
-    users = db.query(User).order_by(User.created_at.desc()).offset(skip).limit(limit).all()
+    query = db.query(User)
+    
+    if search:
+        search_filter = f"%{search}%"
+        query = query.filter(
+            (User.email.ilike(search_filter)) | 
+            (User.username.ilike(search_filter)) |
+            (User.display_name.ilike(search_filter))
+        )
+        
+    users = query.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
     return [UserResponse.from_orm(user) for user in users]
 
 @router.post("/users/{user_id}/reset-password")

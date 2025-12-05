@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: str = "tarantuverse-photos"
     R2_PUBLIC_URL: str = ""  # e.g., https://pub-xxx.r2.dev
 
+    # Email (SendGrid)
+    SENDGRID_API_KEY: str = ""
+    SENDGRID_FROM_EMAIL: str = "noreply@tarantuverse.com"
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
