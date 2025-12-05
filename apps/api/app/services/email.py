@@ -62,3 +62,25 @@ class EmailService:
         </div>
         """
         await EmailService.send_email(to_email, subject, html_content)
+
+    @staticmethod
+    async def send_verification_email(to_email: str, verify_link: str):
+        subject = "Verify Your Email - Tarantuverse"
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Verify Your Email Address</h2>
+            <p>Hello,</p>
+            <p>Thanks for signing up for Tarantuverse! Please confirm your email address by clicking the button below:</p>
+            <p style="margin: 20px 0;">
+                <a href="{verify_link}" style="background-color: #7c3aed; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Verify Email
+                </a>
+            </p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p><a href="{verify_link}">{verify_link}</a></p>
+            <p>If you did not create an account, please ignore this email.</p>
+            <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
+            <p style="color: #666; font-size: 12px;">Tarantuverse Team</p>
+        </div>
+        """
+        await EmailService.send_email(to_email, subject, html_content)

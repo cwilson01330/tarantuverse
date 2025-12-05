@@ -16,12 +16,14 @@ from app.utils.oauth import (
     generate_username_from_email,
 )
 from typing import Optional
+from datetime import datetime, timedelta, timezone
 import uuid
+import secrets
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Register a new user
@@ -48,24 +50,33 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         )
 
     # Create new user
+    verification_token = secrets.token_urlsafe(32)
+    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
     new_user = User(
         email=user_data.email,
         username=user_data.username,
         hashed_password=get_password_hash(user_data.password),
         display_name=user_data.display_name or user_data.username,
+        is_verified=False,
+        verification_token=verification_token,
+        verification_token_expires_at=verification_token_expires_at
     )
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    # Create access token
-    access_token = create_access_token(data={"sub": str(new_user.id)})
+    # Send verification email
+    # TODO: Get frontend URL from config
+    frontend_url = "http://localhost:3000"
+    verify_link = f"{frontend_url}/verify-email?token={verification_token}"
+    pass # prevent blocking
+    
+    # We use background task or await
+    await EmailService.send_verification_email(new_user.email, verify_link)
 
-    return Token(
-        access_token=access_token,
-        user=UserResponse.from_orm(new_user)
-    )
+    return {"message": "Registration successful. Please check your email to verify your account."}
 
 
 @router.post("/login", response_model=Token)
@@ -98,6 +109,16 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is inactive"
+        )
+
+    # Check if email is verified (only for password users, OAuth users are verified by default logic or we trust them)
+    # We should ensure oauth users have is_verified=True when created (which I didn't do in register but they don't hit this login endpoint often if using oauth-login?)
+    # Wait, oauth-login endpoint handles its own login.
+    # This /login endpoint is for email/password.
+    if not user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email not verified. Please check your inbox."
         )
 
     # Create access token
@@ -237,6 +258,7 @@ async def oauth_login(
                 oauth_provider=provider,
                 oauth_id=provider_id,
                 hashed_password=None,  # OAuth users don't have passwords
+                is_verified=True,
             )
             db.add(user)
             db.commit()
@@ -323,6 +345,7 @@ async def google_oauth_callback(
                 oauth_access_token=google_user.get("access_token"),
                 oauth_refresh_token=google_user.get("refresh_token"),
                 hashed_password=None,  # OAuth users don't have passwords
+                is_verified=True,
             )
             db.add(user)
             db.commit()
@@ -411,6 +434,7 @@ async def apple_oauth_callback(
                 oauth_provider="apple",
                 oauth_id=apple_user["provider_id"],
                 hashed_password=None,  # OAuth users don't have passwords
+                is_verified=True,
             )
             db.add(user)
             db.commit()
@@ -482,4 +506,84 @@ async def reset_password(
     db.commit()
     
     return {"message": "Password has been reset successfully"}
+
+
+@router.post("/verify-email")
+async def verify_email(
+    token: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Verify email using a valid token
+    """
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token is required"
+        )
+
+    user = db.query(User).filter(User.verification_token == token).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification token"
+        )
+        
+    # Check expiry
+    if not user.verification_token_expires_at:
+         raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification token"
+        )
+
+    now = datetime.now(timezone.utc)
+    if user.verification_token_expires_at < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification token has expired"
+        )
+        
+    # Verify user
+    user.is_verified = True
+    user.verification_token = None
+    user.verification_token_expires_at = None
+    
+    db.commit()
+    
+    return {"message": "Email verified successfully"}
+
+
+@router.post("/resend-verification")
+async def resend_verification(
+    email: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Resend verification email
+    """
+    user = db.query(User).filter(User.email == email).first()
+    
+    if not user:
+         # Return success even if user not found to prevent user enumeration
+        return {"message": "If an account exists, a verification email has been sent."}
+        
+    if user.is_verified:
+        return {"message": "Account is already verified"}
+        
+    # Generate new token
+    verification_token = secrets.token_urlsafe(32)
+    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    
+    user.verification_token = verification_token
+    user.verification_token_expires_at = verification_token_expires_at
+    db.commit()
+    
+    # Send email
+    frontend_url = "http://localhost:3000"
+    verify_link = f"{frontend_url}/verify-email?token={verification_token}"
+    
+    await EmailService.send_verification_email(user.email, verify_link)
+    
+    return {"message": "Verification email sent"}
 

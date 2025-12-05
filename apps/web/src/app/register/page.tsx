@@ -15,6 +15,7 @@ export default function RegisterPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,27 +39,37 @@ export default function RegisterPage() {
         throw new Error(data.detail || 'Registration failed')
       }
 
-      // Step 2: Auto-login via NextAuth to establish session
-      const result = await signIn('credentials', {
-        email: formData.email,
-        password: formData.password,
-        redirect: false,
-      })
-
-      if (result?.error) {
-        throw new Error('Registration successful but login failed. Please try logging in.')
-      }
-
-      if (result?.ok) {
-        // Redirect to dashboard on success
-        router.push('/dashboard')
-        router.refresh() // Refresh to update session
-      }
+      setSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (success) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-24">
+        <div className="w-full max-w-md text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold mb-4">Registration Successful!</h2>
+          <p className="text-gray-600 mb-8">
+            We've sent a verification email to <strong>{formData.email}</strong>.
+            Please check your inbox and verify your account to log in.
+          </p>
+          <a
+            href="/login"
+            className="inline-block py-3 px-8 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+          >
+            Go to Login
+          </a>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -13,10 +13,13 @@ export default function LoginPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showResend, setShowResend] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setShowResend(false)
     setLoading(true)
 
     try {
@@ -28,7 +31,10 @@ export default function LoginPage() {
       })
 
       if (result?.error) {
-        throw new Error('Invalid email or password')
+        if (result.error.includes('Email not verified')) {
+          setShowResend(true)
+        }
+        throw new Error(result.error)
       }
 
       if (result?.ok) {
@@ -43,14 +49,44 @@ export default function LoginPage() {
     }
   }
 
+  const handleResendVerification = async () => {
+    setResendLoading(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/v1/auth/resend-verification?email=${formData.email}`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        alert('Verification email sent! Please check your inbox.');
+      } else {
+        alert('Failed to send verification email.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('An error occurred.');
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center p-24">
       <div className="w-full max-w-md">
         <h1 className="text-4xl font-bold mb-8 text-center">Login</h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded flex flex-col gap-2">
+            <span>{error}</span>
+            {showResend && (
+              <button
+                onClick={handleResendVerification}
+                disabled={resendLoading}
+                className="text-sm underline font-bold hover:text-red-900 text-left"
+              >
+                {resendLoading ? 'Sending...' : 'Resend Verification Email'}
+              </button>
+            )}
           </div>
         )}
 
