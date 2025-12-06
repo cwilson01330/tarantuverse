@@ -105,3 +105,40 @@ async def resend_verification_email(
     await EmailService.send_verification_email(user.email, verify_link)
 
     return {"message": f"Verification email sent to {user.email}"}
+
+
+@router.post("/test-email")
+async def test_email_sending(
+    test_email: str,
+):
+    """
+    Send a test email to verify SendGrid configuration (Superuser only)
+    Useful for debugging email delivery issues
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"🧪 Testing email send to: {test_email}")
+
+    try:
+        await EmailService.send_email(
+            to_email=test_email,
+            subject="Test Email from Tarantuverse",
+            content="""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>✅ SendGrid Test Email</h2>
+                <p>This is a test email from your Tarantuverse API.</p>
+                <p>If you're seeing this, SendGrid is configured correctly!</p>
+                <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
+                <p style="color: #666; font-size: 12px;">Sent from Tarantuverse Email Service</p>
+            </div>
+            """
+        )
+        logger.info(f"✅ Test email sent successfully to {test_email}")
+        return {"message": f"Test email sent to {test_email}. Check your inbox and Render logs."}
+    except Exception as e:
+        logger.error(f"❌ Failed to send test email: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send test email: {str(e)}"
+        )

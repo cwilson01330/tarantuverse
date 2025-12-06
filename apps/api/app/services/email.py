@@ -5,7 +5,7 @@ import asyncio
 import logging
 from typing import Optional
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import Mail, Email, To, Content
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,10 @@ class EmailService:
             logger.info("==================================================================")
             return
 
+        logger.info(f"Attempting to send email to {to_email} with subject: {subject}")
+        logger.info(f"From email: {settings.SENDGRID_FROM_EMAIL}")
+        logger.info(f"API Key configured: {settings.SENDGRID_API_KEY[:10]}...")
+
         message = Mail(
             from_email=settings.SENDGRID_FROM_EMAIL,
             to_emails=to_email,
@@ -37,11 +41,26 @@ class EmailService:
 
         try:
             sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
+
             # Run blocking call in thread pool to avoid blocking event loop
             response = await asyncio.to_thread(sg.send, message)
-            logger.info(f"Email sent to {to_email}. Status Code: {response.status_code}")
+
+            # Log full response for debugging
+            logger.info(f"SendGrid Response Status Code: {response.status_code}")
+            logger.info(f"SendGrid Response Body: {response.body}")
+            logger.info(f"SendGrid Response Headers: {response.headers}")
+
+            if response.status_code >= 200 and response.status_code < 300:
+                logger.info(f"✅ Email successfully sent to {to_email}")
+            else:
+                logger.error(f"❌ SendGrid returned non-success status: {response.status_code}")
+                logger.error(f"Response body: {response.body}")
+
         except Exception as e:
-            logger.error(f"Failed to send email to {to_email}: {str(e)}")
+            logger.error(f"❌ Failed to send email to {to_email}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error message: {str(e)}")
+            logger.error(f"Full exception:", exc_info=True)
             raise e
 
     @staticmethod
