@@ -7,6 +7,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "sdkVersion": "54.0.0",
+    "entryPoint": "./index.js",
     "assetBundlePatterns": [
       "**/*"
     ],
