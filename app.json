@@ -1,5 +1,6 @@
 {
   "expo": {
+    "entryPoint": "./apps/mobile/index.js",
     "extra": {
       "eas": {
         "projectId": "1d412361-4866-482a-a0a6-5d525508d8b8"
