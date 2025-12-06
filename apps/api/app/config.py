@@ -22,6 +22,9 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         "http://localhost:19006",
     ]
+    
+    # Frontend URL for emails
+    FRONTEND_URL: str = "http://localhost:3000"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

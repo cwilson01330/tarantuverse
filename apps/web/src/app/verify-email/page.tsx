@@ -76,6 +76,14 @@ function VerifyEmailContent() {
                                 >
                                     Go to Login
                                 </Link>
+                                <div className="mt-4 w-full">
+                                    <a
+                                        href="tarantuverse://login"
+                                        className="w-full flex justify-center py-2 px-4 border border-purple-600 rounded-md shadow-sm text-sm font-medium text-purple-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                    >
+                                        Open App
+                                    </a>
+                                </div>
                             </div>
                         )}
 

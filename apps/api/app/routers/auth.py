@@ -68,9 +68,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     # Send verification email
-    # TODO: Get frontend URL from config
-    frontend_url = "http://localhost:3000"
-    verify_link = f"{frontend_url}/verify-email?token={verification_token}"
+    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
     pass # prevent blocking
     
     # We use background task or await
@@ -580,8 +578,7 @@ async def resend_verification(
     db.commit()
     
     # Send email
-    frontend_url = "http://localhost:3000"
-    verify_link = f"{frontend_url}/verify-email?token={verification_token}"
+    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
     
     await EmailService.send_verification_email(user.email, verify_link)
     
