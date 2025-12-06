@@ -1,6 +1,7 @@
 """
 Email Service (SendGrid)
 """
+import asyncio
 import logging
 from typing import Optional
 from sendgrid import SendGridAPIClient
@@ -13,7 +14,10 @@ class EmailService:
     @staticmethod
     async def send_email(to_email: str, subject: str, content: str):
         """
-        Send email using SendGrid
+        Send email using SendGrid (async wrapper)
+
+        Note: SendGrid's Python client is synchronous, so we use asyncio.to_thread()
+        to run it in a thread pool without blocking the event loop.
         """
         if not settings.SENDGRID_API_KEY:
             logger.warning("SENDGRID_API_KEY is not set. Falling back to mock email.")
@@ -30,10 +34,11 @@ class EmailService:
             subject=subject,
             html_content=content
         )
-        
+
         try:
             sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
-            response = sg.send(message)
+            # Run blocking call in thread pool to avoid blocking event loop
+            response = await asyncio.to_thread(sg.send, message)
             logger.info(f"Email sent to {to_email}. Status Code: {response.status_code}")
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {str(e)}")
