@@ -74,13 +74,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
         display_name: display_name || username,
       });
-      const { access_token, user: userData } = response.data;
-      
-      await AsyncStorage.setItem('auth_token', access_token);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
-      
-      setToken(access_token);
-      setUser(userData);
+
+      // Registration now returns a message instead of a token
+      // User must verify email before logging in
+      // Return the response so the UI can handle showing the verification message
+      return response.data;
     } catch (error: any) {
       throw new Error(error.response?.data?.detail || 'Registration failed');
     }

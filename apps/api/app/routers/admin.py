@@ -5,6 +5,7 @@ from app.models.user import User
 from app.schemas.user import UserResponse
 from app.utils.dependencies import get_current_superuser
 from app.services.email import EmailService
+from app.config import settings
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -59,10 +60,8 @@ async def trigger_password_reset(
     user.reset_token_expires_at = expires
     db.commit()
     
-    # Construct reset link
-    # TODO: Get frontend URL from config/env
-    frontend_url = "http://localhost:3000"
-    reset_link = f"{frontend_url}/reset-password?token={token}"
+    # Construct reset link using configured frontend URL
+    reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
     
     # Send email
     await EmailService.send_password_reset_email(user.email, reset_link)

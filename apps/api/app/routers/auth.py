@@ -15,6 +15,8 @@ from app.utils.oauth import (
     verify_apple_id_token,
     generate_username_from_email,
 )
+from app.services.email import EmailService
+from app.config import settings
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import uuid

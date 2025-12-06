@@ -25,6 +25,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const handleRegister = async () => {
     if (!email || !username || !password || !confirmPassword) {
@@ -45,7 +46,8 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await register(email, username, password, displayName || username);
-      router.replace('/(tabs)');
+      // Registration successful - show verification message
+      setSuccess(true);
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message);
     } finally {
@@ -122,6 +124,30 @@ export default function RegisterScreen() {
       fontSize: 14,
     },
   });
+
+  // Show success screen if registration was successful
+  if (success) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <View style={{ width: 64, height: 64, backgroundColor: '#10B981', borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+            <Text style={{ fontSize: 32, color: '#fff' }}>✓</Text>
+          </View>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>Registration Successful!</Text>
+          <Text style={[styles.subtitle, { textAlign: 'center', marginTop: 16, marginBottom: 32 }]}>
+            We've sent a verification email to {email}.{'\n'}
+            Please check your inbox and verify your account to log in.
+          </Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => router.replace('/login')}
+          >
+            <Text style={styles.buttonText}>Go to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
