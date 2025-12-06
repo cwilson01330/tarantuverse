@@ -42,7 +42,7 @@ async def trigger_password_reset(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger a password reset email for a specific user
+    Trigger a password reset email for a specific user (Superuser only)
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -50,20 +50,58 @@ async def trigger_password_reset(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
+
     # Generate token
     token = secrets.token_urlsafe(32)
     # Set expiration to 24 hours from now
     expires = datetime.now(timezone.utc) + timedelta(hours=24)
-    
+
     user.reset_token = token
     user.reset_token_expires_at = expires
     db.commit()
-    
+
     # Construct reset link using configured frontend URL
     reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-    
+
     # Send email
     await EmailService.send_password_reset_email(user.email, reset_link)
-    
+
     return {"message": f"Password reset email sent to {user.email}"}
+
+
+@router.post("/users/{user_id}/resend-verification")
+async def resend_verification_email(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Resend verification email for a specific user (Superuser only)
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if user.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already verified"
+        )
+
+    # Generate new verification token
+    verification_token = secrets.token_urlsafe(32)
+    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    user.verification_token = verification_token
+    user.verification_token_expires_at = verification_token_expires_at
+    db.commit()
+
+    # Construct verification link
+    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
+
+    # Send email
+    await EmailService.send_verification_email(user.email, verify_link)
+
+    return {"message": f"Verification email sent to {user.email}"}

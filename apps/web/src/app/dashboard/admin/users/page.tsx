@@ -12,6 +12,7 @@ interface User {
     username: string;
     is_active: boolean;
     is_superuser: boolean;
+    is_verified: boolean;
     created_at: string;
 }
 
@@ -21,6 +22,7 @@ export default function ManageUsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [resetLoading, setResetLoading] = useState<string | null>(null);
+    const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -103,6 +105,35 @@ export default function ManageUsersPage() {
         }
     };
 
+    const handleResendVerification = async (userId: string, email: string) => {
+        if (!confirm(`Are you sure you want to resend verification email to ${email}?`)) {
+            return;
+        }
+
+        setVerifyLoading(userId);
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/api/v1/admin/users/${userId}/resend-verification`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                alert(`Verification email sent to ${email}`);
+            } else {
+                const data = await response.json();
+                alert(data.detail || 'Failed to send verification email');
+            }
+        } catch (error) {
+            console.error('Error sending verification email:', error);
+            alert('Error sending verification email');
+        } finally {
+            setVerifyLoading(null);
+        }
+    };
+
     if (loading || authLoading) {
         return (
             <DashboardLayout
@@ -155,6 +186,9 @@ export default function ManageUsersPage() {
                                         Status
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Verified
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Role
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -187,6 +221,14 @@ export default function ManageUsersPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${user.is_verified
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                                }`}>
+                                                {user.is_verified ? '✓ Verified' : '⚠ Unverified'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
                                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${user.is_superuser
                                                 ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
                                                 : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
@@ -198,13 +240,24 @@ export default function ManageUsersPage() {
                                             {format(new Date(user.created_at), 'MMM d, yyyy')}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <button
-                                                onClick={() => handleResetPassword(user.id, user.email)}
-                                                disabled={resetLoading === user.id}
-                                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium disabled:opacity-50"
-                                            >
-                                                {resetLoading === user.id ? 'Sending...' : 'Send Reset Email'}
-                                            </button>
+                                            <div className="flex flex-col gap-2">
+                                                {!user.is_verified && (
+                                                    <button
+                                                        onClick={() => handleResendVerification(user.id, user.email)}
+                                                        disabled={verifyLoading === user.id}
+                                                        className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
+                                                    >
+                                                        {verifyLoading === user.id ? 'Sending...' : 'Resend Verification'}
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleResetPassword(user.id, user.email)}
+                                                    disabled={resetLoading === user.id}
+                                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium disabled:opacity-50"
+                                                >
+                                                    {resetLoading === user.id ? 'Sending...' : 'Send Reset Email'}
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
