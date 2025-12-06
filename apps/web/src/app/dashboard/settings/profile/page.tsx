@@ -100,6 +100,50 @@ export default function ProfileSettingsPage() {
     }
   }
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate size (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB')
+      return
+    }
+
+    setSubmitting(true)
+    setError('')
+
+    try {
+      const formDataUpload = new FormData()
+      formDataUpload.append('file', file)
+
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/auth/me/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formDataUpload,
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.detail || 'Failed to upload avatar')
+      }
+
+      const data = await response.json()
+      setFormData(prev => ({ ...prev, avatar_url: data.avatar_url }))
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload avatar')
+    } finally {
+      setSubmitting(false)
+      // Reset file input
+      e.target.value = ''
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -217,14 +261,45 @@ export default function ProfileSettingsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Avatar URL</label>
-                <input
-                  type="url"
-                  value={formData.avatar_url}
-                  onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
-                  placeholder="https://example.com/avatar.jpg"
-                />
+                <label className="block text-sm font-medium mb-1">Avatar</label>
+                <div className="flex items-center gap-4">
+                  {formData.avatar_url && (
+                    <img
+                      src={formData.avatar_url}
+                      alt="Avatar Preview"
+                      className="w-16 h-16 rounded-full object-cover border border-theme"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleFileChange}
+                      className="block w-full text-sm text-theme-secondary
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-full file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-primary-50 file:text-primary-700
+                        hover:file:bg-primary-100
+                        dark:file:bg-primary-900/30 dark:file:text-primary-400
+                      "
+                    />
+                    <p className="mt-1 text-xs text-theme-tertiary">
+                      JPG, PNG, GIF or WebP. Max 10MB.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2">
+                  <label className="block text-xs font-medium mb-1 text-theme-tertiary">Or use an external URL</label>
+                  <input
+                    type="url"
+                    value={formData.avatar_url}
+                    onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
+                    className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated text-sm"
+                    placeholder="https://example.com/avatar.jpg"
+                  />
+                </div>
               </div>
 
               <div>

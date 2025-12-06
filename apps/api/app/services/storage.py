@@ -75,6 +75,77 @@ class StorageService:
         
         return thumb_buffer.getvalue()
     
+    async def upload_avatar(
+        self,
+        file_data: bytes,
+        filename: str,
+        content_type: str = "image/jpeg"
+    ) -> str:
+        """
+        Upload an avatar image (creates a square thumbnail).
+
+        Args:
+            file_data: Raw image bytes
+            filename: Original filename
+            content_type: MIME type of the image
+
+        Returns:
+            Avatar URL
+        """
+        # Generate unique filename
+        file_extension = os.path.splitext(filename)[1] or '.jpg'
+        unique_filename = f"avatar_{uuid.uuid4()}{file_extension}"
+
+        # Create square avatar (200x200)
+        avatar_data = self._create_square_avatar(file_data, size=200)
+
+        if self.use_r2:
+            # Upload to R2
+            avatar_url = await self._upload_to_r2(
+                avatar_data,
+                f"avatars/{unique_filename}",
+                "image/jpeg"
+            )
+        else:
+            # Upload to local filesystem
+            avatar_dir = "uploads/avatars"
+            os.makedirs(avatar_dir, exist_ok=True)
+            avatar_url = await self._upload_to_local(
+                avatar_data,
+                unique_filename,
+                avatar_dir
+            )
+
+        return avatar_url
+
+    def _create_square_avatar(self, image_data: bytes, size: int = 200) -> bytes:
+        """Create a square avatar from image data (crops to center)."""
+        img = Image.open(BytesIO(image_data))
+
+        # Convert RGBA to RGB if necessary
+        if img.mode == 'RGBA':
+            img = img.convert('RGB')
+
+        # Crop to square (center crop)
+        width, height = img.size
+        min_dim = min(width, height)
+        left = (width - min_dim) // 2
+        top = (height - min_dim) // 2
+        right = left + min_dim
+        bottom = top + min_dim
+
+        img = img.crop((left, top, right, bottom))
+
+        # Resize to target size
+        img = img.resize((size, size), Image.Resampling.LANCZOS)
+
+        # Save to bytes
+        buffer = BytesIO()
+        img.save(buffer, format='JPEG', quality=90)
+        buffer.seek(0)
+
+        return buffer.getvalue()
+
     async def upload_photo(
         self,
         file_data: bytes,
@@ -83,12 +154,12 @@ class StorageService:
     ) -> Tuple[str, str]:
         """
         Upload a photo and its thumbnail.
-        
+
         Args:
             file_data: Raw image bytes
             filename: Original filename
             content_type: MIME type of the image
-        
+
         Returns:
             Tuple of (photo_url, thumbnail_url)
         """
@@ -96,10 +167,10 @@ class StorageService:
         file_extension = os.path.splitext(filename)[1] or '.jpg'
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         thumbnail_filename = f"thumb_{unique_filename}"
-        
+
         # Create thumbnail
         thumbnail_data = self._create_thumbnail(file_data)
-        
+
         if self.use_r2:
             # Upload to R2
             photo_url = await self._upload_to_r2(
@@ -124,7 +195,7 @@ class StorageService:
                 thumbnail_filename,
                 self.thumbnail_dir
             )
-        
+
         return photo_url, thumbnail_url
     
     async def _upload_to_r2(

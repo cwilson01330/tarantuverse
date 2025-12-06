@@ -1,7 +1,7 @@
 """
 Authentication routes
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
@@ -16,6 +16,7 @@ from app.utils.oauth import (
     generate_username_from_email,
 )
 from app.services.email import EmailService
+from app.services.storage import storage_service
 from app.config import settings
 from typing import Optional
 from datetime import datetime, timedelta, timezone
@@ -193,13 +194,72 @@ async def update_visibility(
 ):
     """
     Quick toggle for collection visibility
-    
+
     - **collection_visibility**: 'private' or 'public'
     """
     current_user.collection_visibility = visibility_data.collection_visibility
     db.commit()
     db.refresh(current_user)
-    
+
+    return UserResponse.from_orm(current_user)
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload user avatar image
+
+    - **file**: Image file (JPEG, PNG, GIF, WebP)
+    - Automatically crops to square and resizes to 200x200px
+    - Uploads to Cloudflare R2 or local storage
+    """
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
+        )
+
+    # Read file data
+    try:
+        file_data = await file.read()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to read file: {str(e)}"
+        )
+
+    # Validate file size (max 10MB)
+    max_size = 10 * 1024 * 1024  # 10MB
+    if len(file_data) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds 10MB limit"
+        )
+
+    # Upload avatar
+    try:
+        avatar_url = await storage_service.upload_avatar(
+            file_data,
+            file.filename or "avatar.jpg",
+            file.content_type
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload avatar: {str(e)}"
+        )
+
+    # Update user's avatar_url
+    current_user.avatar_url = avatar_url
+    db.commit()
+    db.refresh(current_user)
+
     return UserResponse.from_orm(current_user)
 
 
