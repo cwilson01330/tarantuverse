@@ -54,7 +54,19 @@ async def create_egg_sac(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Create a new egg sac"""
+    """Create a new egg sac (Premium feature)"""
+    # Check if user has access to breeding features
+    limits = current_user.get_subscription_limits()
+    if not limits["can_use_breeding"]:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": "Breeding tracking is a premium feature. Upgrade to unlock pairings, egg sacs, and offspring management!",
+                "feature": "breeding",
+                "is_premium": limits["is_premium"]
+            }
+        )
+
     # Verify pairing belongs to the user
     pairing = db.query(Pairing).filter(
         Pairing.id == egg_sac_data.pairing_id,

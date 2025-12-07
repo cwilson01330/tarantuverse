@@ -1,139 +1,120 @@
 """
 Seed subscription plans
-Run this script to populate the database with subscription plans
+
+Run this script to initialize Free and Premium subscription plans.
+Usage: python seed_subscription_plans.py
 """
 import sys
 import os
 
-# Add the app directory to the Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer, Numeric
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.sql import func
-from app.database import SessionLocal, Base
-import uuid
+from app.database import SessionLocal
+from app.models.subscription import SubscriptionPlan
+from sqlalchemy import exists
 
 
-# Define a minimal SubscriptionPlan model to avoid circular imports
-class SubscriptionPlan(Base):
-    __tablename__ = "subscription_plans"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String(50), unique=True, nullable=False)
-    display_name = Column(String(100), nullable=False)
-    description = Column(Text)
-    price_monthly = Column(Numeric(10, 2), default=0)
-    price_yearly = Column(Numeric(10, 2), default=0)
-    features = Column(JSONB, default={})
-    max_tarantulas = Column(Integer, default=10)
-    can_edit_species = Column(Boolean, default=False)
-    can_submit_species = Column(Boolean, default=False)
-    has_advanced_filters = Column(Boolean, default=False)
-    has_priority_support = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-
-def seed_subscription_plans():
+def seed_plans():
+    """Seed subscription plans in database"""
     db = SessionLocal()
-    
+
     try:
         # Check if plans already exist
-        existing = db.query(SubscriptionPlan).count()
-        if existing > 0:
-            print(f"Subscription plans already exist ({existing} plans found). Skipping seed.")
+        free_exists = db.query(exists().where(SubscriptionPlan.name == "free")).scalar()
+        premium_exists = db.query(exists().where(SubscriptionPlan.name == "premium")).scalar()
+
+        if free_exists and premium_exists:
+            print("✅ Subscription plans already exist. Skipping seed.")
             return
-        
-        plans = [
-            # Free Plan
-            SubscriptionPlan(
-                id=uuid.uuid4(),
+
+        # Create Free plan
+        if not free_exists:
+            free_plan = SubscriptionPlan(
                 name="free",
-                display_name="Free",
-                description="Perfect for beginners starting their tarantula journey",
+                display_name="Free Plan",
+                description="Perfect for casual keepers with small collections",
                 price_monthly=0,
                 price_yearly=0,
-                features={
-                    "browse_species": True,
-                    "search_species": True,
-                    "add_tarantulas": True,
-                    "track_feedings": True,
-                    "track_molts": True,
-                    "basic_analytics": True,
-                    "community_access": True,
-                },
-                max_tarantulas=10,
+                price_lifetime=0,
+                max_tarantulas=15,  # Free tier limit
                 can_edit_species=False,
-                can_submit_species=False,
+                can_submit_species=True,  # Can submit species for review
                 has_advanced_filters=False,
                 has_priority_support=False,
-            ),
-            
-            # Premium Plan
-            SubscriptionPlan(
-                id=uuid.uuid4(),
+                can_use_breeding=False,  # Breeding is premium only
+                max_photos_per_tarantula=5,  # 5 photos per tarantula on free
+                features={
+                    "tracking": ["feeding", "molts", "substrate_changes"],
+                    "species_database": "full_access",
+                    "community": "full_access",
+                    "analytics": "basic",
+                    "support": "community"
+                }
+            )
+            db.add(free_plan)
+            print("✅ Created Free plan")
+
+        # Create Premium plan
+        if not premium_exists:
+            premium_plan = SubscriptionPlan(
                 name="premium",
-                display_name="Premium",
-                description="Full access for dedicated keepers and enthusiasts",
+                display_name="Premium Plan",
+                description="Unlock unlimited tracking, breeding module, and advanced features",
                 price_monthly=4.99,
-                price_yearly=49.99,
-                features={
-                    "everything_in_free": True,
-                    "unlimited_tarantulas": True,
-                    "edit_species_guides": True,
-                    "submit_new_species": True,
-                    "advanced_filters": True,
-                    "bulk_operations": True,
-                    "data_export": True,
-                    "priority_support": True,
-                    "ad_free": True,
-                },
-                max_tarantulas=-1,  # -1 means unlimited
-                can_edit_species=True,
+                price_yearly=44.99,  # 25% savings
+                price_lifetime=149.99,
+                max_tarantulas=-1,  # -1 = unlimited
+                can_edit_species=False,  # Reserved for admins
                 can_submit_species=True,
                 has_advanced_filters=True,
                 has_priority_support=True,
-            ),
-            
-            # Verified Contributor Plan
-            SubscriptionPlan(
-                id=uuid.uuid4(),
-                name="verified",
-                display_name="Verified Contributor",
-                description="For recognized experts and breeders (invite-only)",
-                price_monthly=0,  # Free for verified contributors
-                price_yearly=0,
+                can_use_breeding=True,  # PREMIUM FEATURE
+                max_photos_per_tarantula=-1,  # -1 = unlimited
                 features={
-                    "all_premium_features": True,
-                    "verified_badge": True,
-                    "direct_publish": True,
-                    "skip_review_queue": True,
-                    "breeder_tools": True,
-                    "exclusive_community": True,
-                },
-                max_tarantulas=-1,  # Unlimited
-                can_edit_species=True,
-                can_submit_species=True,
-                has_advanced_filters=True,
-                has_priority_support=True,
-            ),
-        ]
-        
-        for plan in plans:
-            db.add(plan)
-            print(f"✓ Created {plan.display_name} plan (${plan.price_monthly}/mo)")
-        
+                    "tracking": ["feeding", "molts", "substrate_changes", "breeding"],
+                    "species_database": "full_access",
+                    "community": "full_access",
+                    "analytics": "advanced",
+                    "support": "priority",
+                    "data_export": ["csv", "pdf"],
+                    "breeding_module": "full_access"
+                }
+            )
+            db.add(premium_plan)
+            print("✅ Created Premium plan")
+
         db.commit()
-        print("\n✅ Successfully seeded subscription plans!")
-        
+        print("\n🎉 Subscription plans seeded successfully!")
+        print("\nPlan Summary:")
+        print("━" * 60)
+        print("FREE PLAN:")
+        print("  • 15 tarantulas max")
+        print("  • 5 photos per tarantula")
+        print("  • Basic tracking (feeding, molts, substrate)")
+        print("  • Community features")
+        print("  • Species database access")
+        print("\nPREMIUM PLAN:")
+        print("  • Unlimited tarantulas")
+        print("  • Unlimited photos")
+        print("  • Full breeding module (pairings, egg sacs, offspring)")
+        print("  • Advanced analytics")
+        print("  • Priority support")
+        print("  • Data export (CSV/PDF)")
+        print("\nPricing:")
+        print("  • $4.99/month")
+        print("  • $44.99/year (save 25%)")
+        print("  • $149.99 lifetime")
+        print("━" * 60)
+
     except Exception as e:
         print(f"❌ Error seeding subscription plans: {e}")
         db.rollback()
+        raise
     finally:
         db.close()
 
 
 if __name__ == "__main__":
     print("🌱 Seeding subscription plans...")
-    seed_subscription_plans()
+    seed_plans()

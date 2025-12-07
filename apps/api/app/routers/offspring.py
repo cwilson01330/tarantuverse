@@ -55,7 +55,19 @@ async def create_offspring_record(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Create a new offspring record"""
+    """Create a new offspring record (Premium feature)"""
+    # Check if user has access to breeding features
+    limits = current_user.get_subscription_limits()
+    if not limits["can_use_breeding"]:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": "Breeding tracking is a premium feature. Upgrade to unlock pairings, egg sacs, and offspring management!",
+                "feature": "breeding",
+                "is_premium": limits["is_premium"]
+            }
+        )
+
     # Verify egg sac belongs to the user
     egg_sac = db.query(EggSac).filter(
         EggSac.id == offspring_data.egg_sac_id,
