@@ -23,6 +23,7 @@ export default function ManageUsersPage() {
     const [loading, setLoading] = useState(true);
     const [resetLoading, setResetLoading] = useState<string | null>(null);
     const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
+    const [grantLoading, setGrantLoading] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -131,6 +132,35 @@ export default function ManageUsersPage() {
             alert('Error sending verification email');
         } finally {
             setVerifyLoading(null);
+        }
+    };
+
+    const handleGrantPremium = async (userId: string, username: string) => {
+        if (!confirm(`Grant LIFETIME premium access to ${username}? This action grants permanent premium features.`)) {
+            return;
+        }
+
+        setGrantLoading(userId);
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/api/v1/promo-codes/admin/grant/${userId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                alert(`✅ Successfully granted lifetime premium to ${username}!`);
+            } else {
+                const error = await response.json();
+                alert(`Failed to grant premium: ${error.detail}`);
+            }
+        } catch (error) {
+            console.error('Error granting premium:', error);
+            alert('Error granting premium access');
+        } finally {
+            setGrantLoading(null);
         }
     };
 
@@ -256,6 +286,13 @@ export default function ManageUsersPage() {
                                                     className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium disabled:opacity-50"
                                                 >
                                                     {resetLoading === user.id ? 'Sending...' : 'Send Reset Email'}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleGrantPremium(user.id, user.username)}
+                                                    disabled={grantLoading === user.id}
+                                                    className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
+                                                >
+                                                    {grantLoading === user.id ? 'Granting...' : '💎 Grant Premium'}
                                                 </button>
                                             </div>
                                         </td>
