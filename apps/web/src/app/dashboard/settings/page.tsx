@@ -13,6 +13,10 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string>('');
+  const [promoCode, setPromoCode] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -49,6 +53,18 @@ export default function SettingsPage() {
         const userData = await response.json();
         setUser(userData);
         setAuthError('');
+
+        // Fetch subscription limits
+        const limitsResponse = await fetch(`${API_URL}/api/v1/promo-codes/me/limits`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (limitsResponse.ok) {
+          const limits = await limitsResponse.json();
+          setSubscriptionLimits(limits);
+        }
       } catch (apiError) {
         console.error('Settings - API fetch failed:', apiError);
         setAuthError('Failed to load user data. Please try again.');
@@ -58,6 +74,45 @@ export default function SettingsPage() {
       setAuthError('Authentication error: ' + (error as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRedeemPromoCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoCode.trim()) {
+      setPromoMessage({ type: 'error', text: 'Please enter a promo code' });
+      return;
+    }
+
+    setPromoLoading(true);
+    setPromoMessage(null);
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/v1/promo-codes/redeem`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: promoCode.trim().toUpperCase() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setPromoMessage({ type: 'success', text: '🎉 Promo code redeemed successfully! Premium access activated.' });
+        setPromoCode('');
+        // Refresh subscription limits
+        fetchUser();
+      } else {
+        setPromoMessage({ type: 'error', text: data.detail || 'Invalid or expired promo code' });
+      }
+    } catch (error) {
+      console.error('Error redeeming promo code:', error);
+      setPromoMessage({ type: 'error', text: 'Failed to redeem promo code. Please try again.' });
+    } finally {
+      setPromoLoading(false);
     }
   };
 
@@ -219,6 +274,114 @@ export default function SettingsPage() {
             >
               Configure Notifications
             </button>
+          </div>
+        </section>
+
+        {/* Subscription Section */}
+        <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="text-2xl">💎</span>
+            <h2 className="text-xl font-bold text-theme-primary">Subscription</h2>
+          </div>
+
+          <div className="space-y-4">
+            {/* Current Plan */}
+            <div className="p-4 bg-surface-elevated rounded-lg">
+              <h3 className="font-semibold text-theme-primary mb-2">Current Plan</h3>
+              <div className="flex items-center justify-between mb-3">
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  subscriptionLimits?.is_premium
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white'
+                    : 'bg-gray-500/20 text-gray-400'
+                }`}>
+                  {subscriptionLimits?.is_premium ? '✨ Premium' : 'Free'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-theme-secondary">Tarantulas</p>
+                  <p className="font-semibold text-theme-primary">
+                    {subscriptionLimits?.max_tarantulas === -1 ? 'Unlimited' : `${subscriptionLimits?.max_tarantulas ?? 15} max`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-theme-secondary">Photos per tarantula</p>
+                  <p className="font-semibold text-theme-primary">
+                    {subscriptionLimits?.max_photos_per_tarantula === -1 ? 'Unlimited' : `${subscriptionLimits?.max_photos_per_tarantula ?? 5} max`}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-theme-secondary">Breeding Module</p>
+                  <p className="font-semibold text-theme-primary">
+                    {subscriptionLimits?.can_use_breeding ? '✓ Enabled' : '✗ Disabled'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-theme-secondary">Priority Support</p>
+                  <p className="font-semibold text-theme-primary">
+                    {subscriptionLimits?.has_priority_support ? '✓ Enabled' : '✗ Disabled'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Promo Code Redemption */}
+            {!subscriptionLimits?.is_premium && (
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Have a Promo Code?</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Redeem your code to unlock premium features
+                </p>
+                <form onSubmit={handleRedeemPromoCode} className="space-y-3">
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    placeholder="ENTER-CODE-HERE"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono"
+                    disabled={promoLoading}
+                  />
+                  {promoMessage && (
+                    <div className={`p-3 rounded-lg text-sm ${
+                      promoMessage.type === 'success'
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                        : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                    }`}>
+                      {promoMessage.text}
+                    </div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={promoLoading || !promoCode.trim()}
+                    className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {promoLoading ? 'Redeeming...' : 'Redeem Code'}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Upgrade Button */}
+            {!subscriptionLimits?.is_premium && (
+              <button
+                onClick={() => router.push('/pricing')}
+                className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all font-semibold shadow-lg"
+              >
+                View Premium Plans
+              </button>
+            )}
+
+            {/* Premium Badge */}
+            {subscriptionLimits?.is_premium && (
+              <div className="p-4 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border-2 border-purple-300 dark:border-purple-700 rounded-lg text-center">
+                <p className="text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  ✨ Thank you for being a Premium member! ✨
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  You have unlimited access to all features
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

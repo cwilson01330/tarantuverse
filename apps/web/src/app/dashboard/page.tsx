@@ -37,6 +37,8 @@ export default function DashboardPage() {
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null)
+  const [showWarning, setShowWarning] = useState(true)
 
   // Helper function to handle both R2 (absolute) and local (relative) URLs
   const getImageUrl = (url?: string) => {
@@ -80,6 +82,18 @@ export default function DashboardPage() {
         // Fetch feeding stats and premolt predictions for each tarantula
         fetchAllFeedingStatuses(token, data)
         fetchAllPremoltPredictions(token, data)
+      }
+
+      // Fetch subscription limits
+      const limitsResponse = await fetch(`${API_URL}/api/v1/promo-codes/me/limits`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (limitsResponse.ok) {
+        const limits = await limitsResponse.json()
+        setSubscriptionLimits(limits)
       }
     } catch (error) {
       console.error('Failed to fetch tarantulas:', error)
@@ -238,6 +252,58 @@ export default function DashboardPage() {
       userAvatar={user.image ?? undefined}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Tarantula Count Warning */}
+        {!subscriptionLimits?.is_premium &&
+         tarantulas.length >= 10 &&
+         tarantulas.length < 15 &&
+         showWarning && (
+          <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 shadow-lg">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3 flex-1">
+                <div className="text-2xl">⚠️</div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-1">
+                    Approaching Free Tier Limit
+                  </h3>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                    You have <strong>{tarantulas.length} of 15</strong> tarantulas on the free plan.
+                    Upgrade to Premium for unlimited tracking!
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => router.push('/pricing')}
+                      className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition font-semibold text-sm"
+                    >
+                      View Premium Plans
+                    </button>
+                    <button
+                      onClick={() => router.push('/dashboard/settings')}
+                      className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-purple-600 dark:border-purple-500 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition font-semibold text-sm"
+                    >
+                      Redeem Promo Code
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowWarning(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ml-2"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* Progress bar */}
+            <div className="mt-3 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div
+                className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${(tarantulas.length / 15) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6 hover:shadow-xl transition-all">
