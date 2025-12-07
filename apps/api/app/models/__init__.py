@@ -12,6 +12,7 @@ from app.models.direct_message import Conversation, DirectMessage
 from app.models.forum import ForumCategory, ForumThread, ForumPost
 from app.models.activity_feed import ActivityFeed
 from app.models.subscription import SubscriptionPlan, UserSubscription
+from app.models.promo_code import PromoCode
 from app.models.notification_preferences import NotificationPreferences
 
 __all__ = [
@@ -30,5 +31,6 @@ __all__ = [
     "ActivityFeed",
     "SubscriptionPlan",
     "UserSubscription",
+    "PromoCode",
     "NotificationPreferences",
 ]

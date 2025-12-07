@@ -24,18 +24,21 @@ class SubscriptionPlan(Base):
     name = Column(String(50), unique=True, nullable=False, index=True)  # 'free', 'premium', 'verified'
     display_name = Column(String(100), nullable=False)
     description = Column(Text)
-    
+
     # Pricing
     price_monthly = Column(Numeric(10, 2), default=0)
     price_yearly = Column(Numeric(10, 2), default=0)
-    
+    price_lifetime = Column(Numeric(10, 2), default=0)
+
     # Features
     features = Column(JSONB, default={})
-    max_tarantulas = Column(Integer, default=10)  # -1 for unlimited
+    max_tarantulas = Column(Integer, default=15)  # -1 for unlimited
     can_edit_species = Column(Boolean, default=False)
     can_submit_species = Column(Boolean, default=False)
     has_advanced_filters = Column(Boolean, default=False)
     has_priority_support = Column(Boolean, default=False)
+    can_use_breeding = Column(Boolean, default=False)
+    max_photos_per_tarantula = Column(Integer, default=5)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -53,17 +56,23 @@ class UserSubscription(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     plan_id = Column(UUID(as_uuid=True), ForeignKey("subscription_plans.id"), nullable=False)
-    
+
     status = Column(String(20), nullable=False, default=SubscriptionStatus.ACTIVE)
-    
+
     # Dates
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True))
     cancelled_at = Column(DateTime(timezone=True))
-    
+
     # Payment tracking
     payment_provider = Column(String(50))  # 'stripe', 'manual', null
     payment_provider_id = Column(String(255))  # External subscription ID
+
+    # Promo code and source tracking
+    promo_code_used = Column(String(50), ForeignKey("promo_codes.code", ondelete="SET NULL"), nullable=True, index=True)
+    subscription_source = Column(String(20), nullable=True)  # 'promo', 'monthly', 'yearly', 'lifetime'
+    auto_renew = Column(Boolean, default=False, nullable=False)
+    granted_by_admin = Column(Boolean, default=False, nullable=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

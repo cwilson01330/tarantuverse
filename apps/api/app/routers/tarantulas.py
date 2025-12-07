@@ -66,6 +66,22 @@ async def create_tarantula(
     print(f"[DEBUG] Creating tarantula for user {current_user.id}")
     print(f"[DEBUG] Tarantula data: {tarantula_data.model_dump()}")
 
+    # Check tarantula count limit
+    limits = current_user.get_subscription_limits()
+    current_count = db.query(Tarantula).filter(Tarantula.user_id == current_user.id).count()
+
+    # -1 means unlimited (premium)
+    if limits["max_tarantulas"] != -1 and current_count >= limits["max_tarantulas"]:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": f"You've reached the limit of {limits['max_tarantulas']} tarantulas on the free plan. Upgrade to premium for unlimited tracking!",
+                "current_count": current_count,
+                "limit": limits["max_tarantulas"],
+                "is_premium": limits["is_premium"]
+            }
+        )
+
     new_tarantula = Tarantula(
         user_id=current_user.id,
         **tarantula_data.model_dump()

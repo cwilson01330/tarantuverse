@@ -29,6 +29,7 @@ import app.routers.offspring as offspring
 import app.routers.notification_preferences as notification_preferences
 import app.routers.import_export as import_export
 import app.routers.admin as admin
+import app.routers.promo_codes as promo_codes
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -147,6 +148,9 @@ app.include_router(import_export.router, prefix="/api/v1", tags=["import"])
 
 print("[STARTUP] Registering admin router...")
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+
+print("[STARTUP] Registering promo codes router...")
+app.include_router(promo_codes.router, prefix="/api/v1/promo-codes", tags=["promo_codes", "premium"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

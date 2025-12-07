@@ -67,3 +67,91 @@ class User(Base):
 
     def __repr__(self):
         return f"<User {self.username}>"
+
+    @property
+    def is_premium(self) -> bool:
+        """Check if user has an active premium subscription"""
+        from datetime import datetime, timezone
+        from app.models.subscription import UserSubscription, SubscriptionStatus
+
+        # Import here to avoid circular dependency
+        from sqlalchemy.orm import object_session
+        session = object_session(self)
+        if not session:
+            return False
+
+        subscription = session.query(UserSubscription).filter(
+            UserSubscription.user_id == self.id,
+            UserSubscription.status == SubscriptionStatus.ACTIVE
+        ).first()
+
+        if not subscription:
+            return False
+
+        # Check if subscription is expired
+        if subscription.expires_at and subscription.expires_at < datetime.now(timezone.utc):
+            return False
+
+        # Get subscription plan
+        from app.models.subscription import SubscriptionPlan
+        plan = session.query(SubscriptionPlan).filter(
+            SubscriptionPlan.id == subscription.plan_id
+        ).first()
+
+        # User is premium if they have any plan other than "free"
+        return plan and plan.name != "free"
+
+    def get_subscription_limits(self):
+        """Get user's current subscription limits"""
+        from app.models.subscription import UserSubscription, SubscriptionPlan, SubscriptionStatus
+        from sqlalchemy.orm import object_session
+
+        session = object_session(self)
+        if not session:
+            # Return free tier defaults
+            return {
+                "max_tarantulas": 15,
+                "can_use_breeding": False,
+                "max_photos_per_tarantula": 5,
+                "has_priority_support": False,
+                "is_premium": False
+            }
+
+        # Get active subscription
+        subscription = session.query(UserSubscription).filter(
+            UserSubscription.user_id == self.id,
+            UserSubscription.status == SubscriptionStatus.ACTIVE
+        ).first()
+
+        if not subscription:
+            # Return free tier defaults
+            return {
+                "max_tarantulas": 15,
+                "can_use_breeding": False,
+                "max_photos_per_tarantula": 5,
+                "has_priority_support": False,
+                "is_premium": False
+            }
+
+        # Get plan details
+        plan = session.query(SubscriptionPlan).filter(
+            SubscriptionPlan.id == subscription.plan_id
+        ).first()
+
+        if not plan:
+            # Fallback to free tier
+            return {
+                "max_tarantulas": 15,
+                "can_use_breeding": False,
+                "max_photos_per_tarantula": 5,
+                "has_priority_support": False,
+                "is_premium": False
+            }
+
+        return {
+            "max_tarantulas": plan.max_tarantulas,
+            "can_use_breeding": plan.can_use_breeding,
+            "max_photos_per_tarantula": plan.max_photos_per_tarantula,
+            "has_priority_support": plan.has_priority_support,
+            "is_premium": plan.name != "free"
+        }
