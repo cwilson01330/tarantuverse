@@ -55,6 +55,7 @@ class UserResponse(BaseModel):
     is_breeder: Optional[bool] = False
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
+    is_verified: Optional[bool] = False
     created_at: datetime
     # Community fields
     profile_bio: Optional[str] = None

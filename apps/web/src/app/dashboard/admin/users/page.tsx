@@ -194,6 +194,74 @@ export default function ManageUsersPage() {
                     </p>
                 </div>
 
+                {/* User Statistics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
+                                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
+                                    {users.length}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                                <span className="text-2xl">👥</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Verified</p>
+                                <p className="text-3xl font-bold text-green-600 dark:text-green-400 mt-2">
+                                    {users.filter(u => u.is_verified).length}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                                <span className="text-2xl">✓</span>
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            {users.length > 0 ? Math.round((users.filter(u => u.is_verified).length / users.length) * 100) : 0}% of total
+                        </p>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Unverified</p>
+                                <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400 mt-2">
+                                    {users.filter(u => !u.is_verified).length}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+                                <span className="text-2xl">⚠</span>
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            {users.length > 0 ? Math.round((users.filter(u => !u.is_verified).length / users.length) * 100) : 0}% of total
+                        </p>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-6 border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Superadmins</p>
+                                <p className="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-2">
+                                    {users.filter(u => u.is_superuser).length}
+                                </p>
+                            </div>
+                            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                                <span className="text-2xl">👑</span>
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            Admin accounts
+                        </p>
+                    </div>
+                </div>
+
                 <div className="mb-6">
                     <input
                         type="text"
