@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { useSubscription } from '@/hooks/useSubscription'
 import GrowthChart from '@/components/GrowthChart'
 import FeedingStatsCard from '@/components/FeedingStatsCard'
 import DashboardLayout from '@/components/DashboardLayout'
+import UpgradeModal from '@/components/UpgradeModal'
 
 interface Tarantula {
   id: string
@@ -163,6 +165,7 @@ export default function TarantulaDetailPage() {
   const params = useParams()
   const id = params?.id as string
   const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { canAddPhoto, isPremium } = useSubscription()
 
   const [tarantula, setTarantula] = useState<Tarantula | null>(null)
   const [feedings, setFeedings] = useState<FeedingLog[]>([])
@@ -183,6 +186,7 @@ export default function TarantulaDetailPage() {
   const [showPhotoUpload, setShowPhotoUpload] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [feedingFormData, setFeedingFormData] = useState({
     fed_at: new Date().toISOString().slice(0, 16),
     food_type: '',
@@ -646,6 +650,14 @@ export default function TarantulaDetailPage() {
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
+
+    // Check if user can add more photos
+    if (!canAddPhoto(photos.length)) {
+      setShowUpgradeModal(true)
+      // Clear the file input
+      event.target.value = ''
+      return
+    }
 
     try {
       setUploadingPhoto(true)
@@ -1971,6 +1983,14 @@ export default function TarantulaDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        feature="Unlimited Photos"
+        description="You've reached the free tier limit of 5 photos per tarantula. Upgrade to Premium for unlimited photo uploads!"
+      />
       </div>
     </DashboardLayout>
   )
