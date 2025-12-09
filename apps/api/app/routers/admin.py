@@ -107,6 +107,60 @@ async def resend_verification_email(
     return {"message": f"Verification email sent to {user.email}"}
 
 
+@router.post("/users/{user_id}/verify")
+async def manually_verify_user(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Manually verify a user (bypass email verification) - Superuser only
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    if user.is_verified:
+        return {"message": f"User {user.email} is already verified"}
+
+    # Verify the user
+    user.is_verified = True
+    user.verification_token = None
+    user.verification_token_expires_at = None
+    db.commit()
+
+    return {"message": f"Successfully verified {user.email}"}
+
+
+@router.post("/users/verify-all")
+async def verify_all_users(
+    db: Session = Depends(get_db)
+):
+    """
+    Verify ALL unverified users (useful for development/testing) - Superuser only
+    """
+    unverified_users = db.query(User).filter(User.is_verified == False).all()
+
+    count = len(unverified_users)
+
+    if count == 0:
+        return {"message": "All users are already verified", "verified_count": 0}
+
+    for user in unverified_users:
+        user.is_verified = True
+        user.verification_token = None
+        user.verification_token_expires_at = None
+
+    db.commit()
+
+    return {
+        "message": f"Successfully verified {count} users",
+        "verified_count": count
+    }
+
+
 @router.post("/test-email")
 async def test_email_sending(
     test_email: str,

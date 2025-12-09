@@ -24,6 +24,8 @@ export default function ManageUsersPage() {
     const [resetLoading, setResetLoading] = useState<string | null>(null);
     const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
     const [grantLoading, setGrantLoading] = useState<string | null>(null);
+    const [manualVerifyLoading, setManualVerifyLoading] = useState<string | null>(null);
+    const [verifyAllLoading, setVerifyAllLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -164,6 +166,76 @@ export default function ManageUsersPage() {
         }
     };
 
+    const handleManualVerify = async (userId: string, email: string) => {
+        if (!confirm(`Manually verify ${email}? This will bypass email verification.`)) {
+            return;
+        }
+
+        setManualVerifyLoading(userId);
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/api/v1/admin/users/${userId}/verify`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                alert(`✅ Successfully verified ${email}!`);
+                // Refresh users list
+                fetchUsers(searchQuery);
+            } else {
+                const error = await response.json();
+                alert(`Failed to verify: ${error.detail}`);
+            }
+        } catch (error) {
+            console.error('Error verifying user:', error);
+            alert('Error verifying user');
+        } finally {
+            setManualVerifyLoading(null);
+        }
+    };
+
+    const handleVerifyAll = async () => {
+        const unverifiedCount = users.filter(u => !u.is_verified).length;
+
+        if (unverifiedCount === 0) {
+            alert('All users are already verified!');
+            return;
+        }
+
+        if (!confirm(`Verify ALL ${unverifiedCount} unverified users? This will bypass email verification for all of them.`)) {
+            return;
+        }
+
+        setVerifyAllLoading(true);
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/api/v1/admin/users/verify-all`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                alert(`✅ ${data.message}`);
+                // Refresh users list
+                fetchUsers(searchQuery);
+            } else {
+                const error = await response.json();
+                alert(`Failed to verify all: ${error.detail}`);
+            }
+        } catch (error) {
+            console.error('Error verifying all users:', error);
+            alert('Error verifying all users');
+        } finally {
+            setVerifyAllLoading(false);
+        }
+    };
+
     if (loading || authLoading) {
         return (
             <DashboardLayout
@@ -262,7 +334,7 @@ export default function ManageUsersPage() {
                     </div>
                 </div>
 
-                <div className="mb-6">
+                <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                     <input
                         type="text"
                         placeholder="Search users by email, username, or name..."
@@ -270,6 +342,15 @@ export default function ManageUsersPage() {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full sm:w-96 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                     />
+                    {users.filter(u => !u.is_verified).length > 0 && (
+                        <button
+                            onClick={handleVerifyAll}
+                            disabled={verifyAllLoading}
+                            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition disabled:opacity-50 whitespace-nowrap"
+                        >
+                            {verifyAllLoading ? 'Verifying...' : `✓ Verify All (${users.filter(u => !u.is_verified).length})`}
+                        </button>
+                    )}
                 </div>
 
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
@@ -340,13 +421,22 @@ export default function ManageUsersPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col gap-2">
                                                 {!user.is_verified && (
-                                                    <button
-                                                        onClick={() => handleResendVerification(user.id, user.email)}
-                                                        disabled={verifyLoading === user.id}
-                                                        className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
-                                                    >
-                                                        {verifyLoading === user.id ? 'Sending...' : 'Resend Verification'}
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleManualVerify(user.id, user.email)}
+                                                            disabled={manualVerifyLoading === user.id}
+                                                            className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
+                                                        >
+                                                            {manualVerifyLoading === user.id ? 'Verifying...' : '✓ Manual Verify'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleResendVerification(user.id, user.email)}
+                                                            disabled={verifyLoading === user.id}
+                                                            className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
+                                                        >
+                                                            {verifyLoading === user.id ? 'Sending...' : 'Resend Verification'}
+                                                        </button>
+                                                    </>
                                                 )}
                                                 <button
                                                     onClick={() => handleResetPassword(user.id, user.email)}
