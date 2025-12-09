@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { useSubscription } from '@/hooks/useSubscription'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 
@@ -47,6 +48,7 @@ interface Offspring {
 export default function BreedingPage() {
   const router = useRouter()
   const { user, token, isAuthenticated, isLoading } = useAuth()
+  const { canUseBreeding, loading: subLoading } = useSubscription()
   const [activeTab, setActiveTab] = useState<'pairings' | 'egg-sacs' | 'offspring'>('pairings')
   const [pairings, setPairings] = useState<Pairing[]>([])
   const [eggSacs, setEggSacs] = useState<EggSac[]>([])
@@ -131,11 +133,93 @@ export default function BreedingPage() {
     }
   }
 
-  if (isLoading || loading) {
+  if (isLoading || loading || subLoading) {
     return (
       <DashboardLayout userName="Loading..." userEmail="">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <p className="text-gray-900 dark:text-white">Loading breeding data...</p>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Premium gate - show upgrade prompt if user doesn't have breeding access
+  if (!canUseBreeding()) {
+    return (
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-3xl p-12 text-center border-2 border-purple-200 dark:border-purple-800 shadow-2xl">
+            {/* Premium Badge */}
+            <div className="w-24 h-24 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
+              <span className="text-5xl">💎</span>
+            </div>
+
+            {/* Title */}
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Breeding Module
+            </h1>
+            <p className="text-xl text-purple-600 dark:text-purple-400 font-semibold mb-6">
+              Premium Feature
+            </p>
+
+            {/* Description */}
+            <p className="text-gray-700 dark:text-gray-300 mb-8 max-w-2xl mx-auto text-lg">
+              Unlock the complete breeding management system to track pairings, egg sacs, and offspring. Perfect for serious breeders who want to maintain detailed breeding records.
+            </p>
+
+            {/* Features list */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 mb-8 border border-purple-200 dark:border-purple-700 max-w-xl mx-auto">
+              <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white">Breeding Module includes:</h3>
+              <ul className="space-y-3 text-left">
+                <li className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-0.5">✓</span>
+                  <span className="text-gray-700 dark:text-gray-300">Pairing records with outcome tracking</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-0.5">✓</span>
+                  <span className="text-gray-700 dark:text-gray-300">Egg sac monitoring and development tracking</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-0.5">✓</span>
+                  <span className="text-gray-700 dark:text-gray-300">Offspring management with sales tracking</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-green-500 text-xl mt-0.5">✓</span>
+                  <span className="text-gray-700 dark:text-gray-300">Complete lineage and breeding history</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
+              <button
+                onClick={() => router.push('/pricing')}
+                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-2xl transition font-bold text-lg"
+              >
+                View Premium Plans
+              </button>
+              <button
+                onClick={() => router.push('/dashboard/settings')}
+                className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-purple-600 dark:border-purple-500 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 transition font-bold text-lg"
+              >
+                Redeem Promo Code
+              </button>
+            </div>
+
+            {/* Back link */}
+            <div className="mt-8">
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition font-medium"
+              >
+                ← Back to Dashboard
+              </button>
+            </div>
+          </div>
         </div>
       </DashboardLayout>
     )
@@ -150,7 +234,7 @@ export default function BreedingPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Breeding Records</h1>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Breeding Records 💎</h1>
           <p className="text-gray-600 dark:text-gray-400">Track pairings, egg sacs, and offspring</p>
         </div>
 

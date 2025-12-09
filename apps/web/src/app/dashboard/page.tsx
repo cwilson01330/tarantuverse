@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { useSubscription } from '@/hooks/useSubscription'
 import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonCard } from '@/components/ui/skeleton'
 import DashboardLayout from '@/components/DashboardLayout'
+import UpgradeModal from '@/components/UpgradeModal'
 
 interface Tarantula {
   id: string
@@ -32,6 +34,7 @@ interface PremoltPrediction {
 export default function DashboardPage() {
   const router = useRouter()
   const { user, token, isAuthenticated, isLoading } = useAuth()
+  const { canAddTarantula, isPremium } = useSubscription()
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
@@ -39,6 +42,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null)
   const [showWarning, setShowWarning] = useState(true)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+
+  const handleAddTarantula = () => {
+    if (!canAddTarantula(tarantulas.length)) {
+      setShowUpgradeModal(true)
+    } else {
+      router.push('/dashboard/tarantulas/add')
+    }
+  }
 
   // Helper function to handle both R2 (absolute) and local (relative) URLs
   const getImageUrl = (url?: string) => {
@@ -374,7 +386,7 @@ export default function DashboardPage() {
                   Start tracking your tarantulas by adding your first one! Keep detailed records of feedings, molts, and husbandry.
                 </p>
                 <button
-                  onClick={() => router.push('/dashboard/tarantulas/add')}
+                  onClick={handleAddTarantula}
                   className="px-8 py-4 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
                 >
                   ➕ Add First Tarantula
@@ -393,7 +405,7 @@ export default function DashboardPage() {
                     {searchQuery ? `Search Results (${filteredTarantulas.length})` : 'My Collection'}
                   </h2>
                   <button
-                    onClick={() => router.push('/dashboard/tarantulas/add')}
+                    onClick={handleAddTarantula}
                     className="px-6 py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
                   >
                     ➕ Add Tarantula
@@ -503,13 +515,21 @@ export default function DashboardPage() {
       {/* Floating Action Button (Mobile-friendly) */}
       {tarantulas.length > 0 && (
         <button
-          onClick={() => router.push('/dashboard/tarantulas/add')}
+          onClick={handleAddTarantula}
           className="fixed bottom-6 right-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-brand text-white shadow-2xl shadow-gradient-brand hover:scale-110 hover:shadow-2xl transition-all duration-200 flex items-center justify-center text-2xl sm:text-3xl z-50"
           aria-label="Add tarantula"
         >
           ➕
         </button>
       )}
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        feature="Unlimited Tarantulas"
+        description="You've reached the free tier limit of 15 tarantulas. Upgrade to Premium for unlimited tracking!"
+      />
     </DashboardLayout>
   )
 }
