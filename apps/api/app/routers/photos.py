@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 from typing import Optional
 import uuid
@@ -44,10 +44,26 @@ async def upload_photo(
         Tarantula.id == tarantula_id,
         Tarantula.user_id == current_user.id
     ).first()
-    
+
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
-    
+
+    # Check photo count limit
+    limits = current_user.get_subscription_limits()
+    current_photo_count = db.query(Photo).filter(Photo.tarantula_id == tarantula_id).count()
+
+    # -1 means unlimited (premium)
+    if limits["max_photos_per_tarantula"] != -1 and current_photo_count >= limits["max_photos_per_tarantula"]:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": f"You've reached the limit of {limits['max_photos_per_tarantula']} photos per tarantula on the free plan. Upgrade to premium for unlimited photos!",
+                "current_count": current_photo_count,
+                "limit": limits["max_photos_per_tarantula"],
+                "is_premium": limits["is_premium"]
+            }
+        )
+
     # Validate file type
     if not file.content_type or not file.content_type.startswith('image/'):
         raise HTTPException(status_code=400, detail="File must be an image")
