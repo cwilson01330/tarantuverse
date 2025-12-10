@@ -17,6 +17,8 @@ from app.models.notification_preferences import NotificationPreferences
 from app.models.pairing import Pairing
 from app.models.egg_sac import EggSac
 from app.models.offspring import Offspring
+from app.models.user_block import UserBlock
+from app.models.content_report import ContentReport
 
 __all__ = [
     "User",
@@ -39,4 +41,6 @@ __all__ = [
     "Pairing",
     "EggSac",
     "Offspring",
+    "UserBlock",
+    "ContentReport",
 ]

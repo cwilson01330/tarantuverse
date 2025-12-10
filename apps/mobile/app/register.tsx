@@ -24,12 +24,18 @@ export default function RegisterScreen() {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const handleRegister = async () => {
     if (!email || !username || !password || !confirmPassword) {
       Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (!agreedToTerms) {
+      Alert.alert('Error', 'You must agree to the Terms of Service and Community Guidelines to create an account');
       return;
     }
 
@@ -123,6 +129,42 @@ export default function RegisterScreen() {
       color: colors.primary,
       fontSize: 14,
     },
+    termsContainer: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 16,
+      marginTop: 8,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 4,
+      borderWidth: 2,
+      borderColor: colors.border,
+      marginRight: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 2,
+    },
+    checkboxChecked: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    checkmark: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+    termsText: {
+      flex: 1,
+      fontSize: 13,
+      color: colors.textSecondary,
+      lineHeight: 18,
+    },
+    termsLink: {
+      color: colors.primary,
+      textDecorationLine: 'underline',
+    },
   });
 
   // Show success screen if registration was successful
@@ -206,6 +248,34 @@ export default function RegisterScreen() {
               secureTextEntry
               editable={!loading}
             />
+
+            {/* Terms of Service Agreement */}
+            <View style={styles.termsContainer}>
+              <TouchableOpacity
+                style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}
+                onPress={() => setAgreedToTerms(!agreedToTerms)}
+                disabled={loading}
+              >
+                {agreedToTerms && <Text style={styles.checkmark}>✓</Text>}
+              </TouchableOpacity>
+              <Text style={styles.termsText}>
+                I agree to the{' '}
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => router.push('/terms')}
+                >
+                  Terms of Service
+                </Text>{' '}
+                and{' '}
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => router.push('/terms')}
+                >
+                  Community Guidelines
+                </Text>
+                . I understand there is zero tolerance for objectionable content or abusive behavior.
+              </Text>
+            </View>
 
             <TouchableOpacity
               style={[styles.button, loading && styles.buttonDisabled]}

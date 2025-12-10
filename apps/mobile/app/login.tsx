@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 
@@ -165,6 +166,11 @@ export default function LoginScreen() {
     oauthIcon: {
       fontSize: 24,
     },
+    appleButton: {
+      width: '100%',
+      height: 50,
+      marginBottom: 12,
+    },
   });
 
   return (
@@ -235,20 +241,13 @@ export default function LoginScreen() {
 
           {/* Apple Sign In (iOS only) */}
           {Platform.OS === 'ios' && (
-            <TouchableOpacity
-              style={styles.oauthButton}
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={8}
+              style={styles.appleButton}
               onPress={handleAppleLogin}
-              disabled={loading || oauthLoading !== null}
-            >
-              {oauthLoading === 'apple' ? (
-                <ActivityIndicator color={colors.textPrimary} />
-              ) : (
-                <>
-                  <Text style={styles.oauthIcon}>🍎</Text>
-                  <Text style={styles.oauthButtonText}>Continue with Apple</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            />
           )}
 
           <TouchableOpacity
