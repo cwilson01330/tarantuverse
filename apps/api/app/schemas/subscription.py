@@ -72,3 +72,17 @@ class FeatureAccess(BaseModel):
     feature: str
     plan_name: Optional[str] = None
     reason: Optional[str] = None
+
+
+# Receipt Validation Schemas
+class ReceiptValidationRequest(BaseModel):
+    platform: str  # 'ios' or 'android'
+    receipt: str  # Transaction receipt data
+    product_id: str  # Product ID (e.g., 'com.tarantuverse.premium.monthly')
+    transaction_id: str  # Transaction ID from store
+
+
+class ReceiptValidationResponse(BaseModel):
+    success: bool
+    message: str
+    subscription: Optional[UserSubscriptionWithPlan] = None

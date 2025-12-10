@@ -17,7 +17,9 @@ from app.schemas.subscription import (
     UserSubscription as UserSubscriptionSchema,
     UserSubscriptionCreate,
     UserSubscriptionWithPlan,
-    FeatureAccess
+    FeatureAccess,
+    ReceiptValidationRequest,
+    ReceiptValidationResponse
 )
 from app.utils.dependencies import get_current_user
 
@@ -158,17 +160,17 @@ def check_feature_access(
             UserSubscription.status == SubscriptionStatus.ACTIVE
         )
     ).first()
-    
+
     if not subscription:
         return FeatureAccess(
             has_access=False,
             feature=feature,
             reason="No active subscription"
         )
-    
+
     plan = subscription.plan
     has_access = False
-    
+
     # Check feature access
     if feature == "edit_species":
         has_access = plan.can_edit_species
@@ -178,10 +180,92 @@ def check_feature_access(
         has_access = plan.has_advanced_filters
     elif feature == "priority_support":
         has_access = plan.has_priority_support
-    
+
     return FeatureAccess(
         has_access=has_access,
         feature=feature,
         plan_name=plan.name,
         reason=None if has_access else f"Requires premium subscription"
+    )
+
+
+@router.post("/validate-receipt", response_model=ReceiptValidationResponse)
+def validate_receipt(
+    receipt_data: ReceiptValidationRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Validate an Apple/Google in-app purchase receipt and activate subscription
+
+    For MVP: Basic validation and subscription activation
+    Production TODO: Validate with Apple/Google servers
+    """
+    # Map product IDs to subscription plans
+    product_to_plan_map = {
+        "com.tarantuverse.premium.monthly": "monthly",
+        "com.tarantuverse.premium.yearly": "yearly",
+        "com.tarantuverse.lifetime": "lifetime"
+    }
+
+    plan_name = product_to_plan_map.get(receipt_data.product_id)
+
+    if not plan_name:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown product ID: {receipt_data.product_id}"
+        )
+
+    # Get the subscription plan
+    plan = db.query(SubscriptionPlan).filter(
+        SubscriptionPlan.name == plan_name
+    ).first()
+
+    if not plan:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Subscription plan '{plan_name}' not found"
+        )
+
+    # Check if user already has an active subscription
+    existing = db.query(UserSubscription).filter(
+        and_(
+            UserSubscription.user_id == current_user.id,
+            UserSubscription.status == SubscriptionStatus.ACTIVE
+        )
+    ).first()
+
+    if existing:
+        # Cancel existing subscription
+        existing.status = SubscriptionStatus.CANCELLED
+        existing.cancelled_at = datetime.utcnow()
+
+    # Create new subscription
+    # Set expiry based on plan type
+    expires_at = None
+    if plan_name == "monthly":
+        expires_at = datetime.utcnow() + timedelta(days=30)
+    elif plan_name == "yearly":
+        expires_at = datetime.utcnow() + timedelta(days=365)
+    # Lifetime has no expiry
+
+    new_subscription = UserSubscription(
+        user_id=current_user.id,
+        plan_id=plan.id,
+        status=SubscriptionStatus.ACTIVE,
+        expires_at=expires_at,
+        payment_provider="apple" if receipt_data.platform == "ios" else "google",
+        payment_provider_id=receipt_data.transaction_id,
+        subscription_source=plan_name,
+        auto_renew=True if plan_name in ["monthly", "yearly"] else False
+    )
+
+    db.add(new_subscription)
+    db.commit()
+    db.refresh(new_subscription)
+
+    return ReceiptValidationResponse(
+        success=True,
+        message=f"Subscription activated successfully",
+        subscription=new_subscription
     )

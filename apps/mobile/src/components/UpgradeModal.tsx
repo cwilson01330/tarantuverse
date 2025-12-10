@@ -1,5 +1,6 @@
 import React from 'react';
 import { Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface UpgradeModalProps {
@@ -18,6 +19,12 @@ export default function UpgradeModal({
   feature,
 }: UpgradeModalProps) {
   const { theme } = useTheme();
+  const router = useRouter();
+
+  const handleUpgrade = () => {
+    onClose();
+    router.push('/subscription');
+  };
 
   const plans = [
     {
@@ -147,6 +154,7 @@ export default function UpgradeModal({
                         ? styles.chooseButtonPopular
                         : { backgroundColor: theme.isDark ? theme.backgroundElevated : '#f3f4f6', borderColor: theme.border },
                     ]}
+                    onPress={handleUpgrade}
                   >
                     <Text
                       style={[

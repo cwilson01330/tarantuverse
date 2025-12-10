@@ -7,6 +7,10 @@ export default function PricingScreen() {
   const router = useRouter();
   const { theme } = useTheme();
 
+  const handleChoosePlan = () => {
+    router.push('/subscription');
+  };
+
   const plans = [
     {
       name: 'Free',
@@ -141,6 +145,7 @@ export default function PricingScreen() {
                   ? styles.ctaButtonPopular
                   : { backgroundColor: theme.isDark ? theme.backgroundElevated : '#f3f4f6', borderColor: theme.border },
               ]}
+              onPress={plan.name === 'Free' ? () => router.push('/register') : handleChoosePlan}
             >
               <Text
                 style={[
@@ -174,7 +179,7 @@ export default function PricingScreen() {
           ))}
         </View>
 
-        <TouchableOpacity style={styles.lifetimeButton}>
+        <TouchableOpacity style={styles.lifetimeButton} onPress={handleChoosePlan}>
           <Text style={styles.lifetimeButtonText}>{lifetimePlan.cta}</Text>
         </TouchableOpacity>
       </View>
