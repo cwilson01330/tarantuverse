@@ -94,7 +94,7 @@ Existing users and early adopters may qualify for promotional codes granting fre
 • GDPR compliant
 
 ### 📱 CROSS-PLATFORM
-• Native iOS and Android apps
+• Native iOS app
 • Full-featured web dashboard
 • Seamless sync across all devices
 
