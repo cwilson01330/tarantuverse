@@ -16,7 +16,8 @@
       "bundleIdentifier": "com.tarantuverse.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.tarantuverse.app",

@@ -1,5 +1,6 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { Platform } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 // OAuth Configuration
 const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '';
@@ -121,6 +122,75 @@ export const signInWithApple = async (): Promise<{
     avatar_url?: string;
   };
 }> => {
-  // Apple Sign In requires native module - will implement when building production app
-  throw new Error('Apple Sign In not yet implemented - use Google OAuth or email/password');
+  try {
+    console.log('[AppleSignIn] Starting Apple Sign-In flow...');
+
+    // Check if Apple Authentication is available (iOS 13+)
+    const isAvailable = await AppleAuthentication.isAvailableAsync();
+    if (!isAvailable) {
+      throw new Error('Apple Sign In is not available on this device');
+    }
+
+    // Request Apple Sign In
+    const credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+
+    console.log('[AppleSignIn] Sign-in successful, sending to backend...');
+
+    // Extract user info from credential
+    const appleUser = credential.user; // This is the unique Apple user ID (sub)
+    const email = credential.email; // Only provided on first sign in
+    const fullName = credential.fullName;
+
+    // Construct name from fullName if available
+    let name = '';
+    if (fullName) {
+      const firstName = fullName.givenName || '';
+      const lastName = fullName.familyName || '';
+      name = `${firstName} ${lastName}`.trim();
+    }
+
+    console.log('[AppleSignIn] User info:', { appleUser, email, name });
+
+    // Send to backend (similar to Google OAuth)
+    const response = await fetch(`${API_URL}/api/v1/auth/oauth-login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        provider: 'apple',
+        email: email || `${appleUser}@privaterelay.appleid.com`, // Apple private relay if email hidden
+        name: name || 'Apple User',
+        id: appleUser, // This is the 'sub' claim - unique Apple user identifier
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Apple OAuth login failed');
+    }
+
+    const data = await response.json();
+
+    console.log('[AppleSignIn] Login successful!');
+
+    return {
+      accessToken: data.access_token,
+      user: data.user,
+    };
+  } catch (error: any) {
+    console.error('[AppleSignIn] Error:', error);
+
+    // Check for user cancellation
+    if (error.code === 'ERR_CANCELED' || error.code === 'ERR_REQUEST_CANCELED') {
+      throw new Error('Apple Sign In was cancelled');
+    }
+
+    throw error;
+  }
 };
