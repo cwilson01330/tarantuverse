@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Linking, Alert, ActionSheetIOS, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -68,6 +68,7 @@ export default function KeeperProfileScreen() {
   const [activeTab, setActiveTab] = useState<'collection' | 'about'>('collection');
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -81,6 +82,7 @@ export default function KeeperProfileScreen() {
         const userData = JSON.parse(userJson);
         setCurrentUser(userData);
         checkFollowingStatus();
+        checkBlockStatus();
       }
     } catch (error) {
       // Silently fail - will show login prompt if needed
@@ -102,6 +104,24 @@ export default function KeeperProfileScreen() {
       }
     } catch (error) {
       // Silently fail - follow status will default to false
+    }
+  };
+
+  const checkBlockStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('auth_token');
+      if (!token || !profile?.id) return;
+
+      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/v1/blocks/check/${profile.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setIsBlocked(data.you_blocked_them);
+      }
+    } catch (error) {
+      // Silently fail
     }
   };
 
@@ -221,25 +241,36 @@ export default function KeeperProfileScreen() {
     if (blocking || !profile) return;
 
     Alert.alert(
-      'Block User',
-      `Block ${profile.display_name}? They will no longer be able to message you.`,
+      isBlocked ? 'Unblock User' : 'Block User',
+      isBlocked
+        ? `Unblock ${profile.display_name}?`
+        : `Block ${profile.display_name}? They will no longer be able to message you and their content will be hidden.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Block',
-          style: 'destructive',
+          text: isBlocked ? 'Unblock' : 'Block',
+          style: isBlocked ? 'default' : 'destructive',
           onPress: async () => {
             setBlocking(true);
             try {
-              await apiClient.post('/blocks/', {
-                blocked_id: profile.id,
-                reason: 'Blocked from profile',
-              });
-              Alert.alert('User Blocked', 'You will no longer see content from this user.', [
-                { text: 'OK', onPress: () => router.back() }
-              ]);
+              if (isBlocked) {
+                // Unblock
+                await apiClient.delete(`/blocks/${profile.id}`);
+                setIsBlocked(false);
+                Alert.alert('User Unblocked', 'You will now see content from this user.');
+              } else {
+                // Block
+                await apiClient.post('/blocks/', {
+                  blocked_id: profile.id,
+                  reason: 'Blocked from profile',
+                });
+                setIsBlocked(true);
+                Alert.alert('User Blocked', 'You will no longer see content from this user.', [
+                  { text: 'OK', onPress: () => router.back() }
+                ]);
+              }
             } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.detail || 'Failed to block user');
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to update block status');
             } finally {
               setBlocking(false);
             }
@@ -247,37 +278,6 @@ export default function KeeperProfileScreen() {
         },
       ]
     );
-  };
-
-  const showActions = () => {
-    if (!profile) return;
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Report User', 'Block User'],
-          destructiveButtonIndex: 2,
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            setReportModalVisible(true);
-          } else if (buttonIndex === 2) {
-            handleBlockUser();
-          }
-        }
-      );
-    } else {
-      Alert.alert(
-        'Actions',
-        '',
-        [
-          { text: 'Report User', onPress: () => setReportModalVisible(true) },
-          { text: 'Block User', onPress: handleBlockUser, style: 'destructive' },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
-    }
   };
 
   const handleMessage = async () => {
@@ -310,6 +310,11 @@ export default function KeeperProfileScreen() {
     ).join(' ');
   };
 
+  const isViewingOwnProfile = currentUser && (
+    currentUser.username === username ||
+    currentUser.email?.split('@')[0] === username
+  );
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -321,6 +326,34 @@ export default function KeeperProfileScreen() {
       alignItems: 'center',
       backgroundColor: colors.background,
       padding: 32,
+    },
+    headerBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 8,
+    },
+    backButtonText: {
+      fontSize: 16,
+      color: colors.primary,
+      marginLeft: 4,
+      fontWeight: '600',
+    },
+    headerActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    iconButton: {
+      padding: 8,
     },
     profileHeader: {
       backgroundColor: colors.surface,
@@ -372,7 +405,7 @@ export default function KeeperProfileScreen() {
     },
     actionButtons: {
       flexDirection: 'row',
-      gap: 12,
+      gap: 8,
       marginBottom: 16,
       width: '100%',
       paddingHorizontal: 20,
@@ -382,14 +415,14 @@ export default function KeeperProfileScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
+      gap: 6,
       backgroundColor: colors.primary,
-      paddingVertical: 12,
+      paddingVertical: 10,
       borderRadius: 12,
     },
     followButtonText: {
       color: '#ffffff',
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: '600',
     },
     followingButton: {
@@ -405,16 +438,50 @@ export default function KeeperProfileScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
+      gap: 6,
       backgroundColor: colors.surface,
       borderWidth: 2,
       borderColor: colors.primary,
-      paddingVertical: 12,
+      paddingVertical: 10,
       borderRadius: 12,
     },
     messageButtonText: {
       color: colors.primary,
-      fontSize: 16,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    blockButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: '#dc2626',
+      paddingVertical: 10,
+      borderRadius: 12,
+    },
+    blockButtonText: {
+      color: '#dc2626',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    reportButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: '#f59e0b',
+      paddingVertical: 10,
+      borderRadius: 12,
+    },
+    reportButtonText: {
+      color: '#f59e0b',
+      fontSize: 14,
       fontWeight: '600',
     },
     profileInfo: {
@@ -645,13 +712,13 @@ export default function KeeperProfileScreen() {
       marginBottom: 24,
       textAlign: 'center',
     },
-    backButton: {
+    errorBackButton: {
       paddingHorizontal: 24,
       paddingVertical: 12,
       backgroundColor: colors.primary,
       borderRadius: 12,
     },
-    backButtonText: {
+    errorBackButtonText: {
       color: '#ffffff',
       fontSize: 16,
       fontWeight: '600',
@@ -674,10 +741,10 @@ export default function KeeperProfileScreen() {
         <Text style={styles.errorTitle}>Profile Not Available</Text>
         <Text style={styles.errorText}>{error || 'Keeper not found'}</Text>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles.errorBackButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Text style={styles.errorBackButtonText}>← Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -687,17 +754,14 @@ export default function KeeperProfileScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: profile.display_name,
-          headerBackTitle: 'Community',
-          headerRight: currentUser && currentUser.username !== username ? () => (
-            <TouchableOpacity onPress={showActions} style={{ marginRight: 8 }}>
-              <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.primary} />
-            </TouchableOpacity>
-          ) : undefined,
-        }}
-      />
+      {/* Custom Header Bar */}
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={styles.container}
         refreshControl={
@@ -721,27 +785,41 @@ export default function KeeperProfileScreen() {
             <Text style={styles.displayName}>{profile.display_name}</Text>
             <Text style={styles.username}>@{profile.username}</Text>
 
-            {/* Action Buttons */}
-            {currentUser && currentUser.username !== username && (
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={[styles.followButton, isFollowing && styles.followingButton]}
-                  onPress={handleFollowToggle}
-                >
-                  <MaterialCommunityIcons
-                    name={isFollowing ? "account-check" : "account-plus"}
-                    size={20}
-                    color={isFollowing ? colors.primary : "#ffffff"}
-                  />
-                  <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
-                    {isFollowing ? 'Following' : 'Follow'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
-                  <MaterialCommunityIcons name="message" size={20} color={colors.primary} />
-                  <Text style={styles.messageButtonText}>Message</Text>
-                </TouchableOpacity>
-              </View>
+            {/* Action Buttons - Show for other users */}
+            {currentUser && !isViewingOwnProfile && (
+              <>
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={[styles.followButton, isFollowing && styles.followingButton]}
+                    onPress={handleFollowToggle}
+                  >
+                    <MaterialCommunityIcons
+                      name={isFollowing ? "account-check" : "account-plus"}
+                      size={18}
+                      color={isFollowing ? colors.primary : "#ffffff"}
+                    />
+                    <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
+                      {isFollowing ? 'Following' : 'Follow'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
+                    <MaterialCommunityIcons name="message" size={18} color={colors.primary} />
+                    <Text style={styles.messageButtonText}>Message</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Moderation Buttons */}
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity style={styles.blockButton} onPress={handleBlockUser}>
+                    <MaterialCommunityIcons name="block-helper" size={18} color="#dc2626" />
+                    <Text style={styles.blockButtonText}>{isBlocked ? 'Unblock' : 'Block'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.reportButton} onPress={() => setReportModalVisible(true)}>
+                    <MaterialCommunityIcons name="alert" size={18} color="#f59e0b" />
+                    <Text style={styles.reportButtonText}>Report</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
 
             {/* Profile Info */}
