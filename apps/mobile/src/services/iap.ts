@@ -1,11 +1,5 @@
 import { Platform } from 'react-native';
-import * as RNIap from 'react-native-iap';
-import {
-  Product,
-  Purchase,
-  PurchaseError,
-  SubscriptionPurchase,
-} from 'react-native-iap';
+import * as InAppPurchases from 'expo-in-app-purchases';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -35,13 +29,8 @@ export const LIFETIME_SKU = Platform.select({
 export const initializeIAP = async (): Promise<void> => {
   try {
     console.log('[IAP] Initializing connection...');
-    await RNIap.initConnection();
+    await InAppPurchases.connectAsync();
     console.log('[IAP] Connection initialized successfully');
-
-    // Clear any pending transactions (important for testing)
-    if (Platform.OS === 'ios') {
-      await RNIap.clearTransactionIOS();
-    }
   } catch (error) {
     console.error('[IAP] Failed to initialize:', error);
     throw error;
@@ -54,7 +43,7 @@ export const initializeIAP = async (): Promise<void> => {
  */
 export const endIAP = async (): Promise<void> => {
   try {
-    await RNIap.endConnection();
+    await InAppPurchases.disconnectAsync();
     console.log('[IAP] Connection ended');
   } catch (error) {
     console.error('[IAP] Failed to end connection:', error);
@@ -64,12 +53,12 @@ export const endIAP = async (): Promise<void> => {
 /**
  * Fetch available subscription products
  */
-export const getSubscriptionProducts = async (): Promise<Product[]> => {
+export const getSubscriptionProducts = async (): Promise<InAppPurchases.InAppPurchase[]> => {
   try {
     console.log('[IAP] Fetching products:', SUBSCRIPTION_SKUS);
-    const products = await RNIap.getSubscriptions({ skus: SUBSCRIPTION_SKUS });
-    console.log('[IAP] Products fetched:', products);
-    return products;
+    const { results } = await InAppPurchases.getProductsAsync(SUBSCRIPTION_SKUS);
+    console.log('[IAP] Products fetched:', results);
+    return results;
   } catch (error) {
     console.error('[IAP] Failed to fetch products:', error);
     throw error;
@@ -81,33 +70,28 @@ export const getSubscriptionProducts = async (): Promise<Product[]> => {
  */
 export const purchaseSubscription = async (
   productId: string
-): Promise<SubscriptionPurchase | null> => {
+): Promise<InAppPurchases.InAppPurchaseResult | null> => {
   try {
     console.log('[IAP] Requesting subscription purchase:', productId);
 
-    const purchase = await RNIap.requestSubscription({
-      sku: productId,
-      ...(Platform.OS === 'android' && {
-        subscriptionOffers: [
-          {
-            sku: productId,
-            offerToken: '', // Will be filled by Google Play
-          },
-        ],
-      }),
-    });
+    const result = await InAppPurchases.purchaseItemAsync(productId);
 
-    console.log('[IAP] Purchase successful:', purchase);
-    return purchase as SubscriptionPurchase;
-  } catch (error) {
-    const purchaseError = error as PurchaseError;
-    console.error('[IAP] Purchase failed:', purchaseError);
+    console.log('[IAP] Purchase result:', result);
 
-    // User cancelled is not an error
-    if (purchaseError.code === 'E_USER_CANCELLED') {
+    // Check if purchase was successful
+    if (result.responseCode === InAppPurchases.IAPResponseCode.OK && result.results) {
+      return result;
+    }
+
+    // User cancelled or error
+    if (result.responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED) {
+      console.log('[IAP] User cancelled purchase');
       return null;
     }
 
+    throw new Error(`Purchase failed with code: ${result.responseCode}`);
+  } catch (error) {
+    console.error('[IAP] Purchase failed:', error);
     throw error;
   }
 };
@@ -117,11 +101,23 @@ export const purchaseSubscription = async (
  * Sends the purchase receipt to your server for Apple/Google validation
  */
 export const validateReceiptWithBackend = async (
-  purchase: SubscriptionPurchase,
+  purchase: InAppPurchases.InAppPurchase,
   token: string
 ): Promise<boolean> => {
   try {
     console.log('[IAP] Validating receipt with backend...');
+
+    // Get the transaction receipt
+    let receipt: string;
+    if (Platform.OS === 'ios') {
+      // For iOS, we need to get the app receipt
+      const { results } = await InAppPurchases.getPurchaseHistoryAsync();
+      const appReceipt = results && results.length > 0 ? results[0].transactionReceipt : '';
+      receipt = appReceipt || '';
+    } else {
+      // For Android, use the purchase token
+      receipt = purchase.purchaseToken || '';
+    }
 
     const response = await fetch(`${API_URL}/api/v1/subscriptions/validate-receipt`, {
       method: 'POST',
@@ -131,9 +127,9 @@ export const validateReceiptWithBackend = async (
       },
       body: JSON.stringify({
         platform: Platform.OS,
-        receipt: purchase.transactionReceipt,
+        receipt,
         product_id: purchase.productId,
-        transaction_id: purchase.transactionId,
+        transaction_id: purchase.orderId,
       }),
     });
 
@@ -145,12 +141,8 @@ export const validateReceiptWithBackend = async (
     const data = await response.json();
     console.log('[IAP] Receipt validated:', data);
 
-    // Acknowledge/finish the transaction
-    if (Platform.OS === 'ios') {
-      await RNIap.finishTransaction({ purchase: purchase as Purchase });
-    } else if (Platform.OS === 'android') {
-      await RNIap.acknowledgePurchaseAndroid({ token: purchase.purchaseToken! });
-    }
+    // Finish the transaction
+    await InAppPurchases.finishTransactionAsync(purchase, false);
 
     return true;
   } catch (error) {
@@ -172,16 +164,16 @@ export const restorePurchases = async (token: string): Promise<boolean> => {
       return true;
     }
 
-    const purchases = await RNIap.getAvailablePurchases();
-    console.log('[IAP] Available purchases:', purchases);
+    const { results } = await InAppPurchases.getPurchaseHistoryAsync();
+    console.log('[IAP] Purchase history:', results);
 
-    if (purchases.length === 0) {
+    if (!results || results.length === 0) {
       return false;
     }
 
     // Validate each purchase with backend
-    for (const purchase of purchases) {
-      await validateReceiptWithBackend(purchase as SubscriptionPurchase, token);
+    for (const purchase of results) {
+      await validateReceiptWithBackend(purchase, token);
     }
 
     return true;
@@ -197,14 +189,13 @@ export const restorePurchases = async (token: string): Promise<boolean> => {
  */
 export const checkSubscriptionStatus = async (): Promise<boolean> => {
   try {
-    const purchases = await RNIap.getAvailablePurchases();
+    const { results } = await InAppPurchases.getPurchaseHistoryAsync();
 
     // Check if any purchases are for our subscription products
-    const hasActiveSubscription = purchases.some((purchase) =>
-      SUBSCRIPTION_SKUS.includes(purchase.productId)
-    );
+    const hasActiveSubscription =
+      results && results.some((purchase) => SUBSCRIPTION_SKUS.includes(purchase.productId));
 
-    return hasActiveSubscription;
+    return hasActiveSubscription || false;
   } catch (error) {
     console.error('[IAP] Failed to check subscription status:', error);
     return false;

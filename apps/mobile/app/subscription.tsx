@@ -21,7 +21,7 @@ import {
   validateReceiptWithBackend,
   restorePurchases,
 } from '../src/services/iap';
-import { Product } from 'react-native-iap';
+import * as InAppPurchases from 'expo-in-app-purchases';
 
 export default function SubscriptionScreen() {
   const router = useRouter();
@@ -31,7 +31,7 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<InAppPurchases.InAppPurchase[]>([]);
   const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
@@ -72,16 +72,20 @@ export default function SubscriptionScreen() {
 
     try {
       // Request the purchase
-      const purchase = await purchaseSubscription(productId);
+      const result = await purchaseSubscription(productId);
 
-      if (!purchase) {
+      if (!result) {
         // User cancelled
         setPurchasing(false);
         return;
       }
 
-      // Validate with backend
-      await validateReceiptWithBackend(purchase, token);
+      // Validate with backend (use the first purchase from results)
+      if (result.results && result.results.length > 0) {
+        await validateReceiptWithBackend(result.results[0], token);
+      } else {
+        throw new Error('No purchase data received');
+      }
 
       Alert.alert(
         'Success! 🎉',
@@ -134,8 +138,11 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const formatPrice = (product: Product) => {
-    return product.localizedPrice || product.price || 'N/A';
+  const formatPrice = (product: InAppPurchases.InAppPurchase) => {
+    // expo-in-app-purchases formats the price as a string with currency
+    return product.priceAmountMicros
+      ? `$${(product.priceAmountMicros / 1000000).toFixed(2)}`
+      : 'N/A';
   };
 
   const styles = StyleSheet.create({
