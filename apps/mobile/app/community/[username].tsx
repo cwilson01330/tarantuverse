@@ -691,11 +691,11 @@ export default function KeeperProfileScreen() {
         options={{
           title: profile.display_name,
           headerBackTitle: 'Community',
-          headerRight: () => (
+          headerRight: currentUser && currentUser.username !== username ? () => (
             <TouchableOpacity onPress={showActions} style={{ marginRight: 8 }}>
               <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.primary} />
             </TouchableOpacity>
-          ),
+          ) : undefined,
         }}
       />
       <ScrollView
