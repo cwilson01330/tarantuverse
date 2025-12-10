@@ -78,11 +78,11 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-green-400">✓</span>
-                <span>Unlimited tarantulas</span>
+                <span>Up to 15 tarantulas free</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-green-400">✓</span>
-                <span>Free forever</span>
+                <span>Free tier forever</span>
               </div>
             </div>
           </div>
@@ -147,7 +147,7 @@ export default function Home() {
 
             {/* Floating badge */}
             <div className="absolute -top-4 -right-4 bg-neon-pink-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg shadow-neon-pink-500/50 transform rotate-12">
-              100% Free
+              Free to Start
             </div>
           </div>
         </div>
@@ -158,20 +158,20 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-4xl font-bold mb-2 text-white">100% Free</div>
-              <div className="text-white/80">Core Features Forever</div>
+              <div className="text-4xl font-bold mb-2 text-white">Start Free</div>
+              <div className="text-white/80">15 Tarantulas Included</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2 text-white">Unlimited</div>
-              <div className="text-white/80">Tarantulas & Photos</div>
+              <div className="text-4xl font-bold mb-2 text-white">$4.99/mo</div>
+              <div className="text-white/80">For Unlimited Access</div>
             </div>
             <div>
               <div className="text-4xl font-bold mb-2 text-white">Web + Mobile</div>
               <div className="text-white/80">Track Anywhere</div>
             </div>
             <div>
-              <div className="text-4xl font-bold mb-2 text-white">Open Source</div>
-              <div className="text-white/80">Built by Keepers</div>
+              <div className="text-4xl font-bold mb-2 text-white">Built by Keepers</div>
+              <div className="text-white/80">For Keepers</div>
             </div>
           </div>
         </div>
@@ -339,7 +339,7 @@ export default function Home() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-400 flex-shrink-0">✓</span>
-                  <span>Unlimited cloud photo storage</span>
+                  <span>Cloud photo storage (5 per T on free, unlimited with premium)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-400 flex-shrink-0">✓</span>
@@ -446,6 +446,209 @@ export default function Home() {
               Share your collection, join discussions, and learn from experienced keepers.
               Public profiles make it easy to show off your beauties.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section - Transparent & Honest */}
+      <section className="bg-dark-50 py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold mb-4 text-gray-100">
+              Simple, Honest Pricing
+            </h2>
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+              Start free with plenty of space. Upgrade anytime for unlimited tracking and breeding features.
+              No tricks, no hidden fees.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
+            {/* Free Tier */}
+            <div className="bg-dark border-2 border-electric-blue-500/30 rounded-2xl p-6">
+              <h3 className="text-2xl font-bold mb-2 text-gray-100">Free Forever</h3>
+              <div className="mb-4">
+                <span className="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">$0</span>
+              </div>
+              <p className="text-gray-400 mb-6 text-sm">Perfect for casual keepers</p>
+
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-electric-blue-400 text-lg">✓</span>
+                  <span className="text-gray-300"><strong>15 tarantulas</strong></span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-electric-blue-400 text-lg">✓</span>
+                  <span className="text-gray-300"><strong>5 photos</strong> per tarantula</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-electric-blue-400 text-lg">✓</span>
+                  <span className="text-gray-300">Feeding & molt tracking</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-electric-blue-400 text-lg">✓</span>
+                  <span className="text-gray-300">Growth analytics</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-electric-blue-400 text-lg">✓</span>
+                  <span className="text-gray-300">Web + mobile apps</span>
+                </li>
+              </ul>
+
+              <Link
+                href="/register"
+                className="block w-full py-3 text-center border-2 border-electric-blue-500/50 text-electric-blue-300 rounded-xl hover:bg-electric-blue-500/10 transition font-semibold"
+              >
+                Start Free
+              </Link>
+            </div>
+
+            {/* Monthly - Most Popular */}
+            <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-2 border-neon-pink-500/50 rounded-2xl p-6 transform scale-105 relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="inline-block px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-xs font-bold shadow-lg">
+                  MOST POPULAR
+                </span>
+              </div>
+              <h3 className="text-2xl font-bold mb-2 text-gray-100 mt-2">Premium</h3>
+              <div className="mb-4">
+                <span className="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">$4.99</span>
+                <span className="text-gray-400">/month</span>
+              </div>
+              <p className="text-neon-pink-300 mb-6 text-sm font-semibold">Cancel anytime, no commitment</p>
+
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-neon-pink-400 text-lg">✓</span>
+                  <span className="text-gray-200 font-semibold">Everything in Free, plus:</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-neon-pink-400 text-lg">✓</span>
+                  <span className="text-gray-200"><strong>Unlimited tarantulas</strong></span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-neon-pink-400 text-lg">✓</span>
+                  <span className="text-gray-200"><strong>Unlimited photos</strong></span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-neon-pink-400 text-lg">✓</span>
+                  <span className="text-gray-200"><strong>Breeding module</strong> (pairings, egg sacs, offspring)</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-neon-pink-400 text-lg">✓</span>
+                  <span className="text-gray-200">Advanced analytics</span>
+                </li>
+              </ul>
+
+              <Link
+                href="/register"
+                className="block w-full py-3 text-center bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg hover:shadow-neon-pink-500/50 transition font-bold"
+              >
+                Go Premium
+              </Link>
+            </div>
+
+            {/* Yearly - Best Value */}
+            <div className="bg-dark border-2 border-electric-blue-500/30 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-2xl font-bold text-gray-100">Yearly</h3>
+                <span className="px-2 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-bold">
+                  SAVE 25%
+                </span>
+              </div>
+              <div className="mb-4">
+                <span className="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">$44.99</span>
+                <span className="text-gray-400">/year</span>
+              </div>
+              <p className="text-gray-400 mb-6 text-sm"><strong className="text-green-400">$3.75/mo</strong> - Save $15/year</p>
+
+              <ul className="space-y-3 mb-6">
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-electric-blue-400 text-lg">✓</span>
+                  <span className="text-gray-300 font-semibold">All Premium features</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-electric-blue-400 text-lg">✓</span>
+                  <span className="text-gray-300">2 months free</span>
+                </li>
+                <li className="flex items-start gap-2 text-sm">
+                  <span className="text-electric-blue-400 text-lg">✓</span>
+                  <span className="text-gray-300">Best value for serious keepers</span>
+                </li>
+              </ul>
+
+              <Link
+                href="/register"
+                className="block w-full py-3 text-center border-2 border-electric-blue-500/50 text-electric-blue-300 rounded-xl hover:bg-electric-blue-500/10 transition font-semibold"
+              >
+                Choose Yearly
+              </Link>
+            </div>
+          </div>
+
+          {/* Lifetime Option - Special Mention */}
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-2 border-yellow-500/30 rounded-2xl p-6">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-2xl font-bold text-gray-100">Lifetime Access</h3>
+                    <span className="px-3 py-1 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-full text-xs font-bold">
+                      BEST DEAL
+                    </span>
+                  </div>
+                  <p className="text-gray-300 mb-3">
+                    <span className="text-4xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">$149.99</span>
+                    <span className="text-gray-400 ml-2">one time</span>
+                  </p>
+                  <p className="text-gray-400 text-sm">
+                    Pay once, own forever. All future features included. No recurring fees, ever.
+                  </p>
+                </div>
+                <div>
+                  <Link
+                    href="/register"
+                    className="block px-8 py-3 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-xl hover:shadow-lg hover:shadow-yellow-500/50 transition font-bold text-center whitespace-nowrap"
+                  >
+                    Get Lifetime Access
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Honest FAQ */}
+          <div className="mt-16 max-w-3xl mx-auto">
+            <h3 className="text-2xl font-bold text-gray-100 mb-6 text-center">Common Questions</h3>
+            <div className="space-y-4">
+              <details className="bg-dark border border-electric-blue-500/20 rounded-xl p-4 hover:border-electric-blue-500/40 transition">
+                <summary className="font-semibold text-gray-100 cursor-pointer">
+                  What happens when I hit my free tier limits?
+                </summary>
+                <p className="text-gray-400 mt-3 text-sm">
+                  We'll show you a friendly upgrade prompt. Your data is never deleted - you can keep using what you have
+                  or upgrade anytime to add more tarantulas and photos.
+                </p>
+              </details>
+              <details className="bg-dark border border-electric-blue-500/20 rounded-xl p-4 hover:border-electric-blue-500/40 transition">
+                <summary className="font-semibold text-gray-100 cursor-pointer">
+                  Can I cancel my subscription?
+                </summary>
+                <p className="text-gray-400 mt-3 text-sm">
+                  Absolutely. Monthly plans can be canceled anytime from your settings. Your account drops back to the free
+                  tier and you keep all your data. No hassle, no questions asked.
+                </p>
+              </details>
+              <details className="bg-dark border border-electric-blue-500/20 rounded-xl p-4 hover:border-electric-blue-500/40 transition">
+                <summary className="font-semibold text-gray-100 cursor-pointer">
+                  Do you have promo codes?
+                </summary>
+                <p className="text-gray-400 mt-3 text-sm">
+                  Yes! Early adopters and community contributors may receive promo codes for free premium access.
+                  You can redeem codes in your account settings.
+                </p>
+              </details>
+            </div>
           </div>
         </div>
       </section>
