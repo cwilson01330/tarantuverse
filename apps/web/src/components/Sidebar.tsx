@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface SidebarProps {
   isOpen: boolean
@@ -19,8 +19,31 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
-  const navItems: NavItem[] = [
+  useEffect(() => {
+    checkAdminStatus()
+  }, [])
+
+  const checkAdminStatus = async () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token) return
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (response.ok) {
+        const user = await response.json()
+        setIsAdmin(user.is_admin || user.is_superuser)
+      }
+    } catch (error) {
+      console.error('Failed to check admin status:', error)
+    }
+  }
+
+  const baseNavItems: NavItem[] = [
     { icon: '🏠', label: 'Dashboard', path: '/dashboard' },
     { icon: '🕷️', label: 'Species', path: '/species' },
     { icon: '📊', label: 'Analytics', path: '/dashboard/analytics' },
@@ -29,6 +52,11 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     { icon: '💬', label: 'Forums', path: '/community/forums' },
     { icon: '⚙️', label: 'Settings', path: '/dashboard/settings' },
   ]
+
+  // Add Admin link if user is admin
+  const navItems: NavItem[] = isAdmin
+    ? [...baseNavItems.slice(0, -1), { icon: '🛡️', label: 'Admin', path: '/dashboard/admin' }, baseNavItems[baseNavItems.length - 1]]
+    : baseNavItems
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
