@@ -62,9 +62,14 @@ export default function KeeperProfilePage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [followStats, setFollowStats] = useState<FollowStats | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'collection' | 'about'>('collection')
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [reportDescription, setReportDescription] = useState('')
+  const [submittingReport, setSubmittingReport] = useState(false)
 
   useEffect(() => {
     if (username) {
@@ -74,6 +79,7 @@ export default function KeeperProfilePage() {
       fetchFollowStats()
       if (isAuthenticated) {
         checkFollowingStatus()
+        checkBlockStatus()
       }
     }
   }, [username, isAuthenticated])
@@ -137,6 +143,116 @@ export default function KeeperProfilePage() {
       return
     }
     router.push(`/messages/${username}`)
+  }
+
+  const checkBlockStatus = async () => {
+    if (!profile?.id) return
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/blocks/check/${profile.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setIsBlocked(data.you_blocked_them)
+      }
+    } catch (error) {
+      // Silent fail
+    }
+  }
+
+  const handleBlockUser = async () => {
+    if (!token || !profile) {
+      router.push('/login')
+      return
+    }
+
+    const confirmed = confirm(
+      isBlocked
+        ? `Are you sure you want to unblock @${profile.username}?`
+        : `Are you sure you want to block @${profile.username}? This will hide their content from your feed.`
+    )
+
+    if (!confirmed) return
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const method = isBlocked ? 'DELETE' : 'POST'
+      const url = isBlocked
+        ? `${API_URL}/api/v1/blocks/${profile.id}`
+        : `${API_URL}/api/v1/blocks/`
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: method === 'POST' ? JSON.stringify({
+          blocked_id: profile.id,
+          reason: 'Blocked from profile'
+        }) : undefined
+      })
+
+      if (response.ok) {
+        setIsBlocked(!isBlocked)
+        if (!isBlocked) {
+          alert('User blocked successfully')
+          router.push('/community')
+        } else {
+          alert('User unblocked successfully')
+        }
+      }
+    } catch (error) {
+      console.error('Failed to block/unblock user')
+      alert('Failed to update block status')
+    }
+  }
+
+  const handleSubmitReport = async () => {
+    if (!token || !profile) {
+      router.push('/login')
+      return
+    }
+
+    if (!reportReason) {
+      alert('Please select a reason for the report')
+      return
+    }
+
+    try {
+      setSubmittingReport(true)
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/reports/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          reported_user_id: profile.id,
+          report_type: 'user',
+          content_id: profile.id.toString(),
+          content_url: window.location.href,
+          reason: reportReason,
+          description: reportDescription
+        })
+      })
+
+      if (response.ok) {
+        alert('Report submitted successfully. Our moderation team will review it.')
+        setShowReportModal(false)
+        setReportReason('')
+        setReportDescription('')
+      } else {
+        alert('Failed to submit report. Please try again.')
+      }
+    } catch (error) {
+      console.error('Failed to submit report')
+      alert('Failed to submit report. Please try again.')
+    } finally {
+      setSubmittingReport(false)
+    }
   }
 
   const fetchProfile = async () => {
@@ -284,7 +400,7 @@ export default function KeeperProfilePage() {
                 </div>
               </div>
               
-              {isAuthenticated && user?.name !== username && (
+              {isAuthenticated && user?.username !== username && (
                 <div className="flex gap-3">
                   <button
                     onClick={handleFollowToggle}
@@ -301,6 +417,18 @@ export default function KeeperProfilePage() {
                     className="px-6 py-2 border-2 border-purple-600 dark:border-purple-400 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition font-semibold"
                   >
                     Message
+                  </button>
+                  <button
+                    onClick={handleBlockUser}
+                    className="px-6 py-2 border-2 border-red-600 dark:border-red-400 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition font-semibold"
+                  >
+                    {isBlocked ? 'Unblock' : '🚫 Block'}
+                  </button>
+                  <button
+                    onClick={() => setShowReportModal(true)}
+                    className="px-6 py-2 border-2 border-orange-600 dark:border-orange-400 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition font-semibold"
+                  >
+                    ⚠️ Report
                   </button>
                 </div>
               )}
@@ -505,6 +633,76 @@ export default function KeeperProfilePage() {
           )}
         </div>
       </div>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              Report @{profile?.username}
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Reason for Report *
+                </label>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                >
+                  <option value="">Select a reason...</option>
+                  <option value="harassment">Harassment or Bullying</option>
+                  <option value="spam">Spam or Scam</option>
+                  <option value="inappropriate_content">Inappropriate Content</option>
+                  <option value="impersonation">Impersonation</option>
+                  <option value="misinformation">Misinformation</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Additional Details (Optional)
+                </label>
+                <textarea
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  placeholder="Please provide any additional context..."
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleSubmitReport}
+                  disabled={submittingReport || !reportReason}
+                  className="flex-1 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                >
+                  {submittingReport ? 'Submitting...' : 'Submit Report'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowReportModal(false)
+                    setReportReason('')
+                    setReportDescription('')
+                  }}
+                  disabled={submittingReport}
+                  className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Reports are reviewed by our moderation team within 24 hours. False reports may result in action against your account.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
