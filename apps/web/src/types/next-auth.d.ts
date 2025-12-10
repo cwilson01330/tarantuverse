@@ -9,6 +9,7 @@ declare module "next-auth" {
       email?: string | null
       name?: string | null
       image?: string | null
+      username?: string
       is_admin?: boolean
       is_superuser?: boolean
     }
@@ -19,6 +20,7 @@ declare module "next-auth" {
     email?: string | null
     name?: string | null
     image?: string | null
+    username?: string
     accessToken?: string
     isNewUser?: boolean
     is_admin?: boolean
@@ -30,6 +32,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     accessToken?: string
     id?: string
+    username?: string
     isNewUser?: boolean
     is_admin?: boolean
     is_superuser?: boolean

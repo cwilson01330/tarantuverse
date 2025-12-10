@@ -44,6 +44,7 @@ export function useAuth(): UseAuthReturn {
       email: session.user.email || null,
       name: session.user.name || null,
       image: session.user.image || null,
+      username: session.user.username || session.user.email?.split('@')[0] || undefined,
       is_admin: session.user.is_admin || false,
       is_superuser: session.user.is_superuser || false,
     } : null,
