@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AdminSection {
   title: string;
@@ -73,49 +74,26 @@ const adminSections: AdminSection[] = [
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
-    checkAdminAccess();
-  }, []);
+    // Wait for auth to load
+    if (isLoading) return;
 
-  const checkAdminAccess = async () => {
-    const token = localStorage.getItem('auth_token');
-    if (!token) {
+    // Check authentication
+    if (!isAuthenticated || !user) {
       router.push('/login');
       return;
     }
 
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Not authenticated');
-      }
-
-      const userData = await response.json();
-
-      // Check if user is admin or superuser
-      if (!userData.is_admin && !userData.is_superuser) {
-        router.push('/dashboard');
-        return;
-      }
-
-      setUser(userData);
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      router.push('/login');
-    } finally {
-      setLoading(false);
+    // Check if user is admin or superuser
+    if (!user.is_admin && !user.is_superuser) {
+      router.push('/dashboard');
+      return;
     }
-  };
+  }, [isLoading, isAuthenticated, user, router]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -126,7 +104,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!user) {
+  if (!user || (!user.is_admin && !user.is_superuser)) {
     return null;
   }
 
@@ -153,15 +131,20 @@ export default function AdminDashboard() {
           </div>
 
           {/* Admin Info Badge */}
-          <div className="mt-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
-            <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                clipRule="evenodd"
-              />
-            </svg>
-            {user.is_superuser ? 'Superuser' : 'Administrator'}
+          <div className="mt-4 inline-flex items-center gap-3">
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+              <svg className="w-4 h-4 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              {user.is_superuser ? 'Superuser' : 'Administrator'}
+            </div>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {user.email || user.username}
+            </span>
           </div>
         </div>
       </div>
