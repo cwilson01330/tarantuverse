@@ -9,6 +9,7 @@ declare module "next-auth" {
       email?: string | null
       name?: string | null
       image?: string | null
+      is_admin?: boolean
       is_superuser?: boolean
     }
   }
@@ -20,6 +21,7 @@ declare module "next-auth" {
     image?: string | null
     accessToken?: string
     isNewUser?: boolean
+    is_admin?: boolean
     is_superuser?: boolean
   }
 }
@@ -29,6 +31,7 @@ declare module "next-auth/jwt" {
     accessToken?: string
     id?: string
     isNewUser?: boolean
+    is_admin?: boolean
     is_superuser?: boolean
   }
 }
