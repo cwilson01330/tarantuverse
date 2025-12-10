@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Linking, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Linking, Alert, ActionSheetIOS, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import ReportModal from '../../src/components/ReportModal';
+import { apiClient } from '../../src/services/api';
 
 interface KeeperProfile {
   id: number;
@@ -64,6 +66,8 @@ export default function KeeperProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'collection' | 'about'>('collection');
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -213,6 +217,69 @@ export default function KeeperProfileScreen() {
     }
   };
 
+  const handleBlockUser = async () => {
+    if (blocking || !profile) return;
+
+    Alert.alert(
+      'Block User',
+      `Block ${profile.display_name}? They will no longer be able to message you.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            setBlocking(true);
+            try {
+              await apiClient.post('/blocks/', {
+                blocked_id: profile.id,
+                reason: 'Blocked from profile',
+              });
+              Alert.alert('User Blocked', 'You will no longer see content from this user.', [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to block user');
+            } finally {
+              setBlocking(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const showActions = () => {
+    if (!profile) return;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Report User', 'Block User'],
+          destructiveButtonIndex: 2,
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            setReportModalVisible(true);
+          } else if (buttonIndex === 2) {
+            handleBlockUser();
+          }
+        }
+      );
+    } else {
+      Alert.alert(
+        'Actions',
+        '',
+        [
+          { text: 'Report User', onPress: () => setReportModalVisible(true) },
+          { text: 'Block User', onPress: handleBlockUser, style: 'destructive' },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    }
+  };
+
   const handleMessage = async () => {
     const token = await AsyncStorage.getItem('auth_token');
     if (!token) {
@@ -238,7 +305,7 @@ export default function KeeperProfileScreen() {
   };
 
   const formatSpecialty = (specialty: string) => {
-    return specialty.split('_').map(word => 
+    return specialty.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
@@ -624,6 +691,11 @@ export default function KeeperProfileScreen() {
         options={{
           title: profile.display_name,
           headerBackTitle: 'Community',
+          headerRight: () => (
+            <TouchableOpacity onPress={showActions} style={{ marginRight: 8 }}>
+              <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ),
         }}
       />
       <ScrollView
@@ -820,8 +892,8 @@ export default function KeeperProfileScreen() {
                         {tarantula.sex && (
                           <View style={[
                             styles.tarantulaBadge,
-                            tarantula.sex === 'female' ? styles.femaleBadge : 
-                            tarantula.sex === 'male' ? styles.maleBadge : styles.unknownBadge
+                            tarantula.sex === 'female' ? styles.femaleBadge :
+                              tarantula.sex === 'male' ? styles.maleBadge : styles.unknownBadge
                           ]}>
                             <Text style={styles.badgeTextSmall}>
                               {tarantula.sex === 'female' ? '♀' : tarantula.sex === 'male' ? '♂' : '?'}
@@ -857,6 +929,17 @@ export default function KeeperProfileScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Report Modal */}
+      {profile && (
+        <ReportModal
+          visible={reportModalVisible}
+          onClose={() => setReportModalVisible(false)}
+          reportType="user_profile"
+          contentId={profile.id.toString()}
+          reportedUserId={profile.id.toString()}
+        />
+      )}
     </>
   );
 }

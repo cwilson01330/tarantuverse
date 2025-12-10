@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActionSheetIOS } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import ReportModal from '../../src/components/ReportModal';
+import { apiClient } from '../../src/services/api';
 
 interface Message {
   id: string;
@@ -35,6 +37,8 @@ export default function ConversationScreen() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -136,6 +140,73 @@ export default function ConversationScreen() {
     }
   };
 
+  const handleBlockUser = async () => {
+    if (blocking || !conversation) return;
+
+    Alert.alert(
+      'Block User',
+      `Block ${conversation.other_user.display_name}? They will no longer be able to message you.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            setBlocking(true);
+            try {
+              await apiClient.post('/blocks/', {
+                blocked_id: conversation.other_user.id,
+                reason: 'Blocked from direct messages',
+              });
+              Alert.alert('User Blocked', 'You will no longer receive messages from this user.', [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.detail || 'Failed to block user');
+            } finally {
+              setBlocking(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const showActions = () => {
+    if (!conversation) return;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Report User', 'Block User', 'View Profile'],
+          destructiveButtonIndex: 2,
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            setReportModalVisible(true);
+          } else if (buttonIndex === 2) {
+            handleBlockUser();
+          } else if (buttonIndex === 3) {
+            router.push(`/community/${conversation.other_user.username}`);
+          }
+        }
+      );
+    } else {
+      // Android - show simple menu
+      Alert.alert(
+        'Actions',
+        '',
+        [
+          { text: 'Report User', onPress: () => setReportModalVisible(true) },
+          { text: 'Block User', onPress: handleBlockUser, style: 'destructive' },
+          { text: 'View Profile', onPress: () => router.push(`/community/${conversation.other_user.username}`) },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -168,10 +239,10 @@ export default function ConversationScreen() {
           headerBackTitle: 'Messages',
           headerRight: () => (
             <TouchableOpacity
-              onPress={() => router.push(`/community/${conversation.other_user.username}`)}
+              onPress={showActions}
               style={{ marginRight: 8 }}
             >
-              <MaterialCommunityIcons name="account" size={24} color="#7c3aed" />
+              <MaterialCommunityIcons name="dots-vertical" size={24} color="#7c3aed" />
             </TouchableOpacity>
           ),
         }}
@@ -244,6 +315,17 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Report Modal */}
+      {conversation && (
+        <ReportModal
+          visible={reportModalVisible}
+          onClose={() => setReportModalVisible(false)}
+          reportType="user_profile"
+          contentId={conversation.other_user.id}
+          reportedUserId={conversation.other_user.id}
+        />
+      )}
     </>
   );
 }

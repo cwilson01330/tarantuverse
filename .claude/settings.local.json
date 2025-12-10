@@ -50,7 +50,8 @@
       "Bash(git pull:*)",
       "Bash(git fetch:*)",
       "Bash(gh pr:*)",
-      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlYTNjMzM0YS1jMjZkLTRmODUtOGViYi01ZmM0ZjZlNDBmODUiLCJleHAiOjE3NjU5MDAzMzZ9.B1XVTxkHl64uS_oW8AKZgukQHuOFvih3QaTbZMN80-4\")"
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlYTNjMzM0YS1jMjZkLTRmODUtOGViYi01ZmM0ZjZlNDBmODUiLCJleHAiOjE3NjU5MDAzMzZ9.B1XVTxkHl64uS_oW8AKZgukQHuOFvih3QaTbZMN80-4\")",
+      "Bash(CI=true cd apps/mobile)"
     ],
     "deny": [],
     "ask": []

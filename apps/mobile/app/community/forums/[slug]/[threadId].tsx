@@ -15,6 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../../../src/contexts/ThemeContext';
+import ReportModal from '../../../../src/components/ReportModal';
 
 interface Post {
   id: number;
@@ -58,6 +59,8 @@ export default function ThreadDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportingPost, setReportingPost] = useState<Post | null>(null);
 
   const fetchThreadData = async () => {
     try {
@@ -240,11 +243,22 @@ export default function ThreadDetailScreen() {
                       </Text>
                     </View>
                   </View>
-                  {index === 0 && (
-                    <View style={[styles.opBadge, { backgroundColor: colors.primary }]}>
-                      <Text style={styles.opBadgeText}>OP</Text>
-                    </View>
-                  )}
+                  <View style={styles.postActions}>
+                    {index === 0 && (
+                      <View style={[styles.opBadge, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.opBadgeText}>OP</Text>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setReportingPost(post);
+                        setReportModalVisible(true);
+                      }}
+                      style={styles.reportButton}
+                    >
+                      <MaterialCommunityIcons name="flag-outline" size={20} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <Text style={[styles.postContent, { color: colors.textPrimary }]}>{post.content}</Text>
               </View>
@@ -295,6 +309,20 @@ export default function ThreadDetailScreen() {
           <MaterialCommunityIcons name="lock" size={16} color={colors.textSecondary} />
           <Text style={[styles.lockedText, { color: colors.textSecondary }]}>This thread is locked</Text>
         </View>
+      )}
+
+      {/* Report Modal */}
+      {reportingPost && (
+        <ReportModal
+          visible={reportModalVisible}
+          onClose={() => {
+            setReportModalVisible(false);
+            setReportingPost(null);
+          }}
+          reportType="forum_post"
+          contentId={reportingPost.id.toString()}
+          reportedUserId={reportingPost.author.id.toString()}
+        />
       )}
     </KeyboardAvoidingView>
   );
@@ -424,6 +452,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+  },
+  postActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  reportButton: {
+    padding: 4,
   },
   authorAvatar: {
     width: 40,
