@@ -487,17 +487,19 @@ export default function ThreadPage() {
               {/* Author sidebar */}
               <div className="bg-surface-elevated p-5 w-52 border-r border-theme">
                 <div className="text-center">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 shadow-xl flex items-center justify-center mx-auto mb-3 text-2xl font-bold text-white ring-4 ring-surface">
-                    {(post.author.display_name || post.author.username)
-                      .charAt(0)
-                      .toUpperCase()}
-                  </div>
-                  <div className="font-bold text-gray-900 dark:text-white mb-1">
+                  <Link href={`/community/${post.author.username}`} className="block">
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 shadow-xl flex items-center justify-center mx-auto mb-3 text-2xl font-bold text-white ring-4 ring-surface hover:ring-primary-300 dark:hover:ring-primary-600 transition-all cursor-pointer">
+                      {(post.author.display_name || post.author.username)
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
+                  </Link>
+                  <Link href={`/community/${post.author.username}`} className="font-bold text-gray-900 dark:text-white mb-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors block">
                     {post.author.display_name || post.author.username}
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                  </Link>
+                  <Link href={`/community/${post.author.username}`} className="text-xs text-gray-600 dark:text-gray-400 mb-2 hover:text-primary-600 dark:hover:text-primary-400 transition-colors block">
                     @{post.author.username}
-                  </div>
+                  </Link>
                   {index === 0 && (
                     <div className="mt-3 inline-flex items-center gap-1 px-2 py-1 bg-primary-100 dark:bg-primary-900/20 border border-primary-300 dark:border-primary-500/50 rounded text-xs text-primary-700 dark:text-primary-400 font-semibold">
                       <span>📌</span>

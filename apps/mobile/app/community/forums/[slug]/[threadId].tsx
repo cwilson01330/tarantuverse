@@ -227,14 +227,17 @@ export default function ThreadDetailScreen() {
                 ]}
               >
                 <View style={styles.postHeader}>
-                  <View style={styles.postAuthor}>
+                  <TouchableOpacity
+                    style={styles.postAuthor}
+                    onPress={() => router.push(`/community/${post.author.username}`)}
+                  >
                     <View style={[styles.authorAvatar, { backgroundColor: colors.primary }]}>
                       <Text style={styles.authorAvatarText}>
                         {post.author.username.charAt(0).toUpperCase()}
                       </Text>
                     </View>
                     <View style={styles.postAuthorInfo}>
-                      <Text style={[styles.postAuthorName, { color: colors.textPrimary }]}>
+                      <Text style={[styles.postAuthorName, { color: colors.primary }]}>
                         {post.author.username}
                       </Text>
                       <Text style={[styles.postDate, { color: colors.textTertiary }]}>
@@ -242,7 +245,7 @@ export default function ThreadDetailScreen() {
                         {post.is_edited && ' (edited)'}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                   <View style={styles.postActions}>
                     {index === 0 && (
                       <View style={[styles.opBadge, { backgroundColor: colors.primary }]}>
