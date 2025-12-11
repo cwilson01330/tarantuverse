@@ -252,10 +252,10 @@ export default function ThreadDetailScreen() {
                       </Text>
                     </View>
                     <View style={styles.postAuthorInfo}>
-                      <Text style={[styles.postAuthorName, { color: colors.primary }]}>
+                      <Text style={[styles.postAuthorName, { color: colors.primary }]} numberOfLines={1}>
                         {post.author.display_name || post.author.username}
                       </Text>
-                      <Text style={[styles.postDate, { color: colors.textTertiary }]}>
+                      <Text style={[styles.postDate, { color: colors.textTertiary }]} numberOfLines={1}>
                         @{post.author.username} • {formatDate(post.created_at)}
                         {post.is_edited && ' (edited)'}
                       </Text>
@@ -273,6 +273,7 @@ export default function ThreadDetailScreen() {
                         setReportModalVisible(true);
                       }}
                       style={styles.reportButton}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
                       <MaterialCommunityIcons name="flag" size={22} color="#f59e0b" />
                     </TouchableOpacity>
@@ -470,11 +471,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flex: 1,
+    minWidth: 0, // Allow shrinking
   },
   postActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0, // Prevent shrinking
   },
   reportButton: {
     padding: 8,
@@ -495,6 +498,7 @@ const styles = StyleSheet.create({
   },
   postAuthorInfo: {
     flex: 1,
+    minWidth: 0, // Allow text truncation
   },
   postAuthorName: {
     fontSize: 15,
