@@ -48,7 +48,8 @@ export default function ModerationReportsPage() {
     }
 
     fetchReports();
-  }, [isLoading, isAuthenticated, user, router, filter, token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, isAuthenticated, user, router, filter]);
 
   const fetchReports = async () => {
     if (!token) {
