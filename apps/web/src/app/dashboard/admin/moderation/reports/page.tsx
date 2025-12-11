@@ -25,7 +25,7 @@ interface ContentReport {
 
 export default function ModerationReportsPage() {
   const router = useRouter();
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, token, isLoading, isAuthenticated } = useAuth();
   const [reports, setReports] = useState<ContentReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'pending' | 'all'>('pending');
@@ -48,12 +48,11 @@ export default function ModerationReportsPage() {
     }
 
     fetchReports();
-  }, [isLoading, isAuthenticated, user, router, filter]);
+  }, [isLoading, isAuthenticated, user, router, filter, token]);
 
   const fetchReports = async () => {
-    const token = localStorage.getItem('auth_token');
     if (!token) {
-      setError('No authentication token found');
+      setError('No authentication token found. Please log in again.');
       setLoading(false);
       return;
     }
@@ -86,7 +85,6 @@ export default function ModerationReportsPage() {
   };
 
   const handleReviewReport = async (reportId: string, newStatus: string) => {
-    const token = localStorage.getItem('auth_token');
     if (!token) return;
 
     try {

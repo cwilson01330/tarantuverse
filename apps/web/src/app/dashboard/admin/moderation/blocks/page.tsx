@@ -32,7 +32,7 @@ interface User {
 
 export default function ModerationBlocksPage() {
   const router = useRouter();
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, token, isLoading, isAuthenticated } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [userBlocks, setUserBlocks] = useState<any[]>([]);
@@ -56,10 +56,9 @@ export default function ModerationBlocksPage() {
 
     fetchUsers();
     fetchBlockStats();
-  }, [isLoading, isAuthenticated, user, router]);
+  }, [isLoading, isAuthenticated, user, router, token]);
 
   const fetchBlockStats = async () => {
-    const token = localStorage.getItem('auth_token');
     if (!token) return;
 
     try {
@@ -77,9 +76,8 @@ export default function ModerationBlocksPage() {
   };
 
   const fetchUsers = async () => {
-    const token = localStorage.getItem('auth_token');
     if (!token) {
-      setError('No authentication token found');
+      setError('No authentication token found. Please log in again.');
       setLoading(false);
       return;
     }
@@ -109,7 +107,6 @@ export default function ModerationBlocksPage() {
   };
 
   const fetchUserBlocks = async (userId: string) => {
-    const token = localStorage.getItem('auth_token');
     if (!token) return;
 
     try {
