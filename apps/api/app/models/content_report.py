@@ -11,9 +11,9 @@ from app.database import Base
 
 class ReportStatus(str, enum.Enum):
     PENDING = "pending"
-    REVIEWING = "reviewing"
-    RESOLVED = "resolved"
+    REVIEWED = "reviewed"
     DISMISSED = "dismissed"
+    ACTION_TAKEN = "action_taken"
 
 
 class ReportType(str, enum.Enum):
