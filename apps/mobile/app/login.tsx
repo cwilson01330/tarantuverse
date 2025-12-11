@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
+import GoogleLogo from '../src/components/GoogleLogo';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -233,7 +234,7 @@ export default function LoginScreen() {
               <ActivityIndicator color={colors.textPrimary} />
             ) : (
               <>
-                <Text style={styles.oauthIcon}>🔍</Text>
+                <GoogleLogo size={24} />
                 <Text style={styles.oauthButtonText}>Continue with Google</Text>
               </>
             )}

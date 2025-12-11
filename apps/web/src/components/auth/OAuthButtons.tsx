@@ -28,14 +28,14 @@ export default function OAuthButtons() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Google Sign In */}
+      {/* Google Sign In - Following official Google branding guidelines */}
       <button
         onClick={handleGoogleSignIn}
         disabled={loading !== null}
-        className="flex items-center justify-center gap-3 w-full px-4 py-3 border border-gray-700 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading === "google" ? (
-          <div className="w-5 h-5 border-2 border-gray-400 border-t-white rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-gray-400 border-t-blue-600 rounded-full animate-spin" />
         ) : (
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
@@ -56,7 +56,7 @@ export default function OAuthButtons() {
             />
           </svg>
         )}
-        <span className="text-white font-medium">
+        <span className="text-gray-700 font-medium">
           {loading === "google" ? "Signing in..." : "Continue with Google"}
         </span>
       </button>
