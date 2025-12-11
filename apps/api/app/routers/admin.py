@@ -3,14 +3,14 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserResponse
-from app.utils.dependencies import get_current_superuser
+from app.utils.dependencies import get_current_admin
 from app.services.email import EmailService
 from app.config import settings
 import secrets
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter(
-    dependencies=[Depends(get_current_superuser)]
+    dependencies=[Depends(get_current_admin)]
 )
 
 @router.get("/users", response_model=list[UserResponse])
@@ -21,7 +21,7 @@ async def list_users(
     db: Session = Depends(get_db)
 ):
     """
-    List users (Superuser only)
+    List users (Admin only)
     """
     query = db.query(User)
     
@@ -42,7 +42,7 @@ async def trigger_password_reset(
     db: Session = Depends(get_db)
 ):
     """
-    Trigger a password reset email for a specific user (Superuser only)
+    Trigger a password reset email for a specific user (Admin only)
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -75,7 +75,7 @@ async def resend_verification_email(
     db: Session = Depends(get_db)
 ):
     """
-    Resend verification email for a specific user (Superuser only)
+    Resend verification email for a specific user (Admin only)
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -113,7 +113,7 @@ async def manually_verify_user(
     db: Session = Depends(get_db)
 ):
     """
-    Manually verify a user (bypass email verification) - Superuser only
+    Manually verify a user (bypass email verification) - Admin only
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -139,7 +139,7 @@ async def verify_all_users(
     db: Session = Depends(get_db)
 ):
     """
-    Verify ALL unverified users (useful for development/testing) - Superuser only
+    Verify ALL unverified users (useful for development/testing) - Admin only
     """
     unverified_users = db.query(User).filter(User.is_verified == False).all()
 
@@ -166,7 +166,7 @@ async def test_email_sending(
     test_email: str,
 ):
     """
-    Send a test email to verify SendGrid configuration (Superuser only)
+    Send a test email to verify SendGrid configuration (Admin only)
     Useful for debugging email delivery issues
     """
     import logging
