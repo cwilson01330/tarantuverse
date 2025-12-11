@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, I
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
@@ -755,12 +756,12 @@ export default function KeeperProfileScreen() {
   return (
     <>
       {/* Custom Header Bar */}
-      <View style={styles.headerBar}>
+      <SafeAreaView edges={['top']} style={styles.headerBar}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
           <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
 
       <ScrollView
         style={styles.container}
