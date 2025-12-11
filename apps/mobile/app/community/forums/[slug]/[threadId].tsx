@@ -17,26 +17,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../../../src/contexts/ThemeContext';
 import ReportModal from '../../../../src/components/ReportModal';
 
+interface Author {
+  id: string;  // UUID
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+}
+
 interface Post {
   id: number;
+  thread_id: number;
+  author_id: string;
+  author: Author;
   content: string;
-  author: {
-    id: number;
-    username: string;
-  };
   created_at: string;
   updated_at: string;
   is_edited: boolean;
+  edited_at?: string;
 }
 
 interface Thread {
   id: number;
   title: string;
   slug: string;
-  author: {
-    id: number;
-    username: string;
-  };
+  author_id: string;
+  author: Author;
   category: {
     id: number;
     name: string;
@@ -47,6 +52,7 @@ interface Thread {
   is_locked: boolean;
   post_count: number;
   view_count: number;
+  first_post?: Post;
 }
 
 export default function ThreadDetailScreen() {
@@ -65,18 +71,27 @@ export default function ThreadDetailScreen() {
   const fetchThreadData = async () => {
     try {
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
-      
+
       // Fetch thread details
       const threadResponse = await fetch(`${API_URL}/api/v1/forums/threads/${threadId}`);
       if (!threadResponse.ok) throw new Error('Failed to fetch thread');
       const threadData = await threadResponse.json();
       setThread(threadData);
 
-      // Fetch posts in thread
-      const postsResponse = await fetch(`${API_URL}/api/v1/forums/threads/${threadId}/posts`);
+      // Fetch posts in thread (API returns paginated response)
+      const postsResponse = await fetch(`${API_URL}/api/v1/forums/threads/${threadId}/posts?page=1&limit=100`);
       if (!postsResponse.ok) throw new Error('Failed to fetch posts');
       const postsData = await postsResponse.json();
-      setPosts(postsData);
+
+      // API returns: {posts: Post[], total, page, limit, has_more}
+      // If thread has first_post, prepend it to avoid duplication
+      if (threadData.first_post && postsData.posts) {
+        // Filter out first_post if it's in the posts array
+        const otherPosts = postsData.posts.filter((p: Post) => p.id !== threadData.first_post.id);
+        setPosts([threadData.first_post, ...otherPosts]);
+      } else if (postsData.posts) {
+        setPosts(postsData.posts);
+      }
     } catch (error) {
       console.error('Error fetching thread data:', error);
     } finally {
@@ -233,15 +248,15 @@ export default function ThreadDetailScreen() {
                   >
                     <View style={[styles.authorAvatar, { backgroundColor: colors.primary }]}>
                       <Text style={styles.authorAvatarText}>
-                        {post.author.username.charAt(0).toUpperCase()}
+                        {(post.author.display_name || post.author.username).charAt(0).toUpperCase()}
                       </Text>
                     </View>
                     <View style={styles.postAuthorInfo}>
                       <Text style={[styles.postAuthorName, { color: colors.primary }]}>
-                        {post.author.username}
+                        {post.author.display_name || post.author.username}
                       </Text>
                       <Text style={[styles.postDate, { color: colors.textTertiary }]}>
-                        {formatDate(post.created_at)}
+                        @{post.author.username} • {formatDate(post.created_at)}
                         {post.is_edited && ' (edited)'}
                       </Text>
                     </View>
