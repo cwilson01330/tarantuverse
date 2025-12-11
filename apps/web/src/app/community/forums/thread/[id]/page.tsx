@@ -69,6 +69,8 @@ export default function ThreadPage() {
   const [editContent, setEditContent] = useState("");
   const [editingThread, setEditingThread] = useState(false);
   const [editThreadTitle, setEditThreadTitle] = useState("");
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportingPost, setReportingPost] = useState<ForumPost | null>(null);
 
   useEffect(() => {
     if (threadId) {
@@ -520,31 +522,42 @@ export default function ThreadPage() {
                       </span>
                     )}
                   </div>
-                  {/* Edit/Delete Buttons */}
-                  {user?.id && post.author_id === user?.id && (
-                    <div className="flex items-center gap-1">
-                      {editingPostId !== post.id && (
-                        <>
+                  {/* Edit/Delete/Report Buttons */}
+                  <div className="flex items-center gap-1">
+                    {user?.id && post.author_id === user?.id && editingPostId !== post.id && (
+                      <>
+                        <button
+                          onClick={() => startEdit(post)}
+                          className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 p-2 rounded-lg transition-all"
+                          title="Edit post"
+                        >
+                          ✏️
+                        </button>
+                        {index !== 0 && ( // Don't show delete for first post
                           <button
-                            onClick={() => startEdit(post)}
-                            className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 p-2 rounded-lg transition-all"
-                            title="Edit post"
+                            onClick={() => handleDeletePost(post.id)}
+                            className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            title="Delete post"
                           >
-                            ✏️
+                            🗑️
                           </button>
-                          {index !== 0 && ( // Don't show delete for first post
-                            <button
-                              onClick={() => handleDeletePost(post.id)}
-                              className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                              title="Delete post"
-                            >
-                              🗑️
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </>
+                    )}
+                    {/* Report button - available to all users except post author */}
+                    {user?.id && post.author_id !== user?.id && (
+                      <button
+                        onClick={() => {
+                          setReportingPost(post);
+                          setReportModalVisible(true);
+                        }}
+                        className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 p-2 rounded-lg transition-all"
+                        title="Report post"
+                      >
+                        🚩
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Edit Mode */}
@@ -636,6 +649,92 @@ export default function ThreadPage() {
           <p className="text-gray-600 dark:text-gray-400">
             This thread is locked. No more replies can be posted.
           </p>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {reportModalVisible && reportingPost && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setReportModalVisible(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Report Post</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Why are you reporting this post by @{reportingPost.author.username}?
+            </p>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const formData = new FormData(e.currentTarget);
+              const reason = formData.get('reason') as string;
+              const description = formData.get('description') as string;
+
+              try {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/reports/`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    report_type: 'forum_post',
+                    content_id: reportingPost.id.toString(),
+                    reported_user_id: reportingPost.author_id,
+                    content_url: window.location.href,
+                    reason,
+                    description,
+                  }),
+                });
+
+                if (response.ok) {
+                  alert('Thank you for your report. Our moderation team will review it.');
+                  setReportModalVisible(false);
+                  setReportingPost(null);
+                } else {
+                  throw new Error('Failed to submit report');
+                }
+              } catch (error) {
+                alert('Failed to submit report. Please try again.');
+              }
+            }}>
+              <select
+                name="reason"
+                required
+                className="w-full px-4 py-2 mb-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Select a reason...</option>
+                <option value="spam">Spam</option>
+                <option value="harassment">Harassment</option>
+                <option value="inappropriate">Inappropriate Content</option>
+                <option value="misinformation">Misinformation</option>
+                <option value="other">Other</option>
+              </select>
+
+              <textarea
+                name="description"
+                placeholder="Additional details (optional)..."
+                className="w-full px-4 py-2 mb-4 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-primary-500 resize-none"
+                rows={3}
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors font-medium"
+                >
+                  Submit Report
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportModalVisible(false);
+                    setReportingPost(null);
+                  }}
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </DashboardLayout>
