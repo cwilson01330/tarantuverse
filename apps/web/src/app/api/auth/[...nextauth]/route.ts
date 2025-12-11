@@ -56,6 +56,7 @@ const authOptions: AuthOptions = {
               name: response.data.user?.display_name || credentials?.email || "",
               image: response.data.user?.avatar_url,
               accessToken: response.data.access_token,
+              is_admin: response.data.user?.is_admin || false,
               is_superuser: response.data.user?.is_superuser || false
             }
           }
@@ -96,6 +97,7 @@ const authOptions: AuthOptions = {
             user.name = response.data.user.display_name
             user.image = response.data.user.avatar_url
             user.isNewUser = response.data.is_new_user
+            user.is_admin = response.data.user.is_admin || false
             user.is_superuser = response.data.user.is_superuser || false
             return true
           }
@@ -116,6 +118,7 @@ const authOptions: AuthOptions = {
         token.accessToken = user.accessToken
         token.id = user.id
         token.isNewUser = user.isNewUser
+        token.is_admin = user.is_admin
         token.is_superuser = user.is_superuser
       }
       return token
@@ -126,6 +129,7 @@ const authOptions: AuthOptions = {
       session.accessToken = token.accessToken as string
       session.user.id = token.id as string
       session.isNewUser = token.isNewUser as boolean
+      session.user.is_admin = token.is_admin as boolean
       session.user.is_superuser = token.is_superuser as boolean
       return session
     }
