@@ -35,9 +35,10 @@ export default function ModerationBlocksPage() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<string>('');
-  const [userBlocks, setUserBlocks] = useState<UserBlock[]>([]);
+  const [userBlocks, setUserBlocks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [totalBlocks, setTotalBlocks] = useState(0);
 
   useEffect(() => {
     if (isLoading) return;
@@ -53,7 +54,26 @@ export default function ModerationBlocksPage() {
     }
 
     fetchUsers();
+    fetchBlockStats();
   }, [isLoading, isAuthenticated, user, router]);
+
+  const fetchBlockStats = async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/blocks/admin/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTotalBlocks(data.total_blocks);
+      }
+    } catch (error) {
+      console.error('Failed to fetch block stats:', error);
+    }
+  };
 
   const fetchUsers = async () => {
     const token = localStorage.getItem('auth_token');
@@ -82,13 +102,29 @@ export default function ModerationBlocksPage() {
     if (!token) return;
 
     try {
-      // Since we don't have an admin endpoint to get all blocks by user,
-      // we'll show a message that this needs backend support
-      // For now, we'll just show the user was selected
       setSelectedUser(userId);
-      setUserBlocks([]);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/blocks/admin/user/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Combine both blocks by user and blocks against user
+        const allBlocks = [
+          ...data.blocks_by_user.map((b: any) => ({
+            ...b,
+            type: 'blocked_by_user'
+          })),
+          ...data.blocks_against_user.map((b: any) => ({
+            ...b,
+            type: 'blocked_user'
+          }))
+        ];
+        setUserBlocks(allBlocks);
+      }
     } catch (error) {
       console.error('Failed to fetch user blocks:', error);
+      setUserBlocks([]);
     }
   };
 
@@ -205,53 +241,66 @@ export default function ModerationBlocksPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="h-5 w-5 text-blue-600 dark:text-blue-400"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                        Backend Enhancement Needed
-                      </h3>
-                      <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                        <p>
-                          To display user block relationships, we need to add an admin endpoint:
-                        </p>
-                        <code className="block mt-2 p-2 bg-blue-100 dark:bg-blue-900/40 rounded">
-                          GET /api/v1/admin/users/{'{user_id}'}/blocks
-                        </code>
-                        <p className="mt-2">
-                          This endpoint should return:
-                        </p>
-                        <ul className="list-disc list-inside mt-1">
-                          <li>Users this user has blocked</li>
-                          <li>Users who have blocked this user</li>
-                        </ul>
-                      </div>
-                    </div>
+              <div className="space-y-4">
+                {userBlocks.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">✅</div>
+                    <p className="text-gray-500 dark:text-gray-400">
+                      No blocking relationships found for this user
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                    {userBlocks.map((block) => (
+                      <div
+                        key={block.id}
+                        className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                              block.type === 'blocked_by_user'
+                                ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                                : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
+                            }`}>
+                              {block.type === 'blocked_by_user' ? '🚫 User Blocked' : '⚠️ Blocked By'}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {formatDate(block.created_at)}
+                          </span>
+                        </div>
 
-                <div className="text-center py-8">
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                    Currently, users can manage their own blocks from their settings page.
-                  </p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
-                    Selected user ID: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{selectedUser}</code>
-                  </p>
-                </div>
+                        <div className="space-y-2">
+                          {block.type === 'blocked_by_user' && block.blocked_user && (
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Blocked User:</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {block.blocked_user.username} ({block.blocked_user.email})
+                              </p>
+                            </div>
+                          )}
+
+                          {block.type === 'blocked_user' && block.blocker && (
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Blocked By:</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {block.blocker.username} ({block.blocker.email})
+                              </p>
+                            </div>
+                          )}
+
+                          {block.reason && (
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Reason:</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{block.reason}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -281,10 +330,10 @@ export default function ModerationBlocksPage() {
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
               <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                ---
+                {totalBlocks}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Total Blocks (needs API)
+                Total Blocks
               </div>
             </div>
           </div>
