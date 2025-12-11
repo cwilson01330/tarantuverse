@@ -57,7 +57,7 @@ export default function ModerationBlocksPage() {
     fetchUsers();
     fetchBlockStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, isAuthenticated, user, router]);
+  }, [isLoading, isAuthenticated]);
 
   const fetchBlockStats = async () => {
     if (!token) return;
