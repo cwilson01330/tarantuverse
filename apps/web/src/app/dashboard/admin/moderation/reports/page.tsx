@@ -32,6 +32,7 @@ export default function ModerationReportsPage() {
   const [selectedReport, setSelectedReport] = useState<ContentReport | null>(null);
   const [moderationNotes, setModerationNotes] = useState('');
   const [actionTaken, setActionTaken] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
@@ -51,10 +52,15 @@ export default function ModerationReportsPage() {
 
   const fetchReports = async () => {
     const token = localStorage.getItem('auth_token');
-    if (!token) return;
+    if (!token) {
+      setError('No authentication token found');
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
+      setError(null);
       const endpoint = filter === 'pending'
         ? '/api/v1/reports/admin/pending'
         : '/api/v1/reports/admin/all';
@@ -66,9 +72,14 @@ export default function ModerationReportsPage() {
       if (response.ok) {
         const data = await response.json();
         setReports(data);
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        console.error('API Error:', response.status, errorData);
+        setError(`Failed to load reports: ${errorData.detail || response.statusText}`);
       }
     } catch (error) {
       console.error('Failed to fetch reports:', error);
+      setError(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -199,7 +210,33 @@ export default function ModerationReportsPage() {
 
       {/* Reports List */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {reports.length === 0 ? (
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-900 dark:text-red-200">Error Loading Reports</h3>
+                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                  <p>{error}</p>
+                </div>
+                <div className="mt-4">
+                  <button
+                    onClick={() => fetchReports()}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!error && reports.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
             <div className="text-6xl mb-4">✅</div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
