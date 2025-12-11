@@ -274,7 +274,7 @@ export default function ThreadDetailScreen() {
                       }}
                       style={styles.reportButton}
                     >
-                      <MaterialCommunityIcons name="flag-outline" size={20} color={colors.textTertiary} />
+                      <MaterialCommunityIcons name="flag" size={22} color="#f59e0b" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -477,7 +477,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   reportButton: {
-    padding: 4,
+    padding: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 8,
   },
   authorAvatar: {
     width: 40,
