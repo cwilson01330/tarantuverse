@@ -29,7 +29,7 @@ export default function NewThreadScreen() {
   const { category: initialCategory } = useLocalSearchParams();
   const { colors } = useTheme();
   const [categories, setCategories] = useState<ForumCategory[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>(String(initialCategory || ''));
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -76,7 +76,7 @@ export default function NewThreadScreen() {
       return;
     }
 
-    if (!selectedCategory) {
+    if (!selectedCategoryId) {
       Alert.alert('Error', 'Please select a category');
       return;
     }
@@ -90,26 +90,44 @@ export default function NewThreadScreen() {
         return;
       }
 
+      const requestBody = {
+        category_id: selectedCategoryId,
+        title: title.trim(),
+        content: content.trim(),
+      };
+
+      console.log('Sending request to:', `${API_URL}/api/v1/forums/threads`);
+      console.log('Request body:', requestBody);
+
       const response = await fetch(`${API_URL}/api/v1/forums/threads`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          category_slug: selectedCategory,
-          title: title.trim(),
-          content: content.trim(),
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to create thread');
+        console.log('Error response:', response.status, errorData);
+
+        // Handle different error formats
+        let errorMessage = 'Failed to create thread';
+        if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        } else if (Array.isArray(errorData.detail)) {
+          // Handle validation errors
+          errorMessage = errorData.detail.map((e: any) => e.msg || e.message || JSON.stringify(e)).join('\n');
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+
+        throw new Error(errorMessage);
       }
 
       const newThread = await response.json();
-      
+
       Alert.alert('Success', 'Thread created successfully', [
         {
           text: 'OK',
@@ -120,7 +138,9 @@ export default function NewThreadScreen() {
         },
       ]);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to create thread');
+      console.error('Thread creation error:', err);
+      const errorMessage = err.message || JSON.stringify(err) || 'Failed to create thread';
+      Alert.alert('Error', errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -153,15 +173,15 @@ export default function NewThreadScreen() {
                 style={[
                   styles.categoryChip,
                   { borderColor: colors.border },
-                  selectedCategory === cat.slug && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  selectedCategoryId === cat.id && { backgroundColor: colors.primary, borderColor: colors.primary },
                 ]}
-                onPress={() => setSelectedCategory(cat.slug)}
+                onPress={() => setSelectedCategoryId(cat.id)}
               >
                 <Text
                   style={[
                     styles.categoryChipText,
                     { color: colors.textSecondary },
-                    selectedCategory === cat.slug && { color: '#fff' },
+                    selectedCategoryId === cat.id && { color: '#fff' },
                   ]}
                 >
                   {cat.name}
@@ -241,10 +261,10 @@ export default function NewThreadScreen() {
             style={[
               styles.submitButton,
               { backgroundColor: colors.primary },
-              (!title.trim() || !content.trim() || !selectedCategory || submitting) && styles.submitButtonDisabled,
+              (!title.trim() || !content.trim() || !selectedCategoryId || submitting) && styles.submitButtonDisabled,
             ]}
             onPress={handleSubmit}
-            disabled={!title.trim() || !content.trim() || !selectedCategory || submitting}
+            disabled={!title.trim() || !content.trim() || !selectedCategoryId || submitting}
           >
             {submitting ? (
               <ActivityIndicator size="small" color="#fff" />
