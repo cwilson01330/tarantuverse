@@ -144,7 +144,13 @@ export default function ThreadDetailScreen() {
   };
 
   const handleUsernamePress = (username: string) => {
-    router.push(`/community/${username}`);
+    console.log('Navigating to profile:', username);
+    try {
+      router.push(`/community/${username}`);
+    } catch (error) {
+      console.error('Navigation error:', error);
+      Alert.alert('Error', 'Failed to navigate to profile');
+    }
   };
 
   const handleReportPress = (post: Post) => {
