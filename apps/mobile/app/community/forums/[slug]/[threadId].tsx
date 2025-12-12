@@ -86,11 +86,20 @@ export default function ThreadDetailScreen() {
       const postsData = await postsResponse.json();
 
       // Combine first_post with other posts
+      console.log('Thread data first_post:', threadData.first_post);
+      console.log('Posts data:', postsData);
+
       if (threadData.first_post && postsData.posts) {
         const otherPosts = postsData.posts.filter((p: Post) => p.id !== threadData.first_post.id);
-        setPosts([threadData.first_post, ...otherPosts]);
+        const allPosts = [threadData.first_post, ...otherPosts];
+        console.log('Setting posts with first_post:', allPosts);
+        setPosts(allPosts);
       } else if (postsData.posts) {
+        console.log('Setting posts without first_post:', postsData.posts);
         setPosts(postsData.posts);
+      } else {
+        console.log('No posts found');
+        setPosts([]);
       }
     } catch (error) {
       console.error('Error fetching thread data:', error);
@@ -237,16 +246,18 @@ export default function ThreadDetailScreen() {
               </Text>
             </View>
           ) : (
-            posts.map((post, index) => (
-              <View
-                key={post.id}
-                style={[
-                  styles.postCard,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-              >
-                {/* Post Header with Author and Actions */}
-                <View style={styles.postHeaderRow}>
+            posts.map((post, index) => {
+              console.log(`Rendering post ${index}:`, post.id, 'by', post.author.username);
+              return (
+                <View
+                  key={post.id}
+                  style={[
+                    styles.postCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border },
+                  ]}
+                >
+                  {/* Post Header with Author and Actions */}
+                  <View style={styles.postHeaderRow}>
                   {/* Author Info - Clickable */}
                   <TouchableOpacity
                     style={styles.postAuthorSection}
@@ -268,19 +279,24 @@ export default function ThreadDetailScreen() {
                     </View>
                   </TouchableOpacity>
 
-                  {/* Action Buttons */}
-                  <View style={styles.postActionsRow}>
-                    {index === 0 && (
-                      <View style={[styles.opBadge, { backgroundColor: colors.primary }]}>
-                        <Text style={styles.opBadgeText}>OP</Text>
-                      </View>
-                    )}
+                  {/* Action Buttons - Forcing visibility with test */}
+                  <View style={{ position: 'absolute', top: 0, right: 0, zIndex: 999 }}>
                     <TouchableOpacity
-                      onPress={() => handleReportPress(post)}
-                      style={styles.reportButton}
-                      activeOpacity={0.7}
+                      onPress={() => {
+                        console.log('Report button pressed for post:', post.id);
+                        Alert.alert('Report', 'Report button clicked!');
+                        handleReportPress(post);
+                      }}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        backgroundColor: 'red',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        borderRadius: 8,
+                      }}
                     >
-                      <MaterialCommunityIcons name="flag" size={20} color="white" />
+                      <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>!</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -288,7 +304,8 @@ export default function ThreadDetailScreen() {
                 {/* Post Content */}
                 <Text style={[styles.postContent, { color: colors.textPrimary }]}>{post.content}</Text>
               </View>
-            ))
+            );
+            })
           )}
         </ScrollView>
 
