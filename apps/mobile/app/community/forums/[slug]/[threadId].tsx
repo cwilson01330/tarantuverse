@@ -69,6 +69,7 @@ export default function ThreadDetailScreen() {
   const [isReplying, setIsReplying] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [reportingPost, setReportingPost] = useState<Post | null>(null);
+  const [menuVisible, setMenuVisible] = useState<number | null>(null);
 
   const fetchThreadData = async () => {
     try {
@@ -86,20 +87,11 @@ export default function ThreadDetailScreen() {
       const postsData = await postsResponse.json();
 
       // Combine first_post with other posts
-      console.log('Thread data first_post:', threadData.first_post);
-      console.log('Posts data:', postsData);
-
       if (threadData.first_post && postsData.posts) {
         const otherPosts = postsData.posts.filter((p: Post) => p.id !== threadData.first_post.id);
-        const allPosts = [threadData.first_post, ...otherPosts];
-        console.log('Setting posts with first_post:', allPosts);
-        setPosts(allPosts);
+        setPosts([threadData.first_post, ...otherPosts]);
       } else if (postsData.posts) {
-        console.log('Setting posts without first_post:', postsData.posts);
         setPosts(postsData.posts);
-      } else {
-        console.log('No posts found');
-        setPosts([]);
       }
     } catch (error) {
       console.error('Error fetching thread data:', error);
@@ -246,16 +238,14 @@ export default function ThreadDetailScreen() {
               </Text>
             </View>
           ) : (
-            posts.map((post, index) => {
-              console.log(`Rendering post ${index}:`, post.id, 'by', post.author.username);
-              return (
-                <View
-                  key={post.id}
-                  style={[
-                    styles.postCard,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
-                  ]}
-                >
+            posts.map((post, index) => (
+              <View
+                key={post.id}
+                style={[
+                  styles.postCard,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+              >
                   {/* Post Header with Author and Actions */}
                   <View style={styles.postHeaderRow}>
                   {/* Author Info - Clickable */}
@@ -279,33 +269,64 @@ export default function ThreadDetailScreen() {
                     </View>
                   </TouchableOpacity>
 
-                  {/* Action Buttons - Forcing visibility with test */}
-                  <View style={{ position: 'absolute', top: 0, right: 0, zIndex: 999 }}>
+                  {/* Action area with OP badge and menu */}
+                  <View style={styles.postActionsRow}>
+                    {index === 0 && (
+                      <View style={[styles.opBadge, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.opBadgeText}>OP</Text>
+                      </View>
+                    )}
+
                     <TouchableOpacity
-                      onPress={() => {
-                        console.log('Report button pressed for post:', post.id);
-                        Alert.alert('Report', 'Report button clicked!');
-                        handleReportPress(post);
-                      }}
-                      style={{
-                        width: 40,
-                        height: 40,
-                        backgroundColor: 'red',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderRadius: 8,
-                      }}
+                      onPress={() => setMenuVisible(post.id)}
+                      style={styles.menuButton}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                      <Text style={{ color: 'white', fontSize: 24, fontWeight: 'bold' }}>!</Text>
+                      <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.textSecondary} />
                     </TouchableOpacity>
+
+                    {/* Menu Modal */}
+                    {menuVisible === post.id && (
+                      <View style={styles.menuOverlay}>
+                        <TouchableOpacity
+                          style={styles.menuOverlayBackground}
+                          onPress={() => setMenuVisible(null)}
+                          activeOpacity={1}
+                        />
+                        <View style={[styles.menuDropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                              setMenuVisible(null);
+                              handleUsernamePress(post.author.username);
+                            }}
+                          >
+                            <MaterialCommunityIcons name="account" size={20} color={colors.primary} />
+                            <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>View Profile</Text>
+                          </TouchableOpacity>
+
+                          <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                              setMenuVisible(null);
+                              handleReportPress(post);
+                            }}
+                          >
+                            <MaterialCommunityIcons name="flag" size={20} color="#ef4444" />
+                            <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>Report Post</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </View>
 
                 {/* Post Content */}
                 <Text style={[styles.postContent, { color: colors.textPrimary }]}>{post.content}</Text>
               </View>
-            );
-            })
+            ))
           )}
         </ScrollView>
 
@@ -507,14 +528,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  reportButton: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ef4444',
-    borderRadius: 8,
-  },
   postContent: {
     fontSize: 15,
     lineHeight: 22,
@@ -552,5 +565,48 @@ const styles = StyleSheet.create({
   lockedText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  menuButton: {
+    padding: 4,
+  },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 1000,
+  },
+  menuOverlayBackground: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  menuDropdown: {
+    position: 'absolute',
+    top: 30,
+    right: 0,
+    minWidth: 180,
+    borderRadius: 8,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+    marginHorizontal: 8,
   },
 });
