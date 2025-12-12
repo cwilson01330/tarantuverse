@@ -321,6 +321,13 @@ export default function ThreadDetailScreen() {
 
                 {/* Post Content */}
                 <Text style={[styles.postContent, { color: colors.textPrimary }]}>{post.content}</Text>
+
+                {/* DEBUG: Menu button placed AFTER content */}
+                <View style={{ backgroundColor: '#00ff00', padding: 20, marginTop: 12, alignItems: 'center' }}>
+                  <Text style={{ color: 'black', fontSize: 20, fontWeight: 'bold' }}>
+                    REPORT BUTTON - POST #{post.id}
+                  </Text>
+                </View>
               </View>
             ))
           )}
