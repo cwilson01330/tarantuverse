@@ -271,10 +271,10 @@ export default function ThreadDetailScreen() {
                     )}
                     <TouchableOpacity
                       onPress={() => handleReportPress(post)}
-                      style={styles.reportButton}
+                      style={[styles.reportButton, { borderColor: colors.border }]}
                       activeOpacity={0.7}
                     >
-                      <MaterialCommunityIcons name="flag" size={20} color="#ef4444" />
+                      <MaterialCommunityIcons name="flag" size={18} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -485,9 +485,13 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   reportButton: {
-    padding: 6,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderRadius: 6,
+    borderWidth: 1,
   },
   postContent: {
     fontSize: 15,
