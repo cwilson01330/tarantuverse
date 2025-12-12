@@ -16,8 +16,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTheme } from '../../../../../src/contexts/ThemeContext';
-import ReportModal from '../../../../../src/components/ReportModal';
+import { useTheme } from '../../../../src/contexts/ThemeContext';
+import ReportModal from '../../../../src/components/ReportModal';
 
 interface Author {
   id: string;
