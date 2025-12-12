@@ -10,15 +10,17 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../../src/contexts/ThemeContext';
 import ReportModal from '../../../../src/components/ReportModal';
 
 interface Author {
-  id: string;  // UUID
+  id: string;
   username: string;
   display_name?: string;
   avatar_url?: string;
@@ -31,7 +33,6 @@ interface Post {
   author: Author;
   content: string;
   created_at: string;
-  updated_at: string;
   is_edited: boolean;
   edited_at?: string;
 }
@@ -59,6 +60,7 @@ export default function ThreadDetailScreen() {
   const { slug, threadId } = useLocalSearchParams<{ slug: string; threadId: string }>();
   const router = useRouter();
   const { colors } = useTheme();
+
   const [thread, setThread] = useState<Thread | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,15 +80,13 @@ export default function ThreadDetailScreen() {
       const threadData = await threadResponse.json();
       setThread(threadData);
 
-      // Fetch posts in thread (API returns paginated response)
+      // Fetch posts
       const postsResponse = await fetch(`${API_URL}/api/v1/forums/threads/${threadId}/posts?page=1&limit=100`);
       if (!postsResponse.ok) throw new Error('Failed to fetch posts');
       const postsData = await postsResponse.json();
 
-      // API returns: {posts: Post[], total, page, limit, has_more}
-      // If thread has first_post, prepend it to avoid duplication
+      // Combine first_post with other posts
       if (threadData.first_post && postsData.posts) {
-        // Filter out first_post if it's in the posts array
         const otherPosts = postsData.posts.filter((p: Post) => p.id !== threadData.first_post.id);
         setPosts([threadData.first_post, ...otherPosts]);
       } else if (postsData.posts) {
@@ -94,6 +94,7 @@ export default function ThreadDetailScreen() {
       }
     } catch (error) {
       console.error('Error fetching thread data:', error);
+      Alert.alert('Error', 'Failed to load thread');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -112,6 +113,12 @@ export default function ThreadDetailScreen() {
   const handleReply = async () => {
     if (!replyText.trim() || isReplying) return;
 
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) {
+      Alert.alert('Login Required', 'Please log in to post replies');
+      return;
+    }
+
     setIsReplying(true);
     try {
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
@@ -119,7 +126,7 @@ export default function ThreadDetailScreen() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // TODO: Add authentication token
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ content: replyText }),
       });
@@ -127,13 +134,22 @@ export default function ThreadDetailScreen() {
       if (!response.ok) throw new Error('Failed to post reply');
 
       setReplyText('');
-      fetchThreadData(); // Refresh to show new post
+      fetchThreadData();
+      Alert.alert('Success', 'Reply posted!');
     } catch (error) {
-      console.error('Error posting reply:', error);
-      // TODO: Show error message to user
+      Alert.alert('Error', 'Failed to post reply');
     } finally {
       setIsReplying(false);
     }
+  };
+
+  const handleUsernamePress = (username: string) => {
+    router.push(`/community/${username}`);
+  };
+
+  const handleReportPress = (post: Post) => {
+    setReportingPost(post);
+    setReportModalVisible(true);
   };
 
   const formatDate = (dateString: string) => {
@@ -141,7 +157,7 @@ export default function ThreadDetailScreen() {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
-    
+
     if (hours < 1) return 'Just now';
     if (hours < 24) return `${hours}h ago`;
     if (hours < 48) return 'Yesterday';
@@ -150,101 +166,86 @@ export default function ThreadDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading thread...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!thread) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.centerContainer}>
           <Text style={[styles.errorText, { color: colors.textPrimary }]}>Thread not found</Text>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Text style={[styles.backButtonText, { color: colors.primary }]}>← Go Back</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
-    >
-      {/* Header */}
-      <LinearGradient
-        colors={['#0066ff', '#ff0099']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <View style={styles.headerTitleRow}>
-            {thread.is_pinned && <MaterialCommunityIcons name="pin" size={20} color="white" />}
-            <Text style={styles.headerTitle} numberOfLines={2}>
-              {thread.title}
-            </Text>
-            {thread.is_locked && <MaterialCommunityIcons name="lock" size={20} color="white" />}
-          </View>
-          <View style={styles.headerMeta}>
-            <Text style={styles.headerMetaText}>
-              {thread.category.name} • {thread.author.username}
+        {/* Header */}
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerBackButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <View style={styles.headerTitleRow}>
+              {thread.is_pinned && <Text style={styles.headerIcon}>📌</Text>}
+              {thread.is_locked && <Text style={styles.headerIcon}>🔒</Text>}
+              <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+                {thread.title}
+              </Text>
+            </View>
+            <Text style={[styles.headerMeta, { color: colors.textSecondary }]}>
+              {thread.category.name} • {thread.post_count} posts • {thread.view_count} views
             </Text>
           </View>
         </View>
-        <View style={styles.headerStats}>
-          <View style={styles.headerStat}>
-            <MaterialCommunityIcons name="message" size={16} color="white" />
-            <Text style={styles.headerStatText}>{thread.post_count}</Text>
-          </View>
-          <View style={styles.headerStat}>
-            <MaterialCommunityIcons name="eye" size={16} color="white" />
-            <Text style={styles.headerStatText}>{thread.view_count}</Text>
-          </View>
-        </View>
-      </LinearGradient>
 
-      {/* Posts List */}
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} />
-        }
-      >
-        {posts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>💬</Text>
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Posts Yet</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              Be the first to reply to this thread!
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.postList}>
-            {posts.map((post, index) => (
+        {/* Posts List */}
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+          }
+        >
+          {posts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>💬</Text>
+              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Posts Yet</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                Be the first to reply to this thread!
+              </Text>
+            </View>
+          ) : (
+            posts.map((post, index) => (
               <View
                 key={post.id}
                 style={[
                   styles.postCard,
                   { backgroundColor: colors.surface, borderColor: colors.border },
-                  index === 0 && styles.firstPost,
                 ]}
               >
-                <View style={styles.postHeader}>
+                {/* Post Header with Author and Actions */}
+                <View style={styles.postHeaderRow}>
+                  {/* Author Info - Clickable */}
                   <TouchableOpacity
-                    style={styles.postAuthor}
-                    onPress={() => router.push(`/community/${post.author.username}`)}
+                    style={styles.postAuthorSection}
+                    onPress={() => handleUsernamePress(post.author.username)}
+                    activeOpacity={0.7}
                   >
                     <View style={[styles.authorAvatar, { backgroundColor: colors.primary }]}>
                       <Text style={styles.authorAvatarText}>
@@ -252,62 +253,59 @@ export default function ThreadDetailScreen() {
                       </Text>
                     </View>
                     <View style={styles.postAuthorInfo}>
-                      <Text style={[styles.postAuthorName, { color: colors.primary }]} numberOfLines={1}>
+                      <Text style={[styles.postAuthorName, { color: colors.textPrimary }]} numberOfLines={1}>
                         {post.author.display_name || post.author.username}
                       </Text>
                       <Text style={[styles.postDate, { color: colors.textTertiary }]} numberOfLines={1}>
                         @{post.author.username} • {formatDate(post.created_at)}
-                        {post.is_edited && ' (edited)'}
                       </Text>
                     </View>
                   </TouchableOpacity>
-                  <View style={styles.postActions}>
+
+                  {/* Action Buttons */}
+                  <View style={styles.postActionsRow}>
                     {index === 0 && (
                       <View style={[styles.opBadge, { backgroundColor: colors.primary }]}>
                         <Text style={styles.opBadgeText}>OP</Text>
                       </View>
                     )}
                     <TouchableOpacity
-                      onPress={() => {
-                        setReportingPost(post);
-                        setReportModalVisible(true);
-                      }}
+                      onPress={() => handleReportPress(post)}
                       style={styles.reportButton}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      activeOpacity={0.7}
                     >
-                      <MaterialCommunityIcons name="flag" size={22} color="#f59e0b" />
+                      <MaterialCommunityIcons name="flag" size={20} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
+
+                {/* Post Content */}
                 <Text style={[styles.postContent, { color: colors.textPrimary }]}>{post.content}</Text>
               </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+            ))
+          )}
+        </ScrollView>
 
-      {/* Reply Input */}
-      {!thread.is_locked && (
-        <View style={[styles.replyContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <TextInput
-            style={[styles.replyInput, { color: colors.textPrimary }]}
-            placeholder="Write a reply..."
-            placeholderTextColor={colors.textTertiary}
-            value={replyText}
-            onChangeText={setReplyText}
-            multiline
-            maxLength={5000}
-          />
-          <TouchableOpacity
-            onPress={handleReply}
-            disabled={!replyText.trim() || isReplying}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={replyText.trim() ? ['#0066ff', '#ff0099'] : [colors.border, colors.border]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.sendButton}
+        {/* Reply Input */}
+        {!thread.is_locked ? (
+          <View style={[styles.replyContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <TextInput
+              style={[styles.replyInput, { color: colors.textPrimary, backgroundColor: colors.background }]}
+              placeholder="Write a reply..."
+              placeholderTextColor={colors.textTertiary}
+              value={replyText}
+              onChangeText={setReplyText}
+              multiline
+              maxLength={5000}
+            />
+            <TouchableOpacity
+              onPress={handleReply}
+              disabled={!replyText.trim() || isReplying}
+              style={[
+                styles.sendButton,
+                { backgroundColor: replyText.trim() ? colors.primary : colors.border }
+              ]}
+              activeOpacity={0.8}
             >
               {isReplying ? (
                 <ActivityIndicator size="small" color="white" />
@@ -318,32 +316,30 @@ export default function ThreadDetailScreen() {
                   color={replyText.trim() ? 'white' : colors.textTertiary}
                 />
               )}
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={[styles.lockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <MaterialCommunityIcons name="lock" size={16} color={colors.textSecondary} />
+            <Text style={[styles.lockedText, { color: colors.textSecondary }]}>This thread is locked</Text>
+          </View>
+        )}
 
-      {thread.is_locked && (
-        <View style={[styles.lockedBanner, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <MaterialCommunityIcons name="lock" size={16} color={colors.textSecondary} />
-          <Text style={[styles.lockedText, { color: colors.textSecondary }]}>This thread is locked</Text>
-        </View>
-      )}
-
-      {/* Report Modal */}
-      {reportingPost && (
-        <ReportModal
-          visible={reportModalVisible}
-          onClose={() => {
-            setReportModalVisible(false);
-            setReportingPost(null);
-          }}
-          reportType="forum_post"
-          contentId={reportingPost.id.toString()}
-          reportedUserId={reportingPost.author.id.toString()}
-        />
-      )}
-    </KeyboardAvoidingView>
+        {/* Report Modal */}
+        {reportingPost && (
+          <ReportModal
+            visible={reportModalVisible}
+            onClose={() => {
+              setReportModalVisible(false);
+              setReportingPost(null);
+            }}
+            reportType="forum_post"
+            contentId={reportingPost.id.toString()}
+            reportedUserId={reportingPost.author_id}
+          />
+        )}
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -375,50 +371,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
   },
   headerBackButton: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   headerContent: {
-    marginBottom: 12,
+    flex: 1,
   },
   headerTitleRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 8,
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  headerIcon: {
+    fontSize: 16,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: 'white',
     flex: 1,
-    lineHeight: 26,
   },
   headerMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerMetaText: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  headerStats: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  headerStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  headerStatText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
   },
   content: {
     flex: 1,
@@ -444,45 +422,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
   },
-  postList: {
-    gap: 12,
-  },
   postCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
-  firstPost: {
-    borderWidth: 2,
-  },
-  postHeader: {
+  postHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  postAuthor: {
+  postAuthorSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     flex: 1,
-    minWidth: 0, // Allow shrinking
-  },
-  postActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0, // Prevent shrinking
-  },
-  reportButton: {
-    padding: 8,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderRadius: 8,
+    marginRight: 12,
   },
   authorAvatar: {
     width: 40,
@@ -498,7 +460,6 @@ const styles = StyleSheet.create({
   },
   postAuthorInfo: {
     flex: 1,
-    minWidth: 0, // Allow text truncation
   },
   postAuthorName: {
     fontSize: 15,
@@ -507,6 +468,11 @@ const styles = StyleSheet.create({
   },
   postDate: {
     fontSize: 12,
+  },
+  postActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   opBadge: {
     paddingHorizontal: 8,
@@ -517,6 +483,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: 'bold',
     color: 'white',
+  },
+  reportButton: {
+    padding: 6,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 6,
   },
   postContent: {
     fontSize: 15,
@@ -533,7 +504,9 @@ const styles = StyleSheet.create({
     flex: 1,
     maxHeight: 100,
     fontSize: 15,
+    paddingHorizontal: 12,
     paddingVertical: 8,
+    borderRadius: 20,
   },
   sendButton: {
     width: 40,
@@ -546,7 +519,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
+    padding: 16,
     gap: 8,
     borderTopWidth: 1,
   },
