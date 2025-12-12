@@ -277,16 +277,9 @@ export default function ThreadDetailScreen() {
                       </View>
                     )}
 
-                    <TouchableOpacity
-                      onPress={() => {
-                        console.log('Menu button pressed for post:', post.id);
-                        setMenuVisible(post.id);
-                      }}
-                      style={[styles.menuButton, { backgroundColor: '#ff0000', padding: 8, borderRadius: 4 }]}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <MaterialCommunityIcons name="dots-vertical" size={24} color="white" />
-                    </TouchableOpacity>
+                    <View style={{ backgroundColor: '#ff0000', padding: 12, borderRadius: 8 }}>
+                      <Text style={{ color: 'white', fontSize: 18, fontWeight: 'bold' }}>MENU</Text>
+                    </View>
 
                     {/* Menu Modal */}
                     {menuVisible === post.id && (
