@@ -4,10 +4,12 @@ const path = require('path');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// IMPORTANT: Limit Metro to only the mobile app directory (not the entire monorepo)
-// This prevents EAS from packaging the entire monorepo (apps/web, apps/api, etc.)
-config.projectRoot = __dirname;
-config.watchFolders = [__dirname];
+// Monorepo support: Allow Metro to access workspace root
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, '../..');
+
+config.projectRoot = projectRoot;
+config.watchFolders = [workspaceRoot];
 
 // Performance optimizations
 config.transformer = {
@@ -24,10 +26,13 @@ config.transformer = {
 // Increase worker count for parallel processing
 config.maxWorkers = 4;
 
-// Prevent Metro from traversing up to parent directories
+// Support pnpm workspace by allowing Metro to resolve from workspace root
 config.resolver = {
   ...config.resolver,
-  disableHierarchicalLookup: true,
+  nodeModulesPaths: [
+    path.resolve(projectRoot, 'node_modules'),
+    path.resolve(workspaceRoot, 'node_modules'),
+  ],
 };
 
 module.exports = config;
