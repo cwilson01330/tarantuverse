@@ -6,6 +6,8 @@ import { useState, useEffect } from 'react'
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
+  isCollapsed: boolean
+  onToggleCollapse: () => void
 }
 
 interface NavItem {
@@ -15,10 +17,9 @@ interface NavItem {
   badge?: number
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const [isCollapsed, setIsCollapsed] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
@@ -113,7 +114,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           {/* Desktop collapse toggle */}
           <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={onToggleCollapse}
             className="hidden lg:block p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
