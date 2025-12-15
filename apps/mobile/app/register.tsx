@@ -12,12 +12,14 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
+import GoogleLogo from '../src/components/GoogleLogo';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { register, loginWithGoogle, loginWithApple } = useAuth();
   const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -26,6 +28,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [success, setSuccess] = useState(false);
 
   const handleRegister = async () => {
@@ -58,6 +61,30 @@ export default function RegisterScreen() {
       Alert.alert('Registration Failed', error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    setOauthLoading('google');
+    try {
+      await loginWithGoogle();
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Google Sign-In Failed', error.message);
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
+  const handleAppleRegister = async () => {
+    setOauthLoading('apple');
+    try {
+      await loginWithApple();
+      router.replace('/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Apple Sign-In Failed', error.message);
+    } finally {
+      setOauthLoading(null);
     }
   };
 
@@ -164,6 +191,43 @@ export default function RegisterScreen() {
     termsLink: {
       color: colors.primary,
       textDecorationLine: 'underline',
+    },
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 24,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    dividerText: {
+      marginHorizontal: 16,
+      color: colors.textTertiary,
+      fontSize: 14,
+    },
+    oauthButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 14,
+      marginBottom: 12,
+    },
+    oauthButtonText: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+      marginLeft: 12,
+    },
+    appleButton: {
+      width: '100%',
+      height: 50,
+      marginBottom: 12,
     },
   });
 
@@ -288,6 +352,40 @@ export default function RegisterScreen() {
                 <Text style={styles.buttonText}>Create Account</Text>
               )}
             </TouchableOpacity>
+
+            {/* Divider */}
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Google Sign In */}
+            <TouchableOpacity
+              style={styles.oauthButton}
+              onPress={handleGoogleRegister}
+              disabled={loading || oauthLoading !== null}
+            >
+              {oauthLoading === 'google' ? (
+                <ActivityIndicator color={colors.textPrimary} />
+              ) : (
+                <>
+                  <GoogleLogo size={24} />
+                  <Text style={styles.oauthButtonText}>Continue with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Apple Sign In (iOS only) */}
+            {Platform.OS === 'ios' && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={8}
+                style={styles.appleButton}
+                onPress={handleAppleRegister}
+              />
+            )}
 
             <TouchableOpacity
               style={styles.linkButton}

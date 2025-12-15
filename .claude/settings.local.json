@@ -53,7 +53,9 @@
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlYTNjMzM0YS1jMjZkLTRmODUtOGViYi01ZmM0ZjZlNDBmODUiLCJleHAiOjE3NjU5MDAzMzZ9.B1XVTxkHl64uS_oW8AKZgukQHuOFvih3QaTbZMN80-4\")",
       "Bash(CI=true cd apps/mobile)",
       "Bash(pnpm remove:*)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "Bash(npx tsc:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
