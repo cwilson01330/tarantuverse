@@ -5,15 +5,21 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-// Configure notification behavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Check if running in Expo Go (which doesn't support push notifications in SDK 53+)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Configure notification behavior (only if not in Expo Go)
+if (!isExpoGo) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 export interface NotificationPreferences {
   feeding_reminders_enabled: boolean;
@@ -50,8 +56,15 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 /**
  * Get Expo push notification token
+ * Note: Push notifications are not supported in Expo Go with SDK 53+
  */
 export async function getExpoPushToken(): Promise<string | null> {
+  // Skip push token registration in Expo Go
+  if (isExpoGo) {
+    console.log('Push notifications are not supported in Expo Go. Use a development build for push notifications.');
+    return null;
+  }
+
   try {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return null;

@@ -11,6 +11,7 @@ import {
   Alert,
   StyleSheet,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -63,6 +64,11 @@ export default function ThreadDetailScreen() {
   const [editingThread, setEditingThread] = useState(false);
   const [editThreadTitle, setEditThreadTitle] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [menuVisible, setMenuVisible] = useState<number | null>(null);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [reportingPost, setReportingPost] = useState<Post | null>(null);
+  const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
 
   useEffect(() => {
     fetchCurrentUser();
@@ -395,6 +401,81 @@ export default function ThreadDetailScreen() {
     );
   };
 
+  const handleOpenMenu = (postId: number) => {
+    setMenuVisible(postId);
+  };
+
+  const handleCloseMenu = () => {
+    setMenuVisible(null);
+  };
+
+  const handleViewProfile = (post: Post) => {
+    handleCloseMenu();
+    router.push(`/community/${post.author.username}`);
+  };
+
+  const handleOpenReportModal = (post: Post) => {
+    handleCloseMenu();
+    setReportingPost(post);
+    setReportModalVisible(true);
+  };
+
+  const handleCloseReportModal = () => {
+    setReportModalVisible(false);
+    setReportingPost(null);
+    setReportReason('');
+    setReportDescription('');
+  };
+
+  const handleSubmitReport = async () => {
+    if (!reportReason) {
+      Alert.alert('Error', 'Please select a reason for reporting');
+      return;
+    }
+
+    if (!reportingPost) return;
+
+    try {
+      setSubmitting(true);
+      const token = await AsyncStorage.getItem('auth_token');
+
+      if (!token) {
+        Alert.alert('Error', 'You must be logged in to report content');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/v1/reports/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reported_user_id: reportingPost.author_id,
+          report_type: 'forum_post',
+          content_id: reportingPost.id.toString(),
+          content_url: `/forums/thread/${id}`,
+          reason: reportReason,
+          description: reportDescription || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit report');
+      }
+
+      Alert.alert(
+        'Report Submitted',
+        'Thank you for helping keep our community safe. A moderator will review your report shortly.',
+        [{ text: 'OK', onPress: handleCloseReportModal }]
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to submit report');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -591,33 +672,64 @@ export default function ThreadDetailScreen() {
                 </Text>
               </View>
               
-              {/* Edit/Delete Buttons */}
-              {(() => {
-                const canEdit = currentUserId && post.author.id === currentUserId && editingPostId !== post.id;
-                if (index === 0) {
-                  console.log('[Thread] Edit check for first post:', {
-                    currentUserId,
-                    authorId: post.author.id,
-                    canEdit,
-                    editingPostId
-                  });
-                }
-                return canEdit;
-              })() && (
+              {/* Three-dot menu for all posts */}
+              {editingPostId !== post.id && (
                 <View style={styles.postActions}>
-                  <TouchableOpacity
-                    onPress={() => startEdit(post)}
-                    style={styles.actionButton}
-                  >
-                    <MaterialCommunityIcons name="pencil" size={20} color={colors.primary} />
-                  </TouchableOpacity>
-                  {index !== 0 && (
-                    <TouchableOpacity
-                      onPress={() => handleDeletePost(post.id, index)}
-                      style={styles.actionButton}
-                    >
-                      <MaterialCommunityIcons name="delete" size={20} color={colors.error} />
-                    </TouchableOpacity>
+                  {/* Own post: Edit/Delete buttons */}
+                  {currentUserId && post.author.id === currentUserId ? (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => startEdit(post)}
+                        style={styles.actionButton}
+                      >
+                        <MaterialCommunityIcons name="pencil" size={20} color={colors.primary} />
+                      </TouchableOpacity>
+                      {index !== 0 && (
+                        <TouchableOpacity
+                          onPress={() => handleDeletePost(post.id, index)}
+                          style={styles.actionButton}
+                        >
+                          <MaterialCommunityIcons name="delete" size={20} color={colors.error} />
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  ) : (
+                    /* Other users' posts: Three-dot menu */
+                    <View>
+                      <TouchableOpacity
+                        onPress={() => handleOpenMenu(post.id)}
+                        style={styles.actionButton}
+                      >
+                        <MaterialCommunityIcons name="dots-vertical" size={22} color={colors.textPrimary} />
+                      </TouchableOpacity>
+
+                      {/* Menu Dropdown */}
+                      {menuVisible === post.id && (
+                        <TouchableOpacity
+                          style={styles.menuOverlay}
+                          onPress={handleCloseMenu}
+                          activeOpacity={1}
+                        >
+                          <View style={[styles.menuDropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <TouchableOpacity
+                              style={styles.menuItem}
+                              onPress={() => handleViewProfile(post)}
+                            >
+                              <MaterialCommunityIcons name="account" size={20} color={colors.textPrimary} />
+                              <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>View Profile</Text>
+                            </TouchableOpacity>
+                            <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+                            <TouchableOpacity
+                              style={styles.menuItem}
+                              onPress={() => handleOpenReportModal(post)}
+                            >
+                              <MaterialCommunityIcons name="flag" size={20} color={colors.error} />
+                              <Text style={[styles.menuItemText, { color: colors.error }]}>Report Post</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   )}
                 </View>
               )}
@@ -706,6 +818,112 @@ export default function ThreadDetailScreen() {
         </View>
       )}
       </KeyboardAvoidingView>
+
+      {/* Report Modal */}
+      <Modal
+        visible={reportModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCloseReportModal}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.reportModal, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Report Post</Text>
+              <TouchableOpacity onPress={handleCloseReportModal}>
+                <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.modalContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={[styles.reportLabel, { color: colors.textSecondary }]}>
+                Why are you reporting this post?
+              </Text>
+
+              {/* Report Reasons */}
+              {[
+                { value: 'spam', label: 'Spam or misleading', icon: 'alert-circle' },
+                { value: 'harassment', label: 'Harassment or bullying', icon: 'account-alert' },
+                { value: 'hate_speech', label: 'Hate speech or discrimination', icon: 'alert-octagon' },
+                { value: 'violence', label: 'Violence or threats', icon: 'alert' },
+                { value: 'illegal', label: 'Illegal activity', icon: 'gavel' },
+                { value: 'misinformation', label: 'False or harmful information', icon: 'information' },
+                { value: 'inappropriate', label: 'Inappropriate content', icon: 'eye-off' },
+                { value: 'other', label: 'Other', icon: 'dots-horizontal' },
+              ].map((reason) => (
+                <TouchableOpacity
+                  key={reason.value}
+                  style={[
+                    styles.reasonOption,
+                    { borderColor: colors.border },
+                    reportReason === reason.value && { backgroundColor: colors.primary + '20', borderColor: colors.primary }
+                  ]}
+                  onPress={() => setReportReason(reason.value)}
+                >
+                  <MaterialCommunityIcons
+                    name={reason.icon as any}
+                    size={20}
+                    color={reportReason === reason.value ? colors.primary : colors.textSecondary}
+                  />
+                  <Text style={[
+                    styles.reasonText,
+                    { color: reportReason === reason.value ? colors.primary : colors.textPrimary }
+                  ]}>
+                    {reason.label}
+                  </Text>
+                  {reportReason === reason.value && (
+                    <MaterialCommunityIcons name="check-circle" size={20} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              <Text style={[styles.reportLabel, { color: colors.textSecondary, marginTop: 16 }]}>
+                Additional details (optional)
+              </Text>
+              <TextInput
+                style={[styles.reportInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
+                placeholder="Provide more context..."
+                placeholderTextColor={colors.textTertiary}
+                value={reportDescription}
+                onChangeText={setReportDescription}
+                multiline
+                maxLength={500}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton, { borderColor: colors.border }]}
+                  onPress={handleCloseReportModal}
+                >
+                  <Text style={[styles.cancelButtonText, { color: colors.textPrimary }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    styles.submitReportButton,
+                    { backgroundColor: colors.error },
+                    !reportReason && styles.submitReportButtonDisabled
+                  ]}
+                  onPress={handleSubmitReport}
+                  disabled={!reportReason || submitting}
+                >
+                  {submitting ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.submitReportButtonText}>Submit Report</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -986,5 +1204,126 @@ const styles = StyleSheet.create({
   threadActionButton: {
     padding: 6,
     borderRadius: 6,
+  },
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 1000,
+  },
+  menuDropdown: {
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+    marginRight: 8,
+    minWidth: 180,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  menuDivider: {
+    height: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  reportModal: {
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '80%',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  modalContent: {
+    padding: 20,
+  },
+  reportLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  reasonOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 10,
+    gap: 12,
+  },
+  reasonText: {
+    flex: 1,
+    fontSize: 15,
+  },
+  reportInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  submitReportButton: {
+    // backgroundColor set dynamically
+  },
+  submitReportButtonDisabled: {
+    opacity: 0.5,
+  },
+  submitReportButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
