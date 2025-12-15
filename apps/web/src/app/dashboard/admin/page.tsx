@@ -109,6 +109,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       if (!token) return;
+      // Prevent refetching if we already have stats
+      if (stats) return;
 
       try {
         setStatsLoading(true);
@@ -129,10 +131,11 @@ export default function AdminDashboard() {
       }
     };
 
-    if (token && user && (user.is_admin || user.is_superuser)) {
+    if (token && user && (user.is_admin || user.is_superuser) && !stats) {
       fetchStats();
     }
-  }, [token, user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   if (isLoading) {
     return (
