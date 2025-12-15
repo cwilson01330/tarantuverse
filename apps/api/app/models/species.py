@@ -2,7 +2,7 @@
 Species model
 """
 from sqlalchemy import Column, String, Text, ARRAY, Enum as SQLEnum, DateTime, Integer, Float, Boolean, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, TSVECTOR
+from sqlalchemy.dialects.postgresql import UUID, TSVECTOR, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -75,6 +75,20 @@ class Species(Base):
 
     # Full-text search vector
     searchable = Column(TSVECTOR)
+
+    # Pricing data (JSONB for flexible pricing structure)
+    pricing_data = Column(JSONB, nullable=True)
+    # Example structure:
+    # {
+    #   "sling_low": 15, "sling_high": 25,
+    #   "juvenile_low": 30, "juvenile_high": 50,
+    #   "subadult_female_low": 60, "subadult_female_high": 90,
+    #   "adult_female_low": 75, "adult_female_high": 120,
+    #   "adult_male_low": 20, "adult_male_high": 35,
+    #   "rarity_multiplier": 1.0,
+    #   "last_updated": "2024-12-15",
+    #   "data_source": "community_average|manual|estimated"
+    # }
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

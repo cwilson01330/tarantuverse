@@ -19,6 +19,7 @@ from app.models.egg_sac import EggSac
 from app.models.offspring import Offspring
 from app.models.user_block import UserBlock
 from app.models.content_report import ContentReport
+from app.models.pricing_submission import PricingSubmission
 
 __all__ = [
     "User",
@@ -43,4 +44,5 @@ __all__ = [
     "Offspring",
     "UserBlock",
     "ContentReport",
+    "PricingSubmission",
 ]
