@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, ReactNode } from 'react'
+import { useState, useEffect, ReactNode } from 'react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 
@@ -13,7 +13,21 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children, userName, userEmail, userAvatar }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    // Initialize from localStorage on mount
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebarCollapsed')
+      return saved === 'true'
+    }
+    return false
+  })
+
+  // Persist sidebar state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed))
+    }
+  }, [sidebarCollapsed])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
