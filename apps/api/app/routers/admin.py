@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.database import get_db
 from app.models.user import User
+from app.models.species import Species
+from app.models.subscription import UserSubscription
+from app.models.content_report import ContentReport
 from app.schemas.user import UserResponse
 from app.utils.dependencies import get_current_admin
 from app.services.email import EmailService
@@ -12,6 +16,36 @@ from datetime import datetime, timedelta, timezone
 router = APIRouter(
     dependencies=[Depends(get_current_admin)]
 )
+
+@router.get("/stats")
+async def get_admin_stats(
+    db: Session = Depends(get_db)
+):
+    """
+    Get platform statistics for admin dashboard
+    """
+    # Total users
+    total_users = db.query(func.count(User.id)).scalar() or 0
+
+    # Total species
+    total_species = db.query(func.count(Species.id)).scalar() or 0
+
+    # Premium users (users with active subscriptions)
+    premium_users = db.query(func.count(UserSubscription.id)).filter(
+        UserSubscription.status == 'active'
+    ).scalar() or 0
+
+    # Pending reports (not resolved)
+    pending_reports = db.query(func.count(ContentReport.id)).filter(
+        ContentReport.status == 'pending'
+    ).scalar() or 0
+
+    return {
+        "total_users": total_users,
+        "total_species": total_species,
+        "premium_users": premium_users,
+        "pending_reports": pending_reports
+    }
 
 @router.get("/users", response_model=list[UserResponse])
 async def list_users(

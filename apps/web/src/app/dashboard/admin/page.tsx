@@ -1,10 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface AdminStats {
+  total_users: number;
+  total_species: number;
+  premium_users: number;
+  pending_reports: number;
+}
 
 interface AdminSection {
   title: string;
@@ -75,7 +84,9 @@ const adminSections: AdminSection[] = [
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, token } = useAuth();
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     // Wait for auth to load
@@ -93,6 +104,35 @@ export default function AdminDashboard() {
       return;
     }
   }, [isLoading, isAuthenticated, user, router]);
+
+  // Fetch admin stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!token) return;
+
+      try {
+        setStatsLoading(true);
+        const response = await fetch(`${API_URL}/api/v1/admin/stats`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch admin stats:', error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    if (token && user && (user.is_admin || user.is_superuser)) {
+      fetchStats();
+    }
+  }, [token, user]);
 
   if (isLoading) {
     return (
@@ -213,44 +253,74 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* Quick Stats Section (Optional - can be populated with real data) */}
+        {/* Quick Stats Section */}
         <div className="mt-12 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
             Quick Platform Stats
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                ---
-              </div>
+              {statsLoading ? (
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 animate-pulse">
+                  ...
+                </div>
+              ) : (
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {stats?.total_users?.toLocaleString() || '0'}
+                </div>
+              )}
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Total Users
               </div>
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">---</div>
+              {statsLoading ? (
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 animate-pulse">
+                  ...
+                </div>
+              ) : (
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {stats?.total_species?.toLocaleString() || '0'}
+                </div>
+              )}
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Total Species
               </div>
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                ---
-              </div>
+              {statsLoading ? (
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400 animate-pulse">
+                  ...
+                </div>
+              ) : (
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {stats?.premium_users?.toLocaleString() || '0'}
+                </div>
+              )}
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Premium Users
               </div>
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <div className="text-2xl font-bold text-red-600 dark:text-red-400">---</div>
+              {statsLoading ? (
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400 animate-pulse">
+                  ...
+                </div>
+              ) : (
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {stats?.pending_reports?.toLocaleString() || '0'}
+                </div>
+              )}
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Pending Reports
               </div>
             </div>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
-            Connect backend API endpoints to populate real-time stats
-          </p>
+          {!statsLoading && stats && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
+              ✅ Live stats updated from database
+            </p>
+          )}
         </div>
 
         {/* Help Section */}
