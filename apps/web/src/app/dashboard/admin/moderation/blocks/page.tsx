@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import DashboardLayout from '@/components/DashboardLayout';
 
 interface UserBlock {
   id: string;
@@ -148,12 +149,18 @@ export default function ModerationBlocksPage() {
 
   if (isLoading || loading) {
     return (
+    <DashboardLayout
+      userName={user?.display_name || user?.username || "Loading..."}
+      userEmail={user?.email || ""}
+      userAvatar={user?.avatar_url}
+    >
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400">Loading user blocks...</p>
         </div>
       </div>
+    </DashboardLayout>
     );
   }
 
@@ -162,6 +169,11 @@ export default function ModerationBlocksPage() {
   }
 
   return (
+    <DashboardLayout
+      userName={user.display_name || user.username}
+      userEmail={user.email}
+      userAvatar={user.avatar_url}
+    >
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 mb-8">
@@ -378,5 +390,6 @@ export default function ModerationBlocksPage() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import DashboardLayout from '@/components/DashboardLayout';
 
 interface AdminSection {
   title: string;
@@ -109,7 +110,11 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <DashboardLayout
+      userName={user.display_name || user.username}
+      userEmail={user.email}
+      userAvatar={user.avatar_url}
+    >
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 mb-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -280,6 +285,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
