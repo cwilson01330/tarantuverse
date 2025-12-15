@@ -8,6 +8,7 @@ import GrowthChart from '@/components/GrowthChart'
 import FeedingStatsCard from '@/components/FeedingStatsCard'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
+import PricingCard from '@/components/PricingCard'
 
 interface Tarantula {
   id: string
@@ -1031,6 +1032,11 @@ export default function TarantulaDetailPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
+              {/* Pricing Card */}
+              {tarantula.species_id && (
+                <PricingCard tarantulaId={tarantula.id} token={token} />
+              )}
+
               {/* Premolt Prediction Card */}
               {premoltPrediction && (
                 <div className={`rounded-2xl shadow-lg p-6 text-white ${
