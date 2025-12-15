@@ -111,9 +111,9 @@ export default function AdminDashboard() {
 
   return (
     <DashboardLayout
-      userName={user.display_name || user.username}
-      userEmail={user.email}
-      userAvatar={user.avatar_url}
+      userName={user.name || user.username}
+      userEmail={user.email || undefined}
+      userAvatar={user.image || undefined}
     >
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 mb-8">

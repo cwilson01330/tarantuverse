@@ -150,9 +150,9 @@ export default function ModerationBlocksPage() {
   if (isLoading || loading) {
     return (
     <DashboardLayout
-      userName={user?.display_name || user?.username || "Loading..."}
-      userEmail={user?.email || ""}
-      userAvatar={user?.avatar_url}
+      userName={user?.name || user?.username || "Loading..."}
+      userEmail={user?.email || undefined}
+      userAvatar={user?.image || undefined}
     >
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
@@ -170,9 +170,9 @@ export default function ModerationBlocksPage() {
 
   return (
     <DashboardLayout
-      userName={user.display_name || user.username}
-      userEmail={user.email}
-      userAvatar={user.avatar_url}
+      userName={user.name || user.username}
+      userEmail={user.email || undefined}
+      userAvatar={user.image || undefined}
     >
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
