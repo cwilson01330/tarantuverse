@@ -23,6 +23,7 @@ from app.models.offspring import Offspring
 from app.models.user_block import UserBlock
 from app.models.content_report import ContentReport
 from app.models.pricing_submission import PricingSubmission
+from app.models.referral_reward import ReferralReward
 
 __all__ = [
     "User",
@@ -51,4 +52,5 @@ __all__ = [
     "UserBlock",
     "ContentReport",
     "PricingSubmission",
+    "ReferralReward",
 ]

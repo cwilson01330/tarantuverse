@@ -1,21 +1,60 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 
+interface ReferrerInfo {
+  valid: boolean;
+  referrer_username?: string;
+  referrer_display_name?: string;
+  message?: string;
+}
+
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [formData, setFormData] = useState({
     email: '',
     username: '',
     password: '',
-    display_name: ''
+    display_name: '',
+    referral_code: ''
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [referrerInfo, setReferrerInfo] = useState<ReferrerInfo | null>(null)
+  const [validatingReferral, setValidatingReferral] = useState(false)
+
+  // Check for referral code in URL on mount
+  useEffect(() => {
+    const refCode = searchParams.get('ref')
+    if (refCode) {
+      setFormData(prev => ({ ...prev, referral_code: refCode }))
+      validateReferralCode(refCode)
+    }
+  }, [searchParams])
+
+  const validateReferralCode = async (code: string) => {
+    if (!code) {
+      setReferrerInfo(null)
+      return
+    }
+
+    setValidatingReferral(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/referrals/validate/${code}`)
+      const data = await response.json()
+      setReferrerInfo(data)
+    } catch (err) {
+      setReferrerInfo({ valid: false, message: 'Could not validate referral code' })
+    } finally {
+      setValidatingReferral(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,12 +64,26 @@ export default function RegisterPage() {
     try {
       // Step 1: Register the user via API
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+      // Only include referral_code if it's valid
+      const registrationData: any = {
+        email: formData.email,
+        username: formData.username,
+        password: formData.password,
+        display_name: formData.display_name || undefined,
+      }
+
+      // Include referral code only if it's been validated as valid
+      if (formData.referral_code && referrerInfo?.valid) {
+        registrationData.referral_code = formData.referral_code
+      }
+
       const response = await fetch(`${API_URL}/api/v1/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(registrationData),
       })
 
       const data = await response.json()
@@ -145,6 +198,53 @@ export default function RegisterPage() {
               placeholder="••••••••"
             />
             <p className="text-xs text-gray-500 mt-1">At least 8 characters</p>
+          </div>
+
+          {/* Referral Code */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Referral Code (Optional)</label>
+            <input
+              type="text"
+              value={formData.referral_code}
+              onChange={(e) => {
+                const code = e.target.value.toUpperCase()
+                setFormData({ ...formData, referral_code: code })
+                if (code.length >= 8) {
+                  validateReferralCode(code)
+                } else {
+                  setReferrerInfo(null)
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              placeholder="ABCD1234"
+              maxLength={12}
+            />
+            {validatingReferral && (
+              <p className="text-xs text-gray-500 mt-1">Validating referral code...</p>
+            )}
+            {referrerInfo && !validatingReferral && (
+              <div className={`mt-2 p-2 rounded-lg text-sm ${
+                referrerInfo.valid
+                  ? 'bg-green-50 border border-green-200 text-green-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}>
+                {referrerInfo.valid ? (
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span>Referred by <strong>@{referrerInfo.referrer_username}</strong></span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span>{referrerInfo.message || 'Invalid referral code'}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <button

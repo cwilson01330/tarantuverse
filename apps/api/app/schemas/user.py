@@ -13,6 +13,7 @@ class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8, max_length=100)
     display_name: Optional[str] = Field(None, max_length=100)
+    referral_code: Optional[str] = Field(None, max_length=12)  # Optional referral code
 
 
 class UserLogin(BaseModel):

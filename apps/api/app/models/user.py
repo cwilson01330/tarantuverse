@@ -1,7 +1,7 @@
 """
 User model
 """
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -16,7 +16,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=True)  # Nullable for OAuth users
-    
+
     # OAuth fields
     oauth_provider = Column(String(50))  # 'google', 'apple', 'github'
     oauth_id = Column(String(255))  # Provider's unique user ID
@@ -27,6 +27,11 @@ class User(Base):
     avatar_url = Column(String(500))
     bio = Column(Text)
     is_breeder = Column(Boolean, default=False)
+
+    # Referral system fields
+    referral_code = Column(String(12), unique=True, nullable=True, index=True)
+    referred_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    referred_at = Column(DateTime(timezone=True), nullable=True)
 
     # Community/Profile fields
     profile_bio = Column(Text)
@@ -70,6 +75,11 @@ class User(Base):
 
     # Enclosures
     enclosures = relationship("Enclosure", back_populates="user", lazy="select")
+
+    # Referral relationships
+    referred_by = relationship("User", remote_side=[id], foreign_keys=[referred_by_user_id], lazy="select")
+    referrals = relationship("User", foreign_keys="User.referred_by_user_id", lazy="select")
+    referral_rewards = relationship("ReferralReward", back_populates="referrer", lazy="select")
 
     def __repr__(self):
         return f"<User {self.username}>"

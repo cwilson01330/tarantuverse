@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,24 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth, isGoogleSignInAvailable } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { apiClient } from '../src/services/api';
 import GoogleLogo from '../src/components/GoogleLogo';
+
+interface ReferrerInfo {
+  valid: boolean;
+  referrer_username?: string;
+  referrer_display_name?: string;
+  message?: string;
+}
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ ref?: string }>();
   const { register, loginWithGoogle, loginWithApple } = useAuth();
   const { colors } = useTheme();
   const [email, setEmail] = useState('');
@@ -26,10 +36,38 @@ export default function RegisterScreen() {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [referrerInfo, setReferrerInfo] = useState<ReferrerInfo | null>(null);
+  const [validatingReferral, setValidatingReferral] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Check for referral code from URL params
+  useEffect(() => {
+    if (params.ref) {
+      setReferralCode(params.ref.toUpperCase());
+      validateReferralCode(params.ref);
+    }
+  }, [params.ref]);
+
+  const validateReferralCode = async (code: string) => {
+    if (!code || code.length < 8) {
+      setReferrerInfo(null);
+      return;
+    }
+
+    setValidatingReferral(true);
+    try {
+      const response = await apiClient.get(`/referrals/validate/${code}`);
+      setReferrerInfo(response.data);
+    } catch (err) {
+      setReferrerInfo({ valid: false, message: 'Could not validate referral code' });
+    } finally {
+      setValidatingReferral(false);
+    }
+  };
 
   const handleRegister = async () => {
     if (!email || !username || !password || !confirmPassword) {
@@ -54,7 +92,9 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await register(email, username, password, displayName || username);
+      // Only include referral code if it's valid
+      const validReferralCode = referrerInfo?.valid ? referralCode : undefined;
+      await register(email, username, password, displayName || username, validReferralCode);
       // Registration successful - show verification message
       setSuccess(true);
     } catch (error: any) {
@@ -229,6 +269,35 @@ export default function RegisterScreen() {
       height: 50,
       marginBottom: 12,
     },
+    referralValidation: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+      padding: 8,
+      borderRadius: 6,
+      gap: 8,
+    },
+    referralValid: {
+      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    },
+    referralInvalid: {
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    },
+    referralText: {
+      flex: 1,
+      fontSize: 13,
+    },
+    referralValidText: {
+      color: '#22c55e',
+    },
+    referralInvalidText: {
+      color: '#ef4444',
+    },
+    referralHint: {
+      fontSize: 12,
+      color: colors.textTertiary,
+      marginTop: 4,
+    },
   });
 
   // Show success screen if registration was successful
@@ -313,6 +382,53 @@ export default function RegisterScreen() {
               editable={!loading}
             />
 
+            {/* Referral Code */}
+            <TextInput
+              style={styles.input}
+              placeholder="Referral Code (optional)"
+              placeholderTextColor={colors.textTertiary}
+              value={referralCode}
+              onChangeText={(text) => {
+                const code = text.toUpperCase();
+                setReferralCode(code);
+                if (code.length >= 8) {
+                  validateReferralCode(code);
+                } else {
+                  setReferrerInfo(null);
+                }
+              }}
+              autoCapitalize="characters"
+              maxLength={12}
+              editable={!loading}
+            />
+            {validatingReferral && (
+              <Text style={styles.referralHint}>Validating referral code...</Text>
+            )}
+            {referrerInfo && !validatingReferral && (
+              <View
+                style={[
+                  styles.referralValidation,
+                  referrerInfo.valid ? styles.referralValid : styles.referralInvalid,
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={referrerInfo.valid ? 'check-circle' : 'close-circle'}
+                  size={18}
+                  color={referrerInfo.valid ? '#22c55e' : '#ef4444'}
+                />
+                <Text
+                  style={[
+                    styles.referralText,
+                    referrerInfo.valid ? styles.referralValidText : styles.referralInvalidText,
+                  ]}
+                >
+                  {referrerInfo.valid
+                    ? `Referred by @${referrerInfo.referrer_username}`
+                    : referrerInfo.message || 'Invalid referral code'}
+                </Text>
+              </View>
+            )}
+
             {/* Terms of Service Agreement */}
             <View style={styles.termsContainer}>
               <TouchableOpacity
@@ -382,7 +498,11 @@ export default function RegisterScreen() {
             {Platform.OS === 'ios' && (
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                buttonStyle={
+                  colors.background === '#000000' || colors.background === '#121212' || colors.background.toLowerCase().startsWith('#1')
+                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
                 cornerRadius={8}
                 style={styles.appleButton}
                 onPress={handleAppleRegister}

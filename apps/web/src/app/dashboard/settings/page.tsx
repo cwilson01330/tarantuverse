@@ -284,6 +284,31 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Referral Program Section */}
+        <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="text-2xl">🎁</span>
+            <h2 className="text-xl font-bold text-theme-primary">Referral Program</h2>
+          </div>
+
+          <div className="space-y-4">
+            <div className="p-4 bg-surface-elevated rounded-lg">
+              <h3 className="font-semibold text-theme-primary mb-1">Refer Friends & Earn</h3>
+              <p className="text-sm text-theme-secondary">
+                {subscriptionLimits?.is_premium
+                  ? 'Share your referral link and earn up to 6 free months of subscription!'
+                  : 'Upgrade to Premium to unlock the referral program and start earning free months!'}
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard/settings/referrals')}
+              className="w-full px-4 py-3 bg-gradient-brand hover:bg-gradient-brand-hover text-white rounded-lg transition-all font-medium shadow-lg shadow-gradient-brand"
+            >
+              {subscriptionLimits?.is_premium ? 'View Referral Dashboard' : 'Learn More'}
+            </button>
+          </div>
+        </section>
+
         {/* Subscription Section */}
         <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">

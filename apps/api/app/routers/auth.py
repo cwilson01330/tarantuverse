@@ -35,6 +35,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     - **username**: Unique username (3-50 characters)
     - **password**: Password (min 8 characters)
     - **display_name**: Optional display name
+    - **referral_code**: Optional referral code from a premium subscriber
     """
     # Check if email already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
@@ -52,6 +53,26 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Username already taken"
         )
 
+    # Validate referral code if provided
+    referrer = None
+    if user_data.referral_code:
+        referrer = db.query(User).filter(
+            User.referral_code == user_data.referral_code.upper()
+        ).first()
+
+        if not referrer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid referral code"
+            )
+
+        # Check if referrer is a premium subscriber
+        if not referrer.is_premium:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This referral code is no longer valid"
+            )
+
     # Create new user
     verification_token = secrets.token_urlsafe(32)
     verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
@@ -63,7 +84,10 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         display_name=user_data.display_name or user_data.username,
         is_verified=False,
         verification_token=verification_token,
-        verification_token_expires_at=verification_token_expires_at
+        verification_token_expires_at=verification_token_expires_at,
+        # Set referral info if referral code was provided
+        referred_by_user_id=referrer.id if referrer else None,
+        referred_at=datetime.now(timezone.utc) if referrer else None
     )
 
     db.add(new_user)
@@ -72,12 +96,15 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
     # Send verification email
     verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-    pass # prevent blocking
-    
+
     # We use background task or await
     await EmailService.send_verification_email(new_user.email, verify_link)
 
-    return {"message": "Registration successful. Please check your email to verify your account."}
+    response_message = "Registration successful. Please check your email to verify your account."
+    if referrer:
+        response_message = f"Registration successful! You were referred by {referrer.username}. Please check your email to verify your account."
+
+    return {"message": response_message}
 
 
 @router.post("/login", response_model=Token)
@@ -583,13 +610,13 @@ async def verify_email(
         )
 
     user = db.query(User).filter(User.verification_token == token).first()
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification token"
         )
-        
+
     # Check expiry
     if not user.verification_token_expires_at:
          raise HTTPException(
@@ -603,14 +630,19 @@ async def verify_email(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Verification token has expired"
         )
-        
+
     # Verify user
     user.is_verified = True
     user.verification_token = None
     user.verification_token_expires_at = None
-    
+
     db.commit()
-    
+
+    # Check if this user was referred - grant rewards to referrer
+    if user.referred_by_user_id:
+        from app.routers.referrals import check_and_grant_rewards
+        check_and_grant_rewards(user.referred_by_user_id, db)
+
     return {"message": "Email verified successfully"}
 
 
@@ -623,26 +655,59 @@ async def resend_verification(
     Resend verification email
     """
     user = db.query(User).filter(User.email == email).first()
-    
+
     if not user:
          # Return success even if user not found to prevent user enumeration
         return {"message": "If an account exists, a verification email has been sent."}
-        
+
     if user.is_verified:
         return {"message": "Account is already verified"}
-        
+
     # Generate new token
     verification_token = secrets.token_urlsafe(32)
     verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-    
+
     user.verification_token = verification_token
     user.verification_token_expires_at = verification_token_expires_at
     db.commit()
-    
+
     # Send email
     verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-    
+
     await EmailService.send_verification_email(user.email, verify_link)
-    
+
     return {"message": "Verification email sent"}
+
+
+@router.delete("/me", status_code=status.HTTP_200_OK)
+async def delete_account(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete the current user's account and all associated data.
+
+    This action is irreversible. All user data including:
+    - Tarantulas and their photos
+    - Feeding, molt, and substrate change logs
+    - Breeding records (pairings, egg sacs, offspring)
+    - Forum posts and messages
+    - Direct messages
+    - Follows and followers
+    - Notification preferences
+
+    will be permanently deleted.
+    """
+    try:
+        # Delete the user - CASCADE will handle related data
+        db.delete(current_user)
+        db.commit()
+
+        return {"message": "Account deleted successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete account: {str(e)}"
+        )
 

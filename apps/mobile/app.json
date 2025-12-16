@@ -15,7 +15,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.tarantuverse.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Tarantuverse needs access to your photo library so you can select photos of your tarantulas to add to their profiles and track their growth over time. For example, you can upload a photo after a molt to document your tarantula's new appearance, or add photos to track enclosure setups.",
+        "NSCameraUsageDescription": "Tarantuverse needs access to your camera so you can take photos of your tarantulas directly within the app to document molts, track growth, and maintain a visual record of your collection."
       },
       "usesAppleSignIn": true
     },

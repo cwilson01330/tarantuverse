@@ -22,7 +22,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithApple: () => Promise<void>;
-  register: (email: string, username: string, password: string, display_name?: string) => Promise<void>;
+  register: (email: string, username: string, password: string, display_name?: string, referral_code?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -69,14 +69,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const register = async (email: string, username: string, password: string, display_name?: string) => {
+  const register = async (email: string, username: string, password: string, display_name?: string, referral_code?: string) => {
     try {
-      const response = await apiClient.post('/auth/register', {
+      const registrationData: any = {
         email,
         username,
         password,
         display_name: display_name || username,
-      });
+      };
+
+      // Include referral code if provided
+      if (referral_code) {
+        registrationData.referral_code = referral_code;
+      }
+
+      const response = await apiClient.post('/auth/register', registrationData);
 
       // Registration now returns a message instead of a token
       // User must verify email before logging in
