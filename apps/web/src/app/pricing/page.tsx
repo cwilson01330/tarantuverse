@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
+import { TarantuverseLogoTransparent } from '@/components/TarantuverseLogo'
 
 export default function PricingPage() {
   return (
@@ -11,7 +11,7 @@ export default function PricingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/logo-transparent.png" alt="Tarantuverse" width={40} height={40} />
+              <TarantuverseLogoTransparent className="w-10 h-10" />
               <span className="text-2xl font-bold text-gradient-brand">
                 Tarantuverse
               </span>

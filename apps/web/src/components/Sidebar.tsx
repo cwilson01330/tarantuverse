@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { TarantuverseLogoTransparent } from './TarantuverseLogo'
 
 interface SidebarProps {
   isOpen: boolean
@@ -95,22 +96,14 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
           {!isCollapsed && (
             <div className="flex items-center gap-3">
-              <img
-                src="/logo-transparent.png"
-                alt="Tarantuverse"
-                className="w-8 h-8 object-contain"
-              />
+              <TarantuverseLogoTransparent className="w-8 h-8" />
               <span className="text-xl font-bold text-gradient-brand">
                 Tarantuverse
               </span>
             </div>
           )}
           {isCollapsed && (
-            <img
-              src="/logo-transparent.png"
-              alt="Tarantuverse"
-              className="w-8 h-8 object-contain mx-auto"
-            />
+            <TarantuverseLogoTransparent className="w-8 h-8 mx-auto" />
           )}
 
           {/* Desktop collapse toggle */}

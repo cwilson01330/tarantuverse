@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { TarantuverseLogoTransparent } from '@/components/TarantuverseLogo'
 
 export default function Home() {
   return (
@@ -10,11 +11,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <img
-                src="/logo-transparent.png"
-                alt="Tarantuverse"
-                className="w-10 h-10 object-contain"
-              />
+              <TarantuverseLogoTransparent className="w-10 h-10" />
               <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 Tarantuverse
               </span>
@@ -730,11 +727,7 @@ export default function Home() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <img
-                  src="/logo-transparent.png"
-                  alt="Tarantuverse"
-                  className="w-8 h-8 object-contain"
-                />
+                <TarantuverseLogoTransparent className="w-8 h-8" />
                 <span className="text-white font-bold text-lg">Tarantuverse</span>
               </div>
               <p className="text-sm">
