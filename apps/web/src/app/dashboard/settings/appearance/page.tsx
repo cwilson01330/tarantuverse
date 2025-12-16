@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
 import { useThemeStore, THEME_PRESETS, ThemePreset } from '@/stores/themeStore';
 
 export default function AppearanceSettings() {
   const router = useRouter();
-  const [token, setToken] = useState<string | null>(null);
+  const { token, isAuthenticated, isLoading: authLoading } = useAuth();
   const [isPremium, setIsPremium] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
@@ -35,25 +37,28 @@ export default function AppearanceSettings() {
   const [localAccent, setLocalAccent] = useState(customAccent || resolvedColors.accent);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (!storedToken) {
+    // Wait for auth to load
+    if (authLoading) return;
+
+    // Redirect if not authenticated
+    if (!isAuthenticated || !token) {
       router.push('/login');
       return;
     }
-    setToken(storedToken);
 
     // Load theme preferences from API
-    loadFromAPI(storedToken);
+    loadFromAPI(token);
 
     // Check premium status
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     fetch(`${API_URL}/api/v1/promo-codes/me/limits`, {
-      headers: { Authorization: `Bearer ${storedToken}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => setIsPremium(data.is_premium || false))
-      .catch(() => setIsPremium(false));
-  }, [router, loadFromAPI]);
+      .catch(() => setIsPremium(false))
+      .finally(() => setLoading(false));
+  }, [authLoading, isAuthenticated, token, router, loadFromAPI]);
 
   // Update local color state when store changes
   useEffect(() => {
@@ -108,6 +113,19 @@ export default function AppearanceSettings() {
 
   const freePresets = Object.values(THEME_PRESETS).filter((p) => p.is_free);
   const premiumPresets = Object.values(THEME_PRESETS).filter((p) => !p.is_free);
+
+  // Show loading state while auth or data is loading
+  if (authLoading || loading) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-4xl mx-auto p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
