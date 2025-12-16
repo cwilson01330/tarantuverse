@@ -1,7 +1,24 @@
 import { Platform } from 'react-native';
-import * as InAppPurchases from 'expo-in-app-purchases';
+import Constants from 'expo-constants';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Check if we're running in Expo Go (where native modules aren't available)
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// Lazy load InAppPurchases only when not in Expo Go
+let InAppPurchases: typeof import('expo-in-app-purchases') | null = null;
+
+const getIAP = async () => {
+  if (isExpoGo) {
+    console.log('[IAP] Running in Expo Go - IAP not available');
+    return null;
+  }
+  if (!InAppPurchases) {
+    InAppPurchases = await import('expo-in-app-purchases');
+  }
+  return InAppPurchases;
+};
 
 // Product IDs (must match App Store Connect)
 export const SUBSCRIPTION_SKUS = Platform.select({
@@ -22,14 +39,22 @@ export const LIFETIME_SKU = Platform.select({
   android: 'com.tarantuverse.lifetime',
 }) || '';
 
+// Export whether IAP is available (for UI to show/hide purchase options)
+export const isIAPAvailable = () => !isExpoGo;
+
 /**
  * Initialize IAP connection
  * Must be called before any other IAP operations
  */
 export const initializeIAP = async (): Promise<void> => {
+  const iap = await getIAP();
+  if (!iap) {
+    console.log('[IAP] Skipping initialization - not available in Expo Go');
+    return;
+  }
   try {
     console.log('[IAP] Initializing connection...');
-    await InAppPurchases.connectAsync();
+    await iap.connectAsync();
     console.log('[IAP] Connection initialized successfully');
   } catch (error) {
     console.error('[IAP] Failed to initialize:', error);
@@ -42,8 +67,10 @@ export const initializeIAP = async (): Promise<void> => {
  * Call when app is closing
  */
 export const endIAP = async (): Promise<void> => {
+  const iap = await getIAP();
+  if (!iap) return;
   try {
-    await InAppPurchases.disconnectAsync();
+    await iap.disconnectAsync();
     console.log('[IAP] Connection ended');
   } catch (error) {
     console.error('[IAP] Failed to end connection:', error);
@@ -53,10 +80,15 @@ export const endIAP = async (): Promise<void> => {
 /**
  * Fetch available subscription products
  */
-export const getSubscriptionProducts = async (): Promise<InAppPurchases.InAppPurchase[]> => {
+export const getSubscriptionProducts = async (): Promise<any[]> => {
+  const iap = await getIAP();
+  if (!iap) {
+    console.log('[IAP] Products not available in Expo Go');
+    return [];
+  }
   try {
     console.log('[IAP] Fetching products:', SUBSCRIPTION_SKUS);
-    const { results } = await InAppPurchases.getProductsAsync(SUBSCRIPTION_SKUS);
+    const { results } = await iap.getProductsAsync(SUBSCRIPTION_SKUS);
     console.log('[IAP] Products fetched:', results);
     return results;
   } catch (error) {
@@ -70,21 +102,25 @@ export const getSubscriptionProducts = async (): Promise<InAppPurchases.InAppPur
  */
 export const purchaseSubscription = async (
   productId: string
-): Promise<InAppPurchases.InAppPurchaseResult | null> => {
+): Promise<any | null> => {
+  const iap = await getIAP();
+  if (!iap) {
+    throw new Error('In-app purchases not available in Expo Go. Please use a development build.');
+  }
   try {
     console.log('[IAP] Requesting subscription purchase:', productId);
 
-    const result = await InAppPurchases.purchaseItemAsync(productId);
+    const result = await iap.purchaseItemAsync(productId);
 
     console.log('[IAP] Purchase result:', result);
 
     // Check if purchase was successful
-    if (result.responseCode === InAppPurchases.IAPResponseCode.OK && result.results) {
+    if (result.responseCode === iap.IAPResponseCode.OK && result.results) {
       return result;
     }
 
     // User cancelled or error
-    if (result.responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED) {
+    if (result.responseCode === iap.IAPResponseCode.USER_CANCELED) {
       console.log('[IAP] User cancelled purchase');
       return null;
     }
@@ -101,9 +137,13 @@ export const purchaseSubscription = async (
  * Sends the purchase receipt to your server for Apple/Google validation
  */
 export const validateReceiptWithBackend = async (
-  purchase: InAppPurchases.InAppPurchase,
+  purchase: any,
   token: string
 ): Promise<boolean> => {
+  const iap = await getIAP();
+  if (!iap) {
+    throw new Error('In-app purchases not available');
+  }
   try {
     console.log('[IAP] Validating receipt with backend...');
 
@@ -111,7 +151,7 @@ export const validateReceiptWithBackend = async (
     let receipt: string;
     if (Platform.OS === 'ios') {
       // For iOS, we need to get the app receipt
-      const { results } = await InAppPurchases.getPurchaseHistoryAsync();
+      const { results } = await iap.getPurchaseHistoryAsync();
       const appReceipt = results && results.length > 0 ? results[0].transactionReceipt : '';
       receipt = appReceipt || '';
     } else {
@@ -142,7 +182,7 @@ export const validateReceiptWithBackend = async (
     console.log('[IAP] Receipt validated:', data);
 
     // Finish the transaction
-    await InAppPurchases.finishTransactionAsync(purchase, false);
+    await iap.finishTransactionAsync(purchase, false);
 
     return true;
   } catch (error) {
@@ -156,6 +196,10 @@ export const validateReceiptWithBackend = async (
  * iOS only - restores previous purchases
  */
 export const restorePurchases = async (token: string): Promise<boolean> => {
+  const iap = await getIAP();
+  if (!iap) {
+    throw new Error('In-app purchases not available in Expo Go');
+  }
   try {
     console.log('[IAP] Restoring purchases...');
 
@@ -164,7 +208,7 @@ export const restorePurchases = async (token: string): Promise<boolean> => {
       return true;
     }
 
-    const { results } = await InAppPurchases.getPurchaseHistoryAsync();
+    const { results } = await iap.getPurchaseHistoryAsync();
     console.log('[IAP] Purchase history:', results);
 
     if (!results || results.length === 0) {
@@ -188,12 +232,16 @@ export const restorePurchases = async (token: string): Promise<boolean> => {
  * This queries the device's purchase history
  */
 export const checkSubscriptionStatus = async (): Promise<boolean> => {
+  const iap = await getIAP();
+  if (!iap) {
+    return false;
+  }
   try {
-    const { results } = await InAppPurchases.getPurchaseHistoryAsync();
+    const { results } = await iap.getPurchaseHistoryAsync();
 
     // Check if any purchases are for our subscription products
     const hasActiveSubscription =
-      results && results.some((purchase) => SUBSCRIPTION_SKUS.includes(purchase.productId));
+      results && results.some((purchase: any) => SUBSCRIPTION_SKUS.includes(purchase.productId));
 
     return hasActiveSubscription || false;
   } catch (error) {

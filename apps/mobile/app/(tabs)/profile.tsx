@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Switch, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Switch, ActivityIndicator, TextInput, Modal, ScrollView } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +21,9 @@ export default function ProfileScreen() {
   );
 
   const [uploading, setUploading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -92,10 +95,33 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      Alert.alert('Error', 'Please type DELETE to confirm account deletion');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await apiClient.delete('/auth/me');
+      setShowDeleteModal(false);
+      await logout();
+      router.replace('/login');
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to delete account');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    scrollContent: {
+      paddingBottom: 40,
     },
     header: {
       alignItems: 'center',
@@ -165,10 +191,88 @@ export default function ProfileScreen() {
       borderWidth: 2,
       borderColor: colors.surface,
     },
+    deleteText: {
+      color: colors.error,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 24,
+      width: '100%',
+      maxWidth: 400,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.error,
+      marginBottom: 12,
+      textAlign: 'center',
+    },
+    modalText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 16,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    modalWarning: {
+      fontSize: 13,
+      color: colors.error,
+      marginBottom: 16,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    modalInput: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      padding: 14,
+      fontSize: 16,
+      color: colors.textPrimary,
+      marginBottom: 16,
+      textAlign: 'center',
+      fontWeight: '600',
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    modalButton: {
+      flex: 1,
+      padding: 14,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    modalCancelButton: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modalDeleteButton: {
+      backgroundColor: colors.error,
+    },
+    modalCancelButtonText: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    modalDeleteButtonText: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: '600',
+    },
   });
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.avatarContainer} onPress={handleAvatarPress} disabled={uploading}>
           {uploading ? (
@@ -228,6 +332,12 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/referrals')}>
+          <MaterialCommunityIcons name="gift" size={24} color={colors.secondary} />
+          <Text style={styles.menuText}>Refer Friends</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/subscription')}>
           <MaterialCommunityIcons name="crown" size={24} color="#fbbf24" />
           <Text style={styles.menuText}>Subscription & Premium</Text>
@@ -245,8 +355,66 @@ export default function ProfileScreen() {
           <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => setShowDeleteModal(true)}>
+          <MaterialCommunityIcons name="delete-forever" size={24} color={colors.error} />
+          <Text style={[styles.menuText, styles.deleteText]}>Delete Account</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
       </View>
-    </View>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Delete Account</Text>
+            <Text style={styles.modalText}>
+              This action is permanent and cannot be undone. All your data including tarantulas, photos, logs, and messages will be permanently deleted.
+            </Text>
+            <Text style={styles.modalWarning}>
+              Type DELETE to confirm
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Type DELETE"
+              placeholderTextColor={colors.textTertiary}
+              value={deleteConfirmation}
+              onChangeText={setDeleteConfirmation}
+              autoCapitalize="characters"
+              editable={!deleting}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmation('');
+                }}
+                disabled={deleting}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalDeleteButton, { opacity: deleting ? 0.6 : 1 }]}
+                onPress={handleDeleteAccount}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.modalDeleteButtonText}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </ScrollView>
   );
 }
 

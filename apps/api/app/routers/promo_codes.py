@@ -344,6 +344,49 @@ async def debug_my_subscription(
     }
 
 
+@router.post("/me/revoke", status_code=status.HTTP_200_OK)
+async def revoke_my_premium(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Revoke your own premium subscription (for testing purposes)
+    """
+    # Find active subscription
+    active_sub = db.query(UserSubscription).filter(
+        UserSubscription.user_id == current_user.id,
+        UserSubscription.status == "active"
+    ).first()
+
+    if not active_sub:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active subscription found"
+        )
+
+    # Check if it's the free plan
+    plan = db.query(SubscriptionPlan).filter(
+        SubscriptionPlan.id == active_sub.plan_id
+    ).first()
+
+    if plan and plan.name == "free":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You're already on the free plan"
+        )
+
+    # Cancel the subscription
+    active_sub.status = "cancelled"
+    active_sub.cancelled_at = datetime.now(timezone.utc)
+
+    db.commit()
+
+    return {
+        "message": "Premium subscription revoked successfully",
+        "previous_plan": plan.name if plan else "unknown"
+    }
+
+
 @router.post("/admin/grant/{user_id}", status_code=status.HTTP_200_OK)
 async def grant_premium_to_user(
     user_id: str,
