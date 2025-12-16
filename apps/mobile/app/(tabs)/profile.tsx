@@ -210,6 +210,12 @@ export default function ProfileScreen() {
           />
         </View>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/appearance')}>
+          <MaterialCommunityIcons name="palette" size={24} color={colors.secondary} />
+          <Text style={styles.menuText}>Customize Theme</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
           <MaterialCommunityIcons name="cog" size={24} color={colors.textTertiary} />
           <Text style={styles.menuText}>Edit Profile</Text>

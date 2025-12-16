@@ -14,6 +14,7 @@ from app.models.activity_feed import ActivityFeed
 from app.models.subscription import SubscriptionPlan, UserSubscription
 from app.models.promo_code import PromoCode
 from app.models.notification_preferences import NotificationPreferences
+from app.models.user_theme_preferences import UserThemePreferences
 from app.models.pairing import Pairing
 from app.models.egg_sac import EggSac
 from app.models.offspring import Offspring
@@ -39,6 +40,7 @@ __all__ = [
     "UserSubscription",
     "PromoCode",
     "NotificationPreferences",
+    "UserThemePreferences",
     "Pairing",
     "EggSac",
     "Offspring",

@@ -190,6 +190,13 @@ export default function SettingsPage() {
             <div className="text-sm text-theme-secondary p-4 bg-surface-elevated rounded-lg">
               Current theme: <span className="font-semibold capitalize text-theme-primary">{theme}</span>
             </div>
+
+            <button
+              onClick={() => router.push('/dashboard/settings/appearance')}
+              className="w-full px-4 py-3 bg-gradient-brand hover:bg-gradient-brand-hover text-white rounded-lg transition-all font-medium shadow-lg shadow-gradient-brand"
+            >
+              Customize Theme Colors
+            </button>
           </div>
         </section>
 

@@ -12,7 +12,17 @@
     --text-primary: 15 23 42; /* slate-900 */
     --text-secondary: 71 85 105; /* slate-600 */
     --text-tertiary: 148 163 184; /* slate-400 */
-    --primary: 0 102 255; /* #0066ff - electric blue */
+
+    /* User-customizable colors (defaults) */
+    --user-primary: 0 102 255; /* #0066ff - electric blue */
+    --user-secondary: 255 0 153; /* #ff0099 - neon pink */
+    --user-accent: 51 133 255; /* #3385ff - lighter blue */
+    --user-primary-hex: #0066ff;
+    --user-secondary-hex: #ff0099;
+    --user-accent-hex: #3385ff;
+
+    /* Primary uses user colors */
+    --primary: var(--user-primary);
     --primary-hover: 0 82 204; /* #0052cc */
   }
 
@@ -25,7 +35,9 @@
     --text-primary: 229 231 235; /* gray-200 */
     --text-secondary: 156 163 175; /* gray-400 */
     --text-tertiary: 107 114 128; /* gray-500 */
-    --primary: 0 102 255; /* #0066ff - electric blue (same in both themes) */
+
+    /* Primary uses user colors (inherited from :root) */
+    --primary: var(--user-primary);
     --primary-hover: 0 82 204; /* #0052cc */
   }
 
@@ -105,34 +117,60 @@
     color: rgb(var(--primary));
   }
 
-  /* Brand gradient - electric blue to neon pink */
+  /* Brand gradient - uses user colors (primary to secondary) */
   .bg-gradient-brand {
-    background: linear-gradient(135deg, #0066ff 0%, #ff0099 100%);
+    background: linear-gradient(135deg, var(--user-primary-hex, #0066ff) 0%, var(--user-secondary-hex, #ff0099) 100%);
   }
 
   .hover\:bg-gradient-brand-hover:hover {
-    background: linear-gradient(135deg, #0052cc 0%, #cc007a 100%);
+    background: linear-gradient(135deg, var(--user-primary-hex, #0066ff) 0%, var(--user-secondary-hex, #ff0099) 100%);
+    filter: brightness(0.85);
   }
 
-  /* Text gradient for headings */
+  /* Text gradient for headings - uses user colors */
   .text-gradient-brand {
-    background: linear-gradient(135deg, #0066ff 0%, #ff0099 100%);
+    background: linear-gradient(135deg, var(--user-primary-hex, #0066ff) 0%, var(--user-secondary-hex, #ff0099) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
-  /* Gradient border effect */
+  /* Gradient border effect - uses user colors */
   .border-gradient-brand {
     border: 2px solid transparent;
     background: linear-gradient(rgb(var(--surface)), rgb(var(--surface))) padding-box,
-                linear-gradient(135deg, #0066ff 0%, #ff0099 100%) border-box;
+                linear-gradient(135deg, var(--user-primary-hex, #0066ff) 0%, var(--user-secondary-hex, #ff0099) 100%) border-box;
   }
 
   /* Gradient shadow for depth */
   .shadow-gradient-brand {
-    box-shadow: 0 10px 40px -10px rgba(0, 102, 255, 0.3),
-                0 0 20px rgba(255, 0, 153, 0.2);
+    box-shadow: 0 10px 40px -10px rgba(var(--user-primary), 0.3),
+                0 0 20px rgba(var(--user-secondary), 0.2);
+  }
+
+  /* User accent color utility */
+  .bg-user-accent {
+    background-color: rgb(var(--user-accent));
+  }
+
+  .text-user-accent {
+    color: rgb(var(--user-accent));
+  }
+
+  .text-user-primary {
+    color: rgb(var(--user-primary));
+  }
+
+  .text-user-secondary {
+    color: rgb(var(--user-secondary));
+  }
+
+  .bg-user-primary {
+    background-color: rgb(var(--user-primary));
+  }
+
+  .bg-user-secondary {
+    background-color: rgb(var(--user-secondary));
   }
 }
 

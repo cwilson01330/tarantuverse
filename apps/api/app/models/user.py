@@ -65,6 +65,9 @@ class User(Base):
     # Notification preferences
     notification_preferences = relationship("NotificationPreferences", back_populates="user", uselist=False, lazy="select")
 
+    # Theme preferences
+    theme_preferences = relationship("UserThemePreferences", back_populates="user", uselist=False, lazy="select")
+
     def __repr__(self):
         return f"<User {self.username}>"
 
