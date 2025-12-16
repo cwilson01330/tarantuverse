@@ -362,14 +362,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   };
 
   const setPreset = (newPresetId: string) => {
-    if (newPresetId === 'default') {
-      setThemeType('default');
-      setPresetId(null);
-    } else {
-      setThemeType('preset');
-      setPresetId(newPresetId);
-    }
-    setTimeout(saveThemePrefs, 0);
+    const newThemeType = newPresetId === 'default' ? 'default' : 'preset';
+    const newPresetIdValue = newPresetId === 'default' ? null : newPresetId;
+
+    setThemeType(newThemeType);
+    setPresetId(newPresetIdValue);
+
+    // Save with the new values directly to avoid stale closure
+    setTimeout(() => {
+      AsyncStorage.setItem(
+        THEME_PREFS_STORAGE_KEY,
+        JSON.stringify({
+          themeType: newThemeType,
+          presetId: newPresetIdValue,
+          customColors
+        })
+      ).catch(err => console.error('Failed to save theme prefs:', err));
+    }, 0);
   };
 
   const setCustomColors = (colors: UserColors) => {

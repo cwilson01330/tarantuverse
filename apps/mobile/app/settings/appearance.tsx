@@ -41,6 +41,13 @@ export default function AppearanceSettings() {
   const [localSecondary, setLocalSecondary] = useState(customColors?.secondary || colors.secondary);
   const [localAccent, setLocalAccent] = useState(customColors?.accent || colors.accent);
 
+  // Update local colors when theme colors change (e.g., when selecting a preset)
+  useEffect(() => {
+    setLocalPrimary(customColors?.primary || colors.primary);
+    setLocalSecondary(customColors?.secondary || colors.secondary);
+    setLocalAccent(customColors?.accent || colors.accent);
+  }, [colors.primary, colors.secondary, colors.accent, customColors]);
+
   useEffect(() => {
     loadData();
   }, []);
