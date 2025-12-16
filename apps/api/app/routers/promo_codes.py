@@ -302,6 +302,48 @@ async def get_my_limits(
     return limits
 
 
+@router.get("/me/debug")
+async def debug_my_subscription(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Debug endpoint to see raw subscription data
+    """
+    # Get all subscriptions for this user
+    all_subs = db.query(UserSubscription).filter(
+        UserSubscription.user_id == current_user.id
+    ).all()
+
+    # Get all plans
+    all_plans = db.query(SubscriptionPlan).all()
+
+    return {
+        "user_id": str(current_user.id),
+        "username": current_user.username,
+        "subscriptions": [
+            {
+                "id": str(sub.id),
+                "plan_id": str(sub.plan_id),
+                "status": sub.status,
+                "status_type": type(sub.status).__name__,
+                "expires_at": str(sub.expires_at) if sub.expires_at else None,
+                "created_at": str(sub.created_at),
+            }
+            for sub in all_subs
+        ],
+        "plans": [
+            {
+                "id": str(plan.id),
+                "name": plan.name,
+                "can_use_breeding": plan.can_use_breeding,
+            }
+            for plan in all_plans
+        ],
+        "limits_from_method": current_user.get_subscription_limits()
+    }
+
+
 @router.post("/admin/grant/{user_id}", status_code=status.HTTP_200_OK)
 async def grant_premium_to_user(
     user_id: str,
