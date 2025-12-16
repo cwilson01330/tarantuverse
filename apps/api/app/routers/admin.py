@@ -47,7 +47,7 @@ async def get_admin_stats(
         "pending_reports": pending_reports
     }
 
-@router.get("/users", response_model=list[UserResponse])
+@router.get("/users")
 async def list_users(
     skip: int = 0,
     limit: int = 1000,
@@ -55,20 +55,30 @@ async def list_users(
     db: Session = Depends(get_db)
 ):
     """
-    List users (Admin only)
+    List users with premium status (Admin only)
     """
     query = db.query(User)
-    
+
     if search:
         search_filter = f"%{search}%"
         query = query.filter(
-            (User.email.ilike(search_filter)) | 
+            (User.email.ilike(search_filter)) |
             (User.username.ilike(search_filter)) |
             (User.display_name.ilike(search_filter))
         )
-        
+
     users = query.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
-    return [UserResponse.from_orm(user) for user in users]
+
+    # Build response with is_premium computed from subscription
+    result = []
+    for user in users:
+        user_dict = UserResponse.model_validate(user).model_dump()
+        # Check if user has premium subscription
+        limits = user.get_subscription_limits()
+        user_dict['is_premium'] = limits.get('is_premium', False)
+        result.append(user_dict)
+
+    return result
 
 @router.post("/users/{user_id}/reset-password")
 async def trigger_password_reset(

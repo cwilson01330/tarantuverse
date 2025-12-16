@@ -13,6 +13,7 @@ interface User {
     is_active: boolean;
     is_superuser: boolean;
     is_verified: boolean;
+    is_premium?: boolean;
     created_at: string;
 }
 
@@ -24,6 +25,7 @@ export default function ManageUsersPage() {
     const [resetLoading, setResetLoading] = useState<string | null>(null);
     const [verifyLoading, setVerifyLoading] = useState<string | null>(null);
     const [grantLoading, setGrantLoading] = useState<string | null>(null);
+    const [revokeLoading, setRevokeLoading] = useState<string | null>(null);
     const [manualVerifyLoading, setManualVerifyLoading] = useState<string | null>(null);
     const [verifyAllLoading, setVerifyAllLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -154,6 +156,7 @@ export default function ManageUsersPage() {
 
             if (response.ok) {
                 alert(`✅ Successfully granted lifetime premium to ${username}!`);
+                fetchUsers(searchQuery); // Refresh to show updated status
             } else {
                 const error = await response.json();
                 alert(`Failed to grant premium: ${error.detail}`);
@@ -163,6 +166,36 @@ export default function ManageUsersPage() {
             alert('Error granting premium access');
         } finally {
             setGrantLoading(null);
+        }
+    };
+
+    const handleRevokePremium = async (userId: string, username: string) => {
+        if (!confirm(`Revoke premium access from ${username}? They will lose all premium features.`)) {
+            return;
+        }
+
+        setRevokeLoading(userId);
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/api/v1/promo-codes/admin/revoke/${userId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                alert(`✅ Successfully revoked premium from ${username}`);
+                fetchUsers(searchQuery); // Refresh to show updated status
+            } else {
+                const error = await response.json();
+                alert(`Failed to revoke premium: ${error.detail}`);
+            }
+        } catch (error) {
+            console.error('Error revoking premium:', error);
+            alert('Error revoking premium access');
+        } finally {
+            setRevokeLoading(null);
         }
     };
 
@@ -371,6 +404,9 @@ export default function ManageUsersPage() {
                                         Role
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Premium
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Joined
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -415,6 +451,14 @@ export default function ManageUsersPage() {
                                                 {user.is_superuser ? 'Superadmin' : 'User'}
                                             </span>
                                         </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${user.is_premium
+                                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                                }`}>
+                                                {user.is_premium ? '💎 Premium' : 'Free'}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                             {format(new Date(user.created_at), 'MMM d, yyyy')}
                                         </td>
@@ -445,13 +489,23 @@ export default function ManageUsersPage() {
                                                 >
                                                     {resetLoading === user.id ? 'Sending...' : 'Send Reset Email'}
                                                 </button>
-                                                <button
-                                                    onClick={() => handleGrantPremium(user.id, user.username)}
-                                                    disabled={grantLoading === user.id}
-                                                    className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
-                                                >
-                                                    {grantLoading === user.id ? 'Granting...' : '💎 Grant Premium'}
-                                                </button>
+                                                {user.is_premium ? (
+                                                    <button
+                                                        onClick={() => handleRevokePremium(user.id, user.username)}
+                                                        disabled={revokeLoading === user.id}
+                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50"
+                                                    >
+                                                        {revokeLoading === user.id ? 'Revoking...' : '❌ Revoke Premium'}
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleGrantPremium(user.id, user.username)}
+                                                        disabled={grantLoading === user.id}
+                                                        className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
+                                                    >
+                                                        {grantLoading === user.id ? 'Granting...' : '💎 Grant Premium'}
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

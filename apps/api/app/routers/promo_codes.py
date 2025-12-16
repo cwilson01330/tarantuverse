@@ -471,3 +471,55 @@ async def grant_premium_to_user(
         "expires_at": expires_at,
         "is_lifetime": expires_at is None
     }
+
+
+@router.post("/admin/revoke/{user_id}", status_code=status.HTTP_200_OK)
+async def revoke_premium_from_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser)
+):
+    """
+    Revoke premium from a user (Superuser only)
+    """
+    # Find user
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Find active subscription
+    active_sub = db.query(UserSubscription).filter(
+        UserSubscription.user_id == user_id,
+        UserSubscription.status == "active"
+    ).first()
+
+    if not active_sub:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active subscription found for this user"
+        )
+
+    # Check if it's the free plan
+    plan = db.query(SubscriptionPlan).filter(
+        SubscriptionPlan.id == active_sub.plan_id
+    ).first()
+
+    if plan and plan.name == "free":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User is already on the free plan"
+        )
+
+    # Cancel the subscription
+    active_sub.status = "cancelled"
+    active_sub.cancelled_at = datetime.now(timezone.utc)
+
+    db.commit()
+
+    return {
+        "message": f"Premium access revoked from {target_user.username}",
+        "previous_plan": plan.name if plan else "unknown"
+    }
