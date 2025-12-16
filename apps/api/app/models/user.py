@@ -83,9 +83,10 @@ class User(Base):
         if not session:
             return False
 
+        # Use string value explicitly for reliable comparison
         subscription = session.query(UserSubscription).filter(
             UserSubscription.user_id == self.id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE
+            UserSubscription.status == "active"
         ).first()
 
         if not subscription:
@@ -121,9 +122,10 @@ class User(Base):
             }
 
         # Get active subscription
+        # Use string value explicitly for reliable comparison
         subscription = session.query(UserSubscription).filter(
             UserSubscription.user_id == self.id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE
+            UserSubscription.status == "active"
         ).first()
 
         if not subscription:

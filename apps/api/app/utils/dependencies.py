@@ -124,10 +124,11 @@ def require_premium(
     from app.models.subscription import UserSubscription, SubscriptionStatus
     
     # Check if user has active subscription
+    # Use string value explicitly for reliable comparison
     subscription = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE
+            UserSubscription.status == "active"
         )
     ).first()
     

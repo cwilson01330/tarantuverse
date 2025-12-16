@@ -224,9 +224,10 @@ async def redeem_promo_code(
         )
 
     # Check if user already has an active premium subscription
+    # Use string value explicitly for reliable comparison
     existing_subscription = db.query(UserSubscription).filter(
         UserSubscription.user_id == current_user.id,
-        UserSubscription.status == SubscriptionStatus.ACTIVE
+        UserSubscription.status == "active"
     ).first()
 
     if existing_subscription:
@@ -260,14 +261,14 @@ async def redeem_promo_code(
 
     # Cancel existing subscription if exists
     if existing_subscription:
-        existing_subscription.status = SubscriptionStatus.CANCELLED
+        existing_subscription.status = "cancelled"
         existing_subscription.cancelled_at = datetime.now(timezone.utc)
 
     # Create new subscription
     new_subscription = UserSubscription(
         user_id=current_user.id,
         plan_id=premium_plan.id,
-        status=SubscriptionStatus.ACTIVE,
+        status="active",
         expires_at=expires_at,
         promo_code_used=promo_code.code,
         subscription_source="promo",
@@ -350,20 +351,21 @@ async def grant_premium_to_user(
     expires_at = datetime.now(timezone.utc) + timedelta(days=duration_days) if duration_days < 36500 else None
 
     # Cancel existing subscriptions
+    # Use string value explicitly for reliable comparison
     existing = db.query(UserSubscription).filter(
         UserSubscription.user_id == user_id,
-        UserSubscription.status == SubscriptionStatus.ACTIVE
+        UserSubscription.status == "active"
     ).all()
 
     for sub in existing:
-        sub.status = SubscriptionStatus.CANCELLED
+        sub.status = "cancelled"
         sub.cancelled_at = datetime.now(timezone.utc)
 
     # Create new subscription
     new_subscription = UserSubscription(
         user_id=user_id,
         plan_id=premium_plan.id,
-        status=SubscriptionStatus.ACTIVE,
+        status="active",
         expires_at=expires_at,
         promo_code_used=code,
         subscription_source="promo",

@@ -42,24 +42,24 @@ def get_my_subscription(
     subscription = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE
+            UserSubscription.status == "active"
         )
     ).first()
-    
+
     if not subscription:
         # Get free plan
         free_plan = db.query(SubscriptionPlan).filter(
             SubscriptionPlan.name == "free"
         ).first()
-        
+
         if not free_plan:
             raise HTTPException(status_code=500, detail="Free plan not found")
-        
+
         # Create free subscription for user
         subscription = UserSubscription(
             user_id=current_user.id,
             plan_id=free_plan.id,
-            status=SubscriptionStatus.ACTIVE
+            status="active"
         )
         db.add(subscription)
         db.commit()
@@ -87,26 +87,26 @@ def create_subscription(
     existing = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE
+            UserSubscription.status == "active"
         )
     ).first()
-    
+
     if existing:
         # Cancel existing subscription
-        existing.status = SubscriptionStatus.CANCELLED
+        existing.status = "cancelled"
         existing.cancelled_at = datetime.utcnow()
-    
+
     # Create new subscription
     # Set expiry to 1 month from now for monthly, 1 year for yearly
     expires_at = None
     if plan.price_monthly > 0:
         # For paid plans, set expiry (in production, this would come from payment provider)
         expires_at = datetime.utcnow() + timedelta(days=30)
-    
+
     new_subscription = UserSubscription(
         user_id=current_user.id,
         plan_id=subscription_data.plan_id,
-        status=SubscriptionStatus.ACTIVE,
+        status="active",
         expires_at=expires_at,
         payment_provider=subscription_data.payment_provider,
         payment_provider_id=subscription_data.payment_provider_id
@@ -128,18 +128,18 @@ def cancel_subscription(
     subscription = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE
+            UserSubscription.status == "active"
         )
     ).first()
-    
+
     if not subscription:
         raise HTTPException(status_code=404, detail="No active subscription found")
-    
+
     # Don't cancel free plan
     if subscription.plan.name == "free":
         raise HTTPException(status_code=400, detail="Cannot cancel free plan")
-    
-    subscription.status = SubscriptionStatus.CANCELLED
+
+    subscription.status = "cancelled"
     subscription.cancelled_at = datetime.utcnow()
     
     db.commit()
@@ -157,7 +157,7 @@ def check_feature_access(
     subscription = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE
+            UserSubscription.status == "active"
         )
     ).first()
 
@@ -231,13 +231,13 @@ def validate_receipt(
     existing = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == SubscriptionStatus.ACTIVE
+            UserSubscription.status == "active"
         )
     ).first()
 
     if existing:
         # Cancel existing subscription
-        existing.status = SubscriptionStatus.CANCELLED
+        existing.status = "cancelled"
         existing.cancelled_at = datetime.utcnow()
 
     # Create new subscription
@@ -252,7 +252,7 @@ def validate_receipt(
     new_subscription = UserSubscription(
         user_id=current_user.id,
         plan_id=plan.id,
-        status=SubscriptionStatus.ACTIVE,
+        status="active",
         expires_at=expires_at,
         payment_provider="apple" if receipt_data.platform == "ios" else "google",
         payment_provider_id=receipt_data.transaction_id,
