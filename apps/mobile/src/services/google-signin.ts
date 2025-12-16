@@ -1,6 +1,9 @@
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import Constants from 'expo-constants';
+
+// Check if running in Expo Go (where native modules aren't available)
+const isExpoGo = Constants.appOwnership === 'expo';
 
 // OAuth Configuration
 const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || '';
@@ -9,19 +12,38 @@ const GOOGLE_CLIENT_ID_ANDROID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROI
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
-// Configure Google Sign-In
-GoogleSignin.configure({
-  webClientId: GOOGLE_CLIENT_ID_WEB, // From Google Cloud Console
-  iosClientId: GOOGLE_CLIENT_ID_IOS, // From Google Cloud Console
-  offlineAccess: true, // To get server auth code
-  forceCodeForRefreshToken: true,
-});
+// Dynamically import and configure Google Sign-In only in development/production builds
+let GoogleSignin: any = null;
 
-console.log('[GoogleSignIn] Configured with:');
-console.log('[GoogleSignIn] Web Client ID:', GOOGLE_CLIENT_ID_WEB ? 'Set' : 'Missing');
-console.log('[GoogleSignIn] iOS Client ID:', GOOGLE_CLIENT_ID_IOS ? 'Set' : 'Missing');
-console.log('[GoogleSignIn] Android Client ID:', GOOGLE_CLIENT_ID_ANDROID ? 'Set' : 'Missing');
-console.log('[GoogleSignIn] Platform:', Platform.OS);
+// Export flag so UI can conditionally show/hide Google Sign-In button
+export const isGoogleSignInAvailable = !isExpoGo;
+
+if (!isExpoGo) {
+  try {
+    // Dynamic require to avoid crash in Expo Go
+    const googleSignInModule = require('@react-native-google-signin/google-signin');
+    GoogleSignin = googleSignInModule.GoogleSignin;
+
+    // Configure Google Sign-In
+    GoogleSignin.configure({
+      webClientId: GOOGLE_CLIENT_ID_WEB,
+      iosClientId: GOOGLE_CLIENT_ID_IOS,
+      offlineAccess: true,
+      forceCodeForRefreshToken: true,
+    });
+
+    console.log('[GoogleSignIn] Configured with:');
+    console.log('[GoogleSignIn] Web Client ID:', GOOGLE_CLIENT_ID_WEB ? 'Set' : 'Missing');
+    console.log('[GoogleSignIn] iOS Client ID:', GOOGLE_CLIENT_ID_IOS ? 'Set' : 'Missing');
+    console.log('[GoogleSignIn] Android Client ID:', GOOGLE_CLIENT_ID_ANDROID ? 'Set' : 'Missing');
+    console.log('[GoogleSignIn] Platform:', Platform.OS);
+  } catch (error) {
+    console.warn('[GoogleSignIn] Failed to load native module:', error);
+  }
+} else {
+  console.log('[GoogleSignIn] Running in Expo Go - Google Sign-In is disabled');
+  console.log('[GoogleSignIn] Use a development build to test Google Sign-In');
+}
 
 /**
  * Sign in with Google using @react-native-google-signin/google-signin
@@ -37,6 +59,13 @@ export const signInWithGoogle = async (): Promise<{
     avatar_url?: string;
   };
 }> => {
+  // Check if Google Sign-In is available
+  if (!GoogleSignin) {
+    throw new Error(
+      'Google Sign-In is not available in Expo Go. Please use a development build to test OAuth login.'
+    );
+  }
+
   try {
     console.log('[GoogleSignIn] Starting Google Sign-In flow...');
 
@@ -100,6 +129,11 @@ export const signInWithGoogle = async (): Promise<{
  * Sign out from Google
  */
 export const signOutFromGoogle = async (): Promise<void> => {
+  if (!GoogleSignin) {
+    // No-op in Expo Go
+    return;
+  }
+
   try {
     await GoogleSignin.signOut();
     console.log('[GoogleSignIn] Signed out successfully');

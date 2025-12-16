@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useAuth } from '../src/contexts/AuthContext';
+import { useAuth, isGoogleSignInAvailable } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import GoogleLogo from '../src/components/GoogleLogo';
 
@@ -360,21 +360,23 @@ export default function RegisterScreen() {
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Google Sign In */}
-            <TouchableOpacity
-              style={styles.oauthButton}
-              onPress={handleGoogleRegister}
-              disabled={loading || oauthLoading !== null}
-            >
-              {oauthLoading === 'google' ? (
-                <ActivityIndicator color={colors.textPrimary} />
-              ) : (
-                <>
-                  <GoogleLogo size={24} />
-                  <Text style={styles.oauthButtonText}>Continue with Google</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            {/* Google Sign In - only shown in development/production builds */}
+            {isGoogleSignInAvailable && (
+              <TouchableOpacity
+                style={styles.oauthButton}
+                onPress={handleGoogleRegister}
+                disabled={loading || oauthLoading !== null}
+              >
+                {oauthLoading === 'google' ? (
+                  <ActivityIndicator color={colors.textPrimary} />
+                ) : (
+                  <>
+                    <GoogleLogo size={24} />
+                    <Text style={styles.oauthButtonText}>Continue with Google</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
 
             {/* Apple Sign In (iOS only) */}
             {Platform.OS === 'ios' && (

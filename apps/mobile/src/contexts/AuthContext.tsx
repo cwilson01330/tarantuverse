@@ -1,7 +1,10 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../services/api';
-import { signInWithGoogle, signInWithApple, signOutFromGoogle } from '../services/google-signin';
+import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable } from '../services/google-signin';
+
+// Re-export for convenience so login screens can import from one place
+export { isGoogleSignInAvailable };
 
 interface User {
   id: string;
