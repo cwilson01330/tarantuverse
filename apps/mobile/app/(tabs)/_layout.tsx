@@ -34,6 +34,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="enclosures"
+        options={{
+          title: 'Enclosures',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="home-variant" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="community"
         options={{
           title: 'Community',

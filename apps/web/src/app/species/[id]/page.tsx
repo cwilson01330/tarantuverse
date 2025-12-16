@@ -57,7 +57,6 @@ export default function EnhancedSpeciesDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
-  const [addingToCollection, setAddingToCollection] = useState(false)
 
   useEffect(() => {
     fetchSpecies()
@@ -81,13 +80,15 @@ export default function EnhancedSpeciesDetailPage() {
     }
   }
 
-  const addToCollection = async () => {
-    // TODO: Implement add to collection
-    setAddingToCollection(true)
-    setTimeout(() => {
-      alert('Collection feature coming soon!')
-      setAddingToCollection(false)
-    }, 500)
+  const addToCollection = () => {
+    if (!species) return
+    // Navigate to add tarantula page with species pre-selected
+    const params = new URLSearchParams({
+      speciesId: species.id,
+      scientificName: species.scientific_name,
+      commonName: species.common_names?.[0] || '',
+    })
+    router.push(`/dashboard/tarantulas/add?${params.toString()}`)
   }
 
   const getCareLevel = (level?: string) => {
@@ -260,10 +261,9 @@ export default function EnhancedSpeciesDetailPage() {
             <div className="flex flex-col gap-2 pb-4">
               <button
                 onClick={addToCollection}
-                disabled={addingToCollection}
-                className="px-6 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                className="px-6 py-3 bg-gradient-brand text-white rounded-lg font-semibold shadow-lg hover:shadow-xl hover:brightness-90 transition-all"
               >
-                {addingToCollection ? 'Adding...' : '+ Add to Collection'}
+                + Add to Collection
               </button>
               
               {canEdit && (

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -62,6 +63,31 @@ export default function CollectionScreen() {
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+
+  // Load view preference from AsyncStorage
+  useEffect(() => {
+    const loadViewMode = async () => {
+      try {
+        const savedView = await AsyncStorage.getItem('collection_view_mode');
+        if (savedView === 'card' || savedView === 'list') {
+          setViewMode(savedView);
+        }
+      } catch (error) {
+        // Silently fail
+      }
+    };
+    loadViewMode();
+  }, []);
+
+  const toggleViewMode = async (mode: 'card' | 'list') => {
+    setViewMode(mode);
+    try {
+      await AsyncStorage.setItem('collection_view_mode', mode);
+    } catch (error) {
+      // Silently fail
+    }
+  };
 
   // Helper function to handle both R2 (absolute) and local (relative) URLs
   const getImageUrl = (url?: string) => {
@@ -238,6 +264,87 @@ export default function CollectionScreen() {
         )}
       </View>
     </TouchableOpacity>
+  );
+
+  const renderListItem = ({ item }: { item: Tarantula }) => {
+    const feedingStatus = feedingStatuses.get(item.id);
+    const premoltPrediction = premoltPredictions.get(item.id);
+    const days = feedingStatus?.days_since_last_feeding;
+
+    let feedingColor = colors.success;
+    if (days !== undefined) {
+      if (days >= 21) feedingColor = '#ef4444';
+      else if (days >= 14) feedingColor = '#f97316';
+      else if (days >= 7) feedingColor = '#eab308';
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.listItem}
+        onPress={() => router.push(`/tarantula/${item.id}`)}
+      >
+        <View style={styles.listImageContainer}>
+          {item.photo_url ? (
+            <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.listImage} />
+          ) : (
+            <View style={styles.listPlaceholder}>
+              <MaterialCommunityIcons name="spider" size={24} color={colors.textTertiary} />
+            </View>
+          )}
+        </View>
+        <View style={styles.listContent}>
+          <View style={styles.listHeader}>
+            <Text style={styles.listName} numberOfLines={1}>{item.name}</Text>
+            {item.sex && (
+              <MaterialCommunityIcons
+                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
+                size={18}
+                color={item.sex === 'female' ? '#ec4899' : '#3b82f6'}
+              />
+            )}
+          </View>
+          <Text style={styles.listScientificName} numberOfLines={1}>{item.scientific_name}</Text>
+        </View>
+        <View style={styles.listBadges}>
+          {days !== undefined && (
+            <View style={[styles.listBadge, { backgroundColor: feedingColor }]}>
+              <Text style={styles.listBadgeText}>{days}d</Text>
+            </View>
+          )}
+          {premoltPrediction && premoltPrediction.confidence_level !== 'low' && (
+            <View style={[styles.listBadge, { backgroundColor: '#f97316' }]}>
+              <Text style={styles.listBadgeText}>🦋 {premoltPrediction.probability}%</Text>
+            </View>
+          )}
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+      </TouchableOpacity>
+    );
+  };
+
+  const ViewToggle = () => (
+    <View style={styles.viewToggleContainer}>
+      <TouchableOpacity
+        style={[styles.viewToggleButton, viewMode === 'card' && styles.viewToggleActive]}
+        onPress={() => toggleViewMode('card')}
+      >
+        <MaterialCommunityIcons
+          name="view-grid"
+          size={20}
+          color={viewMode === 'card' ? '#fff' : colors.textSecondary}
+        />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
+        onPress={() => toggleViewMode('list')}
+      >
+        <MaterialCommunityIcons
+          name="view-list"
+          size={20}
+          color={viewMode === 'list' ? '#fff' : colors.textSecondary}
+        />
+      </TouchableOpacity>
+    </View>
   );
 
   const styles = StyleSheet.create({
@@ -488,6 +595,96 @@ export default function CollectionScreen() {
       justifyContent: 'center',
       alignItems: 'center',
     },
+    // View toggle styles
+    viewToggleContainer: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      padding: 4,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    viewToggleButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 6,
+    },
+    viewToggleActive: {
+      backgroundColor: colors.primary,
+    },
+    // List view styles
+    listItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      marginHorizontal: 8,
+      marginVertical: 4,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    listImageContainer: {
+      width: 50,
+      height: 50,
+      borderRadius: 8,
+      overflow: 'hidden',
+      marginRight: 12,
+    },
+    listImage: {
+      width: 50,
+      height: 50,
+    },
+    listPlaceholder: {
+      width: 50,
+      height: 50,
+      backgroundColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    listContent: {
+      flex: 1,
+    },
+    listHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    listName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      flex: 1,
+    },
+    listScientificName: {
+      fontSize: 13,
+      fontStyle: 'italic',
+      color: colors.textTertiary,
+      marginTop: 2,
+    },
+    listBadges: {
+      flexDirection: 'row',
+      gap: 6,
+      marginRight: 8,
+    },
+    listBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 10,
+    },
+    listBadgeText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    // Stats header with toggle
+    statsHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginHorizontal: 8,
+      marginBottom: 8,
+    },
   });
 
   if (loading) {
@@ -530,54 +727,64 @@ export default function CollectionScreen() {
       ) : (
         <>
           <FlatList
+            key={viewMode} // Force re-render when viewMode changes (needed for numColumns)
             data={tarantulas}
-            renderItem={renderTarantula}
+            renderItem={viewMode === 'card' ? renderTarantula : renderListItem}
             keyExtractor={(item) => item.id}
-            numColumns={2}
+            numColumns={viewMode === 'card' ? 2 : 1}
             contentContainerStyle={styles.list}
             ListHeaderComponent={
-              collectionStats ? (
-                <View style={styles.statsCard}>
-                  <View style={styles.statsHeader}>
-                    <Text style={styles.statsTitle}>📊 Collection Stats</Text>
-                    <TouchableOpacity onPress={() => router.push('/analytics')}>
-                      <Text style={styles.viewAllLink}>View All →</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.statsGrid}>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{collectionStats.total_tarantulas}</Text>
-                      <Text style={styles.statLabel}>Total</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{collectionStats.unique_species}</Text>
-                      <Text style={styles.statLabel}>Species</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{collectionStats.total_feedings}</Text>
-                      <Text style={styles.statLabel}>Feedings</Text>
-                    </View>
-                    <View style={styles.statItem}>
-                      <Text style={styles.statValue}>{collectionStats.total_molts}</Text>
-                      <Text style={styles.statLabel}>Molts</Text>
-                    </View>
-                  </View>
-                  <View style={styles.sexDistribution}>
-                    <View style={styles.sexItem}>
-                      <MaterialCommunityIcons name="gender-male" size={16} color="#3b82f6" />
-                      <Text style={styles.sexText}>{collectionStats.sex_distribution.male} ♂</Text>
-                    </View>
-                    <View style={styles.sexItem}>
-                      <MaterialCommunityIcons name="gender-female" size={16} color="#ec4899" />
-                      <Text style={styles.sexText}>{collectionStats.sex_distribution.female} ♀</Text>
-                    </View>
-                    <View style={styles.sexItem}>
-                      <MaterialCommunityIcons name="help-circle" size={16} color={colors.textTertiary} />
-                      <Text style={styles.sexText}>{collectionStats.sex_distribution.unknown} ?</Text>
-                    </View>
-                  </View>
+              <>
+                {/* View Toggle Row */}
+                <View style={styles.statsHeaderRow}>
+                  <Text style={styles.statsTitle}>🕷️ My Collection</Text>
+                  <ViewToggle />
                 </View>
-              ) : null
+
+                {/* Stats Card */}
+                {collectionStats && (
+                  <View style={styles.statsCard}>
+                    <View style={styles.statsHeader}>
+                      <Text style={styles.statsTitle}>📊 Collection Stats</Text>
+                      <TouchableOpacity onPress={() => router.push('/analytics')}>
+                        <Text style={styles.viewAllLink}>View All →</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.statsGrid}>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{collectionStats.total_tarantulas}</Text>
+                        <Text style={styles.statLabel}>Total</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{collectionStats.unique_species}</Text>
+                        <Text style={styles.statLabel}>Species</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{collectionStats.total_feedings}</Text>
+                        <Text style={styles.statLabel}>Feedings</Text>
+                      </View>
+                      <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{collectionStats.total_molts}</Text>
+                        <Text style={styles.statLabel}>Molts</Text>
+                      </View>
+                    </View>
+                    <View style={styles.sexDistribution}>
+                      <View style={styles.sexItem}>
+                        <MaterialCommunityIcons name="gender-male" size={16} color="#3b82f6" />
+                        <Text style={styles.sexText}>{collectionStats.sex_distribution.male} ♂</Text>
+                      </View>
+                      <View style={styles.sexItem}>
+                        <MaterialCommunityIcons name="gender-female" size={16} color="#ec4899" />
+                        <Text style={styles.sexText}>{collectionStats.sex_distribution.female} ♀</Text>
+                      </View>
+                      <View style={styles.sexItem}>
+                        <MaterialCommunityIcons name="help-circle" size={16} color={colors.textTertiary} />
+                        <Text style={styles.sexText}>{collectionStats.sex_distribution.unknown} ?</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </>
             }
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />

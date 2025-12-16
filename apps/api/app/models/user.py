@@ -68,6 +68,9 @@ class User(Base):
     # Theme preferences
     theme_preferences = relationship("UserThemePreferences", back_populates="user", uselist=False, lazy="select")
 
+    # Enclosures
+    enclosures = relationship("Enclosure", back_populates="user", lazy="select")
+
     def __repr__(self):
         return f"<User {self.username}>"
 

@@ -43,6 +43,20 @@ export default function DashboardPage() {
   const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null)
   const [showWarning, setShowWarning] = useState(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
+
+  // Load view preference from localStorage
+  useEffect(() => {
+    const savedView = localStorage.getItem('collection_view_mode')
+    if (savedView === 'card' || savedView === 'list') {
+      setViewMode(savedView)
+    }
+  }, [])
+
+  const toggleViewMode = (mode: 'card' | 'list') => {
+    setViewMode(mode)
+    localStorage.setItem('collection_view_mode', mode)
+  }
 
   const handleAddTarantula = () => {
     if (!canAddTarantula(tarantulas.length)) {
@@ -400,22 +414,53 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div>
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
                   <h2 className="text-2xl font-bold text-theme-primary">
                     {searchQuery ? `Search Results (${filteredTarantulas.length})` : 'My Collection'}
                   </h2>
-                  <button
-                    onClick={handleAddTarantula}
-                    className="px-6 py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
-                  >
-                    ➕ Add Tarantula
-                  </button>
-                  <button
-                    onClick={() => router.push('/dashboard/tarantulas/import')}
-                    className="ml-3 px-6 py-3 bg-surface border border-theme text-theme-primary rounded-xl hover:bg-surface-elevated transition-all duration-200 font-semibold shadow-lg"
-                  >
-                    📥 Import
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {/* View Toggle */}
+                    <div className="flex bg-surface border border-theme rounded-lg p-1">
+                      <button
+                        onClick={() => toggleViewMode('card')}
+                        className={`p-2 rounded-md transition-all ${
+                          viewMode === 'card'
+                            ? 'bg-gradient-brand text-white shadow-md'
+                            : 'text-theme-secondary hover:text-theme-primary'
+                        }`}
+                        title="Card View"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => toggleViewMode('list')}
+                        className={`p-2 rounded-md transition-all ${
+                          viewMode === 'list'
+                            ? 'bg-gradient-brand text-white shadow-md'
+                            : 'text-theme-secondary hover:text-theme-primary'
+                        }`}
+                        title="List View"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                        </svg>
+                      </button>
+                    </div>
+                    <button
+                      onClick={handleAddTarantula}
+                      className="px-6 py-3 bg-gradient-brand text-white rounded-xl hover:brightness-90 transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
+                    >
+                      ➕ Add Tarantula
+                    </button>
+                    <button
+                      onClick={() => router.push('/dashboard/tarantulas/import')}
+                      className="px-6 py-3 bg-surface border border-theme text-theme-primary rounded-xl hover:bg-surface-elevated transition-all duration-200 font-semibold shadow-lg"
+                    >
+                      📥 Import
+                    </button>
+                  </div>
                 </div>
 
                 {filteredTarantulas.length === 0 ? (
@@ -423,7 +468,94 @@ export default function DashboardPage() {
                     <div className="text-4xl mb-3">🔍</div>
                     <p className="text-theme-secondary">No tarantulas match your search.</p>
                   </div>
+                ) : viewMode === 'list' ? (
+                  /* List View */
+                  <div className="bg-surface rounded-2xl shadow-lg border border-theme overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-gray-800/50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Photo</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden sm:table-cell">Species</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden md:table-cell">Sex</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Last Fed</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden lg:table-cell">Premolt</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {filteredTarantulas.map((tarantula) => {
+                          const feedingStatus = feedingStatuses.get(tarantula.id)
+                          const premoltPrediction = premoltPredictions.get(tarantula.id)
+                          return (
+                            <tr
+                              key={tarantula.id}
+                              onClick={() => router.push(`/dashboard/tarantulas/${tarantula.id}`)}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+                            >
+                              <td className="px-4 py-3">
+                                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30 flex-shrink-0">
+                                  {tarantula.photo_url ? (
+                                    <img
+                                      src={getImageUrl(tarantula.photo_url)}
+                                      alt={tarantula.common_name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-2xl">🕷️</div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="font-semibold text-theme-primary">{tarantula.common_name}</div>
+                                <div className="text-sm text-theme-secondary italic sm:hidden">{tarantula.scientific_name}</div>
+                              </td>
+                              <td className="px-4 py-3 hidden sm:table-cell">
+                                <span className="text-sm italic text-theme-secondary">{tarantula.scientific_name}</span>
+                              </td>
+                              <td className="px-4 py-3 hidden md:table-cell">
+                                {tarantula.sex ? (
+                                  <span className="px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold">
+                                    {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
+                                  </span>
+                                ) : (
+                                  <span className="text-theme-tertiary text-sm">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                {feedingStatus?.days_since_last_feeding !== undefined ? (
+                                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                    feedingStatus.days_since_last_feeding >= 21 ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
+                                    feedingStatus.days_since_last_feeding >= 14 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
+                                    feedingStatus.days_since_last_feeding >= 7 ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' :
+                                    'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300'
+                                  }`}>
+                                    {feedingStatus.days_since_last_feeding}d ago
+                                  </span>
+                                ) : (
+                                  <span className="text-theme-tertiary text-sm">No data</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 hidden lg:table-cell">
+                                {premoltPrediction && premoltPrediction.confidence_level !== 'low' ? (
+                                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                    premoltPrediction.confidence_level === 'very_high' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
+                                    premoltPrediction.confidence_level === 'high' ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
+                                    'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300'
+                                  }`}>
+                                    🦋 {premoltPrediction.probability}%
+                                  </span>
+                                ) : (
+                                  <span className="text-theme-tertiary text-sm">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
+                  /* Card View */
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredTarantulas.map((tarantula) => (
                       <div

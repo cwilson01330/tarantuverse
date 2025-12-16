@@ -33,7 +33,8 @@ class SubstrateChangeUpdate(BaseModel):
 class SubstrateChangeResponse(SubstrateChangeBase):
     """Schema for substrate change response"""
     id: uuid.UUID
-    tarantula_id: uuid.UUID
+    tarantula_id: Optional[uuid.UUID] = None  # Now optional - can be enclosure-level
+    enclosure_id: Optional[uuid.UUID] = None  # For enclosure-level substrate changes
     created_at: datetime
 
     class Config:

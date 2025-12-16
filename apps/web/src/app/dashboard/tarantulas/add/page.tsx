@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -17,6 +17,7 @@ interface SelectedSpecies {
 
 export default function AddTarantulaPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, token, isAuthenticated, isLoading } = useAuth()
   const [formData, setFormData] = useState({
     common_name: '',
@@ -46,6 +47,29 @@ export default function AddTarantulaPage() {
   const [selectedSpecies, setSelectedSpecies] = useState<SelectedSpecies | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Check for pre-filled species from URL params (from "Add to Collection" on species page)
+  useEffect(() => {
+    const speciesId = searchParams.get('speciesId')
+    const scientificName = searchParams.get('scientificName')
+    const commonName = searchParams.get('commonName')
+
+    if (speciesId && scientificName) {
+      // Pre-fill the form with species data
+      setFormData(prev => ({
+        ...prev,
+        species_id: speciesId,
+        scientific_name: scientificName,
+        common_name: commonName || '',
+      }))
+      // Set selected species for display
+      setSelectedSpecies({
+        id: speciesId,
+        scientific_name: scientificName,
+        common_names: commonName ? [commonName] : [],
+      })
+    }
+  }, [searchParams])
 
   useEffect(() => {
     // Wait for auth to load

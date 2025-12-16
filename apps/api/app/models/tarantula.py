@@ -34,6 +34,7 @@ class Tarantula(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     species_id = Column(UUID(as_uuid=True), ForeignKey("species.id"), nullable=True)
+    enclosure_id = Column(UUID(as_uuid=True), ForeignKey("enclosures.id", ondelete="SET NULL"), nullable=True)
 
     # Basic Info
     name = Column(String(100))  # Pet name
@@ -78,6 +79,7 @@ class Tarantula(Base):
     # Relationships
     user = relationship("User", backref="tarantulas")
     species = relationship("Species", backref="tarantulas")
+    enclosure = relationship("Enclosure", back_populates="inhabitants")
 
     # Breeding relationships
     pairings_as_male = relationship("Pairing", foreign_keys="Pairing.male_id", back_populates="male")
