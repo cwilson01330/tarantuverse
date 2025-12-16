@@ -126,7 +126,7 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
                   className="w-8 h-8 rounded-full object-cover"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 flex items-center justify-center text-white font-semibold text-sm">
+                <div className="w-8 h-8 rounded-full bg-gradient-brand flex items-center justify-center text-white font-semibold text-sm">
                   {(userName || userEmail || '?')[0].toUpperCase()}
                 </div>
               )}

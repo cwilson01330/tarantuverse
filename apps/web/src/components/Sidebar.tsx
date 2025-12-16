@@ -100,7 +100,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
                 alt="Tarantuverse"
                 className="w-8 h-8 object-contain"
               />
-              <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <span className="text-xl font-bold text-gradient-brand">
                 Tarantuverse
               </span>
             </div>
@@ -151,7 +151,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
                 className={`
                   w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200
                   ${active
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/30'
+                    ? 'bg-gradient-brand text-white shadow-gradient-brand'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                   }
                   ${isCollapsed ? 'justify-center' : ''}
