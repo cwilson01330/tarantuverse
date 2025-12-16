@@ -154,7 +154,7 @@ export default function BreedingPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-3xl p-12 text-center border-2 border-purple-200 dark:border-purple-800 shadow-2xl">
             {/* Premium Badge */}
-            <div className="w-24 h-24 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
+            <div className="w-24 h-24 bg-gradient-brand rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
               <span className="text-5xl">💎</span>
             </div>
 
@@ -198,7 +198,7 @@ export default function BreedingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
               <button
                 onClick={() => router.push('/pricing')}
-                className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-2xl transition font-bold text-lg"
+                className="px-8 py-4 bg-gradient-brand text-white rounded-xl hover:shadow-2xl hover:brightness-90 transition font-bold text-lg"
               >
                 View Premium Plans
               </button>

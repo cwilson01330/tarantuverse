@@ -360,7 +360,7 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={promoLoading || !promoCode.trim()}
-                    className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 bg-gradient-brand text-white rounded-lg hover:brightness-90 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {promoLoading ? 'Redeeming...' : 'Redeem Code'}
                   </button>
@@ -372,7 +372,7 @@ export default function SettingsPage() {
             {!subscriptionLimits?.is_premium && (
               <button
                 onClick={() => router.push('/pricing')}
-                className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all font-semibold shadow-lg"
+                className="w-full px-4 py-3 bg-gradient-brand hover:brightness-90 text-white rounded-lg transition-all font-semibold shadow-lg"
               >
                 View Premium Plans
               </button>
@@ -381,7 +381,7 @@ export default function SettingsPage() {
             {/* Premium Badge */}
             {subscriptionLimits?.is_premium && (
               <div className="p-4 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 border-2 border-purple-300 dark:border-purple-700 rounded-lg text-center">
-                <p className="text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                <p className="text-lg font-bold text-gradient-brand">
                   ✨ Thank you for being a Premium member! ✨
                 </p>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">

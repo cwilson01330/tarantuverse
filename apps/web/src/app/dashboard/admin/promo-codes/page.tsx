@@ -205,7 +205,7 @@ export default function ManagePromoCodesPage() {
                 <div className="mb-6">
                     <button
                         onClick={() => setShowBulkCreate(!showBulkCreate)}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition font-semibold"
+                        className="px-4 py-2 bg-gradient-brand text-white rounded-lg hover:brightness-90 transition font-semibold"
                     >
                         {showBulkCreate ? 'Cancel' : 'Generate Bulk Codes'}
                     </button>
@@ -294,7 +294,7 @@ export default function ManagePromoCodesPage() {
                                 <button
                                     type="submit"
                                     disabled={creatingBulk}
-                                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition font-semibold disabled:opacity-50"
+                                    className="w-full py-3 bg-gradient-brand text-white rounded-lg hover:brightness-90 transition font-semibold disabled:opacity-50"
                                 >
                                     {creatingBulk ? 'Generating...' : `Generate ${bulkForm.count} Codes`}
                                 </button>

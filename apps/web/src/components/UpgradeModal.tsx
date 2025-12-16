@@ -18,7 +18,7 @@ export default function UpgradeModal({ isOpen, onClose, feature, description }: 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8 border border-gray-200 dark:border-gray-700">
         {/* Icon */}
-        <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-gradient-brand rounded-2xl flex items-center justify-center mx-auto mb-4">
           <span className="text-3xl">💎</span>
         </div>
 
@@ -71,7 +71,7 @@ export default function UpgradeModal({ isOpen, onClose, feature, description }: 
               onClose()
               router.push('/pricing')
             }}
-            className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition font-semibold"
+            className="w-full px-6 py-3 bg-gradient-brand text-white rounded-xl hover:shadow-lg hover:brightness-90 transition font-semibold"
           >
             View Premium Plans
           </button>

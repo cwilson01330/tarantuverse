@@ -189,7 +189,7 @@ export default function BulkImportPage() {
             <button
               onClick={handleImport}
               disabled={loading || !jsonInput.trim()}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 bg-gradient-brand text-white py-3 rounded-lg font-semibold hover:brightness-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? '⏳ Importing...' : '📥 Import Species'}
             </button>

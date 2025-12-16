@@ -12,7 +12,7 @@ export default function PrivacyPolicyPage() {
           <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center gap-2">
               <Image src="/logo-transparent.png" alt="Tarantuverse" width={40} height={40} />
-              <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <span className="text-2xl font-bold text-gradient-brand">
                 Tarantuverse
               </span>
             </Link>
@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
               <Link href="/login" className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 font-medium transition">
                 Login
               </Link>
-              <Link href="/register" className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium">
+              <Link href="/register" className="px-6 py-2 bg-gradient-brand text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium">
                 Get Started
               </Link>
             </div>
@@ -259,7 +259,7 @@ export default function PrivacyPolicyPage() {
         <div className="mt-12 text-center">
           <Link
             href="/"
-            className="inline-block px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium"
+            className="inline-block px-8 py-3 bg-gradient-brand text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium"
           >
             Back to Home
           </Link>

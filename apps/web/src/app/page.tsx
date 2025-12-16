@@ -506,7 +506,7 @@ export default function Home() {
             {/* Monthly - Most Popular */}
             <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-2 border-neon-pink-500/50 rounded-2xl p-6 transform scale-105 relative">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="inline-block px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-xs font-bold shadow-lg">
+                <span className="inline-block px-3 py-1 bg-gradient-brand text-white rounded-full text-xs font-bold shadow-lg">
                   MOST POPULAR
                 </span>
               </div>
@@ -542,7 +542,7 @@ export default function Home() {
 
               <Link
                 href="/register"
-                className="block w-full py-3 text-center bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg hover:shadow-neon-pink-500/50 transition font-bold"
+                className="block w-full py-3 text-center bg-gradient-brand text-white rounded-xl hover:shadow-lg hover:shadow-neon-pink-500/50 transition font-bold"
               >
                 Go Premium
               </Link>

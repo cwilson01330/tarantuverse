@@ -148,7 +148,7 @@ export default function SpeciesPage() {
               </Link>
               <Link
                 href="/dashboard/admin/species/add"
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                className="px-6 py-3 bg-gradient-brand text-white rounded-lg font-semibold hover:brightness-90 transition-all shadow-md hover:shadow-lg flex items-center gap-2"
               >
                 <span>➕</span>
                 <span>Add Species</span>

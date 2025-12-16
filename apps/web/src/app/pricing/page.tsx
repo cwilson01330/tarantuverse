@@ -12,7 +12,7 @@ export default function PricingPage() {
           <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center gap-2">
               <Image src="/logo-transparent.png" alt="Tarantuverse" width={40} height={40} />
-              <span className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <span className="text-2xl font-bold text-gradient-brand">
                 Tarantuverse
               </span>
             </Link>
@@ -20,7 +20,7 @@ export default function PricingPage() {
               <Link href="/login" className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 font-medium transition">
                 Login
               </Link>
-              <Link href="/register" className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium">
+              <Link href="/register" className="px-6 py-2 bg-gradient-brand text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium">
                 Get Started
               </Link>
             </div>
@@ -30,7 +30,7 @@ export default function PricingPage() {
 
       {/* Hero */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-        <h1 className="text-5xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+        <h1 className="text-5xl md:text-6xl font-bold mb-6 text-gradient-brand">
           Simple, Transparent Pricing
         </h1>
         <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
@@ -156,7 +156,7 @@ export default function PricingPage() {
           </div>
 
           {/* Yearly Plan - Most Popular */}
-          <div className="bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-3xl p-8 shadow-2xl transform scale-105 relative">
+          <div className="bg-gradient-brand text-white rounded-3xl p-8 shadow-2xl transform scale-105 relative">
             <div className="absolute -top-4 left-1/2 -translate-x-1/2">
               <span className="inline-block px-4 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full text-sm font-bold shadow-lg">
                 MOST POPULAR
@@ -208,7 +208,7 @@ export default function PricingPage() {
         <div className="max-w-3xl mx-auto mt-12">
           <div className="bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-600 text-white rounded-3xl p-8 shadow-2xl relative">
             <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-              <span className="inline-block px-4 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-sm font-bold shadow-lg">
+              <span className="inline-block px-4 py-1 bg-gradient-brand text-white rounded-full text-sm font-bold shadow-lg">
                 BEST DEAL
               </span>
             </div>
@@ -332,7 +332,7 @@ export default function PricingPage() {
       </section>
 
       {/* CTA */}
-      <section className="bg-gradient-to-r from-purple-600 to-pink-600 text-white py-20">
+      <section className="bg-gradient-brand text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl font-bold mb-6">Ready to Start Your Journey?</h2>
           <p className="text-xl text-purple-100 mb-10">Join the community of tarantula keepers today</p>

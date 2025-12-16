@@ -284,7 +284,7 @@ export default function DashboardPage() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => router.push('/pricing')}
-                      className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition font-semibold text-sm"
+                      className="px-4 py-2 bg-gradient-brand text-white rounded-lg hover:brightness-90 transition font-semibold text-sm"
                     >
                       View Premium Plans
                     </button>
