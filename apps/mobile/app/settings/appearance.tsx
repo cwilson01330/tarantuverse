@@ -47,7 +47,7 @@ export default function AppearanceSettings() {
 
   const loadData = async () => {
     try {
-      const storedToken = await AsyncStorage.getItem('token');
+      const storedToken = await AsyncStorage.getItem('auth_token');
       if (!storedToken) {
         router.replace('/login');
         return;
