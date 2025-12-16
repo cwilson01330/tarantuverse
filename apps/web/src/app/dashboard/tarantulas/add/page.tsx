@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
@@ -15,7 +15,7 @@ interface SelectedSpecies {
   image_url?: string
 }
 
-export default function AddTarantulaPage() {
+function AddTarantulaContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, token, isAuthenticated, isLoading } = useAuth()
@@ -480,5 +480,19 @@ export default function AddTarantulaPage() {
         </form>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function AddTarantulaPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </DashboardLayout>
+    }>
+      <AddTarantulaContent />
+    </Suspense>
   )
 }
