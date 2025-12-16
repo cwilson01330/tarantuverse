@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
@@ -12,7 +12,7 @@ interface ReferrerInfo {
   message?: string;
 }
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [formData, setFormData] = useState({
@@ -264,5 +264,30 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+function RegisterLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-24">
+      <div className="w-full max-w-md text-center">
+        <div className="animate-pulse">
+          <div className="h-10 bg-gray-200 rounded w-3/4 mx-auto mb-8"></div>
+          <div className="space-y-4">
+            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<RegisterLoading />}>
+      <RegisterForm />
+    </Suspense>
   )
 }
