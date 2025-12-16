@@ -548,7 +548,7 @@ export default function AddEnclosureScreen() {
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={['#0066ff', '#ff0099']}
+            colors={[colors.primary, colors.secondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.submitGradient}
