@@ -107,6 +107,7 @@ export const getSubscriptionProducts = async (): Promise<any[]> => {
 
 /**
  * Purchase a subscription
+ * NOTE: Uses setPurchaseListener callback pattern - purchaseItemAsync returns void
  */
 export const purchaseSubscription = async (
   productId: string
@@ -115,66 +116,43 @@ export const purchaseSubscription = async (
   if (!iap) {
     throw new Error('In-app purchases not available in Expo Go. Please use a development build.');
   }
-  try {
+
+  return new Promise((resolve, reject) => {
     console.log('[IAP] Requesting subscription purchase:', productId);
 
-    let result;
-    try {
-      result = await iap.purchaseItemAsync(productId);
-      console.log('[IAP] Purchase result type:', typeof result);
-      console.log('[IAP] Purchase result:', JSON.stringify(result, null, 2));
-    } catch (purchaseError: any) {
-      console.error('[IAP] purchaseItemAsync threw error:', purchaseError);
-      console.error('[IAP] Error code:', purchaseError.code);
-      console.error('[IAP] Error message:', purchaseError.message);
+    // Set up purchase listener BEFORE calling purchaseItemAsync
+    const listener = iap.setPurchaseListener(({ responseCode, results, errorCode }) => {
+      console.log('[IAP] Purchase listener triggered');
+      console.log('[IAP] Response code:', responseCode);
+      console.log('[IAP] Error code:', errorCode);
+      console.log('[IAP] Results:', JSON.stringify(results, null, 2));
 
-      // Check if it's a user cancellation
-      if (purchaseError.code === 'E_USER_CANCELLED' ||
-          purchaseError.message?.includes('cancel') ||
-          purchaseError.message?.includes('Cancel')) {
+      // Clean up listener
+      listener.remove();
+
+      // Handle response
+      if (responseCode === iap.IAPResponseCode.OK) {
+        console.log('[IAP] Purchase successful');
+        resolve({ responseCode, results, errorCode });
+      } else if (responseCode === iap.IAPResponseCode.USER_CANCELED) {
         console.log('[IAP] User cancelled purchase');
-        return null;
+        resolve(null);
+      } else if (responseCode === iap.IAPResponseCode.DEFERRED) {
+        console.log('[IAP] Purchase deferred (pending approval)');
+        resolve(null);
+      } else {
+        console.error('[IAP] Purchase failed with code:', responseCode);
+        reject(new Error(`Purchase failed with code: ${responseCode}, error: ${errorCode}`));
       }
-
-      // Re-throw other errors
-      throw purchaseError;
-    }
-
-    // Handle undefined result
-    if (!result) {
-      console.error('[IAP] Purchase result is undefined after successful call');
-      throw new Error('Purchase completed but no result returned');
-    }
-
-    // Check if purchase was successful
-    if (result.responseCode === iap.IAPResponseCode.OK && result.results) {
-      console.log('[IAP] Purchase successful with OK response code');
-      return result;
-    }
-
-    // User cancelled or error
-    if (result.responseCode === iap.IAPResponseCode.USER_CANCELED) {
-      console.log('[IAP] User cancelled purchase (responseCode)');
-      return null;
-    }
-
-    // If responseCode is undefined, check if we have results anyway (some platforms)
-    if (result.results && result.results.length > 0) {
-      console.log('[IAP] Purchase succeeded (no responseCode but has results)');
-      return result;
-    }
-
-    console.error('[IAP] Purchase failed - no valid response');
-    throw new Error(`Purchase failed with code: ${result.responseCode || 'UNKNOWN'}`);
-  } catch (error: any) {
-    console.error('[IAP] Purchase failed (outer catch):', error);
-    console.error('[IAP] Error details:', {
-      message: error.message,
-      code: error.code,
-      name: error.name,
     });
-    throw error;
-  }
+
+    // Now initiate the purchase (returns void)
+    iap.purchaseItemAsync(productId).catch((error) => {
+      console.error('[IAP] purchaseItemAsync error:', error);
+      listener.remove();
+      reject(error);
+    });
+  });
 };
 
 /**
