@@ -118,40 +118,78 @@ export const purchaseSubscription = async (
   }
 
   return new Promise((resolve, reject) => {
-    console.log('[IAP] Requesting subscription purchase:', productId);
+    console.log('[IAP] ===== PURCHASE STARTING =====');
+    console.log('[IAP] Product ID:', productId);
+    console.log('[IAP] Timestamp:', new Date().toISOString());
+
+    let timeoutId: NodeJS.Timeout;
+    let listenerRemoved = false;
 
     // Set up purchase listener BEFORE calling purchaseItemAsync
     const listener = iap.setPurchaseListener(({ responseCode, results, errorCode }) => {
-      console.log('[IAP] Purchase listener triggered');
+      console.log('[IAP] ===== LISTENER TRIGGERED =====');
       console.log('[IAP] Response code:', responseCode);
+      console.log('[IAP] Response code type:', typeof responseCode);
       console.log('[IAP] Error code:', errorCode);
+      console.log('[IAP] Results count:', results?.length || 0);
       console.log('[IAP] Results:', JSON.stringify(results, null, 2));
+      console.log('[IAP] IAPResponseCode.OK:', iap.IAPResponseCode.OK);
+      console.log('[IAP] IAPResponseCode.USER_CANCELED:', iap.IAPResponseCode.USER_CANCELED);
 
-      // Clean up listener
-      listener.remove();
+      // Clean up
+      clearTimeout(timeoutId);
+      if (!listenerRemoved) {
+        listener.remove();
+        listenerRemoved = true;
+      }
 
       // Handle response
       if (responseCode === iap.IAPResponseCode.OK) {
-        console.log('[IAP] Purchase successful');
+        console.log('[IAP] ✅ Purchase successful');
         resolve({ responseCode, results, errorCode });
       } else if (responseCode === iap.IAPResponseCode.USER_CANCELED) {
-        console.log('[IAP] User cancelled purchase');
+        console.log('[IAP] ❌ User cancelled purchase');
         resolve(null);
       } else if (responseCode === iap.IAPResponseCode.DEFERRED) {
-        console.log('[IAP] Purchase deferred (pending approval)');
+        console.log('[IAP] ⏳ Purchase deferred (pending approval)');
         resolve(null);
       } else {
-        console.error('[IAP] Purchase failed with code:', responseCode);
+        console.error('[IAP] ❌ Purchase failed with code:', responseCode);
         reject(new Error(`Purchase failed with code: ${responseCode}, error: ${errorCode}`));
       }
     });
 
+    console.log('[IAP] Listener set up, calling purchaseItemAsync...');
+
+    // Set a timeout in case listener never fires
+    timeoutId = setTimeout(() => {
+      console.error('[IAP] ⏰ TIMEOUT - Listener never fired after 60 seconds');
+      if (!listenerRemoved) {
+        listener.remove();
+        listenerRemoved = true;
+      }
+      reject(new Error('Purchase timeout - listener never received response'));
+    }, 60000); // 60 second timeout
+
     // Now initiate the purchase (returns void)
-    iap.purchaseItemAsync(productId).catch((error) => {
-      console.error('[IAP] purchaseItemAsync error:', error);
-      listener.remove();
-      reject(error);
-    });
+    iap.purchaseItemAsync(productId)
+      .then(() => {
+        console.log('[IAP] purchaseItemAsync completed (void return)');
+      })
+      .catch((error) => {
+        console.error('[IAP] ❌ purchaseItemAsync error:', error);
+        console.error('[IAP] Error type:', typeof error);
+        console.error('[IAP] Error message:', error.message);
+        console.error('[IAP] Error code:', error.code);
+        clearTimeout(timeoutId);
+        if (!listenerRemoved) {
+          listener.remove();
+          listenerRemoved = true;
+        }
+        reject(error);
+      });
+
+    console.log('[IAP] purchaseItemAsync called, waiting for listener...');
   });
 };
 
