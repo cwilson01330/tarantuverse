@@ -31,7 +31,7 @@ const getIAP = async () => {
 // Product IDs (must match App Store Connect)
 export const SUBSCRIPTION_SKUS = Platform.select({
   ios: [
-    'com.tarantuverse.premium.monthly', // Monthly subscription
+    'com.tarantuverse.premium.monthly.v2', // Monthly subscription
     // Add these after approval:
     // 'com.tarantuverse.premium.yearly',
   ],

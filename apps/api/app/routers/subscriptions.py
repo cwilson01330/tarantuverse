@@ -204,6 +204,7 @@ def validate_receipt(
     # Map product IDs to subscription plans
     product_to_plan_map = {
         "com.tarantuverse.premium.monthly": "monthly",
+        "com.tarantuverse.premium.monthly.v2": "monthly",  # New iOS product ID
         "com.tarantuverse.premium.yearly": "yearly",
         "com.tarantuverse.lifetime": "lifetime"
     }

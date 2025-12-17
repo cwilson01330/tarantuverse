@@ -86,3 +86,14 @@ class ReceiptValidationResponse(BaseModel):
     success: bool
     message: str
     subscription: Optional[UserSubscriptionWithPlan] = None
+
+
+# Restore request: client wants to restore/migrate an existing store receipt
+class ReceiptRestoreRequest(BaseModel):
+    platform: str  # 'ios' or 'android'
+    receipt: str  # base64 receipt data
+
+class ReceiptRestoreResponse(BaseModel):
+    success: bool
+    message: str
+    subscription: Optional[UserSubscriptionWithPlan] = None
