@@ -118,23 +118,43 @@ export const purchaseSubscription = async (
   try {
     console.log('[IAP] Requesting subscription purchase:', productId);
 
-    const result = await iap.purchaseItemAsync(productId);
+    let result;
+    try {
+      result = await iap.purchaseItemAsync(productId);
+      console.log('[IAP] Purchase result type:', typeof result);
+      console.log('[IAP] Purchase result:', JSON.stringify(result, null, 2));
+    } catch (purchaseError: any) {
+      console.error('[IAP] purchaseItemAsync threw error:', purchaseError);
+      console.error('[IAP] Error code:', purchaseError.code);
+      console.error('[IAP] Error message:', purchaseError.message);
 
-    console.log('[IAP] Purchase result:', JSON.stringify(result, null, 2));
+      // Check if it's a user cancellation
+      if (purchaseError.code === 'E_USER_CANCELLED' ||
+          purchaseError.message?.includes('cancel') ||
+          purchaseError.message?.includes('Cancel')) {
+        console.log('[IAP] User cancelled purchase');
+        return null;
+      }
+
+      // Re-throw other errors
+      throw purchaseError;
+    }
 
     // Handle undefined result
     if (!result) {
-      throw new Error('Purchase result is undefined');
+      console.error('[IAP] Purchase result is undefined after successful call');
+      throw new Error('Purchase completed but no result returned');
     }
 
     // Check if purchase was successful
     if (result.responseCode === iap.IAPResponseCode.OK && result.results) {
+      console.log('[IAP] Purchase successful with OK response code');
       return result;
     }
 
     // User cancelled or error
     if (result.responseCode === iap.IAPResponseCode.USER_CANCELED) {
-      console.log('[IAP] User cancelled purchase');
+      console.log('[IAP] User cancelled purchase (responseCode)');
       return null;
     }
 
@@ -144,9 +164,15 @@ export const purchaseSubscription = async (
       return result;
     }
 
+    console.error('[IAP] Purchase failed - no valid response');
     throw new Error(`Purchase failed with code: ${result.responseCode || 'UNKNOWN'}`);
-  } catch (error) {
-    console.error('[IAP] Purchase failed:', error);
+  } catch (error: any) {
+    console.error('[IAP] Purchase failed (outer catch):', error);
+    console.error('[IAP] Error details:', {
+      message: error.message,
+      code: error.code,
+      name: error.name,
+    });
     throw error;
   }
 };
