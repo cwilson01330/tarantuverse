@@ -120,7 +120,12 @@ export const purchaseSubscription = async (
 
     const result = await iap.purchaseItemAsync(productId);
 
-    console.log('[IAP] Purchase result:', result);
+    console.log('[IAP] Purchase result:', JSON.stringify(result, null, 2));
+
+    // Handle undefined result
+    if (!result) {
+      throw new Error('Purchase result is undefined');
+    }
 
     // Check if purchase was successful
     if (result.responseCode === iap.IAPResponseCode.OK && result.results) {
@@ -133,7 +138,13 @@ export const purchaseSubscription = async (
       return null;
     }
 
-    throw new Error(`Purchase failed with code: ${result.responseCode}`);
+    // If responseCode is undefined, check if we have results anyway (some platforms)
+    if (result.results && result.results.length > 0) {
+      console.log('[IAP] Purchase succeeded (no responseCode but has results)');
+      return result;
+    }
+
+    throw new Error(`Purchase failed with code: ${result.responseCode || 'UNKNOWN'}`);
   } catch (error) {
     console.error('[IAP] Purchase failed:', error);
     throw error;
