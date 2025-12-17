@@ -46,6 +46,7 @@ export default function SubscriptionScreen() {
   const [restoring, setRestoring] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [iapAvailable, setIapAvailable] = useState(false);
+  const [productsLoaded, setProductsLoaded] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
   const [revoking, setRevoking] = useState(false);
@@ -100,10 +101,11 @@ export default function SubscriptionScreen() {
       await initializeIAP();
       const availableProducts = await getSubscriptionProducts();
       setProducts(availableProducts);
+      setProductsLoaded(true);
       return availableProducts;
     } catch (error: any) {
       console.error('Failed to load IAP products:', error);
-      // Don't show alert - IAP might not be available in Expo Go
+      setProductsLoaded(true); // Mark as loaded even on error
       return [];
     }
   };
@@ -666,10 +668,22 @@ export default function SubscriptionScreen() {
                     </TouchableOpacity>
                   </View>
                 ))
+              ) : productsLoaded ? (
+                <View style={styles.productCard}>
+                  <Text style={styles.noProductsText}>
+                    Subscriptions coming soon!
+                  </Text>
+                  <Text style={styles.noProductsText}>
+                    Use a promo code below to unlock premium features.
+                  </Text>
+                </View>
               ) : (
-                <Text style={styles.noProductsText}>
-                  Subscription options loading...
-                </Text>
+                <View style={styles.productCard}>
+                  <ActivityIndicator color="white" style={{ marginBottom: 8 }} />
+                  <Text style={styles.noProductsText}>
+                    Loading subscription options...
+                  </Text>
+                </View>
               )}
 
               {/* Restore Purchases Button */}

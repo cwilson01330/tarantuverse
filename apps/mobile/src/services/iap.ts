@@ -1,10 +1,18 @@
 import { Platform } from 'react-native';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
 
 // Check if we're running in Expo Go (where native modules aren't available)
-const isExpoGo = Constants.appOwnership === 'expo';
+// executionEnvironment is more reliable than appOwnership in newer Expo SDKs
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+                 Constants.appOwnership === 'expo';
+
+console.log('[IAP] Environment check:', {
+  executionEnvironment: Constants.executionEnvironment,
+  appOwnership: Constants.appOwnership,
+  isExpoGo,
+});
 
 // Lazy load InAppPurchases only when not in Expo Go
 let InAppPurchases: typeof import('expo-in-app-purchases') | null = null;
