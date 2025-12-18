@@ -191,12 +191,14 @@ export const purchaseSubscription = async (
       originalRejecter(error);
     };
 
-    // Initiate purchase
+    // Initiate purchase (expo-iap v2.7.0+ unified API)
     console.log('[IAP] Calling requestPurchase...');
     iap.requestPurchase({
-      request: Platform.OS === 'ios'
-        ? { sku: productId }
-        : { skus: [productId] },
+      request: {
+        apple: { sku: productId },
+        google: { skus: [productId] },
+      },
+      type: 'subs', // subscription purchase
     })
       .then((result) => {
         console.log('[IAP] requestPurchase returned:', result);
