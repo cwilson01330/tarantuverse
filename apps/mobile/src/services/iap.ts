@@ -50,8 +50,12 @@ export const LIFETIME_SKU = Platform.select({
 // Export whether IAP is available (for UI to show/hide purchase options)
 export const isIAPAvailable = () => !isExpoGo;
 
+// Global purchase handler - will be set when a purchase is in progress
+let pendingPurchaseResolver: ((result: any) => void) | null = null;
+let pendingPurchaseRejecter: ((error: Error) => void) | null = null;
+
 /**
- * Initialize IAP connection
+ * Initialize IAP connection and set up global purchase listener
  * Must be called before any other IAP operations
  */
 export const initializeIAP = async (): Promise<void> => {
@@ -64,6 +68,43 @@ export const initializeIAP = async (): Promise<void> => {
     console.log('[IAP] Initializing connection...');
     await iap.connectAsync();
     console.log('[IAP] Connection initialized successfully');
+
+    // Set up GLOBAL purchase listener once during initialization
+    console.log('[IAP] Setting up global purchase listener...');
+    iap.setPurchaseListener(({ responseCode, results, errorCode }) => {
+      console.log('[IAP] ===== PURCHASE LISTENER TRIGGERED =====');
+      console.log('[IAP] Response code:', responseCode);
+      console.log('[IAP] Error code:', errorCode);
+      console.log('[IAP] Results:', JSON.stringify(results, null, 2));
+
+      if (!pendingPurchaseResolver) {
+        console.log('[IAP] No pending purchase to resolve');
+        return;
+      }
+
+      // Handle response
+      if (responseCode === iap.IAPResponseCode.OK) {
+        console.log('[IAP] ✅ Purchase successful');
+        pendingPurchaseResolver({ responseCode, results, errorCode });
+      } else if (responseCode === iap.IAPResponseCode.USER_CANCELED) {
+        console.log('[IAP] ❌ User cancelled purchase');
+        pendingPurchaseResolver(null);
+      } else if (responseCode === iap.IAPResponseCode.DEFERRED) {
+        console.log('[IAP] ⏳ Purchase deferred');
+        pendingPurchaseResolver(null);
+      } else {
+        console.error('[IAP] ❌ Purchase failed with code:', responseCode);
+        if (pendingPurchaseRejecter) {
+          pendingPurchaseRejecter(new Error(`Purchase failed: ${responseCode}, error: ${errorCode}`));
+        }
+      }
+
+      // Clear pending handlers
+      pendingPurchaseResolver = null;
+      pendingPurchaseRejecter = null;
+    });
+    console.log('[IAP] Global purchase listener set up');
+
   } catch (error) {
     console.error('[IAP] Failed to initialize:', error);
     throw error;
@@ -107,7 +148,7 @@ export const getSubscriptionProducts = async (): Promise<any[]> => {
 
 /**
  * Purchase a subscription
- * NOTE: Uses setPurchaseListener callback pattern - purchaseItemAsync returns void
+ * Uses global purchase listener set up in initializeIAP
  */
 export const purchaseSubscription = async (
   productId: string
@@ -117,79 +158,48 @@ export const purchaseSubscription = async (
     throw new Error('In-app purchases not available in Expo Go. Please use a development build.');
   }
 
+  console.log('[IAP] ===== PURCHASE STARTING =====');
+  console.log('[IAP] Product ID:', productId);
+
   return new Promise((resolve, reject) => {
-    console.log('[IAP] ===== PURCHASE STARTING =====');
-    console.log('[IAP] Product ID:', productId);
-    console.log('[IAP] Timestamp:', new Date().toISOString());
-
-    let timeoutId: NodeJS.Timeout;
-    let listenerRemoved = false;
-
-    // Set up purchase listener BEFORE calling purchaseItemAsync
-    const listener = iap.setPurchaseListener(({ responseCode, results, errorCode }) => {
-      console.log('[IAP] ===== LISTENER TRIGGERED =====');
-      console.log('[IAP] Response code:', responseCode);
-      console.log('[IAP] Response code type:', typeof responseCode);
-      console.log('[IAP] Error code:', errorCode);
-      console.log('[IAP] Results count:', results?.length || 0);
-      console.log('[IAP] Results:', JSON.stringify(results, null, 2));
-      console.log('[IAP] IAPResponseCode.OK:', iap.IAPResponseCode.OK);
-      console.log('[IAP] IAPResponseCode.USER_CANCELED:', iap.IAPResponseCode.USER_CANCELED);
-
-      // Clean up
-      clearTimeout(timeoutId);
-      if (!listenerRemoved) {
-        listener.remove();
-        listenerRemoved = true;
-      }
-
-      // Handle response
-      if (responseCode === iap.IAPResponseCode.OK) {
-        console.log('[IAP] ✅ Purchase successful');
-        resolve({ responseCode, results, errorCode });
-      } else if (responseCode === iap.IAPResponseCode.USER_CANCELED) {
-        console.log('[IAP] ❌ User cancelled purchase');
-        resolve(null);
-      } else if (responseCode === iap.IAPResponseCode.DEFERRED) {
-        console.log('[IAP] ⏳ Purchase deferred (pending approval)');
-        resolve(null);
-      } else {
-        console.error('[IAP] ❌ Purchase failed with code:', responseCode);
-        reject(new Error(`Purchase failed with code: ${responseCode}, error: ${errorCode}`));
-      }
-    });
-
-    console.log('[IAP] Listener set up, calling purchaseItemAsync...');
+    // Set up the pending handlers that the global listener will use
+    pendingPurchaseResolver = resolve;
+    pendingPurchaseRejecter = reject;
 
     // Set a timeout in case listener never fires
-    timeoutId = setTimeout(() => {
-      console.error('[IAP] ⏰ TIMEOUT - Listener never fired after 60 seconds');
-      if (!listenerRemoved) {
-        listener.remove();
-        listenerRemoved = true;
-      }
-      reject(new Error('Purchase timeout - listener never received response'));
-    }, 60000); // 60 second timeout
+    const timeoutId = setTimeout(() => {
+      console.error('[IAP] ⏰ TIMEOUT - No response after 120 seconds');
+      pendingPurchaseResolver = null;
+      pendingPurchaseRejecter = null;
+      reject(new Error('Purchase timeout - no response received'));
+    }, 120000); // 2 minute timeout
 
-    // Now initiate the purchase (returns void)
+    // Wrap resolver to clear timeout
+    const originalResolver = pendingPurchaseResolver;
+    pendingPurchaseResolver = (result) => {
+      clearTimeout(timeoutId);
+      originalResolver(result);
+    };
+
+    const originalRejecter = pendingPurchaseRejecter;
+    pendingPurchaseRejecter = (error) => {
+      clearTimeout(timeoutId);
+      originalRejecter(error);
+    };
+
+    // Initiate the purchase (returns void, result comes via global listener)
+    console.log('[IAP] Calling purchaseItemAsync...');
     iap.purchaseItemAsync(productId)
       .then(() => {
-        console.log('[IAP] purchaseItemAsync completed (void return)');
+        console.log('[IAP] purchaseItemAsync promise resolved (waiting for listener)');
       })
       .catch((error) => {
         console.error('[IAP] ❌ purchaseItemAsync error:', error);
-        console.error('[IAP] Error type:', typeof error);
-        console.error('[IAP] Error message:', error.message);
-        console.error('[IAP] Error code:', error.code);
         clearTimeout(timeoutId);
-        if (!listenerRemoved) {
-          listener.remove();
-          listenerRemoved = true;
-        }
+        pendingPurchaseResolver = null;
+        pendingPurchaseRejecter = null;
         reject(error);
       });
-
-    console.log('[IAP] purchaseItemAsync called, waiting for listener...');
   });
 };
 
