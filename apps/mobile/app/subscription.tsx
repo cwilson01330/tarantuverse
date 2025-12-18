@@ -658,7 +658,7 @@ export default function SubscriptionScreen() {
                 </View>
               ) : products.length > 0 ? (
                 products.map((product) => (
-                  <View key={product.productId} style={styles.productCard}>
+                  <View key={product.id} style={styles.productCard}>
                     <View style={styles.productHeader}>
                       <View>
                         <Text style={styles.productName}>Premium Monthly</Text>
@@ -668,7 +668,7 @@ export default function SubscriptionScreen() {
                     </View>
                     <TouchableOpacity
                       style={[styles.purchaseButton, purchasing && styles.purchaseButtonDisabled]}
-                      onPress={() => handlePurchase(product.productId)}
+                      onPress={() => handlePurchase(product.id)}
                       disabled={purchasing || restoring}
                     >
                       {purchasing ? (
