@@ -124,17 +124,22 @@ export default function SubscriptionScreen() {
     setPurchasing(true);
 
     try {
-      const result = await purchaseSubscription(productId);
+      const purchase = await purchaseSubscription(productId);
 
-      if (!result) {
+      if (!purchase) {
         // User cancelled
         setPurchasing(false);
         return;
       }
 
-      // Validate with backend
-      if (result.results && result.results.length > 0) {
-        await validateReceiptWithBackend(result.results[0], token);
+      console.log('[Subscription] Purchase result:', purchase);
+
+      // Validate with backend - expo-iap returns the purchase object directly
+      // Handle both array (Android) and single object (iOS) formats
+      const purchaseToValidate = Array.isArray(purchase) ? purchase[0] : purchase;
+
+      if (purchaseToValidate) {
+        await validateReceiptWithBackend(purchaseToValidate, token);
       } else {
         throw new Error('No purchase data received');
       }
@@ -237,7 +242,8 @@ export default function SubscriptionScreen() {
   };
 
   const formatPrice = (product: any) => {
-    return product.price || 'N/A';
+    // expo-iap uses localizedPrice or price
+    return product.localizedPrice || product.price || 'N/A';
   };
 
   const styles = StyleSheet.create({
