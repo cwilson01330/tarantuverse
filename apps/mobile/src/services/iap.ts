@@ -133,11 +133,17 @@ export const getSubscriptionProducts = async (): Promise<any[]> => {
   }
 
   try {
-    console.log('[IAP] Fetching products:', SUBSCRIPTION_SKUS);
+    console.log('[IAP] Fetching subscription products:', SUBSCRIPTION_SKUS);
+    // Must use type: 'subs' for subscription products (not 'in-app')
     const products = await iap.fetchProducts({
       skus: SUBSCRIPTION_SKUS,
+      type: 'subs',
     });
-    console.log('[IAP] Products fetched:', products);
+    console.log('[IAP] Subscription products fetched:', products);
+    console.log('[IAP] Product count:', products?.length || 0);
+    if (products && products.length > 0) {
+      console.log('[IAP] First product details:', JSON.stringify(products[0], null, 2));
+    }
     return products || [];
   } catch (error) {
     console.error('[IAP] Failed to fetch products:', error);
