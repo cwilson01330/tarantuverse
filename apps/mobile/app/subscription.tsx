@@ -55,10 +55,8 @@ export default function SubscriptionScreen() {
     setIapAvailable(isIAPAvailable());
     loadData();
 
-    return () => {
-      // Cleanup IAP connection when component unmounts
-      endIAP().catch(console.error);
-    };
+    // Don't disconnect IAP on unmount - it breaks pending purchases
+    // The connection is managed globally
   }, []);
 
   const loadData = async () => {
@@ -98,13 +96,20 @@ export default function SubscriptionScreen() {
 
   const loadProducts = async () => {
     try {
+      console.log('[Subscription] Initializing IAP...');
       await initializeIAP();
+      console.log('[Subscription] IAP initialized, fetching products...');
       const availableProducts = await getSubscriptionProducts();
+      console.log('[Subscription] Products received:', availableProducts);
+      console.log('[Subscription] Product count:', availableProducts?.length || 0);
+      if (availableProducts?.length > 0) {
+        console.log('[Subscription] First product:', JSON.stringify(availableProducts[0], null, 2));
+      }
       setProducts(availableProducts);
       setProductsLoaded(true);
       return availableProducts;
     } catch (error: any) {
-      console.error('Failed to load IAP products:', error);
+      console.error('[Subscription] Failed to load IAP products:', error);
       setProductsLoaded(true); // Mark as loaded even on error
       return [];
     }
