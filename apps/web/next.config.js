@@ -18,6 +18,17 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
+  async redirects() {
+    return [
+      // Redirect non-www to www for consistent cookies/OAuth
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'tarantuverse.com' }],
+        destination: 'https://www.tarantuverse.com/:path*',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 module.exports = nextConfig
