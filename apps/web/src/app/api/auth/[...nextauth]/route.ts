@@ -207,6 +207,19 @@ const authOptions: AuthOptions = {
       session.user.is_admin = token.is_admin as boolean
       session.user.is_superuser = token.is_superuser as boolean
       return session
+    },
+
+    async redirect({ url, baseUrl }) {
+      // Handle relative URLs
+      if (url.startsWith("/")) {
+        return `${baseUrl}${url}`
+      }
+      // Handle URLs from same origin
+      if (url.startsWith(baseUrl)) {
+        return url
+      }
+      // Default to dashboard for OAuth callbacks
+      return `${baseUrl}/dashboard`
     }
   },
   
