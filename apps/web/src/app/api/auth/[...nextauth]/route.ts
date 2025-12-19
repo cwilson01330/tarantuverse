@@ -3,8 +3,47 @@ import GoogleProvider from "next-auth/providers/google"
 import AppleProvider from "next-auth/providers/apple"
 import CredentialsProvider from "next-auth/providers/credentials"
 import axios from "axios"
+import jwt from "jsonwebtoken"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+// Generate Apple client secret dynamically
+// This creates a fresh JWT on each server start, avoiding expiration issues
+function generateAppleClientSecret(): string | undefined {
+  const teamId = process.env.APPLE_TEAM_ID
+  const keyId = process.env.APPLE_KEY_ID
+  const privateKey = process.env.APPLE_PRIVATE_KEY
+  const clientId = process.env.APPLE_CLIENT_ID
+
+  // If we have all components, generate the JWT dynamically
+  if (teamId && keyId && privateKey && clientId) {
+    try {
+      const now = Math.floor(Date.now() / 1000)
+      const secret = jwt.sign(
+        {
+          iss: teamId,
+          iat: now,
+          exp: now + 86400 * 180, // 180 days (max allowed by Apple)
+          aud: "https://appleid.apple.com",
+          sub: clientId,
+        },
+        privateKey.replace(/\\n/g, "\n"), // Handle escaped newlines from env
+        {
+          algorithm: "ES256",
+          keyid: keyId,
+        }
+      )
+      console.log("[Apple] Generated client secret dynamically")
+      return secret
+    } catch (error) {
+      console.error("[Apple] Failed to generate client secret:", error)
+      return undefined
+    }
+  }
+
+  // Fall back to pre-generated secret if provided
+  return process.env.APPLE_CLIENT_SECRET
+}
 
 const authOptions: AuthOptions = {
   providers: [
@@ -26,18 +65,25 @@ const authOptions: AuthOptions = {
       : []),
 
     // Apple OAuth (only if credentials are configured)
-    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET
-      ? [
+    // Supports both dynamic JWT generation (preferred) and pre-generated secret
+    ...(() => {
+      const clientId = process.env.APPLE_CLIENT_ID
+      const clientSecret = generateAppleClientSecret()
+
+      if (clientId && clientSecret) {
+        return [
           AppleProvider({
-            clientId: process.env.APPLE_CLIENT_ID,
-            clientSecret: process.env.APPLE_CLIENT_SECRET,
+            clientId,
+            clientSecret,
             // Apple uses form POST callback which breaks cookie-based checks
             // Disable all checks - security is maintained via HTTPS-only callback
             // and the id_token validation that Apple performs
             checks: [],
           })
         ]
-      : []),
+      }
+      return []
+    })(),
 
     // Email/Password (existing auth)
     CredentialsProvider({

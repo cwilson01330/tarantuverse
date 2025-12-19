@@ -63,7 +63,14 @@
       "Bash(echo \"=== $file ===\")",
       "Bash(fi)",
       "Bash(done)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add apps/mobile/src/services/iap.ts)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"$(cat <<''EOF''\nfix: Use ''subs'' type parameter for subscription product fetching\n\nexpo-iap''s fetchProducts defaults to ''in-app'' purchases. Must specify\ntype: ''subs'' to fetch subscription products from App Store Connect.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add apps/api/app/routers/subscriptions.py)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"$\\(cat <<''EOF''\nfix: Map IAP products to ''premium'' plan instead of ''monthly''\n\nThe seed script creates ''free'' and ''premium'' plans, but receipt\nvalidation was looking for ''monthly''. All IAP products now map to\nthe ''premium'' plan, with billing_period used for expiry calculation.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add apps/web/src/components/FeedingStatsCard.tsx)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"fix: Remove unused percentage param from Pie chart label\")",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" push)"
     ],
     "deny": [],
     "ask": []
