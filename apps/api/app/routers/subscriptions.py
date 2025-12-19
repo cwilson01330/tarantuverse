@@ -202,14 +202,24 @@ def validate_receipt(
     Production TODO: Validate with Apple/Google servers
     """
     # Map product IDs to subscription plans
+    # All premium products map to the "premium" plan (monthly/yearly/lifetime are billing periods)
     product_to_plan_map = {
+        "com.tarantuverse.premium.monthly": "premium",
+        "com.tarantuverse.premium.monthly.v2": "premium",  # New iOS product ID
+        "com.tarantuverse.premium.yearly": "premium",
+        "com.tarantuverse.lifetime": "premium"
+    }
+
+    # Determine billing period for expiry calculation
+    product_to_period_map = {
         "com.tarantuverse.premium.monthly": "monthly",
-        "com.tarantuverse.premium.monthly.v2": "monthly",  # New iOS product ID
+        "com.tarantuverse.premium.monthly.v2": "monthly",
         "com.tarantuverse.premium.yearly": "yearly",
         "com.tarantuverse.lifetime": "lifetime"
     }
 
     plan_name = product_to_plan_map.get(receipt_data.product_id)
+    billing_period = product_to_period_map.get(receipt_data.product_id, "monthly")
 
     if not plan_name:
         raise HTTPException(
@@ -242,11 +252,11 @@ def validate_receipt(
         existing.cancelled_at = datetime.utcnow()
 
     # Create new subscription
-    # Set expiry based on plan type
+    # Set expiry based on billing period
     expires_at = None
-    if plan_name == "monthly":
+    if billing_period == "monthly":
         expires_at = datetime.utcnow() + timedelta(days=30)
-    elif plan_name == "yearly":
+    elif billing_period == "yearly":
         expires_at = datetime.utcnow() + timedelta(days=365)
     # Lifetime has no expiry
 
@@ -257,8 +267,8 @@ def validate_receipt(
         expires_at=expires_at,
         payment_provider="apple" if receipt_data.platform == "ios" else "google",
         payment_provider_id=receipt_data.transaction_id,
-        subscription_source=plan_name,
-        auto_renew=True if plan_name in ["monthly", "yearly"] else False
+        subscription_source=billing_period,
+        auto_renew=True if billing_period in ["monthly", "yearly"] else False
     )
 
     db.add(new_subscription)
