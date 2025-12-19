@@ -31,6 +31,9 @@ const authOptions: AuthOptions = {
           AppleProvider({
             clientId: process.env.APPLE_CLIENT_ID,
             clientSecret: process.env.APPLE_CLIENT_SECRET,
+            // Disable PKCE - Apple OAuth doesn't require it and NextAuth's PKCE
+            // cookie handling has issues with domain/SameSite configurations
+            checks: ["state"],
           })
         ]
       : []),
