@@ -209,25 +209,31 @@ const authOptions: AuthOptions = {
     },
 
     async redirect({ url, baseUrl }) {
+      console.log("[Redirect] url:", url, "baseUrl:", baseUrl)
+
       // Always redirect to dashboard after successful sign in
       // This handles Apple OAuth which loses callbackUrl due to cross-origin POST
 
-      // If url is just "/" or the base URL, go to dashboard
-      if (url === "/" || url === baseUrl || url === `${baseUrl}/`) {
+      // If url is just "/" or the base URL or empty, go to dashboard
+      if (!url || url === "/" || url === baseUrl || url === `${baseUrl}/`) {
+        console.log("[Redirect] Going to dashboard (base url detected)")
         return `${baseUrl}/dashboard`
       }
 
       // Handle relative URLs (like "/dashboard")
       if (url.startsWith("/")) {
+        console.log("[Redirect] Relative URL:", `${baseUrl}${url}`)
         return `${baseUrl}${url}`
       }
 
       // Handle URLs from same origin
       if (url.startsWith(baseUrl)) {
+        console.log("[Redirect] Same origin URL:", url)
         return url
       }
 
       // Default to dashboard
+      console.log("[Redirect] Defaulting to dashboard")
       return `${baseUrl}/dashboard`
     }
   },
