@@ -165,6 +165,7 @@ const authOptions: AuthOptions = {
 
           if (response.data.access_token) {
             // Store our backend token
+            console.log("[OAuth] Backend returned access_token, length:", response.data.access_token.length)
             user.accessToken = response.data.access_token
             user.id = response.data.user.id
             user.email = response.data.user.email
@@ -175,6 +176,7 @@ const authOptions: AuthOptions = {
             user.is_superuser = response.data.user.is_superuser || false
             return true
           }
+          console.error("[OAuth] Backend did not return access_token")
           return false
         } catch (error: any) {
           console.error(`${account.provider} OAuth error:`, error)
@@ -189,22 +191,26 @@ const authOptions: AuthOptions = {
     async jwt({ token, user, account }) {
       // Initial sign in
       if (user) {
+        console.log("[JWT] Initial sign in, user.accessToken exists:", !!user.accessToken)
         token.accessToken = user.accessToken
         token.id = user.id
         token.isNewUser = user.isNewUser
         token.is_admin = user.is_admin
         token.is_superuser = user.is_superuser
       }
+      console.log("[JWT] Returning token.accessToken exists:", !!token.accessToken)
       return token
     },
 
     async session({ session, token }) {
       // Add access token and user ID to session
+      console.log("[Session] token.accessToken exists:", !!token.accessToken)
       session.accessToken = token.accessToken as string
       session.user.id = token.id as string
       session.isNewUser = token.isNewUser as boolean
       session.user.is_admin = token.is_admin as boolean
       session.user.is_superuser = token.is_superuser as boolean
+      console.log("[Session] session.accessToken exists:", !!session.accessToken)
       return session
     },
 
