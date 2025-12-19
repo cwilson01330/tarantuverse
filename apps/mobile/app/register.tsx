@@ -371,6 +371,9 @@ export default function RegisterScreen() {
               onChangeText={setPassword}
               secureTextEntry
               editable={!loading}
+              textContentType="newPassword"
+              autoComplete="new-password"
+              autoCorrect={false}
             />
             <TextInput
               style={styles.input}
@@ -380,6 +383,9 @@ export default function RegisterScreen() {
               onChangeText={setConfirmPassword}
               secureTextEntry
               editable={!loading}
+              textContentType="newPassword"
+              autoComplete="new-password"
+              autoCorrect={false}
             />
 
             {/* Referral Code */}

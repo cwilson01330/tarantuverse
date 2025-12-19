@@ -205,6 +205,35 @@ async def verify_all_users(
     }
 
 
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a user and all their data (Admin only)
+    Use with caution - this is irreversible!
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    username = user.username
+    email = user.email
+
+    # Delete the user (CASCADE will handle related records)
+    db.delete(user)
+    db.commit()
+
+    return {
+        "message": f"Successfully deleted user {username} ({email})",
+        "deleted_user_id": user_id
+    }
+
+
 @router.post("/test-email")
 async def test_email_sending(
     test_email: str,
