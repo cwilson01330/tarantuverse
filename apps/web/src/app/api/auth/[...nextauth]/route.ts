@@ -75,10 +75,9 @@ const authOptions: AuthOptions = {
           AppleProvider({
             clientId,
             clientSecret,
-            // Apple uses form POST callback which breaks cookie-based checks
-            // Disable all checks - security is maintained via HTTPS-only callback
-            // and the id_token validation that Apple performs
-            checks: [],
+            // Use nonce check - validates via id_token without requiring cookies
+            // This preserves state (including callbackUrl) while avoiding cookie issues
+            checks: ["nonce"],
           })
         ]
       }
