@@ -500,14 +500,14 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Apple Sign In (iOS only) */}
+            {/* Apple Sign In (iOS only) - Use WHITE_OUTLINE for light mode for better contrast */}
             {Platform.OS === 'ios' && (
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
                 buttonStyle={
                   colors.background === '#000000' || colors.background === '#121212' || colors.background.toLowerCase().startsWith('#1')
                     ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                    : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE
                 }
                 cornerRadius={8}
                 style={styles.appleButton}
