@@ -257,11 +257,11 @@ export default function GrowthChart({ data }: GrowthChartProps) {
                 fontSize: "0.875rem",
                 color: "white",
               }}
-              formatter={(value: any, name: string) => {
-                if (name === "weight") return [`${value.toFixed(1)}g`, "Weight"];
+              formatter={(value, name) => {
+                if (name === "weight") return [`${(value as number).toFixed(1)}g`, "Weight"];
                 if (name === "legSpan")
-                  return [`${value.toFixed(1)} cm`, "Leg Span"];
-                return [value, name];
+                  return [`${(value as number).toFixed(1)} cm`, "Leg Span"];
+                return [value, name || ""];
               }}
             />
             <Legend />
