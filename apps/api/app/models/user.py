@@ -62,24 +62,24 @@ class User(Base):
     # messages = relationship("Message", back_populates="user", lazy="select")  # Legacy message board (deprecated, commented out to avoid circular import)
     # subscriptions = relationship("UserSubscription", back_populates="user", lazy="select")  # Temporarily commented out to fix deployment
 
-    # Breeding relationships
-    pairings = relationship("Pairing", back_populates="user", lazy="select")
-    egg_sacs = relationship("EggSac", back_populates="user", lazy="select")
-    offspring = relationship("Offspring", back_populates="user", lazy="select")
+    # Breeding relationships (passive_deletes=True lets database handle CASCADE)
+    pairings = relationship("Pairing", back_populates="user", lazy="select", passive_deletes=True)
+    egg_sacs = relationship("EggSac", back_populates="user", lazy="select", passive_deletes=True)
+    offspring = relationship("Offspring", back_populates="user", lazy="select", passive_deletes=True)
 
     # Notification preferences
-    notification_preferences = relationship("NotificationPreferences", back_populates="user", uselist=False, lazy="select")
+    notification_preferences = relationship("NotificationPreferences", back_populates="user", uselist=False, lazy="select", passive_deletes=True)
 
     # Theme preferences
-    theme_preferences = relationship("UserThemePreferences", back_populates="user", uselist=False, lazy="select")
+    theme_preferences = relationship("UserThemePreferences", back_populates="user", uselist=False, lazy="select", passive_deletes=True)
 
     # Enclosures
-    enclosures = relationship("Enclosure", back_populates="user", lazy="select")
+    enclosures = relationship("Enclosure", back_populates="user", lazy="select", passive_deletes=True)
 
     # Referral relationships
     referred_by = relationship("User", remote_side=[id], foreign_keys=[referred_by_user_id], lazy="select")
     referrals = relationship("User", foreign_keys="User.referred_by_user_id", lazy="select")
-    referral_rewards = relationship("ReferralReward", back_populates="referrer", lazy="select")
+    referral_rewards = relationship("ReferralReward", back_populates="referrer", lazy="select", passive_deletes=True)
 
     def __repr__(self):
         return f"<User {self.username}>"
