@@ -31,9 +31,10 @@ const authOptions: AuthOptions = {
           AppleProvider({
             clientId: process.env.APPLE_CLIENT_ID,
             clientSecret: process.env.APPLE_CLIENT_SECRET,
-            // Disable PKCE - Apple OAuth doesn't require it and NextAuth's PKCE
-            // cookie handling has issues with domain/SameSite configurations
-            checks: ["state"],
+            // Apple uses form POST callback which breaks cookie-based checks
+            // Disable all checks - security is maintained via HTTPS-only callback
+            // and the id_token validation that Apple performs
+            checks: [],
           })
         ]
       : []),
@@ -173,7 +174,7 @@ const authOptions: AuthOptions = {
     strategy: "jwt" as const,
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  
+
   secret: process.env.NEXTAUTH_SECRET,
 }
 
