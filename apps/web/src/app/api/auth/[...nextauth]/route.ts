@@ -75,9 +75,9 @@ const authOptions: AuthOptions = {
           AppleProvider({
             clientId,
             clientSecret,
-            // Use nonce check - validates via id_token without requiring cookies
-            // This preserves state (including callbackUrl) while avoiding cookie issues
-            checks: ["nonce"],
+            // Apple uses cross-origin form POST callback - no cookie-based checks work
+            // SameSite=Lax cookies aren't sent on cross-origin POST requests
+            checks: [],
           })
         ]
       }
@@ -209,15 +209,25 @@ const authOptions: AuthOptions = {
     },
 
     async redirect({ url, baseUrl }) {
-      // Handle relative URLs
+      // Always redirect to dashboard after successful sign in
+      // This handles Apple OAuth which loses callbackUrl due to cross-origin POST
+
+      // If url is just "/" or the base URL, go to dashboard
+      if (url === "/" || url === baseUrl || url === `${baseUrl}/`) {
+        return `${baseUrl}/dashboard`
+      }
+
+      // Handle relative URLs (like "/dashboard")
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`
       }
+
       // Handle URLs from same origin
       if (url.startsWith(baseUrl)) {
         return url
       }
-      // Default to dashboard for OAuth callbacks
+
+      // Default to dashboard
       return `${baseUrl}/dashboard`
     }
   },
