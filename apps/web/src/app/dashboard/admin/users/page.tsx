@@ -28,6 +28,7 @@ export default function ManageUsersPage() {
     const [revokeLoading, setRevokeLoading] = useState<string | null>(null);
     const [manualVerifyLoading, setManualVerifyLoading] = useState<string | null>(null);
     const [verifyAllLoading, setVerifyAllLoading] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -269,6 +270,43 @@ export default function ManageUsersPage() {
         }
     };
 
+    const handleDeleteUser = async (userId: string, username: string, email: string) => {
+        // Double confirmation for destructive action
+        if (!confirm(`⚠️ DELETE USER: ${username} (${email})\n\nThis will permanently delete:\n• All their tarantulas\n• All feeding/molt/substrate logs\n• All photos\n• All breeding data\n• All messages and posts\n\nThis action CANNOT be undone!\n\nAre you sure?`)) {
+            return;
+        }
+
+        // Second confirmation
+        if (!confirm(`FINAL WARNING: Type 'DELETE' mentally and click OK to permanently delete ${username}'s account and ALL their data.`)) {
+            return;
+        }
+
+        setDeleteLoading(userId);
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const response = await fetch(`${API_URL}/api/v1/admin/users/${userId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                alert(`✅ Successfully deleted user ${username} (${email})`);
+                // Remove from local state
+                setUsers(users.filter(u => u.id !== userId));
+            } else {
+                const error = await response.json();
+                alert(`Failed to delete user: ${error.detail}`);
+            }
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            alert('Error deleting user');
+        } finally {
+            setDeleteLoading(null);
+        }
+    };
+
     if (loading || authLoading) {
         return (
             <DashboardLayout
@@ -504,6 +542,16 @@ export default function ManageUsersPage() {
                                                         className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
                                                     >
                                                         {grantLoading === user.id ? 'Granting...' : '💎 Grant Premium'}
+                                                    </button>
+                                                )}
+                                                {/* Delete user - don't allow deleting yourself */}
+                                                {user.id !== authUser?.id && (
+                                                    <button
+                                                        onClick={() => handleDeleteUser(user.id, user.username, user.email)}
+                                                        disabled={deleteLoading === user.id}
+                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600"
+                                                    >
+                                                        {deleteLoading === user.id ? 'Deleting...' : '🗑️ Delete User'}
                                                     </button>
                                                 )}
                                             </div>
