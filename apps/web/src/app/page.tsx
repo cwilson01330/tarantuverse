@@ -1,9 +1,36 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { TarantuverseLogoTransparent } from '@/components/TarantuverseLogo'
 
 export default function Home() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  // Redirect authenticated users to dashboard
+  // This handles Apple OAuth edge case where cross-origin POST callback
+  // may not properly follow the redirect to /dashboard
+  useEffect(() => {
+    if (status === 'authenticated' && session?.accessToken) {
+      router.replace('/dashboard')
+    }
+  }, [status, session, router])
+
+  // Show nothing while checking auth (prevents flash of landing page for authenticated users)
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-dark flex items-center justify-center">
+        <div className="text-center">
+          <TarantuverseLogoTransparent className="w-16 h-16 mx-auto mb-4 animate-pulse" />
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-dark">
       {/* Navigation */}
