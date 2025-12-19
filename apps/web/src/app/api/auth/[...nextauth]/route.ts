@@ -76,15 +76,40 @@ const authOptions: AuthOptions = {
         try {
           console.log("[OAuth Debug] Provider:", account.provider)
           console.log("[OAuth Debug] Profile data:", JSON.stringify(profile, null, 2))
+          console.log("[OAuth Debug] User data:", JSON.stringify(user, null, 2))
+
+          // Handle Apple's different profile format
+          // Apple's name is an object {firstName, lastName} and only on first login
+          let userName = user.name
+          if (account.provider === "apple" && profile) {
+            const appleProfile = profile as any
+            if (appleProfile.name) {
+              // Apple provides name as object on first login only
+              const firstName = appleProfile.name.firstName || ""
+              const lastName = appleProfile.name.lastName || ""
+              userName = `${firstName} ${lastName}`.trim() || user.name
+            }
+          } else if (profile?.name) {
+            // Google and others provide name as string
+            userName = profile.name as string
+          }
+
+          // Get email - Apple might hide it, fall back to user.email from NextAuth
+          const email = profile?.email || user.email
+
+          if (!email) {
+            console.error("[OAuth] No email provided by", account.provider)
+            return false
+          }
 
           // Send user info to our backend (NextAuth has already completed OAuth)
           const response = await axios.post(
             `${API_URL}/api/v1/auth/oauth-login`,
             {
               provider: account.provider,
-              email: profile?.email || user.email,
-              name: profile?.name || user.name,
-              picture: (profile as any)?.picture || user.image,
+              email: email,
+              name: userName || email.split("@")[0], // Fallback to email prefix
+              picture: (profile as any)?.picture || user.image || null,
               id: (profile as any)?.sub || (profile as any)?.id,
             }
           )
