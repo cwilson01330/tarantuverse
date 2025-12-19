@@ -226,7 +226,7 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
                       borderRadius: '0.5rem',
                       color: 'white'
                     }}
-                    formatter={(value: number) => {
+                    formatter={(value) => {
                       const item = preyTypeData.find(d => d.count === value);
                       return [`${value} feedings (${item?.percentage}%)`, 'Count'];
                     }}
