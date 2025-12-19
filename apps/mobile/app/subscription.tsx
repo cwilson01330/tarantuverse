@@ -155,7 +155,23 @@ export default function SubscriptionScreen() {
       );
     } catch (error: any) {
       console.error('Purchase failed:', error);
-      Alert.alert('Purchase Failed', error.message || 'Something went wrong');
+
+      // Handle "already owned" error - auto-restore
+      const errorMessage = error.message?.toLowerCase() || '';
+      if (errorMessage.includes('already owned') ||
+          errorMessage.includes('already purchased') ||
+          error.code === 'E_ALREADY_OWNED') {
+        Alert.alert(
+          'Already Subscribed',
+          'You already have an active subscription. Restoring your purchase...',
+          [{
+            text: 'OK',
+            onPress: () => handleRestore(),
+          }]
+        );
+      } else {
+        Alert.alert('Purchase Failed', error.message || 'Something went wrong');
+      }
     } finally {
       setPurchasing(false);
     }
