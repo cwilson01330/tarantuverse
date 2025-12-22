@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { apiClient } from '../src/services/api';
+
+const PRIVACY_POLICY_URL = 'https://www.tarantuverse.com/privacy-policy';
 
 export default function PrivacyScreen() {
   const router = useRouter();
@@ -155,6 +157,29 @@ export default function PrivacyScreen() {
       fontSize: 16,
       fontWeight: '600',
     },
+    linkButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    linkContent: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    linkTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    linkDescription: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
   });
 
   return (
@@ -221,6 +246,34 @@ export default function PrivacyScreen() {
               ) : (
                 <Text style={styles.saveButtonText}>Save Changes</Text>
               )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Legal Links - Required by Apple */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Legal</Text>
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => Linking.openURL('https://www.tarantuverse.com/terms')}
+            >
+              <MaterialCommunityIcons name="file-document-outline" size={24} color={colors.primary} />
+              <View style={styles.linkContent}>
+                <Text style={styles.linkTitle}>Terms of Use</Text>
+                <Text style={styles.linkDescription}>View our terms of service</Text>
+              </View>
+              <MaterialCommunityIcons name="open-in-new" size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
+            <View style={{ height: 12 }} />
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+            >
+              <MaterialCommunityIcons name="shield-account" size={24} color={colors.primary} />
+              <View style={styles.linkContent}>
+                <Text style={styles.linkTitle}>Privacy Policy</Text>
+                <Text style={styles.linkDescription}>View our privacy policy</Text>
+              </View>
+              <MaterialCommunityIcons name="open-in-new" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           </View>
         </View>

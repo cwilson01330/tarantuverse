@@ -30,7 +30,7 @@ export default function RegisterScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ ref?: string }>();
   const { register, loginWithGoogle, loginWithApple } = useAuth();
-  const { colors } = useTheme();
+  const { colors, theme } = useTheme();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -500,14 +500,14 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Apple Sign In (iOS only) - Use WHITE_OUTLINE for light mode for better contrast */}
+            {/* Apple Sign In (iOS only) - Use BLACK on light backgrounds, WHITE on dark (per Apple HIG) */}
             {Platform.OS === 'ios' && (
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
                 buttonStyle={
-                  colors.background === '#000000' || colors.background === '#121212' || colors.background.toLowerCase().startsWith('#1')
+                  theme === 'dark'
                     ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                    : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE
+                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
                 }
                 cornerRadius={8}
                 style={styles.appleButton}

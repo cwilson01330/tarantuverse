@@ -8,8 +8,11 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
-  TextInput,
+  Linking,
 } from 'react-native';
+
+// Apple's URL to manage subscriptions
+const MANAGE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -47,8 +50,6 @@ export default function SubscriptionScreen() {
   const [products, setProducts] = useState<any[]>([]);
   const [iapAvailable, setIapAvailable] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
-  const [promoCode, setPromoCode] = useState('');
-  const [promoLoading, setPromoLoading] = useState(false);
   const [revoking, setRevoking] = useState(false);
 
   useEffect(() => {
@@ -200,34 +201,6 @@ export default function SubscriptionScreen() {
       Alert.alert('Restore Failed', error.message || 'Something went wrong');
     } finally {
       setRestoring(false);
-    }
-  };
-
-  const handleRedeemPromoCode = async () => {
-    if (!promoCode.trim()) {
-      Alert.alert('Error', 'Please enter a promo code');
-      return;
-    }
-
-    setPromoLoading(true);
-    try {
-      await apiClient.post('/promo-codes/redeem', {
-        code: promoCode.trim().toUpperCase(),
-      });
-
-      Alert.alert('Success!', 'Your promo code has been redeemed! Enjoy premium features.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            setPromoCode('');
-            loadSubscriptionStatus();
-          },
-        },
-      ]);
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Invalid or expired promo code');
-    } finally {
-      setPromoLoading(false);
     }
   };
 
@@ -419,49 +392,26 @@ export default function SubscriptionScreen() {
       fontSize: 14,
       fontWeight: '500',
     },
-    promoSection: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 20,
-      marginBottom: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    promoTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.textPrimary,
+    legalSection: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 16,
       marginBottom: 8,
     },
-    promoSubtitle: {
+    legalLink: {
+      paddingVertical: 8,
+      paddingHorizontal: 4,
+    },
+    legalLinkText: {
       fontSize: 13,
-      color: colors.textSecondary,
-      marginBottom: 16,
+      color: colors.primary,
+      textDecorationLine: 'underline',
     },
-    promoInput: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 8,
-      padding: 14,
-      fontSize: 16,
-      color: colors.textPrimary,
-      fontFamily: 'monospace',
-      marginBottom: 12,
-    },
-    promoButton: {
-      backgroundColor: colors.primary,
-      padding: 14,
-      borderRadius: 10,
-      alignItems: 'center',
-    },
-    promoButtonDisabled: {
-      opacity: 0.6,
-    },
-    promoButtonText: {
-      color: 'white',
-      fontSize: 16,
-      fontWeight: '600',
+    legalDivider: {
+      fontSize: 13,
+      color: colors.textTertiary,
+      marginHorizontal: 8,
     },
     loadingContainer: {
       flex: 1,
@@ -490,6 +440,24 @@ export default function SubscriptionScreen() {
       fontSize: 14,
       color: colors.textSecondary,
       textAlign: 'center',
+    },
+    manageButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      backgroundColor: colors.primary + '15',
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 8,
+      gap: 8,
+    },
+    manageButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.primary,
     },
     revokeButton: {
       marginTop: 20,
@@ -615,6 +583,17 @@ export default function SubscriptionScreen() {
               You have access to all features. Enjoy tracking your collection!
             </Text>
 
+            {/* Manage Subscription Button - Required by Apple */}
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={styles.manageButton}
+                onPress={() => Linking.openURL(MANAGE_SUBSCRIPTIONS_URL)}
+              >
+                <MaterialCommunityIcons name="cog" size={18} color={colors.primary} />
+                <Text style={styles.manageButtonText}>Manage Subscription</Text>
+              </TouchableOpacity>
+            )}
+
             {/* Revoke Premium Button (for testing) */}
             <TouchableOpacity
               style={styles.revokeButton}
@@ -700,9 +679,6 @@ export default function SubscriptionScreen() {
                   <Text style={styles.noProductsText}>
                     Subscriptions coming soon!
                   </Text>
-                  <Text style={styles.noProductsText}>
-                    Use a promo code below to unlock premium features.
-                  </Text>
                 </View>
               ) : (
                 <View style={styles.productCard}>
@@ -729,31 +705,20 @@ export default function SubscriptionScreen() {
               )}
             </LinearGradient>
 
-            {/* Promo Code Section */}
-            <View style={styles.promoSection}>
-              <Text style={styles.promoTitle}>Have a Promo Code?</Text>
-              <Text style={styles.promoSubtitle}>
-                Enter your code to unlock premium features
-              </Text>
-              <TextInput
-                style={styles.promoInput}
-                placeholder="ENTER-CODE-HERE"
-                placeholderTextColor={colors.textTertiary}
-                value={promoCode}
-                onChangeText={(text) => setPromoCode(text.toUpperCase())}
-                autoCapitalize="characters"
-                editable={!promoLoading}
-              />
+            {/* Legal Links - Required by Apple */}
+            <View style={styles.legalSection}>
               <TouchableOpacity
-                style={[styles.promoButton, promoLoading && styles.promoButtonDisabled]}
-                onPress={handleRedeemPromoCode}
-                disabled={promoLoading}
+                style={styles.legalLink}
+                onPress={() => Linking.openURL('https://www.tarantuverse.com/terms')}
               >
-                {promoLoading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.promoButtonText}>Redeem Code</Text>
-                )}
+                <Text style={styles.legalLinkText}>Terms of Use</Text>
+              </TouchableOpacity>
+              <Text style={styles.legalDivider}>•</Text>
+              <TouchableOpacity
+                style={styles.legalLink}
+                onPress={() => Linking.openURL('https://www.tarantuverse.com/privacy-policy')}
+              >
+                <Text style={styles.legalLinkText}>Privacy Policy</Text>
               </TouchableOpacity>
             </View>
 
