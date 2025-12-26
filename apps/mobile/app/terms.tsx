@@ -209,28 +209,51 @@ export default function TermsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>7. Account Termination</Text>
+          <Text style={styles.sectionTitle}>7. Subscriptions and Payments</Text>
+          <Text style={styles.text}>
+            Tarantuverse offers optional premium subscriptions with additional features. By subscribing:
+          </Text>
+          <View style={styles.bulletPoint}>
+            <Text style={styles.bullet}>•</Text>
+            <Text style={styles.bulletText}>Payment will be charged to your Apple ID or Google Play account at confirmation of purchase</Text>
+          </View>
+          <View style={styles.bulletPoint}>
+            <Text style={styles.bullet}>•</Text>
+            <Text style={styles.bulletText}>Subscriptions automatically renew unless canceled at least 24 hours before the end of the current period</Text>
+          </View>
+          <View style={styles.bulletPoint}>
+            <Text style={styles.bullet}>•</Text>
+            <Text style={styles.bulletText}>You can manage and cancel your subscription in your App Store or Google Play account settings</Text>
+          </View>
+          <View style={styles.bulletPoint}>
+            <Text style={styles.bullet}>•</Text>
+            <Text style={styles.bulletText}>No refunds will be provided for partial subscription periods</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>8. Account Termination</Text>
           <Text style={styles.text}>
             We reserve the right to suspend or terminate your account at any time for violations of these terms. Serious or repeated violations will result in permanent ban without warning.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>8. Privacy</Text>
+          <Text style={styles.sectionTitle}>9. Privacy</Text>
           <Text style={styles.text}>
             Your privacy is important to us. Please review our Privacy Policy to understand how we collect, use, and protect your personal information.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>9. Changes to Terms</Text>
+          <Text style={styles.sectionTitle}>10. Changes to Terms</Text>
           <Text style={styles.text}>
             We may update these Terms of Service from time to time. Continued use of Tarantuverse after changes constitutes acceptance of the updated terms.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>10. Contact</Text>
+          <Text style={styles.sectionTitle}>11. Contact</Text>
           <Text style={styles.text}>
             If you have questions about these terms or need to report a violation, please contact us through the app's support channels or via email.
           </Text>

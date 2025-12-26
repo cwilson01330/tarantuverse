@@ -11,8 +11,12 @@ import {
   Linking,
 } from 'react-native';
 
-// Apple's URL to manage subscriptions
-const MANAGE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
+// URLs to manage subscriptions per platform
+const MANAGE_SUBSCRIPTIONS_URL = Platform.select({
+  ios: 'https://apps.apple.com/account/subscriptions',
+  android: 'https://play.google.com/store/account/subscriptions',
+  default: 'https://play.google.com/store/account/subscriptions',
+});
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -583,16 +587,14 @@ export default function SubscriptionScreen() {
               You have access to all features. Enjoy tracking your collection!
             </Text>
 
-            {/* Manage Subscription Button - Required by Apple */}
-            {Platform.OS === 'ios' && (
-              <TouchableOpacity
-                style={styles.manageButton}
-                onPress={() => Linking.openURL(MANAGE_SUBSCRIPTIONS_URL)}
-              >
-                <MaterialCommunityIcons name="cog" size={18} color={colors.primary} />
-                <Text style={styles.manageButtonText}>Manage Subscription</Text>
-              </TouchableOpacity>
-            )}
+            {/* Manage Subscription Button - Required by Apple & Google */}
+            <TouchableOpacity
+              style={styles.manageButton}
+              onPress={() => Linking.openURL(MANAGE_SUBSCRIPTIONS_URL!)}
+            >
+              <MaterialCommunityIcons name="cog" size={18} color={colors.primary} />
+              <Text style={styles.manageButtonText}>Manage Subscription</Text>
+            </TouchableOpacity>
 
             {/* Revoke Premium Button (for testing) */}
             <TouchableOpacity
@@ -689,8 +691,8 @@ export default function SubscriptionScreen() {
                 </View>
               )}
 
-              {/* Restore Purchases Button */}
-              {Platform.OS === 'ios' && iapAvailable && (
+              {/* Restore Purchases Button - Required by Apple & Google */}
+              {iapAvailable && (
                 <TouchableOpacity
                   style={styles.restoreButton}
                   onPress={handleRestore}
@@ -725,10 +727,9 @@ export default function SubscriptionScreen() {
             {/* Disclaimer - only show when IAP is available */}
             {iapAvailable && (
               <Text style={styles.disclaimer}>
-                Payment will be charged to your Apple ID account at confirmation of purchase.
-                Subscription automatically renews unless canceled at least 24 hours before
-                the end of the current period. You can manage and cancel your subscription
-                in your App Store account settings.
+                {Platform.OS === 'ios'
+                  ? 'Payment will be charged to your Apple ID account at confirmation of purchase. Subscription automatically renews unless canceled at least 24 hours before the end of the current period. You can manage and cancel your subscription in your App Store account settings.'
+                  : 'Payment will be charged to your Google Play account at confirmation of purchase. Subscription automatically renews unless canceled at least 24 hours before the end of the current period. You can manage and cancel your subscription in your Google Play account settings.'}
               </Text>
             )}
           </>

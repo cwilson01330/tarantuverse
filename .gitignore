@@ -87,5 +87,9 @@ inspect-outpu/
 **/inspect-output/
 **/inspect-outpu/
 
+# Google Play Service Account (sensitive credentials)
+google-play-service-account.json
+**/google-play-service-account.json
+
 # Project documentation (internal use)
 CLAUDE.md
