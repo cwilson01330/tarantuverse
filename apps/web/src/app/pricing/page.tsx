@@ -1,9 +1,61 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { TarantuverseLogoTransparent } from '@/components/TarantuverseLogo'
+import { useAuth } from '@/hooks/useAuth'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function PricingPage() {
+  const { token, isAuthenticated, isLoading } = useAuth()
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+
+  const handleCheckout = async (priceType: 'monthly' | 'yearly' | 'lifetime') => {
+    // If still loading auth, wait
+    if (isLoading) {
+      return
+    }
+
+    if (!isAuthenticated || !token) {
+      // Redirect to login with return URL - use callbackUrl for NextAuth
+      const callbackUrl = encodeURIComponent(`/pricing?plan=${priceType}`)
+      window.location.href = `/login?callbackUrl=${callbackUrl}`
+      return
+    }
+
+    setLoadingPlan(priceType)
+
+    try {
+      const response = await fetch(`${API_URL}/api/v1/subscriptions/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          price_type: priceType,
+          success_url: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${window.location.origin}/checkout/cancel`,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to create checkout session')
+      }
+
+      const data = await response.json()
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.checkout_url
+    } catch (error) {
+      console.error('Checkout error:', error)
+      alert('Failed to start checkout. Please try again.')
+      setLoadingPlan(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       {/* Navigation */}
@@ -17,12 +69,20 @@ export default function PricingPage() {
               </span>
             </Link>
             <div className="flex gap-3">
-              <Link href="/login" className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 font-medium transition">
-                Login
-              </Link>
-              <Link href="/register" className="px-6 py-2 bg-gradient-brand text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium">
-                Get Started
-              </Link>
+              {isAuthenticated ? (
+                <Link href="/dashboard" className="px-6 py-2 bg-gradient-brand text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium">
+                  Go to Dashboard
+                </Link>
+              ) : (
+                <>
+                  <Link href="/login" className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 font-medium transition">
+                    Login
+                  </Link>
+                  <Link href="/register" className="px-6 py-2 bg-gradient-brand text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition font-medium">
+                    Get Started
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -147,12 +207,13 @@ export default function PricingPage() {
                 <span className="text-gray-700 dark:text-gray-300">Cancel anytime</span>
               </li>
             </ul>
-            <Link
-              href="/register"
-              className="block w-full py-3 text-center border-2 border-purple-600 dark:border-purple-500 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 transition font-semibold"
+            <button
+              onClick={() => handleCheckout('monthly')}
+              disabled={loadingPlan === 'monthly'}
+              className="block w-full py-3 text-center border-2 border-purple-600 dark:border-purple-500 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Choose Monthly
-            </Link>
+              {loadingPlan === 'monthly' ? 'Loading...' : 'Choose Monthly'}
+            </button>
           </div>
 
           {/* Yearly Plan - Most Popular */}
@@ -195,12 +256,13 @@ export default function PricingPage() {
                 <span>All premium features</span>
               </li>
             </ul>
-            <Link
-              href="/register"
-              className="block w-full py-3 text-center bg-white text-purple-600 rounded-xl hover:shadow-xl transition font-semibold"
+            <button
+              onClick={() => handleCheckout('yearly')}
+              disabled={loadingPlan === 'yearly'}
+              className="block w-full py-3 text-center bg-white text-purple-600 rounded-xl hover:shadow-xl transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Choose Yearly
-            </Link>
+              {loadingPlan === 'yearly' ? 'Loading...' : 'Choose Yearly'}
+            </button>
           </div>
         </div>
 
@@ -248,12 +310,13 @@ export default function PricingPage() {
                     <span>No recurring fees</span>
                   </li>
                 </ul>
-                <Link
-                  href="/register"
-                  className="block w-full py-3 text-center bg-white text-orange-600 rounded-xl hover:shadow-xl transition font-semibold text-lg"
+                <button
+                  onClick={() => handleCheckout('lifetime')}
+                  disabled={loadingPlan === 'lifetime'}
+                  className="block w-full py-3 text-center bg-white text-orange-600 rounded-xl hover:shadow-xl transition font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Get Lifetime Access
-                </Link>
+                  {loadingPlan === 'lifetime' ? 'Loading...' : 'Get Lifetime Access'}
+                </button>
               </div>
             </div>
           </div>

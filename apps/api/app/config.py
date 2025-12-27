@@ -52,6 +52,13 @@ class Settings(BaseSettings):
     SENDGRID_API_KEY: str = ""
     SENDGRID_FROM_EMAIL: str = "noreply@tarantuverse.com"
 
+    # Stripe Payments
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_MONTHLY: str = ""  # price_xxx from Stripe Dashboard
+    STRIPE_PRICE_YEARLY: str = ""   # price_xxx from Stripe Dashboard
+    STRIPE_PRICE_LIFETIME: str = "" # price_xxx from Stripe Dashboard (one-time)
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True

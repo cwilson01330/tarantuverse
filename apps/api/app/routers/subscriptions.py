@@ -1,14 +1,19 @@
 """
 Subscription API routes
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timedelta
 from uuid import UUID
+from pydantic import BaseModel
+import stripe
+import logging
 
 from app.database import get_db
+from app.config import settings
 from app.models.user import User
 from app.models.subscription import SubscriptionPlan, UserSubscription, SubscriptionStatus
 from app.schemas.subscription import (
@@ -23,7 +28,28 @@ from app.schemas.subscription import (
 )
 from app.utils.dependencies import get_current_user
 
+# Initialize Stripe
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
+
+
+# Pydantic models for Stripe endpoints
+class CreateCheckoutSessionRequest(BaseModel):
+    price_type: str  # "monthly", "yearly", or "lifetime"
+    success_url: str
+    cancel_url: str
+
+
+class CreateCheckoutSessionResponse(BaseModel):
+    checkout_url: str
+    session_id: str
+
+
+class BillingPortalResponse(BaseModel):
+    portal_url: str
 
 
 @router.get("/plans", response_model=List[SubscriptionPlanSchema])
@@ -280,3 +306,265 @@ def validate_receipt(
         message=f"Subscription activated successfully",
         subscription=new_subscription
     )
+
+
+# ==================== STRIPE ENDPOINTS ====================
+
+@router.post("/create-checkout-session", response_model=CreateCheckoutSessionResponse)
+def create_checkout_session(
+    request_data: CreateCheckoutSessionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a Stripe Checkout session for subscription purchase.
+    Returns a checkout URL to redirect the user to.
+    """
+    # Map price type to Stripe price ID
+    price_map = {
+        "monthly": settings.STRIPE_PRICE_MONTHLY,
+        "yearly": settings.STRIPE_PRICE_YEARLY,
+        "lifetime": settings.STRIPE_PRICE_LIFETIME,
+    }
+
+    price_id = price_map.get(request_data.price_type)
+    if not price_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid price type: {request_data.price_type}"
+        )
+
+    # Determine if this is a subscription or one-time payment
+    is_subscription = request_data.price_type in ["monthly", "yearly"]
+
+    try:
+        # Check if user already has a Stripe customer ID
+        existing_sub = db.query(UserSubscription).filter(
+            and_(
+                UserSubscription.user_id == current_user.id,
+                UserSubscription.payment_provider == "stripe"
+            )
+        ).first()
+
+        customer_id = existing_sub.payment_provider_id if existing_sub else None
+
+        # Create or retrieve Stripe customer
+        if not customer_id:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                metadata={"user_id": str(current_user.id)}
+            )
+            customer_id = customer.id
+
+        # Create checkout session
+        checkout_params = {
+            "customer": customer_id,
+            "success_url": request_data.success_url,
+            "cancel_url": request_data.cancel_url,
+            "line_items": [{"price": price_id, "quantity": 1}],
+            "metadata": {
+                "user_id": str(current_user.id),
+                "price_type": request_data.price_type
+            },
+        }
+
+        if is_subscription:
+            checkout_params["mode"] = "subscription"
+        else:
+            checkout_params["mode"] = "payment"
+
+        session = stripe.checkout.Session.create(**checkout_params)
+
+        return CreateCheckoutSessionResponse(
+            checkout_url=session.url,
+            session_id=session.id
+        )
+
+    except stripe.StripeError as e:
+        logger.error(f"Stripe error creating checkout session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create checkout session")
+
+
+@router.post("/webhook")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    Handle Stripe webhook events.
+    Activates/updates subscriptions based on payment events.
+    """
+    payload = await request.body()
+    sig_header = request.headers.get("stripe-signature")
+
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    # Handle the event
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        await handle_checkout_completed(session, db)
+
+    elif event["type"] == "customer.subscription.updated":
+        subscription = event["data"]["object"]
+        await handle_subscription_updated(subscription, db)
+
+    elif event["type"] == "customer.subscription.deleted":
+        subscription = event["data"]["object"]
+        await handle_subscription_deleted(subscription, db)
+
+    elif event["type"] == "invoice.payment_failed":
+        invoice = event["data"]["object"]
+        await handle_payment_failed(invoice, db)
+
+    return JSONResponse(content={"status": "success"})
+
+
+async def handle_checkout_completed(session: dict, db: Session):
+    """Process completed checkout session"""
+    user_id = session.get("metadata", {}).get("user_id")
+    price_type = session.get("metadata", {}).get("price_type")
+    customer_id = session.get("customer")
+    subscription_id = session.get("subscription")  # None for one-time payments
+
+    if not user_id:
+        logger.error("No user_id in checkout session metadata")
+        return
+
+    # Get the premium plan
+    plan = db.query(SubscriptionPlan).filter(
+        SubscriptionPlan.name == "premium"
+    ).first()
+
+    if not plan:
+        logger.error("Premium plan not found")
+        return
+
+    # Cancel any existing active subscription
+    existing = db.query(UserSubscription).filter(
+        and_(
+            UserSubscription.user_id == user_id,
+            UserSubscription.status == "active"
+        )
+    ).first()
+
+    if existing:
+        existing.status = "cancelled"
+        existing.cancelled_at = datetime.utcnow()
+
+    # Calculate expiry based on price type
+    expires_at = None
+    if price_type == "monthly":
+        expires_at = datetime.utcnow() + timedelta(days=30)
+    elif price_type == "yearly":
+        expires_at = datetime.utcnow() + timedelta(days=365)
+    # Lifetime has no expiry
+
+    # Create new subscription
+    new_subscription = UserSubscription(
+        user_id=user_id,
+        plan_id=plan.id,
+        status="active",
+        expires_at=expires_at,
+        payment_provider="stripe",
+        payment_provider_id=customer_id,
+        subscription_source=price_type,
+        auto_renew=price_type in ["monthly", "yearly"]
+    )
+
+    db.add(new_subscription)
+    db.commit()
+
+    logger.info(f"Subscription activated for user {user_id} via Stripe ({price_type})")
+
+
+async def handle_subscription_updated(subscription: dict, db: Session):
+    """Handle subscription updates (renewals, plan changes)"""
+    customer_id = subscription.get("customer")
+    status = subscription.get("status")
+
+    user_sub = db.query(UserSubscription).filter(
+        and_(
+            UserSubscription.payment_provider == "stripe",
+            UserSubscription.payment_provider_id == customer_id,
+            UserSubscription.status == "active"
+        )
+    ).first()
+
+    if user_sub:
+        if status == "active":
+            # Subscription renewed - update expiry
+            current_period_end = subscription.get("current_period_end")
+            if current_period_end:
+                user_sub.expires_at = datetime.utcfromtimestamp(current_period_end)
+        elif status in ["past_due", "unpaid"]:
+            # Payment issue - could add grace period logic here
+            logger.warning(f"Subscription {customer_id} has payment issues: {status}")
+
+        db.commit()
+
+
+async def handle_subscription_deleted(subscription: dict, db: Session):
+    """Handle subscription cancellation"""
+    customer_id = subscription.get("customer")
+
+    user_sub = db.query(UserSubscription).filter(
+        and_(
+            UserSubscription.payment_provider == "stripe",
+            UserSubscription.payment_provider_id == customer_id,
+            UserSubscription.status == "active"
+        )
+    ).first()
+
+    if user_sub:
+        user_sub.status = "cancelled"
+        user_sub.cancelled_at = datetime.utcnow()
+        db.commit()
+        logger.info(f"Subscription cancelled for customer {customer_id}")
+
+
+async def handle_payment_failed(invoice: dict, db: Session):
+    """Handle failed payment"""
+    customer_id = invoice.get("customer")
+    logger.warning(f"Payment failed for customer {customer_id}")
+    # Could implement email notification here
+
+
+@router.get("/billing-portal", response_model=BillingPortalResponse)
+def get_billing_portal(
+    return_url: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a Stripe Customer Portal session for managing subscriptions.
+    Returns a portal URL to redirect the user to.
+    """
+    # Find user's Stripe customer ID
+    user_sub = db.query(UserSubscription).filter(
+        and_(
+            UserSubscription.user_id == current_user.id,
+            UserSubscription.payment_provider == "stripe"
+        )
+    ).first()
+
+    if not user_sub or not user_sub.payment_provider_id:
+        raise HTTPException(
+            status_code=404,
+            detail="No Stripe subscription found. Please subscribe first."
+        )
+
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=user_sub.payment_provider_id,
+            return_url=return_url,
+        )
+
+        return BillingPortalResponse(portal_url=session.url)
+
+    except stripe.StripeError as e:
+        logger.error(f"Stripe error creating portal session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create billing portal session")
