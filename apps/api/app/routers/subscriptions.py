@@ -349,6 +349,15 @@ def create_checkout_session(
         customer_id = existing_sub.payment_provider_id if existing_sub else None
 
         # Create or retrieve Stripe customer
+        if customer_id:
+            # Verify the customer still exists (may not if switching from test to live mode)
+            try:
+                stripe.Customer.retrieve(customer_id)
+            except stripe.InvalidRequestError:
+                # Customer doesn't exist (e.g., was in test mode, now in live mode)
+                logger.info(f"Customer {customer_id} not found, creating new customer")
+                customer_id = None
+
         if not customer_id:
             customer = stripe.Customer.create(
                 email=current_user.email,
