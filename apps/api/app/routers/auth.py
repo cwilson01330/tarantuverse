@@ -3,10 +3,16 @@ Authentication routes
 """
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
+from typing import Optional, List
+from datetime import datetime, timedelta, timezone
+import uuid
+import secrets
+
 from app.database import get_db
 from app.models.user import User
+from app.models.user_oauth_account import UserOAuthAccount
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest
-from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse
+from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse, LinkedAccountResponse, LinkAccountRequest
 from app.utils.auth import get_password_hash, verify_password, create_access_token
 from app.utils.dependencies import get_current_user
 from app.utils.oauth import (
@@ -18,10 +24,6 @@ from app.utils.oauth import (
 from app.services.email import EmailService
 from app.services.storage import storage_service
 from app.config import settings
-from typing import Optional
-from datetime import datetime, timedelta, timezone
-import uuid
-import secrets
 
 router = APIRouter()
 
@@ -301,7 +303,11 @@ async def oauth_login(
 ):
     """
     Handle OAuth login from NextAuth (after NextAuth has completed OAuth flow)
-    Accepts user info from Google/Apple after NextAuth exchanges tokens
+    Accepts user info from Google/Apple after NextAuth exchanges tokens.
+
+    Features:
+    - Auto-links OAuth account if email matches existing user
+    - Supports multiple OAuth providers per user account
     """
     try:
         provider = oauth_data.get("provider")  # 'google' or 'apple'
@@ -316,48 +322,76 @@ async def oauth_login(
                 detail="Email and provider are required"
             )
 
-        # Check if user exists with this email or OAuth ID
-        user = db.query(User).filter(
-            (User.email == email) |
-            ((User.oauth_provider == provider) & (User.oauth_id == provider_id))
+        is_new_user = False
+        user = None
+
+        # First, check if this OAuth account is already linked
+        oauth_account = db.query(UserOAuthAccount).filter(
+            UserOAuthAccount.provider == provider,
+            UserOAuthAccount.provider_account_id == provider_id
         ).first()
 
-        is_new_user = False
-
-        if not user:
-            # Create new user from OAuth data
-            is_new_user = True
-
-            # Generate username from email
-            base_username = generate_username_from_email(email)
-            username = base_username
-            counter = 1
-            while db.query(User).filter(User.username == username).first():
-                username = f"{base_username}{counter}"
-                counter += 1
-
-            user = User(
-                id=uuid.uuid4(),
-                email=email,
-                username=username,
-                display_name=name or username,
-                avatar_url=picture,
-                oauth_provider=provider,
-                oauth_id=provider_id,
-                hashed_password=None,  # OAuth users don't have passwords
-                is_verified=True,
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+        if oauth_account:
+            # OAuth account found - get the linked user
+            user = db.query(User).filter(User.id == oauth_account.user_id).first()
         else:
-            # Update existing user's OAuth info if needed
-            if not user.oauth_provider:
-                user.oauth_provider = provider
-                user.oauth_id = provider_id
-            if not user.avatar_url and picture:
-                user.avatar_url = picture
-            db.commit()
+            # OAuth account not found - check if email matches existing user (auto-linking)
+            user = db.query(User).filter(User.email == email).first()
+
+            if user:
+                # Email matches - auto-link this OAuth account to existing user
+                oauth_account = UserOAuthAccount(
+                    user_id=user.id,
+                    provider=provider,
+                    provider_account_id=provider_id,
+                    provider_email=email,
+                    provider_name=name,
+                    provider_avatar=picture,
+                )
+                db.add(oauth_account)
+            else:
+                # No existing user - create new user and link OAuth account
+                is_new_user = True
+
+                # Generate username from email
+                base_username = generate_username_from_email(email)
+                username = base_username
+                counter = 1
+                while db.query(User).filter(User.username == username).first():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+
+                user = User(
+                    id=uuid.uuid4(),
+                    email=email,
+                    username=username,
+                    display_name=name or username,
+                    avatar_url=picture,
+                    oauth_provider=provider,  # Keep for backwards compatibility
+                    oauth_id=provider_id,
+                    hashed_password=None,
+                    is_verified=True,
+                )
+                db.add(user)
+                db.flush()  # Get user.id for the OAuth account
+
+                # Create OAuth account link
+                oauth_account = UserOAuthAccount(
+                    user_id=user.id,
+                    provider=provider,
+                    provider_account_id=provider_id,
+                    provider_email=email,
+                    provider_name=name,
+                    provider_avatar=picture,
+                )
+                db.add(oauth_account)
+
+        # Update avatar if not set
+        if user and not user.avatar_url and picture:
+            user.avatar_url = picture
+
+        db.commit()
+        if user:
             db.refresh(user)
 
         # Create access token for our app
@@ -377,6 +411,8 @@ async def oauth_login(
             is_new_user=is_new_user,
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -392,6 +428,10 @@ async def google_oauth_callback(
     """
     Handle Google OAuth callback
     Exchange authorization code for user info and create/login user
+
+    Features:
+    - Auto-links Google account if email matches existing user
+    - Supports multiple OAuth providers per user account
     """
     try:
         # Exchange code for Google user info
@@ -400,58 +440,98 @@ async def google_oauth_callback(
             callback_data.code,
             callback_data.redirect_uri
         )
-        
-        # Check if user exists with this email or Google OAuth ID
-        user = db.query(User).filter(
-            (User.email == google_user["email"]) |
-            ((User.oauth_provider == "google") & (User.oauth_id == google_user["provider_id"]))
-        ).first()
-        
+
+        provider_id = google_user["provider_id"]
+        email = google_user["email"]
+        name = google_user.get("name")
+        picture = google_user.get("picture")
+        access_token_from_google = google_user.get("access_token")
+        refresh_token_from_google = google_user.get("refresh_token")
+
         is_new_user = False
-        
-        if not user:
-            # Create new user from Google data
-            is_new_user = True
-            
-            # Generate username from email (ensure uniqueness)
-            base_username = generate_username_from_email(google_user["email"])
-            username = base_username
-            counter = 1
-            while db.query(User).filter(User.username == username).first():
-                username = f"{base_username}{counter}"
-                counter += 1
-            
-            user = User(
-                id=uuid.uuid4(),
-                email=google_user["email"],
-                username=username,
-                display_name=google_user.get("name") or username,
-                avatar_url=google_user.get("picture"),
-                oauth_provider="google",
-                oauth_id=google_user["provider_id"],
-                oauth_access_token=google_user.get("access_token"),
-                oauth_refresh_token=google_user.get("refresh_token"),
-                hashed_password=None,  # OAuth users don't have passwords
-                is_verified=True,
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+        user = None
+
+        # First, check if this Google account is already linked
+        oauth_account = db.query(UserOAuthAccount).filter(
+            UserOAuthAccount.provider == "google",
+            UserOAuthAccount.provider_account_id == provider_id
+        ).first()
+
+        if oauth_account:
+            # OAuth account found - get the linked user
+            user = db.query(User).filter(User.id == oauth_account.user_id).first()
+            # Update tokens
+            oauth_account.access_token = access_token_from_google
+            oauth_account.refresh_token = refresh_token_from_google
         else:
-            # Update existing user's OAuth tokens
-            user.oauth_access_token = google_user.get("access_token")
-            user.oauth_refresh_token = google_user.get("refresh_token")
-            if not user.oauth_provider:
-                user.oauth_provider = "google"
-                user.oauth_id = google_user["provider_id"]
-            if not user.avatar_url and google_user.get("picture"):
-                user.avatar_url = google_user.get("picture")
-            db.commit()
+            # OAuth account not found - check if email matches existing user (auto-linking)
+            user = db.query(User).filter(User.email == email).first()
+
+            if user:
+                # Email matches - auto-link this Google account to existing user
+                oauth_account = UserOAuthAccount(
+                    user_id=user.id,
+                    provider="google",
+                    provider_account_id=provider_id,
+                    access_token=access_token_from_google,
+                    refresh_token=refresh_token_from_google,
+                    provider_email=email,
+                    provider_name=name,
+                    provider_avatar=picture,
+                )
+                db.add(oauth_account)
+            else:
+                # No existing user - create new user and link OAuth account
+                is_new_user = True
+
+                # Generate username from email (ensure uniqueness)
+                base_username = generate_username_from_email(email)
+                username = base_username
+                counter = 1
+                while db.query(User).filter(User.username == username).first():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+
+                user = User(
+                    id=uuid.uuid4(),
+                    email=email,
+                    username=username,
+                    display_name=name or username,
+                    avatar_url=picture,
+                    oauth_provider="google",  # Keep for backwards compatibility
+                    oauth_id=provider_id,
+                    oauth_access_token=access_token_from_google,
+                    oauth_refresh_token=refresh_token_from_google,
+                    hashed_password=None,  # OAuth users don't have passwords
+                    is_verified=True,
+                )
+                db.add(user)
+                db.flush()  # Get user.id for the OAuth account
+
+                # Create OAuth account link
+                oauth_account = UserOAuthAccount(
+                    user_id=user.id,
+                    provider="google",
+                    provider_account_id=provider_id,
+                    access_token=access_token_from_google,
+                    refresh_token=refresh_token_from_google,
+                    provider_email=email,
+                    provider_name=name,
+                    provider_avatar=picture,
+                )
+                db.add(oauth_account)
+
+        # Update avatar if not set
+        if user and not user.avatar_url and picture:
+            user.avatar_url = picture
+
+        db.commit()
+        if user:
             db.refresh(user)
-        
+
         # Create access token for our app
         access_token = create_access_token(data={"sub": str(user.id)})
-        
+
         return OAuthLoginResponse(
             access_token=access_token,
             token_type="bearer",
@@ -481,62 +561,93 @@ async def apple_oauth_callback(
     """
     Handle Apple OAuth callback
     Exchange authorization code for user info and create/login user
+
+    Features:
+    - Auto-links Apple account if email matches existing user
+    - Supports multiple OAuth providers per user account
     """
     try:
         # Verify Apple ID token
         apple_user = await verify_apple_id_token(callback_data.id_token)
-        
-        # Check if user exists with this email or Apple OAuth ID
-        user = db.query(User).filter(
-            (User.email == apple_user["email"]) |
-            ((User.oauth_provider == "apple") & (User.oauth_id == apple_user["provider_id"]))
-        ).first()
-        
+
+        provider_id = apple_user["provider_id"]
+        email = apple_user["email"]
+
+        # Apple sends user info only on first login
+        name = None
+        if callback_data.user:
+            first_name = callback_data.user.get("name", {}).get("firstName", "")
+            last_name = callback_data.user.get("name", {}).get("lastName", "")
+            name = f"{first_name} {last_name}".strip()
+
         is_new_user = False
-        
-        if not user:
-            # Create new user from Apple data
-            is_new_user = True
-            
-            # Apple sends user info only on first login
-            name = None
-            if callback_data.user:
-                first_name = callback_data.user.get("name", {}).get("firstName", "")
-                last_name = callback_data.user.get("name", {}).get("lastName", "")
-                name = f"{first_name} {last_name}".strip()
-            
-            # Generate username from email
-            base_username = generate_username_from_email(apple_user["email"])
-            username = base_username
-            counter = 1
-            while db.query(User).filter(User.username == username).first():
-                username = f"{base_username}{counter}"
-                counter += 1
-            
-            user = User(
-                id=uuid.uuid4(),
-                email=apple_user["email"],
-                username=username,
-                display_name=name or username,
-                oauth_provider="apple",
-                oauth_id=apple_user["provider_id"],
-                hashed_password=None,  # OAuth users don't have passwords
-                is_verified=True,
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+        user = None
+
+        # First, check if this Apple account is already linked
+        oauth_account = db.query(UserOAuthAccount).filter(
+            UserOAuthAccount.provider == "apple",
+            UserOAuthAccount.provider_account_id == provider_id
+        ).first()
+
+        if oauth_account:
+            # OAuth account found - get the linked user
+            user = db.query(User).filter(User.id == oauth_account.user_id).first()
         else:
-            # Update existing user if needed
-            if not user.oauth_provider:
-                user.oauth_provider = "apple"
-                user.oauth_id = apple_user["provider_id"]
-            db.commit()
+            # OAuth account not found - check if email matches existing user (auto-linking)
+            user = db.query(User).filter(User.email == email).first()
+
+            if user:
+                # Email matches - auto-link this Apple account to existing user
+                oauth_account = UserOAuthAccount(
+                    user_id=user.id,
+                    provider="apple",
+                    provider_account_id=provider_id,
+                    provider_email=email,
+                    provider_name=name,
+                )
+                db.add(oauth_account)
+            else:
+                # No existing user - create new user and link OAuth account
+                is_new_user = True
+
+                # Generate username from email
+                base_username = generate_username_from_email(email)
+                username = base_username
+                counter = 1
+                while db.query(User).filter(User.username == username).first():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+
+                user = User(
+                    id=uuid.uuid4(),
+                    email=email,
+                    username=username,
+                    display_name=name or username,
+                    oauth_provider="apple",  # Keep for backwards compatibility
+                    oauth_id=provider_id,
+                    hashed_password=None,  # OAuth users don't have passwords
+                    is_verified=True,
+                )
+                db.add(user)
+                db.flush()  # Get user.id for the OAuth account
+
+                # Create OAuth account link
+                oauth_account = UserOAuthAccount(
+                    user_id=user.id,
+                    provider="apple",
+                    provider_account_id=provider_id,
+                    provider_email=email,
+                    provider_name=name,
+                )
+                db.add(oauth_account)
+
+        db.commit()
+        if user:
             db.refresh(user)
-        
+
         # Create access token for our app
         access_token = create_access_token(data={"sub": str(user.id)})
-        
+
         return OAuthLoginResponse(
             access_token=access_token,
             token_type="bearer",
@@ -556,6 +667,202 @@ async def apple_oauth_callback(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Apple OAuth failed: {str(e)}"
         )
+
+
+# ============================================================================
+# Linked Accounts Management Endpoints
+# ============================================================================
+
+@router.get("/linked-accounts", response_model=List[LinkedAccountResponse])
+async def get_linked_accounts(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all OAuth accounts linked to the current user.
+
+    Returns a list of linked accounts with provider info.
+    """
+    oauth_accounts = db.query(UserOAuthAccount).filter(
+        UserOAuthAccount.user_id == current_user.id
+    ).all()
+
+    return [
+        LinkedAccountResponse(
+            id=str(acc.id),
+            provider=acc.provider,
+            provider_email=acc.provider_email,
+            provider_name=acc.provider_name,
+            provider_avatar=acc.provider_avatar,
+            created_at=acc.created_at.isoformat() if acc.created_at else None,
+        )
+        for acc in oauth_accounts
+    ]
+
+
+@router.post("/link-account", response_model=LinkedAccountResponse)
+async def link_account(
+    link_data: LinkAccountRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually link an OAuth account to the current user.
+
+    - **provider**: 'google' or 'apple'
+    - **code**: OAuth authorization code from the provider
+    - **id_token**: Required for Apple OAuth
+    - **redirect_uri**: Required for mobile apps
+
+    This allows users to add additional sign-in methods to their account.
+    """
+    provider = link_data.provider.lower()
+
+    # Check if user already has this provider linked
+    existing = db.query(UserOAuthAccount).filter(
+        UserOAuthAccount.user_id == current_user.id,
+        UserOAuthAccount.provider == provider
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A {provider} account is already linked to your account"
+        )
+
+    # Exchange the OAuth code for user info
+    if provider == "google":
+        try:
+            google_user = await exchange_google_code_for_token(
+                link_data.code,
+                link_data.redirect_uri
+            )
+            provider_id = google_user["provider_id"]
+            email = google_user["email"]
+            name = google_user.get("name")
+            picture = google_user.get("picture")
+            access_token = google_user.get("access_token")
+            refresh_token = google_user.get("refresh_token")
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to verify Google account: {str(e)}"
+            )
+    elif provider == "apple":
+        if not link_data.id_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="id_token is required for Apple OAuth"
+            )
+        try:
+            apple_user = await verify_apple_id_token(link_data.id_token)
+            provider_id = apple_user["provider_id"]
+            email = apple_user["email"]
+            name = None
+            picture = None
+            access_token = None
+            refresh_token = None
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to verify Apple account: {str(e)}"
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported provider: {provider}. Use 'google' or 'apple'"
+        )
+
+    # Check if this OAuth account is already linked to another user
+    existing_link = db.query(UserOAuthAccount).filter(
+        UserOAuthAccount.provider == provider,
+        UserOAuthAccount.provider_account_id == provider_id
+    ).first()
+
+    if existing_link:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"This {provider} account is already linked to another user"
+        )
+
+    # Create the link
+    oauth_account = UserOAuthAccount(
+        user_id=current_user.id,
+        provider=provider,
+        provider_account_id=provider_id,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        provider_email=email,
+        provider_name=name,
+        provider_avatar=picture,
+    )
+    db.add(oauth_account)
+    db.commit()
+    db.refresh(oauth_account)
+
+    return LinkedAccountResponse(
+        id=str(oauth_account.id),
+        provider=oauth_account.provider,
+        provider_email=oauth_account.provider_email,
+        provider_name=oauth_account.provider_name,
+        provider_avatar=oauth_account.provider_avatar,
+        created_at=oauth_account.created_at.isoformat() if oauth_account.created_at else None,
+    )
+
+
+@router.delete("/unlink-account/{provider}")
+async def unlink_account(
+    provider: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Unlink an OAuth account from the current user.
+
+    - **provider**: The OAuth provider to unlink ('google' or 'apple')
+
+    Note: Users must have either a password or at least one linked OAuth account
+    to maintain access to their account.
+    """
+    # Find the linked account
+    oauth_account = db.query(UserOAuthAccount).filter(
+        UserOAuthAccount.user_id == current_user.id,
+        UserOAuthAccount.provider == provider
+    ).first()
+
+    if not oauth_account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No {provider} account linked"
+        )
+
+    # Check if user has a password or other linked accounts
+    other_accounts = db.query(UserOAuthAccount).filter(
+        UserOAuthAccount.user_id == current_user.id,
+        UserOAuthAccount.provider != provider
+    ).count()
+
+    has_password = current_user.hashed_password is not None
+
+    if not has_password and other_accounts == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot unlink the only authentication method. Set a password first or link another account."
+        )
+
+    # Delete the linked account
+    db.delete(oauth_account)
+
+    # Also clear the legacy oauth fields if this was the primary provider
+    if current_user.oauth_provider == provider:
+        current_user.oauth_provider = None
+        current_user.oauth_id = None
+        current_user.oauth_access_token = None
+        current_user.oauth_refresh_token = None
+
+    db.commit()
+
+    return {"message": f"{provider.capitalize()} account unlinked successfully"}
 
 
 @router.post("/reset-password")

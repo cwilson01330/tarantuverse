@@ -34,3 +34,24 @@ class OAuthLoginResponse(BaseModel):
     token_type: str = "bearer"
     user: dict
     is_new_user: bool  # True if this was first time login (registration)
+
+
+class LinkedAccountResponse(BaseModel):
+    """Response for a linked OAuth account"""
+    id: str
+    provider: str
+    provider_email: Optional[str] = None
+    provider_name: Optional[str] = None
+    provider_avatar: Optional[str] = None
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class LinkAccountRequest(BaseModel):
+    """Request to link a new OAuth account"""
+    provider: str  # 'google' or 'apple'
+    code: str  # OAuth authorization code
+    id_token: Optional[str] = None  # Required for Apple
+    redirect_uri: Optional[str] = None  # For mobile apps

@@ -81,6 +81,9 @@ class User(Base):
     referrals = relationship("User", foreign_keys="User.referred_by_user_id", lazy="select")
     referral_rewards = relationship("ReferralReward", back_populates="referrer", lazy="select", passive_deletes=True)
 
+    # Linked OAuth accounts (allows multiple providers per user)
+    oauth_accounts = relationship("UserOAuthAccount", back_populates="user", lazy="select", passive_deletes=True)
+
     def __repr__(self):
         return f"<User {self.username}>"
 
