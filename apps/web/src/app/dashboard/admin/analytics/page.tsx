@@ -77,6 +77,8 @@ export default function AdminAnalyticsPage() {
   const [activityData, setActivityData] = useState<ActivityAnalyticsResponse | null>(null);
   const [communityData, setCommunityData] = useState<CommunityAnalyticsResponse | null>(null);
 
+  const isAdmin = user?.is_admin || user?.is_superuser;
+
   // Auth check
   useEffect(() => {
     if (isLoading) return;
@@ -92,10 +94,13 @@ export default function AdminAnalyticsPage() {
     }
   }, [isLoading, isAuthenticated, user, router]);
 
-  // Fetch overview data
+  // Fetch overview data - only once when we have token and admin access
   useEffect(() => {
+    // Prevent refetching if we already have data
+    if (overview) return;
+
     const fetchOverview = async () => {
-      if (!token) return;
+      if (!token || !isAdmin) return;
 
       try {
         const response = await fetch(`${API_URL}/api/v1/admin/analytics/overview`, {
@@ -117,15 +122,19 @@ export default function AdminAnalyticsPage() {
       }
     };
 
-    if (token && user && (user.is_admin || user.is_superuser)) {
+    if (token && isAdmin) {
       fetchOverview();
     }
-  }, [token, user, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, isAdmin]);
 
   // Fetch tab-specific data when period or tab changes
   useEffect(() => {
+    // Track the current request to avoid race conditions
+    let isCancelled = false;
+
     const fetchTabData = async () => {
-      if (!token) return;
+      if (!token || !isAdmin) return;
 
       try {
         const endpoint = {
@@ -140,8 +149,12 @@ export default function AdminAnalyticsPage() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
 
+        if (isCancelled) return;
+
         if (!response.ok) throw new Error(`Failed to fetch ${activeTab} data`);
         const data = await response.json();
+
+        if (isCancelled) return;
 
         switch (activeTab) {
           case 'users':
@@ -158,14 +171,20 @@ export default function AdminAnalyticsPage() {
             break;
         }
       } catch (err) {
-        console.error(`Error fetching ${activeTab} data:`, err);
+        if (!isCancelled) {
+          console.error(`Error fetching ${activeTab} data:`, err);
+        }
       }
     };
 
-    if (token) {
+    if (token && isAdmin) {
       fetchTabData();
     }
-  }, [period, activeTab, token]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [period, activeTab, token, isAdmin]);
 
   if (isLoading) {
     return (
