@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/useAuth';
+import DashboardLayout from '@/components/DashboardLayout';
 import {
   AdminStatCard,
   AdminTimeSeriesChart,
@@ -62,9 +64,10 @@ const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
 
 export default function AdminAnalyticsPage() {
   const router = useRouter();
+  const { user, token, isLoading, isAuthenticated } = useAuth();
   const [period, setPeriod] = useState<AnalyticsPeriod>('30d');
   const [activeTab, setActiveTab] = useState<TabType>('users');
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Data states
@@ -74,16 +77,25 @@ export default function AdminAnalyticsPage() {
   const [activityData, setActivityData] = useState<ActivityAnalyticsResponse | null>(null);
   const [communityData, setCommunityData] = useState<CommunityAnalyticsResponse | null>(null);
 
-  const getToken = () => localStorage.getItem('token');
+  // Auth check
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (!isAuthenticated || !user) {
+      router.push('/login');
+      return;
+    }
+
+    if (!user.is_admin && !user.is_superuser) {
+      router.push('/dashboard');
+      return;
+    }
+  }, [isLoading, isAuthenticated, user, router]);
 
   // Fetch overview data
   useEffect(() => {
     const fetchOverview = async () => {
-      const token = getToken();
-      if (!token) {
-        router.push('/login');
-        return;
-      }
+      if (!token) return;
 
       try {
         const response = await fetch(`${API_URL}/api/v1/admin/analytics/overview`, {
@@ -101,17 +113,18 @@ export default function AdminAnalyticsPage() {
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
-        setLoading(false);
+        setDataLoading(false);
       }
     };
 
-    fetchOverview();
-  }, [router]);
+    if (token && user && (user.is_admin || user.is_superuser)) {
+      fetchOverview();
+    }
+  }, [token, user, router]);
 
   // Fetch tab-specific data when period or tab changes
   useEffect(() => {
     const fetchTabData = async () => {
-      const token = getToken();
       if (!token) return;
 
       try {
@@ -149,36 +162,48 @@ export default function AdminAnalyticsPage() {
       }
     };
 
-    fetchTabData();
-  }, [period, activeTab]);
+    if (token) {
+      fetchTabData();
+    }
+  }, [period, activeTab, token]);
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-48" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-            ))}
-          </div>
-          <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading analytics...</p>
         </div>
       </div>
     );
+  }
+
+  if (!user || (!user.is_admin && !user.is_superuser)) {
+    return null;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-        <div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
-          {error}
+      <DashboardLayout
+        userName={user.name || user.username}
+        userEmail={user.email || undefined}
+        userAvatar={user.image || undefined}
+      >
+        <div className="p-6">
+          <div className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
+            {error}
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
+    <DashboardLayout
+      userName={user.name || user.username}
+      userEmail={user.email || undefined}
+      userAvatar={user.image || undefined}
+    >
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -300,6 +325,7 @@ export default function AdminAnalyticsPage() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 }
 
