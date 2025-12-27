@@ -6,6 +6,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { useThemeStore } from '@/stores/themeStore';
 import DashboardLayout from '@/components/DashboardLayout';
 
+interface LinkedAccount {
+  id: string;
+  provider: string;
+  provider_email: string | null;
+  provider_name: string | null;
+  provider_avatar: string | null;
+  created_at: string | null;
+}
+
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useThemeStore();
@@ -17,6 +26,9 @@ export default function SettingsPage() {
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null);
+  const [linkedAccounts, setLinkedAccounts] = useState<LinkedAccount[]>([]);
+  const [linkedAccountsLoading, setLinkedAccountsLoading] = useState(true);
+  const [unlinkingProvider, setUnlinkingProvider] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -27,6 +39,7 @@ export default function SettingsPage() {
     }
 
     fetchUser();
+    fetchLinkedAccounts();
   }, [authLoading, isAuthenticated, token]);
 
   const fetchUser = async () => {
@@ -115,6 +128,82 @@ export default function SettingsPage() {
       setPromoLoading(false);
     }
   };
+
+  const fetchLinkedAccounts = async () => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/v1/auth/linked-accounts`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const accounts = await response.json();
+        setLinkedAccounts(accounts);
+      }
+    } catch (error) {
+      console.error('Error fetching linked accounts:', error);
+    } finally {
+      setLinkedAccountsLoading(false);
+    }
+  };
+
+  const handleUnlinkAccount = async (provider: string) => {
+    if (!confirm(`Are you sure you want to unlink your ${provider.charAt(0).toUpperCase() + provider.slice(1)} account? You will no longer be able to sign in with this provider unless you link it again.`)) {
+      return;
+    }
+
+    setUnlinkingProvider(provider);
+
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/v1/auth/unlink-account/${provider}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        // Remove the account from the list
+        setLinkedAccounts(prev => prev.filter(acc => acc.provider !== provider));
+      } else {
+        const data = await response.json();
+        alert(data.detail || 'Failed to unlink account');
+      }
+    } catch (error) {
+      console.error('Error unlinking account:', error);
+      alert('Failed to unlink account. Please try again.');
+    } finally {
+      setUnlinkingProvider(null);
+    }
+  };
+
+  const getProviderIcon = (provider: string) => {
+    switch (provider) {
+      case 'google':
+        return (
+          <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+          </svg>
+        );
+      case 'apple':
+        return (
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+          </svg>
+        );
+      default:
+        return <span className="w-5 h-5 rounded-full bg-gray-400"></span>;
+    }
+  };
+
+  const hasPassword = user?.hashed_password !== null;
+  const canUnlink = linkedAccounts.length > 1 || hasPassword;
 
   if (loading || authLoading) {
     return (
@@ -258,6 +347,111 @@ export default function SettingsPage() {
             >
               Change Privacy Settings
             </button>
+          </div>
+        </section>
+
+        {/* Linked Accounts Section */}
+        <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="text-2xl">🔗</span>
+            <h2 className="text-xl font-bold text-theme-primary">Linked Accounts</h2>
+          </div>
+
+          <div className="space-y-4">
+            <p className="text-sm text-theme-secondary">
+              Link multiple sign-in methods to your account. This allows you to access your account from any device and ensures your subscription works across all platforms.
+            </p>
+
+            {linkedAccountsLoading ? (
+              <div className="p-4 bg-surface-elevated rounded-lg text-center">
+                <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="text-sm text-theme-secondary mt-2">Loading linked accounts...</p>
+              </div>
+            ) : linkedAccounts.length === 0 ? (
+              <div className="p-4 bg-surface-elevated rounded-lg text-center">
+                <p className="text-theme-secondary">No OAuth accounts linked yet.</p>
+                <p className="text-sm text-theme-tertiary mt-1">
+                  Sign in with Google or Apple to automatically link that account.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {linkedAccounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="flex items-center justify-between p-4 bg-surface-elevated rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      {getProviderIcon(account.provider)}
+                      <div>
+                        <h3 className="font-semibold text-theme-primary capitalize">
+                          {account.provider}
+                        </h3>
+                        <p className="text-sm text-theme-secondary">
+                          {account.provider_email || 'Email not available'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUnlinkAccount(account.provider)}
+                      disabled={!canUnlink || unlinkingProvider === account.provider}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition ${
+                        canUnlink
+                          ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                      }`}
+                      title={!canUnlink ? 'Cannot unlink the only sign-in method' : undefined}
+                    >
+                      {unlinkingProvider === account.provider ? 'Unlinking...' : 'Unlink'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Available providers to link */}
+            {!linkedAccountsLoading && (
+              <div className="pt-4 border-t border-theme">
+                <h3 className="font-semibold text-theme-primary mb-3">Link Additional Accounts</h3>
+                <div className="space-y-2">
+                  {!linkedAccounts.find(a => a.provider === 'google') && (
+                    <div className="flex items-center justify-between p-3 bg-surface-elevated rounded-lg">
+                      <div className="flex items-center gap-3">
+                        {getProviderIcon('google')}
+                        <span className="text-theme-primary">Google</span>
+                      </div>
+                      <span className="text-xs text-theme-tertiary">
+                        Sign in with Google to link
+                      </span>
+                    </div>
+                  )}
+                  {!linkedAccounts.find(a => a.provider === 'apple') && (
+                    <div className="flex items-center justify-between p-3 bg-surface-elevated rounded-lg">
+                      <div className="flex items-center gap-3">
+                        {getProviderIcon('apple')}
+                        <span className="text-theme-primary">Apple</span>
+                      </div>
+                      <span className="text-xs text-theme-tertiary">
+                        Sign in with Apple to link
+                      </span>
+                    </div>
+                  )}
+                  {linkedAccounts.find(a => a.provider === 'google') && linkedAccounts.find(a => a.provider === 'apple') && (
+                    <p className="text-sm text-green-600 dark:text-green-400 text-center py-2">
+                      All available providers are linked
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!canUnlink && linkedAccounts.length > 0 && (
+              <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                  You cannot unlink your only sign-in method. Set a password or link another account first.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 
