@@ -24,6 +24,7 @@ from app.utils.oauth import (
 from app.services.email import EmailService
 from app.services.storage import storage_service
 from app.config import settings
+from app.utils.username_validation import validate_username
 
 router = APIRouter()
 
@@ -53,6 +54,14 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken"
+        )
+
+    # Validate username for offensive content
+    is_valid, error_message = validate_username(user_data.username)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message
         )
 
     # Validate referral code if provided
