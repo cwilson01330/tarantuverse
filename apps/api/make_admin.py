@@ -55,12 +55,12 @@ def make_admin():
 
             # Make admin
             db.execute(
-                text("UPDATE users SET is_superuser = true WHERE id = :id"),
+                text("UPDATE users SET is_superuser = true, is_admin = true WHERE id = :id"),
                 {"id": user_id}
             )
             db.commit()
 
-            print(f"\n✅ {email} (@{username}) is now a SUPERUSER!")
+            print(f"\n✅ {email} (@{username}) is now an ADMIN!")
             print("\nAs admin, you can now:")
             print("  • Edit any species information")
             print("  • Delete species")

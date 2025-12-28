@@ -56,6 +56,7 @@ class UserResponse(BaseModel):
     is_breeder: Optional[bool] = False
     is_active: Optional[bool] = True
     is_superuser: Optional[bool] = False
+    is_admin: Optional[bool] = False
     is_verified: Optional[bool] = False
     is_premium: Optional[bool] = False
     created_at: datetime
