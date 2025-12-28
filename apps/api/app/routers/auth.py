@@ -407,6 +407,7 @@ async def oauth_login(
                 "display_name": user.display_name,
                 "avatar_url": user.avatar_url,
                 "is_superuser": user.is_superuser,
+                "is_admin": user.is_admin,
             },
             is_new_user=is_new_user,
         )
@@ -542,6 +543,7 @@ async def google_oauth_callback(
                 "display_name": user.display_name,
                 "avatar_url": user.avatar_url,
                 "is_superuser": user.is_superuser,
+                "is_admin": user.is_admin,
             },
             is_new_user=is_new_user,
         )
@@ -658,6 +660,7 @@ async def apple_oauth_callback(
                 "display_name": user.display_name,
                 "avatar_url": user.avatar_url,
                 "is_superuser": user.is_superuser,
+                "is_admin": user.is_admin,
             },
             is_new_user=is_new_user,
         )

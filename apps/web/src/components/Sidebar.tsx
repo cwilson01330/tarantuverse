@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { TarantuverseLogoTransparent } from './TarantuverseLogo'
+import { useAuth } from '@/hooks/useAuth'
 
 interface SidebarProps {
   isOpen: boolean
@@ -21,34 +22,36 @@ interface NavItem {
 export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { user, token } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
-    checkAdminStatus()
-  }, [])
+    // Check admin status from useAuth hook first
+    if (user?.is_admin || user?.is_superuser) {
+      setIsAdmin(true)
+      return
+    }
 
-  const checkAdminStatus = async () => {
-    const token = localStorage.getItem('auth_token')
-    console.log('[Sidebar] Token exists:', !!token)
-    if (!token) return
+    // Fallback: fetch from API if token is available
+    if (token) {
+      checkAdminStatus(token)
+    }
+  }, [user, token])
 
+  const checkAdminStatus = async (authToken: string) => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       })
 
-      console.log('[Sidebar] Response status:', response.status)
-
       if (response.ok) {
-        const user = await response.json()
-        console.log('[Sidebar] User data:', {
-          email: user.email,
-          is_admin: user.is_admin,
-          is_superuser: user.is_superuser
+        const userData = await response.json()
+        console.log('[Sidebar] User data from API:', {
+          email: userData.email,
+          is_admin: userData.is_admin,
+          is_superuser: userData.is_superuser
         })
-        setIsAdmin(user.is_admin || user.is_superuser)
-      } else {
-        console.log('[Sidebar] Response not OK:', response.status)
+        setIsAdmin(userData.is_admin || userData.is_superuser)
       }
     } catch (error) {
       console.error('Failed to check admin status:', error)
