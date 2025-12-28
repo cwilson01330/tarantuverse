@@ -545,13 +545,13 @@ export default function KeeperProfileScreen() {
     statsContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 8,
+      justifyContent: 'space-between',
       paddingHorizontal: 16,
       marginBottom: 16,
+      gap: 8,
     },
     statCard: {
-      minWidth: '30%',
-      maxWidth: '48%',
+      width: '48%',
       backgroundColor: colors.surface,
       padding: 16,
       borderRadius: 12,

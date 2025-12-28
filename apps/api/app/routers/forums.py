@@ -22,6 +22,7 @@ from app.routers.auth import get_current_user
 from app.utils.dependencies import get_current_user_optional
 from app.services.activity_service import create_activity
 from app.utils.push_notifications import send_forum_reply_notification
+from app.utils.spam_protection import full_spam_check
 
 router = APIRouter(prefix="/api/v1/forums", tags=["forums"])
 
@@ -241,13 +242,24 @@ async def create_thread(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new thread with initial post"""
+    # Run spam protection checks (rate limit, account requirements, honeypot, content filter)
+    is_allowed, error_message = full_spam_check(
+        db=db,
+        user=current_user,
+        content=thread_data.content,
+        title=thread_data.title,
+        honeypot=thread_data.website  # Honeypot field
+    )
+    if not is_allowed:
+        raise HTTPException(status_code=400, detail=error_message)
+
     # Verify category exists
     category = db.query(ForumCategory).filter(
         ForumCategory.id == thread_data.category_id
     ).first()
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
-    
+
     # Create thread
     slug = slugify(thread_data.title)
     thread = ForumThread(
@@ -413,14 +425,24 @@ async def create_post(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new post (reply) in a thread"""
+    # Run spam protection checks (rate limit, account requirements, honeypot, content filter)
+    is_allowed, error_message = full_spam_check(
+        db=db,
+        user=current_user,
+        content=post_data.content,
+        honeypot=post_data.website  # Honeypot field
+    )
+    if not is_allowed:
+        raise HTTPException(status_code=400, detail=error_message)
+
     # Verify thread exists and is not locked
     thread = db.query(ForumThread).filter(ForumThread.id == thread_id).first()
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found")
-    
+
     if thread.is_locked and not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Thread is locked")
-    
+
     # Create post
     post = ForumPost(
         thread_id=thread_id,

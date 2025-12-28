@@ -64,6 +64,7 @@ export default function ThreadPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
+  const [replyHoneypot, setReplyHoneypot] = useState(""); // Honeypot - must stay empty
   const [submitting, setSubmitting] = useState(false);
   const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -140,7 +141,7 @@ export default function ThreadPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ content: replyContent }),
+          body: JSON.stringify({ content: replyContent, website: replyHoneypot }),
         }
       );
 
@@ -627,6 +628,30 @@ export default function ThreadPage() {
               rows={6}
               required
             />
+
+            {/* Honeypot field - hidden from humans, bots will fill it */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                left: '-9999px',
+                opacity: 0,
+                height: 0,
+                overflow: 'hidden',
+              }}
+            >
+              <label htmlFor="reply-website">Website</label>
+              <input
+                type="text"
+                id="reply-website"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                value={replyHoneypot}
+                onChange={(e) => setReplyHoneypot(e.target.value)}
+              />
+            </div>
+
             <div className="mt-4 flex justify-between items-center">
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Be respectful and constructive in your replies

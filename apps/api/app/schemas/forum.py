@@ -53,6 +53,8 @@ class ForumThreadBase(BaseModel):
 
 class ForumThreadCreate(ForumThreadBase):
     content: str  # First post content
+    # Honeypot field - should always be empty (bots fill it, humans don't see it)
+    website: Optional[str] = None  # Named generically to trick bots
 
 
 class ForumThreadUpdate(BaseModel):
@@ -103,6 +105,8 @@ class ForumThreadDetail(ForumThreadResponse):
 
 class ForumPostBase(BaseModel):
     content: str
+    # Honeypot field - should always be empty (bots fill it, humans don't see it)
+    website: Optional[str] = None  # Named generically to trick bots
 
 
 class ForumPostCreate(ForumPostBase):

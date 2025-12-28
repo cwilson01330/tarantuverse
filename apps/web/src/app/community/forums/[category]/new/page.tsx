@@ -9,6 +9,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 interface NewThreadFormData {
   title: string;
   content: string;
+  website: string; // Honeypot field - should stay empty
 }
 
 interface Category {
@@ -27,6 +28,7 @@ export default function NewThreadPage() {
   const [formData, setFormData] = useState<NewThreadFormData>({
     title: "",
     content: "",
+    website: "", // Honeypot - must stay empty
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +86,7 @@ export default function NewThreadPage() {
             category_id: category.id,
             title: formData.title,
             content: formData.content,
+            website: formData.website, // Honeypot field
           }),
         }
       );
@@ -223,6 +226,31 @@ export default function NewThreadPage() {
               <li>• Use clear, descriptive titles</li>
               <li>• Search before posting to avoid duplicates</li>
             </ul>
+          </div>
+
+          {/* Honeypot field - hidden from humans, bots will fill it */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '-9999px',
+              opacity: 0,
+              height: 0,
+              overflow: 'hidden',
+            }}
+          >
+            <label htmlFor="website">Website</label>
+            <input
+              type="text"
+              id="website"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={formData.website}
+              onChange={(e) =>
+                setFormData({ ...formData, website: e.target.value })
+              }
+            />
           </div>
 
           {/* Buttons */}
