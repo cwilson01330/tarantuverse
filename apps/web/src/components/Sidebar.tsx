@@ -29,6 +29,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
 
   const checkAdminStatus = async () => {
     const token = localStorage.getItem('auth_token')
+    console.log('[Sidebar] Token exists:', !!token)
     if (!token) return
 
     try {
@@ -36,9 +37,18 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
         headers: { Authorization: `Bearer ${token}` },
       })
 
+      console.log('[Sidebar] Response status:', response.status)
+
       if (response.ok) {
         const user = await response.json()
+        console.log('[Sidebar] User data:', {
+          email: user.email,
+          is_admin: user.is_admin,
+          is_superuser: user.is_superuser
+        })
         setIsAdmin(user.is_admin || user.is_superuser)
+      } else {
+        console.log('[Sidebar] Response not OK:', response.status)
       }
     } catch (error) {
       console.error('Failed to check admin status:', error)
