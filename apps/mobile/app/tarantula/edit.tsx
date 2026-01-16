@@ -10,10 +10,12 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { apiClient } from '../../src/services/api';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface TarantulaData {
   name: string;
@@ -39,6 +41,7 @@ interface TarantulaData {
 export default function EditTarantulaScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { colors } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -143,29 +146,29 @@ export default function EditTarantulaScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#7c3aed" />
-      </View>
+      <SafeAreaView style={[styles.loadingContainer, { backgroundColor: colors.background }]} edges={['top']}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="close" size={24} color="#1f2937" />
+          <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Tarantula</Text>
-        <TouchableOpacity 
-          onPress={handleSave} 
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Edit Tarantula</Text>
+        <TouchableOpacity
+          onPress={handleSave}
           style={styles.saveButton}
           disabled={saving}
         >
           {saving ? (
-            <ActivityIndicator size="small" color="#7c3aed" />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={[styles.saveButtonText, { color: colors.primary }]}>Save</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -436,31 +439,26 @@ export default function EditTarantulaScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   backButton: {
     padding: 8,

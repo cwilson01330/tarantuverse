@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, RefreshControl, Image, FlatList, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
@@ -207,12 +208,12 @@ export default function SpeciesScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.loadingContainer}>
           <Text style={{ fontSize: 60, marginBottom: 16 }}>🕷️</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Loading species...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -282,7 +283,7 @@ export default function SpeciesScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {filteredSpecies.length === 0 && !loading ? (
         <>
           <ListHeader />
@@ -313,7 +314,7 @@ export default function SpeciesScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -328,7 +329,6 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 16,
-    paddingTop: 50,
     borderBottomWidth: 1,
   },
   title: {

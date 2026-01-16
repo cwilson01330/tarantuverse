@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -120,7 +121,7 @@ export default function SpeciesDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.loadingContainer}>
           <Text style={{ fontSize: 60, marginBottom: 16 }}>🕷️</Text>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -128,13 +129,13 @@ export default function SpeciesDetailScreen() {
             Loading species...
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error || !species) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
@@ -147,7 +148,7 @@ export default function SpeciesDetailScreen() {
             {error || 'The requested species could not be found.'}
           </Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -503,8 +504,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     gap: 12,
   },

@@ -9,11 +9,13 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { apiClient } from '../../src/services/api';
 import { scheduleSubstrateReminder } from '../../src/services/notifications';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 const SUBSTRATE_TYPES = [
   'Coco Fiber',
@@ -37,6 +39,7 @@ const CHANGE_REASONS = [
 export default function AddSubstrateChangeScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { colors } = useTheme();
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [substrateType, setSubstrateType] = useState('');
@@ -122,16 +125,16 @@ export default function AddSubstrateChangeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="close" size={24} color="#1f2937" />
+          <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Log Substrate Change</Text>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Log Substrate Change</Text>
         <TouchableOpacity
           onPress={handleSave}
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+          style={[styles.saveButton, { backgroundColor: colors.primary }, saving && styles.saveButtonDisabled]}
           disabled={saving}
         >
           <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
@@ -241,25 +244,21 @@ export default function AddSubstrateChangeScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 50,
     paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   backButton: {
     padding: 8,
@@ -267,12 +266,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
   },
   saveButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: '#7c3aed',
     borderRadius: 8,
   },
   saveButtonDisabled: {
