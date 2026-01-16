@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -59,6 +59,7 @@ interface Species {
 
 export default function SpeciesDetailScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
   const [species, setSpecies] = useState<Species | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,7 +169,7 @@ export default function SpeciesDetailScreen() {
           {/* Floating Back Button */}
           <TouchableOpacity
             onPress={() => router.back()}
-            style={styles.floatingBackButton}
+            style={[styles.floatingBackButton, { top: insets.top + 8 }]}
           >
             <Ionicons name="arrow-back" size={24} color="#ffffff" />
           </TouchableOpacity>
@@ -535,7 +536,6 @@ const styles = StyleSheet.create({
   },
   floatingBackButton: {
     position: 'absolute',
-    top: 50,
     left: 16,
     width: 44,
     height: 44,
