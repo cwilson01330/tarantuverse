@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, RefreshControl, Im
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
@@ -284,6 +284,7 @@ export default function SpeciesScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <Stack.Screen options={{ headerShown: false }} />
       {filteredSpecies.length === 0 && !loading ? (
         <>
           <ListHeader />
