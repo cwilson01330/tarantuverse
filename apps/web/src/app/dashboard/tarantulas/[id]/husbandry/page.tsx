@@ -201,24 +201,24 @@ export default function EditHusbandryPage() {
         <div className="mb-6">
           <button
             onClick={() => router.push(`/dashboard/tarantulas/${id}`)}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-theme-secondary hover:text-theme-primary transition-colors"
           >
             ← Back to {tarantula?.common_name}
           </button>
         </div>
 
         <h1 className="text-4xl font-bold mb-2">Edit Husbandry</h1>
-        <p className="text-xl text-gray-600 mb-8">{tarantula?.common_name} - {tarantula?.scientific_name}</p>
+        <p className="text-xl text-theme-secondary mb-8">{tarantula?.common_name} - {tarantula?.scientific_name}</p>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Enclosure Section */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="bg-surface border border-theme rounded-xl p-6">
             <h2 className="text-2xl font-bold mb-4">Enclosure Setup</h2>
 
             <div className="space-y-4">
@@ -227,14 +227,14 @@ export default function EditHusbandryPage() {
                 <select
                   value={formData.enclosure_type}
                   onChange={(e) => setFormData({ ...formData, enclosure_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                 >
                   <option value="">Select...</option>
                   <option value="terrestrial">Terrestrial</option>
                   <option value="arboreal">Arboreal</option>
                   <option value="fossorial">Fossorial</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Ground-dwelling, tree-dwelling, or burrowing</p>
+                <p className="text-xs text-theme-tertiary mt-1">Ground-dwelling, tree-dwelling, or burrowing</p>
               </div>
 
               <div>
@@ -243,7 +243,7 @@ export default function EditHusbandryPage() {
                   type="text"
                   value={formData.enclosure_size}
                   onChange={(e) => setFormData({ ...formData, enclosure_size: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                   placeholder="e.g., 10x10x12 inches"
                 />
               </div>
@@ -254,14 +254,14 @@ export default function EditHusbandryPage() {
                   type="date"
                   value={formData.last_enclosure_cleaning}
                   onChange={(e) => setFormData({ ...formData, last_enclosure_cleaning: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                 />
               </div>
             </div>
           </div>
 
           {/* Substrate Section */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="bg-surface border border-theme rounded-xl p-6">
             <h2 className="text-2xl font-bold mb-4">Substrate</h2>
 
             <div className="space-y-4">
@@ -271,7 +271,7 @@ export default function EditHusbandryPage() {
                   type="text"
                   value={formData.substrate_type}
                   onChange={(e) => setFormData({ ...formData, substrate_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                   placeholder="e.g., Coco fiber, peat moss, mix"
                 />
               </div>
@@ -282,7 +282,7 @@ export default function EditHusbandryPage() {
                   type="text"
                   value={formData.substrate_depth}
                   onChange={(e) => setFormData({ ...formData, substrate_depth: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                   placeholder="e.g., 3 inches, 5-6 inches"
                 />
               </div>
@@ -293,14 +293,14 @@ export default function EditHusbandryPage() {
                   type="date"
                   value={formData.last_substrate_change}
                   onChange={(e) => setFormData({ ...formData, last_substrate_change: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                 />
               </div>
             </div>
           </div>
 
           {/* Climate Section */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="bg-surface border border-theme rounded-xl p-6">
             <h2 className="text-2xl font-bold mb-4">Climate Control</h2>
 
             <div className="space-y-4">
@@ -312,7 +312,7 @@ export default function EditHusbandryPage() {
                     step="0.1"
                     value={formData.target_temp_min}
                     onChange={(e) => setFormData({ ...formData, target_temp_min: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                     placeholder="70"
                   />
                 </div>
@@ -323,7 +323,7 @@ export default function EditHusbandryPage() {
                     step="0.1"
                     value={formData.target_temp_max}
                     onChange={(e) => setFormData({ ...formData, target_temp_max: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                     placeholder="80"
                   />
                 </div>
@@ -337,7 +337,7 @@ export default function EditHusbandryPage() {
                     step="1"
                     value={formData.target_humidity_min}
                     onChange={(e) => setFormData({ ...formData, target_humidity_min: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                     placeholder="60"
                   />
                 </div>
@@ -348,7 +348,7 @@ export default function EditHusbandryPage() {
                     step="1"
                     value={formData.target_humidity_max}
                     onChange={(e) => setFormData({ ...formData, target_humidity_max: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                     placeholder="75"
                   />
                 </div>
@@ -357,7 +357,7 @@ export default function EditHusbandryPage() {
           </div>
 
           {/* Maintenance Section */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="bg-surface border border-theme rounded-xl p-6">
             <h2 className="text-2xl font-bold mb-4">Maintenance</h2>
 
             <div className="space-y-4">
@@ -367,7 +367,7 @@ export default function EditHusbandryPage() {
                     type="checkbox"
                     checked={formData.water_dish}
                     onChange={(e) => setFormData({ ...formData, water_dish: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-600"
+                    className="w-4 h-4 text-blue-600 border-theme rounded focus:ring-blue-500"
                   />
                   <span className="text-sm font-medium">Water Dish Present</span>
                 </label>
@@ -379,7 +379,7 @@ export default function EditHusbandryPage() {
                   type="text"
                   value={formData.misting_schedule}
                   onChange={(e) => setFormData({ ...formData, misting_schedule: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                   placeholder="e.g., 2x per week, Daily, As needed"
                 />
               </div>
@@ -387,7 +387,7 @@ export default function EditHusbandryPage() {
           </div>
 
           {/* Notes Section */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="bg-surface border border-theme rounded-xl p-6">
             <h2 className="text-2xl font-bold mb-4">Enclosure Notes</h2>
 
             <div>
@@ -396,10 +396,10 @@ export default function EditHusbandryPage() {
                 value={formData.enclosure_notes}
                 onChange={(e) => setFormData({ ...formData, enclosure_notes: e.target.value })}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                 placeholder="Decorations, hides, modifications, special setup details..."
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-theme-tertiary mt-1">
                 Document hides, decorations, modifications, or any special setup details
               </p>
             </div>
@@ -410,14 +410,14 @@ export default function EditHusbandryPage() {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {loading ? 'Saving...' : 'Save Husbandry Info'}
             </button>
             <button
               type="button"
               onClick={() => router.push(`/dashboard/tarantulas/${id}`)}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              className="px-6 py-3 border border-theme rounded-xl hover:bg-surface-elevated transition text-theme-primary"
             >
               Cancel
             </button>

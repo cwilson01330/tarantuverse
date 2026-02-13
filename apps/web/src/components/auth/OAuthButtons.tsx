@@ -32,7 +32,7 @@ export default function OAuthButtons() {
       <button
         onClick={handleGoogleSignIn}
         disabled={loading !== null}
-        className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-surface border border-theme rounded-xl hover:bg-surface-elevated hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading === "google" ? (
           <div className="w-5 h-5 border-2 border-gray-400 border-t-blue-600 rounded-full animate-spin" />
@@ -56,7 +56,7 @@ export default function OAuthButtons() {
             />
           </svg>
         )}
-        <span className="text-gray-700 font-medium">
+        <span className="text-theme-primary font-medium">
           {loading === "google" ? "Signing in..." : "Continue with Google"}
         </span>
       </button>
@@ -65,7 +65,7 @@ export default function OAuthButtons() {
       <button
         onClick={handleAppleSignIn}
         disabled={loading !== null}
-        className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-white text-black rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="flex items-center justify-center gap-3 w-full px-4 py-3 bg-surface text-theme-primary border border-theme rounded-xl hover:bg-surface-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading === "apple" ? (
           <div className="w-5 h-5 border-2 border-gray-400 border-t-black rounded-full animate-spin" />

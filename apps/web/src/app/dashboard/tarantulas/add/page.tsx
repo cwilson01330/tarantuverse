@@ -167,7 +167,7 @@ function AddTarantulaContent() {
         <div className="mb-6">
           <button
             onClick={() => router.push('/dashboard')}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-theme-secondary hover:text-theme-primary transition-colors"
           >
             ← Back to Dashboard
           </button>
@@ -176,7 +176,7 @@ function AddTarantulaContent() {
         <h1 className="text-4xl font-bold mb-8">Add Tarantula</h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl">
             {error}
           </div>
         )}
@@ -189,7 +189,7 @@ function AddTarantulaContent() {
               initialValue={formData.scientific_name}
               placeholder="Search for a species (e.g., Grammostola rosea)"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-theme-tertiary mt-1">
               Start typing to search our species database. Select to auto-fill species info.
             </p>
           </div>
@@ -202,7 +202,7 @@ function AddTarantulaContent() {
                 required
                 value={formData.common_name}
                 onChange={(e) => setFormData({ ...formData, common_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                 placeholder="e.g., Rose Hair"
               />
             </div>
@@ -214,10 +214,10 @@ function AddTarantulaContent() {
                 required
                 value={formData.scientific_name}
                 onChange={(e) => setFormData({ ...formData, scientific_name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600"
+                className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                 placeholder="e.g., Grammostola rosea"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-theme-tertiary mt-1">
                 Or enter manually if not found above
               </p>
             </div>
@@ -229,7 +229,7 @@ function AddTarantulaContent() {
               <select
                 value={formData.sex}
                 onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               >
                 <option value="">Select...</option>
                 <option value="male">Male</option>
@@ -246,7 +246,7 @@ function AddTarantulaContent() {
                 type="date"
                 value={formData.date_acquired}
                 onChange={(e) => setFormData({ ...formData, date_acquired: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               />
             </div>
 
@@ -255,7 +255,7 @@ function AddTarantulaContent() {
               <select
                 value={formData.source}
                 onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               >
                 <option value="">Select...</option>
                 <option value="bred">Bred</option>
@@ -272,7 +272,7 @@ function AddTarantulaContent() {
               step="0.01"
               value={formData.price_paid}
               onChange={(e) => setFormData({ ...formData, price_paid: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="0.00"
             />
           </div>
@@ -283,16 +283,16 @@ function AddTarantulaContent() {
               type="url"
               value={formData.photo_url}
               onChange={(e) => setFormData({ ...formData, photo_url: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="https://example.com/image.jpg"
             />
-            <p className="text-xs text-gray-500 mt-1">Enter a URL to a photo of your tarantula</p>
+            <p className="text-xs text-theme-tertiary mt-1">Enter a URL to a photo of your tarantula</p>
           </div>
 
           {/* Husbandry Section */}
-          <div className="border-t border-gray-200 pt-6 mt-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900">Husbandry Information</h2>
-            <p className="text-sm text-gray-600 mb-6">Optional: Track enclosure setup and environmental conditions</p>
+          <div className="border-t border-theme pt-6 mt-8">
+            <h2 className="text-2xl font-bold mb-4 text-theme-primary">Husbandry Information</h2>
+            <p className="text-sm text-theme-secondary mb-6">Optional: Track enclosure setup and environmental conditions</p>
 
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -301,7 +301,7 @@ function AddTarantulaContent() {
                   <select
                     value={formData.enclosure_type}
                     onChange={(e) => setFormData({ ...formData, enclosure_type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                   >
                     <option value="">Select...</option>
                     <option value="terrestrial">Terrestrial</option>
@@ -316,7 +316,7 @@ function AddTarantulaContent() {
                     type="text"
                     value={formData.enclosure_size}
                     onChange={(e) => setFormData({ ...formData, enclosure_size: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                     placeholder="e.g., 10x10x10 inches"
                   />
                 </div>
@@ -329,7 +329,7 @@ function AddTarantulaContent() {
                     type="text"
                     value={formData.substrate_type}
                     onChange={(e) => setFormData({ ...formData, substrate_type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                     placeholder="e.g., coco fiber"
                   />
                 </div>
@@ -340,7 +340,7 @@ function AddTarantulaContent() {
                     type="text"
                     value={formData.substrate_depth}
                     onChange={(e) => setFormData({ ...formData, substrate_depth: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                     placeholder="e.g., 3 inches"
                   />
                 </div>
@@ -353,7 +353,7 @@ function AddTarantulaContent() {
                     type="date"
                     value={formData.last_substrate_change}
                     onChange={(e) => setFormData({ ...formData, last_substrate_change: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                   />
                 </div>
 
@@ -363,7 +363,7 @@ function AddTarantulaContent() {
                     type="date"
                     value={formData.last_enclosure_cleaning}
                     onChange={(e) => setFormData({ ...formData, last_enclosure_cleaning: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                   />
                 </div>
               </div>
@@ -376,15 +376,15 @@ function AddTarantulaContent() {
                       type="number"
                       value={formData.target_temp_min}
                       onChange={(e) => setFormData({ ...formData, target_temp_min: e.target.value })}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      className="flex-1 px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                       placeholder="Min"
                     />
-                    <span className="text-gray-500">to</span>
+                    <span className="text-theme-tertiary">to</span>
                     <input
                       type="number"
                       value={formData.target_temp_max}
                       onChange={(e) => setFormData({ ...formData, target_temp_max: e.target.value })}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      className="flex-1 px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                       placeholder="Max"
                     />
                   </div>
@@ -397,15 +397,15 @@ function AddTarantulaContent() {
                       type="number"
                       value={formData.target_humidity_min}
                       onChange={(e) => setFormData({ ...formData, target_humidity_min: e.target.value })}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      className="flex-1 px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                       placeholder="Min"
                     />
-                    <span className="text-gray-500">to</span>
+                    <span className="text-theme-tertiary">to</span>
                     <input
                       type="number"
                       value={formData.target_humidity_max}
                       onChange={(e) => setFormData({ ...formData, target_humidity_max: e.target.value })}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                      className="flex-1 px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                       placeholder="Max"
                     />
                   </div>
@@ -419,7 +419,7 @@ function AddTarantulaContent() {
                       type="checkbox"
                       checked={formData.water_dish}
                       onChange={(e) => setFormData({ ...formData, water_dish: e.target.checked })}
-                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                      className="w-4 h-4 text-blue-600 border-theme rounded focus:ring-blue-500"
                     />
                     <span className="text-sm font-medium">Water Dish Provided</span>
                   </label>
@@ -431,7 +431,7 @@ function AddTarantulaContent() {
                     type="text"
                     value={formData.misting_schedule}
                     onChange={(e) => setFormData({ ...formData, misting_schedule: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                     placeholder="e.g., 2x per week"
                   />
                 </div>
@@ -443,7 +443,7 @@ function AddTarantulaContent() {
                   value={formData.enclosure_notes}
                   onChange={(e) => setFormData({ ...formData, enclosure_notes: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
                   placeholder="Modifications, decorations, hide setup, etc."
                 />
               </div>
@@ -456,7 +456,7 @@ function AddTarantulaContent() {
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="Any additional information about this tarantula..."
             />
           </div>
@@ -465,14 +465,14 @@ function AddTarantulaContent() {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
               {loading ? 'Adding...' : 'Add Tarantula'}
             </button>
             <button
               type="button"
               onClick={() => router.push('/dashboard')}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              className="px-6 py-3 border border-theme rounded-xl hover:bg-surface-elevated transition text-theme-primary"
             >
               Cancel
             </button>

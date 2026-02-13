@@ -76,13 +76,13 @@ export default function LoginPage() {
         <h1 className="text-4xl font-bold mb-8 text-center">Login</h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded flex flex-col gap-2">
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl flex flex-col gap-2">
             <span>{error}</span>
             {showResend && (
               <button
                 onClick={handleResendVerification}
                 disabled={resendLoading}
-                className="text-sm underline font-bold hover:text-red-900 text-left"
+                className="text-sm underline font-bold hover:text-red-900 dark:hover:text-red-300 text-left"
               >
                 {resendLoading ? 'Sending...' : 'Resend Verification Email'}
               </button>
@@ -96,10 +96,10 @@ export default function LoginPage() {
         {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
+            <div className="w-full border-t border-theme"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">Or continue with email</span>
+            <span className="px-2 bg-theme text-theme-tertiary">Or continue with email</span>
           </div>
         </div>
 
@@ -111,7 +111,7 @@ export default function LoginPage() {
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="you@example.com"
             />
           </div>
@@ -123,7 +123,7 @@ export default function LoginPage() {
               required
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="••••••••"
             />
           </div>
@@ -131,13 +131,13 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
+        <p className="mt-6 text-center text-sm text-theme-secondary">
           Don't have an account?{' '}
           <a href="/register" className="text-primary-600 hover:underline">
             Register

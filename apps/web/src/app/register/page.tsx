@@ -104,13 +104,13 @@ function RegisterForm() {
     return (
       <div className="flex min-h-screen items-center justify-center p-24">
         <div className="w-full max-w-md text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h2 className="text-2xl font-bold mb-4">Registration Successful!</h2>
-          <p className="text-gray-600 mb-8">
+          <p className="text-theme-secondary mb-8">
             We've sent a verification email to <strong>{formData.email}</strong>.
             Please check your inbox and verify your account to log in.
           </p>
@@ -131,7 +131,7 @@ function RegisterForm() {
         <h1 className="text-4xl font-bold mb-8 text-center">Create Account</h1>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl">
             {error}
           </div>
         )}
@@ -142,10 +142,10 @@ function RegisterForm() {
         {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300"></div>
+            <div className="w-full border-t border-theme"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white text-gray-500">Or sign up with email</span>
+            <span className="px-2 bg-theme text-theme-tertiary">Or sign up with email</span>
           </div>
         </div>
 
@@ -157,7 +157,7 @@ function RegisterForm() {
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="you@example.com"
             />
           </div>
@@ -170,7 +170,7 @@ function RegisterForm() {
               minLength={3}
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="username"
             />
           </div>
@@ -181,7 +181,7 @@ function RegisterForm() {
               type="text"
               value={formData.display_name}
               onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="Your Name"
             />
           </div>
@@ -194,10 +194,10 @@ function RegisterForm() {
               minLength={8}
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="••••••••"
             />
-            <p className="text-xs text-gray-500 mt-1">At least 8 characters</p>
+            <p className="text-xs text-theme-tertiary mt-1">At least 8 characters</p>
           </div>
 
           {/* Referral Code */}
@@ -215,18 +215,18 @@ function RegisterForm() {
                   setReferrerInfo(null)
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-gray-900 bg-white"
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="ABCD1234"
               maxLength={12}
             />
             {validatingReferral && (
-              <p className="text-xs text-gray-500 mt-1">Validating referral code...</p>
+              <p className="text-xs text-theme-tertiary mt-1">Validating referral code...</p>
             )}
             {referrerInfo && !validatingReferral && (
               <div className={`mt-2 p-2 rounded-lg text-sm ${
                 referrerInfo.valid
-                  ? 'bg-green-50 border border-green-200 text-green-700'
-                  : 'bg-red-50 border border-red-200 text-red-700'
+                  ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                  : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
               }`}>
                 {referrerInfo.valid ? (
                   <div className="flex items-center gap-2">
@@ -250,13 +250,13 @@ function RegisterForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             {loading ? 'Creating Account...' : 'Register'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
+        <p className="mt-6 text-center text-sm text-theme-secondary">
           Already have an account?{' '}
           <a href="/login" className="text-primary-600 hover:underline">
             Login
@@ -272,11 +272,11 @@ function RegisterLoading() {
     <div className="flex min-h-screen items-center justify-center p-24">
       <div className="w-full max-w-md text-center">
         <div className="animate-pulse">
-          <div className="h-10 bg-gray-200 rounded w-3/4 mx-auto mb-8"></div>
+          <div className="h-10 bg-surface-elevated rounded w-3/4 mx-auto mb-8"></div>
           <div className="space-y-4">
-            <div className="h-10 bg-gray-200 rounded"></div>
-            <div className="h-10 bg-gray-200 rounded"></div>
-            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-10 bg-surface-elevated rounded"></div>
+            <div className="h-10 bg-surface-elevated rounded"></div>
+            <div className="h-10 bg-surface-elevated rounded"></div>
           </div>
         </div>
       </div>
