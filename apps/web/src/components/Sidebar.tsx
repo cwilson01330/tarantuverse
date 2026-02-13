@@ -46,15 +46,10 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
 
       if (response.ok) {
         const userData = await response.json()
-        console.log('[Sidebar] User data from API:', {
-          email: userData.email,
-          is_admin: userData.is_admin,
-          is_superuser: userData.is_superuser
-        })
         setIsAdmin(userData.is_admin || userData.is_superuser)
       }
-    } catch (error) {
-      console.error('Failed to check admin status:', error)
+    } catch {
+      // Admin status check failed silently - user just won't see admin nav
     }
   }
 

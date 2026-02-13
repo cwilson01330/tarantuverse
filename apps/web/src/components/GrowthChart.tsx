@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useThemeStore } from "@/stores/themeStore";
 import {
   LineChart,
   Line,
@@ -42,6 +43,20 @@ interface GrowthChartProps {
 type DateRange = "all" | "1y" | "6m" | "3m";
 
 export default function GrowthChart({ data }: GrowthChartProps) {
+  const theme = useThemeStore((state) => state.theme);
+  const isDark = theme === "dark";
+
+  const tooltipStyle = {
+    backgroundColor: isDark ? "rgb(31, 41, 55)" : "rgb(255, 255, 255)",
+    border: isDark ? "1px solid rgb(75, 85, 99)" : "1px solid rgb(229, 231, 235)",
+    borderRadius: "0.5rem",
+    fontSize: "0.875rem",
+    color: isDark ? "white" : "rgb(17, 24, 39)",
+  };
+  const gridStroke = isDark ? "#374151" : "#e5e7eb";
+  const tickStyle = { fontSize: 12, fill: isDark ? "#9ca3af" : "#6b7280" };
+  const labelStyle = { fontSize: 12, fill: isDark ? "#9ca3af" : "#6b7280" };
+
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [metric, setMetric] = useState<"weight" | "leg_span" | "both">("both");
 
@@ -218,45 +233,39 @@ export default function GrowthChart({ data }: GrowthChartProps) {
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
             <XAxis
               dataKey="shortDate"
-              tick={{ fontSize: 12 }}
+              tick={tickStyle}
               angle={-45}
               textAnchor="end"
               height={80}
             />
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 12 }}
+              tick={tickStyle}
               label={{
                 value: metric === "leg_span" ? "" : "Weight (g)",
                 angle: -90,
                 position: "insideLeft",
-                style: { fontSize: 12 },
+                style: labelStyle,
               }}
             />
             {(metric === "both" || metric === "leg_span") && (
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                tick={{ fontSize: 12 }}
+                tick={tickStyle}
                 label={{
                   value: "Leg Span (cm)",
                   angle: 90,
                   position: "insideRight",
-                  style: { fontSize: 12 },
+                  style: labelStyle,
                 }}
               />
             )}
             <Tooltip
-              contentStyle={{
-                backgroundColor: "rgb(31, 41, 55)", // gray-800
-                border: "1px solid rgb(75, 85, 99)", // gray-600
-                borderRadius: "0.5rem",
-                fontSize: "0.875rem",
-                color: "white",
-              }}
+              contentStyle={tooltipStyle}
               formatter={(value, name) => {
                 if (name === "weight") return [`${(value as number).toFixed(1)}g`, "Weight"];
                 if (name === "legSpan")

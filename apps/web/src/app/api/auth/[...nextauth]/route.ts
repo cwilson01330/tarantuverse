@@ -33,7 +33,6 @@ function generateAppleClientSecret(): string | undefined {
           keyid: keyId,
         }
       )
-      console.log("[Apple] Generated client secret dynamically")
       return secret
     } catch (error) {
       console.error("[Apple] Failed to generate client secret:", error)
@@ -123,10 +122,6 @@ const authOptions: AuthOptions = {
       // Handle OAuth providers
       if (account?.provider === "google" || account?.provider === "apple") {
         try {
-          console.log("[OAuth Debug] Provider:", account.provider)
-          console.log("[OAuth Debug] Profile data:", JSON.stringify(profile, null, 2))
-          console.log("[OAuth Debug] User data:", JSON.stringify(user, null, 2))
-
           // Handle Apple's different profile format
           // Apple's name is an object {firstName, lastName} and only on first login
           let userName = user.name
@@ -147,7 +142,6 @@ const authOptions: AuthOptions = {
           const email = profile?.email || user.email
 
           if (!email) {
-            console.error("[OAuth] No email provided by", account.provider)
             return false
           }
 
@@ -164,8 +158,6 @@ const authOptions: AuthOptions = {
           )
 
           if (response.data.access_token) {
-            // Store our backend token
-            console.log("[OAuth] Backend returned access_token, length:", response.data.access_token.length)
             user.accessToken = response.data.access_token
             user.id = response.data.user.id
             user.email = response.data.user.email
@@ -176,11 +168,8 @@ const authOptions: AuthOptions = {
             user.is_superuser = response.data.user.is_superuser || false
             return true
           }
-          console.error("[OAuth] Backend did not return access_token")
           return false
-        } catch (error: any) {
-          console.error(`${account.provider} OAuth error:`, error)
-          console.error("Error details:", error.response?.data)
+        } catch {
           return false
         }
       }
@@ -189,57 +178,40 @@ const authOptions: AuthOptions = {
     },
     
     async jwt({ token, user, account }) {
-      // Initial sign in
       if (user) {
-        console.log("[JWT] Initial sign in, user.accessToken exists:", !!user.accessToken)
         token.accessToken = user.accessToken
         token.id = user.id
         token.isNewUser = user.isNewUser
         token.is_admin = user.is_admin
         token.is_superuser = user.is_superuser
       }
-      console.log("[JWT] Returning token.accessToken exists:", !!token.accessToken)
       return token
     },
 
     async session({ session, token }) {
-      // Add access token and user ID to session
-      console.log("[Session] token.accessToken exists:", !!token.accessToken)
       session.accessToken = token.accessToken as string
       session.user.id = token.id as string
       session.isNewUser = token.isNewUser as boolean
       session.user.is_admin = token.is_admin as boolean
       session.user.is_superuser = token.is_superuser as boolean
-      console.log("[Session] session.accessToken exists:", !!session.accessToken)
       return session
     },
 
     async redirect({ url, baseUrl }) {
-      console.log("[Redirect] url:", url, "baseUrl:", baseUrl)
-
       // Always redirect to dashboard after successful sign in
       // This handles Apple OAuth which loses callbackUrl due to cross-origin POST
-
-      // If url is just "/" or the base URL or empty, go to dashboard
       if (!url || url === "/" || url === baseUrl || url === `${baseUrl}/`) {
-        console.log("[Redirect] Going to dashboard (base url detected)")
         return `${baseUrl}/dashboard`
       }
 
-      // Handle relative URLs (like "/dashboard")
       if (url.startsWith("/")) {
-        console.log("[Redirect] Relative URL:", `${baseUrl}${url}`)
         return `${baseUrl}${url}`
       }
 
-      // Handle URLs from same origin
       if (url.startsWith(baseUrl)) {
-        console.log("[Redirect] Same origin URL:", url)
         return url
       }
 
-      // Default to dashboard
-      console.log("[Redirect] Defaulting to dashboard")
       return `${baseUrl}/dashboard`
     }
   },

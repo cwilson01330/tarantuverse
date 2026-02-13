@@ -155,9 +155,8 @@ async def send_message(
                 sender_username=current_user.username,
                 message_preview=preview
             )
-    except Exception as e:
-        # Log error but don't fail the request
-        print(f"Failed to send push notification: {str(e)}")
+    except Exception:
+        pass  # Push notification failed - don't block the request
 
     return {
         "id": str(message.id),

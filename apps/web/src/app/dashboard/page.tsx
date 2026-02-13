@@ -66,15 +66,12 @@ export default function DashboardPage() {
     }
   }
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
   // Helper function to handle both R2 (absolute) and local (relative) URLs
   const getImageUrl = (url?: string) => {
     if (!url) return ''
-    // If URL starts with http, it's already absolute (R2)
-    if (url.startsWith('http')) {
-      return url
-    }
-    // Otherwise, it's a local path - prepend the API base URL
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    if (url.startsWith('http')) return url
     return `${API_URL}${url}`
   }
 
@@ -94,7 +91,6 @@ export default function DashboardPage() {
 
   const fetchTarantulas = async (token: string) => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_URL}/api/v1/tarantulas/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -121,15 +117,14 @@ export default function DashboardPage() {
         const limits = await limitsResponse.json()
         setSubscriptionLimits(limits)
       }
-    } catch (error) {
-      console.error('Failed to fetch tarantulas:', error)
+    } catch {
+      // Fetch failed - user sees empty collection state
     } finally {
       setLoading(false)
     }
   }
 
   const fetchAllFeedingStatuses = async (token: string, tarantulasList: Tarantula[]) => {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     const statusMap = new Map<string, FeedingStatus>()
 
     await Promise.all(
@@ -148,8 +143,8 @@ export default function DashboardPage() {
               acceptance_rate: data.acceptance_rate,
             })
           }
-        } catch (error) {
-          console.error(`Failed to fetch feeding stats for ${t.id}:`, error)
+        } catch {
+          // Individual feeding stat fetch failed - skip this tarantula
         }
       })
     )
@@ -158,7 +153,6 @@ export default function DashboardPage() {
   }
 
   const fetchAllPremoltPredictions = async (token: string, tarantulasList: Tarantula[]) => {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     const predictionMap = new Map<string, PremoltPrediction>()
 
     await Promise.all(
@@ -178,8 +172,8 @@ export default function DashboardPage() {
               status_text: data.status_text,
             })
           }
-        } catch (error) {
-          console.error(`Failed to fetch premolt prediction for ${t.id}:`, error)
+        } catch {
+          // Individual premolt prediction failed - skip
         }
       })
     )

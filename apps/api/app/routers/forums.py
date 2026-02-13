@@ -497,9 +497,8 @@ async def create_post(
                     thread_title=thread.title,
                     thread_id=str(thread.id)
                 )
-    except Exception as e:
-        # Log error but don't fail the request
-        print(f"Failed to send forum reply push notification: {str(e)}")
+    except Exception:
+        pass  # Push notification failed - don't block the request
 
     # Load author relationship
     post = db.query(ForumPost).filter(ForumPost.id == post.id).options(

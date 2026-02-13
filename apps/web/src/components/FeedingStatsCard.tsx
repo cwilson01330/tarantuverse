@@ -1,5 +1,6 @@
 "use client";
 
+import { useThemeStore } from '@/stores/themeStore';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
 interface PreyTypeCount {
@@ -28,6 +29,18 @@ interface FeedingStatsCardProps {
 }
 
 export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
+  const theme = useThemeStore((state) => state.theme);
+  const isDark = theme === 'dark';
+
+  const tooltipStyle = {
+    backgroundColor: isDark ? 'rgb(31, 41, 55)' : 'rgb(255, 255, 255)',
+    border: isDark ? 'none' : '1px solid rgb(229, 231, 235)',
+    borderRadius: '0.5rem',
+    color: isDark ? 'white' : 'rgb(17, 24, 39)',
+  };
+  const gridStroke = isDark ? '#374151' : '#e5e7eb';
+  const tickFill = isDark ? '#9ca3af' : '#6b7280';
+
   // Determine feeding status color
   const getFeedingStatusColor = (days?: number) => {
     if (!days) return "gray";
@@ -190,14 +203,7 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgb(31, 41, 55)', 
-                    border: 'none', 
-                    borderRadius: '0.5rem',
-                    color: 'white'
-                  }}
-                />
+                <Tooltip contentStyle={tooltipStyle} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -210,22 +216,17 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
               </h4>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={preyTypeData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis 
-                    dataKey="name" 
-                    tick={{ fill: '#9ca3af', fontSize: 12 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: tickFill, fontSize: 12 }}
                     angle={-45}
                     textAnchor="end"
                     height={70}
                   />
-                  <YAxis tick={{ fill: '#9ca3af', fontSize: 12 }} />
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'rgb(31, 41, 55)', 
-                      border: 'none', 
-                      borderRadius: '0.5rem',
-                      color: 'white'
-                    }}
+                  <YAxis tick={{ fill: tickFill, fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={tooltipStyle}
                     formatter={(value) => {
                       const item = preyTypeData.find(d => d.count === value);
                       return [`${value} feedings (${item?.percentage}%)`, 'Count'];

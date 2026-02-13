@@ -79,9 +79,8 @@ async def follow_user(
                 expo_push_token=followed_prefs.expo_push_token,
                 follower_username=current_user.username
             )
-    except Exception as e:
-        # Log error but don't fail the request
-        print(f"Failed to send new follower push notification: {str(e)}")
+    except Exception:
+        pass  # Push notification failed - don't block the request
 
     return {"message": "Successfully followed user", "username": username}
 

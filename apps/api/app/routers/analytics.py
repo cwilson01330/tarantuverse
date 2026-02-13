@@ -101,16 +101,22 @@ async def get_collection_analytics(
     ).scalar() or 0
     
     # Calculate average days between feedings across collection
+    # Batch-fetch all feedings in one query instead of per-tarantula
+    all_feedings = db.query(FeedingLog).filter(
+        FeedingLog.tarantula_id.in_(tarantula_ids)
+    ).order_by(FeedingLog.tarantula_id, FeedingLog.fed_at.asc()).all()
+
+    # Group feedings by tarantula
+    feedings_by_tarantula: Dict[Any, list] = {}
+    for feeding in all_feedings:
+        feedings_by_tarantula.setdefault(feeding.tarantula_id, []).append(feeding)
+
     feeding_intervals = []
-    for t_id in tarantula_ids:
-        feedings = db.query(FeedingLog).filter(
-            FeedingLog.tarantula_id == t_id
-        ).order_by(FeedingLog.fed_at.asc()).all()
-        
+    for t_id, feedings in feedings_by_tarantula.items():
         if len(feedings) > 1:
             for i in range(1, len(feedings)):
                 days_diff = (feedings[i].fed_at - feedings[i-1].fed_at).days
-                if days_diff > 0:  # Only count positive intervals
+                if days_diff > 0:
                     feeding_intervals.append(days_diff)
     
     average_days_between_feedings = sum(feeding_intervals) / len(feeding_intervals) if feeding_intervals else 0.0
@@ -165,15 +171,18 @@ async def get_collection_analytics(
         }
     
     # Get recent activity (last 10 items across feedings, molts, and substrate changes)
+    # Build a lookup map to avoid N+1 queries for tarantula names
+    tarantula_map = {t.id: t for t in tarantulas}
+
     recent_activity = []
-    
+
     # Get recent feedings
     recent_feedings = db.query(FeedingLog).filter(
         FeedingLog.tarantula_id.in_(tarantula_ids)
     ).order_by(FeedingLog.fed_at.desc()).limit(5).all()
-    
+
     for feeding in recent_feedings:
-        tarantula = db.query(Tarantula).filter(Tarantula.id == feeding.tarantula_id).first()
+        tarantula = tarantula_map.get(feeding.tarantula_id)
         if tarantula:
             recent_activity.append(ActivityItem(
                 type="feeding",
@@ -182,14 +191,14 @@ async def get_collection_analytics(
                 tarantula_name=tarantula.common_name,
                 description=f"Fed {feeding.food_type}" + (" (refused)" if not feeding.accepted else "")
             ))
-    
+
     # Get recent molts
     recent_molts = db.query(MoltLog).filter(
         MoltLog.tarantula_id.in_(tarantula_ids)
     ).order_by(MoltLog.molted_at.desc()).limit(5).all()
-    
+
     for molt in recent_molts:
-        tarantula = db.query(Tarantula).filter(Tarantula.id == molt.tarantula_id).first()
+        tarantula = tarantula_map.get(molt.tarantula_id)
         if tarantula:
             description = "Molted successfully"
             if molt.weight_after or molt.leg_span_after:
@@ -199,7 +208,7 @@ async def get_collection_analytics(
                 if molt.leg_span_after:
                     details.append(f"{molt.leg_span_after}cm")
                 description += f" ({', '.join(details)})"
-            
+
             recent_activity.append(ActivityItem(
                 type="molt",
                 date=molt.molted_at.date() if molt.molted_at else date.today(),
@@ -207,14 +216,14 @@ async def get_collection_analytics(
                 tarantula_name=tarantula.common_name,
                 description=description
             ))
-    
+
     # Get recent substrate changes
     recent_substrate = db.query(SubstrateChange).filter(
         SubstrateChange.tarantula_id.in_(tarantula_ids)
     ).order_by(SubstrateChange.changed_at.desc()).limit(5).all()
-    
+
     for change in recent_substrate:
-        tarantula = db.query(Tarantula).filter(Tarantula.id == change.tarantula_id).first()
+        tarantula = tarantula_map.get(change.tarantula_id)
         if tarantula:
             recent_activity.append(ActivityItem(
                 type="substrate_change",

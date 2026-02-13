@@ -63,9 +63,6 @@ async def create_tarantula(
     - **date_acquired**: When you got this tarantula
     - All other fields are optional
     """
-    print(f"[DEBUG] Creating tarantula for user {current_user.id}")
-    print(f"[DEBUG] Tarantula data: {tarantula_data.model_dump()}")
-
     # Check tarantula count limit
     limits = current_user.get_subscription_limits()
     current_count = db.query(Tarantula).filter(Tarantula.user_id == current_user.id).count()
@@ -91,8 +88,6 @@ async def create_tarantula(
     db.commit()
     db.refresh(new_tarantula)
 
-    print(f"[DEBUG] Tarantula created successfully: {new_tarantula.id}")
-    
     # Create activity feed entry
     await create_activity(
         db=db,

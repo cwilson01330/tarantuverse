@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
@@ -50,7 +50,7 @@ async def get_admin_stats(
 @router.get("/users")
 async def list_users(
     skip: int = 0,
-    limit: int = 1000,
+    limit: int = Query(100, ge=1, le=1000),
     search: str = None,
     db: Session = Depends(get_db)
 ):
@@ -60,6 +60,7 @@ async def list_users(
     query = db.query(User)
 
     if search:
+        search = search[:100]  # Cap search length to prevent abuse
         search_filter = f"%{search}%"
         query = query.filter(
             (User.email.ilike(search_filter)) |

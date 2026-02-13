@@ -79,10 +79,6 @@ async def upload_photo(
             content_type=file.content_type
         )
         
-        # Log the URLs for debugging
-        print(f"📸 Photo uploaded - URL: {photo_url}")
-        print(f"🖼️  Thumbnail created - URL: {thumbnail_url}")
-        
         # Create photo record in database
         photo = Photo(
             id=str(uuid.uuid4()),
