@@ -75,21 +75,31 @@ postgres-data/
 .vercel/
 *.tsbuildinfo
 
-.vercel
-
 # pnpm store
 .pnpm-store/
 C:\Users\*\AppData\Local\pnpm\store\*
 
 # EAS build inspection output
 inspect-output/
-inspect-outpu/
 **/inspect-output/
-**/inspect-outpu/
 
 # Google Play Service Account (sensitive credentials)
 google-play-service-account.json
 **/google-play-service-account.json
+
+# Screenshots and temp images (debug artifacts)
+*.PNG
+*.png
+!apps/**/*.png
+!docs/**/*.png
+*.jpg
+!apps/**/*.jpg
+*.jpeg
+!apps/**/*.jpeg
+
+# Temp/scratch files
+temp_*
+scratch_*
 
 # Project documentation (internal use)
 CLAUDE.md
