@@ -55,8 +55,8 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
 
   const baseNavItems: NavItem[] = [
     { icon: '🏠', label: 'Dashboard', path: '/dashboard' },
-    { icon: '📦', label: 'Enclosures', path: '/dashboard/enclosures' },
-    { icon: '🕷️', label: 'Species', path: '/species' },
+    { icon: '🕷️', label: 'Tarantulas', path: '/dashboard/tarantulas' },
+    { icon: '📖', label: 'Species', path: '/species' },
     { icon: '📊', label: 'Analytics', path: '/dashboard/analytics' },
     { icon: '💰', label: 'Collection Value', path: '/dashboard/collection-value' },
     { icon: '🥚', label: 'Breeding', path: '/dashboard/breeding' },
