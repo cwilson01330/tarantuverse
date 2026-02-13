@@ -74,57 +74,24 @@ export default function BreedingPage() {
     setError('')
 
     try {
-      // Fetch pairings
-      try {
-        const pairingsRes = await fetch(`${API_URL}/api/v1/pairings/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        })
-        if (pairingsRes.ok) {
-          const pairingsData = await pairingsRes.json()
-          setPairings(pairingsData)
-        } else if (pairingsRes.status !== 404) {
-          console.warn('Pairings endpoint returned:', pairingsRes.status)
-        }
-      } catch (err) {
-        console.warn('Pairings endpoint not available:', err)
-      }
+      const headers = { 'Authorization': `Bearer ${token}` }
 
-      // Fetch egg sacs
-      try {
-        const eggSacsRes = await fetch(`${API_URL}/api/v1/egg-sacs/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        })
-        if (eggSacsRes.ok) {
-          const eggSacsData = await eggSacsRes.json()
-          setEggSacs(eggSacsData)
-        } else if (eggSacsRes.status !== 404) {
-          console.warn('Egg sacs endpoint returned:', eggSacsRes.status)
-        }
-      } catch (err) {
-        console.warn('Egg sacs endpoint not available:', err)
-      }
+      // Fetch all breeding data in parallel
+      const [pairingsRes, eggSacsRes, offspringRes] = await Promise.all([
+        fetch(`${API_URL}/api/v1/pairings/`, { headers }).catch(() => null),
+        fetch(`${API_URL}/api/v1/egg-sacs/`, { headers }).catch(() => null),
+        fetch(`${API_URL}/api/v1/offspring/`, { headers }).catch(() => null),
+      ])
 
-      // Fetch offspring
-      try {
-        const offspringRes = await fetch(`${API_URL}/api/v1/offspring/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        })
-        if (offspringRes.ok) {
-          const offspringData = await offspringRes.json()
-          setOffspring(offspringData)
-        } else if (offspringRes.status !== 404) {
-          console.warn('Offspring endpoint returned:', offspringRes.status)
-        }
-      } catch (err) {
-        console.warn('Offspring endpoint not available:', err)
+      if (pairingsRes?.ok) {
+        setPairings(await pairingsRes.json())
       }
-
+      if (eggSacsRes?.ok) {
+        setEggSacs(await eggSacsRes.json())
+      }
+      if (offspringRes?.ok) {
+        setOffspring(await offspringRes.json())
+      }
     } catch (err) {
       console.error('Unexpected error fetching breeding data:', err)
       setError('Unable to connect to the server. Please try again later.')
@@ -137,7 +104,47 @@ export default function BreedingPage() {
     return (
       <DashboardLayout userName="Loading..." userEmail="">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <p className="text-gray-900 dark:text-white">Loading breeding data...</p>
+          {/* Header skeleton */}
+          <div className="mb-8 animate-pulse">
+            <div className="h-10 w-64 bg-surface-elevated rounded mb-2"></div>
+            <div className="h-5 w-48 bg-surface-elevated rounded"></div>
+          </div>
+
+          {/* Stats cards skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-surface rounded-lg shadow-md p-6 border border-theme animate-pulse">
+                <div className="h-5 w-32 bg-surface-elevated rounded mb-3"></div>
+                <div className="h-10 w-16 bg-surface-elevated rounded"></div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tabs skeleton */}
+          <div className="mb-6 border-b border-theme animate-pulse">
+            <div className="flex gap-4 pb-2">
+              <div className="h-8 w-28 bg-surface-elevated rounded"></div>
+              <div className="h-8 w-24 bg-surface-elevated rounded"></div>
+              <div className="h-8 w-26 bg-surface-elevated rounded"></div>
+            </div>
+          </div>
+
+          {/* Content skeleton */}
+          <div className="bg-surface rounded-lg shadow-md border border-theme p-6 animate-pulse">
+            <div className="flex justify-between items-center mb-6">
+              <div className="h-7 w-40 bg-surface-elevated rounded"></div>
+              <div className="h-10 w-32 bg-surface-elevated rounded-lg"></div>
+            </div>
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="p-4 border border-theme rounded-lg">
+                  <div className="h-4 w-48 bg-surface-elevated rounded mb-2"></div>
+                  <div className="h-4 w-36 bg-surface-elevated rounded mb-2"></div>
+                  <div className="h-4 w-40 bg-surface-elevated rounded"></div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </DashboardLayout>
     )
