@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, I
 import { useRouter, Stack } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface Conversation {
   id: string;
@@ -23,6 +24,7 @@ interface Conversation {
 
 export default function MessagesScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,10 +85,21 @@ export default function MessagesScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingEmoji}>💬</Text>
-        <Text style={styles.loadingText}>Loading messages...</Text>
-      </View>
+      <>
+        <Stack.Screen
+          options={{
+            title: 'Messages',
+            headerBackTitle: 'Back',
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.textPrimary,
+            headerTitleStyle: { color: colors.textPrimary },
+          }}
+        />
+        <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+          <Text style={styles.loadingEmoji}>💬</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading messages...</Text>
+        </View>
+      </>
     );
   }
 
@@ -96,17 +109,20 @@ export default function MessagesScreen() {
         options={{
           title: 'Messages',
           headerBackTitle: 'Back',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.textPrimary,
+          headerTitleStyle: { color: colors.textPrimary },
         }}
       />
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
           style={styles.scrollView}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7c3aed" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
           }
         >
           {error && (
-            <View style={styles.errorContainer}>
+            <View style={[styles.errorContainer, { backgroundColor: colors.background, borderColor: '#fecaca' }]}>
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
@@ -114,10 +130,12 @@ export default function MessagesScreen() {
           {conversations.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>💬</Text>
-              <Text style={styles.emptyTitle}>No messages yet</Text>
-              <Text style={styles.emptySubtitle}>Start a conversation with other keepers!</Text>
+              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No messages yet</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                Start a conversation with other keepers!
+              </Text>
               <TouchableOpacity
-                style={styles.browseCommunityButton}
+                style={[styles.browseCommunityButton, { backgroundColor: colors.primary }]}
                 onPress={() => router.push('/(tabs)/community')}
               >
                 <Text style={styles.browseCommunityButtonText}>Browse Community</Text>
@@ -128,8 +146,9 @@ export default function MessagesScreen() {
               {conversations.map((conv) => (
                 <TouchableOpacity
                   key={conv.id}
-                  style={styles.conversationCard}
+                  style={[styles.conversationCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                   onPress={() => router.push(`/messages/${conv.other_user.username}`)}
+                  activeOpacity={0.7}
                 >
                   <View style={styles.conversationContent}>
                     {conv.other_user.avatar_url ? (
@@ -138,28 +157,34 @@ export default function MessagesScreen() {
                         style={styles.avatar}
                       />
                     ) : (
-                      <View style={styles.avatarPlaceholder}>
+                      <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
                         <Text style={styles.avatarEmoji}>🕷️</Text>
                       </View>
                     )}
 
                     <View style={styles.conversationInfo}>
                       <View style={styles.conversationHeader}>
-                        <Text style={styles.displayName}>{conv.other_user.display_name}</Text>
+                        <Text style={[styles.displayName, { color: colors.textPrimary }]}>
+                          {conv.other_user.display_name}
+                        </Text>
                         {conv.last_message && (
-                          <Text style={styles.timestamp}>{formatDate(conv.updated_at)}</Text>
+                          <Text style={[styles.timestamp, { color: colors.textTertiary }]}>
+                            {formatDate(conv.updated_at)}
+                          </Text>
                         )}
                       </View>
-                      <Text style={styles.username}>@{conv.other_user.username}</Text>
+                      <Text style={[styles.username, { color: colors.textTertiary }]}>
+                        @{conv.other_user.username}
+                      </Text>
                       {conv.last_message && (
-                        <Text style={styles.lastMessage} numberOfLines={1}>
+                        <Text style={[styles.lastMessage, { color: colors.textSecondary }]} numberOfLines={1}>
                           {conv.last_message.content}
                         </Text>
                       )}
                     </View>
 
                     {conv.unread_count > 0 && (
-                      <View style={styles.unreadBadge}>
+                      <View style={[styles.unreadBadge, { backgroundColor: colors.primary }]}>
                         <Text style={styles.unreadText}>{conv.unread_count}</Text>
                       </View>
                     )}
@@ -177,24 +202,20 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
   },
   scrollView: {
     flex: 1,
   },
   errorContainer: {
-    backgroundColor: '#fee2e2',
     padding: 16,
     margin: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#fecaca',
   },
   errorText: {
     color: '#dc2626',
@@ -212,17 +233,14 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
     textAlign: 'center',
     marginBottom: 24,
   },
   browseCommunityButton: {
-    backgroundColor: '#7c3aed',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
@@ -238,18 +256,17 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6b7280',
   },
   conversationsList: {
     padding: 16,
   },
   conversationCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     marginBottom: 12,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 3,
     elevation: 2,
   },
@@ -267,7 +284,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#7c3aed',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -287,23 +303,18 @@ const styles = StyleSheet.create({
   displayName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#111827',
   },
   timestamp: {
     fontSize: 12,
-    color: '#6b7280',
   },
   username: {
     fontSize: 12,
-    color: '#6b7280',
     marginBottom: 4,
   },
   lastMessage: {
     fontSize: 14,
-    color: '#374151',
   },
   unreadBadge: {
-    backgroundColor: '#7c3aed',
     width: 28,
     height: 28,
     borderRadius: 14,
@@ -317,4 +328,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-

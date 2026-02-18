@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface Message {
   id: string;
@@ -29,6 +30,7 @@ interface ConversationData {
 export default function ConversationScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const { colors } = useTheme();
   const username = params.username as string;
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -193,7 +195,6 @@ export default function ConversationScreen() {
         }
       );
     } else {
-      // Android - show simple menu
       Alert.alert(
         'Actions',
         '',
@@ -207,27 +208,39 @@ export default function ConversationScreen() {
     }
   };
 
+  const headerOptions = {
+    headerStyle: { backgroundColor: colors.surface },
+    headerTintColor: colors.textPrimary,
+    headerTitleStyle: { color: colors.textPrimary },
+  };
+
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.loadingEmoji}>💬</Text>
-        <Text style={styles.loadingText}>Loading conversation...</Text>
-      </View>
+      <>
+        <Stack.Screen options={{ title: 'Loading...', headerBackTitle: 'Messages', ...headerOptions }} />
+        <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+          <Text style={styles.loadingEmoji}>💬</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading conversation...</Text>
+        </View>
+      </>
     );
   }
 
   if (!conversation) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorEmoji}>❌</Text>
-        <Text style={styles.errorTitle}>Error loading conversation</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>← Back to Messages</Text>
-        </TouchableOpacity>
-      </View>
+      <>
+        <Stack.Screen options={{ title: 'Error', headerBackTitle: 'Messages', ...headerOptions }} />
+        <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+          <Text style={styles.errorEmoji}>❌</Text>
+          <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>Error loading conversation</Text>
+          <TouchableOpacity
+            style={[styles.backButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.back()}
+          >
+            <Text style={styles.backButtonText}>← Back to Messages</Text>
+          </TouchableOpacity>
+        </View>
+      </>
     );
   }
 
@@ -237,18 +250,19 @@ export default function ConversationScreen() {
         options={{
           title: conversation.other_user.display_name,
           headerBackTitle: 'Messages',
+          ...headerOptions,
           headerRight: () => (
             <TouchableOpacity
               onPress={showActions}
               style={{ marginRight: 8 }}
             >
-              <MaterialCommunityIcons name="dots-vertical" size={24} color="#7c3aed" />
+              <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.primary} />
             </TouchableOpacity>
           ),
         }}
       />
       <KeyboardAvoidingView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
@@ -267,7 +281,7 @@ export default function ConversationScreen() {
           {conversation.messages.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>👋</Text>
-              <Text style={styles.emptyText}>Start the conversation!</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Start the conversation!</Text>
             </View>
           ) : (
             conversation.messages.map((msg, index) => {
@@ -277,15 +291,24 @@ export default function ConversationScreen() {
                 <View key={msg.id}>
                   {showDate && (
                     <View style={styles.dateSeparator}>
-                      <Text style={styles.dateText}>{formatDate(msg.created_at)}</Text>
+                      <Text style={[styles.dateText, { color: colors.textTertiary }]}>
+                        {formatDate(msg.created_at)}
+                      </Text>
                     </View>
                   )}
                   <View style={[styles.messageRow, msg.is_own && styles.messageRowOwn]}>
-                    <View style={[styles.messageBubble, msg.is_own ? styles.messageBubbleOwn : styles.messageBubbleOther]}>
-                      <Text style={[styles.messageText, msg.is_own && styles.messageTextOwn]}>
+                    <View
+                      style={[
+                        styles.messageBubble,
+                        msg.is_own
+                          ? [styles.messageBubbleOwn, { backgroundColor: colors.primary }]
+                          : [styles.messageBubbleOther, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }],
+                      ]}
+                    >
+                      <Text style={[styles.messageText, { color: msg.is_own ? '#fff' : colors.textPrimary }]}>
                         {msg.content}
                       </Text>
-                      <Text style={[styles.messageTime, msg.is_own && styles.messageTimeOwn]}>
+                      <Text style={[styles.messageTime, { color: msg.is_own ? 'rgba(255,255,255,0.7)' : colors.textTertiary }]}>
                         {formatTime(msg.created_at)}
                       </Text>
                     </View>
@@ -297,17 +320,18 @@ export default function ConversationScreen() {
         </ScrollView>
 
         {/* Message Input */}
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, { backgroundColor: colors.background, color: colors.textPrimary }]}
             placeholder="Type a message..."
+            placeholderTextColor={colors.textTertiary}
             value={newMessage}
             onChangeText={setNewMessage}
             multiline
             maxLength={1000}
           />
           <TouchableOpacity
-            style={[styles.sendButton, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
+            style={[styles.sendButton, { backgroundColor: colors.primary }, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
             onPress={handleSend}
             disabled={!newMessage.trim() || sending}
           >
@@ -333,13 +357,11 @@ export default function ConversationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
     padding: 24,
   },
   messagesContainer: {
@@ -370,7 +392,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: '#6b7280',
   },
   dateSeparator: {
     alignItems: 'center',
@@ -378,7 +399,6 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 12,
-    color: '#6b7280',
     fontWeight: '600',
   },
   messageRow: {
@@ -395,40 +415,27 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   messageBubbleOwn: {
-    backgroundColor: '#7c3aed',
     borderBottomRightRadius: 4,
   },
   messageBubbleOther: {
-    backgroundColor: 'white',
     borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: 15,
     lineHeight: 20,
-    color: '#111827',
-  },
-  messageTextOwn: {
-    color: 'white',
   },
   messageTime: {
     fontSize: 11,
-    color: '#6b7280',
     marginTop: 4,
-  },
-  messageTimeOwn: {
-    color: '#e9d5ff',
   },
   inputContainer: {
     flexDirection: 'row',
     padding: 16,
-    backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
     alignItems: 'flex-end',
   },
   textInput: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -440,7 +447,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#7c3aed',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -453,7 +459,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6b7280',
   },
   errorEmoji: {
     fontSize: 64,
@@ -462,13 +467,11 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
     marginBottom: 24,
   },
   backButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#7c3aed',
     borderRadius: 12,
   },
   backButtonText: {
