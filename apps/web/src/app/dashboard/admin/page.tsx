@@ -67,6 +67,13 @@ const adminSections: AdminSection[] = [
     ],
   },
   {
+    title: 'Announcements',
+    description: 'Create and manage banners for sales, coupon codes, update notes, and more',
+    icon: '📢',
+    href: '/dashboard/admin/announcements',
+    color: 'from-amber-500 to-yellow-500',
+  },
+  {
     title: 'Analytics & Insights',
     description: 'Platform statistics, user metrics, and growth data',
     icon: '📊',

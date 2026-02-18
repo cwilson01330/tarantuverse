@@ -7,6 +7,7 @@ import { useSubscription } from '@/hooks/useSubscription'
 import ActivityFeed from '@/components/ActivityFeed'
 import DashboardLayout from '@/components/DashboardLayout'
 import DashboardTour from '@/components/DashboardTour'
+import AnnouncementBanner from '@/components/AnnouncementBanner'
 import UpgradeModal from '@/components/UpgradeModal'
 
 interface Tarantula {
@@ -319,6 +320,9 @@ export default function DashboardHub() {
             </div>
           </div>
         )}
+
+        {/* Announcement Banner */}
+        <AnnouncementBanner />
 
         {/* Quick Stats Row */}
         <div data-tour="stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

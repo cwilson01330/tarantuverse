@@ -37,6 +37,7 @@ import app.routers.pricing as pricing
 import app.routers.theme_preferences as theme_preferences
 import app.routers.enclosures as enclosures
 import app.routers.referrals as referrals
+import app.routers.announcements as announcements
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -179,6 +180,9 @@ app.include_router(enclosures.router, prefix="/api/v1/enclosures", tags=["enclos
 
 print("[STARTUP] Registering referrals router...")
 app.include_router(referrals.router, prefix="/api/v1", tags=["referrals", "premium"])
+
+print("[STARTUP] Registering announcements router...")
+app.include_router(announcements.router, prefix="/api/v1/announcements", tags=["announcements"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

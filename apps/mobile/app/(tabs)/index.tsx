@@ -17,6 +17,7 @@ import { apiClient } from '../../src/services/api';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import TourTooltip from '../../src/components/TourTooltip';
+import AnnouncementBanner from '../../src/components/AnnouncementBanner';
 
 const WalkthroughableView = walkthroughable(View);
 
@@ -623,6 +624,9 @@ function DashboardHubScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
+        {/* Announcement Banner */}
+        <AnnouncementBanner />
+
         {/* Quick Stats Row */}
         <CopilotStep
           text="These cards show your collection at a glance — total count, feeding alerts, molt tracking, and premolt predictions."
