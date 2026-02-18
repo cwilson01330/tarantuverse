@@ -1,8 +1,5 @@
 "use client";
 
-import { useThemeStore } from '@/stores/themeStore';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-
 interface PreyTypeCount {
   food_type: string;
   count: number;
@@ -28,19 +25,16 @@ interface FeedingStatsCardProps {
   data: FeedingStats;
 }
 
+const preyBarColors = [
+  'bg-purple-500 dark:bg-purple-400',
+  'bg-blue-500 dark:bg-blue-400',
+  'bg-emerald-500 dark:bg-emerald-400',
+  'bg-amber-500 dark:bg-amber-400',
+  'bg-rose-500 dark:bg-rose-400',
+  'bg-cyan-500 dark:bg-cyan-400',
+];
+
 export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
-  const theme = useThemeStore((state) => state.theme);
-  const isDark = theme === 'dark';
-
-  const tooltipStyle = {
-    backgroundColor: isDark ? 'rgb(31, 41, 55)' : 'rgb(255, 255, 255)',
-    border: isDark ? 'none' : '1px solid rgb(229, 231, 235)',
-    borderRadius: '0.5rem',
-    color: isDark ? 'white' : 'rgb(17, 24, 39)',
-  };
-  const gridStroke = isDark ? '#374151' : '#e5e7eb';
-  const tickFill = isDark ? '#9ca3af' : '#6b7280';
-
   // Determine feeding status color
   const getFeedingStatusColor = (days?: number) => {
     if (!days) return "gray";
@@ -51,7 +45,7 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
   };
 
   const statusColor = getFeedingStatusColor(data.days_since_last_feeding);
-  const colorClasses = {
+  const colorClasses: Record<string, string> = {
     green: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-200 dark:border-green-700",
     yellow: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-700",
     orange: "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-700",
@@ -65,23 +59,19 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
     return "text-orange-600 dark:text-orange-400";
   };
 
-  // Prepare chart data
-  const acceptanceData = [
-    { name: 'Accepted', value: data.total_accepted, color: '#10b981' },
-    { name: 'Refused', value: data.total_refused, color: '#ef4444' },
-  ];
+  // SVG donut calculations
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  const acceptedLength = circumference * (data.acceptance_rate / 100);
 
-  const preyTypeData = data.prey_type_distribution.map((item) => ({
-    name: item.food_type,
-    count: item.count,
-    percentage: item.percentage,
-  }));
+  // Sort prey types by count descending
+  const sortedPrey = [...data.prey_type_distribution].sort((a, b) => b.count - a.count);
 
   if (data.total_feedings === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-900 dark:text-white">
-          🍽️ Feeding Stats
+          Feeding Stats
         </h3>
         <p className="text-gray-500 dark:text-gray-400 text-center py-8">
           No feeding data recorded yet. Add feeding logs to track patterns.
@@ -91,19 +81,23 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6 border border-gray-200 dark:border-gray-700">
-      <h3 className="text-lg font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-        🍽️ Feeding Stats
-      </h3>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 space-y-6 border border-gray-200 dark:border-gray-700">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Feeding Stats
+        </h3>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-full">
+          {data.total_feedings} total
+        </span>
+      </div>
 
       {/* Status Banner */}
       {data.days_since_last_feeding !== undefined && (
-        <div
-          className={`rounded-lg p-4 border-2 ${colorClasses[statusColor]}`}
-        >
+        <div className={`rounded-xl p-4 border-2 ${colorClasses[statusColor]}`}>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase mb-1">
+              <div className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-80">
                 Last Fed
               </div>
               <div className="text-2xl font-bold">
@@ -112,7 +106,7 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
             </div>
             {data.next_feeding_prediction && (
               <div className="text-right">
-                <div className="text-sm font-semibold uppercase mb-1">
+                <div className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-80">
                   Next Feeding
                 </div>
                 <div className="text-lg font-semibold">
@@ -125,145 +119,149 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
       )}
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1 font-semibold">
-            ACCEPTANCE RATE
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 border-l-4 border-green-500">
+          <div className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wide mb-1">
+            Acceptance Rate
           </div>
-          <div
-            className={`text-2xl font-bold ${getAcceptanceColor(
-              data.acceptance_rate
-            )}`}
-          >
+          <div className={`text-2xl font-bold ${getAcceptanceColor(data.acceptance_rate)}`}>
             {data.acceptance_rate}%
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             {data.total_accepted}/{data.total_feedings} accepted
           </div>
         </div>
 
-        {data.average_days_between_feedings && (
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1 font-semibold">
-              AVG INTERVAL
+        {data.average_days_between_feedings != null && data.average_days_between_feedings > 0 && (
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 border-l-4 border-blue-500">
+            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wide mb-1">
+              Avg Interval
             </div>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {Math.round(data.average_days_between_feedings)}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">days between</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">days between</div>
           </div>
         )}
 
         {data.current_streak_accepted > 0 && (
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1 font-semibold">
-              CURRENT STREAK
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 border-l-4 border-purple-500">
+            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wide mb-1">
+              Current Streak
             </div>
             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
               {data.current_streak_accepted}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">accepted in a row</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">accepted in a row</div>
           </div>
         )}
 
-        {data.longest_gap_days && (
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1 font-semibold">
-              LONGEST GAP
+        {data.longest_gap_days != null && data.longest_gap_days > 0 && (
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 border-l-4 border-gray-400 dark:border-gray-500">
+            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-semibold uppercase tracking-wide mb-1">
+              Longest Gap
             </div>
             <div className="text-2xl font-bold text-gray-700 dark:text-gray-300">
               {data.longest_gap_days}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">days</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">days</div>
           </div>
         )}
       </div>
 
-      {/* Charts Section */}
+      {/* Acceptance Breakdown — SVG Donut + Legend */}
       {data.total_feedings > 1 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          {/* Acceptance Rate Pie Chart */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 text-center">
-              Acceptance Rate Breakdown
-            </h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={acceptanceData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {acceptanceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Prey Type Bar Chart */}
-          {preyTypeData.length > 0 && (
-            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 text-center">
-                Prey Type Distribution
-              </h4>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={preyTypeData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fill: tickFill, fontSize: 12 }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={70}
-                  />
-                  <YAxis tick={{ fill: tickFill, fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value) => {
-                      const item = preyTypeData.find(d => d.count === value);
-                      return [`${value} feedings (${item?.percentage}%)`, 'Count'];
-                    }}
-                  />
-                  <Bar dataKey="count" fill="#7c3aed" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-5">
+          <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+            Acceptance Breakdown
+          </h4>
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            {/* SVG Donut */}
+            <div className="relative flex-shrink-0">
+              <svg viewBox="0 0 140 140" className="w-32 h-32">
+                {/* Track */}
+                <circle
+                  cx="70" cy="70" r={radius}
+                  fill="none"
+                  stroke="currentColor"
+                  className="text-gray-200 dark:text-gray-600"
+                  strokeWidth="12"
+                />
+                {/* Refused arc (full circle, rendered behind accepted) */}
+                <circle
+                  cx="70" cy="70" r={radius}
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="12"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={0}
+                  strokeLinecap="round"
+                  transform="rotate(-90 70 70)"
+                />
+                {/* Accepted arc (on top) */}
+                <circle
+                  cx="70" cy="70" r={radius}
+                  fill="none"
+                  stroke="#10b981"
+                  strokeWidth="12"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference - acceptedLength}
+                  strokeLinecap="round"
+                  transform="rotate(-90 70 70)"
+                />
+              </svg>
+              {/* Center text */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {data.acceptance_rate}%
+                </span>
+              </div>
             </div>
-          )}
+
+            {/* Legend */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <span className="w-3 h-3 rounded-full bg-emerald-500 flex-shrink-0" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Accepted: <span className="font-semibold">{data.total_accepted}</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Refused: <span className="font-semibold">{data.total_refused}</span>
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {data.total_feedings} feedings recorded
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Prey Type Distribution List (keep for smaller screens or as fallback) */}
-      {data.prey_type_distribution.length > 0 && (
+      {/* Prey Type Distribution */}
+      {sortedPrey.length > 0 && (
         <div>
           <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-            Prey Type Details
+            Prey Type Distribution
           </h4>
-          <div className="space-y-2">
-            {data.prey_type_distribution.map((prey, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <div className="flex-1">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium capitalize text-gray-900 dark:text-white">
-                      {prey.food_type}
-                    </span>
-                    <span className="text-gray-600 dark:text-gray-400">
-                      {prey.count} ({prey.percentage}%)
-                    </span>
-                  </div>
-                  <div className="h-2 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-orange-500 dark:bg-orange-400 transition-all"
-                      style={{ width: `${prey.percentage}%` }}
-                    />
-                  </div>
+          <div className="space-y-3">
+            {sortedPrey.map((prey, index) => (
+              <div key={prey.food_type}>
+                <div className="flex justify-between text-sm mb-1.5">
+                  <span className="font-medium capitalize text-gray-900 dark:text-white">
+                    {prey.food_type}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400 tabular-nums">
+                    {prey.count} ({prey.percentage}%)
+                  </span>
+                </div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${preyBarColors[index % preyBarColors.length]}`}
+                    style={{ width: `${Math.max(prey.percentage, 3)}%` }}
+                  />
                 </div>
               </div>
             ))}

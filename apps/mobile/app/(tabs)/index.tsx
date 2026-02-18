@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CopilotProvider, CopilotStep, walkthroughable, useCopilot } from 'react-native-copilot';
@@ -100,15 +100,24 @@ function DashboardHubScreen() {
     fetchDashboardData();
   }, []);
 
+  // Re-check tour state when screen regains focus (e.g. after "Replay Tutorial")
+  useFocusEffect(
+    useCallback(() => {
+      setTourChecked(false);
+    }, [])
+  );
+
   // Start tour on first visit (after data loads)
   useEffect(() => {
-    if (loading || tourChecked) return;
+    if (loading) return;
+
     const checkTour = async () => {
       try {
         const completed = await AsyncStorage.getItem(TOUR_KEY);
         if (!completed && tarantulas.length > 0) {
           // Mark as completed before starting (covers both skip and finish)
           await AsyncStorage.setItem(TOUR_KEY, 'true');
+          setTourChecked(true);
           setTimeout(() => {
             startTour();
           }, 800);
@@ -116,9 +125,11 @@ function DashboardHubScreen() {
       } catch {
         // skip
       }
-      setTourChecked(true);
     };
-    checkTour();
+
+    if (!tourChecked) {
+      checkTour();
+    }
   }, [loading, tourChecked, tarantulas.length]);
 
   const fetchDashboardData = async () => {
