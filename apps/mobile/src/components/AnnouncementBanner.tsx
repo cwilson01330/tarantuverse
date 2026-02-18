@@ -40,7 +40,7 @@ export default function AnnouncementBanner() {
 
   const fetchAnnouncement = async () => {
     try {
-      const res = await apiClient.get('/api/v1/announcements/active');
+      const res = await apiClient.get('/announcements/active');
       const data = res.data;
       if (!data) return;
 
