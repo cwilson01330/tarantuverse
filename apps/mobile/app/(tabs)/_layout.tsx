@@ -26,8 +26,18 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          title: 'Dashboard',
+          tabBarLabel: 'Dashboard',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="collection"
+        options={{
           title: 'My Tarantulas',
-          tabBarLabel: 'Collection',
+          tabBarLabel: 'Tarantulas',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="spider" size={size} color={color} />
           ),
@@ -36,10 +46,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="enclosures"
         options={{
-          title: 'Enclosures',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home-variant" size={size} color={color} />
-          ),
+          href: null, // Hidden from tab bar, still accessible via navigation
         }}
       />
       <Tabs.Screen

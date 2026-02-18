@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useThemeStore } from '@/stores/themeStore';
 import DashboardLayout from '@/components/DashboardLayout';
+import { resetDashboardTour } from '@/components/DashboardTour';
 
 interface LinkedAccount {
   id: string;
@@ -611,17 +612,36 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* About Section */}
+        {/* Help & About Section */}
         <section className="bg-surface rounded-xl border border-theme p-6">
           <div className="flex items-center gap-3 mb-6">
             <span className="text-2xl">🌐</span>
-            <h2 className="text-xl font-bold text-theme-primary">About</h2>
+            <h2 className="text-xl font-bold text-theme-primary">Help & About</h2>
           </div>
 
-          <div className="space-y-3 text-sm text-theme-secondary">
-            <p>Tarantuverse v1.0.0</p>
-            <p>A comprehensive tarantula husbandry tracking platform</p>
-            <p className="text-xs text-theme-tertiary">© 2025 Tarantuverse. All rights reserved.</p>
+          <div className="space-y-4">
+            <button
+              onClick={() => {
+                resetDashboardTour()
+                router.push('/dashboard')
+              }}
+              className="w-full flex items-center justify-between p-4 bg-surface-elevated rounded-lg hover:bg-surface transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🎓</span>
+                <div className="text-left">
+                  <h3 className="font-semibold text-theme-primary">Replay Tutorial</h3>
+                  <p className="text-sm text-theme-secondary">Take the guided tour of the dashboard again</p>
+                </div>
+              </div>
+              <span className="text-theme-tertiary group-hover:text-theme-primary transition-colors">→</span>
+            </button>
+
+            <div className="space-y-3 text-sm text-theme-secondary pt-2">
+              <p>Tarantuverse v1.0.0</p>
+              <p>A comprehensive tarantula husbandry tracking platform</p>
+              <p className="text-xs text-theme-tertiary">© 2025 Tarantuverse. All rights reserved.</p>
+            </div>
           </div>
         </section>
       </div>

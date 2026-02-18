@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../../src/services/api';
 
 export default function ProfileScreen() {
@@ -347,6 +348,19 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy')}>
           <MaterialCommunityIcons name="shield-account" size={24} color={colors.textTertiary} />
           <Text style={styles.menuText}>Privacy Settings</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={async () => {
+            await AsyncStorage.removeItem('dashboard_tour_completed');
+            router.push('/(tabs)');
+            Alert.alert('Tutorial Reset', 'The dashboard tutorial will play on your next visit.');
+          }}
+        >
+          <MaterialCommunityIcons name="school" size={24} color={colors.primary} />
+          <Text style={styles.menuText}>Replay Tutorial</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 

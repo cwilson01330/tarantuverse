@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useSubscription } from '@/hooks/useSubscription'
 import ActivityFeed from '@/components/ActivityFeed'
 import DashboardLayout from '@/components/DashboardLayout'
+import DashboardTour from '@/components/DashboardTour'
 import UpgradeModal from '@/components/UpgradeModal'
 
 interface Tarantula {
@@ -320,7 +321,7 @@ export default function DashboardHub() {
         )}
 
         {/* Quick Stats Row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div data-tour="stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {/* Total Collection */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
@@ -419,7 +420,7 @@ export default function DashboardHub() {
           {/* Left column (2/3 width) */}
           <div className="lg:col-span-2 space-y-8">
             {/* Feeding Alerts Section */}
-            <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
+            <div data-tour="feeding-alerts" className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
               <h2 className="text-xl font-bold text-theme-primary mb-4 flex items-center gap-2">
                 🍽️ Feeding Alerts
               </h2>
@@ -566,7 +567,7 @@ export default function DashboardHub() {
           {/* Right column (1/3 width) */}
           <div className="space-y-8">
             {/* Quick Actions Grid */}
-            <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
+            <div data-tour="quick-actions" className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
               <h2 className="text-xl font-bold text-theme-primary mb-4">Quick Actions</h2>
               <div className="grid grid-cols-2 gap-3">
                 {[
@@ -597,6 +598,9 @@ export default function DashboardHub() {
           </div>
         </div>
       </div>
+
+      {/* Dashboard Tour (first visit only) */}
+      <DashboardTour />
 
       {/* Upgrade Modal */}
       <UpgradeModal
