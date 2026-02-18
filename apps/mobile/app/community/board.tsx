@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Refres
 import { useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface Message {
   id: string;
@@ -36,6 +37,7 @@ const REACTION_EMOJIS = ['❤️', '👍', '😂', '🔥', '🕷️', '🎉'];
 
 export default function BoardScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,7 +88,7 @@ export default function BoardScreen() {
 
   const handlePostMessage = async () => {
     if (!newPostTitle.trim() || !newPostContent.trim()) return;
-    
+
     try {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) {
@@ -253,9 +255,9 @@ export default function BoardScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
+      <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
         <Text style={styles.loadingEmoji}>💬</Text>
-        <Text style={styles.loadingText}>Loading messages...</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading messages...</Text>
       </View>
     );
   }
@@ -266,31 +268,34 @@ export default function BoardScreen() {
         options={{
           title: 'Community Board',
           headerBackTitle: 'Community',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.textPrimary,
+          headerTitleStyle: { color: colors.textPrimary },
         }}
       />
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
           style={styles.scrollView}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7c3aed" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
           }
         >
           {/* New Post Button */}
           {currentUser && (
             <TouchableOpacity
-              style={styles.newPostButton}
+              style={[styles.newPostButton, { backgroundColor: colors.primary }]}
               onPress={() => setShowNewPostModal(true)}
             >
-              <MaterialCommunityIcons name="pencil" size={24} color="white" />
+              <MaterialCommunityIcons name="pencil" size={24} color="#fff" />
               <Text style={styles.newPostButtonText}>Post a Message</Text>
             </TouchableOpacity>
           )}
 
           {!currentUser && (
-            <View style={styles.loginPrompt}>
-              <Text style={styles.loginPromptText}>Want to join the conversation?</Text>
+            <View style={[styles.loginPrompt, { backgroundColor: colors.primaryLight, borderColor: colors.border }]}>
+              <Text style={[styles.loginPromptText, { color: colors.textPrimary }]}>Want to join the conversation?</Text>
               <TouchableOpacity
-                style={styles.loginButton}
+                style={[styles.loginButton, { backgroundColor: colors.primary }]}
                 onPress={() => router.push('/login')}
               >
                 <Text style={styles.loginButtonText}>Log In</Text>
@@ -302,27 +307,27 @@ export default function BoardScreen() {
           {messages.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>💬</Text>
-              <Text style={styles.emptyTitle}>No messages yet</Text>
-              <Text style={styles.emptySubtitle}>Be the first to post!</Text>
+              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No messages yet</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>Be the first to post!</Text>
             </View>
           ) : (
             <View style={styles.messagesList}>
               {messages.map((message) => (
-                <View key={message.id} style={styles.messageCard}>
+                <View key={message.id} style={[styles.messageCard, { backgroundColor: colors.surface }]}>
                   {/* Message Header */}
                   <View style={styles.messageHeader}>
                     <View style={styles.authorInfo}>
-                      <View style={styles.avatarSmall}>
+                      <View style={[styles.avatarSmall, { backgroundColor: colors.primary }]}>
                         <Text style={styles.avatarTextSmall}>
                           {message.author_display_name?.[0]?.toUpperCase() || '?'}
                         </Text>
                       </View>
                       <View>
-                        <Text style={styles.authorName}>{message.author_display_name || 'Unknown'}</Text>
+                        <Text style={[styles.authorName, { color: colors.textPrimary }]}>{message.author_display_name || 'Unknown'}</Text>
                         <View style={styles.metaInfo}>
-                          <Text style={styles.metaText}>@{message.author_username || 'unknown'}</Text>
-                          <Text style={styles.metaText}>•</Text>
-                          <Text style={styles.metaText}>{formatDate(message.created_at)}</Text>
+                          <Text style={[styles.metaText, { color: colors.textSecondary }]}>@{message.author_username || 'unknown'}</Text>
+                          <Text style={[styles.metaText, { color: colors.textSecondary }]}>•</Text>
+                          <Text style={[styles.metaText, { color: colors.textSecondary }]}>{formatDate(message.created_at)}</Text>
                         </View>
                       </View>
                     </View>
@@ -331,33 +336,33 @@ export default function BoardScreen() {
                         onPress={() => handleDeleteMessage(message.id)}
                         style={styles.deleteButton}
                       >
-                        <MaterialCommunityIcons name="delete" size={20} color="#ef4444" />
+                        <MaterialCommunityIcons name="delete" size={20} color={colors.error} />
                       </TouchableOpacity>
                     )}
                   </View>
 
                   {/* Message Content */}
-                  <Text style={styles.messageTitle}>{message.title}</Text>
-                  <Text style={styles.messageContent}>{message.content}</Text>
+                  <Text style={[styles.messageTitle, { color: colors.textPrimary }]}>{message.title}</Text>
+                  <Text style={[styles.messageContent, { color: colors.textPrimary }]}>{message.content}</Text>
 
                   {/* Interactions */}
-                  <View style={styles.interactions}>
+                  <View style={[styles.interactions, { borderTopColor: colors.border }]}>
                     <TouchableOpacity
-                      style={[styles.interactionButton, message.user_has_liked && styles.likedButton]}
+                      style={[styles.interactionButton, { backgroundColor: colors.surfaceElevated }, message.user_has_liked && styles.likedButton]}
                       onPress={() => currentUser ? toggleLike(message.id) : router.push('/login')}
                     >
                       <Text style={styles.interactionEmoji}>{message.user_has_liked ? '❤️' : '🤍'}</Text>
-                      <Text style={[styles.interactionCount, message.user_has_liked && styles.likedCount]}>
+                      <Text style={[styles.interactionCount, { color: colors.textSecondary }, message.user_has_liked && { color: colors.error }]}>
                         {message.like_count}
                       </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={styles.interactionButton}
+                      style={[styles.interactionButton, { backgroundColor: colors.surfaceElevated }]}
                       onPress={() => toggleReplies(message.id)}
                     >
                       <Text style={styles.interactionEmoji}>💬</Text>
-                      <Text style={styles.interactionCount}>{message.reply_count}</Text>
+                      <Text style={[styles.interactionCount, { color: colors.textSecondary }]}>{message.reply_count}</Text>
                     </TouchableOpacity>
 
                     {REACTION_EMOJIS.map(emoji => {
@@ -367,11 +372,11 @@ export default function BoardScreen() {
                       return (
                         <TouchableOpacity
                           key={emoji}
-                          style={[styles.reactionButton, userReacted && styles.reactionButtonActive]}
+                          style={[styles.reactionButton, { backgroundColor: colors.surfaceElevated }, userReacted && { backgroundColor: colors.primaryLight, transform: [{ scale: 1.05 }] }]}
                           onPress={() => currentUser ? toggleReaction(message.id, emoji) : router.push('/login')}
                         >
                           <Text style={styles.reactionEmoji}>{emoji}</Text>
-                          {count > 0 && <Text style={styles.reactionCount}>{count}</Text>}
+                          {count > 0 && <Text style={[styles.reactionCount, { color: colors.textSecondary }]}>{count}</Text>}
                         </TouchableOpacity>
                       );
                     })}
@@ -379,13 +384,14 @@ export default function BoardScreen() {
 
                   {/* Replies Section */}
                   {expandedReplies.has(message.id) && (
-                    <View style={styles.repliesSection}>
+                    <View style={[styles.repliesSection, { borderTopColor: colors.border }]}>
                       {/* Reply Input */}
                       {currentUser && (
                         <View style={styles.replyInput}>
                           <TextInput
-                            style={styles.replyTextInput}
+                            style={[styles.replyTextInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
                             placeholder="Write a reply..."
+                            placeholderTextColor={colors.textTertiary}
                             value={replyContent[message.id] || ''}
                             onChangeText={(text) =>
                               setReplyContent(prev => ({ ...prev, [message.id]: text }))
@@ -393,29 +399,29 @@ export default function BoardScreen() {
                             multiline
                           />
                           <TouchableOpacity
-                            style={styles.replySubmitButton}
+                            style={[styles.replySubmitButton, { backgroundColor: colors.primary }]}
                             onPress={() => submitReply(message.id)}
                           >
-                            <MaterialCommunityIcons name="send" size={20} color="white" />
+                            <MaterialCommunityIcons name="send" size={20} color="#fff" />
                           </TouchableOpacity>
                         </View>
                       )}
 
                       {/* Replies List */}
                       {replies[message.id]?.map(reply => (
-                        <View key={reply.id} style={styles.replyCard}>
+                        <View key={reply.id} style={[styles.replyCard, { backgroundColor: colors.surfaceElevated }]}>
                           <View style={styles.replyHeader}>
-                            <View style={styles.replyAvatar}>
+                            <View style={[styles.replyAvatar, { backgroundColor: colors.info }]}>
                               <Text style={styles.replyAvatarText}>
                                 {reply.author_display_name?.[0]?.toUpperCase() || '?'}
                               </Text>
                             </View>
                             <View style={styles.replyInfo}>
-                              <Text style={styles.replyAuthor}>{reply.author_display_name}</Text>
-                              <Text style={styles.replyMeta}>{formatDate(reply.created_at)}</Text>
+                              <Text style={[styles.replyAuthor, { color: colors.textPrimary }]}>{reply.author_display_name}</Text>
+                              <Text style={[styles.replyMeta, { color: colors.textSecondary }]}>{formatDate(reply.created_at)}</Text>
                             </View>
                           </View>
-                          <Text style={styles.replyContent}>{reply.content}</Text>
+                          <Text style={[styles.replyContent, { color: colors.textPrimary }]}>{reply.content}</Text>
                         </View>
                       ))}
                     </View>
@@ -434,25 +440,26 @@ export default function BoardScreen() {
           onRequestClose={() => setShowNewPostModal(false)}
         >
           <KeyboardAvoidingView
-            style={styles.modalContainer}
+            style={[styles.modalContainer, { backgroundColor: colors.surface }]}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <TouchableOpacity onPress={() => setShowNewPostModal(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: colors.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>New Message</Text>
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>New Message</Text>
               <TouchableOpacity onPress={handlePostMessage}>
-                <Text style={styles.modalPostText}>Post</Text>
+                <Text style={[styles.modalPostText, { color: colors.primary }]}>Post</Text>
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalContent}>
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Title</Text>
+                <Text style={[styles.modalLabel, { color: colors.textPrimary }]}>Title</Text>
                 <TextInput
-                  style={styles.modalTitleInput}
+                  style={[styles.modalTitleInput, { borderColor: colors.border, backgroundColor: colors.surfaceElevated, color: colors.textPrimary }]}
                   placeholder="What's on your mind?"
+                  placeholderTextColor={colors.textTertiary}
                   value={newPostTitle}
                   onChangeText={setNewPostTitle}
                   maxLength={200}
@@ -460,10 +467,11 @@ export default function BoardScreen() {
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalLabel}>Message</Text>
+                <Text style={[styles.modalLabel, { color: colors.textPrimary }]}>Message</Text>
                 <TextInput
-                  style={styles.modalContentInput}
+                  style={[styles.modalContentInput, { borderColor: colors.border, backgroundColor: colors.surfaceElevated, color: colors.textPrimary }]}
                   placeholder="Share your thoughts..."
+                  placeholderTextColor={colors.textTertiary}
                   value={newPostContent}
                   onChangeText={setNewPostContent}
                   multiline
@@ -481,13 +489,11 @@ export default function BoardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
   },
   scrollView: {
     flex: 1,
@@ -497,7 +503,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#7c3aed',
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 12,
@@ -510,33 +515,29 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   newPostButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },
   loginPrompt: {
-    backgroundColor: '#f3e8ff',
     marginHorizontal: 16,
     marginVertical: 12,
     padding: 20,
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9d5ff',
   },
   loginPromptText: {
     fontSize: 16,
-    color: '#374151',
     marginBottom: 12,
   },
   loginButton: {
-    backgroundColor: '#7c3aed',
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 10,
   },
   loginButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -545,7 +546,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   messageCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -571,19 +571,17 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#7c3aed',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarTextSmall: {
-    color: 'white',
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
   authorName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#111827',
   },
   metaInfo: {
     flexDirection: 'row',
@@ -593,7 +591,6 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: '#6b7280',
   },
   deleteButton: {
     padding: 8,
@@ -601,12 +598,10 @@ const styles = StyleSheet.create({
   messageTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
     marginBottom: 8,
   },
   messageContent: {
     fontSize: 14,
-    color: '#374151',
     lineHeight: 22,
     marginBottom: 12,
   },
@@ -615,14 +610,12 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
     flexWrap: 'wrap',
   },
   interactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f3f4f6',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
@@ -636,23 +629,14 @@ const styles = StyleSheet.create({
   interactionCount: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#6b7280',
-  },
-  likedCount: {
-    color: '#dc2626',
   },
   reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f3f4f6',
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 10,
-  },
-  reactionButtonActive: {
-    backgroundColor: '#f3e8ff',
-    transform: [{ scale: 1.05 }],
   },
   reactionEmoji: {
     fontSize: 14,
@@ -660,13 +644,11 @@ const styles = StyleSheet.create({
   reactionCount: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#6b7280',
   },
   repliesSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
     gap: 12,
   },
   replyInput: {
@@ -675,9 +657,7 @@ const styles = StyleSheet.create({
   },
   replyTextInput: {
     flex: 1,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -685,7 +665,6 @@ const styles = StyleSheet.create({
     maxHeight: 100,
   },
   replySubmitButton: {
-    backgroundColor: '#7c3aed',
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -693,7 +672,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   replyCard: {
-    backgroundColor: '#f9fafb',
     borderRadius: 12,
     padding: 12,
   },
@@ -707,12 +685,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#3b82f6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   replyAvatarText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -722,15 +699,12 @@ const styles = StyleSheet.create({
   replyAuthor: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#111827',
   },
   replyMeta: {
     fontSize: 12,
-    color: '#6b7280',
   },
   replyContent: {
     fontSize: 14,
-    color: '#374151',
     lineHeight: 20,
   },
   emptyState: {
@@ -744,12 +718,10 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
   },
   loadingEmoji: {
     fontSize: 64,
@@ -757,11 +729,9 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6b7280',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'white',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -771,20 +741,16 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   modalCancelText: {
     fontSize: 16,
-    color: '#6b7280',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
   },
   modalPostText: {
     fontSize: 16,
-    color: '#7c3aed',
     fontWeight: '600',
   },
   modalContent: {
@@ -797,12 +763,10 @@ const styles = StyleSheet.create({
   modalLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
     marginBottom: 8,
   },
   modalTitleInput: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -810,7 +774,6 @@ const styles = StyleSheet.create({
   },
   modalContentInput: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -818,4 +781,3 @@ const styles = StyleSheet.create({
     minHeight: 200,
   },
 });
-

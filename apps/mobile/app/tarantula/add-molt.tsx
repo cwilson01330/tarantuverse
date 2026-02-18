@@ -87,14 +87,14 @@ export default function AddMoltScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Molt Date */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Molt Date *</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Molt Date *</Text>
           <TouchableOpacity
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
             onPress={() => setShowMoltDatePicker(true)}
           >
-            <MaterialCommunityIcons name="calendar" size={20} color="#7c3aed" />
-            <Text style={styles.inputText}>{moltDate.toLocaleDateString()}</Text>
+            <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
+            <Text style={[styles.inputText, { color: colors.textPrimary }]}>{moltDate.toLocaleDateString()}</Text>
           </TouchableOpacity>
           {showMoltDatePicker && (
             <DateTimePicker
@@ -108,14 +108,14 @@ export default function AddMoltScreen() {
         </View>
 
         {/* Premolt Start Date */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Premolt Started (Optional)</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Premolt Started (Optional)</Text>
           <TouchableOpacity
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
             onPress={() => setShowPremoltDatePicker(true)}
           >
-            <MaterialCommunityIcons name="calendar" size={20} color="#7c3aed" />
-            <Text style={styles.inputText}>
+            <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
+            <Text style={[styles.inputText, { color: colors.textPrimary }]}>
               {premoltDate ? premoltDate.toLocaleDateString() : 'Select date'}
             </Text>
           </TouchableOpacity>
@@ -133,35 +133,35 @@ export default function AddMoltScreen() {
               style={styles.clearButton}
               onPress={() => setPremoltDate(null)}
             >
-              <Text style={styles.clearButtonText}>Clear</Text>
+              <Text style={[styles.clearButtonText, { color: colors.error }]}>Clear</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Measurements */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Measurements (Optional)</Text>
-          
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Measurements (Optional)</Text>
+
           <View style={styles.row}>
             <View style={styles.measurementGroup}>
-              <Text style={styles.label}>Leg Span Before (inches)</Text>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Leg Span Before (inches)</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
                 value={legSpanBefore}
                 onChangeText={setLegSpanBefore}
                 placeholder="0.0"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="decimal-pad"
               />
             </View>
             <View style={styles.measurementGroup}>
-              <Text style={styles.label}>Leg Span After (inches)</Text>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Leg Span After (inches)</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
                 value={legSpanAfter}
                 onChangeText={setLegSpanAfter}
                 placeholder="0.0"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="decimal-pad"
               />
             </View>
@@ -169,24 +169,24 @@ export default function AddMoltScreen() {
 
           <View style={styles.row}>
             <View style={styles.measurementGroup}>
-              <Text style={styles.label}>Weight Before (grams)</Text>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Weight Before (grams)</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
                 value={weightBefore}
                 onChangeText={setWeightBefore}
                 placeholder="0.0"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="decimal-pad"
               />
             </View>
             <View style={styles.measurementGroup}>
-              <Text style={styles.label}>Weight After (grams)</Text>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>Weight After (grams)</Text>
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
                 value={weightAfter}
                 onChangeText={setWeightAfter}
                 placeholder="0.0"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
                 keyboardType="decimal-pad"
               />
             </View>
@@ -194,14 +194,14 @@ export default function AddMoltScreen() {
         </View>
 
         {/* Notes */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Notes</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Notes</Text>
           <TextInput
-            style={styles.textArea}
+            style={[styles.textArea, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
             value={notes}
             onChangeText={setNotes}
             placeholder="Add any additional notes..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.textTertiary}
             multiline
             numberOfLines={4}
             textAlignVertical="top"
@@ -252,33 +252,27 @@ const styles = StyleSheet.create({
   section: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 16,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 8,
   },
   input: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     gap: 8,
   },
   inputText: {
     fontSize: 16,
-    color: '#1f2937',
   },
   clearButton: {
     marginTop: 8,
@@ -286,7 +280,6 @@ const styles = StyleSheet.create({
   },
   clearButtonText: {
     fontSize: 14,
-    color: '#ef4444',
     fontWeight: '600',
   },
   row: {
@@ -299,21 +292,15 @@ const styles = StyleSheet.create({
   },
   textInput: {
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     fontSize: 15,
-    color: '#1f2937',
   },
   textArea: {
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     fontSize: 15,
-    color: '#1f2937',
     minHeight: 100,
   },
 });

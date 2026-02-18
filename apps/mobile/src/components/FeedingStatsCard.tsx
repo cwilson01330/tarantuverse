@@ -210,8 +210,8 @@ const styles = StyleSheet.create({
     borderColor: '#fca5a5',
   },
   statusGray: {
-    backgroundColor: '#f3f4f6',
-    borderColor: '#e5e7eb',
+    backgroundColor: '#e5e7eb',
+    borderColor: '#9ca3af',
   },
   statusRow: {
     flexDirection: 'row',
@@ -226,19 +226,19 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1f2937',
     marginBottom: 4,
     textTransform: 'uppercase',
   },
   statusValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#1f2937',
   },
   statusSmallValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: '#1f2937',
   },
   metricsGrid: {
     flexDirection: 'row',
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#f97316',
+    backgroundColor: '#f97316', // Intentional brand orange for prey distribution
   },
 });
 

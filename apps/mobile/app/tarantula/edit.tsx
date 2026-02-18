@@ -46,7 +46,7 @@ export default function EditTarantulaScreen() {
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showSubstrateDatePicker, setShowSubstrateDatePicker] = useState(false);
-  
+
   const [formData, setFormData] = useState<TarantulaData>({
     name: '',
     common_name: '',
@@ -76,7 +76,7 @@ export default function EditTarantulaScreen() {
     try {
       const response = await apiClient.get(`/tarantulas/${id}`);
       const data = response.data;
-      
+
       setFormData({
         name: data.name || '',
         common_name: data.common_name || '',
@@ -175,57 +175,59 @@ export default function EditTarantulaScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Basic Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Basic Information</Text>
-          
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Basic Information</Text>
+
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Name *</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Name *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.name}
               onChangeText={(text) => setFormData({ ...formData, name: text })}
               placeholder="Enter name"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Common Name</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Common Name</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.common_name}
               onChangeText={(text) => setFormData({ ...formData, common_name: text })}
               placeholder="e.g., Mexican Redknee"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Scientific Name</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Scientific Name</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.scientific_name}
               onChangeText={(text) => setFormData({ ...formData, scientific_name: text })}
               placeholder="e.g., Brachypelma hamorii"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Sex</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Sex</Text>
             <View style={styles.sexButtons}>
               {['Male', 'Female', 'Unknown'].map((sex) => (
                 <TouchableOpacity
                   key={sex}
                   style={[
                     styles.sexButton,
-                    formData.sex === sex && styles.sexButtonActive
+                    { borderColor: colors.border },
+                    formData.sex === sex && { backgroundColor: colors.primary, borderColor: colors.primary }
                   ]}
                   onPress={() => setFormData({ ...formData, sex })}
                 >
                   <Text style={[
                     styles.sexButtonText,
-                    formData.sex === sex && styles.sexButtonTextActive
+                    { color: colors.textSecondary },
+                    formData.sex === sex && { color: '#fff' }
                   ]}>
                     {sex}
                   </Text>
@@ -235,15 +237,15 @@ export default function EditTarantulaScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Date Acquired</Text>
-            <TouchableOpacity 
-              style={styles.dateButton}
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Date Acquired</Text>
+            <TouchableOpacity
+              style={[styles.dateButton, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}
               onPress={() => setShowDatePicker(true)}
             >
-              <Text style={styles.dateButtonText}>
+              <Text style={[styles.dateButtonText, { color: colors.textPrimary }]}>
                 {formatDate(formData.date_acquired)}
               </Text>
-              <MaterialCommunityIcons name="calendar" size={20} color="#6b7280" />
+              <MaterialCommunityIcons name="calendar" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
             {showDatePicker && (
               <DateTimePicker
@@ -256,75 +258,75 @@ export default function EditTarantulaScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Source</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Source</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.source}
               onChangeText={(text) => setFormData({ ...formData, source: text })}
               placeholder="Where did you get it?"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
         </View>
 
         {/* Enclosure */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Enclosure Setup</Text>
-          
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Enclosure Setup</Text>
+
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Enclosure Type</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Enclosure Type</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.enclosure_type}
               onChangeText={(text) => setFormData({ ...formData, enclosure_type: text })}
               placeholder="e.g., Terrestrial, Arboreal"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Enclosure Size</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Enclosure Size</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.enclosure_size}
               onChangeText={(text) => setFormData({ ...formData, enclosure_size: text })}
               placeholder="e.g., 10x10x10 inches"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Substrate Type</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Substrate Type</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.substrate_type}
               onChangeText={(text) => setFormData({ ...formData, substrate_type: text })}
               placeholder="e.g., Coco fiber"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Substrate Depth</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Substrate Depth</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.substrate_depth}
               onChangeText={(text) => setFormData({ ...formData, substrate_depth: text })}
               placeholder="e.g., 3 inches"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Last Substrate Change</Text>
-            <TouchableOpacity 
-              style={styles.dateButton}
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Last Substrate Change</Text>
+            <TouchableOpacity
+              style={[styles.dateButton, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}
               onPress={() => setShowSubstrateDatePicker(true)}
             >
-              <Text style={styles.dateButtonText}>
+              <Text style={[styles.dateButtonText, { color: colors.textPrimary }]}>
                 {formatDate(formData.last_substrate_change)}
               </Text>
-              <MaterialCommunityIcons name="calendar" size={20} color="#6b7280" />
+              <MaterialCommunityIcons name="calendar" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
             {showSubstrateDatePicker && (
               <DateTimePicker
@@ -338,57 +340,57 @@ export default function EditTarantulaScreen() {
         </View>
 
         {/* Environment */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Environment</Text>
-          
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Environment</Text>
+
           <View style={styles.row}>
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.label}>Min Temp (°F)</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Min Temp (°F)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
                 value={formData.target_temp_min?.toString()}
                 onChangeText={(text) => setFormData({ ...formData, target_temp_min: text ? parseInt(text) : undefined })}
                 placeholder="72"
                 keyboardType="numeric"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
 
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.label}>Max Temp (°F)</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Max Temp (°F)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
                 value={formData.target_temp_max?.toString()}
                 onChangeText={(text) => setFormData({ ...formData, target_temp_max: text ? parseInt(text) : undefined })}
                 placeholder="78"
                 keyboardType="numeric"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>
 
           <View style={styles.row}>
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.label}>Min Humidity (%)</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Min Humidity (%)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
                 value={formData.target_humidity_min?.toString()}
                 onChangeText={(text) => setFormData({ ...formData, target_humidity_min: text ? parseInt(text) : undefined })}
                 placeholder="60"
                 keyboardType="numeric"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
 
             <View style={[styles.inputGroup, styles.halfWidth]}>
-              <Text style={styles.label}>Max Humidity (%)</Text>
+              <Text style={[styles.label, { color: colors.textSecondary }]}>Max Humidity (%)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
                 value={formData.target_humidity_max?.toString()}
                 onChangeText={(text) => setFormData({ ...formData, target_humidity_max: text ? parseInt(text) : undefined })}
                 placeholder="70"
                 keyboardType="numeric"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.textTertiary}
               />
             </View>
           </View>
@@ -396,40 +398,40 @@ export default function EditTarantulaScreen() {
           <View style={styles.inputGroup}>
             <View style={styles.checkboxRow}>
               <TouchableOpacity
-                style={styles.checkbox}
+                style={[styles.checkbox, { borderColor: colors.border }]}
                 onPress={() => setFormData({ ...formData, water_dish: !formData.water_dish })}
               >
                 {formData.water_dish && (
-                  <MaterialCommunityIcons name="check" size={18} color="#7c3aed" />
+                  <MaterialCommunityIcons name="check" size={18} color={colors.primary} />
                 )}
               </TouchableOpacity>
-              <Text style={styles.checkboxLabel}>Has Water Dish</Text>
+              <Text style={[styles.checkboxLabel, { color: colors.textPrimary }]}>Has Water Dish</Text>
             </View>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Misting Schedule</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Misting Schedule</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.misting_schedule}
               onChangeText={(text) => setFormData({ ...formData, misting_schedule: text })}
               placeholder="e.g., Twice weekly"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
             />
           </View>
         </View>
 
         {/* Notes */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notes</Text>
-          
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Notes</Text>
+
           <View style={styles.inputGroup}>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.textArea, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.notes}
               onChangeText={(text) => setFormData({ ...formData, notes: text })}
               placeholder="Additional notes..."
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.textTertiary}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
@@ -466,7 +468,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
   },
   saveButton: {
     paddingHorizontal: 16,
@@ -475,7 +476,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#7c3aed',
   },
   content: {
     flex: 1,
@@ -483,12 +483,10 @@ const styles = StyleSheet.create({
   section: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 16,
   },
   inputGroup: {
@@ -497,17 +495,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#374151',
     marginBottom: 6,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#1f2937',
-    backgroundColor: '#fff',
   },
   textArea: {
     minHeight: 100,
@@ -520,35 +514,23 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#d1d5db',
     borderRadius: 8,
     alignItems: 'center',
-  },
-  sexButtonActive: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
   },
   sexButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#6b7280',
-  },
-  sexButtonTextActive: {
-    color: '#fff',
   },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#d1d5db',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#fff',
   },
   dateButtonText: {
     fontSize: 16,
-    color: '#1f2937',
   },
   row: {
     flexDirection: 'row',
@@ -565,7 +547,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderWidth: 2,
-    borderColor: '#d1d5db',
     borderRadius: 4,
     marginRight: 8,
     justifyContent: 'center',
@@ -573,6 +554,5 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     fontSize: 16,
-    color: '#1f2937',
   },
 });

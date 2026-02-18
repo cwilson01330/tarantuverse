@@ -549,7 +549,7 @@ export default function TarantulaDetailScreen() {
                     <MaterialCommunityIcons 
                       name={log.accepted ? "check-circle" : "close-circle"} 
                       size={20} 
-                      color={log.accepted ? "#10b981" : "#ef4444"} 
+                      color={log.accepted ? colors.success : colors.error}
                     />
                   </View>
                   <View style={styles.logContent}>
@@ -745,9 +745,9 @@ export default function TarantulaDetailScreen() {
                   }}
                   onLongPress={() => handlePhotoLongPress(photo.id, photo.url, photo.caption)}
                 >
-                  <Image 
-                    source={{ uri: getImageUrl(photo.thumbnail_url || photo.url) }} 
-                    style={styles.thumbnailImage}
+                  <Image
+                    source={{ uri: getImageUrl(photo.thumbnail_url || photo.url) }}
+                    style={[styles.thumbnailImage, { backgroundColor: colors.border }]}
                     resizeMode="cover"
                   />
                   {tarantula?.photo_url === photo.url && (
@@ -857,7 +857,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
   },
   headerActions: {
     flexDirection: 'row',
@@ -872,7 +871,6 @@ const styles = StyleSheet.create({
   heroImageContainer: {
     width: '100%',
     height: 300,
-    backgroundColor: '#f3f4f6',
   },
   heroImage: {
     width: '100%',
@@ -884,33 +882,27 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
   },
   section: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   name: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#1f2937',
     marginBottom: 4,
   },
   scientificName: {
     fontSize: 18,
     fontStyle: 'italic',
-    color: '#6b7280',
     marginBottom: 2,
   },
   commonName: {
     fontSize: 16,
-    color: '#9ca3af',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 16,
   },
   infoGrid: {
@@ -925,32 +917,26 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: '#6b7280',
     marginTop: 4,
     marginBottom: 2,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1f2937',
   },
   notes: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#4b5563',
   },
   actionBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 16,
-    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
     paddingBottom: 32,
   },
   actionButton: {
     alignItems: 'center',
-    backgroundColor: '#7c3aed',
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 12,
@@ -971,7 +957,6 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 14,
-    color: '#7c3aed',
     fontWeight: '600',
   },
   emptyState: {
@@ -980,12 +965,10 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#9ca3af',
     marginTop: 8,
   },
   emptyStateSubtext: {
     fontSize: 12,
-    color: '#d1d5db',
     marginTop: 4,
     textAlign: 'center',
   },
@@ -994,11 +977,9 @@ const styles = StyleSheet.create({
   },
   logItem: {
     flexDirection: 'row',
-    backgroundColor: '#f9fafb',
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
   logIcon: {
     marginRight: 12,
@@ -1010,17 +991,14 @@ const styles = StyleSheet.create({
   logTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 4,
   },
   logDate: {
     fontSize: 13,
-    color: '#6b7280',
     marginBottom: 4,
   },
   logNotes: {
     fontSize: 13,
-    color: '#4b5563',
     fontStyle: 'italic',
   },
   photoGallery: {
@@ -1030,19 +1008,16 @@ const styles = StyleSheet.create({
     marginRight: 12,
     width: 150,
     borderRadius: 8,
-    backgroundColor: '#f9fafb',
     overflow: 'hidden',
     position: 'relative',
   },
   thumbnailImage: {
     width: 150,
     height: 150,
-    backgroundColor: '#e5e7eb',
   },
   photoCaption: {
     padding: 8,
     fontSize: 12,
-    color: '#4b5563',
   },
   deleteHint: {
     position: 'absolute',

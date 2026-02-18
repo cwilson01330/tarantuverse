@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   heroContainer: {
     position: 'relative',
     height: 300,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#1e293b', // Intentional dark hero bg for image overlay
   },
   heroImage: {
     width: '100%',

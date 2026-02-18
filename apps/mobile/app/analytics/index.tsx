@@ -210,10 +210,10 @@ export default function AnalyticsScreen() {
       alignItems: 'center',
     },
     maleSegment: {
-      backgroundColor: '#3b82f6',
+      backgroundColor: colors.male || colors.info,
     },
     femaleSegment: {
-      backgroundColor: '#ec4899',
+      backgroundColor: colors.female || '#ec4899',
     },
     sexSegmentText: {
       color: '#fff',
@@ -266,29 +266,29 @@ export default function AnalyticsScreen() {
       marginBottom: 8,
     },
     purpleBg: {
-      backgroundColor: '#f3e8ff',
+      backgroundColor: colors.primary + '20',
     },
     greenBg: {
-      backgroundColor: '#dcfce7',
+      backgroundColor: colors.success + '20',
     },
     blueBg: {
-      backgroundColor: '#dbeafe',
+      backgroundColor: colors.info + '20',
     },
     notableLabel: {
       fontSize: 12,
       fontWeight: '600',
-      color: '#374151',
+      color: colors.textSecondary,
       marginBottom: 4,
     },
     notableName: {
       fontSize: 16,
       fontWeight: '700',
-      color: '#111827',
+      color: colors.textPrimary,
       marginBottom: 2,
     },
     notableDetail: {
       fontSize: 13,
-      color: '#6b7280',
+      color: colors.textSecondary,
     },
     speciesItem: {
       flexDirection: 'row',
@@ -312,7 +312,7 @@ export default function AnalyticsScreen() {
     },
     speciesBarFill: {
       height: '100%',
-      backgroundColor: '#10b981',
+      backgroundColor: colors.success,
     },
     speciesCount: {
       fontSize: 13,

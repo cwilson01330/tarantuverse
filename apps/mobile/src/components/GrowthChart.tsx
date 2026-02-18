@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { format } from 'date-fns';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface GrowthDataPoint {
   date: string;
@@ -40,6 +41,7 @@ type DateRange = 'all' | '1y' | '6m' | '3m';
 type Metric = 'weight' | 'leg_span' | 'both';
 
 const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
+  const { colors } = useTheme();
   const [dateRange, setDateRange] = useState<DateRange>('all');
   const [metric, setMetric] = useState<Metric>('both');
   const screenWidth = Dimensions.get('window').width;
@@ -82,11 +84,11 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
 
   if (data.total_molts === 0) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Growth Tracking</Text>
+      <View style={[styles.container, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Growth Tracking</Text>
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>📊</Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
             No molt data recorded yet.{'\n'}Add molt logs to track growth over time.
           </Text>
         </View>
@@ -95,38 +97,38 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Growth Tracking</Text>
+    <ScrollView style={[styles.container, { backgroundColor: colors.surface }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Growth Tracking</Text>
       </View>
 
       {/* Metric Selector */}
       <View style={styles.selectorContainer}>
-        <Text style={styles.selectorLabel}>Metric:</Text>
-        <View style={styles.buttonGroup}>
+        <Text style={[styles.selectorLabel, { color: colors.textPrimary }]}>Metric:</Text>
+        <View style={[styles.buttonGroup, { backgroundColor: colors.surfaceElevated }]}>
           <TouchableOpacity
-            style={[styles.button, metric === 'both' && styles.buttonActive]}
+            style={[styles.button, metric === 'both' && [styles.buttonActive, { backgroundColor: colors.surface }]]}
             onPress={() => setMetric('both')}
           >
-            <Text style={[styles.buttonText, metric === 'both' && styles.buttonTextActive]}>
+            <Text style={[styles.buttonText, { color: colors.textSecondary }, metric === 'both' && { color: colors.primary }]}>
               Both
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, metric === 'weight' && styles.buttonActive, !hasWeightData && styles.buttonDisabled]}
+            style={[styles.button, metric === 'weight' && [styles.buttonActive, { backgroundColor: colors.surface }], !hasWeightData && styles.buttonDisabled]}
             onPress={() => hasWeightData && setMetric('weight')}
             disabled={!hasWeightData}
           >
-            <Text style={[styles.buttonText, metric === 'weight' && styles.buttonTextActive, !hasWeightData && styles.buttonTextDisabled]}>
+            <Text style={[styles.buttonText, { color: colors.textSecondary }, metric === 'weight' && { color: colors.primary }, !hasWeightData && { color: colors.textTertiary }]}>
               Weight
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, metric === 'leg_span' && styles.buttonActive, !hasLegSpanData && styles.buttonDisabled]}
+            style={[styles.button, metric === 'leg_span' && [styles.buttonActive, { backgroundColor: colors.surface }], !hasLegSpanData && styles.buttonDisabled]}
             onPress={() => hasLegSpanData && setMetric('leg_span')}
             disabled={!hasLegSpanData}
           >
-            <Text style={[styles.buttonText, metric === 'leg_span' && styles.buttonTextActive, !hasLegSpanData && styles.buttonTextDisabled]}>
+            <Text style={[styles.buttonText, { color: colors.textSecondary }, metric === 'leg_span' && { color: colors.primary }, !hasLegSpanData && { color: colors.textTertiary }]}>
               Leg Span
             </Text>
           </TouchableOpacity>
@@ -135,69 +137,48 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
 
       {/* Date Range Selector */}
       <View style={styles.selectorContainer}>
-        <Text style={styles.selectorLabel}>Range:</Text>
-        <View style={styles.buttonGroup}>
-          <TouchableOpacity
-            style={[styles.button, dateRange === '3m' && styles.buttonActive]}
-            onPress={() => setDateRange('3m')}
-          >
-            <Text style={[styles.buttonText, dateRange === '3m' && styles.buttonTextActive]}>
-              3M
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, dateRange === '6m' && styles.buttonActive]}
-            onPress={() => setDateRange('6m')}
-          >
-            <Text style={[styles.buttonText, dateRange === '6m' && styles.buttonTextActive]}>
-              6M
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, dateRange === '1y' && styles.buttonActive]}
-            onPress={() => setDateRange('1y')}
-          >
-            <Text style={[styles.buttonText, dateRange === '1y' && styles.buttonTextActive]}>
-              1Y
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, dateRange === 'all' && styles.buttonActive]}
-            onPress={() => setDateRange('all')}
-          >
-            <Text style={[styles.buttonText, dateRange === 'all' && styles.buttonTextActive]}>
-              All
-            </Text>
-          </TouchableOpacity>
+        <Text style={[styles.selectorLabel, { color: colors.textPrimary }]}>Range:</Text>
+        <View style={[styles.buttonGroup, { backgroundColor: colors.surfaceElevated }]}>
+          {(['3m', '6m', '1y', 'all'] as DateRange[]).map((range) => (
+            <TouchableOpacity
+              key={range}
+              style={[styles.button, dateRange === range && [styles.buttonActive, { backgroundColor: colors.surface }]]}
+              onPress={() => setDateRange(range)}
+            >
+              <Text style={[styles.buttonText, { color: colors.textSecondary }, dateRange === range && { color: colors.primary }]}>
+                {range === 'all' ? 'All' : range.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
       {/* Summary Stats */}
       <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statLabel}>Total Molts</Text>
-          <Text style={styles.statValue}>{data.total_molts}</Text>
+        <View style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Molts</Text>
+          <Text style={[styles.statValue, { color: colors.textPrimary }]}>{data.total_molts}</Text>
         </View>
         {data.average_days_between_molts && (
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Avg Days Between</Text>
-            <Text style={styles.statValue}>
+          <View style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Avg Days Between</Text>
+            <Text style={[styles.statValue, { color: colors.textPrimary }]}>
               {Math.round(data.average_days_between_molts)}
             </Text>
           </View>
         )}
         {data.total_weight_gain && (
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Weight Gain</Text>
-            <Text style={[styles.statValue, styles.statGreen]}>
+          <View style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Weight Gain</Text>
+            <Text style={[styles.statValue, { color: colors.success }]}>
               +{parseFloat(data.total_weight_gain.toString()).toFixed(1)}g
             </Text>
           </View>
         )}
         {data.total_leg_span_gain && (
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Size Gain</Text>
-            <Text style={[styles.statValue, styles.statBlue]}>
+          <View style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Size Gain</Text>
+            <Text style={[styles.statValue, { color: colors.info }]}>
               +{parseFloat(data.total_leg_span_gain.toString()).toFixed(1)} cm
             </Text>
           </View>
@@ -208,7 +189,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
       <View style={styles.chartContainer}>
         {(metric === 'both' || metric === 'weight') && hasWeightData && (
           <View style={styles.chartWrapper}>
-            <Text style={styles.chartTitle}>Weight (g)</Text>
+            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>Weight (g)</Text>
             <LineChart
               data={{
                 labels: chartData.map((d) => d.date),
@@ -223,23 +204,23 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
               width={screenWidth - 32}
               height={220}
               chartConfig={{
-                backgroundColor: '#ffffff',
-                backgroundGradientFrom: '#ffffff',
-                backgroundGradientTo: '#ffffff',
+                backgroundColor: colors.surface,
+                backgroundGradientFrom: colors.surface,
+                backgroundGradientTo: colors.surface,
                 decimalPlaces: 1,
                 color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                labelColor: () => colors.textSecondary,
                 style: {
                   borderRadius: 16,
                 },
                 propsForDots: {
                   r: '4',
                   strokeWidth: '2',
-                  stroke: '#10b981',
+                  stroke: colors.success,
                 },
                 propsForBackgroundLines: {
-                  strokeDasharray: '', // solid lines
-                  stroke: '#e5e7eb',
+                  strokeDasharray: '',
+                  stroke: colors.border,
                   strokeWidth: 1,
                 },
               }}
@@ -257,7 +238,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
         )}
         {(metric === 'both' || metric === 'leg_span') && hasLegSpanData && (
           <View style={styles.chartWrapper}>
-            <Text style={styles.chartTitle}>Leg Span (cm)</Text>
+            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>Leg Span (cm)</Text>
             <LineChart
               data={{
                 labels: chartData.map((d) => d.date),
@@ -272,23 +253,23 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
               width={screenWidth - 32}
               height={220}
               chartConfig={{
-                backgroundColor: '#ffffff',
-                backgroundGradientFrom: '#ffffff',
-                backgroundGradientTo: '#ffffff',
+                backgroundColor: colors.surface,
+                backgroundGradientFrom: colors.surface,
+                backgroundGradientTo: colors.surface,
                 decimalPlaces: 1,
                 color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
-                labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                labelColor: () => colors.textSecondary,
                 style: {
                   borderRadius: 16,
                 },
                 propsForDots: {
                   r: '4',
                   strokeWidth: '2',
-                  stroke: '#3b82f6',
+                  stroke: colors.info,
                 },
                 propsForBackgroundLines: {
                   strokeDasharray: '',
-                  stroke: '#e5e7eb',
+                  stroke: colors.border,
                   strokeWidth: 1,
                 },
               }}
@@ -311,24 +292,24 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
         <View style={styles.infoContainer}>
           {data.growth_rate_weight && (
             <Text style={styles.infoText}>
-              <Text style={styles.infoLabel}>Weight Growth Rate: </Text>
-              <Text style={styles.infoValueGreen}>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Weight Growth Rate: </Text>
+              <Text style={[styles.infoValueGreen, { color: colors.success }]}>
                 {parseFloat(data.growth_rate_weight.toString()).toFixed(2)}g/mo
               </Text>
             </Text>
           )}
           {data.growth_rate_leg_span && (
             <Text style={styles.infoText}>
-              <Text style={styles.infoLabel}>Size Growth Rate: </Text>
-              <Text style={styles.infoValueBlue}>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Size Growth Rate: </Text>
+              <Text style={[styles.infoValueBlue, { color: colors.info }]}>
                 {parseFloat(data.growth_rate_leg_span.toString()).toFixed(2)} cm/mo
               </Text>
             </Text>
           )}
           {data.days_since_last_molt !== undefined && (
             <Text style={styles.infoText}>
-              <Text style={styles.infoLabel}>Days Since Last Molt: </Text>
-              <Text style={styles.infoValue}>{data.days_since_last_molt}</Text>
+              <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Days Since Last Molt: </Text>
+              <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{data.days_since_last_molt}</Text>
             </Text>
           )}
         </View>
@@ -340,17 +321,14 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   header: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
   },
   emptyState: {
     alignItems: 'center',
@@ -363,7 +341,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#6b7280',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -376,13 +353,11 @@ const styles = StyleSheet.create({
   selectorLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
     marginRight: 12,
     width: 60,
   },
   buttonGroup: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
     borderRadius: 8,
     padding: 2,
     flex: 1,
@@ -395,7 +370,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonActive: {
-    backgroundColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -408,13 +382,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6b7280',
-  },
-  buttonTextActive: {
-    color: '#9333ea',
-  },
-  buttonTextDisabled: {
-    color: '#d1d5db',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -423,7 +390,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   statCard: {
-    backgroundColor: '#f9fafb',
     borderRadius: 12,
     padding: 12,
     minWidth: '47%',
@@ -431,7 +397,6 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 11,
-    color: '#6b7280',
     fontWeight: '600',
     marginBottom: 4,
     textTransform: 'uppercase',
@@ -439,13 +404,6 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
-  },
-  statGreen: {
-    color: '#10b981',
-  },
-  statBlue: {
-    color: '#3b82f6',
   },
   chartContainer: {
     paddingVertical: 16,
@@ -457,32 +415,11 @@ const styles = StyleSheet.create({
   chartTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
     marginBottom: 8,
     marginLeft: 16,
   },
   chart: {
     borderRadius: 16,
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
-    gap: 16,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 6,
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#374151',
   },
   infoContainer: {
     padding: 16,
@@ -493,20 +430,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
-  infoLabel: {
-    color: '#6b7280',
-  },
+  infoLabel: {},
   infoValue: {
     fontWeight: '600',
-    color: '#111827',
   },
   infoValueGreen: {
     fontWeight: '600',
-    color: '#10b981',
   },
   infoValueBlue: {
     fontWeight: '600',
-    color: '#3b82f6',
   },
 });
 

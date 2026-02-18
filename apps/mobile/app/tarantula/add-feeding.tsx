@@ -130,14 +130,14 @@ export default function AddFeedingScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Date */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Date</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Date</Text>
           <TouchableOpacity
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
             onPress={() => setShowDatePicker(true)}
           >
-            <MaterialCommunityIcons name="calendar" size={20} color="#7c3aed" />
-            <Text style={styles.inputText}>{date.toLocaleDateString()}</Text>
+            <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
+            <Text style={[styles.inputText, { color: colors.textPrimary }]}>{date.toLocaleDateString()}</Text>
           </TouchableOpacity>
           {showDatePicker && (
             <DateTimePicker
@@ -151,22 +151,24 @@ export default function AddFeedingScreen() {
         </View>
 
         {/* Food Type */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Food Type *</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Food Type *</Text>
           <View style={styles.chipContainer}>
             {FOOD_TYPES.map((type) => (
               <TouchableOpacity
                 key={type}
                 style={[
                   styles.chip,
-                  foodType === type && styles.chipSelected,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  foodType === type && { backgroundColor: colors.primary, borderColor: colors.primary },
                 ]}
                 onPress={() => setFoodType(type)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    foodType === type && styles.chipTextSelected,
+                    { color: colors.textSecondary },
+                    foodType === type && { color: '#fff' },
                   ]}
                 >
                   {type}
@@ -177,22 +179,24 @@ export default function AddFeedingScreen() {
         </View>
 
         {/* Food Size */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Food Size</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Food Size</Text>
           <View style={styles.chipContainer}>
             {FOOD_SIZES.map((size) => (
               <TouchableOpacity
                 key={size}
                 style={[
                   styles.chip,
-                  foodSize === size && styles.chipSelected,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  foodSize === size && { backgroundColor: colors.primary, borderColor: colors.primary },
                 ]}
                 onPress={() => setFoodSize(foodSize === size ? '' : size)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    foodSize === size && styles.chipTextSelected,
+                    { color: colors.textSecondary },
+                    foodSize === size && { color: '#fff' },
                   ]}
                 >
                   {size}
@@ -203,25 +207,27 @@ export default function AddFeedingScreen() {
         </View>
 
         {/* Accepted */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Did they accept the food?</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Did they accept the food?</Text>
           <View style={styles.toggleContainer}>
             <TouchableOpacity
               style={[
                 styles.toggleButton,
-                accepted && styles.toggleButtonActive,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                accepted && { backgroundColor: colors.primary, borderColor: colors.primary },
               ]}
               onPress={() => setAccepted(true)}
             >
               <MaterialCommunityIcons
                 name="check-circle"
                 size={20}
-                color={accepted ? '#fff' : '#10b981'}
+                color={accepted ? '#fff' : colors.success}
               />
               <Text
                 style={[
                   styles.toggleButtonText,
-                  accepted && styles.toggleButtonTextActive,
+                  { color: colors.textSecondary },
+                  accepted && { color: '#fff' },
                 ]}
               >
                 Yes
@@ -230,19 +236,21 @@ export default function AddFeedingScreen() {
             <TouchableOpacity
               style={[
                 styles.toggleButton,
-                !accepted && styles.toggleButtonActive,
+                { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                !accepted && { backgroundColor: colors.primary, borderColor: colors.primary },
               ]}
               onPress={() => setAccepted(false)}
             >
               <MaterialCommunityIcons
                 name="close-circle"
                 size={20}
-                color={!accepted ? '#fff' : '#ef4444'}
+                color={!accepted ? '#fff' : colors.error}
               />
               <Text
                 style={[
                   styles.toggleButtonText,
-                  !accepted && styles.toggleButtonTextActive,
+                  { color: colors.textSecondary },
+                  !accepted && { color: '#fff' },
                 ]}
               >
                 No
@@ -252,14 +260,14 @@ export default function AddFeedingScreen() {
         </View>
 
         {/* Notes */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Notes</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Notes</Text>
           <TextInput
-            style={styles.textArea}
+            style={[styles.textArea, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
             value={notes}
             onChangeText={setNotes}
             placeholder="Add any additional notes..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.textTertiary}
             multiline
             numberOfLines={4}
             textAlignVertical="top"
@@ -310,27 +318,22 @@ const styles = StyleSheet.create({
   section: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 12,
   },
   input: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     gap: 8,
   },
   inputText: {
     fontSize: 16,
-    color: '#1f2937',
   },
   chipContainer: {
     flexDirection: 'row',
@@ -340,22 +343,12 @@ const styles = StyleSheet.create({
   chip: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: '#f3f4f6',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 20,
-  },
-  chipSelected: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
   },
   chipText: {
     fontSize: 14,
-    color: '#6b7280',
     fontWeight: '500',
-  },
-  chipTextSelected: {
-    color: '#fff',
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -367,32 +360,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     gap: 8,
   },
-  toggleButtonActive: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
-  },
   toggleButtonText: {
     fontSize: 16,
-    color: '#6b7280',
     fontWeight: '500',
-  },
-  toggleButtonTextActive: {
-    color: '#fff',
   },
   textArea: {
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     fontSize: 15,
-    color: '#1f2937',
     minHeight: 100,
   },
 });

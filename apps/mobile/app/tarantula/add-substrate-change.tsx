@@ -143,14 +143,14 @@ export default function AddSubstrateChangeScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Date */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Date Changed</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Date Changed</Text>
           <TouchableOpacity
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
             onPress={() => setShowDatePicker(true)}
           >
-            <MaterialCommunityIcons name="calendar" size={20} color="#7c3aed" />
-            <Text style={styles.inputText}>{date.toLocaleDateString()}</Text>
+            <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
+            <Text style={[styles.inputText, { color: colors.textPrimary }]}>{date.toLocaleDateString()}</Text>
           </TouchableOpacity>
           {showDatePicker && (
             <DateTimePicker
@@ -164,22 +164,24 @@ export default function AddSubstrateChangeScreen() {
         </View>
 
         {/* Substrate Type */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Substrate Type *</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Substrate Type *</Text>
           <View style={styles.chipContainer}>
             {SUBSTRATE_TYPES.map((type) => (
               <TouchableOpacity
                 key={type}
                 style={[
                   styles.chip,
-                  substrateType === type && styles.chipSelected,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  substrateType === type && { backgroundColor: colors.primary, borderColor: colors.primary },
                 ]}
                 onPress={() => setSubstrateType(type)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    substrateType === type && styles.chipTextSelected,
+                    { color: colors.textSecondary },
+                    substrateType === type && { color: '#fff' },
                   ]}
                 >
                   {type}
@@ -190,34 +192,36 @@ export default function AddSubstrateChangeScreen() {
         </View>
 
         {/* Substrate Depth */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Substrate Depth</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Substrate Depth</Text>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
             value={substrateDepth}
             onChangeText={setSubstrateDepth}
             placeholder="e.g., 3 inches"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.textTertiary}
           />
         </View>
 
         {/* Reason */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Reason for Change</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Reason for Change</Text>
           <View style={styles.chipContainer}>
             {CHANGE_REASONS.map((r) => (
               <TouchableOpacity
                 key={r}
                 style={[
                   styles.chip,
-                  reason === r && styles.chipSelected,
+                  { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+                  reason === r && { backgroundColor: colors.primary, borderColor: colors.primary },
                 ]}
                 onPress={() => setReason(reason === r ? '' : r)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    reason === r && styles.chipTextSelected,
+                    { color: colors.textSecondary },
+                    reason === r && { color: '#fff' },
                   ]}
                 >
                   {r}
@@ -228,14 +232,14 @@ export default function AddSubstrateChangeScreen() {
         </View>
 
         {/* Notes */}
-        <View style={styles.section}>
-          <Text style={styles.label}>Notes</Text>
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>Notes</Text>
           <TextInput
-            style={styles.textArea}
+            style={[styles.textArea, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
             value={notes}
             onChangeText={setNotes}
             placeholder="Add any additional notes..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.textTertiary}
             multiline
             numberOfLines={4}
             textAlignVertical="top"
@@ -286,36 +290,28 @@ const styles = StyleSheet.create({
   section: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
     marginBottom: 12,
   },
   input: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     gap: 8,
   },
   inputText: {
     fontSize: 16,
-    color: '#1f2937',
   },
   textInput: {
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     fontSize: 15,
-    color: '#1f2937',
   },
   chipContainer: {
     flexDirection: 'row',
@@ -325,31 +321,18 @@ const styles = StyleSheet.create({
   chip: {
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: '#f3f4f6',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 20,
-  },
-  chipSelected: {
-    backgroundColor: '#7c3aed',
-    borderColor: '#7c3aed',
   },
   chipText: {
     fontSize: 14,
-    color: '#6b7280',
     fontWeight: '500',
-  },
-  chipTextSelected: {
-    color: '#fff',
   },
   textArea: {
     padding: 12,
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
     borderRadius: 8,
     fontSize: 15,
-    color: '#1f2937',
     minHeight: 100,
   },
 });
