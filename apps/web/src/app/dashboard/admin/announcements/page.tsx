@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -58,13 +58,17 @@ export default function AdminAnnouncements() {
     if (!user.is_admin && !user.is_superuser) { router.push('/dashboard'); return }
   }, [isLoading, isAuthenticated, user, router])
 
+  const hasFetched = useRef(false)
+
   useEffect(() => {
+    if (hasFetched.current) return
     if (token && user && (user.is_admin || user.is_superuser)) {
+      hasFetched.current = true
       fetchAnnouncements()
     } else if (!isLoading) {
       setLoading(false)
     }
-  }, [token, user, isLoading])
+  }, [token, isLoading])
 
   const fetchAnnouncements = async () => {
     try {
