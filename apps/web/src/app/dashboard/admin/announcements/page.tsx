@@ -61,8 +61,10 @@ export default function AdminAnnouncements() {
   useEffect(() => {
     if (token && user && (user.is_admin || user.is_superuser)) {
       fetchAnnouncements()
+    } else if (!isLoading) {
+      setLoading(false)
     }
-  }, [token, user])
+  }, [token, user, isLoading])
 
   const fetchAnnouncements = async () => {
     try {
@@ -73,8 +75,8 @@ export default function AdminAnnouncements() {
       if (res.ok) {
         setAnnouncements(await res.json())
       }
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error('Failed to fetch announcements:', err)
     } finally {
       setLoading(false)
     }
