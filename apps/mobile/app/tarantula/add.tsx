@@ -78,7 +78,11 @@ export default function AddTarantulaScreen() {
       Alert.alert('Success', 'Tarantula added successfully');
       router.replace(`/tarantula/${response.data.id}`);
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to add tarantula');
+      const detail = error.response?.data?.detail;
+      const message = typeof detail === 'object' && detail !== null
+        ? detail.message || JSON.stringify(detail)
+        : detail || 'Failed to add tarantula';
+      Alert.alert('Error', message);
       console.error(error);
     } finally {
       setSaving(false);

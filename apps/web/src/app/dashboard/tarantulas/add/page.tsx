@@ -145,7 +145,11 @@ function AddTarantulaContent() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Failed to add tarantula')
+        const detail = data.detail
+        const message = typeof detail === 'object' && detail !== null
+          ? detail.message || JSON.stringify(detail)
+          : detail || 'Failed to add tarantula'
+        throw new Error(message)
       }
 
       // Redirect to dashboard

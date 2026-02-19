@@ -73,7 +73,11 @@ export default function ImportCollectionPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Failed to import collection')
+        const detail = data.detail
+        const message = typeof detail === 'object' && detail !== null
+          ? detail.message || JSON.stringify(detail)
+          : detail || 'Failed to import collection'
+        throw new Error(message)
       }
 
       setSuccessMessage(data.message)
