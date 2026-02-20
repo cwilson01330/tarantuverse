@@ -8,12 +8,11 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateInput from '../../src/components/DateInput';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -42,8 +41,6 @@ export default function AddTarantulaScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [saving, setSaving] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showSubstrateDatePicker, setShowSubstrateDatePicker] = useState(false);
 
   const [formData, setFormData] = useState<TarantulaData>({
     name: '',
@@ -86,25 +83,6 @@ export default function AddTarantulaScreen() {
       console.error(error);
     } finally {
       setSaving(false);
-    }
-  };
-
-  const formatDate = (dateString: string | undefined): string => {
-    if (!dateString) return 'Not set';
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setFormData({ ...formData, date_acquired: selectedDate.toISOString().split('T')[0] });
-    }
-  };
-
-  const onSubstrateDateChange = (event: any, selectedDate?: Date) => {
-    setShowSubstrateDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setFormData({ ...formData, last_substrate_change: selectedDate.toISOString().split('T')[0] });
     }
   };
 
@@ -198,20 +176,6 @@ export default function AddTarantulaScreen() {
     },
     sexButtonTextActive: {
       color: '#fff',
-    },
-    dateButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 8,
-      padding: 12,
-      backgroundColor: colors.surface,
-    },
-    dateButtonText: {
-      fontSize: 16,
-      color: colors.textPrimary,
     },
     row: {
       flexDirection: 'row',
@@ -324,23 +288,12 @@ export default function AddTarantulaScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Date Acquired</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                {formatDate(formData.date_acquired)}
-              </Text>
-              <MaterialCommunityIcons name="calendar" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={formData.date_acquired ? new Date(formData.date_acquired) : new Date()}
-                mode="date"
-                display="default"
-                onChange={onDateChange}
-              />
-            )}
+            <DateInput
+              value={formData.date_acquired ? new Date(formData.date_acquired) : new Date()}
+              onChange={(date) => setFormData({ ...formData, date_acquired: date.toISOString().split('T')[0] })}
+              maximumDate={new Date()}
+              label="Date Acquired"
+            />
           </View>
 
           <View style={styles.inputGroup}>
@@ -405,23 +358,12 @@ export default function AddTarantulaScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Last Substrate Change</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowSubstrateDatePicker(true)}
-            >
-              <Text style={styles.dateButtonText}>
-                {formatDate(formData.last_substrate_change)}
-              </Text>
-              <MaterialCommunityIcons name="calendar" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            {showSubstrateDatePicker && (
-              <DateTimePicker
-                value={formData.last_substrate_change ? new Date(formData.last_substrate_change) : new Date()}
-                mode="date"
-                display="default"
-                onChange={onSubstrateDateChange}
-              />
-            )}
+            <DateInput
+              value={formData.last_substrate_change ? new Date(formData.last_substrate_change) : new Date()}
+              onChange={(date) => setFormData({ ...formData, last_substrate_change: date.toISOString().split('T')[0] })}
+              maximumDate={new Date()}
+              label="Last Substrate Change"
+            />
           </View>
         </View>
 

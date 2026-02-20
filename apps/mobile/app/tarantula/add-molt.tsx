@@ -7,12 +7,11 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateInput from '../../src/components/DateInput';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -21,9 +20,7 @@ export default function AddMoltScreen() {
   const { id } = useLocalSearchParams();
   const { colors } = useTheme();
   const [moltDate, setMoltDate] = useState(new Date());
-  const [showMoltDatePicker, setShowMoltDatePicker] = useState(false);
   const [premoltDate, setPremoltDate] = useState<Date | null>(null);
-  const [showPremoltDatePicker, setShowPremoltDatePicker] = useState(false);
   const [legSpanBefore, setLegSpanBefore] = useState('');
   const [legSpanAfter, setLegSpanAfter] = useState('');
   const [weightBefore, setWeightBefore] = useState('');
@@ -54,20 +51,6 @@ export default function AddMoltScreen() {
     }
   };
 
-  const onMoltDateChange = (event: any, selectedDate?: Date) => {
-    setShowMoltDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setMoltDate(selectedDate);
-    }
-  };
-
-  const onPremoltDateChange = (event: any, selectedDate?: Date) => {
-    setShowPremoltDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setPremoltDate(selectedDate);
-    }
-  };
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
@@ -89,45 +72,23 @@ export default function AddMoltScreen() {
         {/* Molt Date */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.label, { color: colors.textPrimary }]}>Molt Date *</Text>
-          <TouchableOpacity
-            style={[styles.input, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            onPress={() => setShowMoltDatePicker(true)}
-          >
-            <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
-            <Text style={[styles.inputText, { color: colors.textPrimary }]}>{moltDate.toLocaleDateString()}</Text>
-          </TouchableOpacity>
-          {showMoltDatePicker && (
-            <DateTimePicker
-              value={moltDate}
-              mode="date"
-              display="default"
-              onChange={onMoltDateChange}
-              maximumDate={new Date()}
-            />
-          )}
+          <DateInput
+            value={moltDate}
+            onChange={setMoltDate}
+            maximumDate={new Date()}
+            label="Molt Date"
+          />
         </View>
 
         {/* Premolt Start Date */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.label, { color: colors.textPrimary }]}>Premolt Started (Optional)</Text>
-          <TouchableOpacity
-            style={[styles.input, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            onPress={() => setShowPremoltDatePicker(true)}
-          >
-            <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
-            <Text style={[styles.inputText, { color: colors.textPrimary }]}>
-              {premoltDate ? premoltDate.toLocaleDateString() : 'Select date'}
-            </Text>
-          </TouchableOpacity>
-          {showPremoltDatePicker && (
-            <DateTimePicker
-              value={premoltDate || new Date()}
-              mode="date"
-              display="default"
-              onChange={onPremoltDateChange}
-              maximumDate={new Date()}
-            />
-          )}
+          <DateInput
+            value={premoltDate || new Date()}
+            onChange={setPremoltDate}
+            maximumDate={new Date()}
+            label="Premolt Start Date"
+          />
           {premoltDate && (
             <TouchableOpacity
               style={styles.clearButton}

@@ -7,12 +7,11 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateInput from '../../src/components/DateInput';
 import { apiClient } from '../../src/services/api';
 import { scheduleSubstrateReminder } from '../../src/services/notifications';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -41,7 +40,6 @@ export default function AddSubstrateChangeScreen() {
   const { id } = useLocalSearchParams();
   const { colors } = useTheme();
   const [date, setDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [substrateType, setSubstrateType] = useState('');
   const [substrateDepth, setSubstrateDepth] = useState('');
   const [reason, setReason] = useState('');
@@ -117,13 +115,6 @@ export default function AddSubstrateChangeScreen() {
     }
   };
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setDate(selectedDate);
-    }
-  };
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
@@ -145,22 +136,12 @@ export default function AddSubstrateChangeScreen() {
         {/* Date */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.label, { color: colors.textPrimary }]}>Date Changed</Text>
-          <TouchableOpacity
-            style={[styles.input, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <MaterialCommunityIcons name="calendar" size={20} color={colors.primary} />
-            <Text style={[styles.inputText, { color: colors.textPrimary }]}>{date.toLocaleDateString()}</Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display="default"
-              onChange={onDateChange}
-              maximumDate={new Date()}
-            />
-          )}
+          <DateInput
+            value={date}
+            onChange={setDate}
+            maximumDate={new Date()}
+            label="Date Changed"
+          />
         </View>
 
         {/* Substrate Type */}

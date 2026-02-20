@@ -8,12 +8,11 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateInput from '../../src/components/DateInput';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -44,8 +43,6 @@ export default function EditTarantulaScreen() {
   const { colors } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showSubstrateDatePicker, setShowSubstrateDatePicker] = useState(false);
 
   const [formData, setFormData] = useState<TarantulaData>({
     name: '',
@@ -122,25 +119,6 @@ export default function EditTarantulaScreen() {
       console.error(error);
     } finally {
       setSaving(false);
-    }
-  };
-
-  const formatDate = (dateString: string | undefined): string => {
-    if (!dateString) return 'Not set';
-    return new Date(dateString).toLocaleDateString();
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setFormData({ ...formData, date_acquired: selectedDate.toISOString().split('T')[0] });
-    }
-  };
-
-  const onSubstrateDateChange = (event: any, selectedDate?: Date) => {
-    setShowSubstrateDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setFormData({ ...formData, last_substrate_change: selectedDate.toISOString().split('T')[0] });
     }
   };
 
@@ -238,23 +216,12 @@ export default function EditTarantulaScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Date Acquired</Text>
-            <TouchableOpacity
-              style={[styles.dateButton, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={[styles.dateButtonText, { color: colors.textPrimary }]}>
-                {formatDate(formData.date_acquired)}
-              </Text>
-              <MaterialCommunityIcons name="calendar" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={formData.date_acquired ? new Date(formData.date_acquired) : new Date()}
-                mode="date"
-                display="default"
-                onChange={onDateChange}
-              />
-            )}
+            <DateInput
+              value={formData.date_acquired ? new Date(formData.date_acquired) : new Date()}
+              onChange={(date) => setFormData({ ...formData, date_acquired: date.toISOString().split('T')[0] })}
+              maximumDate={new Date()}
+              label="Date Acquired"
+            />
           </View>
 
           <View style={styles.inputGroup}>
@@ -319,23 +286,12 @@ export default function EditTarantulaScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Last Substrate Change</Text>
-            <TouchableOpacity
-              style={[styles.dateButton, { borderColor: colors.border, backgroundColor: colors.surfaceElevated }]}
-              onPress={() => setShowSubstrateDatePicker(true)}
-            >
-              <Text style={[styles.dateButtonText, { color: colors.textPrimary }]}>
-                {formatDate(formData.last_substrate_change)}
-              </Text>
-              <MaterialCommunityIcons name="calendar" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            {showSubstrateDatePicker && (
-              <DateTimePicker
-                value={formData.last_substrate_change ? new Date(formData.last_substrate_change) : new Date()}
-                mode="date"
-                display="default"
-                onChange={onSubstrateDateChange}
-              />
-            )}
+            <DateInput
+              value={formData.last_substrate_change ? new Date(formData.last_substrate_change) : new Date()}
+              onChange={(date) => setFormData({ ...formData, last_substrate_change: date.toISOString().split('T')[0] })}
+              maximumDate={new Date()}
+              label="Last Substrate Change"
+            />
           </View>
         </View>
 
@@ -520,17 +476,6 @@ const styles = StyleSheet.create({
   sexButtonText: {
     fontSize: 14,
     fontWeight: '500',
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-  },
-  dateButtonText: {
-    fontSize: 16,
   },
   row: {
     flexDirection: 'row',
