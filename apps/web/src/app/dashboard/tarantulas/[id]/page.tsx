@@ -7,6 +7,7 @@ import { useSubscription } from '@/hooks/useSubscription'
 import GrowthChart from '@/components/GrowthChart'
 import FeedingStatsCard from '@/components/FeedingStatsCard'
 import DashboardLayout from '@/components/DashboardLayout'
+import DateInput from '@/components/DateInput'
 import UpgradeModal from '@/components/UpgradeModal'
 import PricingCard from '@/components/PricingCard'
 
@@ -1485,12 +1486,9 @@ export default function TarantulaDetailPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Date Changed *</label>
-                      <input
-                        type="date"
-                        required
+                      <DateInput
                         value={substrateFormData.changed_at}
-                        onChange={(e) => setSubstrateFormData({ ...substrateFormData, changed_at: e.target.value })}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
+                        onChange={(value) => setSubstrateFormData({ ...substrateFormData, changed_at: value })}
                       />
                     </div>
                     <div>

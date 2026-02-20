@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
+import DateInput from '@/components/DateInput'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -215,12 +216,9 @@ export default function AddPairingPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Paired Date *
               </label>
-              <input
-                type="date"
+              <DateInput
                 value={formData.paired_date}
-                onChange={(e) => setFormData({...formData, paired_date: e.target.value})}
-                required
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:text-white"
+                onChange={(value) => setFormData({...formData, paired_date: value})}
               />
             </div>
 
@@ -229,11 +227,9 @@ export default function AddPairingPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Separated Date
               </label>
-              <input
-                type="date"
+              <DateInput
                 value={formData.separated_date}
-                onChange={(e) => setFormData({...formData, separated_date: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-gray-700 dark:text-white"
+                onChange={(value) => setFormData({...formData, separated_date: value})}
               />
             </div>
 

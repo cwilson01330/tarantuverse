@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
+import DateInput from '@/components/DateInput'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -257,11 +258,9 @@ export default function AddOffspringPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Status Date
               </label>
-              <input
-                type="date"
+              <DateInput
                 value={formData.status_date}
-                onChange={(e) => setFormData({...formData, status_date: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 dark:bg-gray-700 dark:text-white"
+                onChange={(value) => setFormData({...formData, status_date: value})}
               />
             </div>
 

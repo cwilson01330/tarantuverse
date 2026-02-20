@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
 import DashboardLayout from '@/components/DashboardLayout'
+import DateInput from '@/components/DateInput'
 
 interface SelectedSpecies {
   id: string
@@ -276,11 +277,9 @@ export default function EditTarantulaPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Acquired Date</label>
-              <input
-                type="date"
+              <DateInput
                 value={formData.date_acquired}
-                onChange={(e) => setFormData({ ...formData, date_acquired: e.target.value })}
-                className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
+                onChange={(value) => setFormData({ ...formData, date_acquired: value })}
               />
             </div>
 
@@ -383,21 +382,17 @@ export default function EditTarantulaPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Last Substrate Change</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={formData.last_substrate_change}
-                    onChange={(e) => setFormData({ ...formData, last_substrate_change: e.target.value })}
-                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
+                    onChange={(value) => setFormData({ ...formData, last_substrate_change: value })}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-1">Last Enclosure Cleaning</label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={formData.last_enclosure_cleaning}
-                    onChange={(e) => setFormData({ ...formData, last_enclosure_cleaning: e.target.value })}
-                    className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
+                    onChange={(value) => setFormData({ ...formData, last_enclosure_cleaning: value })}
                   />
                 </div>
               </div>

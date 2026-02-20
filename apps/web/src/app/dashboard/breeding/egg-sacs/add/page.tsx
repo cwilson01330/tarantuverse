@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
+import DateInput from '@/components/DateInput'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -206,34 +207,27 @@ export default function AddEggSacPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Laid Date *
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={formData.laid_date}
-                  onChange={(e) => setFormData({...formData, laid_date: e.target.value})}
-                  required
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 dark:bg-gray-700 dark:text-white"
+                  onChange={(value) => setFormData({...formData, laid_date: value})}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Pulled Date
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={formData.pulled_date}
-                  onChange={(e) => setFormData({...formData, pulled_date: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 dark:bg-gray-700 dark:text-white"
+                  onChange={(value) => setFormData({...formData, pulled_date: value})}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Hatch Date
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   value={formData.hatch_date}
-                  onChange={(e) => setFormData({...formData, hatch_date: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 dark:bg-gray-700 dark:text-white"
+                  onChange={(value) => setFormData({...formData, hatch_date: value})}
                 />
               </div>
             </div>
