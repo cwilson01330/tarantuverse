@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tarantuverse",
     "slug": "tarantuverse",
-    "version": "0.1.6",
+    "version": "0.1.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -64,6 +64,12 @@
       "eas": {
         "projectId": "1d412361-4866-482a-a0a6-5d525508d8b8"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/1d412361-4866-482a-a0a6-5d525508d8b8"
     }
   }
 }
