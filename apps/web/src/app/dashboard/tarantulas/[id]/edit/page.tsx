@@ -23,6 +23,7 @@ export default function EditTarantulaPage() {
   const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
 
   const [formData, setFormData] = useState({
+    name: '',
     common_name: '',
     scientific_name: '',
     sex: '',
@@ -78,6 +79,7 @@ export default function EditTarantulaPage() {
 
       const data = await response.json()
       setFormData({
+        name: data.name || '',
         common_name: data.common_name || '',
         scientific_name: data.scientific_name || '',
         sex: data.sex || '',
@@ -137,6 +139,7 @@ export default function EditTarantulaPage() {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const submitData = {
+        name: formData.name || null,
         common_name: formData.common_name || null,
         scientific_name: formData.scientific_name || null,
         species_id: formData.species_id || null,
@@ -230,6 +233,17 @@ export default function EditTarantulaPage() {
             <p className="text-xs text-theme-tertiary mt-1">
               Start typing to search our species database. Select to link species and enable care sheet access.
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
+              placeholder="Pet name (optional, e.g., Rosie)"
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

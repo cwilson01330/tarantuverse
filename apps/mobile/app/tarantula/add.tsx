@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateInput from '../../src/components/DateInput';
+import SpeciesAutocomplete from '../../src/components/SpeciesAutocomplete';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -20,6 +21,7 @@ interface TarantulaData {
   name: string;
   common_name: string;
   scientific_name: string;
+  species_id?: string;
   sex?: string;
   date_acquired?: string;
   source?: string;
@@ -64,11 +66,6 @@ export default function AddTarantulaScreen() {
   });
 
   const handleSave = async () => {
-    if (!formData.name.trim()) {
-      Alert.alert('Error', 'Name is required');
-      return;
-    }
-
     setSaving(true);
     try {
       const response = await apiClient.post('/tarantulas/', formData);
@@ -231,13 +228,17 @@ export default function AddTarantulaScreen() {
           <Text style={styles.sectionTitle}>Basic Information</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Name *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.name}
-              onChangeText={(text) => setFormData({ ...formData, name: text })}
-              placeholder="Enter name"
-              placeholderTextColor={colors.textTertiary}
+            <Text style={styles.label}>Species Lookup</Text>
+            <SpeciesAutocomplete
+              onSelect={(species) => {
+                setFormData({
+                  ...formData,
+                  species_id: species.id,
+                  scientific_name: species.scientific_name,
+                  common_name: species.common_names[0] || '',
+                });
+              }}
+              placeholder="Search species by name..."
             />
           </View>
 
@@ -259,6 +260,17 @@ export default function AddTarantulaScreen() {
               value={formData.scientific_name}
               onChangeText={(text) => setFormData({ ...formData, scientific_name: text })}
               placeholder="e.g., Brachypelma hamorii"
+              placeholderTextColor={colors.textTertiary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Name</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.name}
+              onChangeText={(text) => setFormData({ ...formData, name: text })}
+              placeholder="Pet name (optional, e.g., Rosie)"
               placeholderTextColor={colors.textTertiary}
             />
           </View>

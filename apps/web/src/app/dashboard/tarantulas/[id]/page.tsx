@@ -826,20 +826,20 @@ export default function TarantulaDetailPage() {
       </div>
 
       {/* Action Buttons Bar */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-wrap gap-3 items-center">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+          <div className="flex flex-wrap gap-2 items-center">
             {tarantula.species_id && (
               <button
                 onClick={() => router.push(`/species/${tarantula.species_id}`)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium inline-flex items-center gap-2 shadow-sm"
+                className="px-3 py-1.5 text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 text-sm font-medium inline-flex items-center gap-1.5"
               >
                 📖 Care Sheet
               </button>
             )}
             <button
               onClick={() => router.push(`/dashboard/tarantulas/${id}/edit`)}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200 font-medium inline-flex items-center gap-2 shadow-sm"
+              className="px-3 py-1.5 text-purple-600 dark:text-purple-400 border border-purple-300 dark:border-purple-700 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-all duration-200 text-sm font-medium inline-flex items-center gap-1.5"
             >
               ✏️ Edit
             </button>
@@ -848,26 +848,26 @@ export default function TarantulaDetailPage() {
                 setActiveTab('logs')
                 setShowFeedingForm(true)
               }}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 font-medium inline-flex items-center gap-2 shadow-sm"
+              className="px-3 py-1.5 text-green-600 dark:text-green-400 border border-green-300 dark:border-green-700 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 transition-all duration-200 text-sm font-medium inline-flex items-center gap-1.5"
             >
               🍴 Log Feeding
             </button>
-            
+
             {/* Visibility Toggle */}
-            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
                 {tarantula.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
               </span>
               <button
                 onClick={handleVisibilityToggle}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                   tarantula.visibility === 'public' ? 'bg-purple-600' : 'bg-gray-300'
                 }`}
                 title={tarantula.visibility === 'public' ? 'Make private' : 'Make public'}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    tarantula.visibility === 'public' ? 'translate-x-6' : 'translate-x-1'
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    tarantula.visibility === 'public' ? 'translate-x-4' : 'translate-x-0.5'
                   }`}
                 />
               </button>
@@ -875,7 +875,7 @@ export default function TarantulaDetailPage() {
 
             <button
               onClick={() => setDeleteConfirm(true)}
-              className="ml-auto px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-all duration-200 font-medium border border-red-200 dark:border-red-800"
+              className="ml-auto px-3 py-1.5 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-all duration-200 text-sm font-medium"
             >
               🗑️ Delete
             </button>

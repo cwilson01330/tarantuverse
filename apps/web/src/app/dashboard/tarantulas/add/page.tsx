@@ -21,6 +21,7 @@ function AddTarantulaContent() {
   const searchParams = useSearchParams()
   const { user, token, isAuthenticated, isLoading } = useAuth()
   const [formData, setFormData] = useState({
+    name: '',
     common_name: '',
     scientific_name: '',
     sex: '',
@@ -109,6 +110,7 @@ function AddTarantulaContent() {
 
       // Prepare data - convert empty strings to null for optional fields
       const submitData = {
+        name: formData.name || null,
         common_name: formData.common_name || null,
         scientific_name: formData.scientific_name || null,
         species_id: formData.species_id || null,
@@ -197,6 +199,17 @@ function AddTarantulaContent() {
             <p className="text-xs text-theme-tertiary mt-1">
               Start typing to search our species database. Select to auto-fill species info.
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
+              placeholder="Pet name (optional, e.g., Rosie)"
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -794,32 +794,32 @@ export default function TarantulaDetailScreen() {
       {/* Action Bar */}
       <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary }]}
+          style={[styles.actionButton, { backgroundColor: colors.primary + '15' }]}
           onPress={() => router.push(`/tarantula/add-feeding?id=${id}`)}
         >
-          <MaterialCommunityIcons name="food-apple" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>Feed</Text>
+          <MaterialCommunityIcons name="food-apple" size={18} color={colors.primary} />
+          <Text style={[styles.actionButtonText, { color: colors.primary }]}>Feed</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary }]}
+          style={[styles.actionButton, { backgroundColor: colors.primary + '15' }]}
           onPress={() => router.push(`/tarantula/add-molt?id=${id}`)}
         >
-          <MaterialCommunityIcons name="reload" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>Molt</Text>
+          <MaterialCommunityIcons name="reload" size={18} color={colors.primary} />
+          <Text style={[styles.actionButtonText, { color: colors.primary }]}>Molt</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary }]}
+          style={[styles.actionButton, { backgroundColor: colors.primary + '15' }]}
           onPress={() => router.push(`/tarantula/add-substrate-change?id=${id}`)}
         >
-          <MaterialCommunityIcons name="layers" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>Substrate</Text>
+          <MaterialCommunityIcons name="layers" size={18} color={colors.primary} />
+          <Text style={[styles.actionButtonText, { color: colors.primary }]}>Substrate</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.primary }]}
+          style={[styles.actionButton, { backgroundColor: colors.primary + '15' }]}
           onPress={() => router.push(`/tarantula/add-photo?id=${id}`)}
         >
-          <MaterialCommunityIcons name="camera" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>Photo</Text>
+          <MaterialCommunityIcons name="camera" size={18} color={colors.primary} />
+          <Text style={[styles.actionButtonText, { color: colors.primary }]}>Photo</Text>
         </TouchableOpacity>
       </View>
 
@@ -930,24 +930,24 @@ const styles = StyleSheet.create({
   },
   actionBar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 16,
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderTopWidth: 1,
-    paddingBottom: 32,
+    paddingBottom: 24,
   },
   actionButton: {
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    minWidth: 70,
-    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    minWidth: 64,
   },
   actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
