@@ -512,7 +512,7 @@ export default function TarantulaDetailPage() {
       })
       if (response.ok || response.status === 204) {
         setDeleteConfirm(false)
-        router.push('/dashboard')
+        router.push('/dashboard/tarantulas')
         return
       }
       const data = await response.json().catch(() => null)
