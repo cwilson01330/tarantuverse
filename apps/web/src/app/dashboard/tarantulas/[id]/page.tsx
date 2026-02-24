@@ -497,13 +497,30 @@ export default function TarantulaDetailPage() {
   }
 
   const handleDelete = async () => {
+    if (!token) {
+      setDeleteConfirm(false)
+      setError('Not authenticated. Please log in again.')
+      return
+    }
     try {
-      await apiClient.delete(`/api/v1/tarantulas/${id}`)
-      setDeleteConfirm(false)
-      router.push('/dashboard')
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      if (response.ok || response.status === 204) {
+        setDeleteConfirm(false)
+        router.push('/dashboard')
+        return
+      }
+      const data = await response.json().catch(() => null)
+      throw new Error(data?.detail || `Server error (${response.status})`)
     } catch (err: any) {
+      console.error('Delete failed:', { error: err, token: token ? 'present' : 'missing', id })
       setDeleteConfirm(false)
-      setError(err.response?.data?.detail || err.message || 'Failed to delete')
+      setError(err.message || 'Failed to delete')
     }
   }
 
