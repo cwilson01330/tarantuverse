@@ -474,18 +474,18 @@ export default function TarantulasPage() {
                               <td className="px-4 py-3 hidden sm:table-cell">
                                 <span className="text-sm italic text-theme-secondary">{tarantula.scientific_name}</span>
                               </td>
-                              <td className="px-4 py-3 hidden md:table-cell">
+                              <td className="px-4 py-3 hidden md:table-cell align-middle">
                                 {tarantula.sex ? (
-                                  <span className="px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
                                     {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
                                   </span>
                                 ) : (
                                   <span className="text-theme-tertiary text-sm">—</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3">
+                              <td className="px-4 py-3 align-middle">
                                 {feedingStatus?.days_since_last_feeding !== undefined ? (
-                                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                                     feedingStatus.days_since_last_feeding >= 21 ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
                                     feedingStatus.days_since_last_feeding >= 14 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
                                     feedingStatus.days_since_last_feeding >= 7 ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' :
@@ -497,9 +497,9 @@ export default function TarantulasPage() {
                                   <span className="text-theme-tertiary text-sm">No data</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3 hidden lg:table-cell">
+                              <td className="px-4 py-3 hidden lg:table-cell align-middle">
                                 {premoltPrediction && premoltPrediction.confidence_level !== 'low' ? (
-                                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                                     premoltPrediction.confidence_level === 'very_high' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
                                     premoltPrediction.confidence_level === 'high' ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
                                     'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300'
