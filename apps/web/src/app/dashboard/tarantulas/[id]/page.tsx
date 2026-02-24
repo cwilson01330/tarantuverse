@@ -497,7 +497,11 @@ export default function TarantulaDetailPage() {
 
   const handleDelete = async () => {
     try {
-      if (!token) return
+      if (!token) {
+        setDeleteConfirm(false)
+        setError('Not authenticated. Please log in again.')
+        return
+      }
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
       const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
@@ -508,11 +512,14 @@ export default function TarantulaDetailPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to delete tarantula')
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.detail || `Failed to delete tarantula (${response.status})`)
       }
 
+      setDeleteConfirm(false)
       router.push('/dashboard')
     } catch (err: any) {
+      setDeleteConfirm(false)
       setError(err.message || 'Failed to delete')
     }
   }
