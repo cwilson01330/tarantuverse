@@ -153,7 +153,7 @@ export default function CollectionValuePage() {
     )
   }
 
-  const avgValue = (collectionValue.total_low + collectionValue.total_high) / 2
+  const avgValue = (Number(collectionValue.total_low) + Number(collectionValue.total_high)) / 2
   const coveragePercentage = (collectionValue.valued_tarantulas / collectionValue.total_tarantulas) * 100
 
   return (

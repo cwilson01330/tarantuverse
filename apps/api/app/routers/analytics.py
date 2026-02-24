@@ -42,8 +42,12 @@ async def get_collection_analytics(
     tarantulas = db.query(Tarantula).filter(
         Tarantula.user_id == current_user.id
     ).all()
-    
+
     total_count = len(tarantulas)
+
+    def get_display_name(t):
+        """Get a display name for a tarantula, with fallbacks"""
+        return t.name or t.common_name or t.scientific_name or "Unnamed"
     
     if total_count == 0:
         # Return empty analytics for users with no tarantulas
@@ -65,7 +69,7 @@ async def get_collection_analytics(
         )
     
     # Calculate species diversity
-    species_list = [t.scientific_name or t.common_name for t in tarantulas if t.scientific_name or t.common_name]
+    species_list = [t.scientific_name or t.common_name or t.name or "Unknown" for t in tarantulas]
     species_counter = Counter(species_list)
     unique_species = len(species_counter)
     
@@ -82,7 +86,7 @@ async def get_collection_analytics(
     }
     
     # Calculate total collection value
-    total_value = sum(t.price_paid or 0.0 for t in tarantulas)
+    total_value = float(sum(float(t.price_paid or 0) for t in tarantulas))
     
     # Calculate average age (in months since acquisition)
     ages_in_months = []
@@ -140,7 +144,7 @@ async def get_collection_analytics(
         if molter:
             most_active_molter = {
                 "tarantula_id": str(molter.id),
-                "name": molter.common_name,
+                "name": get_display_name(molter),
                 "molt_count": molt_counts[1]
             }
     
@@ -160,13 +164,13 @@ async def get_collection_analytics(
         
         newest_acquisition = {
             "tarantula_id": str(newest.id),
-            "name": newest.common_name,
+            "name": get_display_name(newest),
             "date": newest.date_acquired.isoformat()
         }
-        
+
         oldest_acquisition = {
             "tarantula_id": str(oldest.id),
-            "name": oldest.common_name,
+            "name": get_display_name(oldest),
             "date": oldest.date_acquired.isoformat()
         }
     
@@ -188,8 +192,8 @@ async def get_collection_analytics(
                 type="feeding",
                 date=feeding.fed_at.date() if feeding.fed_at else date.today(),
                 tarantula_id=str(tarantula.id),
-                tarantula_name=tarantula.common_name,
-                description=f"Fed {feeding.food_type}" + (" (refused)" if not feeding.accepted else "")
+                tarantula_name=get_display_name(tarantula),
+                description=f"Fed {feeding.food_type or 'prey'}" + (" (refused)" if not feeding.accepted else "")
             ))
 
     # Get recent molts
@@ -213,7 +217,7 @@ async def get_collection_analytics(
                 type="molt",
                 date=molt.molted_at.date() if molt.molted_at else date.today(),
                 tarantula_id=str(tarantula.id),
-                tarantula_name=tarantula.common_name,
+                tarantula_name=get_display_name(tarantula),
                 description=description
             ))
 
@@ -229,8 +233,8 @@ async def get_collection_analytics(
                 type="substrate_change",
                 date=change.changed_at,
                 tarantula_id=str(tarantula.id),
-                tarantula_name=tarantula.common_name,
-                description=f"Substrate changed to {change.substrate_type}"
+                tarantula_name=get_display_name(tarantula),
+                description=f"Substrate changed to {change.substrate_type or 'new substrate'}"
             ))
     
     # Sort all activity by date and limit to 10 most recent

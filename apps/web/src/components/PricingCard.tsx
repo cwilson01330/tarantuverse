@@ -124,7 +124,9 @@ export default function PricingCard({ tarantulaId, token }: PricingCardProps) {
     )
   }
 
-  const avgValue = (estimate.estimated_low + estimate.estimated_high) / 2
+  const low = Number(estimate.estimated_low)
+  const high = Number(estimate.estimated_high)
+  const avgValue = (low + high) / 2
 
   return (
     <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-2xl shadow-sm border border-green-200 dark:border-green-800 p-6">
@@ -142,7 +144,7 @@ export default function PricingCard({ tarantulaId, token }: PricingCardProps) {
             {formatCurrency(avgValue)}
           </div>
           <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Range: {formatCurrency(estimate.estimated_low)} - {formatCurrency(estimate.estimated_high)}
+            Range: {formatCurrency(low)} - {formatCurrency(high)}
           </div>
         </div>
 
