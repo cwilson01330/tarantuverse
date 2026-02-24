@@ -276,6 +276,29 @@ export default function TarantulaDetailScreen() {
     }
   };
 
+  const handleDeleteTarantula = () => {
+    Alert.alert(
+      'Delete Tarantula',
+      `Are you sure you want to delete ${tarantula?.name || tarantula?.common_name || 'this tarantula'}? This will permanently remove all feeding logs, molt logs, photos, and other associated data. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiClient.delete(`/tarantulas/${id}`);
+              Alert.alert('Deleted', 'Tarantula has been removed.');
+              router.replace('/(tabs)');
+            } catch (error: any) {
+              Alert.alert('Error', 'Failed to delete tarantula.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const setMainPhoto = async (photoId: string, photoUrl: string) => {
     try {
       await apiClient.patch(`/photos/${photoId}/set-main`);
@@ -428,6 +451,12 @@ export default function TarantulaDetailScreen() {
             onPress={() => router.push(`/tarantula/edit?id=${id}`)}
           >
             <MaterialCommunityIcons name="pencil" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={handleDeleteTarantula}
+          >
+            <MaterialCommunityIcons name="trash-can-outline" size={24} color="#ef4444" />
           </TouchableOpacity>
         </View>
       </View>
