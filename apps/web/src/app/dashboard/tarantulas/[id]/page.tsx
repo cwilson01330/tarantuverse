@@ -10,6 +10,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
 import UpgradeModal from '@/components/UpgradeModal'
 import PricingCard from '@/components/PricingCard'
+import apiClient from '@/lib/api'
 
 interface Tarantula {
   id: string
@@ -497,30 +498,12 @@ export default function TarantulaDetailPage() {
 
   const handleDelete = async () => {
     try {
-      if (!token) {
-        setDeleteConfirm(false)
-        setError('Not authenticated. Please log in again.')
-        return
-      }
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
-      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => null)
-        throw new Error(data?.detail || `Failed to delete tarantula (${response.status})`)
-      }
-
+      await apiClient.delete(`/api/v1/tarantulas/${id}`)
       setDeleteConfirm(false)
       router.push('/dashboard')
     } catch (err: any) {
       setDeleteConfirm(false)
-      setError(err.message || 'Failed to delete')
+      setError(err.response?.data?.detail || err.message || 'Failed to delete')
     }
   }
 
