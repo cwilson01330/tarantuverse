@@ -13,6 +13,11 @@ from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.molt_log import MoltLog
 from app.models.feeding_log import FeedingLog
+from app.models.substrate_change import SubstrateChange
+from app.models.photo import Photo
+from app.models.pairing import Pairing
+from app.models.offspring import Offspring
+from app.models.pricing_submission import PricingSubmission
 from app.schemas.tarantula import (
     TarantulaCreate,
     TarantulaUpdate,
@@ -185,6 +190,23 @@ async def delete_tarantula(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tarantula not found"
         )
+
+    # Manually delete related records to avoid FK constraint errors
+    # (database may lack ON DELETE CASCADE if constraints were added after table creation)
+    db.query(FeedingLog).filter(FeedingLog.tarantula_id == tarantula_id).delete()
+    db.query(MoltLog).filter(MoltLog.tarantula_id == tarantula_id).delete()
+    db.query(SubstrateChange).filter(SubstrateChange.tarantula_id == tarantula_id).delete()
+    db.query(Photo).filter(Photo.tarantula_id == tarantula_id).delete()
+    db.query(PricingSubmission).filter(PricingSubmission.tarantula_id == tarantula_id).update(
+        {PricingSubmission.tarantula_id: None}
+    )
+    db.query(Offspring).filter(Offspring.tarantula_id == tarantula_id).update(
+        {Offspring.tarantula_id: None}
+    )
+    # Delete pairings where this tarantula is male or female
+    db.query(Pairing).filter(
+        (Pairing.male_id == tarantula_id) | (Pairing.female_id == tarantula_id)
+    ).delete(synchronize_session='fetch')
 
     db.delete(tarantula)
     db.commit()
