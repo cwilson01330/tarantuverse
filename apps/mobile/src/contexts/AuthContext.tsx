@@ -13,6 +13,8 @@ interface User {
   display_name: string;
   avatar_url?: string;
   collection_visibility: string;
+  is_superuser?: boolean;
+  is_admin?: boolean;
 }
 
 interface AuthContextType {

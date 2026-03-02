@@ -104,11 +104,6 @@ export default function EditTarantulaScreen() {
   };
 
   const handleSave = async () => {
-    if (!formData.name.trim()) {
-      Alert.alert('Error', 'Name is required');
-      return;
-    }
-
     setSaving(true);
     try {
       await apiClient.put(`/tarantulas/${id}`, formData);
@@ -157,12 +152,12 @@ export default function EditTarantulaScreen() {
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Basic Information</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Name *</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
             <TextInput
               style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
               value={formData.name}
               onChangeText={(text) => setFormData({ ...formData, name: text })}
-              placeholder="Enter name"
+              placeholder="Pet name (optional, e.g., Rosie)"
               placeholderTextColor={colors.textTertiary}
             />
           </View>

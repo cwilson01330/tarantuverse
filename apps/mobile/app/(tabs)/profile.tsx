@@ -351,6 +351,14 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
+        {user?.is_superuser && (
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/admin/species')}>
+            <MaterialCommunityIcons name="shield-crown" size={24} color="#a855f7" />
+            <Text style={styles.menuText}>Admin: Species</Text>
+            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.menuItem}
           onPress={async () => {
