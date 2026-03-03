@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { apiClient } from '../src/services/api';
@@ -31,6 +32,7 @@ export default function SettingsScreen() {
   const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [formData, setFormData] = useState({
     display_name: '',
@@ -80,6 +82,47 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleAvatarPick = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant photo library access to change your avatar.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+
+    setUploadingAvatar(true);
+    try {
+      const asset = result.assets[0];
+      const formDataUpload = new FormData();
+      const fileData = {
+        uri: asset.uri,
+        type: asset.mimeType || 'image/jpeg',
+        name: asset.fileName || 'avatar.jpg',
+      } as any;
+      formDataUpload.append('file', fileData);
+
+      await apiClient.post('/auth/me/avatar', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      await refreshUser();
+      setFormData(prev => ({ ...prev, avatar_url: '' }));
+      Alert.alert('Success', 'Avatar updated!');
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.detail || 'Failed to upload avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -95,7 +138,6 @@ export default function SettingsScreen() {
 
       // Only include fields that have values
       if (formData.display_name) submitData.display_name = formData.display_name;
-      if (formData.avatar_url) submitData.avatar_url = formData.avatar_url;
       if (formData.profile_bio) submitData.profile_bio = formData.profile_bio;
       if (formData.profile_location) submitData.profile_location = formData.profile_location;
       if (formData.profile_experience_level) submitData.profile_experience_level = formData.profile_experience_level;
@@ -307,16 +349,47 @@ export default function SettingsScreen() {
             placeholderTextColor={colors.textTertiary}
           />
 
-          <Text style={styles.label}>Avatar URL</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.avatar_url}
-            onChangeText={(text) => setFormData({ ...formData, avatar_url: text })}
-            placeholder="https://example.com/avatar.jpg"
-            placeholderTextColor={colors.textTertiary}
-            autoCapitalize="none"
-            keyboardType="url"
-          />
+          <Text style={styles.label}>Avatar</Text>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              padding: 12,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 8,
+              backgroundColor: colors.surface,
+              gap: 12,
+            }}
+            onPress={handleAvatarPick}
+            disabled={uploadingAvatar}
+          >
+            {uploadingAvatar ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : user?.avatar_url ? (
+              <Image
+                source={{ uri: user.avatar_url }}
+                style={{ width: 44, height: 44, borderRadius: 22 }}
+              />
+            ) : (
+              <View style={{
+                width: 44, height: 44, borderRadius: 22,
+                backgroundColor: colors.primary + '30',
+                justifyContent: 'center', alignItems: 'center',
+              }}>
+                <MaterialCommunityIcons name="camera" size={20} color={colors.primary} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, color: colors.textPrimary, fontWeight: '500' }}>
+                {uploadingAvatar ? 'Uploading...' : 'Change Avatar'}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>
+                Tap to choose from your photo library
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
+          </TouchableOpacity>
 
           <Text style={styles.label}>Bio</Text>
           <TextInput
