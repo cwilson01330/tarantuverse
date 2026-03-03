@@ -17,7 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
 
-const SUPPORT_USERNAME = 'gwiza';
+const SUPPORT_USERNAME = 'gwizard202';
 
 const QUICK_TOPICS = [
   { label: 'Bug Report', prefix: '[Bug] ' },
