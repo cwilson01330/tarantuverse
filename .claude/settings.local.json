@@ -70,7 +70,17 @@
       "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"$\\(cat <<''EOF''\nfix: Map IAP products to ''premium'' plan instead of ''monthly''\n\nThe seed script creates ''free'' and ''premium'' plans, but receipt\nvalidation was looking for ''monthly''. All IAP products now map to\nthe ''premium'' plan, with billing_period used for expiry calculation.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add apps/web/src/components/FeedingStatsCard.tsx)",
       "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"fix: Remove unused percentage param from Pie chart label\")",
-      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" push)"
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" push)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"fix: Handle Stripe customer not found when switching test to live mode\n\nWhen switching from Stripe test mode to live mode, existing customer IDs\nbecome invalid. Now we verify the customer exists before using it, and\ncreate a new customer if the old one is not found.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\")",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" status)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add apps/web/src/components/Sidebar.tsx)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"debug: Add logging to Sidebar admin check\")",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add apps/api/app/routers/auth.py apps/web/src/components/Sidebar.tsx)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"fix: Add is_admin to OAuth responses and fix Sidebar auth check\n\n- All OAuth endpoints now return is_admin field\n- Sidebar now uses useAuth hook instead of localStorage\n- Fixes admin link not appearing for OAuth users\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\")",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add apps/mobile/app.json)",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"chore: Bump version to 0.1.6 for App Store submission\")",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add \"apps/mobile/app/\\(tabs\\)/species.tsx\")",
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"$\\(cat <<''EOF''\nfix: Hide Stack header on Species tab to remove dead space\n\nThe Species tab had duplicate headers causing dead black space - \nboth the Expo Router Stack header and a custom internal header.\nHide the Stack header since the component provides its own styled one.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": [],
     "ask": []
