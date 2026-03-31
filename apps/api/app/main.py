@@ -38,6 +38,7 @@ import app.routers.theme_preferences as theme_preferences
 import app.routers.enclosures as enclosures
 import app.routers.referrals as referrals
 import app.routers.announcements as announcements
+import app.routers.system_settings as system_settings
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -89,6 +90,48 @@ async def options_middleware(request: Request, call_next):
                 "Access-Control-Max-Age": "3600",
             }
         )
+    return await call_next(request)
+
+# Maintenance mode middleware — blocks write requests for non-admins
+@app.middleware("http")
+async def maintenance_middleware(request: Request, call_next):
+    # Only check write methods
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        # Allow the system-status and health endpoints through always
+        path = request.url.path
+        safe_paths = ("/", "/health", "/api/v1/system/status", "/api/v1/auth/login")
+        if not any(path.startswith(sp) for sp in safe_paths):
+            try:
+                from app.services import settings_service
+                from app.database import SessionLocal
+                db = SessionLocal()
+                try:
+                    if settings_service.is_maintenance_mode(db):
+                        allow_admin = settings_service.get(db, "maintenance.allow_admin_writes", True)
+                        # If admin writes allowed, check the token
+                        is_admin = False
+                        if allow_admin:
+                            auth_header = request.headers.get("authorization", "")
+                            if auth_header.startswith("Bearer "):
+                                from app.utils.auth import decode_access_token
+                                from app.models.user import User
+                                payload = decode_access_token(auth_header[7:])
+                                if payload and payload.get("sub"):
+                                    user = db.query(User).filter(User.id == payload["sub"]).first()
+                                    if user and (user.is_admin or user.is_superuser):
+                                        is_admin = True
+                        if not is_admin:
+                            from fastapi.responses import JSONResponse
+                            msg = settings_service.get_maintenance_message(db)
+                            return JSONResponse(
+                                status_code=503,
+                                content={"detail": msg, "maintenance_mode": True},
+                            )
+                finally:
+                    db.close()
+            except Exception:
+                pass  # If settings can't be read, don't block requests
+
     return await call_next(request)
 
 # Include routers
@@ -183,6 +226,9 @@ app.include_router(referrals.router, prefix="/api/v1", tags=["referrals", "premi
 
 print("[STARTUP] Registering announcements router...")
 app.include_router(announcements.router, prefix="/api/v1/announcements", tags=["announcements"])
+
+print("[STARTUP] Registering system settings router...")
+app.include_router(system_settings.router, prefix="/api/v1", tags=["system-settings"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

@@ -71,6 +71,13 @@ export default function AdminIndexScreen() {
       color: '#8b5cf6',
       route: '/admin/species',
     },
+    {
+      title: 'System Settings',
+      description: 'Feature flags, limits, maintenance mode',
+      icon: 'cog' as const,
+      color: '#64748b',
+      route: '/admin/settings',
+    },
   ];
 
   if (loading) {

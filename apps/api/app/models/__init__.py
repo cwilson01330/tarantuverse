@@ -26,6 +26,7 @@ from app.models.pricing_submission import PricingSubmission
 from app.models.referral_reward import ReferralReward
 from app.models.user_oauth_account import UserOAuthAccount
 from app.models.announcement import Announcement
+from app.models.system_setting import SystemSetting
 
 __all__ = [
     "User",
@@ -57,4 +58,5 @@ __all__ = [
     "ReferralReward",
     "UserOAuthAccount",
     "Announcement",
+    "SystemSetting",
 ]
