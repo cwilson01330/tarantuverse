@@ -205,19 +205,19 @@ async def get_conversation_with_user(
             "messages": []
         }
     
-    # Get messages
-    messages = db.query(DirectMessage).filter(
-        DirectMessage.conversation_id == conversation.id
-    ).order_by(DirectMessage.created_at.asc()).all()
-    
-    # Mark messages as read
+    # Mark messages as read BEFORE querying so response reflects true state
     db.query(DirectMessage).filter(
         DirectMessage.conversation_id == conversation.id,
         DirectMessage.sender_id != current_user.id,
         DirectMessage.is_read == False
     ).update({"is_read": True})
     db.commit()
-    
+
+    # Get messages (now with correct is_read values)
+    messages = db.query(DirectMessage).filter(
+        DirectMessage.conversation_id == conversation.id
+    ).order_by(DirectMessage.created_at.asc()).all()
+
     return {
         "conversation_id": str(conversation.id),
         "other_user": {

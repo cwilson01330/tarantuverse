@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, AppState } from 'react-native';
+import { useRouter, Stack, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface Conversation {
@@ -30,36 +30,56 @@ export default function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch conversations on focus (navigating back from a conversation)
+  useFocusEffect(
+    useCallback(() => {
+      fetchConversations();
+
+      // Poll every 15 seconds while screen is focused
+      pollingRef.current = setInterval(() => {
+        fetchConversations(true);
+      }, 15000);
+
+      return () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      };
+    }, [])
+  );
+
+  // Pause polling when app goes to background
   useEffect(() => {
-    checkAuth();
-    fetchConversations();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    });
+    return () => subscription.remove();
   }, []);
 
-  const checkAuth = async () => {
-    const token = await AsyncStorage.getItem('auth_token');
-    if (!token) {
-      router.push('/login');
-    }
-  };
-
-  const fetchConversations = async () => {
+  const fetchConversations = async (silent = false) => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      if (!token) return;
-
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
-      const response = await fetch(`${API_URL}/api/v1/messages/direct/conversations`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error('Failed to load conversations');
-      const data = await response.json();
-      setConversations(data);
+      if (!silent) setError('');
+      const response = await apiClient.get('/messages/direct/conversations');
+      setConversations(response.data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load conversations');
+      if (!silent) {
+        const message = err.response?.data?.detail || err.message || 'Failed to load conversations';
+        // 401 is handled by apiClient interceptor (redirects to login)
+        if (err.response?.status !== 401) {
+          setError(message);
+        }
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!silent) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -124,6 +144,12 @@ export default function MessagesScreen() {
           {error && (
             <View style={[styles.errorContainer, { backgroundColor: colors.background, borderColor: '#fecaca' }]}>
               <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity
+                style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                onPress={() => { setLoading(true); setError(''); fetchConversations(); }}
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -216,10 +242,24 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 12,
     borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   errorText: {
     color: '#dc2626',
     fontSize: 14,
+    flex: 1,
+  },
+  retryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 12,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',

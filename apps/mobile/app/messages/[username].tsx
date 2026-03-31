@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActionSheetIOS } from 'react-native';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActionSheetIOS, AppState } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
@@ -42,23 +41,45 @@ export default function ConversationScreen() {
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [blocking, setBlocking] = useState(false);
 
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
-    checkAuth();
     if (username) {
       fetchConversation();
+
+      // Poll every 10 seconds for new messages
+      pollingRef.current = setInterval(() => {
+        fetchConversation(true);
+      }, 10000);
     }
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [username]);
+
+  // Pause polling when app backgrounds
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      } else if (state === 'active' && username && !pollingRef.current) {
+        fetchConversation(true);
+        pollingRef.current = setInterval(() => {
+          fetchConversation(true);
+        }, 10000);
+      }
+    });
+    return () => subscription.remove();
   }, [username]);
 
   useEffect(() => {
     scrollToBottom();
   }, [conversation?.messages]);
-
-  const checkAuth = async () => {
-    const token = await AsyncStorage.getItem('auth_token');
-    if (!token) {
-      router.push('/login');
-    }
-  };
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -66,23 +87,20 @@ export default function ConversationScreen() {
     }, 100);
   };
 
-  const fetchConversation = async () => {
+  const fetchConversation = async (silent = false) => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      if (!token) return;
-
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
-      const response = await fetch(`${API_URL}/api/v1/messages/direct/conversation/${username}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) throw new Error('Failed to load conversation');
-      const data = await response.json();
-      setConversation(data);
+      if (!silent) setError('');
+      const response = await apiClient.get(`/messages/direct/conversation/${username}`);
+      setConversation(response.data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load conversation');
+      if (!silent) {
+        const message = err.response?.data?.detail || err.message || 'Failed to load conversation';
+        if (err.response?.status !== 401) {
+          setError(message);
+        }
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -90,33 +108,19 @@ export default function ConversationScreen() {
     if (!newMessage.trim() || sending) return;
 
     setSending(true);
+    setError('');
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      if (!token) return;
-
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
-      const response = await fetch(`${API_URL}/api/v1/messages/direct/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          recipient_username: username,
-          content: newMessage
-        })
+      await apiClient.post('/messages/direct/send', {
+        recipient_username: username,
+        content: newMessage,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to send message');
-      }
-
       setNewMessage('');
-      fetchConversation();
+      // Small delay to let backend commit before fetching
+      setTimeout(() => fetchConversation(true), 300);
     } catch (err: any) {
-      setError(err.message || 'Failed to send message');
-      Alert.alert('Error', err.message || 'Failed to send message');
+      const message = err.response?.data?.detail || err.message || 'Failed to send message';
+      setError(message);
     } finally {
       setSending(false);
     }
@@ -233,12 +237,21 @@ export default function ConversationScreen() {
         <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
           <Text style={styles.errorEmoji}>❌</Text>
           <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>Error loading conversation</Text>
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backButtonText}>← Back to Messages</Text>
-          </TouchableOpacity>
+          {error ? <Text style={[styles.errorSubtitle, { color: colors.textSecondary }]}>{error}</Text> : null}
+          <View style={styles.errorActions}>
+            <TouchableOpacity
+              style={[styles.retryButtonLarge, { backgroundColor: colors.primary }]}
+              onPress={() => { setLoading(true); setError(''); fetchConversation(); }}
+            >
+              <Text style={styles.retryButtonLargeText}>Try Again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.backButton, { borderColor: colors.border, borderWidth: 1 }]}
+              onPress={() => router.back()}
+            >
+              <Text style={[styles.backButtonText, { color: colors.textPrimary }]}>Back to Messages</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </>
     );
@@ -275,6 +288,9 @@ export default function ConversationScreen() {
           {error && (
             <View style={styles.errorBanner}>
               <Text style={styles.errorBannerText}>{error}</Text>
+              <TouchableOpacity onPress={() => setError('')} style={styles.errorDismiss}>
+                <MaterialCommunityIcons name="close" size={18} color="#dc2626" />
+              </TouchableOpacity>
             </View>
           )}
 
@@ -291,9 +307,11 @@ export default function ConversationScreen() {
                 <View key={msg.id}>
                   {showDate && (
                     <View style={styles.dateSeparator}>
-                      <Text style={[styles.dateText, { color: colors.textTertiary }]}>
-                        {formatDate(msg.created_at)}
-                      </Text>
+                      <View style={[styles.datePill, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.dateText, { color: colors.textTertiary }]}>
+                          {formatDate(msg.created_at)}
+                        </Text>
+                      </View>
                     </View>
                   )}
                   <View style={[styles.messageRow, msg.is_own && styles.messageRowOwn]}>
@@ -377,10 +395,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#fecaca',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   errorBannerText: {
     color: '#dc2626',
     fontSize: 14,
+    flex: 1,
+  },
+  errorDismiss: {
+    marginLeft: 8,
+    padding: 4,
   },
   emptyState: {
     alignItems: 'center',
@@ -396,6 +421,11 @@ const styles = StyleSheet.create({
   dateSeparator: {
     alignItems: 'center',
     marginVertical: 16,
+  },
+  datePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   dateText: {
     fontSize: 12,
@@ -442,6 +472,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
     fontSize: 15,
     maxHeight: 100,
+    borderWidth: 1,
+    borderColor: 'rgba(128,128,128,0.2)',
   },
   sendButton: {
     width: 48,
@@ -467,7 +499,27 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  errorSubtitle: {
+    fontSize: 14,
     marginBottom: 24,
+    textAlign: 'center',
+  },
+  errorActions: {
+    marginTop: 16,
+    gap: 12,
+    alignItems: 'center',
+  },
+  retryButtonLarge: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  retryButtonLargeText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   backButton: {
     paddingHorizontal: 24,
@@ -475,7 +527,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   backButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
