@@ -57,8 +57,8 @@ export default function ManageSpeciesPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setSpecies(data.species || data);
-        setFilteredSpecies(data.species || data);
+        setSpecies(data.items || data.species || data);
+        setFilteredSpecies(data.items || data.species || data);
       }
     } catch (error) {
       console.error('Failed to fetch species:', error);

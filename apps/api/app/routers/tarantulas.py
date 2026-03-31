@@ -18,6 +18,7 @@ from app.models.photo import Photo
 from app.models.pairing import Pairing
 from app.models.offspring import Offspring
 from app.models.pricing_submission import PricingSubmission
+from app.models.species import Species
 from app.schemas.tarantula import (
     TarantulaCreate,
     TarantulaUpdate,
@@ -92,6 +93,13 @@ async def create_tarantula(
     db.add(new_tarantula)
     db.commit()
     db.refresh(new_tarantula)
+
+    # Increment times_kept on the linked species
+    if new_tarantula.species_id:
+        linked_species = db.query(Species).filter(Species.id == new_tarantula.species_id).first()
+        if linked_species:
+            linked_species.times_kept = (linked_species.times_kept or 0) + 1
+            db.commit()
 
     # Create activity feed entry
     await create_activity(

@@ -50,11 +50,13 @@ export default function SpeciesPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
+      params.append('limit', '100');
       if (filters.verifiedOnly) params.append('verified_only', 'true');
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/species?${params}`);
       const data = await response.json();
-      setSpecies(data);
+      // Handle paginated response format
+      setSpecies(data.items || data);
     } catch (error) {
       console.error('Error fetching species:', error);
     } finally {

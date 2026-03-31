@@ -48,9 +48,10 @@ export default function SpeciesScreen() {
 
   const fetchSpecies = async () => {
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/species`);
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/species?limit=100`);
       const data = await response.json();
-      setSpecies(data);
+      // Handle paginated response format
+      setSpecies(data.items || data);
     } catch (error) {
       console.error('Error fetching species:', error);
     } finally {
@@ -93,8 +94,6 @@ export default function SpeciesScreen() {
         return { color: '#eab308', text: 'Intermediate', icon: '⚠' };
       case 'advanced':
         return { color: '#f97316', text: 'Advanced', icon: '⚡' };
-      case 'expert':
-        return { color: '#ef4444', text: 'Expert', icon: '☠' };
       default:
         return { color: colors.textSecondary, text: 'Unknown', icon: '?' };
     }

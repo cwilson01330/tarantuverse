@@ -14,7 +14,7 @@ class SpeciesBase(BaseModel):
     genus: Optional[str] = Field(None, max_length=100)
     family: Optional[str] = Field(None, max_length=100)
 
-    care_level: Optional[str] = Field(None, pattern="^(beginner|intermediate|advanced|expert)$")
+    care_level: Optional[str] = Field(None, pattern="^(beginner|intermediate|advanced)$")
     temperament: Optional[str] = None
     native_region: Optional[str] = None
     adult_size: Optional[str] = None
@@ -103,6 +103,18 @@ class SpeciesResponse(SpeciesBase):
     times_kept: int
     created_at: datetime
     updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class SpeciesPaginatedResponse(BaseModel):
+    """Paginated species list response"""
+    items: List[SpeciesResponse]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
 
     class Config:
         from_attributes = True

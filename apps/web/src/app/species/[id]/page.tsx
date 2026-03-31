@@ -640,6 +640,23 @@ export default function EnhancedSpeciesDetailPage() {
                 <p className="text-gray-600 dark:text-gray-400">Care Level</p>
               </div>
             </div>
+
+            {/* Source Attribution */}
+            {species.source_url && (
+              <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  📚 Source:{' '}
+                  <a
+                    href={species.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-600 dark:text-primary-400 hover:underline"
+                  >
+                    {species.source_url}
+                  </a>
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

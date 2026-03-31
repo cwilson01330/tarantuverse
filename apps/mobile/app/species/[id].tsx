@@ -104,8 +104,6 @@ export default function SpeciesDetailScreen() {
         return { color: '#eab308', text: 'Intermediate', icon: '⚠', badge: 'Moderate' };
       case 'advanced':
         return { color: '#f97316', text: 'Advanced', icon: '⚡', badge: 'Challenging' };
-      case 'expert':
-        return { color: '#ef4444', text: 'Expert Only', icon: '☠', badge: 'Difficult' };
       default:
         return { color: colors.textSecondary, text: 'Unknown', icon: '?', badge: 'Unknown' };
     }
@@ -400,6 +398,21 @@ export default function SpeciesDetailScreen() {
               )}
             </View>
           </AccordionSection>
+
+          {/* Source Attribution */}
+          {species.source_url && (
+            <View style={[styles.sourceCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.sourceLabel, { color: colors.textSecondary }]}>📚 Source</Text>
+              <Text
+                style={[styles.sourceLink, { color: colors.primary }]}
+                onPress={() => {
+                  import('expo-linking').then(Linking => Linking.default.openURL(species.source_url!));
+                }}
+              >
+                {species.source_url}
+              </Text>
+            </View>
+          )}
 
           {/* Bottom Spacing */}
           <View style={{ height: 40 }} />
@@ -697,5 +710,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  // Source Attribution
+  sourceCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  sourceLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  sourceLink: {
+    fontSize: 13,
+    textDecorationLine: 'underline',
   },
 });

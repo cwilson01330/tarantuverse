@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
       throw new Error("Failed to fetch species")
     }
 
-    const allSpecies = await speciesRes.json()
+    const speciesData = await speciesRes.json()
+    const allSpecies = speciesData.items || speciesData
 
     const results = []
 

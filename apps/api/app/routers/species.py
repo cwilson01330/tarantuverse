@@ -3,14 +3,20 @@ Species routes
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from typing import List, Optional
 import uuid
 
 from app.database import get_db
 from app.models.user import User
 from app.models.species import Species
-from app.schemas.species import SpeciesCreate, SpeciesUpdate, SpeciesResponse, SpeciesSearchResult
+from app.schemas.species import (
+    SpeciesCreate,
+    SpeciesUpdate,
+    SpeciesResponse,
+    SpeciesPaginatedResponse,
+    SpeciesSearchResult,
+)
 from app.utils.dependencies import get_current_user
 
 router = APIRouter()
@@ -23,37 +29,66 @@ async def search_species(
     db: Session = Depends(get_db)
 ):
     """
-    Search species by scientific or common name (case-insensitive)
-    Returns minimal info for autocomplete
+    Search species by scientific or common name.
+    Uses TSVECTOR full-text search when available, falls back to ILIKE.
+    Returns minimal info for autocomplete.
     """
     search_term = q.lower().strip()
 
-    # Search in scientific_name_lower and common_names (case-insensitive)
-    results = db.query(Species).filter(
-        or_(
-            Species.scientific_name_lower.ilike(f"%{search_term}%"),
-            func.lower(func.array_to_string(Species.common_names, " ")).ilike(f"%{search_term}%")
-        )
-    ).limit(limit).all()
+    # Try TSVECTOR full-text search first (faster for large datasets)
+    try:
+        ts_query = func.plainto_tsquery("english", search_term)
+        results = db.query(Species).filter(
+            or_(
+                Species.searchable.op("@@")(ts_query),
+                # Fallback to ILIKE for partial matches (TSVECTOR needs full words)
+                Species.scientific_name_lower.ilike(f"%{search_term}%"),
+                func.lower(func.array_to_string(Species.common_names, " ")).ilike(f"%{search_term}%")
+            )
+        ).limit(limit).all()
+    except Exception:
+        # Fallback if TSVECTOR column is empty or not populated
+        results = db.query(Species).filter(
+            or_(
+                Species.scientific_name_lower.ilike(f"%{search_term}%"),
+                func.lower(func.array_to_string(Species.common_names, " ")).ilike(f"%{search_term}%")
+            )
+        ).limit(limit).all()
 
     return results
 
 
-@router.get("/", response_model=List[SpeciesResponse])
+@router.get("/", response_model=SpeciesPaginatedResponse)
 async def get_all_species(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(25, ge=1, le=100),
     verified_only: bool = False,
+    care_level: Optional[str] = Query(None, pattern="^(beginner|intermediate|advanced)$"),
+    type: Optional[str] = Query(None, pattern="^(terrestrial|arboreal|fossorial)$"),
     db: Session = Depends(get_db)
 ):
-    """Get all species with optional filtering"""
+    """Get all species with pagination and optional filtering"""
     query = db.query(Species)
 
     if verified_only:
         query = query.filter(Species.is_verified == True)
 
-    species = query.offset(skip).limit(limit).all()
-    return species
+    if care_level:
+        query = query.filter(Species.care_level == care_level)
+
+    if type:
+        query = query.filter(Species.type == type)
+
+    total = query.count()
+    species = query.order_by(Species.scientific_name).offset(skip).limit(limit).all()
+
+    return SpeciesPaginatedResponse(
+        items=species,
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=(skip + limit) < total
+    )
 
 
 @router.get("/{species_id}", response_model=SpeciesResponse)
@@ -176,8 +211,7 @@ async def bulk_import_species(
             )
 
             db.add(new_species)
-            db.commit()
-            db.refresh(new_species)
+            db.flush()  # Flush instead of commit to batch the transaction
 
             results["successful"] += 1
             results["imported_species"].append({
@@ -194,7 +228,47 @@ async def bulk_import_species(
                 "error": str(e)
             })
 
+    # Commit all successful imports at once
+    if results["successful"] > 0:
+        try:
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            results["failed"] += results["successful"]
+            results["successful"] = 0
+            results["errors"].append({"error": f"Batch commit failed: {str(e)}"})
+
     return results
+
+
+@router.post("/{species_id}/rate", response_model=SpeciesResponse)
+async def rate_species(
+    species_id: uuid.UUID,
+    rating: float = Query(..., ge=0.0, le=5.0, description="Rating from 0 to 5"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Rate a species (community rating).
+    Calculates a running average based on the current rating and times_kept count.
+    """
+    species = db.query(Species).filter(Species.id == species_id).first()
+
+    if not species:
+        raise HTTPException(status_code=404, detail="Species not found")
+
+    # Calculate new running average
+    current_rating = species.community_rating or 0.0
+    current_count = max(species.times_kept or 0, 1)  # Avoid division by zero
+
+    # Weighted average: blend existing rating with new rating
+    new_rating = ((current_rating * (current_count - 1)) + rating) / current_count
+    species.community_rating = round(new_rating, 2)
+
+    db.commit()
+    db.refresh(species)
+
+    return species
 
 
 @router.put("/{species_id}", response_model=SpeciesResponse)

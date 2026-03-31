@@ -77,7 +77,7 @@ export default function AdminSpeciesScreen() {
   const fetchSpecies = async () => {
     try {
       const response = await apiClient.get('/species/?limit=1000');
-      const data = response.data.species || response.data;
+      const data = response.data.items || response.data.species || response.data;
       setSpecies(data);
       setFilteredSpecies(data);
     } catch (error) {

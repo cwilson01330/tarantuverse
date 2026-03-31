@@ -34,7 +34,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     try {
         const response = await fetch(`${apiUrl}/api/v1/species?limit=1000`)
         if (response.ok) {
-            const species: Species[] = await response.json()
+            const data = await response.json()
+            const species: Species[] = data.items || data
             speciesRoutes = species.map((s) => ({
                 url: `${baseUrl}/species/${s.id}`,
                 lastModified: s.updated_at ? new Date(s.updated_at) : new Date(),
