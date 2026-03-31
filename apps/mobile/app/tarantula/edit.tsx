@@ -187,22 +187,22 @@ export default function EditTarantulaScreen() {
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Sex</Text>
             <View style={styles.sexButtons}>
-              {['Male', 'Female', 'Unknown'].map((sex) => (
+              {[{ label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }, { label: 'Unknown', value: 'unknown' }].map((option) => (
                 <TouchableOpacity
-                  key={sex}
+                  key={option.value}
                   style={[
                     styles.sexButton,
                     { borderColor: colors.border },
-                    formData.sex === sex && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    formData.sex === option.value && { backgroundColor: colors.primary, borderColor: colors.primary }
                   ]}
-                  onPress={() => setFormData({ ...formData, sex })}
+                  onPress={() => setFormData({ ...formData, sex: option.value })}
                 >
                   <Text style={[
                     styles.sexButtonText,
                     { color: colors.textSecondary },
-                    formData.sex === sex && { color: '#fff' }
+                    formData.sex === option.value && { color: '#fff' }
                   ]}>
-                    {sex}
+                    {option.label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -221,13 +221,27 @@ export default function EditTarantulaScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Source</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
-              value={formData.source}
-              onChangeText={(text) => setFormData({ ...formData, source: text })}
-              placeholder="Where did you get it?"
-              placeholderTextColor={colors.textTertiary}
-            />
+            <View style={styles.sexButtons}>
+              {[{ label: 'Bred', value: 'bred' }, { label: 'Bought', value: 'bought' }, { label: 'Wild Caught', value: 'wild_caught' }].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.sexButton,
+                    { borderColor: colors.border },
+                    formData.source === option.value && { backgroundColor: colors.primary, borderColor: colors.primary }
+                  ]}
+                  onPress={() => setFormData({ ...formData, source: option.value })}
+                >
+                  <Text style={[
+                    styles.sexButtonText,
+                    { color: colors.textSecondary },
+                    formData.source === option.value && { color: '#fff' }
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -237,13 +251,27 @@ export default function EditTarantulaScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Enclosure Type</Text>
-            <TextInput
-              style={[styles.input, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
-              value={formData.enclosure_type}
-              onChangeText={(text) => setFormData({ ...formData, enclosure_type: text })}
-              placeholder="e.g., Terrestrial, Arboreal"
-              placeholderTextColor={colors.textTertiary}
-            />
+            <View style={styles.sexButtons}>
+              {[{ label: 'Terrestrial', value: 'terrestrial' }, { label: 'Arboreal', value: 'arboreal' }, { label: 'Fossorial', value: 'fossorial' }].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.sexButton,
+                    { borderColor: colors.border },
+                    formData.enclosure_type === option.value && { backgroundColor: colors.primary, borderColor: colors.primary }
+                  ]}
+                  onPress={() => setFormData({ ...formData, enclosure_type: option.value })}
+                >
+                  <Text style={[
+                    styles.sexButtonText,
+                    { color: colors.textSecondary },
+                    formData.enclosure_type === option.value && { color: '#fff' }
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           <View style={styles.inputGroup}>

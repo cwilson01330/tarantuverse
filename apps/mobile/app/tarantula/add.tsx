@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateInput from '../../src/components/DateInput';
 import SpeciesAutocomplete from '../../src/components/SpeciesAutocomplete';
+import UpgradeModal from '../../src/components/UpgradeModal';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -43,6 +44,7 @@ export default function AddTarantulaScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [saving, setSaving] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const [formData, setFormData] = useState<TarantulaData>({
     name: '',
@@ -72,6 +74,12 @@ export default function AddTarantulaScreen() {
       Alert.alert('Success', 'Tarantula added successfully');
       router.replace(`/tarantula/${response.data.id}`);
     } catch (error: any) {
+      // Check for free tier limit (402 Payment Required)
+      if (error.response?.status === 402) {
+        setShowUpgradeModal(true);
+        setSaving(false);
+        return;
+      }
       const detail = error.response?.data?.detail;
       const message = typeof detail === 'object' && detail !== null
         ? detail.message || JSON.stringify(detail)
@@ -278,20 +286,20 @@ export default function AddTarantulaScreen() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Sex</Text>
             <View style={styles.sexButtons}>
-              {['Male', 'Female', 'Unknown'].map((sex) => (
+              {[{ label: 'Male', value: 'male' }, { label: 'Female', value: 'female' }, { label: 'Unknown', value: 'unknown' }].map((option) => (
                 <TouchableOpacity
-                  key={sex}
+                  key={option.value}
                   style={[
                     styles.sexButton,
-                    formData.sex === sex && styles.sexButtonActive
+                    formData.sex === option.value && styles.sexButtonActive
                   ]}
-                  onPress={() => setFormData({ ...formData, sex })}
+                  onPress={() => setFormData({ ...formData, sex: option.value })}
                 >
                   <Text style={[
                     styles.sexButtonText,
-                    formData.sex === sex && styles.sexButtonTextActive
+                    formData.sex === option.value && styles.sexButtonTextActive
                   ]}>
-                    {sex}
+                    {option.label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -310,13 +318,25 @@ export default function AddTarantulaScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Source</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.source}
-              onChangeText={(text) => setFormData({ ...formData, source: text })}
-              placeholder="Where did you get it?"
-              placeholderTextColor={colors.textTertiary}
-            />
+            <View style={styles.sexButtons}>
+              {[{ label: 'Bred', value: 'bred' }, { label: 'Bought', value: 'bought' }, { label: 'Wild Caught', value: 'wild_caught' }].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.sexButton,
+                    formData.source === option.value && styles.sexButtonActive
+                  ]}
+                  onPress={() => setFormData({ ...formData, source: option.value })}
+                >
+                  <Text style={[
+                    styles.sexButtonText,
+                    formData.source === option.value && styles.sexButtonTextActive
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
 
@@ -326,13 +346,25 @@ export default function AddTarantulaScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Enclosure Type</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.enclosure_type}
-              onChangeText={(text) => setFormData({ ...formData, enclosure_type: text })}
-              placeholder="e.g., Terrestrial, Arboreal"
-              placeholderTextColor={colors.textTertiary}
-            />
+            <View style={styles.sexButtons}>
+              {[{ label: 'Terrestrial', value: 'terrestrial' }, { label: 'Arboreal', value: 'arboreal' }, { label: 'Fossorial', value: 'fossorial' }].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.sexButton,
+                    formData.enclosure_type === option.value && styles.sexButtonActive
+                  ]}
+                  onPress={() => setFormData({ ...formData, enclosure_type: option.value })}
+                >
+                  <Text style={[
+                    styles.sexButtonText,
+                    formData.enclosure_type === option.value && styles.sexButtonTextActive
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -481,6 +513,15 @@ export default function AddTarantulaScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Upgrade Modal - shown when free tier limit is reached */}
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Collection Limit Reached"
+        message="You've reached the free tier limit of 15 tarantulas."
+        feature="Unlimited Tarantulas"
+      />
     </SafeAreaView>
   );
 }

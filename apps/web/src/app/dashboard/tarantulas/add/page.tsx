@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
+import UpgradeModal from '@/components/UpgradeModal'
 
 interface SelectedSpecies {
   id: string
@@ -49,6 +50,7 @@ function AddTarantulaContent() {
   const [selectedSpecies, setSelectedSpecies] = useState<SelectedSpecies | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   // Check for pre-filled species from URL params (from "Add to Collection" on species page)
   useEffect(() => {
@@ -148,6 +150,12 @@ function AddTarantulaContent() {
       const data = await response.json()
 
       if (!response.ok) {
+        // Show upgrade modal for free tier limit (402 Payment Required)
+        if (response.status === 402) {
+          setShowUpgradeModal(true)
+          setLoading(false)
+          return
+        }
         const detail = data.detail
         const message = typeof detail === 'object' && detail !== null
           ? detail.message || JSON.stringify(detail)
@@ -491,6 +499,14 @@ function AddTarantulaContent() {
           </div>
         </form>
       </div>
+
+      {/* Upgrade Modal - shown when free tier limit is reached */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        feature="Unlimited Tarantulas"
+        description="You've reached the free tier limit of 15 tarantulas. Upgrade to Premium for unlimited tracking!"
+      />
     </DashboardLayout>
   )
 }
