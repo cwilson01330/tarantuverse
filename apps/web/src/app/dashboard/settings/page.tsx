@@ -504,6 +504,28 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Data & Privacy Section */}
+        <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="text-2xl">📦</span>
+            <h2 className="text-xl font-bold text-theme-primary">Data & Privacy</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="p-4 bg-surface-elevated rounded-lg">
+              <h3 className="font-semibold text-theme-primary mb-1">Export Your Data</h3>
+              <p className="text-sm text-theme-secondary">
+                Download your entire collection, logs, photos, and breeding records in JSON, CSV, or a complete backup archive. Your data is always yours.
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard/settings/data-export')}
+              className="w-full px-4 py-3 bg-gradient-brand hover:bg-gradient-brand-hover text-white rounded-lg transition-all font-medium shadow-lg shadow-gradient-brand"
+            >
+              Export Data
+            </button>
+          </div>
+        </section>
+
         {/* Subscription Section */}
         <section className="bg-surface rounded-xl border border-theme p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">

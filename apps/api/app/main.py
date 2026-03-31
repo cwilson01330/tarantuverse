@@ -152,7 +152,7 @@ app.include_router(offspring.router, prefix="/api/v1", tags=["offspring", "breed
 app.include_router(notification_preferences.router, prefix="/api/v1", tags=["notifications"])
 
 print("[STARTUP] Registering import/export router...")
-app.include_router(import_export.router, prefix="/api/v1", tags=["import"])
+app.include_router(import_export.router, prefix="/api/v1", tags=["import-export"])
 
 print("[STARTUP] Registering admin router...")
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])

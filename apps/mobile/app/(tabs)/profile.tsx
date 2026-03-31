@@ -333,6 +333,12 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/data-export')}>
+          <MaterialCommunityIcons name="database-export" size={24} color={colors.primary} />
+          <Text style={styles.menuText}>Export Data</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/referrals')}>
           <MaterialCommunityIcons name="gift" size={24} color={colors.secondary} />
           <Text style={styles.menuText}>Refer Friends</Text>

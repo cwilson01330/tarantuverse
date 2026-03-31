@@ -124,6 +124,27 @@ export default function DeleteAccountPage() {
             </p>
           </section>
 
+          {/* Export before delete */}
+          <section className="mb-8">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-5">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">📦</span>
+                <div>
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Download your data first?</h3>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                    Before deleting your account, you can export all your data — collection, feeding logs, molt logs, photos, breeding records, and more. Once your account is deleted, this data cannot be recovered.
+                  </p>
+                  <Link
+                    href="/dashboard/settings/data-export"
+                    className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-medium text-sm"
+                  >
+                    Export My Data
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Delete form */}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-8">
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">

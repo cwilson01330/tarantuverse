@@ -362,8 +362,8 @@ export default function PricingPage() {
                 <td className="px-6 py-4 text-center text-green-500">✓</td>
               </tr>
               <tr className="bg-gray-50 dark:bg-gray-700/30">
-                <td className="px-6 py-4 text-gray-900 dark:text-white">Data export (CSV/PDF)</td>
-                <td className="px-6 py-4 text-center text-gray-400">-</td>
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Data export (JSON/CSV/Full backup)</td>
+                <td className="px-6 py-4 text-center text-green-500">✓</td>
                 <td className="px-6 py-4 text-center text-green-500">✓</td>
               </tr>
             </tbody>
