@@ -2058,7 +2058,7 @@ export default function TarantulaDetailPage() {
               </button>
               <button
                 onClick={() => {
-                  const url = `${window.location.origin}/keeper/${user?.username}/${(tarantula.name || tarantula.common_name || 'tarantula').toLowerCase().replace(/ /g, '-')}`
+                  const url = `${window.location.origin}/keeper/${user?.username}/${(tarantula.common_name || 'tarantula').toLowerCase().replace(/ /g, '-')}`
                   navigator.clipboard.writeText(url)
                   setCopied(true)
                   setTimeout(() => setCopied(false), 2000)
