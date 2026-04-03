@@ -27,6 +27,7 @@ from app.models.referral_reward import ReferralReward
 from app.models.user_oauth_account import UserOAuthAccount
 from app.models.announcement import Announcement
 from app.models.system_setting import SystemSetting
+from app.models.achievement import AchievementDefinition, UserAchievement
 
 __all__ = [
     "User",
@@ -59,4 +60,6 @@ __all__ = [
     "UserOAuthAccount",
     "Announcement",
     "SystemSetting",
+    "AchievementDefinition",
+    "UserAchievement",
 ]

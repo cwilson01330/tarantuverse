@@ -39,6 +39,10 @@ import app.routers.enclosures as enclosures
 import app.routers.referrals as referrals
 import app.routers.announcements as announcements
 import app.routers.system_settings as system_settings
+import app.routers.premolt as premolt
+import app.routers.achievements as achievements
+import app.routers.search as search
+import app.routers.discover as discover
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -229,6 +233,18 @@ app.include_router(announcements.router, prefix="/api/v1/announcements", tags=["
 
 print("[STARTUP] Registering system settings router...")
 app.include_router(system_settings.router, prefix="/api/v1", tags=["system-settings"])
+
+print("[STARTUP] Registering premolt prediction router...")
+app.include_router(premolt.router, prefix="/api/v1/premolt", tags=["premolt", "analytics"])
+
+print("[STARTUP] Registering achievements router...")
+app.include_router(achievements.router, prefix="/api/v1", tags=["achievements", "gamification"])
+
+print("[STARTUP] Registering global search router...")
+app.include_router(search.router, prefix="/api/v1", tags=["search"])
+
+print("[STARTUP] Registering discover router...")
+app.include_router(discover.router, prefix="/api/v1", tags=["discover", "community"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

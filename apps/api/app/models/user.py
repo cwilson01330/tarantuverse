@@ -84,6 +84,9 @@ class User(Base):
     # Linked OAuth accounts (allows multiple providers per user)
     oauth_accounts = relationship("UserOAuthAccount", back_populates="user", lazy="select", passive_deletes=True)
 
+    # Achievements/Badges
+    achievements = relationship("UserAchievement", back_populates="user", lazy="select", passive_deletes=True)
+
     def __repr__(self):
         return f"<User {self.username}>"
 

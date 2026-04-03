@@ -399,6 +399,17 @@ export default function AnalyticsScreen() {
           <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>📊 Analytics</Text>
+        <TouchableOpacity
+          onPress={() => router.push('/analytics/advanced')}
+          style={{
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            backgroundColor: colors.primary,
+            borderRadius: 6,
+          }}
+        >
+          <MaterialCommunityIcons name="sparkles" size={16} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollContent}>

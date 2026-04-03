@@ -10,6 +10,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
 import UpgradeModal from '@/components/UpgradeModal'
 import PricingCard from '@/components/PricingCard'
+import PremoltPredictionSection from '@/components/PremoltPredictionSection'
 import apiClient from '@/lib/api'
 
 interface Tarantula {
@@ -214,6 +215,8 @@ export default function TarantulaDetailPage() {
     reason: '',
     notes: '',
   })
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     // Wait for auth to load
@@ -880,6 +883,16 @@ export default function TarantulaDetailPage() {
               </button>
             </div>
 
+            {/* Share Button (visible only when public) */}
+            {tarantula.visibility === 'public' && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="px-3 py-1.5 text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 text-sm font-medium inline-flex items-center gap-1.5"
+              >
+                📤 Share
+              </button>
+            )}
+
             <button
               onClick={() => setDeleteConfirm(true)}
               className="ml-auto px-3 py-1.5 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-all duration-200 text-sm font-medium"
@@ -989,6 +1002,9 @@ export default function TarantulaDetailPage() {
                   )}
                 </div>
               </div>
+
+              {/* Premolt Prediction Section */}
+              <PremoltPredictionSection tarantulaId={id} />
 
               {/* Recent Activity Timeline */}
               <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
@@ -1255,9 +1271,16 @@ export default function TarantulaDetailPage() {
 
               <div className="space-y-3">
                 {feedings.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-8 text-center">
                     <div className="text-5xl mb-3">🍽️</div>
-                    <p>No feeding logs yet</p>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No feedings logged yet</h3>
+                    <p className="text-gray-700 dark:text-gray-300 mb-4">Log your first feeding to start tracking patterns and get premolt predictions.</p>
+                    <button
+                      onClick={() => setShowFeedingForm(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
+                    >
+                      + Log First Feeding
+                    </button>
                   </div>
                 ) : (
                   feedings.map((feeding) => (
@@ -1412,9 +1435,16 @@ export default function TarantulaDetailPage() {
 
               <div className="space-y-3">
                 {molts.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                    <div className="text-5xl mb-3">🔄</div>
-                    <p>No molt logs yet</p>
+                  <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-8 text-center">
+                    <div className="text-5xl mb-3">🦋</div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No molts recorded</h3>
+                    <p className="text-gray-700 dark:text-gray-300 mb-4">Track your tarantula's growth by logging molt events with measurements.</p>
+                    <button
+                      onClick={() => setShowMoltForm(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                    >
+                      + Log First Molt
+                    </button>
                   </div>
                 ) : (
                   molts.map((molt) => (
@@ -1558,9 +1588,16 @@ export default function TarantulaDetailPage() {
 
               <div className="space-y-3">
                 {substrateChanges.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                    <div className="text-5xl mb-3">💨</div>
-                    <p>No substrate change logs yet</p>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-8 text-center">
+                    <div className="text-5xl mb-3">🌱</div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No substrate changes logged</h3>
+                    <p className="text-gray-700 dark:text-gray-300 mb-4">Track substrate changes to maintain optimal enclosure conditions.</p>
+                    <button
+                      onClick={() => setShowSubstrateForm(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium"
+                    >
+                      + Log First Change
+                    </button>
                   </div>
                 ) : (
                   substrateChanges.map((change) => (
@@ -1973,7 +2010,7 @@ export default function TarantulaDetailPage() {
               <div className="text-6xl mb-4">⚠️</div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Delete Tarantula?</h2>
               <p className="text-gray-600 dark:text-gray-300">
-                Are you sure you want to delete <strong>{tarantula.common_name}</strong>? 
+                Are you sure you want to delete <strong>{tarantula.common_name}</strong>?
                 This will also delete all associated logs and cannot be undone.
               </p>
             </div>
@@ -1989,6 +2026,46 @@ export default function TarantulaDetailPage() {
                 className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold shadow-sm"
               >
                 Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Profile Modal */}
+      {showShareModal && tarantula && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-8">
+            <div className="text-center mb-6">
+              <div className="text-6xl mb-4">📤</div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Share Profile</h2>
+              <p className="text-gray-600 dark:text-gray-300">
+                Share this tarantula's public profile with others
+              </p>
+            </div>
+            <div className="mb-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">
+              <p className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-2">Public URL</p>
+              <p className="text-sm font-mono text-gray-900 dark:text-white break-all">
+                {`${window.location.origin}/keeper/${user?.username}/${(tarantula.name || tarantula.common_name || 'tarantula').toLowerCase().replace(/ /g, '-')}`}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition font-semibold"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/keeper/${user?.username}/${(tarantula.name || tarantula.common_name || 'tarantula').toLowerCase().replace(/ /g, '-')}`
+                  navigator.clipboard.writeText(url)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm"
+              >
+                {copied ? '✓ Copied!' : '📋 Copy Link'}
               </button>
             </div>
           </div>

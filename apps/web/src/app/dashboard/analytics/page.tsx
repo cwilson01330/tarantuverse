@@ -185,14 +185,22 @@ export default function AnalyticsPage() {
       userAvatar={user?.image ?? undefined}
     >
       <div className="container mx-auto p-6">
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-2 transition-colors"
+          >
+            ← Back to Dashboard
+          </button>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">📊 Collection Analytics</h1>
+        </div>
         <button
-          onClick={() => router.push('/dashboard')}
-          className="mb-4 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white inline-flex items-center gap-2 transition-colors"
+          onClick={() => router.push('/dashboard/analytics/advanced')}
+          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-medium flex items-center gap-2"
         >
-          ← Back to Dashboard
+          ✨ Advanced Analytics
         </button>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">📊 Collection Analytics</h1>
       </div>
 
       {/* Overview Stats */}

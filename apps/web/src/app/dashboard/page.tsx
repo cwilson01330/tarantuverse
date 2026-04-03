@@ -9,6 +9,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import DashboardTour from '@/components/DashboardTour'
 import AnnouncementBanner from '@/components/AnnouncementBanner'
 import UpgradeModal from '@/components/UpgradeModal'
+import PremoltAlertsCard from '@/components/PremoltAlertsCard'
 
 interface Tarantula {
   id: string
@@ -323,6 +324,9 @@ export default function DashboardHub() {
 
         {/* Announcement Banner */}
         <AnnouncementBanner />
+
+        {/* Premolt Alerts Card */}
+        <PremoltAlertsCard />
 
         {/* Quick Stats Row */}
         <div data-tour="stats" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

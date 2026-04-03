@@ -30,20 +30,64 @@ class CollectionAnalytics(BaseModel):
     species_counts: List[SpeciesCount]
     total_value: float
     average_age_months: float
-    
+
     # Activity statistics
     total_feedings: int
     total_molts: int
     total_substrate_changes: int
     average_days_between_feedings: float
-    
+
     # Notable items
     most_active_molter: Optional[Dict[str, Any]] = None  # {"tarantula_id": "...", "name": "...", "molt_count": 5}
     newest_acquisition: Optional[Dict[str, Any]] = None  # {"tarantula_id": "...", "name": "...", "date": "2025-10-01"}
     oldest_acquisition: Optional[Dict[str, Any]] = None  # {"tarantula_id": "...", "name": "...", "date": "2020-05-15"}
-    
+
     # Recent activity
     recent_activity: List[ActivityItem]
-    
+
+    class Config:
+        from_attributes = True
+
+
+class MoltHeatmapEntry(BaseModel):
+    """Monthly molt heatmap entry"""
+    month: str  # "2026-01", "2026-02", etc.
+    count: int
+
+
+class CollectionGrowthEntry(BaseModel):
+    """Monthly collection growth entry"""
+    month: str
+    count: int
+
+
+class SpeciesDistEntry(BaseModel):
+    """Species distribution entry"""
+    species_name: str
+    count: int
+
+
+class AdvancedAnalyticsResponse(BaseModel):
+    """Premium advanced analytics response"""
+    # Collection value
+    collection_value_total: float
+    collection_value_average: float
+    most_expensive_name: Optional[str] = None
+    most_expensive_price: Optional[float] = None
+
+    # Temporal data
+    molt_heatmap: List[MoltHeatmapEntry]
+    collection_growth: List[CollectionGrowthEntry]
+
+    # Distributions
+    species_distribution: List[SpeciesDistEntry]
+    sex_distribution: Dict[str, int]  # {"male": 5, "female": 10, "unknown": 3}
+    enclosure_type_distribution: Dict[str, int]  # {"terrestrial": 8, "arboreal": 5, ...}
+
+    # Activity totals
+    total_feedings_logged: int
+    total_molts_logged: int
+    estimated_monthly_feeding_cost: float
+
     class Config:
         from_attributes = True

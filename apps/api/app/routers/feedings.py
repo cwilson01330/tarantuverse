@@ -11,8 +11,10 @@ from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.feeding_log import FeedingLog
 from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate, FeedingLogResponse
+from app.schemas.feeding_reminder import FeedingReminderSummary
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
+from app.services.feeding_reminder_service import get_user_feeding_reminders
 
 router = APIRouter()
 
@@ -145,3 +147,17 @@ async def delete_feeding_log(
     db.commit()
 
     return None
+
+
+@router.get("/feeding-reminders/", response_model=FeedingReminderSummary)
+async def get_feeding_reminders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get feeding reminders for all of the user's tarantulas.
+
+    Calculates recommended feeding intervals based on species data and life stage,
+    returns status for each tarantula (overdue, due today, due soon, on track, never fed).
+    """
+    return get_user_feeding_reminders(current_user.id, db)

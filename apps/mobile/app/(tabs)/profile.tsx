@@ -345,6 +345,12 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/achievements')}>
+          <MaterialCommunityIcons name="trophy" size={24} color="#fbbf24" />
+          <Text style={styles.menuText}>Achievements</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/subscription')}>
           <MaterialCommunityIcons name="crown" size={24} color="#fbbf24" />
           <Text style={styles.menuText}>Subscription & Premium</Text>

@@ -447,6 +447,175 @@ async def get_feeding_stats(
     )
 
 
+@router.get("/{tarantula_id}/public-link")
+async def get_public_link(
+    tarantula_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the shareable public link for a tarantula
+
+    Only the owner can get the link. The tarantula must be public.
+    Returns the URL path to share.
+    """
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == tarantula_id,
+        Tarantula.user_id == current_user.id
+    ).first()
+
+    if not tarantula:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tarantula not found"
+        )
+
+    if not tarantula.is_public:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This tarantula is not public. Make it public first."
+        )
+
+    user = current_user
+    tarantula_slug = (tarantula.name or tarantula.common_name or "tarantula").lower().replace(" ", "-")
+    public_url = f"/keeper/{user.username}/{tarantula_slug}"
+
+    return {
+        "public_url": public_url,
+        "full_url": f"https://tarantuverse.com{public_url}"  # Update domain as needed
+    }
+
+
+@router.get("/public/{username}/{tarantula_slug}")
+async def get_public_tarantula(
+    username: str,
+    tarantula_slug: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get a public tarantula profile (no authentication required)
+
+    Returns tarantula details, owner info, feeding history, molt timeline, and photos.
+    The tarantula must be public to be viewable.
+    """
+    # Get user by username
+    user = db.query(User).filter(
+        User.username == username
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Keeper not found"
+        )
+
+    # Find matching public tarantula by name slug
+    # Normalize the slug to match against tarantula names
+    user_tarantulas = db.query(Tarantula).filter(
+        Tarantula.user_id == user.id,
+        Tarantula.is_public == True
+    ).all()
+
+    matching_tarantula = None
+    for t in user_tarantulas:
+        t_slug = (t.name or t.common_name or "tarantula").lower().replace(" ", "-")
+        if t_slug == tarantula_slug:
+            matching_tarantula = t
+            break
+
+    if not matching_tarantula:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tarantula not found or is not public"
+        )
+
+    tarantula = matching_tarantula
+
+    # Get feeding logs
+    feeding_logs = db.query(FeedingLog).filter(
+        FeedingLog.tarantula_id == tarantula.id
+    ).order_by(FeedingLog.fed_at.desc()).all()
+
+    total_feedings = len(feeding_logs)
+    total_accepted = sum(1 for log in feeding_logs if log.accepted)
+    acceptance_rate = (total_accepted / total_feedings * 100) if total_feedings > 0 else 0.0
+    last_fed_date = feeding_logs[0].fed_at if feeding_logs else None
+
+    # Get molt logs
+    molt_logs = db.query(MoltLog).filter(
+        MoltLog.tarantula_id == tarantula.id
+    ).order_by(MoltLog.molted_at.desc()).all()
+
+    molt_timeline = []
+    for molt in molt_logs:
+        molt_timeline.append({
+            "id": str(molt.id),
+            "molted_at": molt.molted_at.isoformat(),
+            "leg_span_before": float(molt.leg_span_before) if molt.leg_span_before else None,
+            "leg_span_after": float(molt.leg_span_after) if molt.leg_span_after else None,
+            "weight_before": float(molt.weight_before) if molt.weight_before else None,
+            "weight_after": float(molt.weight_after) if molt.weight_after else None,
+            "notes": molt.notes
+        })
+
+    # Get photos (limit to 10)
+    photos = db.query(Photo).filter(
+        Photo.tarantula_id == tarantula.id
+    ).order_by(Photo.created_at.desc()).limit(10).all()
+
+    photos_data = []
+    for photo in photos:
+        photos_data.append({
+            "id": str(photo.id),
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None
+        })
+
+    # Get species info if linked
+    species_info = None
+    if tarantula.species_id:
+        species = db.query(Species).filter(Species.id == tarantula.species_id).first()
+        if species:
+            species_info = {
+                "id": str(species.id),
+                "scientific_name": species.scientific_name,
+                "common_names": species.common_names,
+                "care_level": species.care_level,
+                "type": species.type,
+                "native_region": species.native_region,
+                "adult_size": species.adult_size,
+                "image_url": species.image_url
+            }
+
+    return {
+        "tarantula": {
+            "id": str(tarantula.id),
+            "name": tarantula.name,
+            "common_name": tarantula.common_name,
+            "scientific_name": tarantula.scientific_name,
+            "sex": tarantula.sex,
+            "date_acquired": tarantula.date_acquired.isoformat() if tarantula.date_acquired else None,
+            "photo_url": tarantula.photo_url,
+            "notes": tarantula.notes
+        },
+        "owner": {
+            "username": user.username,
+            "display_name": user.display_name,
+            "avatar_url": user.avatar_url
+        },
+        "species": species_info,
+        "feeding_summary": {
+            "total_feedings": total_feedings,
+            "acceptance_rate": round(acceptance_rate, 1),
+            "last_fed_date": last_fed_date.isoformat() if last_fed_date else None
+        },
+        "molt_timeline": molt_timeline,
+        "photos": photos_data
+    }
+
+
 @router.get("/{tarantula_id}/premolt-prediction", response_model=PremoltPrediction)
 async def get_premolt_prediction(
     tarantula_id: UUID,

@@ -205,10 +205,16 @@ export default function CommunityScreen() {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>🌐 Community</Text>
           <Text style={styles.headerSubtitle}>Connect with keepers</Text>
         </View>
+        <TouchableOpacity
+          style={{ justifyContent: 'center', paddingRight: 8 }}
+          onPress={() => router.push('/discover')}
+        >
+          <MaterialCommunityIcons name="star" size={28} color="#fff" />
+        </TouchableOpacity>
       </LinearGradient>
 
       {/* Tabs */}

@@ -6,14 +6,22 @@ from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func, distinct
+from sqlalchemy import func, distinct, extract
 from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.molt_log import MoltLog
 from app.models.feeding_log import FeedingLog
 from app.models.substrate_change import SubstrateChange
-from app.schemas.analytics import CollectionAnalytics, SpeciesCount, ActivityItem
+from app.schemas.analytics import (
+    CollectionAnalytics,
+    SpeciesCount,
+    ActivityItem,
+    AdvancedAnalyticsResponse,
+    MoltHeatmapEntry,
+    CollectionGrowthEntry,
+    SpeciesDistEntry,
+)
 from app.utils.dependencies import get_current_user
 
 router = APIRouter()
@@ -256,4 +264,203 @@ async def get_collection_analytics(
         newest_acquisition=newest_acquisition,
         oldest_acquisition=oldest_acquisition,
         recent_activity=recent_activity
+    )
+
+
+@router.get("/advanced/", response_model=AdvancedAnalyticsResponse)
+async def get_advanced_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get premium advanced analytics for the user's collection.
+
+    Returns:
+    - Collection value statistics (total, average, most expensive)
+    - Molt heatmap (molts per month for last 12 months)
+    - Collection growth timeline (tarantulas added per month)
+    - Species distribution (top 10)
+    - Sex distribution
+    - Enclosure type distribution
+    - Estimated monthly feeding cost
+    - Total activity counts
+    """
+
+    # Get all user's tarantulas
+    tarantulas = db.query(Tarantula).filter(
+        Tarantula.user_id == current_user.id
+    ).all()
+
+    total_count = len(tarantulas)
+    tarantula_ids = [t.id for t in tarantulas]
+
+    # Empty response if no tarantulas
+    if total_count == 0:
+        return AdvancedAnalyticsResponse(
+            collection_value_total=0.0,
+            collection_value_average=0.0,
+            most_expensive_name=None,
+            most_expensive_price=None,
+            molt_heatmap=[],
+            collection_growth=[],
+            species_distribution=[],
+            sex_distribution={"male": 0, "female": 0, "unknown": 0},
+            enclosure_type_distribution={},
+            total_feedings_logged=0,
+            total_molts_logged=0,
+            estimated_monthly_feeding_cost=0.0,
+        )
+
+    # ===== COLLECTION VALUE =====
+    collection_value_total = float(sum(float(t.price_paid or 0) for t in tarantulas))
+    collection_value_average = (
+        collection_value_total / total_count if total_count > 0 else 0.0
+    )
+
+    # Find most expensive tarantula
+    most_expensive = None
+    most_expensive_price = None
+    for t in tarantulas:
+        if t.price_paid:
+            if most_expensive_price is None or float(t.price_paid) > most_expensive_price:
+                most_expensive_price = float(t.price_paid)
+                most_expensive = t.name or t.common_name or t.scientific_name or "Unnamed"
+
+    # ===== MOLT HEATMAP (last 12 months) =====
+    now = datetime.now(timezone.utc)
+    twelve_months_ago = now - timedelta(days=365)
+
+    molt_data = (
+        db.query(
+            extract("year", MoltLog.molted_at).label("year"),
+            extract("month", MoltLog.molted_at).label("month"),
+            func.count(MoltLog.id).label("count"),
+        )
+        .filter(
+            MoltLog.tarantula_id.in_(tarantula_ids),
+            MoltLog.molted_at >= twelve_months_ago,
+        )
+        .group_by(
+            extract("year", MoltLog.molted_at),
+            extract("month", MoltLog.molted_at),
+        )
+        .order_by(
+            extract("year", MoltLog.molted_at),
+            extract("month", MoltLog.molted_at),
+        )
+        .all()
+    )
+
+    molt_heatmap = [
+        MoltHeatmapEntry(
+            month=f"{int(m.year)}-{int(m.month):02d}",
+            count=int(m.count),
+        )
+        for m in molt_data
+    ]
+
+    # ===== COLLECTION GROWTH (last 12 months) =====
+    growth_data = (
+        db.query(
+            extract("year", Tarantula.date_acquired).label("year"),
+            extract("month", Tarantula.date_acquired).label("month"),
+            func.count(Tarantula.id).label("count"),
+        )
+        .filter(
+            Tarantula.user_id == current_user.id,
+            Tarantula.date_acquired >= twelve_months_ago.date(),
+        )
+        .group_by(
+            extract("year", Tarantula.date_acquired),
+            extract("month", Tarantula.date_acquired),
+        )
+        .order_by(
+            extract("year", Tarantula.date_acquired),
+            extract("month", Tarantula.date_acquired),
+        )
+        .all()
+    )
+
+    collection_growth = [
+        CollectionGrowthEntry(
+            month=f"{int(g.year)}-{int(g.month):02d}",
+            count=int(g.count),
+        )
+        for g in growth_data
+    ]
+
+    # ===== SPECIES DISTRIBUTION =====
+    species_counts = Counter()
+    for t in tarantulas:
+        species_name = t.scientific_name or t.common_name or t.name or "Unknown"
+        species_counts[species_name] += 1
+
+    species_distribution = [
+        SpeciesDistEntry(species_name=name, count=count)
+        for name, count in species_counts.most_common(10)
+    ]
+
+    # ===== SEX DISTRIBUTION =====
+    sex_distribution = {
+        "male": sum(1 for t in tarantulas if t.sex == "male"),
+        "female": sum(1 for t in tarantulas if t.sex == "female"),
+        "unknown": sum(1 for t in tarantulas if t.sex == "unknown" or t.sex is None),
+    }
+
+    # ===== ENCLOSURE TYPE DISTRIBUTION =====
+    enclosure_type_counts = Counter()
+    for t in tarantulas:
+        enclosure_type = t.enclosure_type or "unknown"
+        enclosure_type_counts[enclosure_type] += 1
+
+    enclosure_type_distribution = dict(enclosure_type_counts)
+
+    # ===== FEEDING COSTS =====
+    total_feedings = (
+        db.query(func.count(FeedingLog.id))
+        .filter(FeedingLog.tarantula_id.in_(tarantula_ids))
+        .scalar()
+        or 0
+    )
+
+    # Estimate monthly feeding cost: count feedings in last 30 days * $0.50 per feeding
+    thirty_days_ago = now - timedelta(days=30)
+    recent_feedings = (
+        db.query(func.count(FeedingLog.id))
+        .filter(
+            FeedingLog.tarantula_id.in_(tarantula_ids),
+            FeedingLog.fed_at >= thirty_days_ago,
+        )
+        .scalar()
+        or 0
+    )
+
+    # Project to monthly average if we have data
+    if recent_feedings > 0:
+        estimated_monthly_feeding_cost = float(recent_feedings * 0.50)
+    else:
+        # Fallback: estimate based on collection size (average 1 feeding per tarantula per week)
+        estimated_monthly_feeding_cost = float(total_count * 4 * 0.50) if total_count > 0 else 0.0
+
+    # ===== TOTAL MOLT LOGS =====
+    total_molts = (
+        db.query(func.count(MoltLog.id))
+        .filter(MoltLog.tarantula_id.in_(tarantula_ids))
+        .scalar()
+        or 0
+    )
+
+    return AdvancedAnalyticsResponse(
+        collection_value_total=round(collection_value_total, 2),
+        collection_value_average=round(collection_value_average, 2),
+        most_expensive_name=most_expensive,
+        most_expensive_price=round(most_expensive_price, 2) if most_expensive_price else None,
+        molt_heatmap=molt_heatmap,
+        collection_growth=collection_growth,
+        species_distribution=species_distribution,
+        sex_distribution=sex_distribution,
+        enclosure_type_distribution=enclosure_type_distribution,
+        total_feedings_logged=total_feedings,
+        total_molts_logged=total_molts,
+        estimated_monthly_feeding_cost=round(estimated_monthly_feeding_cost, 2),
     )

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useThemeStore } from '@/stores/themeStore'
 import { useAuth } from '@/hooks/useAuth'
+import GlobalSearch from './GlobalSearch'
 
 interface TopBarProps {
   userName?: string
@@ -16,6 +17,7 @@ interface TopBarProps {
 export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }: TopBarProps) {
   const router = useRouter()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
   const { theme, toggleTheme } = useThemeStore()
   const { token } = useAuth()
   const [unreadCount, setUnreadCount] = useState(0)
@@ -55,36 +57,53 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
   }, [token])
 
   return (
-    <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
-      <div className="h-16 px-4 flex items-center justify-between gap-4">
-        {/* Left section - Mobile menu button */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            aria-label="Toggle menu"
-          >
-            <svg className="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
+    <>
+      <GlobalSearch isOpen={showSearch} onClose={() => setShowSearch(false)} />
+      <header className="sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="h-16 px-4 flex items-center justify-between gap-4">
+          {/* Left section - Mobile menu button */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onMenuClick}
+              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Toggle menu"
+            >
+              <svg className="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
 
-          {/* Breadcrumb or page title could go here */}
-          <div className="hidden md:block">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Welcome back! 🕷️
-            </h2>
+            {/* Breadcrumb or page title could go here */}
+            <div className="hidden md:block">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Welcome back! 🕷️
+              </h2>
+            </div>
           </div>
-        </div>
 
-        {/* Right section - User menu */}
-        <div className="flex items-center gap-3">
-          {/* Theme toggle */}
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
+          {/* Right section - User menu */}
+          <div className="flex items-center gap-3">
+            {/* Search button */}
+            <button
+              onClick={() => setShowSearch(true)}
+              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-600 dark:text-gray-400"
+              title="Search (Cmd+K)"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span className="text-sm hidden md:inline">Search</span>
+              <kbd className="hidden lg:inline ml-2 px-2 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded border border-gray-300 dark:border-gray-600">
+                ⌘K
+              </kbd>
+            </button>
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
             {theme === 'dark' ? (
               <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
@@ -213,9 +232,11 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
                 </div>
               </>
             )}
+            </div>
           </div>
         </div>
       </div>
     </header>
+    </>
   )
 }

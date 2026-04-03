@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Alert,
   Pressable,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -17,6 +18,7 @@ import { apiClient } from '../../src/services/api';
 import PhotoViewer from '../../src/components/PhotoViewer';
 import GrowthChart from '../../src/components/GrowthChart';
 import FeedingStatsCard from '../../src/components/FeedingStatsCard';
+import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { scheduleMoltPredictionNotification, scheduleMaintenanceReminder } from '../../src/services/notifications';
@@ -346,6 +348,26 @@ export default function TarantulaDetailScreen() {
     );
   };
 
+  const handleShareTarantula = async () => {
+    try {
+      // Fetch the public link first
+      const response = await apiClient.get(`/tarantulas/${id}/public-link`);
+      const publicUrl = response.data.full_url;
+
+      await Share.share({
+        message: `Check out ${tarantula?.name || tarantula?.common_name} on Tarantuverse!`,
+        url: publicUrl,
+        title: `${tarantula?.name} - ${tarantula?.common_name}`
+      });
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        Alert.alert('Not Public', 'This tarantula is not public. Make it public to share it.');
+      } else {
+        Alert.alert('Error', 'Failed to share tarantula');
+      }
+    }
+  };
+
   const handleScheduleMaintenanceReminder = async () => {
     if (!tarantula) return;
 
@@ -442,6 +464,12 @@ export default function TarantulaDetailScreen() {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerActionButton}
+            onPress={handleShareTarantula}
+          >
+            <MaterialCommunityIcons name="share-variant" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerActionButton}
             onPress={handleScheduleMaintenanceReminder}
           >
             <MaterialCommunityIcons name="bell-plus" size={24} color={colors.primary} />
@@ -516,6 +544,9 @@ export default function TarantulaDetailScreen() {
           </View>
         </View>
 
+        {/* Premolt Prediction Card */}
+        <PremoltPredictionCard tarantulaId={id as string} />
+
         {/* Husbandry */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Husbandry</Text>
@@ -566,9 +597,17 @@ export default function TarantulaDetailScreen() {
             )}
           </View>
           {feedingLogs.length === 0 ? (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="food-off" size={32} color={colors.textTertiary} />
-              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No feeding logs yet</Text>
+            <View style={[styles.emptyStateCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <MaterialCommunityIcons name="food-off" size={48} color={colors.textTertiary} />
+              <Text style={[styles.emptyStateCardTitle, { color: colors.textPrimary }]}>No feeding logs yet</Text>
+              <Text style={[styles.emptyStateCardText, { color: colors.textSecondary }]}>Start tracking feedings to monitor patterns and get premolt predictions</Text>
+              <TouchableOpacity
+                style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push(`/tarantula/add-feeding?id=${id}`)}
+              >
+                <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+                <Text style={styles.emptyStateButtonText}>Log First Feeding</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.logList}>
@@ -607,9 +646,17 @@ export default function TarantulaDetailScreen() {
             )}
           </View>
           {moltLogs.length === 0 ? (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="refresh-circle" size={32} color={colors.textTertiary} />
-              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No molt logs yet</Text>
+            <View style={[styles.emptyStateCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <MaterialCommunityIcons name="butterfly" size={48} color={colors.textTertiary} />
+              <Text style={[styles.emptyStateCardTitle, { color: colors.textPrimary }]}>No molts recorded</Text>
+              <Text style={[styles.emptyStateCardText, { color: colors.textSecondary }]}>Track your tarantula's growth by logging molt events with measurements</Text>
+              <TouchableOpacity
+                style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push(`/tarantula/add-molt?id=${id}`)}
+              >
+                <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+                <Text style={styles.emptyStateButtonText}>Log First Molt</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.logList}>
@@ -646,9 +693,17 @@ export default function TarantulaDetailScreen() {
             )}
           </View>
           {substrateChanges.length === 0 ? (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="layers-off" size={32} color={colors.textTertiary} />
-              <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>No substrate changes logged yet</Text>
+            <View style={[styles.emptyStateCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+              <MaterialCommunityIcons name="layers-off" size={48} color={colors.textTertiary} />
+              <Text style={[styles.emptyStateCardTitle, { color: colors.textPrimary }]}>No substrate changes logged</Text>
+              <Text style={[styles.emptyStateCardText, { color: colors.textSecondary }]}>Keep track of enclosure maintenance by logging substrate changes</Text>
+              <TouchableOpacity
+                style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push(`/tarantula/add-substrate-change?id=${id}`)}
+              >
+                <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+                <Text style={styles.emptyStateButtonText}>Log Substrate Change</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <View style={styles.logList}>
@@ -1000,6 +1055,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     textAlign: 'center',
+  },
+  emptyStateCard: {
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  emptyStateCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  emptyStateCardText: {
+    fontSize: 14,
+    marginBottom: 16,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyStateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  emptyStateButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   logList: {
     gap: 12,

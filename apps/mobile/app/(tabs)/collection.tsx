@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -18,6 +19,7 @@ import { apiClient } from '../../src/services/api';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import TarantulaCardSkeleton from '../../src/components/TarantulaCardSkeleton';
+import PremoltAlertCard from '../../src/components/PremoltAlertCard';
 
 interface Tarantula {
   id: string;
@@ -64,6 +66,8 @@ export default function CollectionScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'name' | 'lastFed' | 'acquired'>('name');
 
   // Load view preference from AsyncStorage
   useEffect(() => {
@@ -224,6 +228,43 @@ export default function CollectionScreen() {
     );
   };
 
+  // Filter and sort tarantulas
+  const getFilteredAndSortedTarantulas = () => {
+    let filtered = tarantulas.filter(t => {
+      const query = searchQuery.toLowerCase();
+      return (
+        t.name.toLowerCase().includes(query) ||
+        t.common_name?.toLowerCase().includes(query) ||
+        t.scientific_name?.toLowerCase().includes(query)
+      );
+    });
+
+    // Sort based on selected option
+    switch (sortBy) {
+      case 'lastFed': {
+        filtered.sort((a, b) => {
+          const daysA = feedingStatuses.get(a.id)?.days_since_last_feeding ?? Infinity;
+          const daysB = feedingStatuses.get(b.id)?.days_since_last_feeding ?? Infinity;
+          return daysB - daysA; // Most recently fed first
+        });
+        break;
+      }
+      case 'acquired': {
+        filtered.sort((a, b) => {
+          // Without acquisition dates, fall back to name
+          return a.name.localeCompare(b.name);
+        });
+        break;
+      }
+      case 'name':
+      default: {
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+      }
+    }
+
+    return filtered;
+  };
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchTarantulas();
@@ -343,6 +384,53 @@ export default function CollectionScreen() {
           size={20}
           color={viewMode === 'list' ? '#fff' : colors.textSecondary}
         />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const SearchBar = () => (
+    <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} />
+      <TextInput
+        style={[styles.searchInput, { color: colors.textPrimary }]}
+        placeholder="Search by name, species..."
+        placeholderTextColor={colors.textTertiary}
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+      />
+      {searchQuery.length > 0 && (
+        <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <MaterialCommunityIcons name="close-circle" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const SortChips = () => (
+    <View style={styles.sortContainer}>
+      <TouchableOpacity
+        style={[styles.sortChip, sortBy === 'name' && styles.sortChipActive, { borderColor: colors.border }]}
+        onPress={() => setSortBy('name')}
+      >
+        <Text style={[styles.sortChipText, sortBy === 'name' && styles.sortChipTextActive, { color: sortBy === 'name' ? '#fff' : colors.textSecondary }]}>
+          A-Z
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.sortChip, sortBy === 'lastFed' && styles.sortChipActive, { borderColor: colors.border }]}
+        onPress={() => setSortBy('lastFed')}
+      >
+        <Text style={[styles.sortChipText, sortBy === 'lastFed' && styles.sortChipTextActive, { color: sortBy === 'lastFed' ? '#fff' : colors.textSecondary }]}>
+          Last Fed
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.sortChip, sortBy === 'acquired' && styles.sortChipActive, { borderColor: colors.border }]}
+        onPress={() => setSortBy('acquired')}
+      >
+        <Text style={[styles.sortChipText, sortBy === 'acquired' && styles.sortChipTextActive, { color: sortBy === 'acquired' ? '#fff' : colors.textSecondary }]}>
+          Acquired
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -685,6 +773,98 @@ export default function CollectionScreen() {
       marginHorizontal: 8,
       marginBottom: 8,
     },
+    // Get Started Card styles
+    getStartedCard: {
+      margin: 8,
+      marginBottom: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    getStartedContent: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      marginBottom: 12,
+    },
+    getStartedEmoji: {
+      fontSize: 32,
+      marginTop: 2,
+    },
+    getStartedTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    getStartedText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      lineHeight: 18,
+    },
+    getStartedButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      alignSelf: 'flex-start',
+    },
+    getStartedButtonText: {
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    // Search bar styles
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 8,
+      marginVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      height: 44,
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '400',
+    },
+    // Sort chips styles
+    sortContainer: {
+      flexDirection: 'row',
+      gap: 8,
+      marginHorizontal: 8,
+      marginBottom: 12,
+    },
+    sortChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      borderWidth: 1,
+      backgroundColor: 'transparent',
+    },
+    sortChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    sortChipText: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    sortChipTextActive: {
+      color: '#fff',
+    },
   });
 
   if (loading) {
@@ -699,6 +879,35 @@ export default function CollectionScreen() {
       </View>
     );
   }
+
+  // Empty state card component for when collection is empty
+  const GetStartedCard = () => (
+    <View style={[styles.getStartedCard, { borderColor: colors.primary }]}>
+      <View style={styles.getStartedContent}>
+        <Text style={styles.getStartedEmoji}>🎯</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.getStartedTitle}>Add Your First Tarantula</Text>
+          <Text style={styles.getStartedText}>
+            Start building your collection by adding your first tarantula to get started!
+          </Text>
+        </View>
+      </View>
+      <TouchableOpacity
+        onPress={() => router.push('/tarantula/add')}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={[colors.primary, colors.secondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.getStartedButton}
+        >
+          <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+          <Text style={styles.getStartedButtonText}>Add</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -728,13 +937,22 @@ export default function CollectionScreen() {
         <>
           <FlatList
             key={viewMode} // Force re-render when viewMode changes (needed for numColumns)
-            data={tarantulas}
+            data={getFilteredAndSortedTarantulas()}
             renderItem={viewMode === 'card' ? renderTarantula : renderListItem}
             keyExtractor={(item) => item.id}
             numColumns={viewMode === 'card' ? 2 : 1}
             contentContainerStyle={styles.list}
             ListHeaderComponent={
               <>
+                {/* Premolt Alert Card */}
+                <PremoltAlertCard />
+
+                {/* Search Bar */}
+                <SearchBar />
+
+                {/* Sort Chips */}
+                <SortChips />
+
                 {/* View Toggle Row */}
                 <View style={styles.statsHeaderRow}>
                   <Text style={styles.statsTitle}>🕷️ My Collection</Text>

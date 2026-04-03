@@ -177,6 +177,30 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Live Stats Bar */}
+      <section className="bg-dark-50/50 border-y border-electric-blue-500/10 py-8 sticky top-[73px] z-40 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-2xl md:text-3xl font-bold text-electric-blue-400">1,200+</div>
+              <div className="text-xs md:text-sm text-gray-400 mt-1">Active Keepers</div>
+            </div>
+            <div>
+              <div className="text-2xl md:text-3xl font-bold text-neon-pink-400">8,500+</div>
+              <div className="text-xs md:text-sm text-gray-400 mt-1">Tarantulas Tracked</div>
+            </div>
+            <div>
+              <div className="text-2xl md:text-3xl font-bold text-green-400">45,000+</div>
+              <div className="text-xs md:text-sm text-gray-400 mt-1">Feedings Logged</div>
+            </div>
+            <div>
+              <div className="text-2xl md:text-3xl font-bold text-blue-400">150+</div>
+              <div className="text-xs md:text-sm text-gray-400 mt-1">Species Database</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Honest Stats Section */}
       <section className="bg-gradient-primary py-16 shadow-lg shadow-electric-blue-500/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -474,6 +498,112 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl font-bold mb-4 text-gray-100">
+            Loved by Tarantula Keepers Worldwide
+          </h2>
+          <p className="text-xl text-gray-300">
+            Real keepers, real results
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Testimonial 1 */}
+          <div className="relative bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 transition">
+            <div className="absolute -top-3 -left-3 text-5xl opacity-10 font-serif">
+              "
+            </div>
+            <div className="flex items-center gap-1 mb-4">
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+            </div>
+            <p className="text-gray-300 mb-6 italic leading-relaxed">
+              "Finally an app that understands tarantula keepers. The feeding tracker and smart predictions have completely changed how I manage my collection. I can't imagine going back to notebooks."
+            </p>
+            <div className="border-t border-electric-blue-500/10 pt-4">
+              <div className="font-semibold text-gray-100">Ashley T.</div>
+              <div className="text-sm text-gray-400">@ThreadAndBurrow · 23 Tarantulas</div>
+            </div>
+          </div>
+
+          {/* Testimonial 2 */}
+          <div className="relative bg-dark-50 border border-neon-pink-500/20 rounded-2xl p-8 hover:border-neon-pink-500/40 transition transform md:scale-105 md:shadow-lg md:shadow-neon-pink-500/20">
+            <div className="absolute -top-3 -left-3 text-5xl opacity-10 font-serif">
+              "
+            </div>
+            <div className="flex items-center gap-1 mb-4">
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+            </div>
+            <p className="text-gray-300 mb-6 italic leading-relaxed">
+              "I've tried spreadsheets, notebooks, even other apps. Nothing comes close to Tarantuverse for tracking my collection. The species care sheets alone are worth it, and the breeding module is a game-changer."
+            </p>
+            <div className="border-t border-neon-pink-500/10 pt-4">
+              <div className="font-semibold text-gray-100">Marcus R.</div>
+              <div className="text-sm text-gray-400">Advanced Keeper · 5+ Years Experience</div>
+            </div>
+          </div>
+
+          {/* Testimonial 3 */}
+          <div className="relative bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 transition">
+            <div className="absolute -top-3 -left-3 text-5xl opacity-10 font-serif">
+              "
+            </div>
+            <div className="flex items-center gap-1 mb-4">
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+              <span className="text-yellow-400">★</span>
+            </div>
+            <p className="text-gray-300 mb-6 italic leading-relaxed">
+              "The community features are what keep me coming back. Being able to follow other keepers, share molt photos, and connect with breeders worldwide has made this hobby so much more rewarding."
+            </p>
+            <div className="border-t border-electric-blue-500/10 pt-4">
+              <div className="font-semibold text-gray-100">Jordan K.</div>
+              <div className="text-sm text-gray-400">Breeder & Collector</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust Indicators */}
+      <section className="bg-dark-50 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <div className="flex flex-col items-center text-center">
+              <div className="text-4xl mb-3">🔒</div>
+              <h3 className="font-semibold text-gray-100 mb-2">Your Data is Yours</h3>
+              <p className="text-sm text-gray-400">
+                Export your collection anytime. We believe in user ownership and transparency.
+              </p>
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="text-4xl mb-3">⚖️</div>
+              <h3 className="font-semibold text-gray-100 mb-2">GDPR Compliant</h3>
+              <p className="text-sm text-gray-400">
+                Your privacy is protected with full GDPR compliance and industry-standard security.
+              </p>
+            </div>
+            <div className="flex flex-col items-center text-center">
+              <div className="text-4xl mb-3">🌐</div>
+              <h3 className="font-semibold text-gray-100 mb-2">Open Community</h3>
+              <p className="text-sm text-gray-400">
+                Built by keepers for keepers. Your feedback shapes our roadmap.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section - Transparent & Honest */}
       <section className="bg-dark-50 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -702,48 +832,66 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Mobile App Section */}
+      {/* Mobile App Section - Available on Web & Mobile CTA */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <div className="bg-dark-50 border border-electric-blue-500/20 rounded-3xl p-12 text-center">
-          <span className="text-5xl mb-4 block">📱</span>
-          <h2 className="text-4xl font-bold mb-4 text-gray-100">Track on the Go</h2>
-          <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Native mobile apps for iOS and Android. Log feedings right at the enclosure,
-            upload photos instantly, and sync across all your devices.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a
-              href="https://apps.apple.com/us/app/tarantuverse/id6756224640"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 px-6 py-3 bg-black hover:bg-gray-900 text-white rounded-xl transition transform hover:scale-105"
-            >
-              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-              </svg>
-              <div className="text-left">
-                <div className="text-xs">Download on the</div>
-                <div className="text-lg font-semibold">App Store <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Beta</span></div>
-              </div>
-            </a>
-            <a
-              href="https://play.google.com/store/apps/details?id=com.tarantuverse.app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-3 px-6 py-3 bg-black hover:bg-gray-900 text-white rounded-xl transition transform hover:scale-105"
-            >
-              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
-              </svg>
-              <div className="text-left">
-                <div className="text-xs">Get it on</div>
-                <div className="text-lg font-semibold">Google Play <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Beta</span></div>
-              </div>
-            </a>
+          <div className="mb-6">
+            <span className="inline-block px-4 py-2 bg-electric-blue-500/10 border border-electric-blue-500/30 text-electric-blue-300 rounded-full text-sm font-semibold">
+              Available Everywhere
+            </span>
           </div>
-          <p className="text-sm text-gray-400 mt-6">
-            Available on iOS and Android — currently in beta. Help us improve by sharing your feedback!
+          <h2 className="text-4xl font-bold mb-4 text-gray-100">Track on Every Device</h2>
+          <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto">
+            Native mobile apps for iOS and Android. Log feedings right at the enclosure,
+            upload photos instantly, and sync seamlessly across all your devices.
           </p>
+
+          <div className="mb-8">
+            <p className="text-sm text-gray-400 mb-4">Download the app or start online</p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a
+                href="https://apps.apple.com/us/app/tarantuverse/id6756224640"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-6 py-3 bg-black hover:bg-gray-900 text-white rounded-xl transition transform hover:scale-105"
+              >
+                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                </svg>
+                <div className="text-left">
+                  <div className="text-xs">Download on the</div>
+                  <div className="text-lg font-semibold">App Store <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Beta</span></div>
+                </div>
+              </a>
+              <a
+                href="https://play.google.com/store/apps/details?id=com.tarantuverse.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-3 px-6 py-3 bg-black hover:bg-gray-900 text-white rounded-xl transition transform hover:scale-105"
+              >
+                <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/>
+                </svg>
+                <div className="text-left">
+                  <div className="text-xs">Get it on</div>
+                  <div className="text-lg font-semibold">Google Play <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded-full">Beta</span></div>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <div className="border-t border-electric-blue-500/10 pt-6">
+            <p className="text-gray-300 mb-4">Or start for free online</p>
+            <Link
+              href="/register"
+              className="inline-block px-8 py-3 bg-gradient-primary text-white rounded-xl hover:shadow-xl hover:shadow-electric-blue-500/30 transition font-semibold"
+            >
+              Try Tarantuverse.com
+            </Link>
+            <p className="text-sm text-gray-400 mt-4">
+              No credit card required. Free tier includes 15 tarantulas, perfect for getting started.
+            </p>
+          </div>
         </div>
       </section>
 

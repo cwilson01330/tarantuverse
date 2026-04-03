@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import AchievementBadge from '@/components/AchievementBadge'
 
 interface Keeper {
   id: number
@@ -45,6 +46,24 @@ interface FollowStats {
   following_count: number
 }
 
+interface Achievement {
+  id: string
+  key: string
+  name: string
+  description: string
+  icon: string
+  category: string
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum'
+  earned: boolean
+  earned_at?: string
+}
+
+interface AchievementsResponse {
+  total_available: number
+  total_earned: number
+  achievements: Achievement[]
+}
+
 export default function KeeperProfilePage() {
   const params = useParams()
   const router = useRouter()
@@ -53,6 +72,7 @@ export default function KeeperProfilePage() {
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [stats, setStats] = useState<KeeperStats | null>(null)
   const [followStats, setFollowStats] = useState<FollowStats | null>(null)
+  const [achievements, setAchievements] = useState<AchievementsResponse | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
   const [isBlocked, setIsBlocked] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -123,6 +143,13 @@ export default function KeeperProfilePage() {
       if (followStatsResponse.ok) {
         const followStatsData = await followStatsResponse.json()
         setFollowStats(followStatsData)
+      }
+
+      // Fetch achievements
+      const achievementsResponse = await fetch(`${API_URL}/api/v1/users/${username}/achievements`)
+      if (achievementsResponse.ok) {
+        const achievementsData = await achievementsResponse.json()
+        setAchievements(achievementsData)
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
@@ -519,6 +546,38 @@ export default function KeeperProfilePage() {
                   <span className="text-lg font-bold">{stats.unsexed}</span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Achievements */}
+          {achievements && achievements.total_earned > 0 && (
+            <div className="bg-surface border border-theme rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <span>🏆</span> Achievements ({achievements.total_earned})
+              </h2>
+              <div className="grid grid-cols-2 gap-3">
+                {achievements.achievements
+                  .filter((a) => a.earned)
+                  .slice(0, 6)
+                  .map((achievement) => (
+                    <AchievementBadge
+                      key={achievement.id}
+                      id={achievement.id}
+                      icon={achievement.icon}
+                      name={achievement.name}
+                      description={achievement.description}
+                      tier={achievement.tier}
+                      earned={true}
+                      earnedAt={achievement.earned_at}
+                      size="small"
+                    />
+                  ))}
+              </div>
+              {achievements.total_earned > 6 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
+                  +{achievements.total_earned - 6} more achievement{achievements.total_earned - 6 === 1 ? '' : 's'}
+                </p>
+              )}
             </div>
           )}
         </div>
