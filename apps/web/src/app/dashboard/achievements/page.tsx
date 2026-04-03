@@ -83,7 +83,7 @@ export default function AchievementsPage() {
 
   if (isLoading || pageLoading) {
     return (
-      <DashboardLayout userName={user?.name} userEmail={user?.email} userAvatar={user?.image}>
+      <DashboardLayout userName={user?.name ?? undefined} userEmail={user?.email ?? undefined} userAvatar={user?.image ?? undefined}>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="text-6xl mb-4">🏆</div>
@@ -96,7 +96,7 @@ export default function AchievementsPage() {
 
   if (error || !achievements) {
     return (
-      <DashboardLayout userName={user?.name} userEmail={user?.email} userAvatar={user?.image}>
+      <DashboardLayout userName={user?.name ?? undefined} userEmail={user?.email ?? undefined} userAvatar={user?.image ?? undefined}>
         <div className="max-w-4xl mx-auto px-4 py-12">
           <div className="text-center">
             <div className="text-5xl mb-4">⚠️</div>
@@ -128,7 +128,7 @@ export default function AchievementsPage() {
   )
 
   return (
-    <DashboardLayout userName={user?.name} userEmail={user?.email} userAvatar={user?.image}>
+    <DashboardLayout userName={user?.name ?? undefined} userEmail={user?.email ?? undefined} userAvatar={user?.image ?? undefined}>
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
