@@ -2046,7 +2046,7 @@ export default function TarantulaDetailPage() {
             <div className="mb-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">
               <p className="text-xs text-gray-600 dark:text-gray-400 font-medium mb-2">Public URL</p>
               <p className="text-sm font-mono text-gray-900 dark:text-white break-all">
-                {`${window.location.origin}/keeper/${user?.username}/${(tarantula.name || tarantula.common_name || 'tarantula').toLowerCase().replace(/ /g, '-')}`}
+                {`${window.location.origin}/keeper/${user?.username}/${(tarantula.common_name || 'tarantula').toLowerCase().replace(/ /g, '-')}`}
               </p>
             </div>
             <div className="flex gap-3">
