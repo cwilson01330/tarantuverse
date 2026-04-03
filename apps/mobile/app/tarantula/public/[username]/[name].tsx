@@ -1,7 +1,7 @@
-import { useState, useEffect, useContext } from 'react'
+import { useState, useEffect } from 'react'
 import { ScrollView, View, Text, Image, TouchableOpacity, Share, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { ThemeContext } from '@/src/contexts/ThemeContext'
+import { useTheme } from '../../../../src/contexts/ThemeContext'
 
 interface TarantulaPublicProfile {
   tarantula: {
@@ -55,7 +55,7 @@ interface TarantulaPublicProfile {
 export default function PublicTarantulaProfile() {
   const params = useLocalSearchParams()
   const router = useRouter()
-  const theme = useContext(ThemeContext)
+  const { colors: theme } = useTheme()
   const username = params.username as string
   const name = params.name as string
 
@@ -127,7 +127,7 @@ export default function PublicTarantulaProfile() {
     return (
       <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
         <Text style={{ fontSize: 48, marginBottom: 20 }}>🕷️</Text>
-        <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text, marginBottom: 10, textAlign: 'center' }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 10, textAlign: 'center' }}>
           Profile Not Found
         </Text>
         <Text style={{ color: theme.textSecondary, marginBottom: 30, textAlign: 'center' }}>
@@ -179,7 +179,7 @@ export default function PublicTarantulaProfile() {
 
       {/* Tarantula Info Card */}
       <View style={{ padding: 16 }}>
-        <Text style={{ fontSize: 28, fontWeight: 'bold', color: theme.text, marginBottom: 4 }}>
+        <Text style={{ fontSize: 28, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 4 }}>
           {t.name}
         </Text>
         {t.common_name && (
@@ -193,7 +193,7 @@ export default function PublicTarantulaProfile() {
           {t.sex && (
             <View style={{ marginBottom: 8 }}>
               <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>Sex</Text>
-              <Text style={{ fontSize: 16, color: theme.text, fontWeight: 'bold', textTransform: 'capitalize' }}>
+              <Text style={{ fontSize: 16, color: theme.textPrimary, fontWeight: 'bold', textTransform: 'capitalize' }}>
                 {t.sex}
               </Text>
             </View>
@@ -201,7 +201,7 @@ export default function PublicTarantulaProfile() {
           {t.date_acquired && (
             <View>
               <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>Acquired</Text>
-              <Text style={{ fontSize: 16, color: theme.text, fontWeight: 'bold' }}>
+              <Text style={{ fontSize: 16, color: theme.textPrimary, fontWeight: 'bold' }}>
                 {formatDate(t.date_acquired)}
               </Text>
             </View>
@@ -221,7 +221,7 @@ export default function PublicTarantulaProfile() {
               />
             )}
             <View>
-              <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.text }}>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textPrimary }}>
                 {profile.owner.display_name || profile.owner.username}
               </Text>
               <Text style={{ fontSize: 12, color: theme.textSecondary }}>
@@ -235,7 +235,7 @@ export default function PublicTarantulaProfile() {
       {/* Species Info */}
       {profile.species && (
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 12 }}>
             Species Information
           </Text>
           <View style={{ backgroundColor: theme.surface, borderRadius: 12, padding: 16 }}>
@@ -244,7 +244,7 @@ export default function PublicTarantulaProfile() {
                 <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>
                   Care Level
                 </Text>
-                <Text style={{ fontSize: 14, color: theme.text, textTransform: 'capitalize' }}>
+                <Text style={{ fontSize: 14, color: theme.textPrimary, textTransform: 'capitalize' }}>
                   {profile.species.care_level}
                 </Text>
               </View>
@@ -254,7 +254,7 @@ export default function PublicTarantulaProfile() {
                 <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>
                   Type
                 </Text>
-                <Text style={{ fontSize: 14, color: theme.text, textTransform: 'capitalize' }}>
+                <Text style={{ fontSize: 14, color: theme.textPrimary, textTransform: 'capitalize' }}>
                   {profile.species.type}
                 </Text>
               </View>
@@ -264,7 +264,7 @@ export default function PublicTarantulaProfile() {
                 <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>
                   Native Region
                 </Text>
-                <Text style={{ fontSize: 14, color: theme.text }}>
+                <Text style={{ fontSize: 14, color: theme.textPrimary }}>
                   {profile.species.native_region}
                 </Text>
               </View>
@@ -274,7 +274,7 @@ export default function PublicTarantulaProfile() {
                 <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>
                   Adult Size
                 </Text>
-                <Text style={{ fontSize: 14, color: theme.text }}>
+                <Text style={{ fontSize: 14, color: theme.textPrimary }}>
                   {profile.species.adult_size}
                 </Text>
               </View>
@@ -285,7 +285,7 @@ export default function PublicTarantulaProfile() {
 
       {/* Feeding Summary */}
       <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-        <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 12 }}>
           Feeding Summary
         </Text>
         <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -325,12 +325,12 @@ export default function PublicTarantulaProfile() {
       {/* Molt Timeline */}
       {profile.molt_timeline.length > 0 && (
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 12 }}>
             Molt Timeline
           </Text>
           {profile.molt_timeline.map((molt, index) => (
             <View key={molt.id} style={{ backgroundColor: theme.surface, borderRadius: 12, padding: 16, marginBottom: 12 }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text, marginBottom: 4 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 4 }}>
                 Molt #{profile.molt_timeline.length - index}
               </Text>
               <Text style={{ fontSize: 12, color: theme.textSecondary, marginBottom: 12 }}>
@@ -339,7 +339,7 @@ export default function PublicTarantulaProfile() {
               {(molt.leg_span_before !== undefined && molt.leg_span_after !== undefined) && (
                 <View style={{ marginBottom: 8 }}>
                   <Text style={{ fontSize: 12, color: theme.textSecondary }}>Leg Span</Text>
-                  <Text style={{ fontSize: 14, color: theme.text, fontWeight: '600' }}>
+                  <Text style={{ fontSize: 14, color: theme.textPrimary, fontWeight: '600' }}>
                     {molt.leg_span_before}" → {molt.leg_span_after}"
                   </Text>
                 </View>
@@ -347,7 +347,7 @@ export default function PublicTarantulaProfile() {
               {(molt.weight_before !== undefined && molt.weight_after !== undefined) && (
                 <View>
                   <Text style={{ fontSize: 12, color: theme.textSecondary }}>Weight</Text>
-                  <Text style={{ fontSize: 14, color: theme.text, fontWeight: '600' }}>
+                  <Text style={{ fontSize: 14, color: theme.textPrimary, fontWeight: '600' }}>
                     {molt.weight_before}g → {molt.weight_after}g
                   </Text>
                 </View>
@@ -365,7 +365,7 @@ export default function PublicTarantulaProfile() {
       {/* Photo Gallery */}
       {profile.photos.length > 0 && (
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 12 }}>
             Photo Gallery ({profile.photos.length})
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -384,11 +384,11 @@ export default function PublicTarantulaProfile() {
       {/* Notes */}
       {t.notes && (
         <View style={{ paddingHorizontal: 16, marginBottom: 32 }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 12 }}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 12 }}>
             Notes
           </Text>
           <View style={{ backgroundColor: theme.surface, borderRadius: 12, padding: 16 }}>
-            <Text style={{ fontSize: 14, color: theme.text, lineHeight: 20 }}>
+            <Text style={{ fontSize: 14, color: theme.textPrimary, lineHeight: 20 }}>
               {t.notes}
             </Text>
           </View>

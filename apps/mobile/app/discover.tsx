@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, FlatList, Image, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
-import { useTheme } from '@/src/contexts/ThemeContext'
-import { useAuth } from '@/src/contexts/AuthContext'
+import { useTheme } from '../src/contexts/ThemeContext'
+import { useAuth } from '../src/contexts/AuthContext'
 
 interface DiscoverResponse {
   stats: {
@@ -150,7 +150,7 @@ export default function DiscoverScreen() {
     >
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingVertical: 20 }}>
-        <Text style={{ fontSize: 32, fontWeight: 'bold', color: colors.text, marginBottom: 8 }}>
+        <Text style={{ fontSize: 32, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 8 }}>
           ✨ Discover
         </Text>
         <Text style={{ fontSize: 14, color: colors.secondaryText }}>
@@ -236,7 +236,7 @@ export default function DiscoverScreen() {
 
           {/* Trending Discussions */}
           <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 12 }}>
               🔥 Trending Discussions
             </Text>
             {discover.trending_threads.length > 0 ? (
@@ -257,7 +257,7 @@ export default function DiscoverScreen() {
                     style={{
                       fontSize: 14,
                       fontWeight: '600',
-                      color: colors.text,
+                      color: colors.textPrimary,
                       marginBottom: 8,
                     }}
                     numberOfLines={2}
@@ -298,7 +298,7 @@ export default function DiscoverScreen() {
 
           {/* Active Keepers */}
           <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 12 }}>
               👥 Active Keepers
             </Text>
             {discover.active_keepers.length > 0 ? (
@@ -345,7 +345,7 @@ export default function DiscoverScreen() {
                       style={{
                         fontSize: 13,
                         fontWeight: '600',
-                        color: colors.text,
+                        color: colors.textPrimary,
                         textAlign: 'center',
                       }}
                       numberOfLines={1}
@@ -373,7 +373,7 @@ export default function DiscoverScreen() {
 
           {/* Popular Species */}
           <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 12 }}>
               ⭐ Popular Species
             </Text>
             {discover.popular_species.length > 0 ? (
@@ -418,7 +418,7 @@ export default function DiscoverScreen() {
                         style={{
                           fontSize: 12,
                           fontWeight: '600',
-                          color: colors.text,
+                          color: colors.textPrimary,
                         }}
                         numberOfLines={2}
                       >
@@ -479,7 +479,7 @@ export default function DiscoverScreen() {
 
           {/* Recent Activity */}
           <View style={{ paddingHorizontal: 16, marginBottom: 24 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text, marginBottom: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 12 }}>
               📊 Recent Activity
             </Text>
             {discover.recent_activity.length > 0 ? (
@@ -501,7 +501,7 @@ export default function DiscoverScreen() {
                 >
                   <Text style={{ fontSize: 20 }}>{getActivityEmoji(activity.activity_type)}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, color: colors.text }}>
+                    <Text style={{ fontSize: 14, color: colors.textPrimary }}>
                       <Text style={{ fontWeight: '600' }}>@{activity.user_username}</Text>
                       <Text style={{ color: colors.secondaryText }}>
                         {' '}

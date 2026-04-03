@@ -153,7 +153,7 @@ export default function SearchScreen() {
       }}
     >
       <View style={{ gap: 4 }}>
-        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.textPrimary }}>
           {item.title}
         </Text>
         {item.subtitle && (
@@ -237,7 +237,7 @@ export default function SearchScreen() {
             style={{
               flex: 1,
               fontSize: 16,
-              color: colors.text,
+              color: colors.textPrimary,
               paddingVertical: 0,
             }}
           />
