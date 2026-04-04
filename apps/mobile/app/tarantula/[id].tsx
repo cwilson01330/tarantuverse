@@ -152,6 +152,7 @@ export default function TarantulaDetailScreen() {
   const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null);
   const [premoltPrediction, setPremoltPrediction] = useState<PremoltPrediction | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
 
@@ -167,12 +168,12 @@ export default function TarantulaDetailScreen() {
   }, [id]);
 
   const fetchTarantula = async () => {
+    setLoadError(false);
     try {
       const response = await apiClient.get(`/tarantulas/${id}`);
       setTarantula(response.data);
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to load tarantula details');
-      router.back();
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -449,8 +450,43 @@ export default function TarantulaDetailScreen() {
     return <TarantulaDetailSkeleton />;
   }
 
-  if (!tarantula) {
-    return null;
+  if (loadError || (!loading && !tarantula)) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tarantula Details</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <MaterialCommunityIcons name="spider-web" size={64} color={colors.textSecondary} style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>
+            Couldn't load tarantula
+          </Text>
+          <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+            The server may be warming up. Please try again in a moment.
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setLoading(true);
+              fetchTarantula();
+              fetchFeedingLogs();
+              fetchMoltLogs();
+              fetchSubstrateChanges();
+              fetchPhotos();
+              fetchGrowth();
+              fetchFeedingStats();
+              fetchPremoltPrediction();
+            }}
+            style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   return (

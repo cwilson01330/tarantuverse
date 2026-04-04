@@ -40,7 +40,7 @@ const CATEGORY_ORDER = ['maintenance', 'feature_flags', 'platform_limits', 'noti
 
 export default function AdminSettingsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { colors } = useTheme();
   const [settings, setSettings] = useState<SettingsByCategory>({});
   const [loading, setLoading] = useState(true);
@@ -48,17 +48,19 @@ export default function AdminSettingsScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking permissions
+    if (authLoading) return;
     if (!user?.is_superuser && !user?.is_admin) {
       Alert.alert('Access Denied', 'You do not have admin privileges.');
       router.back();
       return;
     }
     fetchSettings();
-  }, []);
+  }, [authLoading, user]);
 
   const fetchSettings = async () => {
     try {
-      const res = await apiClient.get('/admin/settings/');
+      const res = await apiClient.get('/admin/settings');
       setSettings(res.data);
     } catch (error) {
       Alert.alert('Error', 'Failed to load system settings');
@@ -98,7 +100,7 @@ export default function AdminSettingsScreen() {
         else typedUpdates[key] = rawVal;
       }
 
-      await apiClient.put('/admin/settings/bulk/', { settings: typedUpdates });
+      await apiClient.put('/admin/settings/bulk', { settings: typedUpdates });
       setPendingChanges({});
       Alert.alert('Saved', 'Settings updated successfully');
       fetchSettings();
