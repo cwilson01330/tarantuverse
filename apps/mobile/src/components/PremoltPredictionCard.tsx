@@ -34,31 +34,29 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    const fetchPrediction = async () => {
+      try {
+        const response = await apiClient.get(
+          `/premolt/tarantulas/${tarantulaId}/prediction`
+        );
+        if (!cancelled) setPrediction(response.data);
+      } catch (error) {
+        console.error('Failed to fetch premolt prediction:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
     fetchPrediction();
+    return () => { cancelled = true; };
   }, [tarantulaId]);
-
-  const fetchPrediction = async () => {
-    try {
-      const response = await apiClient.get(
-        `/premolt/tarantulas/${tarantulaId}/prediction`
-      );
-      setPrediction(response.data);
-    } catch (error) {
-      console.error('Failed to fetch premolt prediction:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
       <View
         style={[
           styles.container,
-          {
-            backgroundColor: colors.surface,
-            borderColor: colors.border,
-          },
+          { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
         <ActivityIndicator color={colors.primary} />
@@ -70,128 +68,13 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
     return null;
   }
 
-  const styles = StyleSheet.create({
-    container: {
-      margin: 8,
-      marginBottom: 16,
-      borderRadius: 12,
-      padding: 16,
-      borderWidth: 1,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 12,
-    },
-    title: {
-      fontSize: 16,
-      fontWeight: '700',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    badge: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 10,
-    },
-    badgeText: {
-      color: '#fff',
-      fontSize: 10,
-      fontWeight: '600',
-    },
-    statusBox: {
-      padding: 12,
-      borderRadius: 10,
-      marginBottom: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    statusText: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    metricsContainer: {
-      gap: 10,
-    },
-    metricItem: {
-      padding: 12,
-      borderRadius: 10,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    metricLabel: {
-      fontSize: 13,
-      fontWeight: '500',
-    },
-    metricValue: {
-      fontSize: 16,
-      fontWeight: '700',
-    },
-    progressContainer: {
-      padding: 12,
-      borderRadius: 10,
-    },
-    progressHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 8,
-    },
-    progressLabel: {
-      fontSize: 13,
-      fontWeight: '500',
-    },
-    progressPercentage: {
-      fontSize: 14,
-      fontWeight: '700',
-    },
-    progressBar: {
-      height: 8,
-      borderRadius: 4,
-      overflow: 'hidden',
-      marginBottom: 8,
-    },
-    progressFill: {
-      height: 8,
-      borderRadius: 4,
-    },
-    progressNote: {
-      fontSize: 11,
-      marginTop: 4,
-    },
-    insufficientBox: {
-      padding: 12,
-      borderRadius: 10,
-    },
-    insufficientText: {
-      fontSize: 14,
-    },
-    dataQualityNote: {
-      fontSize: 11,
-      marginTop: 12,
-      paddingTop: 12,
-      borderTopWidth: 1,
-    },
-  });
-
   // Insufficient data state
   if (prediction.data_quality === 'insufficient') {
     return (
       <View
         style={[
           styles.container,
-          {
-            backgroundColor: colors.primary + '20',
-            borderColor: colors.primary,
-          },
+          { backgroundColor: colors.primary + '20', borderColor: colors.primary },
         ]}
       >
         <Text style={[styles.title, { color: colors.primary }]}>💡 Premolt Prediction</Text>
@@ -204,7 +87,6 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
     );
   }
 
-  // Determine colors based on likelihood and confidence
   const getBgColor = () => {
     if (!prediction.is_premolt_likely) return '#dcfce7';
     if (prediction.confidence === 'high') return '#fee2e2';
@@ -251,10 +133,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
     <View
       style={[
         styles.container,
-        {
-          backgroundColor: getBgColor(),
-          borderColor: getBorderColor(),
-        },
+        { backgroundColor: getBgColor(), borderColor: getBorderColor() },
       ]}
     >
       {/* Header */}
@@ -279,24 +158,17 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
 
       {/* Metrics */}
       <View style={styles.metricsContainer}>
-        {/* Refusal Streak */}
         {prediction.recent_refusal_streak > 0 && (
           <View style={[styles.metricItem, { backgroundColor: colors.surface }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
               Feeding refusals
             </Text>
-            <Text
-              style={[
-                styles.metricValue,
-                { color: '#dc2626' },
-              ]}
-            >
+            <Text style={[styles.metricValue, { color: '#dc2626' }]}>
               {prediction.recent_refusal_streak}
             </Text>
           </View>
         )}
 
-        {/* Days Since Last Molt */}
         {prediction.days_since_last_molt !== null && (
           <View style={[styles.metricItem, { backgroundColor: colors.surface }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
@@ -308,7 +180,6 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
           </View>
         )}
 
-        {/* Molt Interval Progress */}
         {prediction.molt_interval_progress !== null && prediction.average_molt_interval && (
           <View style={[styles.progressContainer, { backgroundColor: colors.surface }]}>
             <View style={styles.progressHeader}>
@@ -319,12 +190,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
                 {Math.round(prediction.molt_interval_progress)}%
               </Text>
             </View>
-            <View
-              style={[
-                styles.progressBar,
-                { backgroundColor: colors.border },
-              ]}
-            >
+            <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
               <View
                 style={[
                   styles.progressFill,
@@ -341,7 +207,6 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
           </View>
         )}
 
-        {/* Refusal Rate */}
         {prediction.refusal_rate_last_30_days !== null && (
           <View style={[styles.metricItem, { backgroundColor: colors.surface }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
@@ -353,7 +218,6 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
           </View>
         )}
 
-        {/* Estimated Molt Window */}
         {prediction.estimated_molt_window_days !== null && (
           <View style={[styles.metricItem, { backgroundColor: colors.surface }]}>
             <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
@@ -366,15 +230,11 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
         )}
       </View>
 
-      {/* Data Quality Note */}
       {prediction.data_quality === 'fair' && (
         <Text
           style={[
             styles.dataQualityNote,
-            {
-              color: colors.textTertiary,
-              borderTopColor: colors.border,
-            },
+            { color: colors.textTertiary, borderTopColor: colors.border },
           ]}
         >
           💡 Log more feedings and molts to improve prediction accuracy
@@ -383,3 +243,114 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
     </View>
   );
 }
+
+// StyleSheet defined at module level — avoids temporal dead zone issues
+// that occur when StyleSheet.create is placed after early returns inside the component.
+const styles = StyleSheet.create({
+  container: {
+    margin: 8,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  statusBox: {
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  metricsContainer: {
+    gap: 10,
+  },
+  metricItem: {
+    padding: 12,
+    borderRadius: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  metricLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  progressContainer: {
+    padding: 12,
+    borderRadius: 10,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  progressPercentage: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: 8,
+    borderRadius: 4,
+  },
+  progressNote: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  insufficientBox: {
+    padding: 12,
+    borderRadius: 10,
+  },
+  insufficientText: {
+    fontSize: 14,
+  },
+  dataQualityNote: {
+    fontSize: 11,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+});
