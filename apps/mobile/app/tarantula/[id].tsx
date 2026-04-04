@@ -539,7 +539,7 @@ export default function TarantulaDetailScreen() {
 
         {/* Name and Species */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.name, { color: colors.textPrimary }]}>{tarantula.name}</Text>
+          <Text style={[styles.name, { color: colors.textPrimary }]}>{tarantula.name || tarantula.common_name || 'Unknown Tarantula'}</Text>
           <Text style={[styles.scientificName, { color: colors.textSecondary }]}>{tarantula.scientific_name}</Text>
           <Text style={[styles.commonName, { color: colors.textTertiary }]}>{tarantula.common_name}</Text>
         </View>

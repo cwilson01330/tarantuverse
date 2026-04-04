@@ -228,14 +228,17 @@ export default function CollectionScreen() {
     );
   };
 
+  // Helper: get best display name for a tarantula
+  const getDisplayName = (t: Tarantula) => t.name || t.common_name || 'Unknown';
+
   // Filter and sort tarantulas
   const getFilteredAndSortedTarantulas = () => {
     let filtered = tarantulas.filter(t => {
       const query = searchQuery.toLowerCase();
       return (
-        t.name.toLowerCase().includes(query) ||
-        t.common_name?.toLowerCase().includes(query) ||
-        t.scientific_name?.toLowerCase().includes(query)
+        (t.name || '').toLowerCase().includes(query) ||
+        (t.common_name || '').toLowerCase().includes(query) ||
+        (t.scientific_name || '').toLowerCase().includes(query)
       );
     });
 
@@ -250,15 +253,12 @@ export default function CollectionScreen() {
         break;
       }
       case 'acquired': {
-        filtered.sort((a, b) => {
-          // Without acquisition dates, fall back to name
-          return a.name.localeCompare(b.name);
-        });
+        filtered.sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b)));
         break;
       }
       case 'name':
       default: {
-        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        filtered.sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b)));
       }
     }
 
@@ -298,7 +298,7 @@ export default function CollectionScreen() {
         {getPremoltBadge(item.id)}
       </View>
       <View style={styles.cardContent}>
-        <Text style={styles.name}>{item.name}</Text>
+        <Text style={styles.name}>{item.name || item.common_name || 'Unknown'}</Text>
         <Text style={styles.scientificName}>{item.scientific_name}</Text>
         {item.common_name && (
           <Text style={styles.commonName}>{item.common_name}</Text>
@@ -335,7 +335,7 @@ export default function CollectionScreen() {
         </View>
         <View style={styles.listContent}>
           <View style={styles.listHeader}>
-            <Text style={styles.listName} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.listName} numberOfLines={1}>{item.name || item.common_name || 'Unknown'}</Text>
             {item.sex && (
               <MaterialCommunityIcons
                 name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
