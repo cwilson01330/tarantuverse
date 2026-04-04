@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateInput from '../../src/components/DateInput';
 import SpeciesAutocomplete from '../../src/components/SpeciesAutocomplete';
-import UpgradeModal from '../../src/components/UpgradeModal';
+const UpgradeModal = React.lazy(() => import('../../src/components/UpgradeModal'));
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -836,13 +836,15 @@ export default function AddTarantulaScreen() {
         )}
       </KeyboardAvoidingView>
 
-      <UpgradeModal
-        visible={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        title="Collection Limit Reached"
-        message="You've reached the free tier limit of 15 tarantulas."
-        feature="Unlimited Tarantulas"
-      />
+      <Suspense fallback={null}>
+        <UpgradeModal
+          visible={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          title="Collection Limit Reached"
+          message="You've reached the free tier limit of 15 tarantulas."
+          feature="Unlimited Tarantulas"
+        />
+      </Suspense>
     </SafeAreaView>
   );
 }

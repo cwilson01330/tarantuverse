@@ -18,7 +18,7 @@ export default function UpgradeModal({
   message = 'Unlock unlimited tracking and breeding features',
   feature,
 }: UpgradeModalProps) {
-  const { theme } = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
 
   const handleUpgrade = () => {
@@ -73,7 +73,7 @@ export default function UpgradeModal({
       onRequestClose={onClose}
     >
       <View style={[styles.backdrop, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
-        <View style={[styles.container, { backgroundColor: theme.surface }]}>
+        <View style={[styles.container, { backgroundColor: colors.surface }]}>
           <ScrollView showsVerticalScrollIndicator={false}>
             {/* Header */}
             <View style={styles.header}>
@@ -81,20 +81,20 @@ export default function UpgradeModal({
                 <Text style={styles.icon}>✨</Text>
               </View>
               <View style={styles.titleContainer}>
-                <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
-                <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+                <Text style={[styles.title, { color: colors.textPrimary }]}>{title}</Text>
+                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                   {message}
                 </Text>
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Text style={[styles.closeButtonText, { color: theme.textSecondary }]}>✕</Text>
+                <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
               </TouchableOpacity>
             </View>
 
             {/* Feature Callout */}
             {feature && (
-              <View style={[styles.featureCallout, { backgroundColor: theme.isDark ? 'rgba(168, 85, 247, 0.2)' : 'rgba(168, 85, 247, 0.1)', borderColor: theme.isDark ? 'rgba(168, 85, 247, 0.5)' : 'rgba(168, 85, 247, 0.3)' }]}>
-                <Text style={[styles.featureCalloutText, { color: theme.text }]}>
+              <View style={[styles.featureCallout, { backgroundColor: 'rgba(168, 85, 247, 0.15)', borderColor: 'rgba(168, 85, 247, 0.4)' }]}>
+                <Text style={[styles.featureCalloutText, { color: colors.textPrimary }]}>
                   <Text style={styles.bold}>{feature}</Text> is a premium feature. Upgrade to unlock it!
                 </Text>
               </View>
@@ -107,7 +107,7 @@ export default function UpgradeModal({
                   key={plan.name}
                   style={[
                     styles.planCard,
-                    { backgroundColor: theme.surface, borderColor: plan.popular ? '#a855f7' : theme.border },
+                    { backgroundColor: colors.surface, borderColor: plan.popular ? '#a855f7' : colors.border },
                     plan.popular && styles.planCardPopular,
                   ]}
                 >
@@ -123,13 +123,13 @@ export default function UpgradeModal({
                   )}
 
                   <View style={styles.planHeader}>
-                    <Text style={[styles.planName, { color: theme.text }]}>{plan.name}</Text>
-                    <Text style={[styles.planDescription, { color: theme.textSecondary }]}>
+                    <Text style={[styles.planName, { color: colors.textPrimary }]}>{plan.name}</Text>
+                    <Text style={[styles.planDescription, { color: colors.textSecondary }]}>
                       {plan.description}
                     </Text>
                     <View style={styles.priceContainer}>
-                      <Text style={[styles.price, { color: theme.text }]}>{plan.price}</Text>
-                      <Text style={[styles.period, { color: theme.textSecondary }]}>{plan.period}</Text>
+                      <Text style={[styles.price, { color: colors.textPrimary }]}>{plan.price}</Text>
+                      <Text style={[styles.period, { color: colors.textSecondary }]}>{plan.period}</Text>
                     </View>
                     {plan.savings && (
                       <Text style={styles.savings}>{plan.savings}</Text>
@@ -140,7 +140,7 @@ export default function UpgradeModal({
                     {plan.features.map((feature, i) => (
                       <View key={i} style={styles.featureRow}>
                         <Text style={styles.checkIcon}>✓</Text>
-                        <Text style={[styles.featureText, { color: theme.textSecondary }]}>
+                        <Text style={[styles.featureText, { color: colors.textSecondary }]}>
                           {feature}
                         </Text>
                       </View>
@@ -152,14 +152,14 @@ export default function UpgradeModal({
                       styles.chooseButton,
                       plan.popular
                         ? styles.chooseButtonPopular
-                        : { backgroundColor: theme.isDark ? theme.backgroundElevated : '#f3f4f6', borderColor: theme.border },
+                        : { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
                     ]}
                     onPress={handleUpgrade}
                   >
                     <Text
                       style={[
                         styles.chooseButtonText,
-                        { color: plan.popular ? '#fff' : theme.text },
+                        { color: plan.popular ? '#fff' : colors.textPrimary },
                       ]}
                     >
                       Choose {plan.name}
@@ -170,10 +170,10 @@ export default function UpgradeModal({
             </View>
 
             {/* Premium Features List */}
-            <View style={[styles.premiumSection, { backgroundColor: theme.backgroundElevated }]}>
+            <View style={[styles.premiumSection, { backgroundColor: colors.surfaceElevated }]}>
               <View style={styles.premiumHeader}>
                 <Text style={styles.sparkleIcon}>✨</Text>
-                <Text style={[styles.premiumTitle, { color: theme.text }]}>
+                <Text style={[styles.premiumTitle, { color: colors.textPrimary }]}>
                   What's Included in Premium
                 </Text>
               </View>
@@ -181,7 +181,7 @@ export default function UpgradeModal({
                 {premiumFeatures.map((feature, i) => (
                   <View key={i} style={styles.premiumFeatureRow}>
                     <Text style={styles.checkIconPurple}>✓</Text>
-                    <Text style={[styles.premiumFeatureText, { color: theme.textSecondary }]}>
+                    <Text style={[styles.premiumFeatureText, { color: colors.textSecondary }]}>
                       {feature}
                     </Text>
                   </View>
@@ -191,12 +191,12 @@ export default function UpgradeModal({
 
             {/* Footer */}
             <View style={styles.footer}>
-              <Text style={[styles.footerText, { color: theme.textSecondary }]}>
+              <Text style={[styles.footerText, { color: colors.textSecondary }]}>
                 Have a promo code?{' '}
                 <Text style={styles.footerLink}>Redeem in settings</Text>
               </Text>
               <TouchableOpacity onPress={onClose} style={styles.maybeLaterButton}>
-                <Text style={[styles.maybeLaterText, { color: theme.textSecondary }]}>
+                <Text style={[styles.maybeLaterText, { color: colors.textSecondary }]}>
                   Maybe Later
                 </Text>
               </TouchableOpacity>
