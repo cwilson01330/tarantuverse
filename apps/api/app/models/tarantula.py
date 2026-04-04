@@ -40,14 +40,16 @@ class Tarantula(Base):
     name = Column(String(100))  # Pet name
     common_name = Column(String(100))
     scientific_name = Column(String(255))
-    sex = Column(SQLEnum(Sex, values_callable=lambda obj: [e.value for e in obj]), default=Sex.UNKNOWN)
+    sex = Column(SQLEnum(Sex), default=Sex.UNKNOWN)
 
     # Acquisition
     date_acquired = Column(Date)
-    source = Column(SQLEnum(Source, values_callable=lambda obj: [e.value for e in obj]))
+    source = Column(SQLEnum(Source))
     price_paid = Column(Numeric(10, 2))
 
     # Husbandry
+    # enclosure_type DB enum was created with lowercase values (terrestrial/arboreal/fossorial)
+    # while sex/source were created with uppercase names (MALE/FEMALE/BRED/etc.)
     enclosure_type = Column(SQLEnum(EnclosureType, values_callable=lambda obj: [e.value for e in obj]))
     enclosure_size = Column(String(50))  # e.g., "10x10x10 inches"
     substrate_type = Column(String(100))

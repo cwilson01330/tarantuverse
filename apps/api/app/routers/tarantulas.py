@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
 from app.models.user import User
-from app.models.tarantula import Tarantula
+from app.models.tarantula import Tarantula, Sex, Source
 from app.models.molt_log import MoltLog
 from app.models.feeding_log import FeedingLog
 from app.models.substrate_change import SubstrateChange
@@ -85,9 +85,23 @@ async def create_tarantula(
             }
         )
 
+    tarantula_dict = tarantula_data.model_dump()
+    # sex/source DB enums were created with uppercase names (MALE, FEMALE, BRED, etc.)
+    # so we must pass the Python enum member so SQLAlchemy stores the name, not the value string.
+    if tarantula_dict.get('sex'):
+        try:
+            tarantula_dict['sex'] = Sex(tarantula_dict['sex'])
+        except ValueError:
+            pass
+    if tarantula_dict.get('source'):
+        try:
+            tarantula_dict['source'] = Source(tarantula_dict['source'])
+        except ValueError:
+            pass
+
     new_tarantula = Tarantula(
         user_id=current_user.id,
-        **tarantula_data.model_dump()
+        **tarantula_dict
     )
 
     db.add(new_tarantula)
@@ -168,6 +182,16 @@ async def update_tarantula(
 
     # Update only provided fields
     update_data = tarantula_data.model_dump(exclude_unset=True)
+    if update_data.get('sex'):
+        try:
+            update_data['sex'] = Sex(update_data['sex'])
+        except ValueError:
+            pass
+    if update_data.get('source'):
+        try:
+            update_data['source'] = Source(update_data['source'])
+        except ValueError:
+            pass
     for field, value in update_data.items():
         setattr(tarantula, field, value)
 
