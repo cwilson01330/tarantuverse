@@ -153,6 +153,7 @@ export default function TarantulaDetailScreen() {
   const [premoltPrediction, setPremoltPrediction] = useState<PremoltPrediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [loadErrorMsg, setLoadErrorMsg] = useState<string>('');
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
 
@@ -169,11 +170,19 @@ export default function TarantulaDetailScreen() {
 
   const fetchTarantula = async () => {
     setLoadError(false);
+    setLoadErrorMsg('');
     try {
       const response = await apiClient.get(`/tarantulas/${id}`);
       setTarantula(response.data);
     } catch (error: any) {
       setLoadError(true);
+      const status = error?.response?.status;
+      const detail = error?.response?.data?.detail;
+      const msg = detail
+        ? `${status}: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
+        : error?.message || 'Unknown error';
+      setLoadErrorMsg(msg);
+      console.error('[tarantula detail] fetch error:', msg, error);
     } finally {
       setLoading(false);
     }
@@ -465,9 +474,14 @@ export default function TarantulaDetailScreen() {
           <Text style={{ fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>
             Couldn't load tarantula
           </Text>
-          <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+          <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: loadErrorMsg ? 8 : 24 }}>
             The server may be warming up. Please try again in a moment.
           </Text>
+          {!!loadErrorMsg && (
+            <Text style={{ fontSize: 11, color: colors.error, textAlign: 'center', marginBottom: 24, fontFamily: 'monospace' }}>
+              {loadErrorMsg}
+            </Text>
+          )}
           <TouchableOpacity
             onPress={() => {
               setLoading(true);
