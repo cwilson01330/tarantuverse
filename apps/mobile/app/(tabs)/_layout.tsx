@@ -61,20 +61,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="forums"
         options={{
-          title: 'Forums',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="forum" size={size} color={color} />
-          ),
+          href: null, // Accessible from Community tab
         }}
       />
       <Tabs.Screen
         name="species"
         options={{
-          title: 'Species Database',
-          tabBarLabel: 'Species',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="book-open-variant" size={size} color={color} />
-          ),
+          href: null, // Accessible via Search and species links
         }}
       />
       <Tabs.Screen
@@ -82,6 +75,7 @@ export default function TabLayout() {
         options={{
           title: 'Search',
           tabBarLabel: 'Search',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="magnify" size={size} color={color} />
           ),

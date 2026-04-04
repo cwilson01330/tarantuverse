@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: 'linear-gradient(135deg, #a855f7, #ec4899)',
+    backgroundColor: '#a855f7',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     top: -12,
     left: '50%',
     transform: [{ translateX: -50 }],
-    backgroundColor: 'linear-gradient(90deg, #a855f7, #ec4899)',
+    backgroundColor: '#a855f7',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chooseButtonPopular: {
-    backgroundColor: 'linear-gradient(90deg, #a855f7, #ec4899)',
+    backgroundColor: '#a855f7',
     borderWidth: 0,
   },
   chooseButtonText: {
