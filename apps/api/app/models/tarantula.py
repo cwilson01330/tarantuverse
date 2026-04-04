@@ -40,15 +40,15 @@ class Tarantula(Base):
     name = Column(String(100))  # Pet name
     common_name = Column(String(100))
     scientific_name = Column(String(255))
-    sex = Column(SQLEnum(Sex), default=Sex.UNKNOWN)
+    sex = Column(SQLEnum(Sex, values_callable=lambda obj: [e.value for e in obj]), default=Sex.UNKNOWN)
 
     # Acquisition
     date_acquired = Column(Date)
-    source = Column(SQLEnum(Source))
+    source = Column(SQLEnum(Source, values_callable=lambda obj: [e.value for e in obj]))
     price_paid = Column(Numeric(10, 2))
 
     # Husbandry
-    enclosure_type = Column(SQLEnum(EnclosureType))
+    enclosure_type = Column(SQLEnum(EnclosureType, values_callable=lambda obj: [e.value for e in obj]))
     enclosure_size = Column(String(50))  # e.g., "10x10x10 inches"
     substrate_type = Column(String(100))
     substrate_depth = Column(String(50))  # e.g., "3 inches"
