@@ -5,20 +5,34 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 // Check if running in Expo Go (which doesn't support push notifications in SDK 53+)
-const isExpoGo = Constants.appOwnership === 'expo';
+// Use a safe check — appOwnership is deprecated in SDK 53+; prefer executionEnvironment
+let isExpoGo = false;
+try {
+  isExpoGo =
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+    Constants.appOwnership === 'expo';
+} catch {
+  // If Constants is unavailable, assume production build
+  isExpoGo = false;
+}
 
-// Configure notification behavior (only if not in Expo Go)
-if (!isExpoGo) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
-  });
+// Configure notification behavior — wrapped in try/catch so a native module
+// failure here never crashes the importing screen before it renders.
+try {
+  if (!isExpoGo) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  }
+} catch (e) {
+  console.warn('[notifications] setNotificationHandler failed at module init:', e);
 }
 
 export interface NotificationPreferences {
