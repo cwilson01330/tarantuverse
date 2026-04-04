@@ -23,7 +23,7 @@ import FeedingStatsCard from '../../src/components/FeedingStatsCard';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { scheduleMoltPredictionNotification, scheduleMaintenanceReminder } from '../../src/services/notifications';
+// notifications imported dynamically below to avoid expo-notifications crashing at module load time
 
 interface TarantulaDetail {
   id: string;
@@ -262,6 +262,7 @@ export default function TarantulaDetailScreen() {
         try {
           const prefsResponse = await apiClient.get('/notification-preferences/');
           if (prefsResponse.data.molt_predictions_enabled && tarantula) {
+            const { scheduleMoltPredictionNotification } = await import('../../src/services/notifications');
             await scheduleMoltPredictionNotification(
               id as string,
               tarantula.name || tarantula.common_name || 'Tarantula',
@@ -394,6 +395,7 @@ export default function TarantulaDetailScreen() {
             try {
               const prefsResponse = await apiClient.get('/notification-preferences/');
               if (prefsResponse.data.maintenance_reminders_enabled) {
+                const { scheduleMaintenanceReminder } = await import('../../src/services/notifications');
                 await scheduleMaintenanceReminder(
                   id as string,
                   tarantula.name || tarantula.common_name || 'Tarantula',
@@ -416,6 +418,7 @@ export default function TarantulaDetailScreen() {
               const prefsResponse = await apiClient.get('/notification-preferences/');
               const days = prefsResponse.data.maintenance_reminder_days || 30;
               if (prefsResponse.data.maintenance_reminders_enabled) {
+                const { scheduleMaintenanceReminder } = await import('../../src/services/notifications');
                 await scheduleMaintenanceReminder(
                   id as string,
                   tarantula.name || tarantula.common_name || 'Tarantula',
