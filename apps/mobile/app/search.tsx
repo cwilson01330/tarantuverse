@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, TextInput, SectionList, TouchableOpacity, Text, ActivityIndicator, SafeAreaView } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useTheme } from '../src/contexts/ThemeContext'
-import { useAuth } from '../src/contexts/AuthContext'
-import axios from 'axios'
+import { apiClient } from '../src/services/api'
 
 interface SearchResult {
   id: string
@@ -39,7 +38,6 @@ const SECTION_ICONS = {
 export default function SearchScreen() {
   const router = useRouter()
   const { colors } = useTheme()
-  const { token } = useAuth()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -99,27 +97,14 @@ export default function SearchScreen() {
 
     setLoading(true)
     try {
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000'
-      const headers: any = {
-        'Content-Type': 'application/json',
-      }
-
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      }
-
-      const response = await axios.get(
-        `${API_URL}/api/v1/search?q=${encodeURIComponent(q)}`,
-        { headers }
-      )
-
+      const response = await apiClient.get('/search', { params: { q } })
       setResults(response.data)
     } catch (error) {
       console.error('Search failed:', error)
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [])
 
   // Debounced search
   useEffect(() => {
