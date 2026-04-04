@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,9 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import PhotoViewer from '../../src/components/PhotoViewer';
-import GrowthChart from '../../src/components/GrowthChart';
+// Lazy-load GrowthChart so react-native-chart-kit's native module only
+// initializes when the chart is actually rendered, not at screen import time.
+const GrowthChart = React.lazy(() => import('../../src/components/GrowthChart'));
 import FeedingStatsCard from '../../src/components/FeedingStatsCard';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
@@ -853,7 +855,9 @@ export default function TarantulaDetailScreen() {
         {/* Growth Analytics */}
         {growthData && growthData.total_molts > 0 && (
           <View style={styles.section}>
-            <GrowthChart data={growthData} />
+            <Suspense fallback={<ActivityIndicator color="#8B4513" />}>
+              <GrowthChart data={growthData} />
+            </Suspense>
           </View>
         )}
 
