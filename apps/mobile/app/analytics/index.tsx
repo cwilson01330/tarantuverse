@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
@@ -368,12 +369,17 @@ export default function AnalyticsScreen() {
   if (!analytics || analytics.total_tarantulas === 0) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
+        <LinearGradient
+          colors={[colors.primary, colors.secondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
           <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Collection Analytics</Text>
-        </View>
+          <Text style={[styles.headerTitle, { color: '#fff' }]}>Collection Analytics</Text>
+        </LinearGradient>
         <ScrollView style={styles.container}>
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="chart-bar" size={64} color={colors.textTertiary} />
@@ -394,23 +400,28 @@ export default function AnalyticsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={[colors.primary, colors.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>📊 Analytics</Text>
+        <Text style={[styles.headerTitle, { color: '#fff' }]}>📊 Analytics</Text>
         <TouchableOpacity
           onPress={() => router.push('/analytics/advanced')}
           style={{
             paddingHorizontal: 12,
             paddingVertical: 6,
-            backgroundColor: colors.primary,
+            backgroundColor: 'rgba(255,255,255,0.25)',
             borderRadius: 6,
           }}
         >
           <MaterialCommunityIcons name="sparkles" size={16} color="#FFFFFF" />
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       <ScrollView style={styles.scrollContent}>
 

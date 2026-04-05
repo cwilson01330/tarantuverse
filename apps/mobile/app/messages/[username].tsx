@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActionSheetIOS, AppState } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
@@ -212,10 +213,19 @@ export default function ConversationScreen() {
     }
   };
 
+  const headerBackground = () => (
+    <LinearGradient
+      colors={[colors.primary, colors.secondary]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{ flex: 1 }}
+    />
+  );
+
   const headerOptions = {
-    headerStyle: { backgroundColor: colors.surface },
-    headerTintColor: colors.textPrimary,
-    headerTitleStyle: { color: colors.textPrimary },
+    headerBackground,
+    headerTintColor: '#fff',
+    headerTitleStyle: { color: '#fff', fontWeight: 'bold' as const },
   };
 
   if (loading) {
