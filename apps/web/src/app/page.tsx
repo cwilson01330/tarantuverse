@@ -629,49 +629,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Testimonials ────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold mb-4 text-gray-100">What keepers are saying</h2>
-          <p className="text-xl text-gray-300">From sling keepers to serious breeders</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="relative bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 transition">
-            <div className="absolute -top-3 -left-3 text-5xl opacity-10 font-serif">"</div>
-            <div className="flex items-center gap-1 mb-4">{[...Array(5)].map((_, i) => <span key={i} className="text-yellow-400">★</span>)}</div>
-            <p className="text-gray-300 mb-6 italic leading-relaxed text-sm">
-              "Finally an app that understands tarantula keepers. The feeding tracker and smart predictions have completely changed how I manage my collection."
-            </p>
-            <div className="border-t border-electric-blue-500/10 pt-4">
-              <div className="font-semibold text-gray-100">Ashley T.</div>
-              <div className="text-xs text-gray-400">@ThreadAndBurrow · 23 Tarantulas</div>
-            </div>
-          </div>
-          <div className="relative bg-dark-50 border-2 border-neon-pink-500/30 rounded-2xl p-8 hover:border-neon-pink-500/50 transition transform md:scale-105 md:shadow-lg md:shadow-neon-pink-500/10">
-            <div className="absolute -top-3 -left-3 text-5xl opacity-10 font-serif">"</div>
-            <div className="flex items-center gap-1 mb-4">{[...Array(5)].map((_, i) => <span key={i} className="text-yellow-400">★</span>)}</div>
-            <p className="text-gray-300 mb-6 italic leading-relaxed text-sm">
-              "The breeding module is a game-changer. I used to track pairings and egg sacs in a Google Sheet. Now I have one place for everything from pairing to selling slings."
-            </p>
-            <div className="border-t border-neon-pink-500/10 pt-4">
-              <div className="font-semibold text-gray-100">Marcus R.</div>
-              <div className="text-xs text-gray-400">Breeder · P. metallica & OBT specialist</div>
-            </div>
-          </div>
-          <div className="relative bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 hover:border-electric-blue-500/40 transition">
-            <div className="absolute -top-3 -left-3 text-5xl opacity-10 font-serif">"</div>
-            <div className="flex items-center gap-1 mb-4">{[...Array(5)].map((_, i) => <span key={i} className="text-yellow-400">★</span>)}</div>
-            <p className="text-gray-300 mb-6 italic leading-relaxed text-sm">
-              "The community features keep me coming back. Following other keepers, sharing molt photos, connecting with breeders — it's made the hobby so much more fun."
-            </p>
-            <div className="border-t border-electric-blue-500/10 pt-4">
-              <div className="font-semibold text-gray-100">Jordan K.</div>
-              <div className="text-xs text-gray-400">Keeper & Community Member</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── Pricing ─────────────────────────────────────────────── */}
       <section id="pricing" className="bg-dark-50 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
