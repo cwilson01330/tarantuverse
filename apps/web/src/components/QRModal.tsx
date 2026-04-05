@@ -9,8 +9,17 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { getSession } from 'next-auth/react'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
+
+/** Mirror the same two-source token lookup used in lib/api.ts */
+async function getAuthToken(): Promise<string | null> {
+  const local = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+  if (local) return local
+  const session = await getSession()
+  return (session?.accessToken as string) ?? null
+}
 
 export interface LabelMolt {
   id: string
@@ -110,8 +119,6 @@ export default function QRModal({
   const [photoCount, setPhotoCount] = useState(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
-
   const profileUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://tarantuverse.com'}/t/${tarantulaId}`
 
   const stopPolling = useCallback(() => {
@@ -125,9 +132,10 @@ export default function QRModal({
     setUploadState('generating')
     setGenerateError(null)
     try {
+      const token = await getAuthToken()
       const res = await fetch(`${API}/api/v1/tarantulas/${tarantulaId}/upload-session`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) {
         const errBody = await res.json().catch(() => null)
@@ -154,8 +162,9 @@ export default function QRModal({
       let knownCount = photoCount
       pollRef.current = setInterval(async () => {
         try {
+          const pollToken = await getAuthToken()
           const pr = await fetch(`${API}/api/v1/tarantulas/${tarantulaId}/photos`, {
-            headers: { Authorization: `Bearer ${authToken}` },
+            headers: { Authorization: `Bearer ${pollToken}` },
           })
           if (!pr.ok) return
           const photos = await pr.json()
