@@ -267,7 +267,7 @@ export default function ConversationScreen() {
           headerRight: () => (
             <TouchableOpacity
               onPress={showActions}
-              style={{ marginRight: 8 }}
+              style={{ marginRight: 8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
             >
               <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.primary} />
             </TouchableOpacity>

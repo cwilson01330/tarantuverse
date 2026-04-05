@@ -78,11 +78,11 @@ export default function AchievementBadge({
           ${earned ? colors.bg : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600'}
           flex items-center justify-center
           transition-all duration-300
-          ${earned ? 'hover:shadow-lg hover:scale-105' : ''}
+          ${earned ? 'hover:shadow-lg hover:scale-105' : 'hover:opacity-80'}
           cursor-pointer
           group
         `}
-        onMouseEnter={() => earned && setShowTooltip(true)}
+        onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
       >
         {/* Icon */}
@@ -109,15 +109,22 @@ export default function AchievementBadge({
       </div>
 
       {/* Tooltip */}
-      {showTooltip && earned && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 bg-gray-900 dark:bg-gray-950 text-white dark:text-gray-100 rounded-lg p-3 shadow-xl z-10 border border-gray-700 dark:border-gray-600">
-          <p className="font-bold text-sm mb-1">{name}</p>
+      {showTooltip && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-52 bg-gray-900 dark:bg-gray-950 text-white dark:text-gray-100 rounded-lg p-3 shadow-xl z-10 border border-gray-700 dark:border-gray-600">
+          <div className="flex items-center gap-1.5 mb-1">
+            {!earned && <span className="text-xs">🔒</span>}
+            <p className="font-bold text-sm">{name}</p>
+          </div>
           <p className="text-xs text-gray-300 dark:text-gray-400 mb-2">{description}</p>
-          {formattedDate && (
-            <p className="text-xs text-gray-400 dark:text-gray-500">
-              Earned: {formattedDate}
+          {earned && formattedDate ? (
+            <p className="text-xs text-green-400">
+              ✓ Earned {formattedDate}
             </p>
-          )}
+          ) : !earned ? (
+            <p className="text-xs text-gray-500 dark:text-gray-500 italic">
+              Keep going — you haven't earned this yet
+            </p>
+          ) : null}
           {/* Tooltip arrow */}
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-950" />
         </div>

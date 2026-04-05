@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, AppState } from 'react-native';
 import { useRouter, Stack, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -106,18 +107,21 @@ export default function MessagesScreen() {
   if (loading) {
     return (
       <>
-        <Stack.Screen
-          options={{
-            title: 'Messages',
-            headerBackTitle: 'Back',
-            headerStyle: { backgroundColor: colors.surface },
-            headerTintColor: colors.textPrimary,
-            headerTitleStyle: { color: colors.textPrimary },
-          }}
-        />
-        <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
-          <Text style={styles.loadingEmoji}>💬</Text>
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading messages...</Text>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <LinearGradient
+            colors={[colors.primary, colors.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.header}
+          >
+            <Text style={styles.headerTitle}>💬 Messages</Text>
+            <Text style={styles.headerSubtitle}>Your conversations</Text>
+          </LinearGradient>
+          <View style={styles.centerContainer}>
+            <Text style={styles.loadingEmoji}>💬</Text>
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading messages...</Text>
+          </View>
         </View>
       </>
     );
@@ -125,16 +129,17 @@ export default function MessagesScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          title: 'Messages',
-          headerBackTitle: 'Back',
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.textPrimary,
-          headerTitleStyle: { color: colors.textPrimary },
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <LinearGradient
+          colors={[colors.primary, colors.secondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
+        >
+          <Text style={styles.headerTitle}>💬 Messages</Text>
+          <Text style={styles.headerSubtitle}>Your conversations</Text>
+        </LinearGradient>
         <ScrollView
           style={styles.scrollView}
           refreshControl={
@@ -296,6 +301,21 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
+  },
+  header: {
+    paddingTop: 56,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   conversationsList: {
     padding: 16,

@@ -53,6 +53,7 @@ export default function TabLayout() {
         name="community"
         options={{
           title: 'Community',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="account-group" size={size} color={color} />
           ),
