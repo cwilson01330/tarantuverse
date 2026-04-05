@@ -109,7 +109,7 @@ export default function QRModal({
   const [photoCount, setPhotoCount] = useState(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  const authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
 
   const profileUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://tarantuverse.com'}/t/${tarantulaId}`
 
