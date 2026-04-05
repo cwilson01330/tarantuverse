@@ -2019,7 +2019,7 @@ export default function TarantulaDetailPage() {
           onClose={() => setShowQRModal(false)}
           onPhotoAdded={() => {
             setShowQRModal(false)
-            fetchPhotos()
+            if (token) fetchPhotos(token)
           }}
         />
       )}
