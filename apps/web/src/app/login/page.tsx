@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/dashboard'
@@ -146,5 +146,30 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+function LoginLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center p-24">
+      <div className="w-full max-w-md text-center">
+        <div className="animate-pulse">
+          <div className="h-10 bg-surface-elevated rounded w-1/2 mx-auto mb-8"></div>
+          <div className="space-y-4">
+            <div className="h-10 bg-surface-elevated rounded"></div>
+            <div className="h-10 bg-surface-elevated rounded"></div>
+            <div className="h-12 bg-surface-elevated rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginLoading />}>
+      <LoginForm />
+    </Suspense>
   )
 }
