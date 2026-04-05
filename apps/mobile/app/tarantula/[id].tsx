@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
+const QRSheet = React.lazy(() => import('../../src/components/QRSheet'));
 import {
   View,
   Text,
@@ -157,6 +158,7 @@ export default function TarantulaDetailScreen() {
   const [loadError, setLoadError] = useState(false);
   const [loadErrorMsg, setLoadErrorMsg] = useState<string>('');
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
+  const [showQRSheet, setShowQRSheet] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
 
   useEffect(() => {
@@ -534,6 +536,12 @@ export default function TarantulaDetailScreen() {
             onPress={() => router.push(`/tarantula/edit?id=${id}`)}
           >
             <MaterialCommunityIcons name="pencil" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={() => setShowQRSheet(true)}
+          >
+            <MaterialCommunityIcons name="qrcode" size={24} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerActionButton}
@@ -971,6 +979,23 @@ export default function TarantulaDetailScreen() {
         initialIndex={photoViewerIndex}
         onClose={() => setPhotoViewerVisible(false)}
       />
+
+      {/* QR Identity Sheet */}
+      <Suspense fallback={null}>
+        {showQRSheet && tarantula && (
+          <QRSheet
+            visible={showQRSheet}
+            onClose={() => setShowQRSheet(false)}
+            tarantulaId={id as string}
+            tarantulaName={tarantula.name || tarantula.common_name || tarantula.scientific_name || 'Unknown'}
+            scientificName={tarantula.scientific_name}
+            onPhotoAdded={() => {
+              setShowQRSheet(false);
+              fetchTarantulaData();
+            }}
+          />
+        )}
+      </Suspense>
     </SafeAreaView>
   );
 }

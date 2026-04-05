@@ -43,6 +43,7 @@ import app.routers.premolt as premolt
 import app.routers.achievements as achievements
 import app.routers.search as search
 import app.routers.discover as discover
+import app.routers.qr as qr
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -245,6 +246,7 @@ app.include_router(search.router, prefix="/api/v1", tags=["search"])
 
 print("[STARTUP] Registering discover router...")
 app.include_router(discover.router, prefix="/api/v1", tags=["discover", "community"])
+app.include_router(qr.router, prefix="/api/v1", tags=["qr", "identity"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"
