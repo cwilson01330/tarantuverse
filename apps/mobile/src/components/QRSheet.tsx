@@ -34,7 +34,7 @@ interface QRSheetProps {
 type Tab = 'upload' | 'profile'
 type UploadState = 'idle' | 'loading' | 'ready' | 'received' | 'expired'
 
-const WEB_BASE = process.env.EXPO_PUBLIC_API_URL?.replace('/api/v1', '') || 'https://tarantuverse.com'
+const WEB_BASE = process.env.EXPO_PUBLIC_WEB_URL || 'https://tarantuverse.com'
 
 export default function QRSheet({
   visible,

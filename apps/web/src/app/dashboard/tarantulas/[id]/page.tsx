@@ -8,6 +8,9 @@ import GrowthChart from '@/components/GrowthChart'
 import FeedingStatsCard from '@/components/FeedingStatsCard'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
+import dynamic from 'next/dynamic'
+
+const QRModal = dynamic(() => import('@/components/QRModal'), { ssr: false })
 import UpgradeModal from '@/components/UpgradeModal'
 import PricingCard from '@/components/PricingCard'
 import PremoltPredictionSection from '@/components/PremoltPredictionSection'
@@ -24,7 +27,7 @@ interface Tarantula {
   price_paid?: number
   notes?: string
   photo_url?: string
-  visibility?: string
+  is_public?: boolean
 
   // Husbandry
   enclosure_type?: string
@@ -183,6 +186,7 @@ export default function TarantulaDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'husbandry' | 'photos' | 'growth' | 'breeding'>('overview')
   const [showFeedingForm, setShowFeedingForm] = useState(false)
   const [showMoltForm, setShowMoltForm] = useState(false)
@@ -531,8 +535,7 @@ export default function TarantulaDetailPage() {
     try {
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      
-      const newVisibility = tarantula?.visibility === 'public' ? 'private' : 'public'
+      const newIsPublic = !tarantula?.is_public
 
       const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
         method: 'PUT',
@@ -540,10 +543,7 @@ export default function TarantulaDetailPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...tarantula,
-          visibility: newVisibility,
-        }),
+        body: JSON.stringify({ is_public: newIsPublic }),
       })
 
       if (!response.ok) {
@@ -854,6 +854,12 @@ export default function TarantulaDetailPage() {
               ✏️ Edit
             </button>
             <button
+              onClick={() => setShowQRModal(true)}
+              className="px-3 py-1.5 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 text-sm font-medium inline-flex items-center gap-1.5"
+            >
+              📱 QR / Label
+            </button>
+            <button
               onClick={() => {
                 setActiveTab('logs')
                 setShowFeedingForm(true)
@@ -866,25 +872,25 @@ export default function TarantulaDetailPage() {
             {/* Visibility Toggle */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                {tarantula.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                {tarantula.is_public ? '🌐 Public' : '🔒 Private'}
               </span>
               <button
                 onClick={handleVisibilityToggle}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  tarantula.visibility === 'public' ? 'bg-purple-600' : 'bg-gray-300'
+                  tarantula.is_public ? 'bg-purple-600' : 'bg-gray-300'
                 }`}
-                title={tarantula.visibility === 'public' ? 'Make private' : 'Make public'}
+                title={tarantula.is_public ? 'Make private' : 'Make public'}
               >
                 <span
                   className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                    tarantula.visibility === 'public' ? 'translate-x-4' : 'translate-x-0.5'
+                    tarantula.is_public ? 'translate-x-4' : 'translate-x-0.5'
                   }`}
                 />
               </button>
             </div>
 
             {/* Share Button (visible only when public) */}
-            {tarantula.visibility === 'public' && (
+            {tarantula.is_public && (
               <button
                 onClick={() => setShowShareModal(true)}
                 className="px-3 py-1.5 text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all duration-200 text-sm font-medium inline-flex items-center gap-1.5"
@@ -2000,6 +2006,21 @@ export default function TarantulaDetailPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* QR Identity Modal */}
+      {showQRModal && tarantula && (
+        <QRModal
+          tarantulaId={id as string}
+          tarantulaName={tarantula.name || tarantula.common_name || tarantula.scientific_name || 'Unknown'}
+          scientificName={tarantula.scientific_name || null}
+          sex={tarantula.sex || null}
+          onClose={() => setShowQRModal(false)}
+          onPhotoAdded={() => {
+            setShowQRModal(false)
+            fetchPhotos()
+          }}
+        />
       )}
 
       {/* Delete Confirmation Modal */}
