@@ -2016,6 +2016,7 @@ export default function TarantulaDetailPage() {
           tarantulaName={tarantula.name || tarantula.common_name || tarantula.scientific_name || 'Unknown'}
           scientificName={tarantula.scientific_name || null}
           sex={tarantula.sex || null}
+          molts={molts.map((m) => ({ id: m.id, molted_at: m.molted_at, leg_span_after: m.leg_span_after }))}
           onClose={() => setShowQRModal(false)}
           onPhotoAdded={() => {
             setShowQRModal(false)
