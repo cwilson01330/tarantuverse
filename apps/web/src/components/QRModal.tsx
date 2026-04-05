@@ -104,6 +104,7 @@ export default function QRModal({
   const [uploadToken, setUploadToken] = useState<string | null>(null)
   const [uploadUrl, setUploadUrl] = useState<string | null>(null)
   const [timeLeft, setTimeLeft] = useState('')
+  const [generateError, setGenerateError] = useState<string | null>(null)
   const [labelSize, setLabelSize] = useState<LabelSize>(LABEL_SIZES[1])
   const [showMolts, setShowMolts] = useState(false)
   const [photoCount, setPhotoCount] = useState(0)
@@ -122,12 +123,16 @@ export default function QRModal({
 
   const generateSession = async () => {
     setUploadState('generating')
+    setGenerateError(null)
     try {
       const res = await fetch(`${API}/api/v1/tarantulas/${tarantulaId}/upload-session`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${authToken}` },
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null)
+        throw new Error(errBody?.detail || `Server error (${res.status})`)
+      }
       const data = await res.json()
       setUploadToken(data.token)
       setUploadUrl(data.upload_url)
@@ -163,8 +168,9 @@ export default function QRModal({
           }
         } catch { /* ignore */ }
       }, 3000)
-    } catch {
+    } catch (err: unknown) {
       setUploadState('idle')
+      setGenerateError(err instanceof Error ? err.message : 'Failed to generate QR code. Please try again.')
     }
   }
 
@@ -232,6 +238,11 @@ export default function QRModal({
                   Generate a QR code, scan it with your phone, and upload photos directly to{' '}
                   <strong>{tarantulaName}</strong>. No app or login required on the phone.
                 </p>
+                {generateError && (
+                  <div className="mb-4 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs text-left">
+                    ⚠️ {generateError}
+                  </div>
+                )}
                 <button
                   onClick={generateSession}
                   className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
