@@ -180,100 +180,113 @@ export default function EnhancedSpeciesDetailPage() {
       <div>
 
       {/* Hero Section */}
-      <div className="relative h-96 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700">
+      <div className="relative bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 overflow-hidden">
         {species.image_url && (
-          <div 
+          <div
             className="absolute inset-0 bg-cover bg-center opacity-30"
             style={{ backgroundImage: `url(${species.image_url})` }}
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-end pb-12">
-          <div className="flex items-end gap-8 w-full">
-            {/* Species Image */}
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+          {/* Desktop: side-by-side image + info. Mobile: stacked, no image */}
+          <div className="flex items-end gap-6">
+            {/* Species thumbnail — desktop only */}
             <div className="flex-shrink-0 hidden sm:block">
               {species.image_url ? (
                 <img
                   src={species.image_url}
                   alt={species.scientific_name}
-                  className="w-48 h-48 object-cover rounded-xl border-4 border-white dark:border-gray-800 shadow-2xl"
+                  className="w-40 h-40 object-cover rounded-xl border-4 border-white/20 shadow-2xl"
                 />
               ) : (
-                <div className="w-48 h-48 bg-white dark:bg-gray-800 rounded-xl border-4 border-white dark:border-gray-800 shadow-2xl flex items-center justify-center text-8xl">
+                <div className="w-40 h-40 bg-white/10 rounded-xl border-4 border-white/20 shadow-2xl flex items-center justify-center text-7xl">
                   {typeIcon}
                 </div>
               )}
             </div>
 
-            {/* Title & Quick Info */}
-            <div className="flex-1 pb-4">
-              <div className="flex items-center gap-3 mb-3">
-                <h1 className="text-4xl sm:text-5xl font-bold text-white drop-shadow-lg">
+            {/* Title & badges — full width on mobile */}
+            <div className="flex-1 min-w-0">
+              {/* Name row */}
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <h1 className="text-2xl sm:text-4xl font-bold text-white drop-shadow-lg italic leading-tight">
                   {species.scientific_name}
                 </h1>
                 {species.is_verified && (
-                  <span className="px-3 py-1 bg-purple-500/90 text-white rounded-full text-sm font-medium backdrop-blur-sm">
+                  <span className="shrink-0 px-2 py-0.5 bg-purple-500/90 text-white rounded-full text-xs font-medium backdrop-blur-sm">
                     ✓ Verified
                   </span>
                 )}
               </div>
 
               {species.common_names && species.common_names.length > 0 && (
-                <p className="text-xl text-white/90 mb-4 drop-shadow">
+                <p className="text-base sm:text-lg text-white/90 mb-3 drop-shadow">
                   {species.common_names.join(', ')}
                 </p>
               )}
 
+              {/* Badges */}
               <div className="flex flex-wrap gap-2">
-                <span className={`px-4 py-2 ${careLevel.color} text-white rounded-full text-sm font-medium shadow-lg flex items-center gap-2`}>
+                <span className={`px-3 py-1 ${careLevel.color} text-white rounded-full text-xs font-medium shadow-lg flex items-center gap-1`}>
                   <span>{careLevel.icon}</span>
                   <span>{careLevel.text}</span>
                 </span>
                 {species.type && (
-                  <span className="px-4 py-2 bg-blue-500/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm capitalize flex items-center gap-2">
+                  <span className="px-3 py-1 bg-blue-500/90 text-white rounded-full text-xs font-medium shadow-lg backdrop-blur-sm capitalize flex items-center gap-1">
                     <span>{typeIcon}</span>
                     <span>{species.type}</span>
                   </span>
                 )}
                 {species.native_region && (
-                  <span className="px-4 py-2 bg-green-500/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2">
+                  <span className="px-3 py-1 bg-green-500/90 text-white rounded-full text-xs font-medium shadow-lg backdrop-blur-sm flex items-center gap-1">
                     <span>🌍</span>
                     <span>{species.native_region}</span>
                   </span>
                 )}
                 {species.urticating_hairs && (
-                  <span className="px-4 py-2 bg-orange-500/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2">
+                  <span className="px-3 py-1 bg-orange-500/90 text-white rounded-full text-xs font-medium shadow-lg backdrop-blur-sm flex items-center gap-1">
                     <span>🪮</span>
                     <span>Urticating Hairs</span>
                   </span>
                 )}
                 {species.medically_significant_venom && (
-                  <span className="px-4 py-2 bg-red-600/90 text-white rounded-full text-sm font-medium shadow-lg backdrop-blur-sm flex items-center gap-2 animate-pulse">
+                  <span className="px-3 py-1 bg-red-600/90 text-white rounded-full text-xs font-medium shadow-lg backdrop-blur-sm flex items-center gap-1 animate-pulse">
                     <span>⚠️</span>
                     <span>Medically Significant Venom</span>
                   </span>
                 )}
               </div>
-            </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-2 pb-4">
-              <button
-                onClick={addToCollection}
-                className="px-6 py-3 bg-gradient-brand text-white rounded-lg font-semibold shadow-lg hover:shadow-xl hover:brightness-90 transition-all"
-              >
-                + Add to Collection
-              </button>
-              
-              {canEdit && (
-                <button
-                  onClick={() => router.push(`/species/${id}/edit`)}
-                  className="px-6 py-3 bg-primary-600 text-white rounded-lg font-semibold shadow-lg hover:bg-primary-700 transition-all"
-                >
-                  ✏️ Edit Species
-                </button>
-              )}
+              {/* CTA row */}
+              <div className="mt-4 flex flex-wrap gap-2">
+                {authUser ? (
+                  <>
+                    <button
+                      onClick={addToCollection}
+                      className="px-5 py-2 bg-white text-gray-900 rounded-lg text-sm font-semibold shadow-lg hover:bg-gray-100 transition-all"
+                    >
+                      + Add to Collection
+                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => router.push(`/species/${id}/edit`)}
+                        className="px-5 py-2 bg-primary-600 text-white rounded-lg text-sm font-semibold shadow-lg hover:bg-primary-700 transition-all"
+                      >
+                        ✏️ Edit Species
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <button
+                    onClick={() => router.push(`/register?redirect=/species/${id}`)}
+                    className="px-5 py-2 bg-white/15 hover:bg-white/25 border border-white/30 text-white rounded-lg text-sm font-medium backdrop-blur-sm transition-all"
+                  >
+                    Track this species — Sign up free
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

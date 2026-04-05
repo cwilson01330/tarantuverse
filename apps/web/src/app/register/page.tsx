@@ -15,6 +15,7 @@ interface ReferrerInfo {
 function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || ''
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -115,7 +116,7 @@ function RegisterForm() {
             Please check your inbox and verify your account to log in.
           </p>
           <a
-            href="/login"
+            href={redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : '/login'}
             className="inline-block py-3 px-8 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
           >
             Go to Login

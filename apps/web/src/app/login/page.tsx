@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || '/dashboard'
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -38,9 +40,8 @@ export default function LoginPage() {
       }
 
       if (result?.ok) {
-        // Redirect to dashboard on success
-        router.push('/dashboard')
-        router.refresh() // Refresh to update session
+        router.push(redirectTo)
+        router.refresh()
       }
     } catch (err: any) {
       setError(err.message || 'Invalid email or password')
