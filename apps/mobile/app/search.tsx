@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, TextInput, SectionList, TouchableOpacity, Text, ActivityIndicator, SafeAreaView } from 'react-native'
 import { useRouter } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useTheme } from '../src/contexts/ThemeContext'
 import { apiClient } from '../src/services/api'
 
@@ -195,44 +196,49 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Search Input */}
-      <View style={{
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        backgroundColor: colors.surface,
-      }}>
+      {/* Gradient Header with embedded search */}
+      <LinearGradient
+        colors={[colors.primary, colors.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 20 }}
+      >
+        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 2 }}>
+          🔍 Search
+        </Text>
+        <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 14 }}>
+          Find tarantulas, species & keepers
+        </Text>
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          backgroundColor: colors.background,
-          borderRadius: 8,
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          backgroundColor: 'rgba(255,255,255,0.2)',
+          borderRadius: 12,
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor: 'rgba(255,255,255,0.3)',
         }}>
-          <Text style={{ fontSize: 18, marginRight: 8 }}>🔍</Text>
+          <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
           <TextInput
             placeholder="Search tarantulas, species, keepers..."
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor="rgba(255,255,255,0.65)"
             value={query}
             onChangeText={setQuery}
             style={{
               flex: 1,
               fontSize: 16,
-              color: colors.textPrimary,
+              color: '#fff',
               paddingVertical: 0,
             }}
           />
           {query && (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Text style={{ fontSize: 18 }}>✕</Text>
+              <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)' }}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Results List */}
       {sections.length > 0 || loading || (query.length >= 2 && results) ? (
