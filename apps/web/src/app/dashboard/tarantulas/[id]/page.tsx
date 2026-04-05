@@ -27,6 +27,7 @@ interface Tarantula {
   price_paid?: number
   notes?: string
   photo_url?: string
+  name?: string
   is_public?: boolean
 
   // Husbandry
