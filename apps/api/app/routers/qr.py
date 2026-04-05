@@ -29,7 +29,7 @@ from app.models.user import User
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.species import Species
-from app.routers.auth import get_current_user
+from app.utils.dependencies import get_current_user
 from app.services.storage import storage_service
 from app.config import settings
 
