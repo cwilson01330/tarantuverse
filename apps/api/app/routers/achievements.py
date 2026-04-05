@@ -26,6 +26,8 @@ async def list_achievements(
     - achievements: List of all achievements with earned_at timestamps
     - recently_earned: Last 5 earned achievements
     """
+    # Always run a check first so existing data is reflected immediately
+    check_and_award(db, current_user.id)
     result = get_user_achievements(db, current_user.id)
     return AchievementSummary(**result)
 
