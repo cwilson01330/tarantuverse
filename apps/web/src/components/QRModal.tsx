@@ -40,6 +40,13 @@ const LABEL_SIZES: LabelSize[] = [
   { id: 'large', label: 'Large', description: 'Display / XL tank', width: '4in', height: '2in', qrSize: 110, fontSize: { name: 14, sci: 10, meta: 8 } },
 ]
 
+// Approximate px heights after scale(1.8) for wrapper sizing
+const SCALED_PREVIEW_HEIGHT: Record<string, number> = {
+  small: 220,
+  medium: 265,
+  large: 350,
+}
+
 export default function QRModal({
   tarantulaId,
   tarantulaName,
@@ -144,7 +151,7 @@ export default function QRModal({
     setTimeout(() => { win.print(); win.close() }, 500)
   }
 
-  const sexSymbol = sex === 'male' ? '♂' : sex === 'female' ? '♀' : sex === 'unknown' ? '?' : ''
+  const sexSymbol = sex === 'male' ? '♂' : sex === 'female' ? '♀' : ''
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -261,8 +268,11 @@ export default function QRModal({
               ))}
             </div>
 
-            {/* Label preview */}
-            <div className="flex justify-center mb-4">
+            {/* Label preview — wrapper height accounts for scale(1.8) overflow */}
+            <div
+              className="flex justify-center mb-4"
+              style={{ height: SCALED_PREVIEW_HEIGHT[labelSize.id] }}
+            >
               <div
                 id="qr-label-print"
                 style={{
@@ -277,7 +287,7 @@ export default function QRModal({
                   background: '#fff',
                   transform: 'scale(1.8)',
                   transformOrigin: 'top center',
-                  marginBottom: '60px',
+                  flexShrink: 0,
                 }}
               >
                 <QRCodeSVG value={profileUrl} size={labelSize.qrSize} level="M" />
