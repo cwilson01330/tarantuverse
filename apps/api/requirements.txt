@@ -26,6 +26,9 @@ sendgrid==6.11.0 # Email Service
 boto3==1.35.64  # AWS S3
 pillow==11.0.0  # Image processing
 
+# Rate limiting
+slowapi==0.1.9
+
 # Utilities
 python-dateutil==2.9.0.post0
 httpx==0.28.0

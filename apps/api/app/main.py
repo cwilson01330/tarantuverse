@@ -6,8 +6,11 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 import os
 from app.config import settings
+from app.utils.rate_limit import limiter  # shared limiter instance
 import app.routers.auth as auth
 import app.routers.tarantulas as tarantulas
 import app.routers.species as species
@@ -54,6 +57,10 @@ app = FastAPI(
     redirect_slashes=True,  # Handle both /path and /path/
 )
 
+# Attach rate limiter to app state and register 429 handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Configure CORS
 # Automatically include both www and non-www versions of each origin
 cors_origins = settings.CORS_ORIGINS if settings.CORS_ORIGINS else ["*"]
@@ -76,26 +83,19 @@ app.add_middleware(
     allow_origins=expanded_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,  # Cache preflight requests for 1 hour
+    # Explicit header allowlist — avoids credential + wildcard CORS violation
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Authorization",
+        "Content-Type",
+        "Origin",
+        "X-Requested-With",
+        "X-Request-ID",
+    ],
+    expose_headers=["X-Request-ID"],
+    max_age=3600,
 )
-
-# Middleware to handle OPTIONS requests
-@app.middleware("http")
-async def options_middleware(request: Request, call_next):
-    if request.method == "OPTIONS":
-        return Response(
-            status_code=200,
-            headers={
-                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
-                "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Max-Age": "3600",
-            }
-        )
-    return await call_next(request)
 
 # Maintenance mode middleware — blocks write requests for non-admins
 @app.middleware("http")

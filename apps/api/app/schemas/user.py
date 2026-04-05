@@ -1,10 +1,36 @@
 """
 User schemas
 """
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import uuid
+import re
+
+
+def _validate_password_complexity(password: str) -> str:
+    """
+    Enforce password complexity rules:
+    - At least 8 characters
+    - At least one uppercase letter
+    - At least one lowercase letter
+    - At least one digit
+    - At least one special character
+    """
+    errors = []
+    if len(password) < 8:
+        errors.append("at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        errors.append("at least one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        errors.append("at least one lowercase letter")
+    if not re.search(r"\d", password):
+        errors.append("at least one number")
+    if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?`~]", password):
+        errors.append("at least one special character (!@#$%^&* etc.)")
+    if errors:
+        raise ValueError("Password must contain: " + ", ".join(errors))
+    return password
 
 
 class UserCreate(BaseModel):
@@ -14,6 +40,11 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=8, max_length=100)
     display_name: Optional[str] = Field(None, max_length=100)
     referral_code: Optional[str] = Field(None, max_length=12)  # Optional referral code
+
+    @field_validator("password")
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _validate_password_complexity(v)
 
 
 class UserLogin(BaseModel):
@@ -43,6 +74,11 @@ class UserVisibilityUpdate(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def new_password_complexity(cls, v: str) -> str:
+        return _validate_password_complexity(v)
 
 
 class UserResponse(BaseModel):

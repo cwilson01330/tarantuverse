@@ -4,6 +4,7 @@ Application configuration using pydantic-settings
 from pydantic_settings import BaseSettings
 from typing import List, Union
 from pydantic import field_validator
+import sys
 
 
 class Settings(BaseSettings):
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
     # API Configuration
     API_SECRET_KEY: str = "dev-secret-key-change-in-production"
     API_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours (was 7 days)
 
     # Database
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/tarantuverse"
@@ -70,3 +71,20 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Startup validation: refuse to run with the default dev secret in production
+_DEV_SECRET = "dev-secret-key-change-in-production"
+if settings.API_SECRET_KEY == _DEV_SECRET and settings.ENVIRONMENT != "development":
+    print(
+        "[SECURITY] FATAL: API_SECRET_KEY is still set to the default dev value. "
+        "Set a strong random secret in your environment before running in production.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+if settings.API_SECRET_KEY == _DEV_SECRET:
+    print(
+        "[SECURITY] WARNING: Using default dev JWT secret. "
+        "Set API_SECRET_KEY in your environment before deploying.",
+        file=sys.stderr,
+    )

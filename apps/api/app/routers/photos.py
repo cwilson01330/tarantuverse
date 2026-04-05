@@ -11,6 +11,7 @@ from app.routers.auth import get_current_user
 from app.models.user import User
 from app.services.storage import storage_service
 from app.config import settings
+from app.utils.file_validation import validate_image_bytes
 
 router = APIRouter(tags=["photos"])
 
@@ -64,19 +65,26 @@ async def upload_photo(
             }
         )
 
-    # Validate file type
-    if not file.content_type or not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    
     try:
-        # Read file data
+        # Read file data before any other validation
         file_data = await file.read()
-        
+
+        # Validate by magic bytes (not Content-Type header, which is spoofable)
+        try:
+            detected_mime = validate_image_bytes(file_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # File size limit: 15 MB
+        max_size = 15 * 1024 * 1024
+        if len(file_data) > max_size:
+            raise HTTPException(status_code=400, detail="File size exceeds 15 MB limit")
+
         # Upload to storage service (R2 or local)
         photo_url, thumbnail_url = await storage_service.upload_photo(
             file_data=file_data,
             filename=file.filename or "upload.jpg",
-            content_type=file.content_type
+            content_type=detected_mime,  # use verified MIME, not client-supplied
         )
         
         # Create photo record in database

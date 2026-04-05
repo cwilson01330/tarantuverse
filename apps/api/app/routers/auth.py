@@ -1,7 +1,7 @@
 """
 Authentication routes
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime, timedelta, timezone
@@ -13,8 +13,9 @@ from app.models.user import User
 from app.models.user_oauth_account import UserOAuthAccount
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest
 from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse, LinkedAccountResponse, LinkAccountRequest
-from app.utils.auth import get_password_hash, verify_password, create_access_token
+from app.utils.auth import get_password_hash, verify_password, create_access_token, revoke_token, decode_access_token
 from app.utils.dependencies import get_current_user
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.utils.oauth import (
     exchange_google_code_for_token,
     exchange_apple_code_for_token,
@@ -25,12 +26,15 @@ from app.services.email import EmailService
 from app.services.storage import storage_service
 from app.config import settings
 from app.utils.username_validation import validate_username
+from app.utils.rate_limit import limiter
+from app.utils.file_validation import validate_image_bytes
 
 router = APIRouter()
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Register a new user
 
@@ -119,7 +123,8 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(credentials: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
     """
     Login user
 
@@ -167,6 +172,36 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
         access_token=access_token,
         user=UserResponse.from_orm(user)
     )
+
+
+@router.post("/logout")
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Revoke the current access token so it cannot be reused even if not yet expired.
+    Clients should also discard the token locally.
+    """
+    from datetime import datetime, timezone, timedelta
+    from app.config import settings as app_settings
+
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    if payload:
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        if jti:
+            # expires_at is needed so we can clean up the blocklist later
+            expires_at = (
+                datetime.fromtimestamp(exp, tz=timezone.utc)
+                if exp
+                else datetime.now(timezone.utc) + timedelta(minutes=app_settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            )
+            revoke_token(jti, str(current_user.id), expires_at, db)
+
+    return {"message": "Logged out successfully"}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -255,14 +290,6 @@ async def upload_avatar(
     - Automatically crops to square and resizes to 200x200px
     - Uploads to Cloudflare R2 or local storage
     """
-    # Validate file type
-    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type. Allowed types: {', '.join(allowed_types)}"
-        )
-
     # Read file data
     try:
         file_data = await file.read()
@@ -272,6 +299,12 @@ async def upload_avatar(
             detail=f"Failed to read file: {str(e)}"
         )
 
+    # Validate by magic bytes (not Content-Type header, which is spoofable)
+    try:
+        detected_mime = validate_image_bytes(file_data)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
     # Validate file size (max 10MB)
     max_size = 10 * 1024 * 1024  # 10MB
     if len(file_data) > max_size:
@@ -280,12 +313,12 @@ async def upload_avatar(
             detail="File size exceeds 10MB limit"
         )
 
-    # Upload avatar
+    # Upload avatar (use verified MIME, not client-supplied Content-Type)
     try:
         avatar_url = await storage_service.upload_avatar(
             file_data,
             file.filename or "avatar.jpg",
-            file.content_type
+            detected_mime,
         )
     except Exception as e:
         raise HTTPException(
@@ -344,11 +377,15 @@ async def oauth_login(
             # OAuth account found - get the linked user
             user = db.query(User).filter(User.id == oauth_account.user_id).first()
         else:
-            # OAuth account not found - check if email matches existing user (auto-linking)
-            user = db.query(User).filter(User.email == email).first()
+            # OAuth account not found - check if email matches a verified existing user
+            # SECURITY: Only auto-link if the existing account's email is verified.
+            # Linking to an unverified account could let an attacker pre-register an email
+            # and then hijack a legitimate user's OAuth sign-in.
+            existing_user = db.query(User).filter(User.email == email).first()
 
-            if user:
-                # Email matches - auto-link this OAuth account to existing user
+            if existing_user and existing_user.is_verified:
+                # Verified email match — safe to auto-link
+                user = existing_user
                 oauth_account = UserOAuthAccount(
                     user_id=user.id,
                     provider=provider,
@@ -358,6 +395,13 @@ async def oauth_login(
                     provider_avatar=picture,
                 )
                 db.add(oauth_account)
+            elif existing_user and not existing_user.is_verified:
+                # Unverified account exists — refuse to link (account takeover vector)
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="An account with this email already exists but is not verified. "
+                           "Please verify that account first, or log in with your password.",
+                )
             else:
                 # No existing user - create new user and link OAuth account
                 is_new_user = True
@@ -474,11 +518,12 @@ async def google_oauth_callback(
             oauth_account.access_token = access_token_from_google
             oauth_account.refresh_token = refresh_token_from_google
         else:
-            # OAuth account not found - check if email matches existing user (auto-linking)
-            user = db.query(User).filter(User.email == email).first()
+            # OAuth account not found - check if email matches a verified existing user
+            existing_user = db.query(User).filter(User.email == email).first()
 
-            if user:
-                # Email matches - auto-link this Google account to existing user
+            if existing_user and existing_user.is_verified:
+                # Verified email match — safe to auto-link
+                user = existing_user
                 oauth_account = UserOAuthAccount(
                     user_id=user.id,
                     provider="google",
@@ -490,6 +535,12 @@ async def google_oauth_callback(
                     provider_avatar=picture,
                 )
                 db.add(oauth_account)
+            elif existing_user and not existing_user.is_verified:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="An account with this email already exists but is not verified. "
+                           "Please verify that account first, or log in with your password.",
+                )
             else:
                 # No existing user - create new user and link OAuth account
                 is_new_user = True
@@ -604,11 +655,12 @@ async def apple_oauth_callback(
             # OAuth account found - get the linked user
             user = db.query(User).filter(User.id == oauth_account.user_id).first()
         else:
-            # OAuth account not found - check if email matches existing user (auto-linking)
-            user = db.query(User).filter(User.email == email).first()
+            # OAuth account not found - check if email matches a verified existing user
+            existing_user = db.query(User).filter(User.email == email).first()
 
-            if user:
-                # Email matches - auto-link this Apple account to existing user
+            if existing_user and existing_user.is_verified:
+                # Verified email match — safe to auto-link
+                user = existing_user
                 oauth_account = UserOAuthAccount(
                     user_id=user.id,
                     provider="apple",
@@ -617,6 +669,12 @@ async def apple_oauth_callback(
                     provider_name=name,
                 )
                 db.add(oauth_account)
+            elif existing_user and not existing_user.is_verified:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="An account with this email already exists but is not verified. "
+                           "Please verify that account first, or log in with your password.",
+                )
             else:
                 # No existing user - create new user and link OAuth account
                 is_new_user = True
@@ -878,7 +936,9 @@ async def unlink_account(
 
 
 @router.post("/reset-password")
+@limiter.limit("5/minute")
 async def reset_password(
+    request: Request,
     reset_data: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
@@ -966,7 +1026,9 @@ async def verify_email(
 
 
 @router.post("/resend-verification")
+@limiter.limit("3/minute")
 async def resend_verification(
+    request: Request,
     email: str,
     db: Session = Depends(get_db)
 ):

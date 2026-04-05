@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database import get_db
 from app.models.user import User
-from app.utils.auth import decode_access_token
+from app.utils.auth import decode_access_token, is_token_revoked
 
 security = HTTPBearer()
 
@@ -18,7 +18,8 @@ def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Get the current authenticated user from JWT token
+    Get the current authenticated user from JWT token.
+    Checks the token blocklist so logged-out tokens are immediately rejected.
 
     Usage in routes:
         current_user: User = Depends(get_current_user)
@@ -31,6 +32,15 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Check if this specific token has been revoked (e.g. user logged out)
+    jti = payload.get("jti")
+    if jti and is_token_revoked(jti, db):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
