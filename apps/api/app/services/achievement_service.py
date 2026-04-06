@@ -49,13 +49,12 @@ def get_pairing_count(db: Session, user_id: uuid.UUID) -> int:
 
 def get_successful_pairing_count(db: Session, user_id: uuid.UUID) -> int:
     """Get total successful pairings user has"""
-    # Compare against the string value ("successful") not the enum name ("SUCCESSFUL")
-    # to avoid SQLAlchemy serializing PairingOutcome.SUCCESSFUL → "SUCCESSFUL" for the DB
+    # Cast the enum column to text before comparing so SQLAlchemy's enum type
+    # processor never touches the value — avoids "SUCCESSFUL" vs "successful" mismatch.
+    from sqlalchemy import cast, String as SAString
     return db.query(func.count(Pairing.id)).filter(
-        and_(
-            Pairing.user_id == user_id,
-            Pairing.outcome == PairingOutcome.SUCCESSFUL.value
-        )
+        Pairing.user_id == user_id,
+        cast(Pairing.outcome, SAString) == "successful"
     ).scalar() or 0
 
 
