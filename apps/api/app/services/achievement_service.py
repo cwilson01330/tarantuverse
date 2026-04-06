@@ -60,13 +60,14 @@ def get_successful_pairing_count(db: Session, user_id: uuid.UUID) -> int:
 def get_forum_post_count(db: Session, user_id: uuid.UUID) -> int:
     """Get total forum posts user has created"""
     return db.query(func.count(ForumPost.id)).filter(
-        ForumPost.user_id == user_id
+        ForumPost.author_id == user_id  # column is author_id, not user_id
     ).scalar() or 0
 
 
 def get_following_count(db: Session, user_id: uuid.UUID) -> int:
     """Get total users this user is following"""
-    return db.query(func.count(Follow.id)).filter(
+    # Follow uses a composite PK (follower_id + followed_id) — no id column
+    return db.query(func.count(Follow.follower_id)).filter(
         Follow.follower_id == user_id
     ).scalar() or 0
 
