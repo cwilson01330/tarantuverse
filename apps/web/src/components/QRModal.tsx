@@ -220,6 +220,11 @@ export default function QRModal({
   const handlePrint = () => {
     const printContent = document.getElementById('qr-label-print')
     if (!printContent) return
+
+    // Clone and strip preview-only zoom so physical dimensions are respected
+    const clone = printContent.cloneNode(true) as HTMLElement
+    clone.style.zoom = ''
+
     const win = window.open('', '_blank', 'width=600,height=400')
     if (!win) return
     win.document.write(`
@@ -228,11 +233,11 @@ export default function QRModal({
           <title>Tarantuverse Label — ${tarantulaName}</title>
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: -apple-system, Arial, sans-serif; background: white; }
+            body { background: white; }
             @page { size: ${labelSize.width} ${labelSize.height}; margin: 0; }
           </style>
         </head>
-        <body>${printContent.innerHTML}</body>
+        <body>${clone.outerHTML}</body>
       </html>
     `)
     win.document.close()
