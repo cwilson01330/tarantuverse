@@ -40,6 +40,34 @@ interface QRModalProps {
 type Tab = 'upload' | 'label'
 type UploadState = 'idle' | 'generating' | 'ready' | 'received' | 'expired'
 
+interface LabelFont {
+  id: string
+  label: string
+  stack: string
+}
+
+interface LabelTheme {
+  id: string
+  border: string
+  accent: string   // sex badge, molt header, domain text
+  swatch: string   // CSS color for the swatch button
+}
+
+const LABEL_FONTS: LabelFont[] = [
+  { id: 'sans',    label: 'Clean',   stack: 'Arial, Helvetica, sans-serif' },
+  { id: 'serif',   label: 'Classic', stack: 'Georgia, "Times New Roman", serif' },
+  { id: 'mono',    label: 'Mono',    stack: '"Courier New", Courier, monospace' },
+  { id: 'rounded', label: 'Round',   stack: '"Trebuchet MS", "Segoe UI", sans-serif' },
+]
+
+const LABEL_THEMES: LabelTheme[] = [
+  { id: 'default', border: '#000',    accent: '#555',    swatch: '#111' },
+  { id: 'purple',  border: '#7c3aed', accent: '#7c3aed', swatch: '#7c3aed' },
+  { id: 'teal',    border: '#0d9488', accent: '#0d9488', swatch: '#0d9488' },
+  { id: 'rose',    border: '#e11d48', accent: '#e11d48', swatch: '#e11d48' },
+  { id: 'slate',   border: '#475569', accent: '#475569', swatch: '#475569' },
+]
+
 interface LabelSize {
   id: string
   label: string
@@ -117,6 +145,12 @@ export default function QRModal({
   const [labelSize, setLabelSize] = useState<LabelSize>(LABEL_SIZES[1])
   const [showMolts, setShowMolts] = useState(false)
   const [photoCount, setPhotoCount] = useState(0)
+  const [labelFont, setLabelFont] = useState<LabelFont>(LABEL_FONTS[0])
+  const [labelTheme, setLabelTheme] = useState<LabelTheme>(LABEL_THEMES[0])
+  // Field visibility toggles
+  const [showSex, setShowSex] = useState(true)
+  const [showSciName, setShowSciName] = useState(true)
+  const [showDomain, setShowDomain] = useState(true)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const profileUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://tarantuverse.com'}/t/${tarantulaId}`
@@ -311,51 +345,100 @@ export default function QRModal({
 
         {/* ── Label tab ── */}
         {tab === 'label' && (
-          <div className="p-5">
+          <div className="p-5 space-y-3">
 
             {/* Size picker */}
-            <div className="flex gap-2 mb-3">
-              {LABEL_SIZES.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setLabelSize(s)}
-                  className={`flex-1 py-2 px-2 rounded-lg border text-xs font-medium transition-colors ${
-                    labelSize.id === s.id
-                      ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <div className="font-semibold">{s.label}</div>
-                  <div className="opacity-60">{s.description}</div>
-                </button>
-              ))}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Size</p>
+              <div className="flex gap-2">
+                {LABEL_SIZES.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setLabelSize(s)}
+                    className={`flex-1 py-2 px-2 rounded-lg border text-xs font-medium transition-colors ${
+                      labelSize.id === s.id
+                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="font-semibold">{s.label}</div>
+                    <div className="opacity-60">{s.description}</div>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Label options */}
-            {molts.length > 0 && (
-              <label className="flex items-center gap-2 mb-3 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={showMolts}
-                  onChange={(e) => setShowMolts(e.target.checked)}
-                  className="w-4 h-4 accent-purple-600"
-                />
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  Include last {Math.min(recentMolts.length, 3)} molt{recentMolts.length !== 1 ? 's' : ''}
-                </span>
-              </label>
-            )}
+            {/* Font picker */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Font</p>
+              <div className="flex gap-2">
+                {LABEL_FONTS.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setLabelFont(f)}
+                    className={`flex-1 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                      labelFont.id === f.id
+                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                    }`}
+                    style={{ fontFamily: f.stack }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-            {/* Label preview
-                `zoom` scales the element AND its layout footprint, avoiding overflow math. */}
-            <div className="flex justify-center mb-4 overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+            {/* Color picker */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Color</p>
+              <div className="flex gap-2">
+                {LABEL_THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setLabelTheme(t)}
+                    title={t.id}
+                    className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${
+                      labelTheme.id === t.id ? 'ring-2 ring-offset-2 ring-purple-500 scale-110' : 'border-gray-300 dark:border-gray-600'
+                    }`}
+                    style={{ backgroundColor: t.swatch }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Field toggles */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Fields</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: 'Sex',             checked: showSex,     set: setShowSex,     show: !!sex },
+                  { label: 'Scientific name', checked: showSciName, set: setShowSciName, show: !!scientificName },
+                  { label: `Molts (last ${Math.min(recentMolts.length, 3)})`, checked: showMolts, set: setShowMolts, show: molts.length > 0 },
+                  { label: 'Domain',          checked: showDomain,  set: setShowDomain,  show: true },
+                ].filter(f => f.show).map((f) => (
+                  <label key={f.label} className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={f.checked}
+                      onChange={(e) => f.set(e.target.checked)}
+                      className="w-3.5 h-3.5 accent-purple-600"
+                    />
+                    <span className="text-xs text-gray-600 dark:text-gray-400">{f.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Label preview */}
+            <div className="flex justify-center overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
               <div
                 id="qr-label-print"
                 style={{
                   zoom: labelSize.previewZoom,
                   width: labelSize.width,
                   height: labelSize.height,
-                  border: '1px solid #000',
+                  border: `1.5px solid ${labelTheme.border}`,
                   borderRadius: '4px',
                   display: 'flex',
                   alignItems: 'center',
@@ -363,9 +446,10 @@ export default function QRModal({
                   gap: '6px',
                   background: '#fff',
                   flexShrink: 0,
+                  fontFamily: labelFont.stack,
                 }}
               >
-                <QRCodeSVG value={profileUrl} size={labelSize.qrSize} level="M" />
+                <QRCodeSVG value={profileUrl} size={labelSize.qrSize} level="M" fgColor={labelTheme.border} />
 
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   {/* Name */}
@@ -374,10 +458,10 @@ export default function QRModal({
                   </div>
 
                   {/* Sex badge */}
-                  {sexInfo && (
+                  {showSex && sexInfo && (
                     <div style={{
                       fontSize: labelSize.fontSize.sci,
-                      color: sexInfo.color,
+                      color: labelTheme.accent,
                       fontWeight: 600,
                       lineHeight: 1.3,
                       letterSpacing: '0.01em',
@@ -387,7 +471,7 @@ export default function QRModal({
                   )}
 
                   {/* Scientific name */}
-                  {scientificName && (
+                  {showSciName && scientificName && (
                     <div style={{ fontSize: labelSize.fontSize.sci, fontStyle: 'italic', color: '#555', lineHeight: 1.2 }}>
                       {scientificName}
                     </div>
@@ -400,10 +484,10 @@ export default function QRModal({
                       color: '#777',
                       marginTop: 2,
                       lineHeight: 1.3,
-                      borderTop: '0.5px solid #ddd',
+                      borderTop: `0.5px solid ${labelTheme.border}22`,
                       paddingTop: 2,
                     }}>
-                      <span style={{ fontWeight: 600 }}>Molts: </span>
+                      <span style={{ fontWeight: 600, color: labelTheme.accent }}>Molts: </span>
                       {recentMolts.map((m, i) => (
                         <span key={m.id}>
                           {formatMoltDate(m.molted_at)}
@@ -415,15 +499,17 @@ export default function QRModal({
                   )}
 
                   {/* Domain */}
-                  <div style={{ fontSize: labelSize.fontSize.meta, color: '#aaa', marginTop: 2 }}>
-                    tarantuverse.com
-                  </div>
+                  {showDomain && (
+                    <div style={{ fontSize: labelSize.fontSize.meta, color: labelTheme.accent, opacity: 0.6, marginTop: 2 }}>
+                      tarantuverse.com
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-3">
-              QR links permanently to this spider&apos;s profile. Anyone who scans it can see their public info.
+            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+              QR links permanently to this spider&apos;s profile.
             </p>
 
             <button
