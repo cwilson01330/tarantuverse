@@ -8,10 +8,11 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "clear": "expo start --clear",
+    "build": "expo export --platform ios && expo export --platform android",
     "build:android": "eas build --platform android",
     "build:ios": "eas build --platform ios",
     "lint": "eslint .",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

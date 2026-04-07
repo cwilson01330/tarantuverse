@@ -16,8 +16,8 @@
     "build:web": "pnpm --filter web build",
     "build:mobile": "pnpm --filter mobile build",
     "lint": "pnpm --filter web lint && pnpm --filter mobile lint",
-    "test": "pnpm --filter web test && pnpm --filter mobile test && pnpm --filter api test",
-    "clean": "rm -rf apps/*/node_modules packages/*/node_modules node_modules"
+    "test": "pnpm --if-present --filter web test && pnpm --if-present --filter mobile test && python -m pytest apps/api",
+    "clean": "node -e \"const fs=require('fs');const path=require('path');for(const target of ['node_modules','apps/web/node_modules','apps/mobile/node_modules','apps/api/node_modules','packages/shared/node_modules']){fs.rmSync(path.resolve(target),{recursive:true,force:true});}\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

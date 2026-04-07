@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,11 +91,7 @@ export default function AdvancedAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchAdvancedAnalytics();
-  }, []);
-
-  const fetchAdvancedAnalytics = async () => {
+  const fetchAdvancedAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiClient.get("/api/v1/analytics/advanced/");
@@ -110,7 +106,11 @@ export default function AdvancedAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    fetchAdvancedAnalytics();
+  }, [fetchAdvancedAnalytics]);
 
   if (loading) {
     return (

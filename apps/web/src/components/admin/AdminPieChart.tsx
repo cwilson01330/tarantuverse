@@ -10,7 +10,6 @@ import {
   Legend,
 } from 'recharts';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PieDataItem = { name: string; value: number; percentage?: number } & Record<string, any>;
 
 interface AdminPieChartProps {

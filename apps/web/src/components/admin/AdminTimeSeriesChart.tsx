@@ -18,7 +18,6 @@ interface DataSeries {
   color: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TimeSeriesData = { date: string } & Record<string, any>;
 
 interface AdminTimeSeriesChartProps {

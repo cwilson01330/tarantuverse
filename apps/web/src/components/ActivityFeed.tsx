@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import ActivityFeedItem, {
   ActivityFeedItemData,
@@ -36,11 +36,7 @@ export default function ActivityFeed({
     "all"
   );
 
-  useEffect(() => {
-    fetchActivities();
-  }, [feedType, username, actionTypeFilter, session]);
-
-  const fetchActivities = async (pageNum: number = 1) => {
+  const fetchActivities = useCallback(async (pageNum: number = 1) => {
     try {
       setLoading(true);
       const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -121,7 +117,11 @@ export default function ActivityFeed({
     } finally {
       setLoading(false);
     }
-  };
+  }, [actionTypeFilter, feedType, session, username]);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
 
   const handleLoadMore = () => {
     fetchActivities(page + 1);

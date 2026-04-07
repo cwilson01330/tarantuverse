@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './useAuth'
 
 interface SubscriptionLimits {
@@ -14,16 +14,13 @@ export function useSubscription() {
   const [limits, setLimits] = useState<SubscriptionLimits | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchLimits = useCallback(async () => {
     if (!token) {
+      setLimits(null)
       setLoading(false)
       return
     }
 
-    fetchLimits()
-  }, [token])
-
-  const fetchLimits = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
       const response = await fetch(`${API_URL}/api/v1/promo-codes/me/limits`, {
@@ -58,7 +55,12 @@ export function useSubscription() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [token])
+
+  useEffect(() => {
+    setLoading(true)
+    fetchLimits()
+  }, [fetchLimits])
 
   const canAddTarantula = (currentCount: number): boolean => {
     if (!limits) return false
