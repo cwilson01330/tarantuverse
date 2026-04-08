@@ -110,8 +110,18 @@ const authOptions: AuthOptions = {
           }
           return null
         } catch (error) {
+          if (axios.isAxiosError(error)) {
+            const detail =
+              typeof error.response?.data?.detail === "string"
+                ? error.response.data.detail
+                : undefined
+
+            console.error("Auth error:", detail || error.message)
+            throw new Error(detail || "Invalid email or password")
+          }
+
           console.error("Auth error:", error)
-          return null
+          throw new Error("Invalid email or password")
         }
       }
     })
