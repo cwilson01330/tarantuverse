@@ -81,6 +81,10 @@ class ResetPasswordRequest(BaseModel):
         return _validate_password_complexity(v)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
 class UserResponse(BaseModel):
     """Schema for user response (without password)"""
     id: uuid.UUID

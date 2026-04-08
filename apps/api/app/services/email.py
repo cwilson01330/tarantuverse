@@ -1,72 +1,60 @@
 """
-Email Service (SendGrid)
+Email service backed by Resend.
 """
-import asyncio
 import logging
-from typing import Optional
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, To, Content
+
+import httpx
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class EmailService:
+    API_URL = "https://api.resend.com/emails"
+
     @staticmethod
     async def send_email(to_email: str, subject: str, content: str):
         """
-        Send email using SendGrid (async wrapper)
-
-        Note: SendGrid's Python client is synchronous, so we use asyncio.to_thread()
-        to run it in a thread pool without blocking the event loop.
+        Send email using Resend, with a log-only fallback when the API key is unset.
         """
-        if not settings.SENDGRID_API_KEY:
-            logger.warning("SENDGRID_API_KEY is not set. Falling back to mock email.")
+        if not settings.RESEND_API_KEY:
+            logger.warning("RESEND_API_KEY is not set. Falling back to mock email.")
             logger.info("==================================================================")
-            logger.info(f"MOCK EMAIL SENT TO: {to_email}")
-            logger.info(f"SUBJECT: {subject}")
-            logger.info(f"BODY:\n{content}")
+            logger.info("MOCK EMAIL SENT TO: %s", to_email)
+            logger.info("SUBJECT: %s", subject)
+            logger.info("BODY:\n%s", content)
             logger.info("==================================================================")
             return
 
-        logger.info(f"Attempting to send email to {to_email} with subject: {subject}")
-        logger.info(f"From email: {settings.SENDGRID_FROM_EMAIL}")
-        logger.info(f"API Key configured: {settings.SENDGRID_API_KEY[:10]}...")
-
-        message = Mail(
-            from_email=settings.SENDGRID_FROM_EMAIL,
-            to_emails=to_email,
-            subject=subject,
-            html_content=content
-        )
+        logger.info("Attempting to send email to %s with subject: %s", to_email, subject)
+        logger.info("From email: %s", settings.RESEND_FROM_EMAIL)
 
         try:
-            sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(
+                    EmailService.API_URL,
+                    headers={
+                        "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": settings.RESEND_FROM_EMAIL,
+                        "to": [to_email],
+                        "subject": subject,
+                        "html": content,
+                    },
+                )
 
-            # Run blocking call in thread pool to avoid blocking event loop
-            response = await asyncio.to_thread(sg.send, message)
-
-            # Log full response for debugging
-            logger.info(f"SendGrid Response Status Code: {response.status_code}")
-            logger.info(f"SendGrid Response Body: {response.body}")
-            logger.info(f"SendGrid Response Headers: {response.headers}")
-
-            if response.status_code >= 200 and response.status_code < 300:
-                logger.info(f"✅ Email successfully sent to {to_email}")
-            else:
-                logger.error(f"❌ SendGrid returned non-success status: {response.status_code}")
-                logger.error(f"Response body: {response.body}")
-
-        except Exception as e:
-            logger.error(f"❌ Failed to send email to {to_email}")
-            logger.error(f"Error type: {type(e).__name__}")
-            logger.error(f"Error message: {str(e)}")
-            logger.error(f"Full exception:", exc_info=True)
-            raise e
+            response.raise_for_status()
+            logger.info("Email successfully sent to %s via Resend", to_email)
+        except Exception:
+            logger.error("Failed to send email to %s via Resend", to_email, exc_info=True)
+            raise
 
     @staticmethod
     async def send_password_reset_email(to_email: str, reset_link: str):
         subject = "Reset Your Password - Tarantuverse"
-        # Simple HTML template
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>Reset Your Password</h2>

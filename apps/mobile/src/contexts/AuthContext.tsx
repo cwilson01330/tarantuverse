@@ -17,6 +17,11 @@ interface User {
   is_admin?: boolean;
 }
 
+interface RegisterResponse {
+  message: string;
+  requires_email_verification: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
@@ -24,7 +29,13 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   loginWithApple: () => Promise<void>;
-  register: (email: string, username: string, password: string, display_name?: string, referral_code?: string) => Promise<void>;
+  register: (
+    email: string,
+    username: string,
+    password: string,
+    display_name?: string,
+    referral_code?: string
+  ) => Promise<RegisterResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }

@@ -217,6 +217,14 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => router.push('/forgot-password')}
+            disabled={loading}
+          >
+            <Text style={styles.linkText}>Forgot your password?</Text>
+          </TouchableOpacity>
+
           {/* Divider */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />

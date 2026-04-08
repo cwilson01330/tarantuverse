@@ -11,7 +11,7 @@ import secrets
 from app.database import get_db
 from app.models.user import User
 from app.models.user_oauth_account import UserOAuthAccount
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest
+from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest, ForgotPasswordRequest
 from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse, LinkedAccountResponse, LinkAccountRequest
 from app.utils.auth import get_password_hash, verify_password, create_access_token, revoke_token, decode_access_token
 from app.utils.dependencies import get_current_user
@@ -89,15 +89,19 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
             )
 
     # Create new user
-    verification_token = secrets.token_urlsafe(32)
-    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    verification_required = settings.EMAIL_VERIFICATION_REQUIRED
+    verification_token = None
+    verification_token_expires_at = None
+    if verification_required:
+        verification_token = secrets.token_urlsafe(32)
+        verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
     new_user = User(
         email=user_data.email,
         username=user_data.username,
         hashed_password=get_password_hash(user_data.password),
         display_name=user_data.display_name or user_data.username,
-        is_verified=False,
+        is_verified=not verification_required,
         verification_token=verification_token,
         verification_token_expires_at=verification_token_expires_at,
         # Set referral info if referral code was provided
@@ -109,17 +113,27 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
     db.commit()
     db.refresh(new_user)
 
-    # Send verification email
-    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
+    if verification_required:
+        verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
+        await EmailService.send_verification_email(new_user.email, verify_link)
+        response_message = "Registration successful. Please check your email to verify your account."
+        if referrer:
+            response_message = (
+                f"Registration successful! You were referred by {referrer.username}. "
+                "Please check your email to verify your account."
+            )
+    else:
+        response_message = "Registration successful. Your account is active and ready to log in."
+        if referrer:
+            response_message = (
+                f"Registration successful! You were referred by {referrer.username}. "
+                "Your account is active and ready to log in."
+            )
 
-    # We use background task or await
-    await EmailService.send_verification_email(new_user.email, verify_link)
-
-    response_message = "Registration successful. Please check your email to verify your account."
-    if referrer:
-        response_message = f"Registration successful! You were referred by {referrer.username}. Please check your email to verify your account."
-
-    return {"message": response_message}
+    return {
+        "message": response_message,
+        "requires_email_verification": verification_required,
+    }
 
 
 @router.post("/login", response_model=Token)
@@ -159,11 +173,17 @@ async def login(request: Request, credentials: UserLogin, db: Session = Depends(
     # We should ensure oauth users have is_verified=True when created (which I didn't do in register but they don't hit this login endpoint often if using oauth-login?)
     # Wait, oauth-login endpoint handles its own login.
     # This /login endpoint is for email/password.
-    if not user.is_verified:
+    if settings.EMAIL_VERIFICATION_REQUIRED and not user.is_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email not verified. Please check your inbox."
         )
+    if not settings.EMAIL_VERIFICATION_REQUIRED and not user.is_verified:
+        user.is_verified = True
+        user.verification_token = None
+        user.verification_token_expires_at = None
+        db.commit()
+        db.refresh(user)
 
     # Create access token
     access_token = create_access_token(data={"sub": str(user.id)})
@@ -935,6 +955,33 @@ async def unlink_account(
     return {"message": f"{provider.capitalize()} account unlinked successfully"}
 
 
+@router.post("/forgot-password")
+@limiter.limit("5/minute")
+async def forgot_password(
+    request: Request,
+    forgot_data: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Send a password reset email if the account exists and supports password login.
+    Always returns a success message to avoid user enumeration.
+    """
+    user = db.query(User).filter(User.email == forgot_data.email).first()
+
+    if user and user.hashed_password:
+        token = secrets.token_urlsafe(32)
+        expires = datetime.now(timezone.utc) + timedelta(hours=24)
+
+        user.reset_token = token
+        user.reset_token_expires_at = expires
+        db.commit()
+
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        await EmailService.send_password_reset_email(user.email, reset_link)
+
+    return {"message": "If an account exists for that email, a password reset link has been sent."}
+
+
 @router.post("/reset-password")
 @limiter.limit("5/minute")
 async def reset_password(
@@ -982,6 +1029,9 @@ async def verify_email(
     """
     Verify email using a valid token
     """
+    if not settings.EMAIL_VERIFICATION_REQUIRED:
+        return {"message": "Email verification is currently disabled. Accounts are activated automatically."}
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1035,6 +1085,9 @@ async def resend_verification(
     """
     Resend verification email
     """
+    if not settings.EMAIL_VERIFICATION_REQUIRED:
+        return {"message": "Email verification is currently disabled. Accounts are activated automatically."}
+
     user = db.query(User).filter(User.email == email).first()
 
     if not user:
@@ -1091,4 +1144,3 @@ async def delete_account(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete account: {str(e)}"
         )
-

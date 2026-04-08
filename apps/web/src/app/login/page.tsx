@@ -139,6 +139,12 @@ function LoginForm() {
         </form>
 
         <p className="mt-6 text-center text-sm text-theme-secondary">
+          <a href="/reset-password" className="text-primary-600 hover:underline">
+            Forgot your password?
+          </a>
+        </p>
+
+        <p className="mt-3 text-center text-sm text-theme-secondary">
           Don't have an account?{' '}
           <a href="/register" className="text-primary-600 hover:underline">
             Register

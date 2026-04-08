@@ -26,6 +26,7 @@ function RegisterForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   const [referrerInfo, setReferrerInfo] = useState<ReferrerInfo | null>(null)
   const [validatingReferral, setValidatingReferral] = useState(false)
 
@@ -93,6 +94,7 @@ function RegisterForm() {
         throw new Error(data.detail || 'Registration failed')
       }
 
+      setSuccessMessage(data.message || 'Registration successful. Your account is active and ready to log in.')
       setSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
@@ -112,8 +114,12 @@ function RegisterForm() {
           </div>
           <h2 className="text-2xl font-bold mb-4">Registration Successful!</h2>
           <p className="text-theme-secondary mb-8">
-            We've sent a verification email to <strong>{formData.email}</strong>.
-            Please check your inbox and verify your account to log in.
+            {successMessage || (
+              <>
+                Your account for <strong>{formData.email}</strong> is ready to go.
+                You can log in now.
+              </>
+            )}
           </p>
           <a
             href={redirectTo ? `/login?redirect=${encodeURIComponent(redirectTo)}` : '/login'}

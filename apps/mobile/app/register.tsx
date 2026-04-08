@@ -43,6 +43,7 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Check for referral code from URL params
   useEffect(() => {
@@ -94,8 +95,8 @@ export default function RegisterScreen() {
     try {
       // Only include referral code if it's valid
       const validReferralCode = referrerInfo?.valid ? referralCode : undefined;
-      await register(email, username, password, displayName || username, validReferralCode);
-      // Registration successful - show verification message
+      const response = await register(email, username, password, displayName || username, validReferralCode);
+      setSuccessMessage(response.message || 'Registration successful. Your account is active and ready to log in.');
       setSuccess(true);
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message);
@@ -310,8 +311,7 @@ export default function RegisterScreen() {
           </View>
           <Text style={[styles.title, { color: colors.textPrimary }]}>Registration Successful!</Text>
           <Text style={[styles.subtitle, { textAlign: 'center', marginTop: 16, marginBottom: 32 }]}>
-            We've sent a verification email to {email}.{'\n'}
-            Please check your inbox and verify your account to log in.
+            {successMessage || `Your account for ${email} is ready to go.\nYou can log in now.`}
           </Text>
           <TouchableOpacity
             style={styles.button}

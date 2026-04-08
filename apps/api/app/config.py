@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Frontend URL for emails
     FRONTEND_URL: str = "http://localhost:3000"
 
+    # Auth email flow
+    EMAIL_VERIFICATION_REQUIRED: bool = False
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
@@ -49,9 +52,9 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: str = "tarantuverse-photos"
     R2_PUBLIC_URL: str = ""  # e.g., https://pub-xxx.r2.dev
 
-    # Email (SendGrid)
-    SENDGRID_API_KEY: str = ""
-    SENDGRID_FROM_EMAIL: str = "noreply@tarantuverse.com"
+    # Email (Resend)
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "Tarantuverse <noreply@mail.tarantuverse.com>"
 
     # Stripe Payments
     STRIPE_SECRET_KEY: str = ""
