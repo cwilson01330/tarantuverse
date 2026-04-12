@@ -3,8 +3,13 @@
  */
 import axios from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { EventEmitter } from 'events'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
+
+/** Emitted when a 401 is received — AuthContext listens and forces logout */
+export const authEvents = new EventEmitter()
+export const AUTH_EXPIRED_EVENT = 'auth:expired'
 
 export const apiClient = axios.create({
   baseURL: `${API_URL}/api/v1`,
@@ -34,10 +39,11 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
-    // Handle unauthorized - clear token and redirect to login
+    // Handle unauthorized - clear token and signal AuthContext to redirect
     if (error.response?.status === 401) {
       await AsyncStorage.removeItem('auth_token')
       await AsyncStorage.removeItem('user')
+      authEvents.emit(AUTH_EXPIRED_EVENT)
     }
     return Promise.reject(error)
   }

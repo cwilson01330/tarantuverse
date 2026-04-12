@@ -1,6 +1,6 @@
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiClient } from '../services/api';
+import { apiClient, authEvents, AUTH_EXPIRED_EVENT } from '../services/api';
 import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable } from '../services/google-signin';
 
 // Re-export for convenience so login screens can import from one place
@@ -47,9 +47,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Force logout when the API interceptor detects a 401 (expired/revoked token)
+  const handleAuthExpired = useCallback(() => {
+    setToken(null);
+    setUser(null);
+  }, []);
+
   useEffect(() => {
     loadStoredAuth();
-  }, []);
+
+    authEvents.on(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => {
+      authEvents.off(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    };
+  }, [handleAuthExpired]);
 
   const loadStoredAuth = async () => {
     try {

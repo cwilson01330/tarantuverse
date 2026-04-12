@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { signOut } from 'next-auth/react'
 import { useAuth } from '@/hooks/useAuth'
 import { useSubscription } from '@/hooks/useSubscription'
 import ActivityFeed from '@/components/ActivityFeed'
@@ -74,6 +75,13 @@ export default function DashboardHub() {
     fetchDashboardData(token)
   }, [router, isAuthenticated, isLoading, token])
 
+  /** If any core API call returns 401, the token is dead — force re-login */
+  const handleExpiredToken = useCallback(async () => {
+    localStorage.removeItem('auth_token')
+    await signOut({ redirect: false })
+    router.push('/login')
+  }, [router])
+
   const fetchDashboardData = async (authToken: string) => {
     try {
       const headers = { 'Authorization': `Bearer ${authToken}` }
@@ -84,6 +92,12 @@ export default function DashboardHub() {
         fetch(`${API_URL}/api/v1/enclosures/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/promo-codes/me/limits`, { headers }).catch(() => null),
       ])
+
+      // If the primary fetch returned 401, token is expired — redirect to login
+      if (tarantulasRes?.status === 401) {
+        await handleExpiredToken()
+        return
+      }
 
       if (tarantulasRes?.ok) {
         const data = await tarantulasRes.json()
