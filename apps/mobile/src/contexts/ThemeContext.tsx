@@ -4,6 +4,44 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export type Theme = 'dark' | 'light';
 export type ThemeType = 'default' | 'preset' | 'custom';
 
+// ─── Aesthetic Preset ──────────────────────────────────────────────────────────
+// Controls layout/surface behaviour. Separate from color presets.
+// Semantic tokens (error, warning, success, male, female) are immutable and
+// live outside this system — they cannot be overridden by any preset.
+export type AestheticPreset = 'hobbyist' | 'keeper';
+
+export interface LayoutTokens {
+  /** Whether gradient fills should be rendered (headers, FABs, icon boxes). */
+  useGradient: boolean;
+  radius: { sm: number; md: number; lg: number; full: number };
+  density: { rowHeight: number; cardPadding: number; stackGap: number };
+  /** How surfaces convey depth. */
+  elevation: 'border' | 'shadow' | 'none';
+}
+
+export const AESTHETIC_PRESETS: Record<AestheticPreset, LayoutTokens> = {
+  /**
+   * Hobbyist — the vibrant default.
+   * Full gradients, large radius, generous spacing, shadow elevation.
+   */
+  hobbyist: {
+    useGradient: true,
+    radius: { sm: 12, md: 16, lg: 24, full: 9999 },
+    density: { rowHeight: 52, cardPadding: 16, stackGap: 12 },
+    elevation: 'shadow',
+  },
+  /**
+   * Keeper — restrained tool aesthetic.
+   * Flat surfaces, compact radius, tighter spacing, border elevation.
+   */
+  keeper: {
+    useGradient: false,
+    radius: { sm: 8, md: 12, lg: 16, full: 9999 },
+    density: { rowHeight: 44, cardPadding: 14, stackGap: 8 },
+    elevation: 'border',
+  },
+};
+
 // Theme preset interface
 export interface ThemePreset {
   id: string;
@@ -30,7 +68,7 @@ interface ThemeContextType {
   setTheme: (theme: Theme) => void;
   colors: ThemeColors;
 
-  // Skinning features
+  // Color skinning (species/habitat presets + custom)
   themeType: ThemeType;
   presetId: string | null;
   customColors: UserColors | null;
@@ -40,6 +78,11 @@ interface ThemeContextType {
   loadFromAPI: (token: string) => Promise<void>;
   saveToAPI: (token: string) => Promise<void>;
   isLoading: boolean;
+
+  // Aesthetic preset — layout/surface dimension (separate from color)
+  aestheticPreset: AestheticPreset;
+  setAestheticPreset: (preset: AestheticPreset) => void;
+  layout: LayoutTokens;
 }
 
 export interface ThemeColors {
@@ -279,6 +322,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [presetId, setPresetId] = useState<string | null>(null);
   const [customColors, setCustomColorsState] = useState<UserColors | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [aestheticPreset, setAestheticPresetState] = useState<AestheticPreset>('hobbyist');
 
   // Compute resolved user colors based on theme type
   const resolvedUserColors = useMemo((): UserColors => {
@@ -303,6 +347,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       : createLightColors(resolvedUserColors);
   }, [theme, resolvedUserColors]);
 
+  // Resolve layout tokens from the active aesthetic preset
+  const layout = useMemo((): LayoutTokens => {
+    return AESTHETIC_PRESETS[aestheticPreset];
+  }, [aestheticPreset]);
+
   // Load theme from storage on mount
   useEffect(() => {
     loadTheme();
@@ -324,6 +373,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         if (prefs.themeType) setThemeType(prefs.themeType);
         if (prefs.presetId) setPresetId(prefs.presetId);
         if (prefs.customColors) setCustomColorsState(prefs.customColors);
+        if (prefs.aestheticPreset && (prefs.aestheticPreset === 'keeper' || prefs.aestheticPreset === 'hobbyist')) {
+          setAestheticPresetState(prefs.aestheticPreset);
+        }
       }
     } catch (error) {
       console.error('Failed to load theme:', error);
@@ -336,11 +388,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       await AsyncStorage.setItem(
         THEME_PREFS_STORAGE_KEY,
-        JSON.stringify({ themeType, presetId, customColors })
+        JSON.stringify({ themeType, presetId, customColors, aestheticPreset })
       );
     } catch (error) {
       console.error('Failed to save theme prefs:', error);
     }
+  };
+
+  const setAestheticPreset = (preset: AestheticPreset) => {
+    setAestheticPresetState(preset);
+    // Persist immediately — fire-and-forget
+    setTimeout(() => {
+      AsyncStorage.getItem(THEME_PREFS_STORAGE_KEY).then((raw) => {
+        const existing = raw ? JSON.parse(raw) : {};
+        return AsyncStorage.setItem(
+          THEME_PREFS_STORAGE_KEY,
+          JSON.stringify({ ...existing, aestheticPreset: preset })
+        );
+      }).catch((err) => console.error('Failed to save aesthetic preset:', err));
+    }, 0);
   };
 
   const saveTheme = async (newTheme: Theme) => {
@@ -464,6 +530,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         loadFromAPI,
         saveToAPI,
         isLoading,
+        aestheticPreset,
+        setAestheticPreset,
+        layout,
       }}
     >
       {children}

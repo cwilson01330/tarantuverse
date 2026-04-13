@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, TextInput, SectionList, TouchableOpacity, Text, ActivityIndicator, SafeAreaView } from 'react-native'
 import { useRouter } from 'expo-router'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useTheme } from '../src/contexts/ThemeContext'
+import AppHeader from '../src/components/AppHeader'
 import { apiClient } from '../src/services/api'
 
 interface SearchResult {
@@ -38,7 +38,14 @@ const SECTION_ICONS = {
 
 export default function SearchScreen() {
   const router = useRouter()
-  const { colors } = useTheme()
+  const { colors, layout } = useTheme()
+
+  // Input field styles adapt to the active preset
+  const inputBg = layout.useGradient ? 'rgba(255,255,255,0.2)' : colors.surfaceElevated
+  const inputBorder = layout.useGradient ? 'rgba(255,255,255,0.3)' : colors.border
+  const inputTextColor = layout.useGradient ? '#fff' : colors.textPrimary
+  const inputPlaceholderColor = layout.useGradient ? 'rgba(255,255,255,0.65)' : colors.textTertiary
+  const clearColor = layout.useGradient ? 'rgba(255,255,255,0.8)' : colors.textTertiary
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -195,50 +202,44 @@ export default function SearchScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Gradient Header with embedded search */}
-      <LinearGradient
-        colors={[colors.primary, colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 20 }}
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['left', 'right', 'bottom']}>
+      {/* Header — gradient (Hobbyist) or flat (Keeper) via AppHeader */}
+      <AppHeader
+        title="🔍 Search"
+        subtitle="Find tarantulas, species & keepers"
+        paddingBottom={20}
       >
-        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 2 }}>
-          🔍 Search
-        </Text>
-        <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 14 }}>
-          Find tarantulas, species & keepers
-        </Text>
+        {/* Search input lives inside the header band */}
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 14,
           paddingVertical: 10,
-          backgroundColor: 'rgba(255,255,255,0.2)',
-          borderRadius: 12,
+          backgroundColor: inputBg,
+          borderRadius: layout.radius.md,
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.3)',
+          borderColor: inputBorder,
         }}>
           <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
           <TextInput
             placeholder="Search tarantulas, species, keepers..."
-            placeholderTextColor="rgba(255,255,255,0.65)"
+            placeholderTextColor={inputPlaceholderColor}
             value={query}
             onChangeText={setQuery}
             style={{
               flex: 1,
               fontSize: 16,
-              color: '#fff',
+              color: inputTextColor,
               paddingVertical: 0,
             }}
           />
-          {query && (
+          {query ? (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.8)' }}>✕</Text>
+              <Text style={{ fontSize: 16, color: clearColor }}>✕</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
-      </LinearGradient>
+      </AppHeader>
 
       {/* Results List */}
       {sections.length > 0 || loading || (query.length >= 2 && results) ? (

@@ -6,6 +6,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { KeeperCardSkeleton, CategoryCardSkeleton } from '../../src/components/CommunitySkeletons';
 import ActivityFeedItem, { ActivityFeedItemData } from '../../src/components/ActivityFeedItem';
+import AppHeader from '../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Keeper {
@@ -36,7 +37,8 @@ interface ForumCategory {
 
 export default function CommunityScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const headerIconColor = layout.useGradient ? '#fff' : colors.primary;
   const [keepers, setKeepers] = useState<Keeper[]>([]);
   const [categories, setCategories] = useState<ForumCategory[]>([]);
   const [activities, setActivities] = useState<ActivityFeedItemData[]>([]);
@@ -164,17 +166,7 @@ export default function CommunityScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
-        <LinearGradient
-          colors={[colors.primary, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <View>
-            <Text style={styles.headerTitle}>🌐 Community</Text>
-            <Text style={styles.headerSubtitle}>Connect with keepers</Text>
-          </View>
-        </LinearGradient>
+        <AppHeader title="🌐 Community" subtitle="Connect with keepers" />
 
         {/* Skeleton loading */}
         <View style={{ padding: 16 }}>
@@ -199,23 +191,15 @@ export default function CommunityScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>🌐 Community</Text>
-          <Text style={styles.headerSubtitle}>Connect with keepers</Text>
-        </View>
-        <TouchableOpacity
-          style={{ justifyContent: 'center', paddingRight: 8 }}
-          onPress={() => router.push('/discover')}
-        >
-          <MaterialCommunityIcons name="star" size={28} color="#fff" />
-        </TouchableOpacity>
-      </LinearGradient>
+      <AppHeader
+        title="🌐 Community"
+        subtitle="Connect with keepers"
+        rightAction={
+          <TouchableOpacity onPress={() => router.push('/discover')}>
+            <MaterialCommunityIcons name="star" size={28} color={headerIconColor} />
+          </TouchableOpacity>
+        }
+      />
 
       {/* Tabs */}
       <View style={[styles.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>

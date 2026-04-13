@@ -1,10 +1,11 @@
 import { Tabs } from 'expo-router';
+import { View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function TabLayout() {
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
 
   return (
     <Tabs
@@ -15,18 +16,29 @@ export default function TabLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
         },
-        headerBackground: () => (
-          <LinearGradient
-            colors={[colors.primary, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{ flex: 1 }}
-          />
-        ),
-        headerTintColor: '#fff',
+        // Keeper preset: flat compact header. Hobbyist: full gradient.
+        headerBackground: () =>
+          layout.useGradient ? (
+            <LinearGradient
+              colors={[colors.primary, colors.secondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{ flex: 1 }}
+            />
+          ) : (
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: colors.surface,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border,
+              }}
+            />
+          ),
+        headerTintColor: layout.useGradient ? '#fff' : colors.textPrimary,
         headerTitleStyle: {
           fontWeight: 'bold',
-          color: '#fff',
+          color: layout.useGradient ? '#fff' : colors.textPrimary,
         },
       }}
     >

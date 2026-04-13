@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTheme, THEME_PRESETS, ThemePreset, UserColors } from '../../src/contexts/ThemeContext';
+import { useTheme, THEME_PRESETS, ThemePreset, UserColors, AestheticPreset, AESTHETIC_PRESETS } from '../../src/contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function AppearanceSettings() {
@@ -29,6 +29,8 @@ export default function AppearanceSettings() {
     resetToDefault,
     saveToAPI,
     loadFromAPI,
+    aestheticPreset,
+    setAestheticPreset,
   } = useTheme();
 
   const [token, setToken] = useState<string | null>(null);
@@ -147,6 +149,71 @@ export default function AppearanceSettings() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* ── Aesthetic Preset Section ──────────────────────────────────────── */}
+        <View style={[styles.section, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>App Style</Text>
+          <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
+            Choose how Tarantuverse looks and feels.
+          </Text>
+          <View style={styles.aestheticRow}>
+            {/* Hobbyist card */}
+            <TouchableOpacity
+              style={[
+                styles.aestheticCard,
+                {
+                  borderColor: aestheticPreset === 'hobbyist' ? colors.primary : colors.border,
+                  backgroundColor: aestheticPreset === 'hobbyist' ? colors.primary + '12' : colors.surfaceElevated,
+                },
+              ]}
+              onPress={() => setAestheticPreset('hobbyist')}
+              activeOpacity={0.7}
+            >
+              {/* Mini gradient swatch */}
+              <LinearGradient
+                colors={[colors.primary, colors.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.aestheticSwatch}
+              />
+              <Text style={[styles.aestheticLabel, { color: colors.textPrimary }]}>Hobbyist</Text>
+              <Text style={[styles.aestheticDesc, { color: colors.textSecondary }]}>
+                Vibrant gradients, spacious layout
+              </Text>
+              {aestheticPreset === 'hobbyist' && (
+                <Ionicons name="checkmark-circle" size={18} color={colors.primary} style={styles.aestheticCheck} />
+              )}
+            </TouchableOpacity>
+
+            {/* Keeper card */}
+            <TouchableOpacity
+              style={[
+                styles.aestheticCard,
+                {
+                  borderColor: aestheticPreset === 'keeper' ? colors.primary : colors.border,
+                  backgroundColor: aestheticPreset === 'keeper' ? colors.primary + '12' : colors.surfaceElevated,
+                },
+              ]}
+              onPress={() => setAestheticPreset('keeper')}
+              activeOpacity={0.7}
+            >
+              {/* Mini flat swatch */}
+              <View
+                style={[
+                  styles.aestheticSwatch,
+                  { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+                ]}
+              />
+              <Text style={[styles.aestheticLabel, { color: colors.textPrimary }]}>Keeper</Text>
+              <Text style={[styles.aestheticDesc, { color: colors.textSecondary }]}>
+                Flat surfaces, compact & focused
+              </Text>
+              {aestheticPreset === 'keeper' && (
+                <Ionicons name="checkmark-circle" size={18} color={colors.primary} style={styles.aestheticCheck} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Color Mode Section */}
         <View style={[styles.section, { backgroundColor: colors.surface }]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Color Mode</Text>
@@ -559,6 +626,41 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 12,
     marginBottom: 16,
+  },
+  sectionDescription: {
+    fontSize: 13,
+    marginBottom: 14,
+    marginTop: -4,
+  },
+  aestheticRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  aestheticCard: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 12,
+    position: 'relative',
+  },
+  aestheticSwatch: {
+    height: 40,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  aestheticLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  aestheticDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  aestheticCheck: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
   },
   buttonPreviews: {
     flexDirection: 'row',

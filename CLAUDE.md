@@ -385,6 +385,160 @@
   - `make_admin.py` script for role assignment
   - Command-line user promotion/demotion
 
+- **System Settings** 🆕:
+  - `/dashboard/admin/settings` - Runtime feature flags and system configuration
+  - 21 seeded settings across 4 categories (Feature Flags, Limits, Maintenance, Announcements)
+  - In-memory cache with 5-minute TTL via `settings_service.py`
+  - Maintenance mode middleware (blocks writes for non-admins, returns 503)
+  - Bulk update support
+  - API: `system_settings.py` router
+  - Migration: `w4x5y6z7a8b9_add_system_settings.py`
+
+#### Security Hardening 🔐 (✅ COMPLETE)
+**Defense-in-depth security measures across auth and file handling**
+
+- **Rate Limiting**:
+  - SlowAPI middleware with shared `Limiter` in `utils/rate_limit.py`
+  - Auth endpoints: register (5/min), login (10/min), forgot-password (5/min), reset-password (5/min)
+  - Global default: 200/min
+
+- **Token Revocation (Logout)**:
+  - `token_blocklist` table stores revoked JWT JTIs
+  - `POST /auth/logout` revokes current token immediately
+  - `get_current_user` checks blocklist on every authenticated request
+  - `jti` (UUID) and `iat` claims added to every JWT
+  - Token expiry reduced from 7 days → 24 hours
+
+- **CORS Hardening**:
+  - Replaced `allow_headers=["*"]` with explicit allowlist
+  - Removed custom OPTIONS middleware that was bypassing CORS
+  - Explicit `expose_headers=["X-Request-ID"]`
+
+- **File Upload Validation**:
+  - `utils/file_validation.py` — magic byte validation (JPEG, PNG, GIF, WebP)
+  - Validates raw bytes instead of trusting `Content-Type` header
+  - Applied to avatar upload and photo upload endpoints
+
+- **Password & Secret Management**:
+  - Password complexity validator (uppercase, lowercase, digit, special char)
+  - Dev secret detection — refuses to start in production with default key
+  - OAuth auto-linking only for `is_verified=True` accounts (unverified → 409 Conflict)
+
+#### Password Recovery & Email System 📧 (✅ COMPLETE)
+**Email-based auth flows using Resend API**
+
+- **Email Service**: Resend API (replaces SendGrid)
+  - Mock fallback mode when API key not set (logs email contents)
+  - HTML-formatted emails with plain text fallback
+
+- **Password Recovery Flow**:
+  - `POST /auth/forgot-password` — generates 24-hour reset token, prevents user enumeration
+  - `POST /auth/reset-password` — validates token, prevents password reuse
+  - Web: `/reset-password` page with forgot + reset forms
+  - Mobile: `forgot-password.tsx` screen
+
+- **Email Verification** (optional):
+  - Feature flag: `EMAIL_VERIFICATION_REQUIRED` (default: `False`)
+  - When True: blocks login until email verified
+  - When False: auto-verified on registration
+
+#### QR Identity System 📱 (✅ COMPLETE)
+**QR-based tarantula identity for offline uploads and enclosure labels**
+
+- **Upload Sessions**:
+  - `POST /tarantulas/{id}/upload-session` — owner creates 20-minute session token
+  - `GET /upload-sessions/{token}` — public, returns tarantula context
+  - `POST /upload-sessions/{token}/photo` — public, phone uploads without login
+  - Model: `QRUploadSession` with token, expiry, usage tracking
+  - Migration: `y6z7a8b9c0d1_add_qr_identity_system.py`
+
+- **Enclosure Labels** (`QRModal.tsx`):
+  - Size picker: Small (2"×1.25"), Medium (3"×1.5"), Large (4"×2")
+  - Font picker: Clean, Classic, Mono, Round
+  - Color themes: black, purple, teal, rose, slate
+  - Field toggles: sex, scientific name, molts, domain
+  - Live preview with print-accurate rendering
+  - Print uses `outerHTML` (preserves all theme styles) with zoom stripped
+
+- **Public Tarantula Profiles**:
+  - Route: `/t/{tarantula_id}` — permanent public URL
+  - Context-aware: owner sees full detail, others see public card
+  - Web page: `apps/web/src/app/t/[id]/page.tsx`
+
+- **Web Upload Page**: `/upload/{token}` — file picker, camera, caption, progress
+
+- **Mobile QR Sheet**: `QRSheet.tsx` — bottom sheet with QR display, copy URL, camera/gallery
+
+#### Achievement System 🏆 (✅ COMPLETE)
+**Gamification with 18 achievements across 5 categories**
+
+- **Categories & Tiers**:
+  - Collection (5): First Tarantula → Keeper's Kingdom (1→100)
+  - Feeding (3): First Feeding → Feeding Guru (1→100)
+  - Molts (3): Molt Witness → Growth Master (1→50)
+  - Community (4): First Post → Influencer (1 post → 10 followers)
+  - Breeding (3): First Pairing → Offspring Curator (1→10 offspring)
+
+- **Backend**:
+  - `AchievementService` checks all applicable achievements
+  - Auto-checked on `GET /achievements/` (check-on-load pattern)
+  - Enum column workaround: `cast(Pairing.outcome, SAString) == "successful"`
+  - Migration: `x5y6z7a8b9c0_add_achievements.py`
+
+- **UI**:
+  - Web: `/dashboard/achievements` — gallery with progress bars, locked/unlocked states
+  - Mobile: `/achievements` — tab-filtered grid with category stats
+  - Components: `AchievementBadge.tsx` (web + mobile)
+
+#### Global Search & Discover 🔍 (✅ COMPLETE)
+**Platform-wide unified search and community discovery**
+
+- **Global Search** (`GlobalSearch.tsx`):
+  - Cmd+K shortcut + search modal
+  - Searches: tarantulas, species, keepers, forum threads
+  - Debounced input, result grouping, recent searches
+
+- **Discover Community**:
+  - Router: `discover.py` — trending threads, active keepers, popular species, new members
+  - Web: `/community/discover`
+  - Mobile: `/discover` with swipeable category tabs
+
+#### Premolt Prediction 🧬 (✅ COMPLETE)
+**Algorithmic molt prediction using feeding patterns and history**
+
+- **Algorithm** (`premolt_service.py`):
+  - Analyzes feeding refusal patterns + molt intervals
+  - Detection: 2+ consecutive refusals AND >60% of average interval passed
+  - Confidence scoring: high/medium/low based on data quality
+  - Returns: days since last molt, refusal streak, estimated window, data quality
+
+- **API**: `GET /premolt/{tarantula_id}` and `GET /premolt` (all user's tarantulas)
+- **UI**: `PremoltPredictionSection.tsx` (web), `PremoltPredictionCard.tsx` + `PremoltAlertCard.tsx` (mobile)
+
+#### Data Export System 📦 (✅ COMPLETE)
+**GDPR-compliant data export in multiple formats**
+
+- **Formats**: JSON, CSV, Full ZIP (with photos)
+- **Data included**: profile, tarantulas, all logs, breeding records, photos, forum posts, achievements
+- **API**: `import_export.py` router — `/export/json`, `/export/csv`, `/export/full`, `/export/preview`
+- **UI**:
+  - Web: `/dashboard/settings/data-export`
+  - Mobile: `/settings/data-export` with share sheet
+
+#### Smart Feeding Reminders 🍽️ (✅ COMPLETE)
+**Per-species automatic feeding interval calculation**
+
+- **Service** (`feeding_reminder_service.py`):
+  - Uses species database for optimal feeding intervals by life stage
+  - Auto-schedules reminders on feeding log creation
+  - Displays "overdue" badges on collection grid
+
+#### Mobile Onboarding 📲 (✅ COMPLETE)
+**4-screen welcome sequence for new users**
+
+- Welcome → Add First Tarantula → Track Feedings & Molts → Join Community
+- AsyncStorage persistence, skip option, dismissible "Get Started" card
+
 #### Branding & Assets 🎨 (✅ COMPLETE)
 **Professional branding implementation**
 
@@ -618,7 +772,11 @@ apps/api/
 │       ├── add_oauth_fields.py (oauth_fields_001)
 │       ├── add_safety_fields_to_species.py
 │       ├── k2l3m4n5o6p7_add_breeding_module.py
-│       └── l3m4n5o6p7q8_add_notification_preferences.py
+│       ├── l3m4n5o6p7q8_add_notification_preferences.py
+│       ├── w4x5y6z7a8b9_add_system_settings.py
+│       ├── x5y6z7a8b9c0_add_achievements.py
+│       ├── y6z7a8b9c0d1_add_qr_identity_system.py
+│       └── z7a8b9c0d1e2_add_token_blocklist.py
 ├── app/
 │   ├── models/
 │   │   ├── __init__.py
@@ -641,7 +799,11 @@ apps/api/
 │   │   ├── forum.py (NEW - community)
 │   │   ├── activity_feed.py (NEW - community)
 │   │   ├── subscription.py (NEW - premium)
-│   │   └── notification_preference.py (NEW - notifications)
+│   │   ├── notification_preference.py (NEW - notifications)
+│   │   ├── achievement.py (NEW - gamification)
+│   │   ├── qr_upload_session.py (NEW - QR identity)
+│   │   ├── token_blocklist.py (NEW - JWT revocation)
+│   │   └── system_setting.py (NEW - admin config)
 │   ├── schemas/
 │   │   ├── user.py
 │   │   ├── tarantula.py (UPDATED: husbandry fields)
@@ -649,7 +811,10 @@ apps/api/
 │   │   ├── feeding_log.py
 │   │   ├── molt.py
 │   │   ├── substrate_change.py
-│   │   └── [schemas for all new models]
+│   │   ├── achievement.py (NEW)
+│   │   ├── discover.py (NEW)
+│   │   ├── premolt.py (NEW)
+│   │   └── [schemas for all other models]
 │   ├── routers/
 │   │   ├── __init__.py
 │   │   ├── auth.py (JWT authentication)
@@ -670,21 +835,38 @@ apps/api/
 │   │   ├── forums.py (NEW - community, UPDATED: push notifications)
 │   │   ├── activity.py (NEW - community)
 │   │   ├── subscriptions.py (NEW - premium)
-│   │   └── notification_preferences.py (NEW - notifications)
+│   │   ├── notification_preferences.py (NEW - notifications)
+│   │   ├── achievements.py (NEW - gamification)
+│   │   ├── qr.py (NEW - QR identity, upload sessions, public profiles)
+│   │   ├── discover.py (NEW - community discovery)
+│   │   ├── premolt.py (NEW - molt prediction)
+│   │   ├── import_export.py (NEW - data export)
+│   │   └── system_settings.py (NEW - admin config)
+│   ├── services/
+│   │   ├── achievement_service.py (NEW - achievement checking & awarding)
+│   │   ├── premolt_service.py (NEW - molt prediction algorithm)
+│   │   ├── feeding_reminder_service.py (NEW - smart feeding reminders)
+│   │   ├── export_service.py (NEW - data export in JSON/CSV/ZIP)
+│   │   ├── settings_service.py (NEW - system settings with cache)
+│   │   └── email.py (NEW - Resend email service)
 │   ├── utils/
-│   │   ├── auth.py (JWT token creation, password hashing)
-│   │   ├── dependencies.py (get_current_user with HTTPBearer)
-│   │   └── push_notifications.py (NEW - Expo push notification service)
+│   │   ├── auth.py (JWT token creation, password hashing, token revocation)
+│   │   ├── dependencies.py (get_current_user with HTTPBearer + blocklist check)
+│   │   ├── push_notifications.py (NEW - Expo push notification service)
+│   │   ├── rate_limit.py (NEW - SlowAPI shared limiter)
+│   │   └── file_validation.py (NEW - magic byte image validation)
 │   ├── config.py (settings from environment)
 │   ├── database.py (SQLAlchemy setup)
 │   └── main.py (FastAPI app with CORS, all routers registered, /uploads mount)
 ├── uploads/
 │   ├── photos/
 │   └── thumbnails/
-├── seed_species.py (seed species)
+├── seed_species.py (seed species - original batch)
+├── seed_species_batch2.py through seed_species_batch6.py (100+ species total)
 ├── seed_via_api.py (seed via API)
 ├── import_obsidian_species.py (parse Obsidian markdown)
 ├── make_admin.py (user management script)
+├── requirements.txt (includes slowapi, httpx, resend)
 └── start.sh (runs migrations, starts uvicorn)
 ```
 
@@ -696,7 +878,8 @@ apps/web/
 │   ├── logo.png (professional tarantula logo - solid background)
 │   ├── logo-transparent.png (favicon and brand assets)
 │   ├── 404.html (static error page)
-│   └── 500.html (static error page)
+│   ├── 500.html (static error page)
+│   └── screenshots/ (app screenshots for landing page)
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx (metadata, favicon, theme provider)
@@ -707,14 +890,17 @@ apps/web/
 │   │   ├── register/page.tsx
 │   │   ├── dashboard/
 │   │   │   ├── page.tsx (collection overview)
-│   │   │   ├── analytics/page.tsx (NEW)
+│   │   │   ├── analytics/page.tsx
+│   │   │   ├── analytics/advanced/page.tsx (NEW - premium analytics)
+│   │   │   ├── achievements/page.tsx (NEW - achievement gallery)
 │   │   │   ├── settings/
 │   │   │   │   ├── page.tsx
 │   │   │   │   ├── profile/page.tsx
-│   │   │   │   └── notifications/page.tsx (NEW - notification settings)
-│   │   │   ├── admin/ (NEW - admin tools)
-│   │   │   │   └── species/
-│   │   │   │       └── manage/page.tsx (NEW - species CRUD)
+│   │   │   │   ├── notifications/page.tsx
+│   │   │   │   └── data-export/page.tsx (NEW - data export)
+│   │   │   ├── admin/
+│   │   │   │   ├── species/manage/page.tsx (species CRUD)
+│   │   │   │   └── settings/page.tsx (NEW - system settings)
 │   │   │   ├── breeding/ (NEW)
 │   │   │   │   ├── page.tsx (overview)
 │   │   │   │   ├── pairings/add/page.tsx
@@ -729,25 +915,30 @@ apps/web/
 │   │   ├── species/
 │   │   │   ├── page.tsx (NEW - species list)
 │   │   │   └── [id]/page.tsx (care sheet)
-│   │   ├── community/ (NEW)
+│   │   ├── community/
 │   │   │   ├── page.tsx
 │   │   │   ├── board/page.tsx
+│   │   │   ├── discover/page.tsx (NEW - community discovery)
 │   │   │   ├── [username]/page.tsx (keeper profile)
 │   │   │   └── forums/
 │   │   │       ├── page.tsx
 │   │   │       ├── [category]/page.tsx
 │   │   │       ├── [category]/new/page.tsx
 │   │   │       └── thread/[id]/page.tsx
-│   │   ├── keeper/[username]/page.tsx (NEW)
-│   │   ├── messages/ (NEW)
+│   │   ├── t/[id]/page.tsx (NEW - public tarantula profile)
+│   │   ├── upload/[token]/page.tsx (NEW - QR upload page)
+│   │   ├── reset-password/page.tsx (NEW - forgot + reset password)
+│   │   ├── delete-account/page.tsx (NEW - account deletion with export)
+│   │   ├── keeper/[username]/page.tsx
+│   │   ├── messages/
 │   │   │   ├── page.tsx
 │   │   │   └── [username]/page.tsx
-│   │   ├── features/page.tsx (NEW)
-│   │   ├── pricing/page.tsx (NEW)
-│   │   ├── help/page.tsx (NEW)
-│   │   ├── contact/page.tsx (NEW)
-│   │   ├── blog/page.tsx (NEW)
-│   │   └── privacy/page.tsx (NEW)
+│   │   ├── features/page.tsx
+│   │   ├── pricing/page.tsx
+│   │   ├── help/page.tsx
+│   │   ├── contact/page.tsx
+│   │   ├── blog/page.tsx
+│   │   └── privacy/page.tsx
 │   ├── components/
 │   │   ├── SpeciesAutocomplete.tsx
 │   │   ├── FeedingStatsCard.tsx (with Recharts)
@@ -758,7 +949,11 @@ apps/web/
 │   │   ├── ThemeProvider.tsx (NEW - next-themes)
 │   │   ├── Providers.tsx (NEW)
 │   │   ├── ActivityFeed.tsx (NEW)
-│   │   └── ActivityFeedItem.tsx (NEW)
+│   │   ├── ActivityFeedItem.tsx (NEW)
+│   │   ├── QRModal.tsx (NEW - QR identity, labels, upload sessions)
+│   │   ├── AchievementBadge.tsx (NEW - gamification badge display)
+│   │   ├── GlobalSearch.tsx (NEW - Cmd+K platform search)
+│   │   └── PremoltPredictionSection.tsx (NEW - molt prediction)
 │   └── globals.css (Tailwind + dark mode + global styles)
 ├── next.config.js (with workarounds for styled-jsx)
 ├── tailwind.config.ts (with dark mode)
@@ -790,7 +985,12 @@ apps/mobile/
 │   │   ├── add-molt.tsx
 │   │   └── add-photo.tsx
 │   ├── analytics/
-│   │   └── index.tsx
+│   │   ├── index.tsx
+│   │   └── advanced.tsx (NEW - premium analytics)
+│   ├── achievements.tsx (NEW - achievement gallery)
+│   ├── discover.tsx (NEW - community discovery)
+│   ├── onboarding.tsx (NEW - 4-screen welcome flow)
+│   ├── forgot-password.tsx (NEW - password recovery)
 │   ├── species/
 │   │   └── [id].tsx (NEW)
 │   ├── forums/ (NEW)
@@ -806,9 +1006,11 @@ apps/mobile/
 │   ├── messages/ (NEW)
 │   │   ├── index.tsx
 │   │   └── [username].tsx
-│   ├── settings.tsx (NEW)
-│   ├── notifications.tsx (NEW - notification settings)
-│   └── privacy.tsx (NEW)
+│   ├── settings.tsx
+│   ├── settings/data-export.tsx (NEW - data export)
+│   ├── notifications.tsx (notification settings)
+│   ├── admin/settings.tsx (NEW - system settings)
+│   └── privacy.tsx
 ├── src/
 │   ├── components/
 │   │   ├── FeedingStatsCard.tsx (with dark mode)
@@ -816,9 +1018,13 @@ apps/mobile/
 │   │   ├── PhotoViewer.tsx
 │   │   ├── TarantulaDetailSkeleton.tsx
 │   │   ├── TarantulaCardSkeleton.tsx
-│   │   ├── CommunitySkeletons.tsx (NEW)
-│   │   ├── Skeleton.tsx (NEW)
-│   │   └── ActivityFeedItem.tsx (NEW)
+│   │   ├── CommunitySkeletons.tsx
+│   │   ├── Skeleton.tsx
+│   │   ├── ActivityFeedItem.tsx
+│   │   ├── QRSheet.tsx (NEW - QR bottom sheet)
+│   │   ├── AchievementBadge.tsx (NEW - gamification)
+│   │   ├── PremoltPredictionCard.tsx (NEW - molt prediction)
+│   │   └── PremoltAlertCard.tsx (NEW - molt prediction alert)
 │   ├── contexts/
 │   │   ├── AuthContext.tsx
 │   │   └── ThemeContext.tsx (light/dark theme provider)
@@ -841,8 +1047,11 @@ apps/mobile/
 ### API Routes (All prefixed with `/api/v1`)
 
 **Auth:**
-- `POST /auth/register` - Register new user
-- `POST /auth/login` - Login (returns JWT token)
+- `POST /auth/register` - Register new user (rate limited: 5/min)
+- `POST /auth/login` - Login, returns JWT token (rate limited: 10/min)
+- `POST /auth/logout` - Revoke current token (NEW)
+- `POST /auth/forgot-password` - Request password reset email (NEW, rate limited: 5/min)
+- `POST /auth/reset-password` - Reset password with token (NEW, rate limited: 5/min)
 - `GET /auth/me` - Get current user info (requires auth)
 
 **Tarantulas:**
@@ -941,6 +1150,36 @@ apps/mobile/
 - `PUT /notification-preferences/` - Update notification preferences
 - `POST /notification-preferences/register-token` - Register Expo push token
 - `GET /messages/direct/unread-count` - Get unread message count (for bell icon)
+
+**QR Identity:** (NEW)
+- `POST /tarantulas/{id}/upload-session` - Create 20-min upload session (requires auth)
+- `GET /upload-sessions/{token}` - Get tarantula context for upload (public)
+- `POST /upload-sessions/{token}/photo` - Upload photo via QR session (public)
+- `GET /t/{tarantula_id}` - Public tarantula profile (context-aware)
+
+**Achievements:** (NEW)
+- `GET /achievements/definitions` - List all badges and requirements
+- `GET /achievements/` - Get current user's achievements (auto-checks on load)
+- `GET /achievements/user/{user_id}` - Get specific user's achievements
+
+**Discover:** (NEW)
+- `GET /discover/` - Trending threads, active keepers, popular species, new members
+
+**Premolt Prediction:** (NEW)
+- `GET /premolt/{tarantula_id}` - Prediction for specific tarantula
+- `GET /premolt` - Predictions for all user's tarantulas
+
+**Data Export:** (NEW)
+- `GET /export/json` - Download JSON export
+- `GET /export/csv` - Download CSV export
+- `GET /export/full` - Download ZIP with photos
+- `GET /export/preview` - Get file counts and sizes
+
+**System Settings (Admin):** (NEW)
+- `GET /system/status` - Public system health
+- `GET /admin/settings` - All settings (admin only)
+- `PUT /admin/settings/{key}` - Update single setting
+- `PUT /admin/settings/bulk` - Batch update settings
 
 ### Database Models
 
@@ -1107,6 +1346,47 @@ apps/mobile/
 - **Device**: `expo_push_token`
 - Timestamps: `created_at`, `updated_at`
 
+**Token Blocklist Table:** (NEW)
+- `id` (Integer, PK, autoincrement)
+- `jti` (String(64), unique, indexed) — JWT ID for revocation
+- `user_id` (String, nullable)
+- `revoked_at` (DateTime, server default now)
+- `expires_at` (DateTime, indexed) — for cleanup of expired entries
+
+**QR Upload Sessions Table:** (NEW)
+- `id` (UUID, PK)
+- `token` (String, unique, indexed) — short-lived upload token
+- `tarantula_id` (FK → tarantulas, CASCADE delete)
+- `user_id` (FK → users, CASCADE delete)
+- `used_count` (Integer) — tracks number of uploads
+- `is_active` (Boolean)
+- `expires_at` (DateTime) — 20-minute TTL
+- `created_at`
+
+**Achievement Definitions Table:** (NEW)
+- `id` (UUID, PK)
+- `key` (String, unique) — e.g., "first_tarantula"
+- `name`, `description`, `icon` (String)
+- `category` (String) — collection, feeding, molts, community, breeding
+- `tier` (String) — bronze, silver, gold, platinum
+- `requirement` (Integer) — threshold to earn
+
+**User Achievements Table:** (NEW)
+- `id` (UUID, PK)
+- `user_id` (FK → users, CASCADE delete)
+- `achievement_key` (String) — references definition key
+- `earned_at` (DateTime)
+- Unique constraint: (user_id, achievement_key)
+
+**System Settings Table:** (NEW)
+- `id` (Integer, PK)
+- `key` (String, unique, indexed) — setting name
+- `value` (String) — stored as string, coerced to typed value
+- `value_type` (String) — bool, int, float, string
+- `category` (String) — feature_flags, limits, maintenance, announcements
+- `description` (String)
+- `updated_at`
+
 ---
 
 ## 🐛 Known Issues & Fixes Applied
@@ -1176,8 +1456,14 @@ allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 - `SECRET_KEY` - JWT secret key
 - `CORS_ORIGINS` - Comma-separated list (Vercel domain)
 
+**Email (Resend):**
+- `RESEND_API_KEY` - Resend API key for transactional email (mock mode if unset)
+- `RESEND_FROM_EMAIL` - Sender email address
+- `EMAIL_VERIFICATION_REQUIRED` - `True`/`False` (default: `False`)
+
 **Optional:**
 - `PORT` - Default 8000
+- `ENVIRONMENT` - `development`/`production` (affects dev secret check)
 - `CLOUDFLARE_R2_ACCESS_KEY_ID` - For photo uploads
 - `CLOUDFLARE_R2_SECRET_ACCESS_KEY` - For photo uploads
 - `CLOUDFLARE_R2_BUCKET_NAME` - Photo storage bucket
@@ -1240,12 +1526,48 @@ allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 4. ✅ Breeding tab on tarantula details
 5. ✅ Activity feed integration
 
+### Phase 3.5 - Platform Hardening (✅ COMPLETED)
+1. ✅ Security hardening (rate limiting, token revocation, CORS, magic byte validation)
+2. ✅ Password recovery & email system (Resend API)
+3. ✅ QR Identity system (upload sessions, enclosure labels, public profiles)
+4. ✅ Achievement/badge system (18 achievements across 5 categories)
+5. ✅ Global search & discover (Cmd+K, trending, popular species)
+6. ✅ Premolt prediction algorithm (feeding refusal + interval analysis)
+7. ✅ Data export system (JSON, CSV, ZIP with photos)
+8. ✅ Admin system settings (runtime feature flags, maintenance mode)
+9. ✅ Smart feeding reminders (per-species intervals)
+10. ✅ Mobile onboarding flow (4-screen welcome)
+11. ✅ Advanced analytics dashboard (cost breakdown, molt heatmap)
+12. ✅ Species database expanded to 100+ species (6 batch seed scripts)
+13. ✅ Landing page redesign with screenshots
+
+### Phase 3.6 - Design System & Aesthetic Presets (In Progress — Apr 2026)
+
+**Documents:** `docs/design/ADR-001-theme-preset-system.md`, `docs/design/PRD-theme-preset-system.md`, `docs/design/SPRINT-theme-preset-system.md`, `docs/design/PLATFORM_DESIGN_AUDIT_2026-04-13.md`
+
+1. 🚧 **Multi-axis theme preset system** — Keeper (restrained tool) + Hobbyist (vibrant gradient) presets across mobile + web
+   - Mobile: Extend `ThemeContext` with `preset` axis; replace all hardcoded gradients/heights/radii with token reads
+   - Web: CSS custom properties via `data-preset` on `<html>`; Tailwind config reads from CSS vars
+   - Backend: `users.ui_preferences` JSONB; `PUT /auth/ui-preferences` endpoint; synced across devices
+2. 🚧 Activity feed template rewrite — include tarantula name, species, thumbnail in every item
+3. 🚧 Accessibility labels sweep — stat cards, sex badges, emoji headings, CTA buttons
+4. 🚧 Design audit quick wins — "d" badge copy, search input contrast, FAB padding, Profile menu grouping
+
+**Architecture decision:** Semantic colors (`danger`, `warning`, `success`, `info`, sex colors) are immutable and outside the preset system. Only accent, gradient usage, header height, surface style, radius, density, and icon style are preset-controlled.
+
+**Preset token reference:**
+```
+keeper:   header 56pt flat | radius sm:8 md:12 lg:16 | row 44pt | border elevation | line icons
+hobbyist: header 130pt gradient | radius sm:12 md:16 lg:24 | row 52pt | shadow elevation | duotone icons
+```
+
 ### Phase 4 - Premium & Monetization (In Progress)
 1. ✅ Backend infrastructure complete
 2. ✅ Pricing page created
-3. 🚧 Payment integration (Stripe/PayPal)
-4. 🚧 Premium feature gating
-5. 🚧 Subscription management dashboard
+3. ✅ Premium-gated advanced analytics (teaser + upgrade prompt)
+4. 🚧 Payment integration (Stripe/PayPal)
+5. 🚧 Premium feature gating (full implementation)
+6. 🚧 Subscription management dashboard
 
 ### Phase 5 - Advanced Features (Future)
 
@@ -1257,10 +1579,10 @@ allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 - Vet visit logs
 
 **Smart Insights & ML:**
-- Feeding cost calculator
-- Premolt predictor (ML based on feeding refusals + time since last molt)
+- ~~Premolt predictor~~ (✅ DONE)
+- ~~Feeding cost calculator~~ (✅ DONE — in advanced analytics)
 - Growth predictions
-- Feeding refusal pattern analysis
+- Feeding refusal pattern analysis (enhanced)
 - Collection value estimator
 - Personality profiles (temperament over time)
 
@@ -1277,9 +1599,9 @@ allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 - Breeding project planner
 
 **Enhanced Mobile:**
-- Push notifications
+- ~~Push notifications~~ (✅ DONE)
+- ~~QR code scanning for enclosure labels~~ (✅ DONE)
 - Offline mode with sync
-- QR code scanning for enclosure labels
 - NFC tag support
 - Widget support
 
@@ -1291,8 +1613,8 @@ allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 - MorphMarket integration
 
 **Gamification:**
-- Keeper experience system (levels, badges)
-- Collection achievements
+- ~~Keeper experience system (levels, badges)~~ (✅ DONE — achievement system)
+- ~~Collection achievements~~ (✅ DONE)
 - Community challenges
 - Leaderboards
 
@@ -1397,7 +1719,7 @@ const data = await response.json()
 
 ## 🔍 Database Migration Status
 
-### Complete Migration Chain (15 migrations):
+### Complete Migration Chain (19 migrations):
 1. `9588b399ad54_initial_migration.py` - Initial schema
 2. `a1b2c3d4e5f6_add_photo_url_to_tarantulas.py` - Photo URL field
 3. `b2c3d4e5f6g7_expand_species_model.py` - Expanded species fields
@@ -1413,6 +1735,10 @@ const data = await response.json()
 13. `add_safety_fields_to_species.py` - Safety information
 14. `k2l3m4n5o6p7_add_breeding_module.py` - Breeding module
 15. `l3m4n5o6p7q8_add_notification_preferences.py` - Notification system
+16. `w4x5y6z7a8b9_add_system_settings.py` - System settings & feature flags
+17. `x5y6z7a8b9c0_add_achievements.py` - Achievement definitions & user tracking
+18. `y6z7a8b9c0d1_add_qr_identity_system.py` - QR upload sessions
+19. `z7a8b9c0d1e2_add_token_blocklist.py` - JWT token revocation
 
 **All migrations applied to production database**
 
@@ -1567,6 +1893,13 @@ This includes:
 - Comprehensive analytics with charting
 - Full dark mode implementation across entire stack
 - Modern persistent sidebar navigation (2025 best practices)
+- Token-based QR uploads (no auth required, 20-min TTL)
+- Magic byte file validation (security-first uploads)
+- SQLAlchemy enum workaround: `cast(column, String)` for name vs value mismatch
+- In-memory settings cache with TTL for runtime feature flags
+- Premolt prediction algorithm (feeding refusal + molt interval analysis)
+- Resend email service with mock fallback for dev
+- Achievement system with auto-check-on-load pattern
 
 ---
 
@@ -1574,80 +1907,53 @@ This includes:
 
 ### Current Limitations:
 - No offline mode (requires internet connection)
-- No email notifications (only push notifications implemented)
 - No environmental sensor integration (IoT)
-- Payment integration not complete
-- No export functionality (CSV, PDF)
+- Payment integration not complete (Stripe/PayPal)
+- No WebSocket for real-time messaging
 
 ### Immediate TODOs:
 1. Complete payment integration (Stripe/PayPal)
-2. Implement email notifications for feeding reminders
-3. Implement data export (CSV, PDF)
-4. Add bulk operations (bulk feeding logs, etc.)
-5. Implement search functionality across platform
-6. Complete OAuth provider setup (Google, Apple, GitHub)
-7. Add WebSocket for real-time updates
+2. Add bulk operations (bulk feeding logs, etc.)
+3. Complete OAuth provider setup (Google, Apple, GitHub)
+4. Add WebSocket for real-time updates (DMs, notifications)
+5. Health tracking module (medical logs, treatments, vet visits)
 
 ### Future Enhancements:
 - Offline mode with local storage and sync
-- Email/SMS notifications (feeding reminders, molt predictions)
 - Temperature/humidity sensor integration (IoT)
-- QR code labels for enclosures
 - Multi-user collections (shared access)
 - Marketplace/classifieds integration
-- ML-based premolt predictor
-- Feeding cost calculator
+- NFC tag support for enclosures
 - Collection insurance value tracker
-- Expo wishlist tracker
 - Video uploads
 - Tarantula "personality profiles"
 - Breeder network and marketplace
+- Community challenges and leaderboards
 
 ---
 
-**Last Updated**: 2025-11-22
-**Version**: 0.9.0 (Notifications, Admin Tools & Branding Complete)
+**Last Updated**: 2026-04-09
+**Version**: 1.0.0 (Platform Hardening Complete)
 **Status**: Active Development
 
-**Recent Changes** (2025-11-22):
-- 🔔 **NOTIFICATION SYSTEM COMPLETE**: Comprehensive notification infrastructure
-  - Local notifications (mobile): Feeding reminders, substrate reminders, molt predictions, maintenance
-  - Push notifications: Direct messages, forum replies, new followers, community activity
-  - Web notification settings page with full configuration UI
-  - Functional notification bell icon with unread message count (auto-refreshing)
-  - Expo Push Notification Service integration via httpx
-  - Database migration for `notification_preferences` table
-  - Complete mobile notification settings screen
+**Recent Changes** (2026-04-03 → 2026-04-09):
+- 🔐 **SECURITY HARDENING**: Rate limiting (SlowAPI), JWT token revocation with blocklist, CORS explicit headers, magic byte file validation, password complexity, dev secret detection, OAuth auto-link fix
+- 📧 **PASSWORD RECOVERY & EMAIL**: Resend API integration, forgot/reset password flow (web + mobile), optional email verification feature flag
+- 📱 **QR IDENTITY SYSTEM**: Upload sessions (20-min TTL), enclosure labels with font/color/field customization, public tarantula profiles (`/t/{id}`), web upload page
+- 🏆 **ACHIEVEMENT SYSTEM**: 18 achievements across 5 categories (collection, feeding, molts, community, breeding), auto-check-on-load, web + mobile galleries
+- 🔍 **GLOBAL SEARCH & DISCOVER**: Cmd+K search (tarantulas, species, keepers, threads), community discover page (trending, active keepers, popular species)
+- 🧬 **PREMOLT PREDICTION**: Algorithmic molt prediction based on feeding refusal patterns + molt interval history
+- 📦 **DATA EXPORT**: JSON, CSV, and full ZIP export (GDPR-compliant), preview endpoint
+- ⚙️ **ADMIN SYSTEM SETTINGS**: 21 runtime feature flags, in-memory cache, maintenance mode middleware
+- 🍽️ **SMART FEEDING REMINDERS**: Per-species automatic interval calculation
+- 📲 **MOBILE ONBOARDING**: 4-screen welcome flow with AsyncStorage persistence
+- 📊 **ADVANCED ANALYTICS**: Premium-gated dashboard with cost breakdown, molt heatmap, growth projections
+- 🌱 **SPECIES EXPANSION**: 100+ species seeded via 6 batch scripts
+- 🎨 **LANDING PAGE REDESIGN**: Real app screenshots, live stats, professional layout
+- 🐛 **BUG FIXES**: Achievement enum casting, ForumPost.author_id, Follow composite PK, label print styling, mobile expo-notifications crashes, TypeScript build errors
 
-- 👨‍💼 **ADMIN TOOLS**: Species management interface
-  - `/dashboard/admin/species/manage` - Complete CRUD interface
-  - Searchable species table with inline editing
-  - Verification status toggle
-  - Delete functionality with confirmation
-  - Admin-only access control
+**Previous Changelog** (2025-11-22):
+- Notification system, admin tools, professional branding, documentation reorganization
 
-- 🎨 **PROFESSIONAL BRANDING**: Logo implementation
-  - Purple-to-pink gradient tarantula silhouette
-  - Web: Sidebar logo, favicon, landing page
-  - Mobile: App icon and adaptive icon for Android
-  - Replaced spider emoji throughout platform
-
-- 📚 **DOCUMENTATION REORGANIZATION**: Clean project structure
-  - Organized 60+ markdown files into `/docs/archive`, `/docs/setup`, `/docs/planning`
-  - Root directory cleaned to 4 essential files
-  - Complete git history preserved with `git mv`
-
-**Changes from 2025-11-10**:
-- 📝 **DOCUMENTATION OVERHAUL**: Complete CLAUDE.md update
-  - Added all missing features (community, breeding, photos, OAuth, safety)
-  - Documented 14 migrations (was only showing 3)
-  - Added all new API routes and models
-  - Updated tech stack (React 19)
-  - Moved completed features out of "Future" roadmap
-  - Comprehensive file structure documentation
-
-**Changes from 2025-10-28**:
-- ✅ **BREEDING MODULE COMPLETE**: Full breeding tracking system
-- ✅ **NAVIGATION REWRITE**: Modern persistent sidebar navigation
-- ✅ **SAFETY INFORMATION**: urticating_hairs and medically_significant_venom fields
-- ✅ Fixed build errors and TypeScript issues
+**Previous Changelog** (2025-10-28):
+- Breeding module, navigation rewrite, safety information fields
