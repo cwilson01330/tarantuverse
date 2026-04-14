@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { View, TextInput, SectionList, TouchableOpacity, Text, ActivityIndicator, SafeAreaView } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useTheme } from '../src/contexts/ThemeContext'
-import AppHeader from '../src/components/AppHeader'
+import { AppHeader } from '../src/components/AppHeader'
 import { apiClient } from '../src/services/api'
 
 interface SearchResult {

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, RefreshControl, Image, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { KeeperCardSkeleton, CategoryCardSkeleton } from '../../src/components/CommunitySkeletons';
 import ActivityFeedItem, { ActivityFeedItemData } from '../../src/components/ActivityFeedItem';
-import AppHeader from '../../src/components/AppHeader';
+import { AppHeader } from '../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Keeper {

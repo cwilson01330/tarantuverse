@@ -26,6 +26,8 @@ import { useTheme } from '../contexts/ThemeContext';
 interface AppHeaderProps {
   title: string;
   subtitle?: string;
+  /** Element rendered on the far left of the title row (e.g. a back button). */
+  leftAction?: ReactNode;
   /** Element rendered on the far right of the title row. */
   rightAction?: ReactNode;
   /** Content rendered below title/subtitle inside the header band (e.g. a search input). */
@@ -34,9 +36,10 @@ interface AppHeaderProps {
   paddingBottom?: number;
 }
 
-export default function AppHeader({
+export function AppHeader({
   title,
   subtitle,
+  leftAction,
   rightAction,
   children,
   paddingBottom = 16,
@@ -52,6 +55,9 @@ export default function AppHeader({
   const content = (
     <View style={{ paddingTop: headerPaddingTop, paddingHorizontal: 16, paddingBottom }}>
       <View style={styles.titleRow}>
+        {leftAction ? (
+          <View style={styles.leftAction}>{leftAction}</View>
+        ) : null}
         <View style={styles.titleBlock}>
           <Text style={[styles.title, { color: titleColor }]}>{title}</Text>
           {subtitle ? (
@@ -94,6 +100,9 @@ export default function AppHeader({
   );
 }
 
+// Default export alias for backwards compatibility
+export default AppHeader;
+
 const styles = StyleSheet.create({
   flatHeader: {
     borderBottomWidth: 1,
@@ -113,6 +122,10 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 13,
     marginTop: 2,
+  },
+  leftAction: {
+    marginRight: 8,
+    justifyContent: 'center',
   },
   rightAction: {
     marginLeft: 8,
