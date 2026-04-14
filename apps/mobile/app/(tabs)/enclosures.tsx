@@ -8,7 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
@@ -84,6 +84,7 @@ export default function EnclosuresScreen() {
     },
     list: {
       padding: 8,
+      paddingBottom: 88,
     },
     card: {
       flex: 1,
@@ -357,20 +358,13 @@ export default function EnclosuresScreen() {
           <Text style={styles.emptyText}>
             Create enclosures to track communal setups or organize your collection
           </Text>
-          <TouchableOpacity
+          <PrimaryButton
             onPress={() => router.push('/enclosure/add')}
-            activeOpacity={0.8}
+            style={styles.addButton}
           >
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.addButton}
-            >
-              <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Add Enclosure</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+            <Text style={styles.addButtonText}>Add Enclosure</Text>
+          </PrimaryButton>
         </View>
       ) : (
         <>
@@ -384,20 +378,14 @@ export default function EnclosuresScreen() {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
             }
           />
-          <TouchableOpacity
-            style={styles.fab}
+          <PrimaryButton
+            fab
+            size={56}
             onPress={() => router.push('/enclosure/add')}
-            activeOpacity={0.8}
+            outerStyle={styles.fab}
           >
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.fabGradient}
-            >
-              <MaterialCommunityIcons name="plus" size={28} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
+            <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+          </PrimaryButton>
         </>
       )}
     </View>

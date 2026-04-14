@@ -157,8 +157,17 @@ export default function ProfileScreen() {
       fontSize: 16,
       color: colors.textTertiary,
     },
+    sectionLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      color: colors.textTertiary,
+      marginTop: 24,
+      marginBottom: 4,
+      marginHorizontal: 16,
+    },
     section: {
-      marginTop: 16,
       backgroundColor: colors.surface,
       borderTopWidth: 1,
       borderBottomWidth: 1,
@@ -297,12 +306,34 @@ export default function ProfileScreen() {
         <Text style={styles.username}>@{user?.username}</Text>
       </View>
 
+      {/* Account */}
+      <Text style={styles.sectionLabel}>Account</Text>
+      <View style={styles.section}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
+          <MaterialCommunityIcons name="account-edit" size={24} color={colors.primary} />
+          <Text style={styles.menuText}>Edit Profile</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/notifications')}>
+          <MaterialCommunityIcons name="bell" size={24} color={colors.primary} />
+          <Text style={styles.menuText}>Notifications</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy')}>
+          <MaterialCommunityIcons name="shield-account" size={24} color={colors.primary} />
+          <Text style={styles.menuText}>Privacy</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Customization */}
+      <Text style={styles.sectionLabel}>Customization</Text>
       <View style={styles.section}>
         <View style={styles.menuItem}>
           <MaterialCommunityIcons
             name={theme === 'dark' ? 'weather-night' : 'weather-sunny'}
             size={24}
-            color={colors.primary}
+            color={colors.secondary}
           />
           <Text style={styles.menuText}>
             {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
@@ -314,69 +345,46 @@ export default function ProfileScreen() {
             thumbColor="#ffffff"
           />
         </View>
-
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/appearance')}>
           <MaterialCommunityIcons name="palette" size={24} color={colors.secondary} />
           <Text style={styles.menuText}>Customize Theme</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
+      </View>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
-          <MaterialCommunityIcons name="cog" size={24} color={colors.textTertiary} />
-          <Text style={styles.menuText}>Edit Profile</Text>
+      {/* Subscription */}
+      <Text style={styles.sectionLabel}>Subscription</Text>
+      <View style={styles.section}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/subscription')}>
+          <MaterialCommunityIcons name="crown" size={24} color="#fbbf24" />
+          <Text style={styles.menuText}>Premium</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/notifications')}>
-          <MaterialCommunityIcons name="bell" size={24} color={colors.primary} />
-          <Text style={styles.menuText}>Notifications</Text>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/data-export')}>
-          <MaterialCommunityIcons name="database-export" size={24} color={colors.primary} />
-          <Text style={styles.menuText}>Export Data</Text>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/referrals')}>
-          <MaterialCommunityIcons name="gift" size={24} color={colors.secondary} />
-          <Text style={styles.menuText}>Refer Friends</Text>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-        </TouchableOpacity>
-
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/achievements')}>
           <MaterialCommunityIcons name="trophy" size={24} color="#fbbf24" />
           <Text style={styles.menuText}>Achievements</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/subscription')}>
-          <MaterialCommunityIcons name="crown" size={24} color="#fbbf24" />
-          <Text style={styles.menuText}>Subscription & Premium</Text>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/referrals')}>
+          <MaterialCommunityIcons name="gift" size={24} color="#fbbf24" />
+          <Text style={styles.menuText}>Refer Friends</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
+      </View>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy')}>
-          <MaterialCommunityIcons name="shield-account" size={24} color={colors.textTertiary} />
-          <Text style={styles.menuText}>Privacy Settings</Text>
-          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-        </TouchableOpacity>
-
+      {/* Help */}
+      <Text style={styles.sectionLabel}>Help</Text>
+      <View style={styles.section}>
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/support')}>
-          <MaterialCommunityIcons name="lifebuoy" size={24} color={colors.secondary} />
+          <MaterialCommunityIcons name="lifebuoy" size={24} color={colors.textSecondary} />
           <Text style={styles.menuText}>Contact Support</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
-
-        {user?.is_superuser && (
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/admin')}>
-            <MaterialCommunityIcons name="shield-crown" size={24} color="#a855f7" />
-            <Text style={styles.menuText}>Admin Panel</Text>
-            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
-          </TouchableOpacity>
-        )}
-
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings/data-export')}>
+          <MaterialCommunityIcons name="database-export" size={24} color={colors.textSecondary} />
+          <Text style={styles.menuText}>Export My Data</Text>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={async () => {
@@ -385,17 +393,27 @@ export default function ProfileScreen() {
             Alert.alert('Tutorial Reset', 'The dashboard tutorial will play on your next visit.');
           }}
         >
-          <MaterialCommunityIcons name="school" size={24} color={colors.primary} />
+          <MaterialCommunityIcons name="school" size={24} color={colors.textSecondary} />
           <Text style={styles.menuText}>Replay Tutorial</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
+        {user?.is_superuser && (
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/admin')}>
+            <MaterialCommunityIcons name="shield-crown" size={24} color="#a855f7" />
+            <Text style={styles.menuText}>Admin Panel</Text>
+            <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
+      </View>
 
+      {/* Danger Zone */}
+      <Text style={styles.sectionLabel}>Account Actions</Text>
+      <View style={styles.section}>
         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
-          <MaterialCommunityIcons name="logout" size={24} color={colors.error} />
-          <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
+          <MaterialCommunityIcons name="logout" size={24} color={colors.textSecondary} />
+          <Text style={styles.menuText}>Log Out</Text>
           <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.menuItem} onPress={() => setShowDeleteModal(true)}>
           <MaterialCommunityIcons name="delete-forever" size={24} color={colors.error} />
           <Text style={[styles.menuText, styles.deleteText]}>Delete Account</Text>

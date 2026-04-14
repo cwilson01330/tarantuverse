@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -17,12 +17,12 @@ export interface ActivityFeedItemData {
   user_id: string;
   action_type: ActionType;
   target_type: string;
-  target_id: string | null; // Changed to string to support UUIDs
-  activity_metadata: Record<string, any> | null; // Renamed from metadata to match backend
+  target_id: string | null;
+  activity_metadata: Record<string, any> | null;
   created_at: string;
-  username: string; // From backend response
-  display_name: string | null; // From backend response
-  avatar_url: string | null; // From backend response
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
 }
 
 interface Props {
@@ -37,7 +37,6 @@ export default function ActivityFeedItem({ activity }: Props) {
     const date = new Date(dateString);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
     if (seconds < 60) return 'just now';
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
@@ -45,95 +44,101 @@ export default function ActivityFeedItem({ activity }: Props) {
     return `${Math.floor(seconds / 604800)}w ago`;
   };
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
+  const getInitials = (name: string) =>
+    name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 
   const getActivityIcon = (): { name: string; color: string } => {
     switch (activity.action_type) {
-      case 'new_tarantula':
-        return { name: 'spider', color: '#9333ea' };
-      case 'molt':
-        return { name: 'spider', color: '#3b82f6' };
-      case 'feeding':
-        return { name: 'food-apple', color: '#10b981' };
-      case 'follow':
-        return { name: 'account-plus', color: '#ec4899' };
-      case 'forum_thread':
-        return { name: 'message-text', color: '#f97316' };
-      case 'forum_post':
-        return { name: 'message-reply', color: '#14b8a6' };
-      default:
-        return { name: 'information', color: colors.textTertiary };
+      case 'new_tarantula': return { name: 'spider', color: '#9333ea' };
+      case 'molt':          return { name: 'spider', color: '#3b82f6' };
+      case 'feeding':       return { name: 'food-apple', color: '#10b981' };
+      case 'follow':        return { name: 'account-plus', color: '#ec4899' };
+      case 'forum_thread':  return { name: 'message-text', color: '#f97316' };
+      case 'forum_post':    return { name: 'message-reply', color: '#14b8a6' };
+      default:              return { name: 'information', color: colors.textTertiary };
     }
   };
 
   const getActivityContent = () => {
+    const meta = activity.activity_metadata ?? {};
     const displayName = activity.display_name || activity.username;
 
     switch (activity.action_type) {
       case 'new_tarantula':
         return {
-          title: `${displayName} added a new tarantula`,
-          description: activity.activity_metadata.tarantula_name,
-          subtitle: activity.activity_metadata.species_name || undefined,
+          verb: `${displayName} added`,
+          tarantulaName: meta.tarantula_name,
+          speciesName: meta.species_name,
+          thumbnailUrl: meta.thumbnail_url,
+          subtitle: undefined,
           onPress: () => router.push(`/tarantula/${activity.target_id}`),
         };
 
       case 'molt':
         return {
-          title: `${displayName} logged a molt`,
-          description: activity.activity_metadata.tarantula_name,
-          subtitle: activity.activity_metadata.leg_span_after
-            ? `New leg span: ${activity.activity_metadata.leg_span_after}"`
-            : undefined,
-          onPress: () => router.push(`/tarantula/${activity.activity_metadata.tarantula_id}`),
+          verb: `${displayName} logged a molt for`,
+          tarantulaName: meta.tarantula_name,
+          speciesName: meta.species_name,
+          thumbnailUrl: meta.thumbnail_url,
+          subtitle: meta.leg_span_after ? `New leg span: ${meta.leg_span_after}"` : undefined,
+          onPress: () => router.push(`/tarantula/${meta.tarantula_id}`),
         };
 
-      case 'feeding':
-        const accepted = activity.activity_metadata.accepted;
+      case 'feeding': {
+        const accepted = meta.accepted;
         return {
-          title: `${displayName} logged a feeding`,
-          description: activity.activity_metadata.tarantula_name,
-          subtitle: `${activity.activity_metadata.food_type} - ${accepted ? '✓ Accepted' : '✗ Rejected'}`,
+          verb: `${displayName} fed`,
+          tarantulaName: meta.tarantula_name,
+          speciesName: meta.species_name,
+          thumbnailUrl: meta.thumbnail_url,
+          subtitle: `${meta.food_type} — ${accepted ? '✓ Accepted' : '✗ Rejected'}`,
           subtitleColor: accepted ? '#10b981' : '#ef4444',
-          onPress: () => router.push(`/tarantula/${activity.activity_metadata.tarantula_id}`),
+          onPress: () => router.push(`/tarantula/${meta.tarantula_id}`),
         };
+      }
 
       case 'follow':
         return {
-          title: `${displayName} followed ${activity.activity_metadata.followed_username}`,
-          description: undefined,
-          onPress: () => router.push(`/keeper/${activity.activity_metadata.followed_username}`),
+          verb: `${displayName} followed ${meta.followed_username}`,
+          tarantulaName: undefined,
+          speciesName: undefined,
+          thumbnailUrl: undefined,
+          subtitle: undefined,
+          onPress: () => router.push(`/keeper/${meta.followed_username}`),
         };
 
       case 'forum_thread':
         return {
-          title: `${displayName} started a new thread`,
-          description: activity.activity_metadata.thread_title,
-          subtitle: `in ${activity.activity_metadata.category_name}`,
+          verb: `${displayName} started a thread`,
+          tarantulaName: meta.thread_title,
+          speciesName: `in ${meta.category_name}`,
+          thumbnailUrl: undefined,
+          subtitle: undefined,
           onPress: () => router.push(`/forums/thread/${activity.target_id}`),
         };
 
       case 'forum_post':
         return {
-          title: `${displayName} replied to a thread`,
-          description: activity.activity_metadata.thread_title,
-          onPress: () => router.push(`/forums/thread/${activity.activity_metadata.thread_id}`),
+          verb: `${displayName} replied to`,
+          tarantulaName: meta.thread_title,
+          speciesName: undefined,
+          thumbnailUrl: undefined,
+          subtitle: undefined,
+          onPress: () => router.push(`/forums/thread/${meta.thread_id}`),
         };
 
       default:
         return {
-          title: `${displayName} did something`,
-          description: undefined,
+          verb: `${displayName} did something`,
+          tarantulaName: undefined,
+          speciesName: undefined,
+          thumbnailUrl: undefined,
+          subtitle: undefined,
         };
     }
   };
+
+  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
 
   const icon = getActivityIcon();
   const content = getActivityContent();
@@ -143,31 +148,49 @@ export default function ActivityFeedItem({ activity }: Props) {
       style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}
       onPress={content.onPress}
       disabled={!content.onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${content.verb}${content.tarantulaName ? ` ${content.tarantulaName}` : ''}`}
     >
-      <View style={styles.content}>
-        {/* Icon */}
+      <View style={styles.row}>
+        {/* Activity type icon */}
         <View style={[styles.iconContainer, { backgroundColor: icon.color }]}>
-          <MaterialCommunityIcons name={icon.name as any} size={20} color="#fff" />
+          <MaterialCommunityIcons name={icon.name as any} size={18} color="#fff" />
         </View>
 
-        {/* Content */}
+        {/* Tarantula thumbnail (if available) */}
+        {content.thumbnailUrl ? (
+          <Image
+            source={{ uri: content.thumbnailUrl.startsWith('http') ? content.thumbnailUrl : `${API_BASE}${content.thumbnailUrl}` }}
+            style={styles.thumbnail}
+            accessibilityLabel={content.tarantulaName ?? 'Tarantula photo'}
+          />
+        ) : content.tarantulaName && (
+          <View style={[styles.thumbnail, styles.thumbnailPlaceholder, { backgroundColor: colors.surfaceElevated }]}>
+            <Text style={{ fontSize: 18 }}>🕷️</Text>
+          </View>
+        )}
+
+        {/* Text content */}
         <View style={styles.textContent}>
-          <Text style={[styles.title, { color: colors.textPrimary }]} numberOfLines={2}>
-            {content.title}
+          <Text style={[styles.verb, { color: colors.textSecondary }]} numberOfLines={1}>
+            {content.verb}
           </Text>
 
-          {content.description && (
-            <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
-              {content.description}
+          {content.tarantulaName && (
+            <Text style={[styles.tarantulaName, { color: colors.textPrimary }]} numberOfLines={1}>
+              {content.tarantulaName}
+            </Text>
+          )}
+
+          {content.speciesName && (
+            <Text style={[styles.speciesName, { color: colors.textTertiary }]} numberOfLines={1}>
+              {content.speciesName}
             </Text>
           )}
 
           {content.subtitle && (
             <Text
-              style={[
-                styles.subtitle,
-                { color: content.subtitleColor || colors.textTertiary },
-              ]}
+              style={[styles.subtitle, { color: (content as any).subtitleColor || colors.textTertiary }]}
               numberOfLines={1}
             >
               {content.subtitle}
@@ -179,10 +202,20 @@ export default function ActivityFeedItem({ activity }: Props) {
           </Text>
         </View>
 
-        {/* User Avatar */}
-        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-          <Text style={styles.avatarText}>{getInitials(activity.display_name || activity.username)}</Text>
-        </View>
+        {/* User avatar */}
+        {activity.avatar_url ? (
+          <Image
+            source={{ uri: activity.avatar_url }}
+            style={styles.avatar}
+            accessibilityLabel={`${activity.display_name || activity.username}'s avatar`}
+          />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+            <Text style={styles.avatarText}>
+              {getInitials(activity.display_name || activity.username)}
+            </Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -195,40 +228,56 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
   },
-  content: {
+  row: {
     flexDirection: 'row',
-    padding: 16,
-    alignItems: 'flex-start',
+    padding: 12,
+    alignItems: 'center',
+    gap: 10,
   },
   iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    flexShrink: 0,
+  },
+  thumbnail: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    flexShrink: 0,
+  },
+  thumbnailPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   textContent: {
     flex: 1,
-    marginRight: 12,
+    minWidth: 0,
   },
-  title: {
+  verb: {
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  tarantulaName: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
     lineHeight: 20,
   },
-  description: {
-    fontSize: 14,
-    marginBottom: 4,
-    lineHeight: 18,
+  speciesName: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 17,
   },
   subtitle: {
     fontSize: 13,
-    marginBottom: 4,
+    lineHeight: 17,
+    marginTop: 2,
   },
   time: {
     fontSize: 12,
+    marginTop: 4,
   },
   avatar: {
     width: 32,
@@ -236,10 +285,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   avatarText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
 });

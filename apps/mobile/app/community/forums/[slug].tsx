@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PrimaryButton } from '../../../src/components/PrimaryButton';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { useTheme } from '../../../src/contexts/ThemeContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Thread {
   id: number;
@@ -117,39 +119,28 @@ export default function ForumCategoryScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          {category.icon && <Text style={styles.headerIcon}>{category.icon}</Text>}
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>{category.name}</Text>
-            {category.description && (
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {category.description}
-              </Text>
-            )}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['left', 'right', 'bottom']}>
+      <AppHeader
+        title={`${category.icon ? category.icon + ' ' : ''}${category.name}`}
+        subtitle={category.description ?? undefined}
+        leftAction={
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerBackButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
+          </TouchableOpacity>
+        }
+        rightAction={
+          <View style={styles.headerStats}>
+            <View style={styles.headerStat}>
+              <MaterialCommunityIcons name="message-text" size={16} color="white" />
+              <Text style={styles.headerStatText}>{category.thread_count}</Text>
+            </View>
+            <View style={styles.headerStat}>
+              <MaterialCommunityIcons name="chat" size={16} color="white" />
+              <Text style={styles.headerStatText}>{category.post_count}</Text>
+            </View>
           </View>
-        </View>
-        <View style={styles.headerStats}>
-          <View style={styles.headerStat}>
-            <MaterialCommunityIcons name="message-text" size={16} color="white" />
-            <Text style={styles.headerStatText}>{category.thread_count}</Text>
-          </View>
-          <View style={styles.headerStat}>
-            <MaterialCommunityIcons name="chat" size={16} color="white" />
-            <Text style={styles.headerStatText}>{category.post_count}</Text>
-          </View>
-        </View>
-      </LinearGradient>
+        }
+      />
 
       {/* Thread List */}
       <ScrollView
@@ -228,24 +219,18 @@ export default function ForumCategoryScreen() {
       </ScrollView>
 
       {/* New Thread FAB */}
-      <TouchableOpacity
-        style={styles.fab}
+      <PrimaryButton
+        fab
+        size={56}
         onPress={() => {
           // TODO: Navigate to create thread screen
           console.log('Create new thread');
         }}
-        activeOpacity={0.8}
+        outerStyle={styles.fab}
       >
-        <LinearGradient
-          colors={[colors.primary, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fabGradient}
-        >
-          <MaterialCommunityIcons name="plus" size={28} color="white" />
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
+        <MaterialCommunityIcons name="plus" size={28} color="white" />
+      </PrimaryButton>
+    </SafeAreaView>
   );
 }
 
@@ -325,6 +310,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 88,
   },
   emptyState: {
     alignItems: 'center',

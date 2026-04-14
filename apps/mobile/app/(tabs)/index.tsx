@@ -8,7 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -602,20 +602,13 @@ function DashboardHubScreen() {
           Start your journey by adding your first tarantula to the collection.
         </Text>
         <View style={styles.emptyButtons}>
-          <TouchableOpacity
+          <PrimaryButton
             onPress={() => router.push('/tarantula/add')}
-            activeOpacity={0.8}
+            style={styles.emptyButton}
           >
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.emptyButton}
-            >
-              <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-              <Text style={styles.emptyButtonText}>Add Tarantula</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+            <Text style={styles.emptyButtonText}>Add Tarantula</Text>
+          </PrimaryButton>
           <TouchableOpacity
             style={styles.emptySecondaryButton}
             onPress={() => router.push('/species')}
@@ -650,14 +643,13 @@ function DashboardHubScreen() {
             style={styles.statCard}
             onPress={() => router.push('/(tabs)/collection')}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`My Collection: ${tarantulas.length} tarantulas. View all.`}
           >
             <View style={styles.statIconRow}>
-              <LinearGradient
-                colors={[colors.primary, colors.secondary]}
-                style={styles.statIconBox}
-              >
+              <PrimaryButton iconBox size={40} style={styles.statIconBox}>
                 <Text style={{ fontSize: 20 }}>🕷️</Text>
-              </LinearGradient>
+              </PrimaryButton>
               <Text style={styles.statLabel}>My Collection</Text>
             </View>
             <Text style={styles.statValue}>{tarantulas.length}</Text>
@@ -672,6 +664,8 @@ function DashboardHubScreen() {
             ]}
             onPress={() => router.push('/(tabs)/collection')}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Needs Feeding: ${overdueFeedings.length} tarantulas. ${overdueFeedings.length > 0 ? '7 or more days overdue.' : 'All on schedule.'}`}
           >
             <View style={styles.statIconRow}>
               <View style={[
@@ -691,14 +685,14 @@ function DashboardHubScreen() {
           </TouchableOpacity>
 
           {/* Total Molts */}
-          <View style={styles.statCard}>
+          <View
+            style={styles.statCard}
+            accessibilityLabel={`Premolt tracking: ${Array.from(premoltPredictions.values()).filter(p => p.probability > 0).length} specimens tracked.`}
+          >
             <View style={styles.statIconRow}>
-              <LinearGradient
-                colors={[colors.primary, colors.secondary]}
-                style={styles.statIconBox}
-              >
+              <PrimaryButton iconBox size={40} style={styles.statIconBox}>
                 <Text style={{ fontSize: 20 }}>🦋</Text>
-              </LinearGradient>
+              </PrimaryButton>
               <Text style={styles.statLabel}>Total Molts</Text>
             </View>
             <Text style={styles.statValue}>
@@ -715,6 +709,8 @@ function DashboardHubScreen() {
             ]}
             onPress={() => router.push('/(tabs)/collection')}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Premolt Alerts: ${premoltAlerts.length}. ${premoltAlerts.length > 0 ? 'Medium or higher confidence.' : 'No alerts.'}`}
           >
             <View style={styles.statIconRow}>
               <View style={[
@@ -771,17 +767,14 @@ function DashboardHubScreen() {
                         {days} days since last feeding
                       </Text>
                     </View>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
+                    <PrimaryButton
                       onPress={() => router.push(`/tarantula/${t.id}`)}
+                      style={styles.alertButton}
+                      accessibilityLabel={`Log feeding for ${t.common_name || t.name}`}
+                      accessibilityRole="button"
                     >
-                      <LinearGradient
-                        colors={[colors.primary, colors.secondary]}
-                        style={styles.alertButton}
-                      >
-                        <Text style={styles.alertButtonText}>Log</Text>
-                      </LinearGradient>
-                    </TouchableOpacity>
+                      <Text style={styles.alertButtonText}>Log</Text>
+                    </PrimaryButton>
                   </TouchableOpacity>
                 );
               })}

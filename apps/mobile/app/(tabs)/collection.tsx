@@ -12,7 +12,7 @@ import {
   TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
@@ -180,24 +180,26 @@ export default function CollectionScreen() {
 
     const days = status.days_since_last_feeding;
     let badgeStyle = styles.feedingBadgeGreen;
-    let emoji = '✓';
+    let label: string;
 
-    if (days >= 21) {
+    if (days === 0) {
+      label = '✓ Fed today';
+    } else if (days >= 21) {
       badgeStyle = styles.feedingBadgeRed;
-      emoji = '⚠️';
+      label = `⚠️ ${days}d ago`;
     } else if (days >= 14) {
       badgeStyle = styles.feedingBadgeOrange;
-      emoji = '⏰';
+      label = `⏰ ${days}d ago`;
     } else if (days >= 7) {
       badgeStyle = styles.feedingBadgeYellow;
-      emoji = '📅';
+      label = `📅 ${days}d ago`;
+    } else {
+      label = `✓ ${days}d ago`;
     }
 
     return (
       <View style={[styles.feedingBadge, badgeStyle]}>
-        <Text style={styles.feedingBadgeText}>
-          {emoji} {days}d
-        </Text>
+        <Text style={styles.feedingBadgeText}>{label}</Text>
       </View>
     );
   };
@@ -448,6 +450,7 @@ export default function CollectionScreen() {
     },
     list: {
       padding: 8,
+      paddingBottom: 88, // FAB height (56) + 16pt clearance + 16pt base
     },
     statsCard: {
       margin: 8,
@@ -892,20 +895,13 @@ export default function CollectionScreen() {
           </Text>
         </View>
       </View>
-      <TouchableOpacity
+      <PrimaryButton
         onPress={() => router.push('/tarantula/add')}
-        activeOpacity={0.8}
+        style={styles.getStartedButton}
       >
-        <LinearGradient
-          colors={[colors.primary, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.getStartedButton}
-        >
-          <MaterialCommunityIcons name="plus" size={18} color="#fff" />
-          <Text style={styles.getStartedButtonText}>Add</Text>
-        </LinearGradient>
-      </TouchableOpacity>
+        <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+        <Text style={styles.getStartedButtonText}>Add</Text>
+      </PrimaryButton>
     </View>
   );
 
@@ -918,20 +914,13 @@ export default function CollectionScreen() {
           <Text style={styles.emptyText}>
             Start building your collection by adding your first tarantula
           </Text>
-          <TouchableOpacity
+          <PrimaryButton
             onPress={() => router.push('/tarantula/add')}
-            activeOpacity={0.8}
+            style={styles.addButton}
           >
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.addButton}
-            >
-              <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-              <Text style={styles.addButtonText}>Add Tarantula</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+            <Text style={styles.addButtonText}>Add Tarantula</Text>
+          </PrimaryButton>
         </View>
       ) : (
         <>
@@ -1008,20 +997,14 @@ export default function CollectionScreen() {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
             }
           />
-          <TouchableOpacity
-            style={styles.fab}
+          <PrimaryButton
+            fab
+            size={56}
             onPress={() => router.push('/tarantula/add')}
-            activeOpacity={0.8}
+            outerStyle={styles.fab}
           >
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.fabGradient}
-            >
-              <MaterialCommunityIcons name="plus" size={28} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
+            <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+          </PrimaryButton>
         </>
       )}
     </View>
