@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, RefreshControl, FlatList, Image, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from '../src/contexts/ThemeContext'
 import { useAuth } from '../src/contexts/AuthContext'
+import { AppHeader } from '../src/components/AppHeader'
 
 interface DiscoverResponse {
   stats: {
@@ -97,7 +99,7 @@ function getActivityLabel(actionType: string): string {
 
 export default function DiscoverScreen() {
   const router = useRouter()
-  const { colors } = useTheme()
+  const { colors, layout } = useTheme()
   const { token } = useAuth()
   const [discover, setDiscover] = useState<DiscoverResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -135,28 +137,32 @@ export default function DiscoverScreen() {
     setRefreshing(false)
   }
 
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary
+
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  )
+
   if (loading && !discover) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <AppHeader title="✨ Discover" subtitle="Explore trending content and active community members" leftAction={backButton} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
       </View>
     )
   }
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-    >
-      {/* Header */}
-      <View style={{ paddingHorizontal: 16, paddingVertical: 20 }}>
-        <Text style={{ fontSize: 32, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 8 }}>
-          ✨ Discover
-        </Text>
-        <Text style={{ fontSize: 14, color: colors.secondaryText }}>
-          Explore trending content and active community members
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <AppHeader title="✨ Discover" subtitle="Explore trending content and active community members" leftAction={backButton} />
+      <ScrollView
+        style={{ flex: 1 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
 
       {error && (
         <View style={{ marginHorizontal: 16, marginBottom: 16, padding: 12, backgroundColor: '#fee2e2', borderRadius: 8 }}>
@@ -522,6 +528,7 @@ export default function DiscoverScreen() {
           </View>
         </>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   )
 }
