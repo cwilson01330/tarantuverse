@@ -188,7 +188,7 @@ export default function DiscoverScreen() {
                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary, marginBottom: 4 }}>
                   {discover.stats.total_keepers}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.secondaryText }}>Active Keepers</Text>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Active Keepers</Text>
               </View>
               <View
                 style={{
@@ -203,7 +203,7 @@ export default function DiscoverScreen() {
                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary, marginBottom: 4 }}>
                   {discover.stats.total_tarantulas}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.secondaryText }}>Tarantulas</Text>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Tarantulas</Text>
               </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -220,7 +220,7 @@ export default function DiscoverScreen() {
                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary, marginBottom: 4 }}>
                   {discover.stats.total_species}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.secondaryText }}>Species</Text>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Species</Text>
               </View>
               <View
                 style={{
@@ -235,7 +235,7 @@ export default function DiscoverScreen() {
                 <Text style={{ fontSize: 24, fontWeight: 'bold', color: colors.primary, marginBottom: 4 }}>
                   {discover.stats.total_forum_threads}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.secondaryText }}>Discussions</Text>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>Discussions</Text>
               </View>
             </View>
           </View>
@@ -276,7 +276,7 @@ export default function DiscoverScreen() {
                         style={{
                           fontSize: 11,
                           backgroundColor: colors.background,
-                          color: colors.secondaryText,
+                          color: colors.textSecondary,
                           paddingHorizontal: 8,
                           paddingVertical: 4,
                           borderRadius: 4,
@@ -284,19 +284,19 @@ export default function DiscoverScreen() {
                       >
                         {thread.category}
                       </Text>
-                      <Text style={{ fontSize: 11, color: colors.secondaryText }}>by @{thread.author_username}</Text>
+                      <Text style={{ fontSize: 11, color: colors.textSecondary }}>by @{thread.author_username}</Text>
                     </View>
                     <View style={{ alignItems: 'center' }}>
                       <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.primary }}>
                         {thread.reply_count}
                       </Text>
-                      <Text style={{ fontSize: 10, color: colors.secondaryText }}>replies</Text>
+                      <Text style={{ fontSize: 10, color: colors.textSecondary }}>replies</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
               ))
             ) : (
-              <Text style={{ textAlign: 'center', color: colors.secondaryText, paddingVertical: 16 }}>
+              <Text style={{ textAlign: 'center', color: colors.textSecondary, paddingVertical: 16 }}>
                 No trending discussions yet
               </Text>
             )}
@@ -358,20 +358,20 @@ export default function DiscoverScreen() {
                     >
                       {keeper.display_name || keeper.username}
                     </Text>
-                    <Text style={{ fontSize: 11, color: colors.secondaryText, marginTop: 4 }}>
+                    <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
                       @{keeper.username}
                     </Text>
                     <View style={{ marginTop: 6, alignItems: 'center' }}>
                       <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.primary }}>
                         {keeper.activity_count}
                       </Text>
-                      <Text style={{ fontSize: 10, color: colors.secondaryText }}>activities</Text>
+                      <Text style={{ fontSize: 10, color: colors.textSecondary }}>activities</Text>
                     </View>
                   </TouchableOpacity>
                 )}
               />
             ) : (
-              <Text style={{ textAlign: 'center', color: colors.secondaryText, paddingVertical: 16 }}>
+              <Text style={{ textAlign: 'center', color: colors.textSecondary, paddingVertical: 16 }}>
                 No active keepers yet
               </Text>
             )}
@@ -434,7 +434,7 @@ export default function DiscoverScreen() {
                         <Text
                           style={{
                             fontSize: 10,
-                            color: colors.secondaryText,
+                            color: colors.textSecondary,
                             marginTop: 4,
                           }}
                           numberOfLines={1}
@@ -463,7 +463,7 @@ export default function DiscoverScreen() {
                             fontSize: 9,
                             fontWeight: '600',
                             backgroundColor: colors.background,
-                            color: colors.secondaryText,
+                            color: colors.textSecondary,
                             paddingHorizontal: 4,
                             paddingVertical: 2,
                             borderRadius: 3,
@@ -477,7 +477,7 @@ export default function DiscoverScreen() {
                 )}
               />
             ) : (
-              <Text style={{ textAlign: 'center', color: colors.secondaryText, paddingVertical: 16 }}>
+              <Text style={{ textAlign: 'center', color: colors.textSecondary, paddingVertical: 16 }}>
                 No popular species yet
               </Text>
             )}
@@ -509,19 +509,19 @@ export default function DiscoverScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, color: colors.textPrimary }}>
                       <Text style={{ fontWeight: '600' }}>@{activity.user_username}</Text>
-                      <Text style={{ color: colors.secondaryText }}>
+                      <Text style={{ color: colors.textSecondary }}>
                         {' '}
                         {getActivityLabel(activity.activity_type)}
                       </Text>
                     </Text>
-                    <Text style={{ fontSize: 12, color: colors.secondaryText, marginTop: 4 }}>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
                       {formatDate(activity.created_at)}
                     </Text>
                   </View>
                 </TouchableOpacity>
               ))
             ) : (
-              <Text style={{ textAlign: 'center', color: colors.secondaryText, paddingVertical: 16 }}>
+              <Text style={{ textAlign: 'center', color: colors.textSecondary, paddingVertical: 16 }}>
                 No recent activity yet
               </Text>
             )}
