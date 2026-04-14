@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -34,6 +34,18 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+  // Username change state
+  const [newUsername, setNewUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<{
+    checking: boolean;
+    available: boolean | null;
+    message: string;
+    daysUntilAllowed: number | null;
+    nextChangeDate: string | null;
+  }>({ checking: false, available: null, message: '', daysUntilAllowed: null, nextChangeDate: null });
+  const [savingUsername, setSavingUsername] = useState(false);
+  const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [formData, setFormData] = useState({
     display_name: '',
     avatar_url: '',
@@ -67,6 +79,49 @@ export default function SettingsScreen() {
       });
     }
   }, [user]);
+
+  const checkUsernameAvailability = async (value: string) => {
+    if (!value || value.length < 3 || value === user?.username) {
+      setUsernameStatus({ checking: false, available: null, message: '', daysUntilAllowed: null, nextChangeDate: null });
+      return;
+    }
+    setUsernameStatus(prev => ({ ...prev, checking: true }));
+    try {
+      const res = await apiClient.get(`/auth/me/username/check?username=${encodeURIComponent(value)}`);
+      const data = res.data;
+      setUsernameStatus({
+        checking: false,
+        available: data.available,
+        message: data.message,
+        daysUntilAllowed: data.days_until_allowed ?? null,
+        nextChangeDate: data.next_change_date ?? null,
+      });
+    } catch {
+      setUsernameStatus(prev => ({ ...prev, checking: false }));
+    }
+  };
+
+  const handleUsernameInputChange = (value: string) => {
+    setNewUsername(value);
+    if (usernameTimer.current) clearTimeout(usernameTimer.current);
+    usernameTimer.current = setTimeout(() => checkUsernameAvailability(value), 400);
+  };
+
+  const handleUsernameChange = async () => {
+    if (!newUsername || newUsername.length < 3) return;
+    setSavingUsername(true);
+    try {
+      await apiClient.put('/auth/me/username', { new_username: newUsername });
+      await refreshUser();
+      setNewUsername('');
+      setUsernameStatus({ checking: false, available: null, message: '', daysUntilAllowed: null, nextChangeDate: null });
+      Alert.alert('✓ Username changed', `Your username is now @${newUsername}`);
+    } catch (error: any) {
+      Alert.alert('Could not change username', error.response?.data?.detail || 'Something went wrong.');
+    } finally {
+      setSavingUsername(false);
+    }
+  };
 
   const handleSpecialtyToggle = (specialty: string) => {
     if (formData.profile_specialties.includes(specialty)) {
@@ -336,6 +391,96 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+
+        {/* ── Username Change ─────────────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Username</Text>
+          <Text style={{ fontSize: 13, color: colors.textTertiary, marginBottom: 12, lineHeight: 18 }}>
+            Your @username appears on your public profile. Changes are allowed once every 30 days.
+          </Text>
+
+          {/* Current username display */}
+          <Text style={styles.label}>Current</Text>
+          <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', opacity: 0.6 }]}>
+            <Text style={{ color: colors.textSecondary, fontSize: 16 }}>@{user?.username}</Text>
+          </View>
+
+          {/* New username input */}
+          <Text style={[styles.label, { marginTop: 12 }]}>New username</Text>
+          <View style={{ position: 'relative' }}>
+            <TextInput
+              style={[styles.input, { paddingLeft: 26 }]}
+              value={newUsername}
+              onChangeText={handleUsernameInputChange}
+              placeholder="new_username"
+              placeholderTextColor={colors.textTertiary}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              maxLength={50}
+            />
+            <Text style={{
+              position: 'absolute', left: 12, top: 14,
+              color: colors.textTertiary, fontSize: 16, pointerEvents: 'none',
+            }}>@</Text>
+          </View>
+
+          {/* Status message */}
+          {newUsername.length >= 3 && (
+            <Text style={{
+              marginTop: 6, fontSize: 12,
+              color: usernameStatus.checking
+                ? colors.textTertiary
+                : usernameStatus.available && !usernameStatus.daysUntilAllowed
+                ? '#16a34a'
+                : usernameStatus.available && usernameStatus.daysUntilAllowed
+                ? '#ca8a04'
+                : '#dc2626',
+            }}>
+              {usernameStatus.checking ? 'Checking...' : usernameStatus.message}
+            </Text>
+          )}
+          {usernameStatus.nextChangeDate && (
+            <Text style={{ marginTop: 4, fontSize: 11, color: colors.textTertiary }}>
+              Next change available:{' '}
+              {new Date(usernameStatus.nextChangeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </Text>
+          )}
+
+          {/* Save button */}
+          <TouchableOpacity
+            style={[
+              styles.saveButton,
+              {
+                marginTop: 12,
+                opacity: (
+                  savingUsername ||
+                  !newUsername ||
+                  newUsername.length < 3 ||
+                  !usernameStatus.available ||
+                  !!usernameStatus.daysUntilAllowed ||
+                  usernameStatus.checking
+                ) ? 0.4 : 1,
+              },
+            ]}
+            onPress={handleUsernameChange}
+            disabled={
+              savingUsername ||
+              !newUsername ||
+              newUsername.length < 3 ||
+              !usernameStatus.available ||
+              !!usernameStatus.daysUntilAllowed ||
+              usernameStatus.checking
+            }
+          >
+            {savingUsername ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Change Username</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Basic Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basic Information</Text>

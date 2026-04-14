@@ -11,7 +11,7 @@ import secrets
 from app.database import get_db
 from app.models.user import User
 from app.models.user_oauth_account import UserOAuthAccount
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest, ForgotPasswordRequest
+from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest, ForgotPasswordRequest, UsernameChangeRequest, UsernameAvailabilityResponse
 from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse, LinkedAccountResponse, LinkAccountRequest
 from app.utils.auth import get_password_hash, verify_password, create_access_token, revoke_token, decode_access_token
 from app.utils.dependencies import get_current_user
@@ -348,6 +348,145 @@ async def upload_avatar(
 
     # Update user's avatar_url
     current_user.avatar_url = avatar_url
+    db.commit()
+    db.refresh(current_user)
+
+    return UserResponse.from_orm(current_user)
+
+
+# ============================================================================
+# Username Change
+# ============================================================================
+
+USERNAME_CHANGE_COOLDOWN_DAYS = 30
+
+
+@router.get("/me/username/check", response_model=UsernameAvailabilityResponse)
+async def check_username_availability(
+    username: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Check if a username is available and whether the current user is allowed to change.
+
+    Returns:
+    - **available**: whether the username is free
+    - **days_until_allowed**: how many days remain in the cooldown (null = can change now)
+    - **next_change_date**: earliest datetime the user can next change their username
+    """
+    # Validate format
+    is_valid, error_message = validate_username(username)
+    if not is_valid:
+        return UsernameAvailabilityResponse(
+            available=False,
+            message=error_message,
+        )
+
+    # Check if it's the same as the current username
+    if username.lower() == current_user.username.lower():
+        return UsernameAvailabilityResponse(
+            available=False,
+            message="That's already your username.",
+        )
+
+    # Check uniqueness
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
+        return UsernameAvailabilityResponse(
+            available=False,
+            message="Username is already taken.",
+        )
+
+    # Check cooldown
+    now = datetime.now(timezone.utc)
+    if current_user.last_username_change:
+        elapsed = now - current_user.last_username_change
+        cooldown = timedelta(days=USERNAME_CHANGE_COOLDOWN_DAYS)
+        if elapsed < cooldown:
+            remaining = cooldown - elapsed
+            days_remaining = remaining.days + 1  # ceil to next full day
+            next_date = current_user.last_username_change + cooldown
+            return UsernameAvailabilityResponse(
+                available=True,  # username is free, but change is blocked
+                message=f"Username is available, but you must wait {days_remaining} more day(s) before changing.",
+                days_until_allowed=days_remaining,
+                next_change_date=next_date,
+                last_username_change=current_user.last_username_change,
+            )
+
+    return UsernameAvailabilityResponse(
+        available=True,
+        message="Username is available.",
+        last_username_change=current_user.last_username_change,
+    )
+
+
+@router.put("/me/username", response_model=UserResponse)
+@limiter.limit("5/hour")
+async def change_username(
+    request: Request,
+    data: UsernameChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Change the current user's username.
+
+    - **new_username**: The desired new username (3–50 chars, alphanumeric + underscores)
+    - Enforces a 30-day cooldown between changes
+    - Validates format and uniqueness (case-insensitive)
+    - Since all content references users by UUID, historical content automatically
+      reflects the new username — no cascade updates required
+    """
+    new_username = data.new_username.strip()
+
+    # 1. Format validation (reuses registration validator)
+    is_valid, error_message = validate_username(new_username)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=error_message,
+        )
+
+    # 2. Same-as-current check
+    if new_username.lower() == current_user.username.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New username must be different from your current username.",
+        )
+
+    # 3. Uniqueness check (case-insensitive)
+    existing = db.query(User).filter(
+        User.username.ilike(new_username)
+    ).first()
+    if existing and existing.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username is already taken.",
+        )
+
+    # 4. Cooldown check
+    now = datetime.now(timezone.utc)
+    if current_user.last_username_change:
+        elapsed = now - current_user.last_username_change
+        cooldown = timedelta(days=USERNAME_CHANGE_COOLDOWN_DAYS)
+        if elapsed < cooldown:
+            remaining = cooldown - elapsed
+            days_remaining = remaining.days + 1
+            next_date = current_user.last_username_change + cooldown
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"You can only change your username once every {USERNAME_CHANGE_COOLDOWN_DAYS} days. "
+                    f"Next change allowed in {days_remaining} day(s) "
+                    f"({next_date.strftime('%B %d, %Y')})."
+                ),
+            )
+
+    # 5. Apply change
+    current_user.username = new_username
+    current_user.last_username_change = now
     db.commit()
     db.refresh(current_user)
 

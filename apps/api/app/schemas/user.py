@@ -113,6 +113,21 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class UsernameChangeRequest(BaseModel):
+    """Schema for requesting a username change"""
+    new_username: str = Field(..., min_length=3, max_length=50)
+
+
+class UsernameAvailabilityResponse(BaseModel):
+    """Schema for username availability check response"""
+    available: bool
+    message: str
+    # Days until next change is allowed (null if allowed now)
+    days_until_allowed: Optional[int] = None
+    next_change_date: Optional[datetime] = None
+    last_username_change: Optional[datetime] = None
+
+
 class Token(BaseModel):
     """Schema for JWT token response"""
     access_token: str

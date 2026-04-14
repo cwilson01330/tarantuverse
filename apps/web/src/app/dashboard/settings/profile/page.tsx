@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -8,6 +8,23 @@ import DashboardLayout from '@/components/DashboardLayout'
 export default function ProfileSettingsPage() {
   const router = useRouter()
   const { user, token, isAuthenticated, isLoading: authLoading } = useAuth()
+
+  // Username change state
+  const [currentUsername, setCurrentUsername] = useState('')
+  const [newUsername, setNewUsername] = useState('')
+  const [usernameStatus, setUsernameStatus] = useState<{
+    checking: boolean
+    available: boolean | null
+    message: string
+    daysUntilAllowed: number | null
+    nextChangeDate: string | null
+    lastChanged: string | null
+  }>({ checking: false, available: null, message: '', daysUntilAllowed: null, nextChangeDate: null, lastChanged: null })
+  const [usernameSubmitting, setUsernameSubmitting] = useState(false)
+  const [usernameSuccess, setUsernameSuccess] = useState(false)
+  const [usernameError, setUsernameError] = useState('')
+  const usernameCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [formData, setFormData] = useState({
     display_name: '',
     avatar_url: '',
@@ -64,6 +81,11 @@ export default function ProfileSettingsPage() {
       }
 
       const data = await response.json()
+      setCurrentUsername(data.username || '')
+      setUsernameStatus(prev => ({
+        ...prev,
+        lastChanged: data.last_username_change || null,
+      }))
       setFormData({
         display_name: data.display_name || '',
         avatar_url: data.avatar_url || '',
@@ -83,6 +105,68 @@ export default function ProfileSettingsPage() {
       setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const checkUsernameAvailability = async (value: string) => {
+    if (!value || value === currentUsername || value.length < 3) {
+      setUsernameStatus(prev => ({ ...prev, checking: false, available: null, message: '' }))
+      return
+    }
+    setUsernameStatus(prev => ({ ...prev, checking: true }))
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const res = await fetch(
+        `${API_URL}/api/v1/auth/me/username/check?username=${encodeURIComponent(value)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setUsernameStatus({
+          checking: false,
+          available: data.available,
+          message: data.message,
+          daysUntilAllowed: data.days_until_allowed ?? null,
+          nextChangeDate: data.next_change_date ?? null,
+          lastChanged: data.last_username_change ?? null,
+        })
+      }
+    } catch {
+      setUsernameStatus(prev => ({ ...prev, checking: false }))
+    }
+  }
+
+  const handleUsernameInputChange = (value: string) => {
+    setNewUsername(value)
+    setUsernameError('')
+    setUsernameSuccess(false)
+    if (usernameCheckTimer.current) clearTimeout(usernameCheckTimer.current)
+    usernameCheckTimer.current = setTimeout(() => checkUsernameAvailability(value), 400)
+  }
+
+  const handleUsernameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setUsernameError('')
+    setUsernameSuccess(false)
+    setUsernameSubmitting(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const res = await fetch(`${API_URL}/api/v1/auth/me/username`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ new_username: newUsername }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Failed to change username')
+      setCurrentUsername(data.username)
+      setNewUsername('')
+      setUsernameStatus({ checking: false, available: null, message: '', daysUntilAllowed: null, nextChangeDate: null, lastChanged: data.last_username_change || null })
+      setUsernameSuccess(true)
+      setTimeout(() => setUsernameSuccess(false), 5000)
+    } catch (err: any) {
+      setUsernameError(err.message || 'Something went wrong')
+    } finally {
+      setUsernameSubmitting(false)
     }
   }
 
@@ -242,6 +326,95 @@ export default function ProfileSettingsPage() {
             Profile updated successfully!
           </div>
         )}
+
+        {/* ── Username Change (standalone form) ──────────────────────────── */}
+        <div className="bg-surface border border-theme rounded-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold mb-1 text-theme-primary">Username</h2>
+          <p className="text-sm text-theme-secondary mb-4">
+            Your username appears in your public profile URL and @mentions. You can change it once every 30 days.
+          </p>
+
+          {usernameError && (
+            <div className="mb-3 p-3 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
+              {usernameError}
+            </div>
+          )}
+          {usernameSuccess && (
+            <div className="mb-3 p-3 bg-green-100 border border-green-400 text-green-700 rounded text-sm">
+              ✓ Username changed to <strong>@{currentUsername}</strong>
+            </div>
+          )}
+
+          <form onSubmit={handleUsernameSubmit} className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1 text-theme-secondary">Current username</label>
+              <div className="flex items-center gap-2 px-3 py-2 bg-surface-elevated border border-theme rounded-lg text-theme-secondary text-sm">
+                <span className="opacity-50">@</span>
+                <span>{currentUsername}</span>
+              </div>
+              {usernameStatus.lastChanged && (
+                <p className="mt-1 text-xs text-theme-tertiary">
+                  Last changed: {new Date(usernameStatus.lastChanged).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1 text-theme-secondary">New username</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-tertiary text-sm pointer-events-none">@</span>
+                <input
+                  type="text"
+                  value={newUsername}
+                  onChange={(e) => handleUsernameInputChange(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
+                  placeholder="new_username"
+                  minLength={3}
+                  maxLength={50}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {usernameStatus.checking && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-theme-tertiary animate-pulse">checking…</span>
+                )}
+              </div>
+              {newUsername.length >= 3 && !usernameStatus.checking && usernameStatus.message && (
+                <p className={`mt-1 text-xs ${
+                  usernameStatus.available && !usernameStatus.daysUntilAllowed
+                    ? 'text-green-600 dark:text-green-400'
+                    : usernameStatus.available && usernameStatus.daysUntilAllowed
+                    ? 'text-yellow-600 dark:text-yellow-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}>
+                  {usernameStatus.available && !usernameStatus.daysUntilAllowed && '✓ '}
+                  {usernameStatus.available && usernameStatus.daysUntilAllowed && '⏳ '}
+                  {!usernameStatus.available && '✗ '}
+                  {usernameStatus.message}
+                </p>
+              )}
+              {usernameStatus.nextChangeDate && (
+                <p className="mt-1 text-xs text-theme-tertiary">
+                  Next change available: {new Date(usernameStatus.nextChangeDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={
+                usernameSubmitting ||
+                !newUsername ||
+                newUsername.length < 3 ||
+                !usernameStatus.available ||
+                !!usernameStatus.daysUntilAllowed ||
+                usernameStatus.checking
+              }
+              className="px-5 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-40 disabled:cursor-not-allowed text-sm font-semibold"
+            >
+              {usernameSubmitting ? 'Saving…' : 'Change Username'}
+            </button>
+          </form>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Info */}
