@@ -7,6 +7,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const theme = useThemeStore((state) => state.theme);
   const resolvedColors = useThemeStore((state) => state.resolvedColors);
+  const aestheticPreset = useThemeStore((state) => state.aestheticPreset);
   const applyColorsToDOM = useThemeStore((state) => state.applyColorsToDOM);
 
   useEffect(() => {
@@ -22,11 +23,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.classList.add(theme);
   }, [theme, mounted]);
 
-  // Apply custom colors when they change
+  // Apply custom colors + preset data attribute when they change
   useEffect(() => {
     if (!mounted) return;
     applyColorsToDOM();
-  }, [resolvedColors, mounted, applyColorsToDOM]);
+  }, [resolvedColors, aestheticPreset, mounted, applyColorsToDOM]);
 
   // Render children immediately to avoid layout shift
   return <>{children}</>;

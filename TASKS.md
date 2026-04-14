@@ -19,30 +19,28 @@
 
 ### 🔗 Theme Preset System — Sprint 2 (Backend + Web + QA) · due 2026-05-08
 
-- [ ] **Alembic migration** — add `ui_preferences` JSONB to `users` table
-  - Follow naming convention from existing migrations
-  - Default: `{"mode": "dark", "accent": "hobbyist", "preset": "hobbyist"}`
+**Backend** (pivoted to existing `user_theme_preferences` table — less work than new `ui_preferences` JSONB):
+- [x] ~~**Alembic migration** — `a1b2c3d4e5f7` adds `aesthetic_preset` column to `user_theme_preferences`~~ (2026-04-14)
+- [x] ~~**Extend backend schemas** — `ThemePreferencesBase` + `ThemePreferencesUpdate` now include `aesthetic_preset`~~ (2026-04-14)
+- [x] ~~No new endpoint needed~~ — existing `PUT /api/v1/theme-preferences/` handles it
 
-- [ ] **Extend backend schemas** — add `UIPreferences` Pydantic model to `schemas/user.py`; update `GET /auth/me` response
+**Mobile** (cross-device sync):
+- [x] ~~**`loadFromAPI`** — reads `aesthetic_preset` from server response~~ (2026-04-14)
+- [x] ~~**`saveToAPI`** — includes `aesthetic_preset` in PUT body~~ (2026-04-14)
+- [x] ~~**`setAestheticPreset`** — AsyncStorage + background API sync on every toggle~~ (2026-04-14)
 
-- [ ] **Implement `PUT /auth/ui-preferences` endpoint** — or fold into existing profile PATCH
+**Web**:
+- [x] ~~**Web CSS variables** — `[data-preset="keeper"]` + `[data-preset="hobbyist"]` blocks in `globals.css` with radius, padding, row-height, shadow, gradient tokens~~ (2026-04-14)
+- [x] ~~**Extend `tailwind.config.js`** — `borderRadius`, `spacing`, `boxShadow` read from CSS custom properties~~ (2026-04-14)
+- [x] ~~**Preset utility classes** — `.rounded-preset-{sm/md/lg}`, `.shadow-preset`, `.card-preset`, `.btn-primary-preset`, `.row-preset` in `@layer utilities`~~ (2026-04-14)
+- [x] ~~**`themeStore.ts`** — `aestheticPreset` state, `setAestheticPreset` action, `applyColorsToDOM` sets `data-preset` on `<html>`, `loadFromAPI`/`saveToAPI` synced, localStorage persisted~~ (2026-04-14)
+- [x] ~~**`ThemeProvider.tsx`** — watches `aestheticPreset`, triggers `applyColorsToDOM`~~ (2026-04-14)
 
-- [ ] **Wire mobile sync** — fire `PUT /auth/ui-preferences` on preset change; merge server value on cold start (AsyncStorage wins if offline)
-
-- [ ] **Web CSS variables** — add `[data-preset="keeper"]` + `[data-preset="hobbyist"]` blocks to `apps/web/src/app/globals.css`
-
-- [ ] **Extend `tailwind.config.ts`** — read radius/spacing/height from CSS custom properties
-
-- [ ] **Update `ThemeProvider.tsx`** — read `ui_preferences.preset` from session; set `data-preset` on `<html>` server-side to avoid hydration flash
-
-- [ ] **Web component audit** — scope to 5 primary pages (dashboard, collection, community, search, profile); replace hardcoded gradient/radius/height with CSS-var-derived Tailwind classes; log exceptions
-
+**Remaining**:
+- [ ] **Web component audit** — scope to 5 primary pages (dashboard, collection, community, search, profile); replace hardcoded gradient/radius/height with preset utility classes
 - [ ] **Final QA** — all 4 combos on mobile + web; test cross-device sync (change on mobile → reload web)
-
 - [ ] **EAS OTA update** — `eas update --branch production`
-
 - [ ] **Update CLAUDE.md** — add preset system to architecture section
-
 - [ ] **Mark P0 audit items as resolved** in `PLATFORM_DESIGN_AUDIT_2026-04-13.md`
 
 ---

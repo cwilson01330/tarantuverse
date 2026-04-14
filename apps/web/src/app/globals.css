@@ -26,6 +26,41 @@
     --primary-hover: 0 82 204; /* #0052cc */
   }
 
+  /* ─── Aesthetic preset tokens ──────────────────────────────────────────── */
+  /*  Hobbyist: vibrant, rounded, gradient, shadow elevation                 */
+  /*  Keeper:   restrained, tight, flat, border elevation                    */
+
+  :root,
+  [data-preset="hobbyist"] {
+    --preset-radius-sm: 12px;
+    --preset-radius-md: 16px;
+    --preset-radius-lg: 24px;
+    --preset-radius-full: 9999px;
+    --preset-card-padding: 16px;
+    --preset-row-height: 52px;
+    --preset-stack-gap: 12px;
+    --preset-header-height: 80px;
+    --preset-use-gradient: 1;
+    --preset-elevation: 0 4px 20px rgba(0, 0, 0, 0.2);
+    --preset-card-border-width: 0px;
+    --preset-btn-shadow: 0 4px 14px rgba(var(--user-primary), 0.35);
+  }
+
+  [data-preset="keeper"] {
+    --preset-radius-sm: 8px;
+    --preset-radius-md: 12px;
+    --preset-radius-lg: 16px;
+    --preset-radius-full: 9999px;
+    --preset-card-padding: 12px;
+    --preset-row-height: 44px;
+    --preset-stack-gap: 8px;
+    --preset-header-height: 56px;
+    --preset-use-gradient: 0;
+    --preset-elevation: none;
+    --preset-card-border-width: 1px;
+    --preset-btn-shadow: none;
+  }
+
   .dark {
     /* Dark theme colors */
     --background: 10 10 15; /* #0a0a0f */
@@ -171,6 +206,46 @@
 
   .bg-user-secondary {
     background-color: rgb(var(--user-secondary));
+  }
+
+  /* ─── Preset-aware utilities ──────────────────────────────────────────── */
+
+  /* Border radius */
+  .rounded-preset-sm  { border-radius: var(--preset-radius-sm); }
+  .rounded-preset-md  { border-radius: var(--preset-radius-md); }
+  .rounded-preset-lg  { border-radius: var(--preset-radius-lg); }
+  .rounded-preset-full { border-radius: var(--preset-radius-full); }
+
+  /* Elevation */
+  .shadow-preset      { box-shadow: var(--preset-elevation); }
+  .border-preset      { border-width: var(--preset-card-border-width); }
+
+  /* Card */
+  .card-preset {
+    padding: var(--preset-card-padding);
+    border-radius: var(--preset-radius-md);
+    box-shadow: var(--preset-elevation);
+    border-width: var(--preset-card-border-width);
+    border-style: solid;
+    border-color: rgb(var(--border));
+  }
+
+  /* Primary action button — gradient in Hobbyist, flat in Keeper */
+  .btn-primary-preset {
+    background: linear-gradient(135deg, var(--user-primary-hex, #0066ff) 0%, var(--user-secondary-hex, #ff0099) 100%);
+    box-shadow: var(--preset-btn-shadow);
+    border-radius: var(--preset-radius-md);
+    color: white;
+    font-weight: 600;
+  }
+  [data-preset="keeper"] .btn-primary-preset {
+    background: rgb(var(--user-primary));
+    box-shadow: none;
+  }
+
+  /* Row height for list items */
+  .row-preset {
+    min-height: var(--preset-row-height);
   }
 }
 

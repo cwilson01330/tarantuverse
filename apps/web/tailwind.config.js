@@ -7,6 +7,22 @@ module.exports = {
   ],
   theme: {
     extend: {
+      borderRadius: {
+        'preset-sm':   'var(--preset-radius-sm)',
+        'preset-md':   'var(--preset-radius-md)',
+        'preset-lg':   'var(--preset-radius-lg)',
+        'preset-full': 'var(--preset-radius-full)',
+      },
+      spacing: {
+        'preset-card-pad':  'var(--preset-card-padding)',
+        'preset-row':       'var(--preset-row-height)',
+        'preset-gap':       'var(--preset-stack-gap)',
+        'preset-header':    'var(--preset-header-height)',
+      },
+      boxShadow: {
+        'preset':     'var(--preset-elevation)',
+        'preset-btn': 'var(--preset-btn-shadow)',
+      },
       colors: {
         // Electric Blue to Neon Pink color scheme
         'electric-blue': {

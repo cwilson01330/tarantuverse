@@ -397,8 +397,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setAestheticPreset = (preset: AestheticPreset) => {
     setAestheticPresetState(preset);
-    // Persist immediately — fire-and-forget
+    // Persist immediately — fire-and-forget (AsyncStorage + background API sync)
     setTimeout(() => {
+      // 1. Save to AsyncStorage
       AsyncStorage.getItem(THEME_PREFS_STORAGE_KEY).then((raw) => {
         const existing = raw ? JSON.parse(raw) : {};
         return AsyncStorage.setItem(
@@ -406,6 +407,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           JSON.stringify({ ...existing, aestheticPreset: preset })
         );
       }).catch((err) => console.error('Failed to save aesthetic preset:', err));
+
+      // 2. Sync to backend (cross-device persistence)
+      AsyncStorage.getItem('auth_token').then((token) => {
+        if (!token) return;
+        const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
+        return fetch(`${API_URL}/api/v1/theme-preferences/`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ aesthetic_preset: preset }),
+        });
+      }).catch((err) => console.error('Failed to sync aesthetic preset to API:', err));
     }, 0);
   };
 
@@ -472,6 +487,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setThemeState(data.color_mode === 'light' ? 'light' : 'dark');
         setThemeType(data.theme_type || 'default');
         setPresetId(data.preset_id || null);
+        if (data.aesthetic_preset === 'keeper' || data.aesthetic_preset === 'hobbyist') {
+          setAestheticPresetState(data.aesthetic_preset);
+        }
         if (data.custom_primary) {
           setCustomColorsState({
             primary: data.custom_primary,
@@ -499,6 +517,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           color_mode: theme,
           theme_type: themeType,
           preset_id: presetId,
+          aesthetic_preset: aestheticPreset,
           custom_primary: customColors?.primary,
           custom_secondary: customColors?.secondary,
           custom_accent: customColors?.accent,

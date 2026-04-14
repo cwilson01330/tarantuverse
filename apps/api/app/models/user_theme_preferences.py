@@ -29,6 +29,9 @@ class UserThemePreferences(Base):
     # Only used when theme_type = 'preset'
     preset_id = Column(String(50), nullable=True)
 
+    # Aesthetic preset: 'hobbyist' (gradient, rounded, vibrant) or 'keeper' (flat, tight, restrained)
+    aesthetic_preset = Column(String(20), default='hobbyist', nullable=False)
+
     # Custom colors (hex format: #RRGGBB)
     # Only used when theme_type = 'custom' (premium feature)
     custom_primary = Column(String(7), nullable=True)

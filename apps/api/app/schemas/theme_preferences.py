@@ -19,6 +19,9 @@ class ThemePreferencesBase(BaseModel):
     # Selected preset ID (when theme_type = 'preset')
     preset_id: Optional[str] = Field(None, max_length=50)
 
+    # Aesthetic preset: 'hobbyist' or 'keeper'
+    aesthetic_preset: str = Field('hobbyist', pattern=r'^(hobbyist|keeper)$')
+
     # Custom colors (when theme_type = 'custom')
     custom_primary: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     custom_secondary: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
@@ -30,6 +33,7 @@ class ThemePreferencesUpdate(BaseModel):
     color_mode: Optional[str] = Field(None, pattern=r'^(light|dark|system)$')
     theme_type: Optional[str] = Field(None, pattern=r'^(default|preset|custom)$')
     preset_id: Optional[str] = Field(None, max_length=50)
+    aesthetic_preset: Optional[str] = Field(None, pattern=r'^(hobbyist|keeper)$')
     custom_primary: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     custom_secondary: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     custom_accent: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')

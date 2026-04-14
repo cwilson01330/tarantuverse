@@ -6,6 +6,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 // Types
 export type ColorMode = 'dark' | 'light' | 'system';
 export type ThemeType = 'default' | 'preset' | 'custom';
+export type AestheticPreset = 'hobbyist' | 'keeper';
 
 export interface ResolvedColors {
   primary: string;
@@ -175,6 +176,9 @@ interface ThemeState {
   customAccent: string | null;
   resolvedColors: ResolvedColors;
 
+  // Aesthetic preset axis (Hobbyist vs Keeper visual style)
+  aestheticPreset: AestheticPreset;
+
   // Loading state
   isLoading: boolean;
   isSynced: boolean;
@@ -186,6 +190,7 @@ interface ThemeState {
   setPreset: (presetId: string) => void;
   setCustomColors: (colors: Partial<ResolvedColors>) => void;
   resetToDefault: () => void;
+  setAestheticPreset: (preset: AestheticPreset) => void;
   applyColorsToDOM: () => void;
 
   // API sync actions
@@ -233,6 +238,7 @@ export const useThemeStore = create<ThemeState>()(
       customSecondary: null,
       customAccent: null,
       resolvedColors: DEFAULT_COLORS,
+      aestheticPreset: 'hobbyist',
       isLoading: false,
       isSynced: false,
 
@@ -294,6 +300,14 @@ export const useThemeStore = create<ThemeState>()(
           isSynced: false,
         }),
 
+      setAestheticPreset: (preset: AestheticPreset) => {
+        set({ aestheticPreset: preset, isSynced: false });
+        // Apply to DOM immediately
+        if (typeof document !== 'undefined') {
+          document.documentElement.dataset.preset = preset;
+        }
+      },
+
       applyColorsToDOM: () => {
         const state = get();
         if (typeof document === 'undefined') return;
@@ -310,6 +324,9 @@ export const useThemeStore = create<ThemeState>()(
         root.style.setProperty('--user-primary-hex', colors.primary);
         root.style.setProperty('--user-secondary-hex', colors.secondary);
         root.style.setProperty('--user-accent-hex', colors.accent);
+
+        // Apply aesthetic preset as data attribute
+        root.dataset.preset = state.aestheticPreset;
       },
 
       loadFromAPI: async (token: string) => {
@@ -324,6 +341,8 @@ export const useThemeStore = create<ThemeState>()(
 
           if (response.ok) {
             const data = await response.json();
+            const incomingPreset: AestheticPreset =
+              data.aesthetic_preset === 'keeper' ? 'keeper' : 'hobbyist';
             set({
               theme: data.color_mode === 'light' ? 'light' : 'dark',
               themeType: data.theme_type,
@@ -331,6 +350,7 @@ export const useThemeStore = create<ThemeState>()(
               customPrimary: data.custom_primary,
               customSecondary: data.custom_secondary,
               customAccent: data.custom_accent,
+              aestheticPreset: incomingPreset,
               resolvedColors: data.resolved_colors || resolveColors({
                 themeType: data.theme_type,
                 presetId: data.preset_id,
@@ -341,7 +361,7 @@ export const useThemeStore = create<ThemeState>()(
               isSynced: true,
             });
 
-            // Apply colors to DOM
+            // Apply colors + preset to DOM
             get().applyColorsToDOM();
           }
         } catch (error) {
@@ -365,6 +385,7 @@ export const useThemeStore = create<ThemeState>()(
               color_mode: state.theme,
               theme_type: state.themeType,
               preset_id: state.presetId,
+              aesthetic_preset: state.aestheticPreset,
               custom_primary: state.customPrimary,
               custom_secondary: state.customSecondary,
               custom_accent: state.customAccent,
@@ -399,6 +420,7 @@ export const useThemeStore = create<ThemeState>()(
         customSecondary: state.customSecondary,
         customAccent: state.customAccent,
         resolvedColors: state.resolvedColors,
+        aestheticPreset: state.aestheticPreset,
       }),
     }
   )
