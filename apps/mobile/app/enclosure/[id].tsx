@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -713,22 +713,16 @@ export default function EnclosureDetailScreen() {
             <TouchableOpacity style={styles.cancelButton} onPress={() => setShowFeedingForm(false)}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.submitButton}
+            <PrimaryButton
               onPress={handleQuickFeeding}
               disabled={submittingFeeding}
+              outerStyle={styles.submitButton}
+              style={styles.submitButtonGradient}
             >
-              <LinearGradient
-                colors={[colors.primary, colors.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.submitButtonGradient}
-              >
-                <Text style={styles.submitButtonText}>
-                  {submittingFeeding ? 'Saving...' : 'Log Feeding'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
+              <Text style={styles.submitButtonText}>
+                {submittingFeeding ? 'Saving...' : 'Log Feeding'}
+              </Text>
+            </PrimaryButton>
           </View>
         </View>
       ) : (

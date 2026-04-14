@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -542,28 +542,21 @@ export default function AddEnclosureScreen() {
         </View>
 
         {/* Submit Button */}
-        <TouchableOpacity
-          style={styles.submitButton}
+        <PrimaryButton
           onPress={handleSubmit}
           disabled={submitting}
-          activeOpacity={0.8}
+          outerStyle={styles.submitButton}
+          style={styles.submitGradient}
         >
-          <LinearGradient
-            colors={[colors.primary, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.submitGradient}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="home-plus" size={24} color="#fff" />
-                <Text style={styles.submitText}>Create Enclosure</Text>
-              </>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
+          {submitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <MaterialCommunityIcons name="home-plus" size={24} color="#fff" />
+              <Text style={styles.submitText}>Create Enclosure</Text>
+            </>
+          )}
+        </PrimaryButton>
       </ScrollView>
     </SafeAreaView>
   );
