@@ -1,11 +1,12 @@
-import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { Tabs, useRouter } from 'expo-router';
+import { View, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function TabLayout() {
   const { colors, layout } = useTheme();
+  const router = useRouter();
 
   return (
     <Tabs
@@ -72,7 +73,15 @@ export default function TabLayout() {
         name="community"
         options={{
           title: 'Community',
-          headerShown: false,
+          headerRight: ({ tintColor }) => (
+            <TouchableOpacity
+              onPress={() => router.push('/discover')}
+              style={{ marginRight: 16 }}
+              accessibilityLabel="Discover community"
+            >
+              <MaterialCommunityIcons name="star" size={24} color={tintColor} />
+            </TouchableOpacity>
+          ),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="account-group" size={size} color={color} />
           ),
@@ -95,7 +104,6 @@ export default function TabLayout() {
         options={{
           title: 'Search',
           tabBarLabel: 'Search',
-          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="magnify" size={size} color={color} />
           ),

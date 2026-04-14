@@ -5,7 +5,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { KeeperCardSkeleton, CategoryCardSkeleton } from '../../src/components/CommunitySkeletons';
 import ActivityFeedItem, { ActivityFeedItemData } from '../../src/components/ActivityFeedItem';
-import { AppHeader } from '../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Keeper {
@@ -36,8 +35,7 @@ interface ForumCategory {
 
 export default function CommunityScreen() {
   const router = useRouter();
-  const { colors, layout } = useTheme();
-  const headerIconColor = layout.useGradient ? '#fff' : colors.primary;
+  const { colors } = useTheme();
   const [keepers, setKeepers] = useState<Keeper[]>([]);
   const [categories, setCategories] = useState<ForumCategory[]>([]);
   const [activities, setActivities] = useState<ActivityFeedItemData[]>([]);
@@ -164,9 +162,6 @@ export default function CommunityScreen() {
   if (loading && keepers.length === 0 && categories.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Header */}
-        <AppHeader title="🌐 Community" subtitle="Connect with keepers" />
-
         {/* Skeleton loading */}
         <View style={{ padding: 16 }}>
           {activeTab === 'keepers' ? (
@@ -189,17 +184,6 @@ export default function CommunityScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <AppHeader
-        title="🌐 Community"
-        subtitle="Connect with keepers"
-        rightAction={
-          <TouchableOpacity onPress={() => router.push('/discover')}>
-            <MaterialCommunityIcons name="star" size={28} color={headerIconColor} />
-          </TouchableOpacity>
-        }
-      />
-
       {/* Tabs */}
       <View style={[styles.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity

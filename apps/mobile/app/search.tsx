@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { View, TextInput, SectionList, TouchableOpacity, Text, ActivityIndicator, SafeAreaView } from 'react-native'
+import { View, TextInput, SectionList, TouchableOpacity, Text, ActivityIndicator } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useTheme } from '../src/contexts/ThemeContext'
-import { AppHeader } from '../src/components/AppHeader'
 import { apiClient } from '../src/services/api'
 
 interface SearchResult {
@@ -39,13 +38,6 @@ const SECTION_ICONS = {
 export default function SearchScreen() {
   const router = useRouter()
   const { colors, layout } = useTheme()
-
-  // Input field styles adapt to the active preset
-  const inputBg = layout.useGradient ? 'rgba(255,255,255,0.2)' : colors.surfaceElevated
-  const inputBorder = layout.useGradient ? 'rgba(255,255,255,0.3)' : colors.border
-  const inputTextColor = layout.useGradient ? '#fff' : colors.textPrimary
-  const inputPlaceholderColor = layout.useGradient ? 'rgba(255,255,255,0.65)' : colors.textTertiary
-  const clearColor = layout.useGradient ? 'rgba(255,255,255,0.8)' : colors.textTertiary
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
@@ -202,44 +194,46 @@ export default function SearchScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['left', 'right', 'bottom']}>
-      {/* Header — gradient (Hobbyist) or flat (Keeper) via AppHeader */}
-      <AppHeader
-        title="🔍 Search"
-        subtitle="Find tarantulas, species & keepers"
-        paddingBottom={20}
-      >
-        {/* Search input lives inside the header band */}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Search input bar — sticky between the nav header and results */}
+      <View style={{
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        backgroundColor: colors.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      }}>
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 14,
           paddingVertical: 10,
-          backgroundColor: inputBg,
+          backgroundColor: colors.surfaceElevated ?? colors.background,
           borderRadius: layout.radius.md,
           borderWidth: 1,
-          borderColor: inputBorder,
+          borderColor: colors.border,
         }}>
           <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
           <TextInput
             placeholder="Search tarantulas, species, keepers..."
-            placeholderTextColor={inputPlaceholderColor}
+            placeholderTextColor={colors.textTertiary}
             value={query}
             onChangeText={setQuery}
+            autoFocus
             style={{
               flex: 1,
               fontSize: 16,
-              color: inputTextColor,
+              color: colors.textPrimary,
               paddingVertical: 0,
             }}
           />
           {query ? (
             <TouchableOpacity onPress={() => setQuery('')}>
-              <Text style={{ fontSize: 16, color: clearColor }}>✕</Text>
+              <Text style={{ fontSize: 16, color: colors.textTertiary }}>✕</Text>
             </TouchableOpacity>
           ) : null}
         </View>
-      </AppHeader>
+      </View>
 
       {/* Results List */}
       {sections.length > 0 || loading || (query.length >= 2 && results) ? (
@@ -254,6 +248,6 @@ export default function SearchScreen() {
       ) : (
         renderEmptyState()
       )}
-    </SafeAreaView>
+    </View>
   )
 }
