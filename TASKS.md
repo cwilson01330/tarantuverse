@@ -2,37 +2,18 @@
 
 ## Active
 
-### 🎨 Theme Preset System — Sprint 1 (Mobile Architecture) · due 2026-04-25
+### 🎨 Theme Preset System — Sprint 1 (Mobile Architecture) · ✅ SHIPPED 2026-04-14
 
-- [ ] **Create `presets.ts`** — define `PRESETS` object with `hobbyist` + `keeper` bundles
-  - File: `apps/mobile/src/contexts/presets.ts`
-  - Reference: `ADR-001-theme-preset-system.md` for token values
-
-- [ ] **Extend ThemeContext** — add `preset` axis, merge preset tokens into context value
-  - File: `apps/mobile/src/contexts/ThemeContext.tsx`
-  - Keep existing `colors` object untouched — ADD, don't replace
-
-- [ ] **Audit: hardcoded header heights** — grep for `130`, replace with `theme.header.height`
-  - `grep -r "130" apps/mobile/src --include="*.tsx" --include="*.ts"` as starting point
-
-- [ ] **Audit: unconditional gradients** — replace with conditional on `theme.header.useGradient`
-  - Touch points: header component, FAB, stat card icons, active tab indicator
-  - Highest-risk task — time-box to 1 day
-
-- [ ] **Audit: hardcoded border radii** — replace with `theme.radius.sm/md/lg`
-
-- [ ] **Audit: hardcoded card padding / row height** — replace with `theme.density.*`
-
-- [ ] **Verify semantic tokens are immutable** — grep to confirm `danger`, `warning`, `success`, sex colors not inside any preset bundle
-
-- [ ] **Smoke test 4 combos** — hobbyist×dark, hobbyist×light, keeper×dark, keeper×light on simulator
-  - Document any regressions before declaring Sprint 1 done
-
-- [ ] **Persist preset to AsyncStorage** — store alongside `auth_token`
-
-- [ ] **Build preset selector UI** in "Customize Theme" screen
-  - Side-by-side mini previews; selected state uses accent border
-  - v1: static mockup preview is acceptable; live-render is stretch
+- [x] ~~Extend ThemeContext with `AestheticPreset` axis + `LayoutTokens` (useGradient, radius, density, elevation)~~
+- [x] ~~`_layout.tsx`: conditional gradient vs flat header for all tab screens~~
+- [x] ~~`AppHeader` component: gradient/flat modes, leftAction + rightAction props~~
+- [x] ~~`PrimaryButton` component: LinearGradient in Hobbyist, flat solid in Keeper~~
+- [x] ~~Migrate all 13 gradient button/FAB/header files to preset-aware components~~
+- [x] ~~Appearance settings: App Style section with Hobbyist/Keeper picker~~
+- [x] ~~Archive 22 stale root-level docs to `docs/implementation/`~~
+- [x] ~~Smoke test 4 combos (hobbyist×dark, hobbyist×light, keeper×dark, keeper×light)~~
+- [ ] **Audit: hardcoded border radii** — 452 instances; incremental replacement as files are touched (not a blocker)
+- [ ] **Audit: hardcoded card padding / row height** — replace with `layout.density.*` (Sprint 2 scope)
 
 ---
 
@@ -124,3 +105,4 @@
 - [x] ~~ADR-001: Multi-axis theme preset system~~ (2026-04-13)
 - [x] ~~PRD: Theme preset system~~ (2026-04-13)
 - [x] ~~Sprint plan: Theme preset system~~ (2026-04-13)
+- [x] ~~Sprint 1 mobile: ThemeContext preset axis, AppHeader, PrimaryButton, full gradient migration~~ (2026-04-14)
