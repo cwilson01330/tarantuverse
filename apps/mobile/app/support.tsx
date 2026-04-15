@@ -99,7 +99,6 @@ export default function SupportScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Contact Support" leftAction={closeAction} />
-      </View>
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
