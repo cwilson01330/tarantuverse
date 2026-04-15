@@ -1,12 +1,16 @@
 import { Tabs, useRouter } from 'expo-router';
-import { View, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { useUnreadMessages } from '../../src/hooks/useUnreadMessages';
 
 export default function TabLayout() {
   const { colors, layout } = useTheme();
   const router = useRouter();
+  const { unreadCount } = useUnreadMessages();
+
+  const tintColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   return (
     <Tabs
@@ -36,10 +40,10 @@ export default function TabLayout() {
               }}
             />
           ),
-        headerTintColor: layout.useGradient ? '#fff' : colors.textPrimary,
+        headerTintColor: tintColor,
         headerTitleStyle: {
           fontWeight: 'bold',
-          color: layout.useGradient ? '#fff' : colors.textPrimary,
+          color: tintColor,
         },
       }}
     >
@@ -50,6 +54,26 @@ export default function TabLayout() {
           tabBarLabel: 'Dashboard',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
+          ),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/messages' as any)}
+              style={styles.headerButton}
+              accessibilityLabel={
+                unreadCount > 0
+                  ? `Messages — ${unreadCount} unread`
+                  : 'Messages'
+              }
+            >
+              <MaterialCommunityIcons name="message-outline" size={24} color={tintColor} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
           ),
         }}
       />
@@ -73,13 +97,13 @@ export default function TabLayout() {
         name="community"
         options={{
           title: 'Community',
-          headerRight: ({ tintColor }) => (
+          headerRight: ({ tintColor: tc }) => (
             <TouchableOpacity
               onPress={() => router.push('/discover')}
-              style={{ marginRight: 16 }}
+              style={styles.headerButton}
               accessibilityLabel="Discover community"
             >
-              <MaterialCommunityIcons name="star" size={24} color={tintColor} />
+              <MaterialCommunityIcons name="star" size={24} color={tc} />
             </TouchableOpacity>
           ),
           tabBarIcon: ({ color, size }) => (
@@ -122,3 +146,28 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  headerButton: {
+    marginRight: 16,
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#ef4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 12,
+  },
+});
