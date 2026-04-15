@@ -9,13 +9,13 @@ import {
   Share,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 import { apiClient } from '../../src/services/api';
 
 interface ReferralStats {
@@ -49,7 +49,13 @@ interface ReferralReward {
 export default function ReferralScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ReferralStats | null>(null);
   const [referrals, setReferrals] = useState<ReferredUser[]>([]);
@@ -422,29 +428,19 @@ export default function ReferralScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Refer Friends</Text>
-        </View>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="Refer Friends" leftAction={backButton} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!isPremium) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Refer Friends</Text>
-        </View>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="Refer Friends" leftAction={backButton} />
         <View style={styles.content}>
           <LinearGradient
             colors={[colors.primary, colors.secondary]}
@@ -468,18 +464,13 @@ export default function ReferralScreen() {
             </TouchableOpacity>
           </LinearGradient>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Refer Friends</Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Refer Friends" leftAction={backButton} />
 
       <ScrollView style={styles.content}>
         {stats && (
@@ -666,6 +657,6 @@ export default function ReferralScreen() {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

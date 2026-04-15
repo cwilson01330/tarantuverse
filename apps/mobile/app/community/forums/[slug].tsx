@@ -13,7 +13,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { useTheme } from '../../../src/contexts/ThemeContext';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface Thread {
   id: number;
@@ -44,7 +43,8 @@ interface Category {
 export default function ForumCategoryScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [category, setCategory] = useState<Category | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,24 +119,24 @@ export default function ForumCategoryScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['left', 'right', 'bottom']}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
         title={`${category.icon ? category.icon + ' ' : ''}${category.name}`}
         subtitle={category.description ?? undefined}
         leftAction={
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBackButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
+          <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+            <MaterialCommunityIcons name="arrow-left" size={24} color={iconColor} />
           </TouchableOpacity>
         }
         rightAction={
           <View style={styles.headerStats}>
             <View style={styles.headerStat}>
-              <MaterialCommunityIcons name="message-text" size={16} color="white" />
-              <Text style={styles.headerStatText}>{category.thread_count}</Text>
+              <MaterialCommunityIcons name="message-text" size={16} color={iconColor} />
+              <Text style={[styles.headerStatText, { color: iconColor }]}>{category.thread_count}</Text>
             </View>
             <View style={styles.headerStat}>
-              <MaterialCommunityIcons name="chat" size={16} color="white" />
-              <Text style={styles.headerStatText}>{category.post_count}</Text>
+              <MaterialCommunityIcons name="chat" size={16} color={iconColor} />
+              <Text style={[styles.headerStatText, { color: iconColor }]}>{category.post_count}</Text>
             </View>
           </View>
         }
@@ -230,7 +230,7 @@ export default function ForumCategoryScreen() {
       >
         <MaterialCommunityIcons name="plus" size={28} color="white" />
       </PrimaryButton>
-    </SafeAreaView>
+    </View>
   );
 }
 

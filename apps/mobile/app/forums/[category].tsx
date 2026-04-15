@@ -8,10 +8,10 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
@@ -34,7 +34,13 @@ interface Thread {
 export default function CategoryScreen() {
   const router = useRouter();
   const { category } = useLocalSearchParams();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -112,20 +118,28 @@ export default function CategoryScreen() {
 
   if (loading && page === 1) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader
+          title={categoryName || String(category).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+          leftAction={backButton}
+        />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Loading threads...
           </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error && threads.length === 0) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader
+          title={categoryName || String(category).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+          leftAction={backButton}
+        />
         <View style={styles.centerContent}>
           <MaterialCommunityIcons name="alert-circle" size={64} color={colors.error} />
           <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
@@ -136,25 +150,16 @@ export default function CategoryScreen() {
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header with back button and title */}
-      <View style={[styles.pageHeader, { backgroundColor: colors.primary }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.pageTitle} numberOfLines={1}>
-          {categoryName || String(category).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-        </Text>
-        <View style={styles.headerSpacer} />
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader
+        title={categoryName || String(category).replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        leftAction={backButton}
+      />
 
       {/* Sort tabs */}
       <View style={[styles.sortTabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -277,7 +282,7 @@ export default function CategoryScreen() {
       >
         <MaterialCommunityIcons name="plus" size={28} color="#fff" />
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   );
 }
 

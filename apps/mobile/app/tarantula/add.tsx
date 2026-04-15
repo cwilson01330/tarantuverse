@@ -9,13 +9,13 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateInput from '../../src/components/DateInput';
 import SpeciesAutocomplete from '../../src/components/SpeciesAutocomplete';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 
 const UpgradeModal = React.lazy(() => import('../../src/components/UpgradeModal'));
 
@@ -49,7 +49,8 @@ const STEPS = [
 
 export default function AddTarantulaScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [saving, setSaving] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [quickMode, setQuickMode] = useState(false);
@@ -524,39 +525,42 @@ export default function AddTarantulaScreen() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Tarantula</Text>
-        <View style={styles.headerRight}>
-          {/* Mode toggle */}
-          <TouchableOpacity
-            style={styles.modeToggle}
-            onPress={() => { setQuickMode(!quickMode); setCurrentStep(0); }}
-          >
-            <MaterialCommunityIcons
-              name={quickMode ? 'format-list-bulleted-square' : 'view-sequential'}
-              size={14}
-              color={colors.textSecondary}
-            />
-            <Text style={styles.modeToggleText}>{quickMode ? 'Guided' : 'All fields'}</Text>
-          </TouchableOpacity>
-          {/* Save button only visible in simple/all-fields mode */}
-          {quickMode && (
-            <TouchableOpacity onPress={handleSave} style={styles.saveButton} disabled={saving}>
-              {saving ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Text style={styles.saveButtonText}>Save</Text>
-              )}
-            </TouchableOpacity>
+  const closeAction = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Close">
+      <MaterialCommunityIcons name="close" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
+  const headerRightAction = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      <TouchableOpacity
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+        onPress={() => { setQuickMode(!quickMode); setCurrentStep(0); }}
+        accessibilityLabel={quickMode ? 'Switch to guided mode' : 'Switch to all fields'}
+      >
+        <MaterialCommunityIcons
+          name={quickMode ? 'format-list-bulleted-square' : 'view-sequential'}
+          size={16}
+          color={iconColor}
+        />
+        <Text style={{ color: iconColor, fontSize: 13, fontWeight: '500' }}>
+          {quickMode ? 'Guided' : 'All fields'}
+        </Text>
+      </TouchableOpacity>
+      {quickMode && (
+        <TouchableOpacity onPress={handleSave} disabled={saving} style={{ opacity: saving ? 0.5 : 1 }}>
+          {saving ? (
+            <ActivityIndicator size="small" color={iconColor} />
+          ) : (
+            <Text style={{ color: iconColor, fontSize: 16, fontWeight: '600' }}>Save</Text>
           )}
-        </View>
-      </View>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Add Tarantula" leftAction={closeAction} rightAction={headerRightAction} />
 
       {/* ── GUIDED WIZARD MODE ─────────────────────────────────────────── */}
       {!quickMode && (
@@ -626,6 +630,6 @@ export default function AddTarantulaScreen() {
           feature="Unlimited Tarantulas"
         />
       </Suspense>
-    </SafeAreaView>
+    </View>
   );
 }

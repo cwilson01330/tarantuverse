@@ -10,10 +10,10 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
@@ -27,7 +27,8 @@ interface ForumCategory {
 export default function NewThreadScreen() {
   const router = useRouter();
   const { category: initialCategory } = useLocalSearchParams();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [categories, setCategories] = useState<ForumCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
@@ -146,18 +147,40 @@ export default function NewThreadScreen() {
     }
   };
 
+  const closeAction = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Close">
+      <MaterialCommunityIcons name="close" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
+  const postAction = (
+    <TouchableOpacity
+      onPress={handleSubmit}
+      disabled={!title.trim() || !content.trim() || !selectedCategoryId || submitting}
+      style={{ opacity: (!title.trim() || !content.trim() || !selectedCategoryId || submitting) ? 0.4 : 1, paddingHorizontal: 4 }}
+      accessibilityLabel="Post thread"
+    >
+      {submitting ? (
+        <ActivityIndicator size="small" color={iconColor} />
+      ) : (
+        <Text style={{ color: iconColor, fontSize: 16, fontWeight: '600' }}>Post</Text>
+      )}
+    </TouchableOpacity>
+  );
+
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="New Thread" leftAction={closeAction} />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="New Thread" leftAction={closeAction} rightAction={postAction} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Category Selector */}
         <View style={styles.section}>
@@ -277,7 +300,7 @@ export default function NewThreadScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

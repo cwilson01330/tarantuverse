@@ -8,13 +8,13 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateInput from '../../src/components/DateInput';
 import { apiClient } from '../../src/services/api';
 import { scheduleSubstrateReminder } from '../../src/services/notifications';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 
 const SUBSTRATE_TYPES = [
   'Coco Fiber',
@@ -38,7 +38,8 @@ const CHANGE_REASONS = [
 export default function AddSubstrateChangeScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [date, setDate] = useState(new Date());
   const [substrateType, setSubstrateType] = useState('');
   const [substrateDepth, setSubstrateDepth] = useState('');
@@ -115,22 +116,20 @@ export default function AddSubstrateChangeScreen() {
     }
   };
 
+  const closeAction = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Close">
+      <MaterialCommunityIcons name="close" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
+  const saveAction = (
+    <TouchableOpacity onPress={handleSave} disabled={saving} style={{ opacity: saving ? 0.5 : 1, paddingHorizontal: 4 }}>
+      <Text style={{ color: iconColor, fontSize: 16, fontWeight: '600' }}>{saving ? 'Saving…' : 'Save'}</Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Log Substrate Change</Text>
-        <TouchableOpacity
-          onPress={handleSave}
-          style={[styles.saveButton, { backgroundColor: colors.primary }, saving && styles.saveButtonDisabled]}
-          disabled={saving}
-        >
-          <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Log Substrate Change" leftAction={closeAction} rightAction={saveAction} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Date */}
@@ -229,7 +228,7 @@ export default function AddSubstrateChangeScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

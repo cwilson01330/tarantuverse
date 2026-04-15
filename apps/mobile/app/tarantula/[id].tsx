@@ -12,7 +12,6 @@ import {
   Pressable,
   Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
@@ -24,6 +23,7 @@ import FeedingStatsCard from '../../src/components/FeedingStatsCard';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 // notifications imported dynamically below to avoid expo-notifications crashing at module load time
 
 interface TarantulaDetail {
@@ -145,7 +145,13 @@ interface PremoltPrediction {
 export default function TarantulaDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
   const [tarantula, setTarantula] = useState<TarantulaDetail | null>(null);
   const [feedingLogs, setFeedingLogs] = useState<FeedingLog[]>([]);
   const [moltLogs, setMoltLogs] = useState<MoltLog[]>([]);
@@ -468,14 +474,8 @@ export default function TarantulaDetailScreen() {
 
   if (loadError || (!loading && !tarantula)) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Tarantula Details</Text>
-          <View style={{ width: 40 }} />
-        </View>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="Tarantula Details" leftAction={backButton} />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <MaterialCommunityIcons name="spider-web" size={64} color={colors.textSecondary} style={{ marginBottom: 16 }} />
           <Text style={{ fontSize: 18, fontWeight: '600', color: colors.textPrimary, marginBottom: 8, textAlign: 'center' }}>
@@ -506,51 +506,33 @@ export default function TarantulaDetailScreen() {
             <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Try Again</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
+  const detailRightActions = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+      <TouchableOpacity style={{ padding: 6 }} onPress={handleShareTarantula} accessibilityLabel="Share">
+        <MaterialCommunityIcons name="share-variant" size={22} color={iconColor} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ padding: 6 }} onPress={handleScheduleMaintenanceReminder} accessibilityLabel="Set reminder">
+        <MaterialCommunityIcons name="bell-plus" size={22} color={iconColor} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ padding: 6 }} onPress={() => router.push(`/tarantula/edit?id=${id}`)} accessibilityLabel="Edit">
+        <MaterialCommunityIcons name="pencil" size={22} color={iconColor} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ padding: 6 }} onPress={() => setShowQRSheet(true)} accessibilityLabel="QR code">
+        <MaterialCommunityIcons name="qrcode" size={22} color={iconColor} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ padding: 6 }} onPress={handleDeleteTarantula} accessibilityLabel="Delete">
+        <MaterialCommunityIcons name="trash-can-outline" size={22} color={colors.error} />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Details</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerActionButton}
-            onPress={handleShareTarantula}
-          >
-            <MaterialCommunityIcons name="share-variant" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerActionButton}
-            onPress={handleScheduleMaintenanceReminder}
-          >
-            <MaterialCommunityIcons name="bell-plus" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerActionButton}
-            onPress={() => router.push(`/tarantula/edit?id=${id}`)}
-          >
-            <MaterialCommunityIcons name="pencil" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerActionButton}
-            onPress={() => setShowQRSheet(true)}
-          >
-            <MaterialCommunityIcons name="qrcode" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerActionButton}
-            onPress={handleDeleteTarantula}
-          >
-            <MaterialCommunityIcons name="trash-can-outline" size={24} color="#ef4444" />
-          </TouchableOpacity>
-        </View>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Details" leftAction={backButton} rightAction={detailRightActions} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Hero Image */}
@@ -996,7 +978,7 @@ export default function TarantulaDetailScreen() {
           />
         )}
       </Suspense>
-    </SafeAreaView>
+    </View>
   );
 }
 

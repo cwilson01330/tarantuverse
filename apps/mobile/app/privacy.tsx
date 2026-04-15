@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { AppHeader } from '../src/components/AppHeader';
 import { apiClient } from '../src/services/api';
 
 const PRIVACY_POLICY_URL = 'https://www.tarantuverse.com/privacy-policy';
@@ -12,7 +12,13 @@ const PRIVACY_POLICY_URL = 'https://www.tarantuverse.com/privacy-policy';
 export default function PrivacyScreen() {
   const router = useRouter();
   const { user, refreshUser } = useAuth();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
   const [visibility, setVisibility] = useState<'private' | 'public'>('private');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -183,14 +189,8 @@ export default function PrivacyScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacy Settings</Text>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Privacy Settings" leftAction={backButton} />
 
       <ScrollView style={styles.scrollContainer}>
         <View style={styles.content}>
@@ -278,6 +278,6 @@ export default function PrivacyScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

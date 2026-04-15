@@ -10,17 +10,18 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import apiClient from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 
 export default function AddPhotoScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -143,35 +144,29 @@ export default function AddPhotoScreen() {
     }
   };
 
+  const closeAction = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Close">
+      <MaterialCommunityIcons name="close" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
+  const uploadAction = (
+    <TouchableOpacity
+      onPress={uploadPhoto}
+      disabled={uploading || !imageUri}
+      style={{ opacity: uploading || !imageUri ? 0.4 : 1, paddingHorizontal: 4 }}
+      accessibilityLabel="Upload photo"
+    >
+      {uploading ? (
+        <ActivityIndicator size="small" color={iconColor} />
+      ) : (
+        <Text style={{ color: iconColor, fontSize: 16, fontWeight: '600' }}>Upload</Text>
+      )}
+    </TouchableOpacity>
+  );
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-          <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Add Photo</Text>
-        <TouchableOpacity
-          onPress={uploadPhoto}
-          style={[
-            styles.saveButton,
-            { backgroundColor: imageUri && !uploading ? colors.primary : colors.surfaceElevated },
-            (uploading || !imageUri) && styles.saveButtonDisabled
-          ]}
-          disabled={uploading || !imageUri}
-        >
-          {uploading ? (
-            <ActivityIndicator size="small" color={colors.surface} />
-          ) : (
-            <Text style={[
-              styles.saveButtonText,
-              { color: imageUri ? colors.surface : colors.textTertiary }
-            ]}>
-              Upload
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Add Photo" leftAction={closeAction} rightAction={uploadAction} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Image Preview or Placeholder */}
@@ -252,7 +247,7 @@ export default function AddPhotoScreen() {
         {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

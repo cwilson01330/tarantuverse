@@ -13,10 +13,10 @@ import {
   RefreshControl,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../../src/contexts/ThemeContext';
+import { AppHeader } from '../../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
@@ -48,7 +48,13 @@ interface ThreadDetail {
 export default function ThreadDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -499,20 +505,22 @@ export default function ThreadDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="Thread" leftAction={backButton} />
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Loading thread...
           </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !thread) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="Thread" leftAction={backButton} />
         <View style={styles.centerContent}>
           <MaterialCommunityIcons name="alert-circle" size={64} color={colors.error} />
           <Text style={[styles.errorText, { color: colors.error }]}>{error || 'Thread not found'}</Text>
@@ -523,43 +531,36 @@ export default function ThreadDetailScreen() {
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
+  const threadRightActions = currentUserId && thread && thread.author_id === currentUserId && !editingThread ? (
+    <View style={{ flexDirection: 'row', gap: 4 }}>
+      <TouchableOpacity
+        onPress={startEditThread}
+        style={{ padding: 8 }}
+        accessibilityLabel="Edit thread"
+      >
+        <MaterialCommunityIcons name="pencil" size={22} color={iconColor} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={handleDeleteThread}
+        style={{ padding: 8 }}
+        accessibilityLabel="Delete thread"
+      >
+        <MaterialCommunityIcons name="delete" size={22} color={iconColor} />
+      </TouchableOpacity>
+    </View>
+  ) : undefined;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
-      {/* Page Header with Back Button */}
-      <View style={[styles.pageHeader, { backgroundColor: colors.primary }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.pageTitle} numberOfLines={1}>
-          {thread?.title || 'Thread'}
-        </Text>
-        {/* Header Action Buttons */}
-        <View style={styles.headerActions}>
-          {currentUserId && thread && thread.author_id === currentUserId && !editingThread && (
-            <>
-              <TouchableOpacity
-                onPress={startEditThread}
-                style={styles.headerActionButton}
-              >
-                <MaterialCommunityIcons name="pencil" size={22} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleDeleteThread}
-                style={styles.headerActionButton}
-              >
-                <MaterialCommunityIcons name="delete" size={22} color="#fff" />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <AppHeader
+        title={thread?.title || 'Thread'}
+        leftAction={backButton}
+        rightAction={threadRightActions}
+      />
 
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
@@ -924,7 +925,7 @@ export default function ThreadDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 

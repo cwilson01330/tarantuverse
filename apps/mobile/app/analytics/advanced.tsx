@@ -8,11 +8,11 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 
 interface MoltHeatmapEntry {
   month: string;
@@ -65,7 +65,13 @@ const ENCLOSURE_COLORS: { [key: string]: string } = {
 
 export default function AdvancedAnalyticsScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
   const [analytics, setAnalytics] = useState<AdvancedAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -297,23 +303,19 @@ export default function AdvancedAnalyticsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
+        <AppHeader title="Advanced Analytics" leftAction={backButton} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!analytics) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Advanced Analytics</Text>
-        </View>
+      <View style={styles.container}>
+        <AppHeader title="Advanced Analytics" leftAction={backButton} />
         <ScrollView style={styles.container}>
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="chart-box-outline" size={64} color={colors.textTertiary} />
@@ -323,7 +325,7 @@ export default function AdvancedAnalyticsScreen() {
             </Text>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -334,13 +336,8 @@ export default function AdvancedAnalyticsScreen() {
 
   if (allDataEmpty) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Advanced Analytics</Text>
-        </View>
+      <View style={styles.container}>
+        <AppHeader title="Advanced Analytics" leftAction={backButton} />
         <ScrollView style={styles.container}>
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="sparkles" size={64} color={colors.textTertiary} />
@@ -350,7 +347,7 @@ export default function AdvancedAnalyticsScreen() {
             </Text>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -388,20 +385,15 @@ export default function AdvancedAnalyticsScreen() {
       ? Math.max(...analytics.species_distribution.map((s) => s.count))
       : 0;
 
+  const premiumBadge = (
+    <View style={styles.premiumBadge}>
+      <Text style={styles.premiumBadgeText}>Premium</Text>
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>✨ Advanced Analytics</Text>
-        </View>
-        <View style={styles.premiumBadge}>
-          <Text style={styles.premiumBadgeText}>Premium</Text>
-        </View>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="✨ Advanced Analytics" leftAction={backButton} rightAction={premiumBadge} />
 
       <ScrollView style={styles.scrollContent}>
         {/* Collection Value Cards */}
@@ -620,6 +612,6 @@ export default function AdvancedAnalyticsScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

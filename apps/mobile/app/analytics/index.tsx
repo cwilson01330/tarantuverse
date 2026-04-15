@@ -7,9 +7,8 @@ import {
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { AppHeader } from '../../src/components/AppHeader';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -62,7 +61,8 @@ interface CollectionAnalytics {
 
 export default function AnalyticsScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [analytics, setAnalytics] = useState<CollectionAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -124,6 +124,12 @@ export default function AnalyticsScreen() {
     },
     backButton: {
       marginRight: 12,
+    },
+    advancedButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      borderRadius: 6,
     },
     headerTitle: {
       fontSize: 20,
@@ -358,28 +364,33 @@ export default function AnalyticsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader
+          title="📊 Analytics"
+          leftAction={
+            <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
+              <MaterialCommunityIcons name="arrow-left" size={24} color={iconColor} />
+            </TouchableOpacity>
+          }
+        />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!analytics || analytics.total_tarantulas === 0) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <LinearGradient
-          colors={[colors.primary, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: '#fff' }]}>Collection Analytics</Text>
-        </LinearGradient>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader
+          title="📊 Analytics"
+          leftAction={
+            <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
+              <MaterialCommunityIcons name="arrow-left" size={24} color={iconColor} />
+            </TouchableOpacity>
+          }
+        />
         <ScrollView style={styles.container}>
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="chart-bar" size={64} color={colors.textTertiary} />
@@ -389,7 +400,7 @@ export default function AnalyticsScreen() {
             </Text>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -398,30 +409,23 @@ export default function AnalyticsScreen() {
   const femalePercent = totalSexed > 0 ? (analytics.sex_distribution.female / totalSexed * 100) : 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <LinearGradient
-        colors={[colors.primary, colors.secondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: '#fff' }]}>📊 Analytics</Text>
-        <TouchableOpacity
-          onPress={() => router.push('/analytics/advanced')}
-          style={{
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            backgroundColor: 'rgba(255,255,255,0.25)',
-            borderRadius: 6,
-          }}
-        >
-          <MaterialCommunityIcons name="sparkles" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-      </LinearGradient>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader
+        title="📊 Analytics"
+        leftAction={
+          <TouchableOpacity onPress={() => router.push('/(tabs)')} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+          </TouchableOpacity>
+        }
+        rightAction={
+          <TouchableOpacity
+            onPress={() => router.push('/analytics/advanced')}
+            style={styles.advancedButton}
+          >
+            <MaterialCommunityIcons name="sparkles" size={16} color={iconColor} />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView style={styles.scrollContent}>
 
@@ -568,6 +572,6 @@ export default function AnalyticsScreen() {
 
       <View style={{ height: 32 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

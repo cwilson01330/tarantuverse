@@ -14,9 +14,9 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../../src/contexts/ThemeContext';
+import { AppHeader } from '../../../../src/components/AppHeader';
 import ReportModal from '../../../../src/components/ReportModal';
 
 interface Author {
@@ -59,7 +59,8 @@ interface Thread {
 export default function ThreadDetailScreen() {
   const { slug, threadId } = useLocalSearchParams<{ slug: string; threadId: string }>();
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [thread, setThread] = useState<Thread | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -171,55 +172,49 @@ export default function ThreadDetailScreen() {
     return date.toLocaleDateString();
   };
 
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={24} color={iconColor} />
+    </TouchableOpacity>
+  );
+
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="Thread" leftAction={backButton} />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading thread...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!thread) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="Thread" leftAction={backButton} />
         <View style={styles.centerContainer}>
           <Text style={[styles.errorText, { color: colors.textPrimary }]}>Thread not found</Text>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Text style={[styles.backButtonText, { color: colors.primary }]}>← Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
+  const threadTitle = `${thread.is_pinned ? '📌 ' : ''}${thread.is_locked ? '🔒 ' : ''}${thread.title}`;
+  const threadSubtitle = `${thread.category.name} · ${thread.post_count} posts · ${thread.view_count} views`;
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title={threadTitle} subtitle={threadSubtitle} leftAction={backButton} />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        {/* Header */}
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerBackButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerContent}>
-            <View style={styles.headerTitleRow}>
-              {thread.is_pinned && <Text style={styles.headerIcon}>📌</Text>}
-              {thread.is_locked && <Text style={styles.headerIcon}>🔒</Text>}
-              <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-                {thread.title}
-              </Text>
-            </View>
-            <Text style={[styles.headerMeta, { color: colors.textSecondary }]}>
-              {thread.category.name} • {thread.post_count} posts • {thread.view_count} views
-            </Text>
-          </View>
-        </View>
 
         {/* Posts List */}
         <ScrollView
@@ -386,7 +381,7 @@ export default function ThreadDetailScreen() {
           />
         )}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

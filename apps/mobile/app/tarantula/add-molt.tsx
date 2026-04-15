@@ -8,17 +8,18 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateInput from '../../src/components/DateInput';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 
 export default function AddMoltScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [moltDate, setMoltDate] = useState(new Date());
   const [premoltDate, setPremoltDate] = useState<Date | null>(null);
   const [legSpanBefore, setLegSpanBefore] = useState('');
@@ -51,22 +52,27 @@ export default function AddMoltScreen() {
     }
   };
 
+  const closeAction = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Close">
+      <MaterialCommunityIcons name="close" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
+  const saveAction = (
+    <TouchableOpacity
+      onPress={handleSave}
+      disabled={saving}
+      style={{ opacity: saving ? 0.5 : 1, paddingHorizontal: 4 }}
+      accessibilityLabel="Save"
+    >
+      <Text style={{ color: iconColor, fontSize: 16, fontWeight: '600' }}>
+        {saving ? 'Saving…' : 'Save'}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Log Molt</Text>
-        <TouchableOpacity
-          onPress={handleSave}
-          style={[styles.saveButton, { backgroundColor: colors.primary }, saving && styles.saveButtonDisabled]}
-          disabled={saving}
-        >
-          <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Log Molt" leftAction={closeAction} rightAction={saveAction} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Molt Date */}
@@ -171,7 +177,7 @@ export default function AddMoltScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

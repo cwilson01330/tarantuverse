@@ -8,9 +8,9 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { AppHeader } from '../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme, THEME_PRESETS, ThemePreset, UserColors, AestheticPreset, AESTHETIC_PRESETS } from '../../src/contexts/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -31,7 +31,10 @@ export default function AppearanceSettings() {
     loadFromAPI,
     aestheticPreset,
     setAestheticPreset,
+    layout,
   } = useTheme();
+
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [token, setToken] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState(false);
@@ -118,35 +121,37 @@ export default function AppearanceSettings() {
   const freePresets = Object.values(THEME_PRESETS).filter((p) => p.is_free);
   const premiumPresets = Object.values(THEME_PRESETS).filter((p) => !p.is_free);
 
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <Ionicons name="arrow-back" size={24} color={iconColor} />
+    </TouchableOpacity>
+  );
+  const saveAction = (
+    <TouchableOpacity onPress={handleSave} disabled={saving} style={{ paddingHorizontal: 4 }}>
+      {saving ? (
+        <ActivityIndicator size="small" color={iconColor} />
+      ) : (
+        <Text style={{ color: iconColor, fontSize: 16, fontWeight: '600' }}>Save</Text>
+      )}
+    </TouchableOpacity>
+  );
+
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ headerShown: false }} />
+        <AppHeader title="Appearance" leftAction={backButton} rightAction={saveAction} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
-
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Appearance</Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.saveButton}>
-          {saving ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Text style={[styles.saveText, { color: colors.primary }]}>Save</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <AppHeader title="Appearance" leftAction={backButton} rightAction={saveAction} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* ── Aesthetic Preset Section ──────────────────────────────────────── */}
@@ -388,7 +393,7 @@ export default function AppearanceSettings() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

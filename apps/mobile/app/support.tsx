@@ -11,11 +11,11 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { AppHeader } from '../src/components/AppHeader';
 
 const SUPPORT_USERNAME = 'gwizard202';
 
@@ -28,7 +28,13 @@ const QUICK_TOPICS = [
 
 export default function SupportScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const closeAction = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Close">
+      <MaterialCommunityIcons name="close" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
   const [message, setMessage] = useState('');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -62,14 +68,8 @@ export default function SupportScreen() {
 
   if (sent) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-        <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Support</Text>
-          <View style={{ width: 40 }} />
-        </View>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="Support" leftAction={closeAction} />
 
         <View style={styles.sentContainer}>
           <View style={[styles.sentIcon, { backgroundColor: '#dcfce7' }]}>
@@ -92,18 +92,13 @@ export default function SupportScreen() {
             <Text style={[styles.sentBtnOutlineText, { color: colors.primary }]}>View Messages</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="close" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Contact Support</Text>
-        <View style={{ width: 40 }} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Contact Support" leftAction={closeAction} />
       </View>
 
       <KeyboardAvoidingView
@@ -179,7 +174,7 @@ export default function SupportScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
