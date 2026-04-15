@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, AppState } from 'react-native';
 import { useRouter, Stack, useFocusEffect } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AppHeader } from '../../src/components/AppHeader';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+
 
 interface Conversation {
   id: string;
@@ -25,7 +26,14 @@ interface Conversation {
 
 export default function MessagesScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -109,15 +117,7 @@ export default function MessagesScreen() {
       <>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-          <LinearGradient
-            colors={[colors.primary, colors.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.header}
-          >
-            <Text style={styles.headerTitle}>💬 Messages</Text>
-            <Text style={styles.headerSubtitle}>Your conversations</Text>
-          </LinearGradient>
+          <AppHeader title="💬 Messages" subtitle="Your conversations" leftAction={backButton} />
           <View style={styles.centerContainer}>
             <Text style={styles.loadingEmoji}>💬</Text>
             <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading messages...</Text>
@@ -131,15 +131,7 @@ export default function MessagesScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <LinearGradient
-          colors={[colors.primary, colors.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.header}
-        >
-          <Text style={styles.headerTitle}>💬 Messages</Text>
-          <Text style={styles.headerSubtitle}>Your conversations</Text>
-        </LinearGradient>
+        <AppHeader title="💬 Messages" subtitle="Your conversations" leftAction={backButton} />
         <ScrollView
           style={styles.scrollView}
           refreshControl={

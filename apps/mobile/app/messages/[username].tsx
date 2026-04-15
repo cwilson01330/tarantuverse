@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActionSheetIOS, AppState } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
@@ -30,7 +29,7 @@ interface ConversationData {
 export default function ConversationScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
   const username = params.username as string;
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -213,19 +212,12 @@ export default function ConversationScreen() {
     }
   };
 
-  const headerBackground = () => (
-    <LinearGradient
-      colors={[colors.primary, colors.secondary]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ flex: 1 }}
-    />
-  );
+  // Tint color for header icons — matches _layout.tsx's headerTintColor
+  const headerTintColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const headerOptions = {
-    headerBackground,
-    headerTintColor: '#fff',
-    headerTitleStyle: { color: '#fff', fontWeight: 'bold' as const },
+    headerTintColor,
+    headerTitleStyle: { fontWeight: 'bold' as const, color: headerTintColor },
   };
 
   if (loading) {
@@ -279,7 +271,7 @@ export default function ConversationScreen() {
               onPress={showActions}
               style={{ marginRight: 8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
             >
-              <MaterialCommunityIcons name="dots-vertical" size={24} color={colors.primary} />
+              <MaterialCommunityIcons name="dots-vertical" size={24} color={headerTintColor} />
             </TouchableOpacity>
           ),
         }}
