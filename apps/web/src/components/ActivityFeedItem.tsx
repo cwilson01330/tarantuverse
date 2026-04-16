@@ -81,11 +81,11 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
             </Link>
             <span className="text-gray-300"> added a new tarantula: </span>
             <span className="font-semibold text-gray-100">
-              {metadata.name || "Unnamed"}
+              {metadata.tarantula_name || metadata.name || "Unnamed"}
             </span>
-            {metadata.scientific_name && (
+            {(metadata.species_name || metadata.common_name || metadata.scientific_name) && (
               <span className="text-gray-500 text-sm ml-1">
-                ({metadata.scientific_name})
+                ({metadata.species_name || metadata.common_name || metadata.scientific_name})
               </span>
             )}
           </>
@@ -124,10 +124,10 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
             <span className="font-semibold text-gray-100">
               {metadata.tarantula_name || "a tarantula"}
             </span>
-            {metadata.prey_type && (
+            {(metadata.food_type || metadata.prey_type) && (
               <span className="text-gray-300">
                 {" "}
-                {metadata.prey_type} (
+                {metadata.food_type || metadata.prey_type} (
                 <span className={acceptedColor}>{accepted}</span>)
               </span>
             )}

@@ -79,8 +79,11 @@ async def create_feeding_log(
         target_id=tarantula_id,
         metadata={
             "tarantula_name": tarantula.name,
+            "species_name": tarantula.common_name or tarantula.scientific_name,
+            "thumbnail_url": tarantula.photo_url,
+            "tarantula_id": str(tarantula.id),
             "food_type": feeding_data.food_type,
-            "accepted": feeding_data.accepted
+            "accepted": feeding_data.accepted,
         }
     )
 

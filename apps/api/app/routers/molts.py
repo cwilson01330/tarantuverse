@@ -75,7 +75,11 @@ async def create_molt_log(
         target_id=tarantula_id,
         metadata={
             "tarantula_name": tarantula.name,
-            "molt_id": str(new_molt.id)
+            "species_name": tarantula.common_name or tarantula.scientific_name,
+            "thumbnail_url": tarantula.photo_url,
+            "tarantula_id": str(tarantula.id),
+            "molt_id": str(new_molt.id),
+            "leg_span_after": str(molt_data.leg_span_after) if getattr(molt_data, 'leg_span_after', None) else None,
         }
     )
 

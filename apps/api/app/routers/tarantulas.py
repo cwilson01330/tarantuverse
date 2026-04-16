@@ -123,9 +123,10 @@ async def create_tarantula(
         target_type="tarantula",
         target_id=new_tarantula.id,
         metadata={
-            "name": new_tarantula.name,
-            "common_name": new_tarantula.common_name,
-            "scientific_name": new_tarantula.scientific_name
+            "tarantula_name": new_tarantula.name,
+            "species_name": new_tarantula.common_name or new_tarantula.scientific_name,
+            "thumbnail_url": new_tarantula.photo_url,
+            "tarantula_id": str(new_tarantula.id),
         }
     )
 

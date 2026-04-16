@@ -67,11 +67,11 @@ export default function ActivityFeedItem({ activity }: Props) {
       case 'new_tarantula':
         return {
           verb: `${displayName} added`,
-          tarantulaName: meta.tarantula_name,
-          speciesName: meta.species_name,
+          tarantulaName: meta.tarantula_name ?? meta.name,
+          speciesName: meta.species_name ?? meta.common_name ?? meta.scientific_name,
           thumbnailUrl: meta.thumbnail_url,
           subtitle: undefined,
-          onPress: () => router.push(`/tarantula/${activity.target_id}`),
+          onPress: () => router.push(`/tarantula/${meta.tarantula_id ?? activity.target_id}`),
         };
 
       case 'molt':
@@ -81,7 +81,7 @@ export default function ActivityFeedItem({ activity }: Props) {
           speciesName: meta.species_name,
           thumbnailUrl: meta.thumbnail_url,
           subtitle: meta.leg_span_after ? `New leg span: ${meta.leg_span_after}"` : undefined,
-          onPress: () => router.push(`/tarantula/${meta.tarantula_id}`),
+          onPress: () => router.push(`/tarantula/${meta.tarantula_id ?? activity.target_id}`),
         };
 
       case 'feeding': {
@@ -91,9 +91,11 @@ export default function ActivityFeedItem({ activity }: Props) {
           tarantulaName: meta.tarantula_name,
           speciesName: meta.species_name,
           thumbnailUrl: meta.thumbnail_url,
-          subtitle: `${meta.food_type} — ${accepted ? '✓ Accepted' : '✗ Rejected'}`,
+          subtitle: meta.food_type
+            ? `${meta.food_type} — ${accepted ? '✓ Accepted' : '✗ Rejected'}`
+            : undefined,
           subtitleColor: accepted ? '#10b981' : '#ef4444',
-          onPress: () => router.push(`/tarantula/${meta.tarantula_id}`),
+          onPress: () => router.push(`/tarantula/${meta.tarantula_id ?? activity.target_id}`),
         };
       }
 
