@@ -136,10 +136,12 @@ export default function AchievementsScreen() {
       borderRadius: 4,
       overflow: 'hidden',
       marginBottom: 8,
+      alignSelf: 'stretch',
     },
     progressFill: {
       height: '100%',
       backgroundColor: '#fff',
+      borderRadius: 4,
     },
     progressText: {
       fontSize: 14,
@@ -163,19 +165,19 @@ export default function AchievementsScreen() {
     achievementGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      justifyContent: 'flex-start',
-      gap: 12,
+      gap: 16,
     },
     achievementItem: {
       alignItems: 'center',
+      width: 88,
     },
     achievementName: {
-      marginTop: 8,
-      fontSize: 12,
+      marginTop: 6,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.textPrimary,
       textAlign: 'center',
-      width: 100,
+      width: 88,
     },
     emptyContainer: {
       flex: 1,

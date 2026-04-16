@@ -31,9 +31,9 @@ export default function AchievementBadge({
   const { colors, isDark } = useTheme()
   const tierColor = TIER_COLORS[tier]
 
-  const iconSize = size === 'small' ? 24 : 48
+  const iconSize = size === 'small' ? 26 : 48
   const containerSize = size === 'small' ? 80 : 140
-  const padding = size === 'small' ? 8 : 16
+  const padding = size === 'small' ? 10 : 16
 
   const formattedDate = earnedAt
     ? new Date(earnedAt).toLocaleDateString('en-US', {
@@ -63,15 +63,6 @@ export default function AchievementBadge({
     icon: {
       fontSize: iconSize,
     },
-    label: {
-      marginTop: 8,
-      textAlign: 'center',
-    },
-    labelText: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: colors.textPrimary,
-    },
     tooltip: {
       backgroundColor: isDark ? colors.background : '#1a1a1a',
       borderRadius: 8,
@@ -98,13 +89,6 @@ export default function AchievementBadge({
   return (
     <Pressable style={styles.container}>
       <Text style={styles.icon}>{icon}</Text>
-      {size === 'small' && (
-        <View style={styles.label}>
-          <Text style={styles.labelText} numberOfLines={1}>
-            {name}
-          </Text>
-        </View>
-      )}
     </Pressable>
   )
 }
