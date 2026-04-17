@@ -28,6 +28,7 @@ from app.models.user_oauth_account import UserOAuthAccount
 from app.models.announcement import Announcement
 from app.models.system_setting import SystemSetting
 from app.models.achievement import AchievementDefinition, UserAchievement
+from app.models.communal_incident import CommunalIncident
 
 __all__ = [
     "User",
@@ -62,4 +63,5 @@ __all__ = [
     "SystemSetting",
     "AchievementDefinition",
     "UserAchievement",
+    "CommunalIncident",
 ]

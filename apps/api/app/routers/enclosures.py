@@ -471,3 +471,131 @@ async def create_enclosure_substrate_change(
     db.refresh(new_change)
 
     return new_change
+
+
+# ─── Communal Incident Endpoints ─────────────────────────────────────────────
+
+from app.models.communal_incident import CommunalIncident
+from datetime import date as date_type
+from pydantic import BaseModel
+from typing import Optional as Opt
+
+
+class IncidentCreate(BaseModel):
+    incident_type: str
+    severity: Opt[str] = None
+    occurred_at: date_type
+    tarantula_id: Opt[UUID] = None
+    description: Opt[str] = None
+    outcome: Opt[str] = None
+
+
+class IncidentResponse(BaseModel):
+    id: UUID
+    enclosure_id: UUID
+    incident_type: str
+    severity: Opt[str]
+    occurred_at: date_type
+    tarantula_id: Opt[UUID]
+    description: Opt[str]
+    outcome: Opt[str]
+    created_at: datetime
+
+    # Resolved display name of the involved individual (if linked)
+    tarantula_name: Opt[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/{enclosure_id}/incidents", response_model=List[IncidentResponse])
+async def get_incidents(
+    enclosure_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    enclosure = db.query(Enclosure).filter(
+        Enclosure.id == enclosure_id,
+        Enclosure.user_id == current_user.id,
+    ).first()
+    if not enclosure:
+        raise HTTPException(status_code=404, detail="Enclosure not found")
+
+    incidents = (
+        db.query(CommunalIncident)
+        .filter(CommunalIncident.enclosure_id == enclosure_id)
+        .order_by(CommunalIncident.occurred_at.desc())
+        .all()
+    )
+
+    results = []
+    for inc in incidents:
+        row = IncidentResponse(
+            id=inc.id,
+            enclosure_id=inc.enclosure_id,
+            incident_type=inc.incident_type,
+            severity=inc.severity,
+            occurred_at=inc.occurred_at,
+            tarantula_id=inc.tarantula_id,
+            description=inc.description,
+            outcome=inc.outcome,
+            created_at=inc.created_at,
+            tarantula_name=inc.tarantula.name if inc.tarantula else None,
+        )
+        results.append(row)
+    return results
+
+
+@router.post("/{enclosure_id}/incidents", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
+async def create_incident(
+    enclosure_id: UUID,
+    data: IncidentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    enclosure = db.query(Enclosure).filter(
+        Enclosure.id == enclosure_id,
+        Enclosure.user_id == current_user.id,
+    ).first()
+    if not enclosure:
+        raise HTTPException(status_code=404, detail="Enclosure not found")
+
+    incident = CommunalIncident(
+        enclosure_id=enclosure_id,
+        user_id=current_user.id,
+        **data.model_dump(),
+    )
+    db.add(incident)
+    db.commit()
+    db.refresh(incident)
+
+    return IncidentResponse(
+        id=incident.id,
+        enclosure_id=incident.enclosure_id,
+        incident_type=incident.incident_type,
+        severity=incident.severity,
+        occurred_at=incident.occurred_at,
+        tarantula_id=incident.tarantula_id,
+        description=incident.description,
+        outcome=incident.outcome,
+        created_at=incident.created_at,
+        tarantula_name=incident.tarantula.name if incident.tarantula else None,
+    )
+
+
+@router.delete("/{enclosure_id}/incidents/{incident_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_incident(
+    enclosure_id: UUID,
+    incident_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    incident = db.query(CommunalIncident).join(Enclosure).filter(
+        CommunalIncident.id == incident_id,
+        CommunalIncident.enclosure_id == enclosure_id,
+        Enclosure.user_id == current_user.id,
+    ).first()
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    db.delete(incident)
+    db.commit()

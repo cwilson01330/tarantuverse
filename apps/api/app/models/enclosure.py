@@ -48,6 +48,7 @@ class Enclosure(Base):
     feeding_logs = relationship("FeedingLog", back_populates="enclosure", cascade="all, delete-orphan")
     molt_logs = relationship("MoltLog", back_populates="enclosure", cascade="all, delete-orphan")
     substrate_changes = relationship("SubstrateChange", back_populates="enclosure", cascade="all, delete-orphan")
+    incidents = relationship("CommunalIncident", back_populates="enclosure", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Enclosure {self.name}>"
