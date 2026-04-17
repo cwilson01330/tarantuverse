@@ -97,9 +97,6 @@ export default function NewThreadScreen() {
         content: content.trim(),
       };
 
-      console.log('Sending request to:', `${API_URL}/api/v1/forums/threads`);
-      console.log('Request body:', requestBody);
-
       const response = await fetch(`${API_URL}/api/v1/forums/threads`, {
         method: 'POST',
         headers: {
@@ -111,7 +108,6 @@ export default function NewThreadScreen() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.log('Error response:', response.status, errorData);
 
         // Handle different error formats
         let errorMessage = 'Failed to create thread';

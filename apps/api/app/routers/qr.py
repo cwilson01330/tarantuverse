@@ -13,6 +13,7 @@ Two distinct concerns handled here:
                         • unauthenticated             → read-only care card
 """
 
+import logging
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -30,12 +31,17 @@ from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.species import Species
 from app.utils.dependencies import get_current_user
+from app.utils.file_validation import validate_image_bytes
 from app.services.storage import storage_service
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["qr"])
 
 SESSION_TTL_MINUTES = 20  # upload session lifetime
+MAX_UPLOADS_PER_SESSION = 10  # hard cap on photo uploads per QR session token
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024  # 15 MiB per photo (matches typical phone output)
 
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
@@ -175,11 +181,36 @@ async def upload_photo_via_token(
         db.commit()
         raise HTTPException(status_code=410, detail="Upload session has expired")
 
+    # Enforce per-session upload cap — a leaked/brute-forced token must not
+    # permit unlimited uploads.
+    if (session.used_count or 0) >= MAX_UPLOADS_PER_SESSION:
+        session.is_active = False
+        db.commit()
+        raise HTTPException(
+            status_code=429,
+            detail=f"Upload limit reached for this session ({MAX_UPLOADS_PER_SESSION} photos).",
+        )
+
+    # Cheap preflight on Content-Type — magic-byte check is the authoritative one.
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
+    file_data = await file.read()
+
+    # Enforce size cap to prevent storage abuse via a leaked token.
+    if len(file_data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MiB.",
+        )
+
+    # Validate by magic bytes — do not trust the client-supplied Content-Type.
     try:
-        file_data = await file.read()
+        validate_image_bytes(file_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
         photo_url, thumbnail_url = await storage_service.upload_photo(
             file_data=file_data,
             filename=file.filename or "upload.jpg",
@@ -203,6 +234,9 @@ async def upload_photo_via_token(
             tarantula.photo_url = photo_url
 
         session.used_count = (session.used_count or 0) + 1
+        # Auto-deactivate on the last allowed upload so the token becomes dead.
+        if session.used_count >= MAX_UPLOADS_PER_SESSION:
+            session.is_active = False
         db.commit()
         db.refresh(photo)
 
@@ -213,11 +247,15 @@ async def upload_photo_via_token(
             "thumbnail_url": photo.thumbnail_url,
             "tarantula_name": _tarantula_display_name(tarantula),
             "uploads_this_session": session.used_count,
+            "uploads_remaining": max(0, MAX_UPLOADS_PER_SESSION - session.used_count),
         }
 
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        logger.exception("QR upload failed for session %s", session.id)
+        raise HTTPException(status_code=500, detail="Upload failed. Please try again.")
 
 
 # ─── Public Tarantula Profile (/t/{id}) ───────────────────────────────────────

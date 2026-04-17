@@ -85,17 +85,14 @@ export default function ThreadDetailScreen() {
   const fetchCurrentUser = async () => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
-      console.log('[Thread] Fetching current user, token exists:', !!token);
       if (!token) return;
 
       const response = await fetch(`${API_URL}/api/v1/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log('[Thread] Auth response status:', response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log('[Thread] Current user ID:', data.id);
         setCurrentUserId(data.id);
       }
     } catch (err) {

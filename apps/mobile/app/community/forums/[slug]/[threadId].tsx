@@ -146,7 +146,6 @@ export default function ThreadDetailScreen() {
   };
 
   const handleUsernamePress = (username: string) => {
-    console.log('Navigating to profile:', username);
     try {
       router.push(`/community/${username}`);
     } catch (error) {

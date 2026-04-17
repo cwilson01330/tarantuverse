@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
@@ -73,8 +73,8 @@ def build_message_response(message: Message, user: User, current_user_id: Option
 
 @router.get("/", response_model=List[MessageResponse])
 def get_messages(
-    skip: int = 0,
-    limit: int = 50,
+    skip: int = Query(0, ge=0, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """
@@ -228,8 +228,8 @@ def delete_message(
 @router.get("/{message_id}/replies", response_model=List[ReplyResponse])
 def get_replies(
     message_id: str,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0, le=10000),
+    limit: int = Query(100, ge=1, le=200),
     db: Session = Depends(get_db)
 ):
     """

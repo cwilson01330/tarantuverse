@@ -1,11 +1,11 @@
 """
 API routes for direct messaging functionality
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uuid
 
 from app.database import get_db
@@ -14,13 +14,14 @@ from app.models.direct_message import Conversation, DirectMessage
 from app.models.notification_preferences import NotificationPreferences
 from app.utils.dependencies import get_current_user
 from app.utils.push_notifications import send_direct_message_notification
+from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/messages/direct", tags=["direct_messages"])
 
 
 class SendMessageRequest(BaseModel):
-    recipient_username: str
-    content: str
+    recipient_username: str = Field(..., min_length=1, max_length=64)
+    content: str = Field(..., min_length=1, max_length=5000)
 
 
 class MessageResponse(BaseModel):
@@ -84,14 +85,16 @@ async def get_conversations(
 
 
 @router.post("/send")
+@limiter.limit("30/minute")
 async def send_message(
-    request: SendMessageRequest,
+    request: Request,
+    payload: SendMessageRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Send a direct message to another user"""
     # Get recipient
-    recipient = db.query(User).filter(User.username == request.recipient_username).first()
+    recipient = db.query(User).filter(User.username == payload.recipient_username).first()
     if not recipient:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -125,7 +128,7 @@ async def send_message(
     message = DirectMessage(
         conversation_id=conversation.id,
         sender_id=current_user.id,
-        content=request.content
+        content=payload.content
     )
     db.add(message)
     
@@ -148,7 +151,7 @@ async def send_message(
             recipient_prefs.expo_push_token):
 
             # Truncate message for preview
-            preview = request.content[:100] + "..." if len(request.content) > 100 else request.content
+            preview = payload.content[:100] + "..." if len(payload.content) > 100 else payload.content
 
             send_direct_message_notification(
                 expo_push_token=recipient_prefs.expo_push_token,

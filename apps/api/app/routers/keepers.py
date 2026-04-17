@@ -20,8 +20,8 @@ async def list_public_keepers(
     experience_level: Optional[str] = Query(None, description="Filter by experience level"),
     specialty: Optional[str] = Query(None, description="Filter by specialty"),
     search: Optional[str] = Query(None, description="Search by username, display name, or location"),
-    limit: int = Query(50, le=100, description="Number of results to return"),
-    offset: int = Query(0, description="Number of results to skip"),
+    limit: int = Query(50, ge=1, le=100, description="Number of results to return"),
+    offset: int = Query(0, ge=0, le=10000, description="Number of results to skip"),
     db: Session = Depends(get_db)
 ):
     """

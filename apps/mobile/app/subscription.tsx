@@ -101,15 +101,8 @@ export default function SubscriptionScreen() {
 
   const loadProducts = async () => {
     try {
-      console.log('[Subscription] Initializing IAP...');
       await initializeIAP();
-      console.log('[Subscription] IAP initialized, fetching products...');
       const availableProducts = await getSubscriptionProducts();
-      console.log('[Subscription] Products received:', availableProducts);
-      console.log('[Subscription] Product count:', availableProducts?.length || 0);
-      if (availableProducts?.length > 0) {
-        console.log('[Subscription] First product:', JSON.stringify(availableProducts[0], null, 2));
-      }
       setProducts(availableProducts);
       setProductsLoaded(true);
       return availableProducts;
@@ -136,8 +129,6 @@ export default function SubscriptionScreen() {
         setPurchasing(false);
         return;
       }
-
-      console.log('[Subscription] Purchase result:', purchase);
 
       // Validate with backend - expo-iap returns the purchase object directly
       // Handle both array (Android) and single object (iOS) formats

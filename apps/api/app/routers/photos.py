@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
 from typing import Optional
+import logging
 import uuid
 from datetime import datetime
 
@@ -12,6 +13,8 @@ from app.models.user import User
 from app.services.storage import storage_service
 from app.config import settings
 from app.utils.file_validation import validate_image_bytes
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["photos"])
 
@@ -116,9 +119,12 @@ async def upload_photo(
             "created_at": photo.created_at.isoformat()
         }
         
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to upload photo: {str(e)}")
+        logger.exception("Photo upload failed for tarantula %s", tarantula_id)
+        raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
 
 
 @router.get("/tarantulas/{tarantula_id}/photos")
@@ -186,9 +192,10 @@ async def delete_photo(
         
         return {"message": "Photo deleted successfully"}
         
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete photo: {str(e)}")
+        logger.exception("Photo delete failed for photo %s", photo_id)
+        raise HTTPException(status_code=500, detail="Failed to delete photo. Please try again.")
 
 
 @router.patch("/photos/{photo_id}/set-main")
@@ -223,6 +230,7 @@ async def set_main_photo(
             "photo_url": photo.url
         }
         
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to set main photo: {str(e)}")
+        logger.exception("Set main photo failed for photo %s", photo_id)
+        raise HTTPException(status_code=500, detail="Failed to set main photo. Please try again.")

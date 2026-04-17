@@ -145,7 +145,7 @@ async def delete_category(
 @router.get("/categories/{category_slug}/threads", response_model=ForumThreadList)
 async def list_threads(
     category_slug: str,
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=10000),
     limit: int = Query(20, ge=1, le=100),
     sort: str = Query("recent", regex="^(recent|popular|pinned)$"),
     db: Session = Depends(get_db)
@@ -386,7 +386,7 @@ async def delete_thread(
 @router.get("/threads/{thread_id}/posts", response_model=ForumPostList)
 async def list_posts(
     thread_id: int,
-    page: int = Query(1, ge=1),
+    page: int = Query(1, ge=1, le=10000),
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db)
 ):

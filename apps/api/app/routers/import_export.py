@@ -5,7 +5,7 @@ Export endpoints are available to ALL users (free + premium) for GDPR
 compliance.  Import is also available to all users (subject to the
 per-tier tarantula limit enforced by the tarantulas router).
 """
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, Request, UploadFile, File, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
@@ -16,6 +16,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.utils.dependencies import get_current_user
+from app.utils.rate_limit import limiter
 from app.services.import_service import ImportService
 from app.services.export_service import ExportService
 from app.services.activity_service import create_activity
@@ -77,7 +78,9 @@ async def import_collection(
 # ---------------------------------------------------------------------------
 
 @router.get("/export/json")
+@limiter.limit("10/hour")
 async def export_json(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -99,7 +102,9 @@ async def export_json(
 
 
 @router.get("/export/csv")
+@limiter.limit("10/hour")
 async def export_csv(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -120,7 +125,9 @@ async def export_csv(
 
 
 @router.get("/export/full")
+@limiter.limit("3/hour")
 async def export_full(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):

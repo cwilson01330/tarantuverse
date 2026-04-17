@@ -224,7 +224,6 @@ export default function ForumCategoryScreen() {
         size={56}
         onPress={() => {
           // TODO: Navigate to create thread screen
-          console.log('Create new thread');
         }}
         outerStyle={styles.fab}
       >

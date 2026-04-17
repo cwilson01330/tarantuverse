@@ -111,10 +111,6 @@ export default function NotificationSettingsPage() {
         quiet_hours_end: preferences.quiet_hours_end,
       };
 
-      console.log('Saving to:', `${API_URL}/api/v1/notification-preferences/`);
-      console.log('Token present:', !!token);
-      console.log('Payload:', updatePayload);
-
       const response = await fetch(`${API_URL}/api/v1/notification-preferences/`, {
         method: 'PUT',
         headers: {

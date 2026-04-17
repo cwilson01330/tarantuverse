@@ -1,7 +1,7 @@
 """
 API routes for following/followers functionality
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_, func
 from typing import List
@@ -14,12 +14,15 @@ from app.models.notification_preferences import NotificationPreferences
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
 from app.utils.push_notifications import send_new_follower_notification
+from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/follows", tags=["follows"])
 
 
 @router.post("/{username}")
+@limiter.limit("20/minute")
 async def follow_user(
+    request: Request,
     username: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -86,7 +89,9 @@ async def follow_user(
 
 
 @router.delete("/{username}")
+@limiter.limit("20/minute")
 async def unfollow_user(
+    request: Request,
     username: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

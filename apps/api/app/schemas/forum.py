@@ -52,7 +52,7 @@ class ForumThreadBase(BaseModel):
 
 
 class ForumThreadCreate(ForumThreadBase):
-    content: str  # First post content
+    content: str = Field(..., min_length=1, max_length=10000)  # First post content
     # Honeypot field - should always be empty (bots fill it, humans don't see it)
     website: Optional[str] = None  # Named generically to trick bots
 
@@ -104,7 +104,7 @@ class ForumThreadDetail(ForumThreadResponse):
 # ============================================================================
 
 class ForumPostBase(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=10000)
     # Honeypot field - should always be empty (bots fill it, humans don't see it)
     website: Optional[str] = None  # Named generically to trick bots
 
@@ -114,7 +114,7 @@ class ForumPostCreate(ForumPostBase):
 
 
 class ForumPostUpdate(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=10000)
 
 
 class ForumPostResponse(BaseModel):
