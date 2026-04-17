@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { View as RNView } from 'react-native';
 
 interface Message {
   id: string;
@@ -38,7 +39,7 @@ const REACTION_EMOJIS = ['❤️', '👍', '😂', '🔥', '🕷️', '🎉'];
 
 export default function BoardScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -269,16 +270,19 @@ export default function BoardScreen() {
         options={{
           title: 'Community Board',
           headerBackTitle: 'Community',
-          headerBackground: () => (
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{ flex: 1 }}
-            />
-          ),
-          headerTintColor: '#fff',
-          headerTitleStyle: { color: '#fff', fontWeight: 'bold' },
+          headerBackground: () =>
+            layout.useGradient ? (
+              <LinearGradient
+                colors={[colors.primary, colors.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ flex: 1 }}
+              />
+            ) : (
+              <RNView style={{ flex: 1, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }} />
+            ),
+          headerTintColor: layout.useGradient ? '#fff' : colors.textPrimary,
+          headerTitleStyle: { fontWeight: 'bold', color: layout.useGradient ? '#fff' : colors.textPrimary },
         }}
       />
       <View style={[styles.container, { backgroundColor: colors.background }]}>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../contexts/ThemeContext';
+import { PrimaryButton } from './PrimaryButton';
 import { useCopilot } from 'react-native-copilot';
 
 export default function TourTooltip() {
@@ -134,18 +134,14 @@ export default function TourTooltip() {
               <Text style={styles.backText}>Back</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={isLastStep ? stop : goToNext} activeOpacity={0.8}>
-            <LinearGradient
-              colors={[colors.primary, colors.secondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.nextButton}
-            >
-              <Text style={styles.nextText}>
-                {isLastStep ? 'Done' : 'Next'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <PrimaryButton
+            onPress={isLastStep ? stop : goToNext}
+            style={styles.nextButton}
+          >
+            <Text style={styles.nextText}>
+              {isLastStep ? 'Done' : 'Next'}
+            </Text>
+          </PrimaryButton>
         </View>
       </View>
     </View>
