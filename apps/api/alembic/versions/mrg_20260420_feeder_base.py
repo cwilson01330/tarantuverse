@@ -1,14 +1,17 @@
 """merge heads before feeder module
 
-Merges three pre-existing branches so future migrations have a single head:
+Merges the two branches that diverge after z7a8b9c0d1e2:
   - a0b1c2d3e4f5 (add_communal_incidents)
-  - b1c2d3e4f5g6 (add_username_change_tracking)
-  - s0t1u2v3w4x5 (add_enclosures)
+  - b1c2d3e4f5g6 (add_username_change_tracking, via a1b2c3d4e5f7)
+
+Note: s0t1u2v3w4x5 (add_enclosures) is NOT a head — it is a common
+ancestor of both branches on the main linear chain, so it must not
+appear here.
 
 No schema change; pure merge.
 
 Revision ID: mrg_20260420_feeder_base
-Revises: a0b1c2d3e4f5, b1c2d3e4f5g6, s0t1u2v3w4x5
+Revises: a0b1c2d3e4f5, b1c2d3e4f5g6
 Create Date: 2026-04-20
 
 """
@@ -18,7 +21,7 @@ import sqlalchemy as sa  # noqa: F401
 
 # revision identifiers, used by Alembic.
 revision = 'mrg_20260420_feeder_base'
-down_revision = ('a0b1c2d3e4f5', 'b1c2d3e4f5g6', 's0t1u2v3w4x5')
+down_revision = ('a0b1c2d3e4f5', 'b1c2d3e4f5g6')
 branch_labels = None
 depends_on = None
 
