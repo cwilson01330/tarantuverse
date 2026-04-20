@@ -891,6 +891,7 @@ function DashboardHubScreen() {
             {[
               { emoji: '➕', label: 'Add\nTarantula', route: '/tarantula/add' },
               { emoji: '🕷️', label: 'My\nCollection', route: '/(tabs)/collection' },
+              { emoji: '🦗', label: 'Feeders', route: '/feeders' },
               { emoji: '📊', label: 'Analytics', route: '/analytics' },
               { emoji: '📖', label: 'Species\nDB', route: '/(tabs)/species' },
               { emoji: '🌐', label: 'Community', route: '/(tabs)/community' },
