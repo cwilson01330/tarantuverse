@@ -14,6 +14,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
+import { AppHeader } from '../../src/components/AppHeader';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -113,7 +114,8 @@ type TabType = 'info' | 'inhabitants' | 'feedings' | 'molts' | 'substrate' | 'in
 export default function EnclosureDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [enclosure, setEnclosure] = useState<EnclosureDetail | null>(null);
   const [inhabitants, setInhabitants] = useState<Inhabitant[]>([]);
   const [feedingLogs, setFeedingLogs] = useState<FeedingLog[]>([]);
@@ -1328,14 +1330,45 @@ export default function EnclosureDetailScreen() {
     ? (enclosure.population_count || enclosure.inhabitant_count)
     : enclosure.inhabitant_count;
 
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
+
+  const headerRightActions = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+      <TouchableOpacity
+        style={{ padding: 6 }}
+        onPress={() => router.push(`/enclosure/edit?id=${id}`)}
+        accessibilityLabel="Edit enclosure"
+      >
+        <MaterialCommunityIcons name="pencil" size={22} color={iconColor} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={{ padding: 6 }}
+        onPress={handleDelete}
+        accessibilityLabel="Delete enclosure"
+      >
+        <MaterialCommunityIcons name="trash-can-outline" size={22} color={colors.error} />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
+      <AppHeader
+        title={enclosure.name}
+        subtitle={enclosure.species_name || undefined}
+        leftAction={backButton}
+        rightAction={headerRightActions}
+      />
       <ScrollView
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        {/* Header Image */}
+        {/* Hero Image */}
         <View style={styles.header}>
           {enclosure.photo_url ? (
             <Image source={{ uri: getImageUrl(enclosure.photo_url) }} style={styles.headerImage} />
@@ -1344,36 +1377,16 @@ export default function EnclosureDetailScreen() {
               <MaterialCommunityIcons name="home-variant" size={64} color={colors.textTertiary} />
             </View>
           )}
-          <View style={styles.headerOverlay}>
-            <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
-              <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-            </TouchableOpacity>
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                style={styles.headerButton}
-                onPress={() => router.push(`/enclosure/edit?id=${id}`)}
-              >
-                <MaterialCommunityIcons name="pencil" size={20} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton} onPress={handleDelete}>
-                <MaterialCommunityIcons name="delete" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
 
-        {/* Title */}
+        {/* Stats */}
         <View style={styles.titleContainer}>
-          <View style={styles.titleRow}>
-            <Text style={styles.name}>{enclosure.name}</Text>
-            {enclosure.is_communal && (
+          {enclosure.is_communal && (
+            <View style={styles.titleRow}>
               <View style={styles.communalBadge}>
                 <Text style={styles.communalBadgeText}>Communal</Text>
               </View>
-            )}
-          </View>
-          {enclosure.species_name && (
-            <Text style={styles.speciesName}>{enclosure.species_name}</Text>
+            </View>
           )}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
