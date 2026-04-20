@@ -16,7 +16,6 @@ import { CopilotProvider, CopilotStep, walkthroughable, useCopilot } from 'react
 import { apiClient } from '../../src/services/api';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { useUnreadMessages } from '../../src/hooks/useUnreadMessages';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
 
@@ -82,7 +81,6 @@ function DashboardHubScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
-  const { unreadCount } = useUnreadMessages();
   const { start: startTour } = useCopilot();
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
@@ -470,45 +468,32 @@ function DashboardHubScreen() {
       gap: 10,
     },
     actionButton: {
-      width: '31%',
+      width: '31.5%',
       aspectRatio: 1,
-      backgroundColor: colors.background,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
+      backgroundColor: colors.surfaceElevated,
       borderWidth: 1,
       borderColor: colors.border,
-      gap: 6,
-    },
-    actionEmojiWrapper: {
-      position: 'relative',
-    },
-    actionEmoji: {
-      fontSize: 24,
-    },
-    actionBadge: {
-      position: 'absolute',
-      top: -6,
-      right: -10,
-      minWidth: 16,
-      height: 16,
-      borderRadius: 8,
-      backgroundColor: '#ef4444',
+      borderRadius: 14,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 3,
+      paddingHorizontal: 6,
+      gap: 8,
     },
-    actionBadgeText: {
-      color: '#fff',
-      fontSize: 9,
-      fontWeight: '700',
-      lineHeight: 12,
+    actionIconHalo: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary + '1A', // 10% tint of the accent color
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     actionLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '600',
-      color: colors.textSecondary,
+      color: colors.textPrimary,
       textAlign: 'center',
+      minHeight: 32, // reserves 2 lines so every tile is the same height
+      lineHeight: 15,
     },
     // Empty state
     emptyContainer: {
@@ -886,45 +871,36 @@ function DashboardHubScreen() {
           name="Quick Actions"
         >
         <WalkthroughableView style={styles.sectionCard}>
-          <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 14 }]}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
-            {[
-              { emoji: '➕', label: 'Add\nTarantula', route: '/tarantula/add' },
-              { emoji: '🕷️', label: 'My\nCollection', route: '/(tabs)/collection' },
-              { emoji: '🦗', label: 'Feeders', route: '/feeders' },
-              { emoji: '📊', label: 'Analytics', route: '/analytics' },
-              { emoji: '📖', label: 'Species\nDB', route: '/(tabs)/species' },
-              { emoji: '🌐', label: 'Community', route: '/(tabs)/community' },
-              { emoji: '💬', label: 'Messages', route: '/messages' },
-            ].map((item) => {
-              const isMessages = item.route === '/messages';
-              const showBadge = isMessages && unreadCount > 0;
-              return (
-                <TouchableOpacity
-                  key={item.label}
-                  style={styles.actionButton}
-                  onPress={() => router.push(item.route as any)}
-                  activeOpacity={0.7}
-                  accessibilityLabel={
-                    showBadge
-                      ? `${item.label} — ${unreadCount} unread`
-                      : item.label
-                  }
-                >
-                  <View style={styles.actionEmojiWrapper}>
-                    <Text style={styles.actionEmoji}>{item.emoji}</Text>
-                    {showBadge && (
-                      <View style={styles.actionBadge}>
-                        <Text style={styles.actionBadgeText}>
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.actionLabel}>{item.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
+            {([
+              { icon: 'plus-circle-outline', label: 'Add Tarantula', route: '/tarantula/add' },
+              { icon: 'spider', label: 'My Collection', route: '/(tabs)/collection' },
+              { icon: 'bug-outline', label: 'Feeders', route: '/feeders' },
+              { icon: 'chart-line', label: 'Analytics', route: '/analytics' },
+              { icon: 'book-open-variant', label: 'Species DB', route: '/(tabs)/species' },
+              { icon: 'account-group-outline', label: 'Community', route: '/(tabs)/community' },
+            ] as const).map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                style={styles.actionButton}
+                onPress={() => router.push(item.route as any)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+              >
+                <View style={styles.actionIconHalo}>
+                  <MaterialCommunityIcons
+                    name={item.icon as any}
+                    size={26}
+                    color={colors.primary}
+                  />
+                </View>
+                <Text style={styles.actionLabel} numberOfLines={2}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </WalkthroughableView>
         </CopilotStep>
