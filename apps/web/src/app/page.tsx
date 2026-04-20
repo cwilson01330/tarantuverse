@@ -43,6 +43,7 @@ export default function Home() {
             <div className="hidden md:flex items-center gap-6 text-sm text-gray-400">
               <a href="#keepers" className="hover:text-electric-blue-400 transition">For Keepers</a>
               <a href="#breeders" className="hover:text-electric-blue-400 transition">For Breeders</a>
+              <a href="#feeders" className="hover:text-amber-400 transition">Feeders</a>
               <a href="#community" className="hover:text-electric-blue-400 transition">Community</a>
               <a href="#pricing" className="hover:text-electric-blue-400 transition">Pricing</a>
             </div>
@@ -72,6 +73,9 @@ export default function Home() {
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/30 text-green-300 rounded-full text-xs font-semibold">
                 🏷️ Sellers
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full text-xs font-semibold">
+                🦗 Feeder Colonies
               </span>
             </div>
 
@@ -196,8 +200,8 @@ export default function Home() {
               <div className="text-xs md:text-sm text-gray-400 mt-1">To Start, Forever</div>
             </div>
             <div>
-              <div className="text-2xl md:text-3xl font-bold text-blue-400">$4.99</div>
-              <div className="text-xs md:text-sm text-gray-400 mt-1">For Unlimited Access</div>
+              <div className="text-2xl md:text-3xl font-bold text-amber-400">11</div>
+              <div className="text-xs md:text-sm text-gray-400 mt-1">Feeder Colony Species</div>
             </div>
           </div>
         </div>
@@ -412,6 +416,164 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Feeder Module ────────────────────────────────────────── */}
+      <section id="feeders" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-3xl">🦗</span>
+          <span className="text-amber-400 font-bold text-lg uppercase tracking-widest">Feeder Module</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-full text-xs font-bold">
+            NEW
+          </span>
+        </div>
+        <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-100">
+          Track the food chain too —<br />
+          <span className="bg-gradient-to-r from-amber-400 to-neon-pink-400 bg-clip-text text-transparent">never run out of feeders</span>
+        </h2>
+        <p className="text-xl text-gray-300 mb-16 max-w-2xl">
+          Raising your own crickets, roaches, or mealworms? Tarantuverse is now the only
+          keeper app that tracks feeder colonies with life-stage inventory, care logs,
+          and low-stock alerts — so you never open an empty cricket bin on feeding night.
+        </p>
+
+        <div className="grid lg:grid-cols-2 gap-12 items-start">
+          {/* Left: feature cards */}
+          <div className="space-y-4">
+            <div className="bg-dark-50 border border-amber-500/20 rounded-2xl p-6 hover:border-amber-500/40 transition">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">📦</div>
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-gray-100">Colony Inventory by Life Stage</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    Track pinheads, small, medium, large, and adults as separate counts. Know
+                    exactly which sizes you have for slings vs. adult females — at a glance.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-dark-50 border border-amber-500/20 rounded-2xl p-6 hover:border-amber-500/40 transition">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">⚠️</div>
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-gray-100">Low-Stock Alerts</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    Set a threshold per colony and get flagged the moment you dip below it.
+                    No more Friday-night "wait, am I out of mediums?" panic.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-dark-50 border border-amber-500/20 rounded-2xl p-6 hover:border-amber-500/40 transition">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">🍽️</div>
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-gray-100">Quick-Log Care Actions</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    One-tap logging for feeding the colony, watering, cleaning the enclosure,
+                    or recording a die-off. Your whole feeder operation stays accountable.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-dark-50 border border-amber-500/20 rounded-2xl p-6 hover:border-amber-500/40 transition">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">📚</div>
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-gray-100">11 Feeder Species, Pre-Seeded</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    Crickets (banded & house), dubias, red runners, discoids, superworms,
+                    mealworms, hornworms, BSFL, and isopods — all with care defaults baked in.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: colony card mock */}
+          <div className="relative">
+            <div className="bg-dark-50 border-2 border-amber-500/20 rounded-2xl p-6 shadow-2xl shadow-amber-500/10">
+              <div className="flex items-center justify-between mb-5 pb-5 border-b border-amber-500/10">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center text-2xl">🦗</div>
+                  <div>
+                    <div className="font-bold text-gray-100">Banded Cricket Colony</div>
+                    <div className="text-xs text-gray-400"><em>Gryllodes sigillatus</em> · Breeding mode</div>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 bg-green-500/20 text-green-300 rounded-lg text-xs font-bold">Stocked</span>
+              </div>
+
+              {/* Life-stage inventory */}
+              <div className="mb-5">
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">Life-Stage Inventory</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-dark border border-amber-500/20 rounded-lg p-3 text-center">
+                    <div className="text-xs text-gray-400 mb-0.5">Pinheads</div>
+                    <div className="font-bold text-amber-300 text-lg">240</div>
+                  </div>
+                  <div className="bg-dark border border-amber-500/20 rounded-lg p-3 text-center">
+                    <div className="text-xs text-gray-400 mb-0.5">Small</div>
+                    <div className="font-bold text-amber-300 text-lg">180</div>
+                  </div>
+                  <div className="bg-dark border border-amber-500/20 rounded-lg p-3 text-center">
+                    <div className="text-xs text-gray-400 mb-0.5">Medium</div>
+                    <div className="font-bold text-amber-300 text-lg">95</div>
+                  </div>
+                  <div className="bg-dark border border-red-500/30 rounded-lg p-3 text-center">
+                    <div className="text-xs text-gray-400 mb-0.5">Large</div>
+                    <div className="font-bold text-red-400 text-lg">12 ⚠</div>
+                  </div>
+                  <div className="bg-dark border border-amber-500/20 rounded-lg p-3 text-center">
+                    <div className="text-xs text-gray-400 mb-0.5">Adults</div>
+                    <div className="font-bold text-amber-300 text-lg">40</div>
+                  </div>
+                  <div className="bg-dark border border-amber-500/20 rounded-lg p-3 text-center">
+                    <div className="text-xs text-gray-400 mb-0.5">Total</div>
+                    <div className="font-bold text-gray-100 text-lg">567</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick actions */}
+              <div>
+                <div className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">Quick Log</div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="bg-dark border border-amber-500/20 rounded-lg py-3 text-center text-xs text-amber-200 hover:border-amber-500/40 transition cursor-default">🍽️ Feed</div>
+                  <div className="bg-dark border border-electric-blue-500/20 rounded-lg py-3 text-center text-xs text-electric-blue-200 hover:border-electric-blue-500/40 transition cursor-default">💧 Water</div>
+                  <div className="bg-dark border border-green-500/20 rounded-lg py-3 text-center text-xs text-green-200 hover:border-green-500/40 transition cursor-default">🧹 Clean</div>
+                  <div className="bg-dark border border-red-500/20 rounded-lg py-3 text-center text-xs text-red-200 hover:border-red-500/40 transition cursor-default">💀 Die-off</div>
+                </div>
+              </div>
+
+              {/* Low stock alert */}
+              <div className="mt-5 bg-red-500/10 border border-red-500/30 rounded-xl p-3 flex items-center gap-3">
+                <span className="text-xl">⚠️</span>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-red-300">Large crickets low</div>
+                  <div className="text-xs text-gray-400">12 remaining · threshold 25</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute -top-4 -right-4 bg-amber-500 text-gray-900 px-4 py-2 rounded-full font-bold text-sm shadow-lg shadow-amber-500/40 transform rotate-6">
+              Industry First
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+          <p className="text-gray-300">
+            <strong className="text-amber-300">No other keeper app tracks feeders.</strong>{' '}
+            If you breed your own, this replaces three spreadsheets and a wall calendar.
+          </p>
+          <Link href="/register" className="px-6 py-3 bg-amber-500 text-gray-900 rounded-xl hover:bg-amber-400 transition font-bold whitespace-nowrap">
+            Start Tracking Free
+          </Link>
+        </div>
+      </section>
+
       {/* ── For Breeders ────────────────────────────────────────── */}
       <section id="breeders" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <div className="flex items-center gap-3 mb-4">
@@ -551,6 +713,60 @@ export default function Home() {
               <h3 className="font-bold mb-2 text-gray-100">Activity Feed</h3>
               <p className="text-gray-300 text-sm">Follow other keepers and see their molt photos, new additions, and breeding updates in a live activity feed.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Also New ────────────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-12">
+          <div>
+            <div className="text-electric-blue-400 font-bold text-sm uppercase tracking-widest mb-2">Also new this quarter</div>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-100">
+              Small wins that make a big difference
+            </h2>
+          </div>
+          <p className="text-gray-400 max-w-md text-sm">
+            Polish, security, and quality-of-life upgrades that shipped alongside the
+            headline features.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/10 transition">
+            <div className="w-12 h-12 bg-electric-blue-500/10 border border-electric-blue-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🏆</div>
+            <h3 className="font-bold mb-2 text-gray-100">18 Achievements</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Earn badges for collection milestones, feeding streaks, molt witnesses,
+              breeding firsts, and community posts.
+            </p>
+          </div>
+
+          <div className="bg-dark-50 border border-neon-pink-500/20 rounded-2xl p-6 hover:border-neon-pink-500/40 hover:shadow-lg hover:shadow-neon-pink-500/10 transition">
+            <div className="w-12 h-12 bg-neon-pink-500/10 border border-neon-pink-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🔍</div>
+            <h3 className="font-bold mb-2 text-gray-100">Global Search (⌘K)</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Press Cmd/Ctrl+K from anywhere to jump to any tarantula, species,
+              keeper, or forum thread instantly.
+            </p>
+          </div>
+
+          <div className="bg-dark-50 border border-green-500/20 rounded-2xl p-6 hover:border-green-500/40 hover:shadow-lg hover:shadow-green-500/10 transition">
+            <div className="w-12 h-12 bg-green-500/10 border border-green-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">🌟</div>
+            <h3 className="font-bold mb-2 text-gray-100">Discover Page</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Trending threads, active keepers, popular species, and new members —
+              your gateway into the community.
+            </p>
+          </div>
+
+          <div className="bg-dark-50 border border-amber-500/20 rounded-2xl p-6 hover:border-amber-500/40 hover:shadow-lg hover:shadow-amber-500/10 transition">
+            <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center justify-center text-2xl mb-4">📦</div>
+            <h3 className="font-bold mb-2 text-gray-100">GDPR Data Export</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Download everything — collection, logs, photos, forum history —
+              as JSON, CSV, or a full ZIP whenever you want.
+            </p>
           </div>
         </div>
       </section>
@@ -749,6 +965,7 @@ export default function Home() {
                 <li><Link href="/pricing" className="hover:text-electric-blue-400 transition">Pricing</Link></li>
                 <li><Link href="/species" className="hover:text-electric-blue-400 transition">Species Database</Link></li>
                 <li><a href="#breeders" className="hover:text-electric-blue-400 transition">Breeding Module</a></li>
+                <li><a href="#feeders" className="hover:text-amber-400 transition">Feeder Module</a></li>
               </ul>
             </div>
             <div>
