@@ -29,6 +29,9 @@ from app.models.announcement import Announcement
 from app.models.system_setting import SystemSetting
 from app.models.achievement import AchievementDefinition, UserAchievement
 from app.models.communal_incident import CommunalIncident
+from app.models.feeder_species import FeederSpecies
+from app.models.feeder_colony import FeederColony
+from app.models.feeder_care_log import FeederCareLog
 
 __all__ = [
     "User",
@@ -64,4 +67,7 @@ __all__ = [
     "AchievementDefinition",
     "UserAchievement",
     "CommunalIncident",
+    "FeederSpecies",
+    "FeederColony",
+    "FeederCareLog",
 ]

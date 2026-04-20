@@ -16,6 +16,10 @@ class Enclosure(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     name = Column(String(100), nullable=False)  # e.g., "Balfouri Colony 1"
 
+    # Purpose — segments enclosures between tarantula collection and feeder colonies.
+    # Values: 'tarantula' (default) | 'feeder'. Enforced at the application layer.
+    purpose = Column(String(20), nullable=False, default="tarantula", index=True)
+
     # Communal settings
     is_communal = Column(Boolean, default=False)
     species_id = Column(UUID(as_uuid=True), ForeignKey("species.id"), nullable=True)  # For same-species communals

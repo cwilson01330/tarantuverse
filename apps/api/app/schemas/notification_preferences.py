@@ -20,6 +20,9 @@ class NotificationPreferencesBase(BaseModel):
     maintenance_reminders_enabled: bool = True
     maintenance_reminder_days: int = Field(30, ge=1, le=365)
 
+    # Feeder colony low-stock local notification
+    feeder_low_stock_enabled: bool = True
+
     # Push Notifications (future)
     push_notifications_enabled: bool = True
     direct_messages_enabled: bool = True
@@ -45,6 +48,8 @@ class NotificationPreferencesUpdate(BaseModel):
 
     maintenance_reminders_enabled: Optional[bool] = None
     maintenance_reminder_days: Optional[int] = Field(None, ge=1, le=365)
+
+    feeder_low_stock_enabled: Optional[bool] = None
 
     push_notifications_enabled: Optional[bool] = None
     direct_messages_enabled: Optional[bool] = None

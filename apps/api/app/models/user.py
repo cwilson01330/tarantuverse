@@ -79,6 +79,9 @@ class User(Base):
     # Enclosures
     enclosures = relationship("Enclosure", back_populates="user", lazy="select", passive_deletes=True)
 
+    # Feeder colonies
+    feeder_colonies = relationship("FeederColony", back_populates="user", lazy="select", passive_deletes=True)
+
     # Referral relationships
     referred_by = relationship("User", remote_side=[id], foreign_keys=[referred_by_user_id], lazy="select")
     referrals = relationship("User", foreign_keys="User.referred_by_user_id", lazy="select")

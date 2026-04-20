@@ -47,6 +47,8 @@ import app.routers.achievements as achievements
 import app.routers.search as search
 import app.routers.discover as discover
 import app.routers.qr as qr
+import app.routers.feeder_species as feeder_species
+import app.routers.feeder_colonies as feeder_colonies
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -247,6 +249,10 @@ app.include_router(search.router, prefix="/api/v1", tags=["search"])
 print("[STARTUP] Registering discover router...")
 app.include_router(discover.router, prefix="/api/v1", tags=["discover", "community"])
 app.include_router(qr.router, prefix="/api/v1", tags=["qr", "identity"])
+
+print("[STARTUP] Registering feeder routers...")
+app.include_router(feeder_species.router, prefix="/api/v1/feeder-species", tags=["feeders"])
+app.include_router(feeder_colonies.router, prefix="/api/v1/feeder-colonies", tags=["feeders"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

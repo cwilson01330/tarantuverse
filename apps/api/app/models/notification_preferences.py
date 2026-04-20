@@ -28,6 +28,9 @@ class NotificationPreferences(Base):
     maintenance_reminders_enabled = Column(Boolean, default=True)
     maintenance_reminder_days = Column(Integer, default=30)
 
+    # Feeder colony low-stock local notification
+    feeder_low_stock_enabled = Column(Boolean, default=True, nullable=False)
+
     # Push Notifications (future - server sent)
     push_notifications_enabled = Column(Boolean, default=True)
     direct_messages_enabled = Column(Boolean, default=True)
