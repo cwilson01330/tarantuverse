@@ -60,6 +60,7 @@ export default function Sidebar({ isOpen, onClose, isCollapsed, onToggleCollapse
     { icon: '📊', label: 'Analytics', path: '/dashboard/analytics' },
     { icon: '💰', label: 'Collection Value', path: '/dashboard/collection-value' },
     { icon: '🥚', label: 'Breeding', path: '/dashboard/breeding' },
+    { icon: '🦗', label: 'Feeders', path: '/dashboard/feeders' },
     { icon: '🏆', label: 'Achievements', path: '/dashboard/achievements' },
     { icon: '✨', label: 'Discover', path: '/community/discover' },
     { icon: '🌐', label: 'Community', path: '/community' },

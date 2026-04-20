@@ -328,8 +328,8 @@ SPECIES_DATA = [
         "webbing_amount": "heavy",
         "burrowing": True,
         "urticating_hairs": False,
-        "medically_significant_venom": False,
-        "care_guide": "**Orange Baboon Tarantula** - HIGHLY AGGRESSIVE and will bite without provocation. Very fast. Only for experts with containment experience. Not a pet for display.",
+        "medically_significant_venom": True,
+        "care_guide": "**Orange Baboon Tarantula** - HIGHLY AGGRESSIVE and will bite without provocation. Very fast. Old World species — no urticating hairs, but possesses medically significant venom. Only for experts with containment experience. Not a pet for display.",
         "is_verified": True,
     },
     {
@@ -354,8 +354,8 @@ SPECIES_DATA = [
         "webbing_amount": "heavy",
         "burrowing": False,
         "urticating_hairs": False,
-        "medically_significant_venom": False,
-        "care_guide": "**Togo Starburst** - Beautifully patterned arboreal species with striking colors. Fast and defensive. Will bite readily. Experts only.",
+        "medically_significant_venom": True,
+        "care_guide": "**Togo Starburst** - Beautifully patterned arboreal species with striking colors. Fast and defensive. Old World species — no urticating hairs, but possesses medically significant venom. Will bite readily. Experts only.",
         "is_verified": True,
     },
 ]
