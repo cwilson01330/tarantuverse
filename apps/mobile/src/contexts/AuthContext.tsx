@@ -66,13 +66,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const storedToken = await AsyncStorage.getItem('auth_token');
       const storedUser = await AsyncStorage.getItem('user');
-      
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+
+      if (!storedToken || !storedUser) {
+        return;
+      }
+
+      // Hydrate cached auth first so app shell renders without a login flash,
+      // and so the request interceptor has a token to attach to /auth/me.
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
+
+      // Validate the token BEFORE the dashboard fires a wave of parallel
+      // requests. If it's expired or revoked, the response interceptor will
+      // clear storage + emit AUTH_EXPIRED, and handleAuthExpired below will
+      // reset state cleanly. If the network is down, we keep the cached
+      // session (offline-friendly).
+      try {
+        const response = await apiClient.get('/auth/me');
+        const freshUser = response.data;
+        await AsyncStorage.setItem('user', JSON.stringify(freshUser));
+        setUser(freshUser);
+      } catch (error: any) {
+        // 401 → interceptor already cleared storage and emitted the event;
+        // state will be reset by handleAuthExpired. Any other error (network,
+        // 5xx) → leave the cached session in place so offline-reopen works.
       }
     } catch (error) {
-      // Silent fail - user will see login screen
+      // AsyncStorage read failed — show login screen.
     } finally {
       setIsLoading(false);
     }

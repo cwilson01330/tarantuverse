@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # API Configuration
     API_SECRET_KEY: str = "dev-secret-key-change-in-production"
     API_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours (was 7 days)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 14  # 14 days. Revocation via /auth/logout + token_blocklist.
 
     # Database
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/tarantuverse"
