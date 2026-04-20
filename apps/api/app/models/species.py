@@ -59,8 +59,13 @@ class Species(Base):
     burrowing = Column(Boolean, default=False)
 
     # Safety Information
-    urticating_hairs = Column(Boolean, default=True)  # New World tarantulas
-    medically_significant_venom = Column(Boolean, default=False)  # Old World arboreals (Poecilotheria, etc.)
+    # IMPORTANT: Defaults are fail-safe. urticating_hairs defaults False so we
+    # never claim a species has hairs unless explicitly set; Old World species
+    # MUST have medically_significant_venom=True set explicitly at insert time.
+    # See import_obsidian_species.py and fix_old_world_species_flags.py — both
+    # classify by genus allow-list rather than relying on these defaults.
+    urticating_hairs = Column(Boolean, default=False)
+    medically_significant_venom = Column(Boolean, default=False)
 
     # Documentation
     care_guide = Column(Text)  # Markdown formatted care guide
