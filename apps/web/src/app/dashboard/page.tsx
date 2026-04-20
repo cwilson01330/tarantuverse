@@ -11,6 +11,7 @@ import DashboardTour from '@/components/DashboardTour'
 import AnnouncementBanner from '@/components/AnnouncementBanner'
 import UpgradeModal from '@/components/UpgradeModal'
 import PremoltAlertsCard from '@/components/PremoltAlertsCard'
+import { PlusCircle, LayoutGrid, LineChart, BookOpen, Egg, Upload } from 'lucide-react'
 
 interface Tarantula {
   id: string
@@ -593,20 +594,22 @@ export default function DashboardHub() {
               <h2 className="text-xl font-bold text-theme-primary mb-4">Quick Actions</h2>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { icon: '➕', label: 'Add Tarantula', action: handleAddTarantula },
-                  { icon: '🕷️', label: 'My Collection', action: () => router.push('/dashboard/tarantulas') },
-                  { icon: '📊', label: 'Analytics', action: () => router.push('/dashboard/analytics') },
-                  { icon: '📖', label: 'Species DB', action: () => router.push('/species') },
-                  { icon: '🥚', label: 'Breeding', action: () => router.push('/dashboard/breeding') },
-                  { icon: '📥', label: 'Import', action: () => router.push('/dashboard/tarantulas/import') },
+                  { Icon: PlusCircle, label: 'Add Tarantula', action: handleAddTarantula },
+                  { Icon: LayoutGrid, label: 'My Collection', action: () => router.push('/dashboard/tarantulas') },
+                  { Icon: LineChart, label: 'Analytics', action: () => router.push('/dashboard/analytics') },
+                  { Icon: BookOpen, label: 'Species DB', action: () => router.push('/species') },
+                  { Icon: Egg, label: 'Breeding', action: () => router.push('/dashboard/breeding') },
+                  { Icon: Upload, label: 'Import', action: () => router.push('/dashboard/tarantulas/import') },
                 ].map((item) => (
                   <button
                     key={item.label}
                     onClick={item.action}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl bg-surface-elevated hover:bg-gradient-brand hover:text-white transition-all group border border-theme"
+                    className="flex flex-col items-center justify-center gap-2 aspect-square rounded-xl bg-surface-elevated hover:bg-gradient-brand hover:text-white hover:border-transparent transition-all group border border-theme"
                   >
-                    <span className="text-2xl">{item.icon}</span>
-                    <span className="text-xs font-medium text-theme-secondary group-hover:text-white">{item.label}</span>
+                    <span className="flex items-center justify-center w-11 h-11 rounded-full bg-primary-soft group-hover:bg-white/20 transition-colors">
+                      <item.Icon className="w-6 h-6 text-primary group-hover:text-white transition-colors" strokeWidth={2} />
+                    </span>
+                    <span className="text-xs font-semibold text-theme-primary group-hover:text-white text-center leading-tight">{item.label}</span>
                   </button>
                 ))}
               </div>
