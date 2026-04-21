@@ -46,6 +46,11 @@ async def get_system_status(db: Session = Depends(get_db)):
         "maintenance_mode": settings_service.is_maintenance_mode(db),
         "maintenance_message": settings_service.get_maintenance_message(db),
         "registration_enabled": settings_service.is_feature_enabled(db, "registration"),
+        "features": {
+            "herpetoverse_app_enabled": settings_service.get(
+                db, "features.herpetoverse_app_enabled", False
+            ),
+        },
         "announcements": {
             "herpetoverse_banner": {
                 "enabled": settings_service.get(
