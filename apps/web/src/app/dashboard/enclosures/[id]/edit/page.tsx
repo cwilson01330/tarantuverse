@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -14,19 +14,45 @@ interface Species {
   common_names: string[]
 }
 
-export default function AddEnclosurePage() {
+interface Enclosure {
+  id: string
+  name: string
+  purpose?: string | null
+  is_communal: boolean
+  population_count: number | null
+  species_id: string | null
+  species_name?: string | null
+  enclosure_type: string | null
+  enclosure_size: string | null
+  substrate_type: string | null
+  substrate_depth: string | null
+  target_temp_min: number | string | null
+  target_temp_max: number | string | null
+  target_humidity_min: number | string | null
+  target_humidity_max: number | string | null
+  water_dish: boolean
+  misting_schedule: string | null
+  notes: string | null
+  photo_url: string | null
+}
+
+export default function EditEnclosurePage() {
   const router = useRouter()
-  const { user, token, isAuthenticated, isLoading } = useAuth()
+  const params = useParams()
+  const enclosureId = params.id as string
+  const { token, isAuthenticated, isLoading } = useAuth()
+
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Species search
+  // Species search (pre-populated from loaded enclosure)
   const [speciesSearch, setSpeciesSearch] = useState('')
   const [speciesResults, setSpeciesResults] = useState<Species[]>([])
   const [selectedSpecies, setSelectedSpecies] = useState<Species | null>(null)
-  const [searchingSpecies, setSearchingSpecies] = useState(false)
 
-  // Form data
+  // Form data (pre-filled after fetch)
   const [formData, setFormData] = useState({
     name: '',
     purpose: 'tarantula' as 'tarantula' | 'feeder',
@@ -45,31 +71,83 @@ export default function AddEnclosurePage() {
     notes: '',
   })
 
+  // Auth gate — wait for authLoading before deciding
   useEffect(() => {
     if (isLoading) return
-
     if (!isAuthenticated) {
       router.push('/login')
-      return
     }
   }, [router, isAuthenticated, isLoading])
 
-  // Search species
+  // Load existing enclosure
+  useEffect(() => {
+    if (isLoading || !token || !enclosureId) return
+
+    const loadEnclosure = async () => {
+      setLoading(true)
+      setLoadError(null)
+      try {
+        const res = await fetch(`${API_URL}/api/v1/enclosures/${enclosureId}`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+        if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error('Enclosure not found. It may have been deleted.')
+          }
+          if (res.status === 403) {
+            throw new Error("You don't have permission to edit this enclosure.")
+          }
+          throw new Error('Failed to load enclosure')
+        }
+        const data: Enclosure = await res.json()
+
+        setFormData({
+          name: data.name ?? '',
+          purpose: (data.purpose === 'feeder' ? 'feeder' : 'tarantula'),
+          is_communal: Boolean(data.is_communal),
+          population_count: data.population_count != null ? String(data.population_count) : '',
+          enclosure_type: data.enclosure_type ?? '',
+          enclosure_size: data.enclosure_size ?? '',
+          substrate_type: data.substrate_type ?? '',
+          substrate_depth: data.substrate_depth ?? '',
+          target_temp_min: data.target_temp_min != null ? String(data.target_temp_min) : '',
+          target_temp_max: data.target_temp_max != null ? String(data.target_temp_max) : '',
+          target_humidity_min: data.target_humidity_min != null ? String(data.target_humidity_min) : '',
+          target_humidity_max: data.target_humidity_max != null ? String(data.target_humidity_max) : '',
+          water_dish: data.water_dish ?? true,
+          misting_schedule: data.misting_schedule ?? '',
+          notes: data.notes ?? '',
+        })
+
+        if (data.species_id && data.species_name) {
+          setSelectedSpecies({
+            id: data.species_id,
+            scientific_name: data.species_name,
+            common_names: [],
+          })
+        }
+      } catch (err: any) {
+        setLoadError(err.message || 'Failed to load enclosure')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadEnclosure()
+  }, [enclosureId, token, isLoading])
+
+  // Species search
   useEffect(() => {
     const searchSpecies = async () => {
       if (speciesSearch.length < 2) {
         setSpeciesResults([])
         return
       }
-
-      setSearchingSpecies(true)
       try {
         const response = await fetch(
           `${API_URL}/api/v1/species/search?q=${encodeURIComponent(speciesSearch)}`,
           {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            headers: { 'Authorization': `Bearer ${token}` },
           }
         )
         if (response.ok) {
@@ -78,8 +156,6 @@ export default function AddEnclosurePage() {
         }
       } catch (err) {
         console.error('Species search error:', err)
-      } finally {
-        setSearchingSpecies(false)
       }
     }
 
@@ -114,8 +190,9 @@ export default function AddEnclosurePage() {
         notes: formData.notes || null,
       }
 
-      const response = await fetch(`${API_URL}/api/v1/enclosures/`, {
-        method: 'POST',
+      // Path-param endpoint — no trailing slash
+      const response = await fetch(`${API_URL}/api/v1/enclosures/${enclosureId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -124,14 +201,13 @@ export default function AddEnclosurePage() {
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Failed to create enclosure')
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.detail || 'Failed to update enclosure')
       }
 
-      const newEnclosure = await response.json()
-      router.push(`/dashboard/enclosures/${newEnclosure.id}`)
+      router.push(`/dashboard/enclosures/${enclosureId}`)
     } catch (err: any) {
-      setError(err.message || 'Failed to create enclosure')
+      setError(err.message || 'Failed to update enclosure')
     } finally {
       setSubmitting(false)
     }
@@ -145,11 +221,45 @@ export default function AddEnclosurePage() {
     }))
   }
 
-  if (isLoading) {
+  // Loading state — show spinner while auth or enclosure is loading
+  if (isLoading || loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Load error — show retry instead of silently bouncing back
+  if (loadError) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-3xl mx-auto px-4 py-8">
+          <Link
+            href="/dashboard/enclosures"
+            className="text-primary-600 dark:text-primary-400 hover:underline mb-4 inline-block"
+          >
+            &larr; Back to Enclosures
+          </Link>
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 mt-4">
+            <h2 className="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">
+              Couldn&apos;t load enclosure
+            </h2>
+            <p className="text-red-700 dark:text-red-400 mb-4">{loadError}</p>
+            <button
+              onClick={() => {
+                setLoadError(null)
+                // Trigger reload
+                setLoading(true)
+                setTimeout(() => window.location.reload(), 0)
+              }}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </DashboardLayout>
     )
@@ -161,16 +271,16 @@ export default function AddEnclosurePage() {
         {/* Header */}
         <div className="mb-8">
           <Link
-            href="/dashboard/enclosures"
+            href={`/dashboard/enclosures/${enclosureId}`}
             className="text-primary-600 dark:text-primary-400 hover:underline mb-4 inline-block"
           >
-            &larr; Back to Enclosures
+            &larr; Back to Enclosure
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Add New Enclosure
+            Edit Enclosure
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Create a new enclosure for your tarantula collection
+            Update the details for this enclosure
           </p>
         </div>
 
@@ -203,7 +313,7 @@ export default function AddEnclosurePage() {
                 />
               </div>
 
-              {/* Purpose selector — segments collection enclosures from feeder colonies */}
+              {/* Purpose selector */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Purpose *
@@ -280,50 +390,67 @@ export default function AddEnclosurePage() {
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    For communals where you don't track individuals separately
+                    For communals where you don&apos;t track individuals separately
                   </p>
                 </div>
               )}
 
-              {/* Species Search */}
-              <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Species (optional)
-                </label>
-                <input
-                  type="text"
-                  value={selectedSpecies ? selectedSpecies.scientific_name : speciesSearch}
-                  onChange={(e) => {
-                    setSpeciesSearch(e.target.value)
-                    setSelectedSpecies(null)
-                  }}
-                  placeholder="Search for species..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                {speciesResults.length > 0 && !selectedSpecies && (
-                  <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {speciesResults.map(species => (
+              {/* Species Search — hidden for feeder bins */}
+              {formData.purpose !== 'feeder' && (
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Species (optional)
+                  </label>
+                  {selectedSpecies ? (
+                    <div className="flex items-center justify-between p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                      <span className="text-gray-900 dark:text-white italic font-medium">
+                        {selectedSpecies.scientific_name}
+                      </span>
                       <button
-                        key={species.id}
                         type="button"
                         onClick={() => {
-                          setSelectedSpecies(species)
+                          setSelectedSpecies(null)
                           setSpeciesSearch('')
-                          setSpeciesResults([])
                         }}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                        className="text-sm text-red-600 dark:text-red-400 hover:underline"
                       >
-                        <span className="font-medium italic">{species.scientific_name}</span>
-                        {species.common_names?.[0] && (
-                          <span className="text-gray-500 dark:text-gray-400 ml-2">
-                            ({species.common_names[0]})
-                          </span>
-                        )}
+                        Change
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={speciesSearch}
+                      onChange={(e) => setSpeciesSearch(e.target.value)}
+                      placeholder="Search for species..."
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  )}
+                  {speciesResults.length > 0 && !selectedSpecies && (
+                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {speciesResults.map(species => (
+                        <button
+                          key={species.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSpecies(species)
+                            setSpeciesSearch('')
+                            setSpeciesResults([])
+                          }}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          <span className="font-medium italic">{species.scientific_name}</span>
+                          {species.common_names?.[0] && (
+                            <span className="text-gray-500 dark:text-gray-400 ml-2">
+                              ({species.common_names[0]})
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -511,7 +638,7 @@ export default function AddEnclosurePage() {
           {/* Submit */}
           <div className="flex justify-end gap-4">
             <Link
-              href="/dashboard/enclosures"
+              href={`/dashboard/enclosures/${enclosureId}`}
               className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition"
             >
               Cancel
@@ -521,7 +648,7 @@ export default function AddEnclosurePage() {
               disabled={submitting || !formData.name}
               className="px-6 py-2 bg-gradient-to-r from-blue-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? 'Creating...' : 'Create Enclosure'}
+              {submitting ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

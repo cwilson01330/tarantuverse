@@ -14,6 +14,10 @@ class EnclosureBase(BaseModel):
     is_communal: bool = False
     population_count: Optional[int] = None
 
+    # Purpose — segments enclosures between tarantula collection and feeder colonies.
+    # Values: 'tarantula' (default) | 'feeder'. Matches enclosures.purpose DB column.
+    purpose: Optional[str] = Field("tarantula", pattern="^(tarantula|feeder)$")
+
     # Enclosure properties
     enclosure_type: Optional[str] = Field(None, pattern="^(terrestrial|arboreal|fossorial)$")
     enclosure_size: Optional[str] = Field(None, max_length=50)
@@ -40,6 +44,7 @@ class EnclosureUpdate(BaseModel):
     is_communal: Optional[bool] = None
     species_id: Optional[uuid.UUID] = None
     population_count: Optional[int] = None
+    purpose: Optional[str] = Field(None, pattern="^(tarantula|feeder)$")
     enclosure_type: Optional[str] = Field(None, pattern="^(terrestrial|arboreal|fossorial)$")
     enclosure_size: Optional[str] = Field(None, max_length=50)
     substrate_type: Optional[str] = Field(None, max_length=100)
@@ -80,6 +85,7 @@ class EnclosureListResponse(BaseModel):
     name: str
     is_communal: bool
     population_count: Optional[int] = None
+    purpose: Optional[str] = "tarantula"
     species_name: Optional[str] = None
     inhabitant_count: int = 0
     days_since_last_feeding: Optional[int] = None
