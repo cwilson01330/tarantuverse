@@ -32,6 +32,7 @@ from app.models.communal_incident import CommunalIncident
 from app.models.feeder_species import FeederSpecies
 from app.models.feeder_colony import FeederColony
 from app.models.feeder_care_log import FeederCareLog
+from app.models.waitlist import WaitlistSignup
 
 __all__ = [
     "User",
@@ -70,4 +71,5 @@ __all__ = [
     "FeederSpecies",
     "FeederColony",
     "FeederCareLog",
+    "WaitlistSignup",
 ]
