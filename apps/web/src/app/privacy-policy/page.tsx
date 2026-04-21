@@ -30,21 +30,22 @@ export default function PrivacyPolicyPage() {
 
       {/* Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-4xl font-bold mb-8 text-gray-900 dark:text-white">Privacy Policy</h1>
+        <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">Privacy Policy</h1>
+        <p className="text-gray-600 dark:text-gray-400 mb-8">
+          <strong>Last Updated:</strong> April 21, 2026 &nbsp;·&nbsp; <strong>Effective:</strong> April 21, 2026
+        </p>
 
         <div className="prose prose-lg dark:prose-invert max-w-none">
-          <p className="text-gray-600 dark:text-gray-400 mb-8">
-            <strong>Effective Date:</strong> December 9, 2024<br />
-            <strong>Last Updated:</strong> December 9, 2024
-          </p>
-
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">1. Introduction</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">1. Who We Are</h2>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              Welcome to Tarantuverse ("we," "our," or "us"). We are committed to protecting your privacy and ensuring you have a positive experience on our platform. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application and website (collectively, the "Services").
+              Tarantuverse is operated by <strong>Appalachian Tarantulas, LLC</strong>, a Tennessee limited liability company (&ldquo;Appalachian Tarantulas,&rdquo; &ldquo;we,&rdquo; &ldquo;us,&rdquo; or &ldquo;our&rdquo;). For purposes of the EU and UK General Data Protection Regulation, Appalachian Tarantulas, LLC is the &ldquo;controller&rdquo; of personal data collected through the Service.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              This Privacy Policy describes how we collect, use, disclose, and safeguard personal information when you use the Tarantuverse website, mobile applications, and related services (collectively, the &ldquo;Service&rdquo;). It should be read together with our <Link href="/terms" className="text-purple-600 dark:text-purple-400 hover:underline">Terms of Service</Link>.
             </p>
             <p className="text-gray-700 dark:text-gray-300">
-              By using Tarantuverse, you agree to the collection and use of information in accordance with this policy. If you do not agree with our policies and practices, please do not use our Services.
+              Questions? Contact us at <a href="mailto:privacy@tarantuverse.com" className="text-purple-600 dark:text-purple-400 hover:underline">privacy@tarantuverse.com</a>.
             </p>
           </section>
 
@@ -52,27 +53,28 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">2. Information We Collect</h2>
 
             <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">2.1 Information You Provide</h3>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">We collect information that you voluntarily provide when using our Services:</p>
             <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li><strong>Account Information:</strong> Email address, username, password (encrypted), display name</li>
-              <li><strong>Profile Information:</strong> Bio, location, experience level, years keeping, specialties, social media links, avatar image</li>
-              <li><strong>Collection Data:</strong> Information about your tarantulas including names, species, photos, husbandry details, feeding logs, molt records, substrate changes</li>
-              <li><strong>Breeding Records:</strong> Pairing information, egg sac data, offspring records (if using premium features)</li>
-              <li><strong>Community Content:</strong> Forum posts, messages, comments, reactions, photos you upload</li>
-              <li><strong>Payment Information:</strong> Processed securely through third-party payment processors (we do not store payment card details)</li>
+              <li><strong>Account information:</strong> email address, username, password (stored only as a bcrypt hash), display name.</li>
+              <li><strong>Profile information:</strong> bio, location (free-text, not precise geolocation), experience level, years keeping, specialties, social-media links, avatar image.</li>
+              <li><strong>Collection data:</strong> your tarantulas and enclosures, including names, species associations, photos, husbandry details, feeding logs, molt records, substrate changes, and any free-text notes you add.</li>
+              <li><strong>Breeding records:</strong> pairing information, egg-sac data, offspring records.</li>
+              <li><strong>Community content:</strong> forum posts, direct messages, comments, reactions, and photos you choose to share.</li>
+              <li><strong>Species submissions:</strong> if you submit species data to the community database.</li>
+              <li><strong>Support communications:</strong> the contents of messages you send us (email, contact form).</li>
+              <li><strong>Payment information:</strong> if and when we enable paid Subscriptions, card details are handled by our third-party payment processor; we receive limited billing metadata (such as last four digits, brand, and transaction IDs) but do not store full card numbers.</li>
             </ul>
 
-            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">2.2 Automatically Collected Information</h3>
+            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">2.2 Information Collected Automatically</h3>
             <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li><strong>Device Information:</strong> Device type, operating system, unique device identifiers</li>
-              <li><strong>Usage Data:</strong> Features used, pages viewed, time spent, interactions with the app</li>
-              <li><strong>Log Data:</strong> IP address, browser type, access times, referring pages</li>
-              <li><strong>Push Notification Tokens:</strong> If you enable notifications (can be disabled in settings)</li>
+              <li><strong>Device and connection information:</strong> device type, operating system, app version, browser type, IP address, and approximate location derived from IP.</li>
+              <li><strong>Usage information:</strong> pages and screens you view, features you use, actions you take, timestamps, and referring URLs.</li>
+              <li><strong>Log data:</strong> server logs including request paths, status codes, and error traces, used for debugging, security, and abuse prevention.</li>
+              <li><strong>Push notification tokens:</strong> if you enable notifications on mobile, we store the Expo push token associated with your device so we can send notifications you&rsquo;ve opted in to.</li>
             </ul>
 
-            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">2.3 Information from Third Parties</h3>
+            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">2.3 Information From Third Parties</h3>
             <p className="text-gray-700 dark:text-gray-300">
-              If you sign in using OAuth providers (Google, Apple, GitHub), we receive basic profile information such as your name, email address, and profile picture from those services.
+              If you sign in using an OAuth provider such as Google, Apple, or GitHub, we receive a limited profile payload from that provider (typically your name, email address, and profile picture). We do not receive passwords from these providers.
             </p>
           </section>
 
@@ -80,177 +82,219 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">3. How We Use Your Information</h2>
             <p className="text-gray-700 dark:text-gray-300 mb-4">We use the information we collect to:</p>
             <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li>Provide, maintain, and improve our Services</li>
-              <li>Create and manage your account</li>
-              <li>Enable you to track your tarantula collection and husbandry data</li>
-              <li>Facilitate community features (forums, messaging, profiles)</li>
-              <li>Send you notifications about feeding reminders, messages, and community activity (if enabled)</li>
-              <li>Process payments and manage subscriptions</li>
-              <li>Respond to your comments, questions, and customer service requests</li>
-              <li>Analyze usage patterns to improve user experience</li>
-              <li>Detect, prevent, and address technical issues and security threats</li>
-              <li>Comply with legal obligations</li>
+              <li>Provide, operate, and maintain the Service, including creating and managing your account;</li>
+              <li>Enable you to record and track husbandry data for animals in your care;</li>
+              <li>Power community features (forums, profiles, follows, direct messages, activity feed);</li>
+              <li>Generate algorithmic features such as premolt prediction and feeding reminders from your own logs;</li>
+              <li>Send transactional and service-related communications (password resets, receipts, security alerts, reminders you opted in to);</li>
+              <li>Process payments and manage Subscriptions;</li>
+              <li>Respond to support requests and feedback;</li>
+              <li>Measure and analyze usage to fix bugs, improve performance, and develop new features;</li>
+              <li>Detect, investigate, and prevent abuse, fraud, and security incidents;</li>
+              <li>Comply with legal obligations and enforce our Terms of Service.</li>
             </ul>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">4. Information Sharing and Disclosure</h2>
-
-            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">4.1 What We Share</h3>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">We do NOT sell your personal information. We may share your information in the following circumstances:</p>
-            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li><strong>Public Profile Information:</strong> If you set your collection to "public," other users can view your profile, collection, and activity. You control this in settings.</li>
-              <li><strong>Community Features:</strong> Forum posts, messages, and public comments are visible to other users</li>
-              <li><strong>Service Providers:</strong> We work with third-party service providers (hosting, analytics, payment processing) who need access to your information to perform services on our behalf. They are bound by confidentiality obligations.</li>
-              <li><strong>Legal Requirements:</strong> We may disclose information if required by law, court order, or government request</li>
-              <li><strong>Business Transfers:</strong> In the event of a merger, acquisition, or sale of assets, your information may be transferred</li>
-              <li><strong>With Your Consent:</strong> We may share information for any other purpose with your explicit consent</li>
-            </ul>
-
-            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">4.2 What We NEVER Share</h3>
-            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li>Your email address (kept private)</li>
-              <li>Prices you paid for tarantulas</li>
-              <li>Private notes on your collection</li>
-              <li>Direct messages (except to the intended recipient)</li>
-              <li>Payment information (handled by third-party processors)</li>
-            </ul>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">5. Data Storage and Security</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">4. Legal Bases for Processing (EU/UK Users)</h2>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              We implement appropriate technical and organizational security measures to protect your information:
+              If you are in the European Economic Area, United Kingdom, or Switzerland, we rely on the following legal bases under GDPR/UK GDPR:
             </p>
             <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li>Passwords are encrypted using industry-standard bcrypt hashing</li>
-              <li>Data transmitted over HTTPS/TLS encryption</li>
-              <li>Secure cloud infrastructure (Neon PostgreSQL, Cloudflare R2)</li>
-              <li>Regular security updates and monitoring</li>
-              <li>Access controls and authentication requirements</li>
+              <li><strong>Performance of a contract</strong> — to provide the Service you signed up for and fulfill our Terms.</li>
+              <li><strong>Legitimate interests</strong> — to operate, secure, and improve the Service, prevent abuse, and communicate with users about the Service, balanced against your rights.</li>
+              <li><strong>Consent</strong> — for optional features such as push notifications, marketing emails, or any future use of non-essential cookies. You can withdraw consent at any time.</li>
+              <li><strong>Legal obligation</strong> — to comply with applicable laws, respond to lawful requests, and meet regulatory requirements.</li>
             </ul>
-            <p className="text-gray-700 dark:text-gray-300">
-              However, no method of transmission over the Internet or electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your information, we cannot guarantee absolute security.
-            </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">6. Your Privacy Rights and Choices</h2>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">You have the following rights regarding your information:</p>
-            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li><strong>Access:</strong> View and download your data at any time through your account settings</li>
-              <li><strong>Correction:</strong> Update or correct your information in your profile settings</li>
-              <li><strong>Deletion:</strong> Delete your account and all associated data (this action is permanent)</li>
-              <li><strong>Privacy Controls:</strong> Set your collection to private or public</li>
-              <li><strong>Notification Preferences:</strong> Control which notifications you receive</li>
-              <li><strong>Email Preferences:</strong> Opt out of promotional emails (account-related emails may still be sent)</li>
-              <li><strong>Data Portability:</strong> Export your data in standard formats (available in settings)</li>
-            </ul>
-            <p className="text-gray-700 dark:text-gray-300">
-              To exercise these rights, visit your account settings or contact us at privacy@tarantuverse.com.
-            </p>
-          </section>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">5. How We Share Information</h2>
 
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">7. Children's Privacy</h2>
-            <p className="text-gray-700 dark:text-gray-300">
-              Our Services are not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us at privacy@tarantuverse.com and we will delete such information from our systems.
-            </p>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">8. International Data Transfers</h2>
-            <p className="text-gray-700 dark:text-gray-300">
-              Your information may be transferred to and maintained on servers located outside of your state, province, country, or other governmental jurisdiction where data protection laws may differ. By using our Services, you consent to the transfer of your information to the United States and other countries where we operate.
-            </p>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">9. Data Retention</h2>
-            <p className="text-gray-700 dark:text-gray-300">
-              We retain your information for as long as your account is active or as needed to provide Services. If you delete your account, we will delete your personal information within 30 days, except where we are required to retain it for legal, regulatory, or security purposes. Anonymous, aggregated data may be retained for analytics purposes.
-            </p>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">10. Third-Party Services</h2>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">Our Services may contain links to third-party websites or integrate with third-party services:</p>
-            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li><strong>OAuth Providers:</strong> Google, Apple, GitHub (subject to their own privacy policies)</li>
-              <li><strong>Payment Processors:</strong> Stripe, PayPal (we do not handle payment card data directly)</li>
-              <li><strong>Cloud Services:</strong> Neon (database), Cloudflare (storage, CDN), Render (hosting)</li>
-              <li><strong>Analytics:</strong> Vercel Analytics (anonymized usage data)</li>
-            </ul>
-            <p className="text-gray-700 dark:text-gray-300">
-              We are not responsible for the privacy practices of these third parties. We encourage you to read their privacy policies.
-            </p>
-          </section>
-
-          <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">11. California Privacy Rights (CCPA)</h2>
+            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">5.1 We Do Not Sell Personal Information</h3>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              If you are a California resident, you have additional rights under the California Consumer Privacy Act (CCPA):
+              We do not sell your personal information and we do not share it for cross-context behavioral advertising, as those terms are defined under the California Consumer Privacy Act (CCPA/CPRA).
+            </p>
+
+            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">5.2 When We Share</h3>
+            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
+              <li><strong>Public profile content:</strong> if you set your collection to public, your profile, collection, and activity are visible to other users and may be indexed by search engines. You control this in Settings.</li>
+              <li><strong>Community features:</strong> forum posts, public comments, and community submissions are visible to other users. Direct messages are visible only to you and the recipient.</li>
+              <li><strong>Service providers:</strong> we use the vendors listed in Section 10 to host, store, secure, and operate the Service. They may process personal data on our behalf under written agreements limiting how they use it.</li>
+              <li><strong>Legal and safety:</strong> we may disclose information if we believe in good faith it is necessary to comply with law, legal process, or enforceable government request, to enforce our Terms, or to protect the rights, property, or safety of any person.</li>
+              <li><strong>Business transfers:</strong> if Appalachian Tarantulas, LLC is involved in a merger, acquisition, financing, or sale of assets, your information may be transferred as part of that transaction; we will provide notice before personal data becomes subject to a different privacy policy.</li>
+              <li><strong>With your consent:</strong> we may share information for any other purpose with your explicit consent.</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">5.3 What We Never Share</h3>
+            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
+              <li>Your email address with other users (kept private on your profile);</li>
+              <li>Prices you paid for your animals;</li>
+              <li>Private notes on your collection;</li>
+              <li>Contents of your direct messages (beyond the intended recipient);</li>
+              <li>Payment card numbers (handled directly by our payment processor).</li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">6. Analytics and Cookies</h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              We use cookies and similar technologies (such as local storage on the web and secure device storage on mobile) to keep you signed in, remember your preferences (for example, theme), and measure how the Service is used.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              We use product-analytics tooling (currently PostHog) to understand aggregate usage and improve the Service. Where required by law, we will request your consent before loading non-essential analytics or cookies. You can generally block or delete cookies through your browser settings; doing so may affect core Service functionality such as staying signed in.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300">
+              We do not currently respond to Do Not Track (DNT) signals because there is no industry consensus on how to interpret them. We do honor applicable Global Privacy Control (GPC) signals as opt-out-of-sale requests.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">7. Data Security</h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              We use commercially reasonable technical and organizational measures to protect personal information, including:
             </p>
             <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li>Right to know what personal information is collected, used, shared, or sold</li>
-              <li>Right to delete personal information</li>
-              <li>Right to opt-out of the sale of personal information (we do not sell personal information)</li>
-              <li>Right to non-discrimination for exercising your rights</li>
+              <li>Passwords stored as bcrypt hashes, never in plaintext;</li>
+              <li>JWT authentication with short token lifetimes and server-side revocation on logout;</li>
+              <li>HTTPS/TLS in transit;</li>
+              <li>Rate limiting, input validation, and content-type verification on uploads;</li>
+              <li>Managed cloud infrastructure with ongoing security updates;</li>
+              <li>Role-based access controls for administrative functions.</li>
             </ul>
             <p className="text-gray-700 dark:text-gray-300">
-              To exercise these rights, contact us at privacy@tarantuverse.com.
+              No method of transmission or storage is perfectly secure. While we work to protect your information, we cannot guarantee absolute security. If we become aware of a personal-data breach affecting you, we will notify you as required by applicable law.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">12. European Privacy Rights (GDPR)</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">8. Data Retention</h2>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              If you are in the European Economic Area (EEA), you have rights under the General Data Protection Regulation (GDPR):
+              We retain your information for as long as your account is active or as needed to provide the Service. If you delete your account through <Link href="/delete-account" className="text-purple-600 dark:text-purple-400 hover:underline">/delete-account</Link>, we permanently remove your personal data within thirty (30) days, except where we are required to keep it longer to comply with legal, tax, regulatory, or security obligations, to resolve disputes, or to enforce our agreements.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300">
+              Aggregated or de-identified information that can no longer reasonably be linked to you may be retained and used indefinitely. Log data and backups are rotated on normal operational schedules.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">9. International Data Transfers</h2>
+            <p className="text-gray-700 dark:text-gray-300">
+              Appalachian Tarantulas, LLC is based in the United States and our infrastructure is primarily located in the United States. If you access the Service from outside the U.S., your information will be transferred to, stored, and processed in the U.S. and other countries where our service providers operate. Where required, we rely on appropriate safeguards (such as the European Commission&rsquo;s Standard Contractual Clauses) for cross-border transfers of personal data from the EEA, UK, or Switzerland.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">10. Third-Party Service Providers</h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              We rely on the following categories of service providers. Each processes only the personal data needed to perform its function and is bound by contractual confidentiality obligations.
             </p>
             <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
-              <li>Right of access to your personal data</li>
-              <li>Right to rectification of inaccurate data</li>
-              <li>Right to erasure ("right to be forgotten")</li>
-              <li>Right to restrict processing</li>
-              <li>Right to data portability</li>
-              <li>Right to object to processing</li>
-              <li>Right to withdraw consent</li>
+              <li><strong>Hosting and compute:</strong> Render (API hosting), Vercel (web hosting).</li>
+              <li><strong>Database:</strong> Neon (PostgreSQL).</li>
+              <li><strong>Object storage / CDN:</strong> Cloudflare R2 (photos, thumbnails, file storage).</li>
+              <li><strong>Email delivery:</strong> Resend (password resets, notifications, transactional email).</li>
+              <li><strong>Push notifications:</strong> Expo Push Notification Service (mobile notifications).</li>
+              <li><strong>OAuth providers:</strong> Google, Apple, GitHub (optional sign-in).</li>
+              <li><strong>Product analytics:</strong> PostHog.</li>
+              <li><strong>Payment processing:</strong> to be announced when paid Subscriptions launch; updates will be reflected in this policy.</li>
             </ul>
             <p className="text-gray-700 dark:text-gray-300">
-              To exercise these rights or make a complaint to a supervisory authority, contact us at privacy@tarantuverse.com.
+              These providers have their own privacy policies governing how they process information on their infrastructure. We are not responsible for their acts or omissions.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">13. Changes to This Privacy Policy</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">11. Your Choices and Rights</h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">You can exercise many rights directly in the Service:</p>
+            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
+              <li><strong>Access and portability:</strong> download your data from <Link href="/dashboard/settings/data-export" className="text-purple-600 dark:text-purple-400 hover:underline">Settings → Data Export</Link> in JSON, CSV, or a full ZIP including photos.</li>
+              <li><strong>Correction:</strong> edit your profile, tarantulas, logs, and other records from the dashboard.</li>
+              <li><strong>Deletion:</strong> permanently delete your account and personal data at <Link href="/delete-account" className="text-purple-600 dark:text-purple-400 hover:underline">/delete-account</Link>.</li>
+              <li><strong>Visibility:</strong> set your collection to private or public in Settings.</li>
+              <li><strong>Notifications:</strong> manage push, email, and in-app notifications from <Link href="/dashboard/settings/notifications" className="text-purple-600 dark:text-purple-400 hover:underline">Settings → Notifications</Link>.</li>
+              <li><strong>Marketing email:</strong> you can opt out of promotional messages using the unsubscribe link in any marketing email; transactional messages (security, account, billing) will continue to be sent.</li>
+            </ul>
             <p className="text-gray-700 dark:text-gray-300">
-              We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date. For material changes, we will provide additional notice (such as an email notification or in-app alert). Your continued use of the Services after changes are posted constitutes acceptance of the updated policy.
+              You can also email <a href="mailto:privacy@tarantuverse.com" className="text-purple-600 dark:text-purple-400 hover:underline">privacy@tarantuverse.com</a> to exercise any privacy right. We will respond within the timeframes required by applicable law.
             </p>
           </section>
 
           <section className="mb-8">
-            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">14. Contact Us</h2>
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">12. California Privacy Rights (CCPA/CPRA)</h2>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              If you have questions, concerns, or requests regarding this Privacy Policy or our privacy practices, please contact us:
+              If you are a California resident, you have the right to:
+            </p>
+            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
+              <li>Know what personal information we collect, the sources and purposes of collection, and the categories of third parties we share it with;</li>
+              <li>Request a copy of the specific pieces of personal information we hold about you;</li>
+              <li>Request correction of inaccurate personal information;</li>
+              <li>Request deletion of your personal information, subject to certain exceptions;</li>
+              <li>Limit the use and disclosure of &ldquo;sensitive personal information,&rdquo; although we do not use such information for any purpose beyond what is permitted without the right to limit;</li>
+              <li>Opt out of the &ldquo;sale&rdquo; or &ldquo;sharing&rdquo; of personal information — we do not sell or share personal information for cross-context behavioral advertising;</li>
+              <li>Be free from retaliation for exercising your rights.</li>
+            </ul>
+            <p className="text-gray-700 dark:text-gray-300">
+              To exercise these rights, email <a href="mailto:privacy@tarantuverse.com" className="text-purple-600 dark:text-purple-400 hover:underline">privacy@tarantuverse.com</a>. You may designate an authorized agent to act on your behalf; we will verify the agent&rsquo;s authority before processing the request.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">13. EEA / UK / Swiss Privacy Rights (GDPR)</h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              If you are in the EEA, UK, or Switzerland, you have the following rights under GDPR and UK GDPR:
+            </p>
+            <ul className="list-disc pl-6 mb-4 text-gray-700 dark:text-gray-300 space-y-2">
+              <li>Right of access to your personal data;</li>
+              <li>Right to rectification of inaccurate data;</li>
+              <li>Right to erasure (&ldquo;right to be forgotten&rdquo;);</li>
+              <li>Right to restrict processing;</li>
+              <li>Right to data portability;</li>
+              <li>Right to object to processing based on legitimate interests;</li>
+              <li>Right to withdraw consent at any time, without affecting the lawfulness of processing based on consent before its withdrawal;</li>
+              <li>Right to lodge a complaint with your local supervisory authority.</li>
+            </ul>
+            <p className="text-gray-700 dark:text-gray-300">
+              Email <a href="mailto:privacy@tarantuverse.com" className="text-purple-600 dark:text-purple-400 hover:underline">privacy@tarantuverse.com</a> to exercise any of these rights.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">14. Children&rsquo;s Privacy</h2>
+            <p className="text-gray-700 dark:text-gray-300">
+              The Service is not directed to children under 13, and we do not knowingly collect personal information from children under 13. Users between 13 and the age of majority in their jurisdiction may use the Service only with the involvement and consent of a parent or legal guardian. If you believe a child under 13 has provided personal information to us, please contact <a href="mailto:privacy@tarantuverse.com" className="text-purple-600 dark:text-purple-400 hover:underline">privacy@tarantuverse.com</a> and we will delete the information promptly.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">15. Changes to This Policy</h2>
+            <p className="text-gray-700 dark:text-gray-300">
+              We may update this Privacy Policy from time to time. When we do, we will update the &ldquo;Last Updated&rdquo; date at the top. For material changes that affect your rights, we will provide additional notice such as an in-app alert or email to the address associated with your account. Your continued use of the Service after the changes take effect means you accept the updated policy. If you do not agree to the updated policy, you should stop using the Service and may delete your account.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white">16. Contact Us</h2>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              For privacy questions, complaints, or to exercise your rights, contact us at:
             </p>
             <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
               <p className="text-gray-700 dark:text-gray-300 mb-2">
-                <strong>Email:</strong> <a href="mailto:privacy@tarantuverse.com" className="text-purple-600 dark:text-purple-400 hover:underline">privacy@tarantuverse.com</a>
+                <strong>Privacy:</strong> <a href="mailto:privacy@tarantuverse.com" className="text-purple-600 dark:text-purple-400 hover:underline">privacy@tarantuverse.com</a>
               </p>
               <p className="text-gray-700 dark:text-gray-300 mb-2">
                 <strong>Support:</strong> <a href="mailto:support@tarantuverse.com" className="text-purple-600 dark:text-purple-400 hover:underline">support@tarantuverse.com</a>
               </p>
-              <p className="text-gray-700 dark:text-gray-300">
-                <strong>Tarantuverse</strong><br />
-                Tarantula Husbandry Tracking Platform<br />
-                Website: <a href="https://tarantuverse.vercel.app" className="text-purple-600 dark:text-purple-400 hover:underline">tarantuverse.vercel.app</a>
+              <p className="text-gray-700 dark:text-gray-300 mt-4">
+                <strong>Appalachian Tarantulas, LLC</strong><br />
+                Tennessee, USA
               </p>
             </div>
           </section>
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-8 mt-8">
             <p className="text-gray-600 dark:text-gray-400 text-sm">
-              By using Tarantuverse, you acknowledge that you have read and understood this Privacy Policy and agree to its terms.
+              By using Tarantuverse, you acknowledge that you have read and understood this Privacy Policy.
             </p>
           </div>
         </div>
@@ -270,16 +314,20 @@ export default function PrivacyPolicyPage() {
       <footer className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-600 dark:text-gray-400 text-sm">
-            <p className="mb-2">© 2024 Tarantuverse. All rights reserved.</p>
+            <p className="mb-2">&copy; 2026 Appalachian Tarantulas, LLC. All rights reserved.</p>
             <div className="flex justify-center gap-4">
               <Link href="/privacy-policy" className="hover:text-purple-600 dark:hover:text-purple-400">
                 Privacy Policy
               </Link>
-              <span>•</span>
+              <span>&bull;</span>
+              <Link href="/terms" className="hover:text-purple-600 dark:hover:text-purple-400">
+                Terms of Service
+              </Link>
+              <span>&bull;</span>
               <Link href="/contact" className="hover:text-purple-600 dark:hover:text-purple-400">
                 Contact
               </Link>
-              <span>•</span>
+              <span>&bull;</span>
               <Link href="/help" className="hover:text-purple-600 dark:hover:text-purple-400">
                 Help
               </Link>
