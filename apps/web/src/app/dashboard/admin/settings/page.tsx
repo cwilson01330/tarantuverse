@@ -40,9 +40,14 @@ const CATEGORY_META: Record<string, { label: string; icon: string; description: 
     icon: '🔔',
     description: 'Default notification preferences and global quiet hours.',
   },
+  announcements: {
+    label: 'Announcements',
+    icon: '📣',
+    description: 'Cross-promo and platform-wide banners shown inside the dashboard.',
+  },
 }
 
-const CATEGORY_ORDER = ['maintenance', 'feature_flags', 'platform_limits', 'notifications']
+const CATEGORY_ORDER = ['maintenance', 'announcements', 'feature_flags', 'platform_limits', 'notifications']
 
 export default function AdminSettingsPage() {
   const router = useRouter()

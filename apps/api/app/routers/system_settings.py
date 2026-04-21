@@ -38,13 +38,31 @@ class BulkSettingUpdate(BaseModel):
 @router.get("/system/status")
 async def get_system_status(db: Session = Depends(get_db)):
     """
-    Public endpoint — returns maintenance mode status and message.
-    Used by frontends to display a maintenance banner.
+    Public endpoint — returns maintenance mode status and any active
+    cross-platform announcements the frontend needs to render.
+    Used by frontends to display maintenance + announcement banners.
     """
     return {
         "maintenance_mode": settings_service.is_maintenance_mode(db),
         "maintenance_message": settings_service.get_maintenance_message(db),
         "registration_enabled": settings_service.is_feature_enabled(db, "registration"),
+        "announcements": {
+            "herpetoverse_banner": {
+                "enabled": settings_service.get(
+                    db, "announcements.herpetoverse_banner_enabled", False
+                ),
+                "message": settings_service.get(
+                    db,
+                    "announcements.herpetoverse_banner_message",
+                    "",
+                ),
+                "url": settings_service.get(
+                    db,
+                    "announcements.herpetoverse_banner_url",
+                    "https://www.herpetoverse.com",
+                ),
+            }
+        },
     }
 
 

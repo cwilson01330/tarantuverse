@@ -3,6 +3,7 @@
 import { useState, useEffect, ReactNode } from 'react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
+import HerpetoverseBanner from './HerpetoverseBanner'
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -48,6 +49,9 @@ export default function DashboardLayout({ children, userName, userEmail, userAva
           userAvatar={userAvatar}
           onMenuClick={() => setSidebarOpen(true)}
         />
+
+        {/* Admin-toggled announcement banner (Herpetoverse cross-promo, etc.) */}
+        <HerpetoverseBanner />
 
         {/* Page content */}
         <main className="min-h-[calc(100vh-4rem)]">
