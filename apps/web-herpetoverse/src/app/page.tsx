@@ -37,14 +37,41 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 py-16">
-      <div className="w-full max-w-xl">
+    <main className="relative min-h-screen flex items-center justify-center px-6 py-16 overflow-hidden">
+      {/* Ambient brand glow, sits behind content */}
+      <div
+        aria-hidden="true"
+        className="herp-hero-glow absolute inset-0 pointer-events-none"
+      />
+
+      <div className="relative w-full max-w-xl">
+        {/* Herpetoverse mark — gecko inside the brand ring, gradient green→teal.
+            The SVG ring is part of the mark itself, no extra container needed. */}
+        <div className="mb-10 flex items-center gap-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.svg"
+            alt="Herpetoverse"
+            width={72}
+            height={75}
+            className="drop-shadow-[0_0_24px_rgba(0,229,255,0.25)]"
+          />
+          <div>
+            <p className="text-xs tracking-[0.2em] uppercase text-herp-teal/90 font-medium">
+              Same universe
+            </p>
+            <p className="text-xs tracking-[0.2em] uppercase text-herp-green/90 font-medium">
+              Different species
+            </p>
+          </div>
+        </div>
+
         <div className="mb-12">
-          <p className="text-sm tracking-widest uppercase text-emerald-400/80 mb-4">
+          <p className="text-xs tracking-[0.2em] uppercase text-herp-lime mb-4 font-medium">
             Coming soon
           </p>
-          <h1 className="font-serif text-5xl sm:text-6xl font-normal leading-tight mb-6 text-white">
-            Herpetoverse
+          <h1 className="text-5xl sm:text-6xl font-bold tracking-wide leading-tight mb-6">
+            <span className="herp-gradient-text">Herpetoverse</span>
           </h1>
           <p className="text-lg sm:text-xl text-neutral-300 leading-relaxed">
             A husbandry platform for reptile keepers. Track environments, record
@@ -62,7 +89,7 @@ export default function Home() {
             <div
               role="status"
               aria-live="polite"
-              className="p-4 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+              className="p-4 rounded-md border border-herp-green/40 bg-herp-green/10 text-herp-lime"
             >
               You&rsquo;re on the list. Watch your inbox — we&rsquo;ll let you know
               the moment Herpetoverse is live.
@@ -81,12 +108,12 @@ export default function Home() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={status === 'submitting'}
-                className="flex-1 px-4 py-3 rounded-md bg-neutral-900 border border-neutral-700 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent disabled:opacity-50"
+                className="flex-1 px-4 py-3 rounded-md bg-neutral-900 border border-neutral-700 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-herp-teal focus:border-transparent disabled:opacity-50"
               />
               <button
                 type="submit"
                 disabled={status === 'submitting'}
-                className="px-6 py-3 rounded-md bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 rounded-md bg-herp-gradient text-herp-dark font-semibold tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {status === 'submitting' ? 'Signing up…' : 'Notify me'}
               </button>
@@ -116,7 +143,7 @@ export default function Home() {
               href="https://tarantuverse.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-emerald-400 hover:text-emerald-300 underline underline-offset-4"
+              className="text-herp-teal hover:text-herp-lime underline underline-offset-4 transition-colors"
             >
               Tarantuverse
             </a>
