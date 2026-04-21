@@ -33,6 +33,10 @@ from app.models.feeder_species import FeederSpecies
 from app.models.feeder_colony import FeederColony
 from app.models.feeder_care_log import FeederCareLog
 from app.models.waitlist import WaitlistSignup
+# Herpetoverse v1 (ADR-002 parallel taxon tables) — reptile_species MUST be
+# imported before snake so SQLAlchemy sees the target of the FK.
+from app.models.reptile_species import ReptileSpecies
+from app.models.snake import Snake
 
 __all__ = [
     "User",
@@ -72,4 +76,6 @@ __all__ = [
     "FeederColony",
     "FeederCareLog",
     "WaitlistSignup",
+    "ReptileSpecies",
+    "Snake",
 ]
