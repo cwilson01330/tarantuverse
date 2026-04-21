@@ -14,8 +14,10 @@ class EnclosureBase(BaseModel):
     is_communal: bool = False
     population_count: Optional[int] = None
 
-    # Purpose — segments enclosures between tarantula collection and feeder colonies.
-    # Values: 'tarantula' (default) | 'feeder'. Matches enclosures.purpose DB column.
+    # Purpose — lightweight tag on the enclosure itself. Values: 'tarantula' | 'feeder'.
+    # This is an enclosure-level flag, NOT the same as the FeederColony subsystem
+    # (which tracks biological populations + care logs). A user can mark a bin as
+    # a feeder bin here without using FeederColony, and vice versa.
     purpose: Optional[str] = Field("tarantula", pattern="^(tarantula|feeder)$")
 
     # Enclosure properties
