@@ -17,7 +17,6 @@ interface Species {
 interface Enclosure {
   id: string
   name: string
-  purpose?: string | null
   is_communal: boolean
   population_count: number | null
   species_id: string | null
@@ -55,7 +54,6 @@ export default function EditEnclosurePage() {
   // Form data (pre-filled after fetch)
   const [formData, setFormData] = useState({
     name: '',
-    purpose: 'tarantula' as 'tarantula' | 'feeder',
     is_communal: false,
     population_count: '',
     enclosure_type: '',
@@ -103,7 +101,6 @@ export default function EditEnclosurePage() {
 
         setFormData({
           name: data.name ?? '',
-          purpose: (data.purpose === 'feeder' ? 'feeder' : 'tarantula'),
           is_communal: Boolean(data.is_communal),
           population_count: data.population_count != null ? String(data.population_count) : '',
           enclosure_type: data.enclosure_type ?? '',
@@ -173,10 +170,9 @@ export default function EditEnclosurePage() {
     try {
       const payload = {
         name: formData.name,
-        purpose: formData.purpose,
         is_communal: formData.is_communal,
         population_count: formData.population_count ? parseInt(formData.population_count) : null,
-        species_id: formData.purpose === 'feeder' ? null : (selectedSpecies?.id || null),
+        species_id: selectedSpecies?.id || null,
         enclosure_type: formData.enclosure_type || null,
         enclosure_size: formData.enclosure_size || null,
         substrate_type: formData.substrate_type || null,
@@ -313,52 +309,6 @@ export default function EditEnclosurePage() {
                 />
               </div>
 
-              {/* Purpose selector */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Purpose *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, purpose: 'tarantula' }))}
-                    className={`p-4 border-2 rounded-lg text-left transition ${
-                      formData.purpose === 'tarantula'
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xl" aria-hidden="true">🕷️</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">Tarantula enclosure</span>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      Part of your keeping collection
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, purpose: 'feeder' }))}
-                    className={`p-4 border-2 rounded-lg text-left transition ${
-                      formData.purpose === 'feeder'
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-400'
-                        : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xl" aria-hidden="true">🦗</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">Feeder bin</span>
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      Cricket / roach / mealworm colony
-                    </p>
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  Feeder bins are kept separate from your collection stats and care views.
-                </p>
-              </div>
-
               <div className="flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -369,9 +319,7 @@ export default function EditEnclosurePage() {
                   className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 />
                 <label htmlFor="is_communal" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {formData.purpose === 'feeder'
-                    ? 'This is a communal bin (multiple specimens — most feeder colonies are)'
-                    : 'This is a communal enclosure (multiple tarantulas)'}
+                  This is a communal enclosure (multiple tarantulas)
                 </label>
               </div>
 
@@ -395,62 +343,60 @@ export default function EditEnclosurePage() {
                 </div>
               )}
 
-              {/* Species Search — hidden for feeder bins */}
-              {formData.purpose !== 'feeder' && (
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Species (optional)
-                  </label>
-                  {selectedSpecies ? (
-                    <div className="flex items-center justify-between p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
-                      <span className="text-gray-900 dark:text-white italic font-medium">
-                        {selectedSpecies.scientific_name}
-                      </span>
+              {/* Species Search */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Species (optional)
+                </label>
+                {selectedSpecies ? (
+                  <div className="flex items-center justify-between p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                    <span className="text-gray-900 dark:text-white italic font-medium">
+                      {selectedSpecies.scientific_name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSpecies(null)
+                        setSpeciesSearch('')
+                      }}
+                      className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={speciesSearch}
+                    onChange={(e) => setSpeciesSearch(e.target.value)}
+                    placeholder="Search for species..."
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                )}
+                {speciesResults.length > 0 && !selectedSpecies && (
+                  <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {speciesResults.map(species => (
                       <button
+                        key={species.id}
                         type="button"
                         onClick={() => {
-                          setSelectedSpecies(null)
+                          setSelectedSpecies(species)
                           setSpeciesSearch('')
+                          setSpeciesResults([])
                         }}
-                        className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                        className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
                       >
-                        Change
+                        <span className="font-medium italic">{species.scientific_name}</span>
+                        {species.common_names?.[0] && (
+                          <span className="text-gray-500 dark:text-gray-400 ml-2">
+                            ({species.common_names[0]})
+                          </span>
+                        )}
                       </button>
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={speciesSearch}
-                      onChange={(e) => setSpeciesSearch(e.target.value)}
-                      placeholder="Search for species..."
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    />
-                  )}
-                  {speciesResults.length > 0 && !selectedSpecies && (
-                    <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {speciesResults.map(species => (
-                        <button
-                          key={species.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedSpecies(species)
-                            setSpeciesSearch('')
-                            setSpeciesResults([])
-                          }}
-                          className="w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
-                        >
-                          <span className="font-medium italic">{species.scientific_name}</span>
-                          {species.common_names?.[0] && (
-                            <span className="text-gray-500 dark:text-gray-400 ml-2">
-                              ({species.common_names[0]})
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
