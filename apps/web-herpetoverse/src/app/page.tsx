@@ -52,9 +52,11 @@ export default function Home() {
           <img
             src="/logo.svg"
             alt="Herpetoverse"
-            width={72}
-            height={75}
-            className="drop-shadow-[0_0_24px_rgba(0,229,255,0.25)]"
+            width={96}
+            height={100}
+            className="h-24 w-auto select-none"
+            style={{ imageRendering: 'auto' }}
+            draggable={false}
           />
           <div>
             <p className="text-xs tracking-[0.2em] uppercase text-herp-teal/90 font-medium">
