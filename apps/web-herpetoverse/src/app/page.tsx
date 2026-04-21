@@ -115,7 +115,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={status === 'submitting'}
-                className="px-6 py-3 rounded-md bg-herp-gradient text-herp-dark font-semibold tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="herp-gradient-bg px-6 py-3 rounded-md font-semibold tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {status === 'submitting' ? 'Signing up…' : 'Notify me'}
               </button>

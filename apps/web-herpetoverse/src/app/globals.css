@@ -8,23 +8,41 @@
 
 html,
 body {
-  background-color: #0a0a0a;
-  color: #e8e8e8;
+  background-color: #0B0B0B;
+  color: #E8E8E8;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
 }
 
-.font-serif {
-  font-family: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+/* Brand gradient applied to text via bg-clip-text */
+.herp-gradient-text {
+  background-image: linear-gradient(90deg, #00C853 0%, #00E5FF 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
 }
 
-/* Selection color */
+/* Brand gradient used as a button/panel background (fallback for bg-herp-gradient) */
+.herp-gradient-bg {
+  background-image: linear-gradient(90deg, #00C853 0%, #00E5FF 100%);
+  color: #0B0B0B;
+}
+
+/* Selection color — brand primary green */
 ::selection {
-  background-color: #22c55e;
-  color: #0a0a0a;
+  background-color: #00C853;
+  color: #0B0B0B;
+}
+
+/* Faint ambient glow behind the hero — subtle, not loud */
+.herp-hero-glow {
+  background:
+    radial-gradient(600px circle at 30% 20%, rgba(0, 200, 83, 0.12), transparent 50%),
+    radial-gradient(500px circle at 70% 80%, rgba(0, 229, 255, 0.10), transparent 50%);
 }
