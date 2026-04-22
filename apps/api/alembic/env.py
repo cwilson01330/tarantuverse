@@ -65,6 +65,38 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def _ensure_alembic_version_length(connection) -> None:
+    """Widen alembic_version.version_num to fit our long revision IDs.
+
+    Alembic's default column is VARCHAR(32), but several of our revision
+    IDs exceed that — e.g. ``flg_20260421_extend_feeding_logs_polymorphic``
+    is 44 chars. On 2026-04-22 this caused a prod deploy to fail mid-chain
+    with ``StringDataRightTruncation`` when Alembic tried to record the
+    ``anc_20260421_add_announcement_settings`` revision.
+
+    Idempotent:
+      - If ``alembic_version`` doesn't exist yet (fresh DB), do nothing —
+        Alembic will create it with whatever default and the next run will
+        widen it.
+      - If the column is already wide enough, do nothing.
+      - Otherwise, ALTER COLUMN to VARCHAR(255).
+    """
+    from sqlalchemy import text
+
+    current_length = connection.execute(text(
+        "SELECT character_maximum_length "
+        "FROM information_schema.columns "
+        "WHERE table_name = 'alembic_version' "
+        "  AND column_name = 'version_num'"
+    )).scalar()
+
+    if current_length is not None and current_length < 255:
+        connection.execute(text(
+            "ALTER TABLE alembic_version "
+            "ALTER COLUMN version_num TYPE VARCHAR(255)"
+        ))
+
+
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
@@ -79,6 +111,12 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Ensure the version column can hold our revision IDs *before*
+        # Alembic tries to UPDATE it. Runs in its own transaction so the
+        # DDL commits regardless of what the migration chain does next.
+        with connection.begin():
+            _ensure_alembic_version_length(connection)
+
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
