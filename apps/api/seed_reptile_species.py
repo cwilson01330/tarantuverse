@@ -493,19 +493,21 @@ SPECIES_DATA = [
         "substrate_depth_min_in": Decimal("3"),
         "substrate_depth_max_in": Decimal("5"),
         "diet_type": "strict_carnivore",
-        "prey_size_hatchling": "Pinky mouse (hognoses are toad specialists in the wild — captive-bred animals typically take mice; some refuse rodents)",
+        "prey_size_hatchling": "Pinky mouse",
         "prey_size_juvenile": "Fuzzy to hopper mouse",
         "prey_size_adult": "Adult mouse",
         "feeding_frequency_hatchling": "Every 5–7 days",
         "feeding_frequency_juvenile": "Every 7 days",
         "feeding_frequency_adult": "Every 7–10 days",
         "supplementation_notes": (
-            "Whole prey adequate. Hognoses are mildly venomous rear-fanged "
-            "colubrids; envenomation in humans is rare and almost always "
-            "results from prolonged chewing bites, not defensive strikes. "
-            "Reactions are typically localized swelling. Not considered "
-            "medically significant in keeping contexts, but noted for "
-            "completeness."
+            "Whole prey adequate. Hognoses are toad specialists in the wild; "
+            "captive-bred animals typically accept mice, but some refuse "
+            "rodents and may need scenting with toad or fish. Hognoses are "
+            "mildly venomous rear-fanged colubrids; envenomation in humans "
+            "is rare and almost always results from prolonged chewing bites, "
+            "not defensive strikes. Reactions are typically localized "
+            "swelling. Not considered medically significant in keeping "
+            "contexts, but noted for completeness."
         ),
         "water_bowl_description": (
             "Small bowl; keep the enclosure overall dry. Provide a humid hide "
