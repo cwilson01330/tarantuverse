@@ -1,7 +1,7 @@
 """add announcement settings for cross-brand banner
 
 Revision ID: anc_20260421_add_announcement_settings
-Revises: wtl_20260420_add_waitlist
+Revises: wtl_20260420_waitlist
 Create Date: 2026-04-21
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'anc_20260421_add_announcement_settings'
-down_revision: Union[str, None] = 'wtl_20260420_add_waitlist'
+down_revision: Union[str, None] = 'wtl_20260420_waitlist'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
