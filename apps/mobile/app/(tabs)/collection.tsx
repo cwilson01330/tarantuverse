@@ -181,24 +181,31 @@ export default function CollectionScreen() {
     const days = status.days_since_last_feeding;
     let badgeStyle = styles.feedingBadgeGreen;
     let label: string;
+    // Screen-reader label — spells out the meaning the emoji carries visually.
+    let a11yLabel: string;
 
     if (days === 0) {
       label = '✓ Fed today';
+      a11yLabel = 'Fed today';
     } else if (days >= 21) {
       badgeStyle = styles.feedingBadgeRed;
       label = `⚠️ ${days}d ago`;
+      a11yLabel = `Overdue, last fed ${days} days ago`;
     } else if (days >= 14) {
       badgeStyle = styles.feedingBadgeOrange;
       label = `⏰ ${days}d ago`;
+      a11yLabel = `Feeding due soon, last fed ${days} days ago`;
     } else if (days >= 7) {
       badgeStyle = styles.feedingBadgeYellow;
       label = `📅 ${days}d ago`;
+      a11yLabel = `Last fed ${days} days ago`;
     } else {
       label = `✓ ${days}d ago`;
+      a11yLabel = `Last fed ${days} days ago`;
     }
 
     return (
-      <View style={[styles.feedingBadge, badgeStyle]}>
+      <View style={[styles.feedingBadge, badgeStyle]} accessibilityLabel={a11yLabel}>
         <Text style={styles.feedingBadgeText}>{label}</Text>
       </View>
     );
@@ -222,7 +229,10 @@ export default function CollectionScreen() {
     }
 
     return (
-      <View style={[styles.premoltBadge, badgeStyle]}>
+      <View
+        style={[styles.premoltBadge, badgeStyle]}
+        accessibilityLabel={`Likely in premolt, ${prediction.probability}% probability`}
+      >
         <Text style={styles.premoltBadgeText}>
           🦋 {prediction.probability}%
         </Text>
@@ -274,40 +284,58 @@ export default function CollectionScreen() {
     setRefreshing(false);
   }, []);
 
-  const renderTarantula = ({ item }: { item: Tarantula }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => router.push(`/tarantula/${item.id}`)}
-    >
-      <View style={styles.imageContainer}>
-        {item.photo_url ? (
-          <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.image} />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <MaterialCommunityIcons name="spider" size={40} color={colors.textTertiary} />
-          </View>
-        )}
-        {item.sex && (
-          <View style={[styles.sexBadge, item.sex === 'female' ? styles.femaleBadge : styles.maleBadge]}>
-            <MaterialCommunityIcons
-              name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
-              size={16}
-              color="#fff"
+  const renderTarantula = ({ item }: { item: Tarantula }) => {
+    const displayName = item.name || item.common_name || 'Unknown';
+    const sexLabel = item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/tarantula/${item.id}`)}
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}, ${item.scientific_name}, ${sexLabel}`}
+        accessibilityHint="Opens this tarantula's detail page"
+      >
+        <View style={styles.imageContainer}>
+          {item.photo_url ? (
+            <Image
+              source={{ uri: getImageUrl(item.photo_url) }}
+              style={styles.image}
+              accessibilityLabel={`Photo of ${displayName}`}
             />
-          </View>
-        )}
-        {getFeedingStatusBadge(item.id)}
-        {getPremoltBadge(item.id)}
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={styles.name}>{item.name || item.common_name || 'Unknown'}</Text>
-        <Text style={styles.scientificName}>{item.scientific_name}</Text>
-        {item.common_name && (
-          <Text style={styles.commonName}>{item.common_name}</Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+          ) : (
+            <View
+              style={styles.placeholderImage}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              <MaterialCommunityIcons name="spider" size={40} color={colors.textTertiary} />
+            </View>
+          )}
+          {item.sex && (
+            <View
+              style={[styles.sexBadge, item.sex === 'female' ? styles.femaleBadge : styles.maleBadge]}
+              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
+            >
+              <MaterialCommunityIcons
+                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
+                size={16}
+                color="#fff"
+              />
+            </View>
+          )}
+          {getFeedingStatusBadge(item.id)}
+          {getPremoltBadge(item.id)}
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.name}>{displayName}</Text>
+          <Text style={styles.scientificName}>{item.scientific_name}</Text>
+          {item.common_name && (
+            <Text style={styles.commonName}>{item.common_name}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderListItem = ({ item }: { item: Tarantula }) => {
     const feedingStatus = feedingStatuses.get(item.id);
@@ -321,28 +349,42 @@ export default function CollectionScreen() {
       else if (days >= 7) feedingColor = '#eab308';
     }
 
+    const displayName = item.name || item.common_name || 'Unknown';
+    const sexLabel = item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
     return (
       <TouchableOpacity
         style={styles.listItem}
         onPress={() => router.push(`/tarantula/${item.id}`)}
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}, ${item.scientific_name}, ${sexLabel}`}
+        accessibilityHint="Opens this tarantula's detail page"
       >
         <View style={styles.listImageContainer}>
           {item.photo_url ? (
-            <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.listImage} />
+            <Image
+              source={{ uri: getImageUrl(item.photo_url) }}
+              style={styles.listImage}
+              accessibilityLabel={`Photo of ${displayName}`}
+            />
           ) : (
-            <View style={styles.listPlaceholder}>
+            <View
+              style={styles.listPlaceholder}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
               <MaterialCommunityIcons name="spider" size={24} color={colors.textTertiary} />
             </View>
           )}
         </View>
         <View style={styles.listContent}>
           <View style={styles.listHeader}>
-            <Text style={styles.listName} numberOfLines={1}>{item.name || item.common_name || 'Unknown'}</Text>
+            <Text style={styles.listName} numberOfLines={1}>{displayName}</Text>
             {item.sex && (
               <MaterialCommunityIcons
                 name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
                 size={18}
                 color={item.sex === 'female' ? '#ec4899' : '#3b82f6'}
+                accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
               />
             )}
           </View>
@@ -350,26 +392,41 @@ export default function CollectionScreen() {
         </View>
         <View style={styles.listBadges}>
           {days !== undefined && (
-            <View style={[styles.listBadge, { backgroundColor: feedingColor }]}>
+            <View
+              style={[styles.listBadge, { backgroundColor: feedingColor }]}
+              accessibilityLabel={`Last fed ${days} days ago`}
+            >
               <Text style={styles.listBadgeText}>{days}d</Text>
             </View>
           )}
           {premoltPrediction && premoltPrediction.confidence_level !== 'low' && (
-            <View style={[styles.listBadge, { backgroundColor: '#f97316' }]}>
+            <View
+              style={[styles.listBadge, { backgroundColor: '#f97316' }]}
+              accessibilityLabel={`Likely in premolt, ${premoltPrediction.probability}% probability`}
+            >
               <Text style={styles.listBadgeText}>🦋 {premoltPrediction.probability}%</Text>
             </View>
           )}
         </View>
-        <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        <MaterialCommunityIcons
+          name="chevron-right"
+          size={24}
+          color={colors.textTertiary}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
       </TouchableOpacity>
     );
   };
 
   const ViewToggle = () => (
-    <View style={styles.viewToggleContainer}>
+    <View style={styles.viewToggleContainer} accessibilityRole="radiogroup">
       <TouchableOpacity
         style={[styles.viewToggleButton, viewMode === 'card' && styles.viewToggleActive]}
         onPress={() => toggleViewMode('card')}
+        accessibilityRole="radio"
+        accessibilityState={{ selected: viewMode === 'card' }}
+        accessibilityLabel="Grid view"
       >
         <MaterialCommunityIcons
           name="view-grid"
@@ -380,6 +437,9 @@ export default function CollectionScreen() {
       <TouchableOpacity
         style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
         onPress={() => toggleViewMode('list')}
+        accessibilityRole="radio"
+        accessibilityState={{ selected: viewMode === 'list' }}
+        accessibilityLabel="List view"
       >
         <MaterialCommunityIcons
           name="view-list"
@@ -392,16 +452,27 @@ export default function CollectionScreen() {
 
   const SearchBar = () => (
     <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} />
+      <MaterialCommunityIcons
+        name="magnify"
+        size={20}
+        color={colors.textSecondary}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
       <TextInput
         style={[styles.searchInput, { color: colors.textPrimary }]}
         placeholder="Search by name, species..."
         placeholderTextColor={colors.textTertiary}
         value={searchQuery}
         onChangeText={setSearchQuery}
+        accessibilityLabel="Search tarantulas by name or species"
       />
       {searchQuery.length > 0 && (
-        <TouchableOpacity onPress={() => setSearchQuery('')}>
+        <TouchableOpacity
+          onPress={() => setSearchQuery('')}
+          accessibilityRole="button"
+          accessibilityLabel="Clear search"
+        >
           <MaterialCommunityIcons name="close-circle" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       )}
@@ -409,10 +480,13 @@ export default function CollectionScreen() {
   );
 
   const SortChips = () => (
-    <View style={styles.sortContainer}>
+    <View style={styles.sortContainer} accessibilityRole="radiogroup">
       <TouchableOpacity
         style={[styles.sortChip, sortBy === 'name' && styles.sortChipActive, { borderColor: colors.border }]}
         onPress={() => setSortBy('name')}
+        accessibilityRole="radio"
+        accessibilityState={{ selected: sortBy === 'name' }}
+        accessibilityLabel="Sort alphabetically"
       >
         <Text style={[styles.sortChipText, sortBy === 'name' && styles.sortChipTextActive, { color: sortBy === 'name' ? '#fff' : colors.textSecondary }]}>
           A-Z
@@ -421,6 +495,9 @@ export default function CollectionScreen() {
       <TouchableOpacity
         style={[styles.sortChip, sortBy === 'lastFed' && styles.sortChipActive, { borderColor: colors.border }]}
         onPress={() => setSortBy('lastFed')}
+        accessibilityRole="radio"
+        accessibilityState={{ selected: sortBy === 'lastFed' }}
+        accessibilityLabel="Sort by last fed date"
       >
         <Text style={[styles.sortChipText, sortBy === 'lastFed' && styles.sortChipTextActive, { color: sortBy === 'lastFed' ? '#fff' : colors.textSecondary }]}>
           Last Fed
@@ -429,6 +506,9 @@ export default function CollectionScreen() {
       <TouchableOpacity
         style={[styles.sortChip, sortBy === 'acquired' && styles.sortChipActive, { borderColor: colors.border }]}
         onPress={() => setSortBy('acquired')}
+        accessibilityRole="radio"
+        accessibilityState={{ selected: sortBy === 'acquired' }}
+        accessibilityLabel="Sort by acquisition date"
       >
         <Text style={[styles.sortChipText, sortBy === 'acquired' && styles.sortChipTextActive, { color: sortBy === 'acquired' ? '#fff' : colors.textSecondary }]}>
           Acquired
