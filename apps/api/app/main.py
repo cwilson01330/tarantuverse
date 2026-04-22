@@ -53,6 +53,8 @@ import app.routers.waitlist as waitlist
 import app.routers.snakes as snakes  # Herpetoverse v1
 import app.routers.sheds as sheds  # Herpetoverse v1
 import app.routers.genes as genes  # Herpetoverse v1 — morph catalog
+import app.routers.reptile_species as reptile_species  # Herpetoverse v1
+import app.routers.animal_genotypes as animal_genotypes  # Herpetoverse v1
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -269,6 +271,9 @@ app.include_router(sheds.router, prefix="/api/v1", tags=["sheds", "herpetoverse"
 
 # Morph catalog + welfare data for the breeding calculator (Sprint 4)
 app.include_router(genes.router, prefix="/api/v1/genes", tags=["genes", "herpetoverse"])
+app.include_router(reptile_species.router, prefix="/api/v1/reptile-species", tags=["reptile_species", "herpetoverse"])
+# animal_genotypes routes are nested under /snakes/{id}/genotype — keep the generic /api/v1 prefix
+app.include_router(animal_genotypes.router, prefix="/api/v1", tags=["animal_genotypes", "herpetoverse"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

@@ -198,3 +198,23 @@ class ReptileSpeciesResponse(ReptileSpeciesBase):
 
     class Config:
         from_attributes = True
+
+
+class ReptileSpeciesSearchResult(BaseModel):
+    """Compact shape for autocomplete — matches the Species pattern."""
+    id: uuid.UUID
+    scientific_name: str
+    common_names: List[str] = []
+    care_level: Optional[str] = None
+    image_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ReptileSpeciesPaginatedResponse(BaseModel):
+    items: List[ReptileSpeciesResponse]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
