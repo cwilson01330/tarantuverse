@@ -12,15 +12,24 @@ from app.database import Base
 class FeedingLog(Base):
     __tablename__ = "feeding_logs"
     __table_args__ = (
+        # Polymorphic parent: exactly one of tarantula_id / enclosure_id /
+        # snake_id is set. Enforced by DB CHECK added in
+        # flg_20260421_extend_feeding_logs_polymorphic.
         CheckConstraint(
-            'tarantula_id IS NOT NULL OR enclosure_id IS NOT NULL',
-            name='feeding_log_must_have_parent'
+            'num_nonnulls(tarantula_id, enclosure_id, snake_id) = 1',
+            name='feeding_logs_must_have_exactly_one_parent',
         ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tarantula_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="CASCADE"), nullable=True)
     enclosure_id = Column(UUID(as_uuid=True), ForeignKey("enclosures.id", ondelete="CASCADE"), nullable=True)
+    snake_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("snakes.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     fed_at = Column(DateTime(timezone=True), nullable=False)
     food_type = Column(String(100))  # e.g., "cricket", "roach", "mealworm"
@@ -35,7 +44,8 @@ class FeedingLog(Base):
     # Relationships
     tarantula = relationship("Tarantula", backref="feeding_logs")
     enclosure = relationship("Enclosure", back_populates="feeding_logs")
+    snake = relationship("Snake", backref="feeding_logs")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.enclosure_id
+        parent = self.tarantula_id or self.enclosure_id or self.snake_id
         return f"<FeedingLog {parent} @ {self.fed_at}>"
