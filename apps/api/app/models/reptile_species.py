@@ -52,7 +52,11 @@ class ReptileSpecies(Base):
 
     # Care classification
     care_level = Column(
-        SQLEnum(ReptileCareLevel, name="reptilecarelevel"),
+        SQLEnum(
+            ReptileCareLevel,
+            name="reptilecarelevel",
+            values_callable=lambda x: [e.value for e in x],
+        ),
         default=ReptileCareLevel.BEGINNER,
     )
     handleability = Column(String(30))  # 'docile' | 'defensive' | 'nippy' | 'hands_off'
