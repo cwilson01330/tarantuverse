@@ -52,6 +52,7 @@ import app.routers.feeder_colonies as feeder_colonies
 import app.routers.waitlist as waitlist
 import app.routers.snakes as snakes  # Herpetoverse v1
 import app.routers.sheds as sheds  # Herpetoverse v1
+import app.routers.genes as genes  # Herpetoverse v1 — morph catalog
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -265,6 +266,9 @@ app.include_router(snakes.router, prefix="/api/v1/snakes", tags=["snakes", "herp
 
 print("[STARTUP] Registering sheds router (Herpetoverse v1)...")
 app.include_router(sheds.router, prefix="/api/v1", tags=["sheds", "herpetoverse"])
+
+# Morph catalog + welfare data for the breeding calculator (Sprint 4)
+app.include_router(genes.router, prefix="/api/v1/genes", tags=["genes", "herpetoverse"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

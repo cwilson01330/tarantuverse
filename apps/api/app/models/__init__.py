@@ -38,6 +38,7 @@ from app.models.waitlist import WaitlistSignup
 from app.models.reptile_species import ReptileSpecies
 from app.models.snake import Snake
 from app.models.shed_log import ShedLog
+from app.models.gene import Gene
 from app.models.animal_genotype import AnimalGenotype
 
 __all__ = [
@@ -81,5 +82,6 @@ __all__ = [
     "ReptileSpecies",
     "Snake",
     "ShedLog",
+    "Gene",
     "AnimalGenotype",
 ]
