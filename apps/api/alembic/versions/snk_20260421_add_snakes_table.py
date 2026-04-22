@@ -66,14 +66,16 @@ def upgrade() -> None:
         sa.Column('scientific_name', sa.String(255)),  # e.g., "Python regius"
 
         # Reuse existing `sex` and `source` enums from the tarantulas table.
-        # These enum types were created by the initial migration with lowercase
-        # values (male/female/unknown, bred/bought/wild_caught). We attach to
-        # the existing enum type rather than creating a parallel type — this is
-        # why we pass create_type=False to postgresql.ENUM.
+        # These enum types were created by the initial migration with UPPERCASE
+        # values (MALE/FEMALE/UNKNOWN, BRED/BOUGHT/WILD_CAUGHT) — see
+        # 9588b399ad54_initial_migration.py. We attach to the existing enum
+        # type rather than creating a parallel type — this is why we pass
+        # create_type=False to postgresql.ENUM. The Python enum's .name maps
+        # to the uppercase DB value; SQLAlchemy writes .name by default.
         sa.Column(
             'sex',
-            postgresql.ENUM('male', 'female', 'unknown', name='sex', create_type=False),
-            server_default='unknown',
+            postgresql.ENUM('MALE', 'FEMALE', 'UNKNOWN', name='sex', create_type=False),
+            server_default='UNKNOWN',
         ),
 
         # Acquisition (snakes have a more useful hatch_date than tarantulas often do)
@@ -81,7 +83,7 @@ def upgrade() -> None:
         sa.Column('hatch_date', sa.Date(), nullable=True),  # CB provenance
         sa.Column(
             'source',
-            postgresql.ENUM('bred', 'bought', 'wild_caught', name='source', create_type=False),
+            postgresql.ENUM('BRED', 'BOUGHT', 'WILD_CAUGHT', name='source', create_type=False),
         ),
         sa.Column('source_breeder', sa.String(255)),  # Morph provenance — important for snakes
         sa.Column('price_paid', sa.Numeric(10, 2)),

@@ -62,8 +62,11 @@ class Snake(Base):
 
     # Reuse shared DB enum types. create_type=False on the migration side; here
     # the Python enum class is the same one the tarantulas column uses.
+    # Do NOT set values_callable — SQLAlchemy's default (write .name) is what
+    # matches the prod enum values (MALE/FEMALE/UNKNOWN, BRED/BOUGHT/WILD_CAUGHT).
+    # Tarantula's column uses the same default and has worked in prod since day 1.
     sex = Column(
-        SQLEnum(Sex, name="sex", create_type=False, values_callable=lambda obj: [e.value for e in obj]),
+        SQLEnum(Sex, name="sex", create_type=False),
         default=Sex.UNKNOWN,
     )
 
@@ -71,7 +74,7 @@ class Snake(Base):
     date_acquired = Column(Date)
     hatch_date = Column(Date, nullable=True)  # CB provenance
     source = Column(
-        SQLEnum(Source, name="source", create_type=False, values_callable=lambda obj: [e.value for e in obj])
+        SQLEnum(Source, name="source", create_type=False)
     )
     source_breeder = Column(String(255))  # Morph provenance — crucial for snakes
     price_paid = Column(Numeric(10, 2))
