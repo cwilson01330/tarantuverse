@@ -248,24 +248,26 @@ async def get_unread_count(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get total unread message count for current user"""
-    # Get all conversations
-    conversations = db.query(Conversation).filter(
-        or_(
-            Conversation.participant1_id == current_user.id,
-            Conversation.participant2_id == current_user.id
-        )
-    ).all()
-    
-    total_unread = 0
-    for conv in conversations:
-        unread = db.query(func.count(DirectMessage.id)).filter(
-            DirectMessage.conversation_id == conv.id,
+    """Get total unread message count for current user.
+
+    Single aggregate query (was N+1: one conversations list + one count per
+    conversation). The bell polls this ~once a minute per tab, so the old
+    shape scaled linearly with conversation count per user per poll.
+    """
+    total_unread = (
+        db.query(func.count(DirectMessage.id))
+        .join(Conversation, Conversation.id == DirectMessage.conversation_id)
+        .filter(
             DirectMessage.sender_id != current_user.id,
-            DirectMessage.is_read == False
-        ).scalar() or 0
-        total_unread += unread
-    
+            DirectMessage.is_read == False,
+            or_(
+                Conversation.participant1_id == current_user.id,
+                Conversation.participant2_id == current_user.id,
+            ),
+        )
+        .scalar()
+    ) or 0
+
     return {"unread_count": total_unread}
 
 
