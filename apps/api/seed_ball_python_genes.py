@@ -190,6 +190,77 @@ def cite(*keys):
 
 
 # ---------------------------------------------------------------------------
+# Morph-specific slug overrides for the two shared index citations.
+# MorphMarket Morphpedia and World of Ball Pythons both maintain a
+# per-morph page; the generic CITATIONS templates point at the INDEX
+# pages. We override url + title below so the in-app citation panel
+# deep-links to the specific morph's reference page.
+#
+# Notes on a few divergences:
+#   - Banana: WOBP uses /morphs/banana-ball/, not /morphs/banana/.
+#   - Ghost: MorphMarket files it under /morphpedia/ball-pythons/hypo/
+#     (Hypo is their canonical trait name; "Ghost" is a common synonym).
+#   - Axanthic: MorphMarket canonicalises the VPI line as
+#     /morphpedia/ball-pythons/axanthic-vpi/. We map to that since
+#     VPI is the most widely-kept axanthic line.
+#   - Super Cinnamon / Super Sable: Neither WOBP nor MorphMarket host
+#     dedicated super-form pages. We fall back to the single-copy
+#     morph page (cinnamon, sable) on both sources.
+#   - Super Black Pastel: WOBP has /morphs/super-black-pastel/, but
+#     MorphMarket Morphpedia lumps super content on the single-copy
+#     /black-pastel/ page.
+# ---------------------------------------------------------------------------
+MORPH_SLUGS: dict[str, dict[str, str]] = {
+    "Albino":             {"wobp": "albino",             "mm": "albino"},
+    "Piebald":            {"wobp": "piebald",            "mm": "piebald"},
+    "Clown":              {"wobp": "clown",              "mm": "clown"},
+    "Ghost":              {"wobp": "ghost",              "mm": "hypo"},
+    "Axanthic":           {"wobp": "axanthic",           "mm": "axanthic-vpi"},
+    "Genetic Stripe":     {"wobp": "genetic-stripe",     "mm": "genetic-stripe"},
+    "Lavender Albino":    {"wobp": "lavender-albino",    "mm": "lavender-albino"},
+    "Caramel Albino":     {"wobp": "caramel-albino",     "mm": "caramel-albino"},
+    "Pastel":             {"wobp": "pastel",             "mm": "pastel"},
+    "Mojave":             {"wobp": "mojave",             "mm": "mojave"},
+    "Lesser":             {"wobp": "lesser",             "mm": "lesser"},
+    "Banana":             {"wobp": "banana-ball",        "mm": "banana"},
+    "Enchi":              {"wobp": "enchi",              "mm": "enchi"},
+    "Fire":               {"wobp": "fire",               "mm": "fire"},
+    "Yellow Belly":       {"wobp": "yellow-belly",       "mm": "yellow-belly"},
+    "Cinnamon":           {"wobp": "cinnamon",           "mm": "cinnamon"},
+    "Black Pastel":       {"wobp": "black-pastel",       "mm": "black-pastel"},
+    "Pinstripe":          {"wobp": "pinstripe",          "mm": "pinstripe"},
+    "Calico":             {"wobp": "calico",             "mm": "calico"},
+    "Spider":             {"wobp": "spider",             "mm": "spider"},
+    "Champagne":          {"wobp": "champagne",          "mm": "champagne"},
+    "Hidden Gene Woma":   {"wobp": "hidden-gene-woma",   "mm": "hidden-gene-woma"},
+    "Woma":               {"wobp": "woma",               "mm": "woma"},
+    "Super Sable":        {"wobp": "sable",              "mm": "sable"},
+    "Super Cinnamon":     {"wobp": "cinnamon",           "mm": "cinnamon"},
+    "Super Black Pastel": {"wobp": "super-black-pastel", "mm": "black-pastel"},
+}
+
+
+def slugify_citations(common_name: str, citations: list[dict]) -> list[dict]:
+    """Rewrite url/title on the two shared index citations so each morph
+    links to its specific reference page. Mutates in place and returns
+    the same list for convenience. No-op for genes whose citations don't
+    include those two templates (e.g., Spider cites peer-reviewed sources
+    only, so there's nothing to slugify)."""
+    slugs = MORPH_SLUGS.get(common_name, {})
+    wobp_slug = slugs.get("wobp")
+    mm_slug = slugs.get("mm")
+    for c in citations:
+        ref = c.get("ref_key")
+        if ref == "morphmarket_morphpedia" and mm_slug:
+            c["url"] = f"https://www.morphmarket.com/morphpedia/ball-pythons/{mm_slug}/"
+            c["title"] = f"{common_name} — Morphpedia (MorphMarket)"
+        elif ref == "world_of_ball_pythons" and wobp_slug:
+            c["url"] = f"https://www.worldofballpythons.com/morphs/{wobp_slug}/"
+            c["title"] = f"{common_name} — World of Ball Pythons"
+    return citations
+
+
+# ---------------------------------------------------------------------------
 # Gene catalog. Each entry becomes one row in `genes`.
 # ---------------------------------------------------------------------------
 GENES = [
@@ -639,6 +710,8 @@ def seed():
                 .first()
             )
 
+            citations = slugify_citations(common_name, entry["citations"])
+
             if existing:
                 # Refresh welfare fields and citations on re-run — content
                 # evolves; everything else stays immutable-ish.
@@ -646,7 +719,7 @@ def seed():
                 existing.welfare_flag = entry.get("welfare_flag")
                 existing.welfare_notes = entry.get("welfare_notes")
                 existing.lethal_homozygous = entry["lethal_homozygous"]
-                existing.welfare_citations = entry["citations"]
+                existing.welfare_citations = citations
                 skipped += 1
                 updated += 1
                 print(f"  Updated: {SPECIES} / {common_name}")
@@ -662,7 +735,7 @@ def seed():
                 welfare_flag=entry.get("welfare_flag"),
                 welfare_notes=entry.get("welfare_notes"),
                 lethal_homozygous=entry["lethal_homozygous"],
-                welfare_citations=entry["citations"],
+                welfare_citations=citations,
                 is_verified=True,
             )
             db.add(row)
