@@ -34,12 +34,17 @@ export type GeneType =
 
 export type WelfareFlag = 'neurological' | 'structural' | 'viability'
 
+export type CitationSourceType = 'peer_reviewed' | 'breeder_community'
+
 export interface WelfareCitation {
   title?: string
   url?: string
   author?: string
+  publication?: string
   publication_date?: string
+  source_type?: CitationSourceType
   summary?: string
+  ref_key?: string
 }
 
 export interface Gene {

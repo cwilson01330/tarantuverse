@@ -27,6 +27,7 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlleleState,
   CALCULATOR_SPECIES,
+  CitationSourceType,
   combineOffspring,
   countToState,
   fetchGenesForSpecies,
@@ -40,6 +41,7 @@ import {
   stateLabel,
   stateToCount,
   validStatesForGene,
+  WelfareCitation,
   WelfareFlag,
 } from '@/lib/genes'
 
@@ -77,6 +79,29 @@ const WELFARE_FLAG_LABELS: Record<WelfareFlag, string> = {
   viability: 'Viability',
 }
 
+const SOURCE_TYPE_LABELS: Record<CitationSourceType, string> = {
+  peer_reviewed: 'Peer reviewed',
+  breeder_community: 'Breeder / community',
+}
+
+const SOURCE_TYPE_STYLES: Record<CitationSourceType, string> = {
+  peer_reviewed: 'bg-herp-teal/15 text-herp-teal border-herp-teal/40',
+  breeder_community: 'bg-neutral-700/40 text-neutral-300 border-neutral-600',
+}
+
+// Peer-reviewed first, then community. Keeps the authority ordering predictable
+// regardless of the array order the API returns.
+function sortCitations(citations: WelfareCitation[]): WelfareCitation[] {
+  const rank = (c: WelfareCitation) => (c.source_type === 'peer_reviewed' ? 0 : 1)
+  return [...citations].sort((a, b) => rank(a) - rank(b))
+}
+
+function extractYear(date?: string): string | null {
+  if (!date) return null
+  const match = date.match(/^\d{4}/)
+  return match ? match[0] : null
+}
+
 // ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
@@ -91,6 +116,9 @@ export default function BreedingCalculatorPage() {
   const [parentA, setParentA] = useState<Record<string, AlleleState>>({})
   const [parentB, setParentB] = useState<Record<string, AlleleState>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [detailsExpanded, setDetailsExpanded] = useState<
+    Record<string, boolean>
+  >({})
   const [filter, setFilter] = useState('')
 
   // Reset + fetch when species changes.
@@ -102,6 +130,7 @@ export default function BreedingCalculatorPage() {
     setParentA({})
     setParentB({})
     setExpanded({})
+    setDetailsExpanded({})
 
     fetchGenesForSpecies(speciesName).then((result) => {
       if (cancelled) return
@@ -162,6 +191,7 @@ export default function BreedingCalculatorPage() {
     setParentA({})
     setParentB({})
     setExpanded({})
+    setDetailsExpanded({})
   }
 
   return (
@@ -271,6 +301,7 @@ export default function BreedingCalculatorPage() {
                       bState={bState}
                       isActive={hasInput}
                       isExpanded={!!expanded[gene.id]}
+                      isDetailsExpanded={!!detailsExpanded[gene.id]}
                       onAChange={(s) =>
                         setParentA((prev) => ({ ...prev, [gene.id]: s }))
                       }
@@ -279,6 +310,12 @@ export default function BreedingCalculatorPage() {
                       }
                       onToggleGrid={() =>
                         setExpanded((prev) => ({
+                          ...prev,
+                          [gene.id]: !prev[gene.id],
+                        }))
+                      }
+                      onToggleDetails={() =>
+                        setDetailsExpanded((prev) => ({
                           ...prev,
                           [gene.id]: !prev[gene.id],
                         }))
@@ -325,7 +362,9 @@ export default function BreedingCalculatorPage() {
         <p className="mb-2">
           <span className="text-neutral-400 font-medium">Welfare flags are sourced.</span>{' '}
           Concerns shown here come from published veterinary or husbandry
-          references. Open a gene&rsquo;s detail (in-app) for citations.
+          references. Expand a gene&rsquo;s{' '}
+          <span className="text-neutral-400">About</span> panel for citations,
+          authors, and review dates.
         </p>
         <p>
           <span className="text-neutral-400 font-medium">Missing a gene?</span>{' '}
@@ -347,9 +386,11 @@ interface GeneRowProps {
   bState: AlleleState
   isActive: boolean
   isExpanded: boolean
+  isDetailsExpanded: boolean
   onAChange: (s: AlleleState) => void
   onBChange: (s: AlleleState) => void
   onToggleGrid: () => void
+  onToggleDetails: () => void
 }
 
 function GeneRow({
@@ -358,11 +399,20 @@ function GeneRow({
   bState,
   isActive,
   isExpanded,
+  isDetailsExpanded,
   onAChange,
   onBChange,
   onToggleGrid,
+  onToggleDetails,
 }: GeneRowProps) {
   const validStates = validStatesForGene(gene.gene_type)
+  // "About" button is only meaningful if the gene has at least one piece of
+  // detail content. If all three are missing/empty, hide the button so we
+  // don't promise a detail panel we can't fill.
+  const hasDetailContent =
+    !!gene.description ||
+    !!gene.welfare_notes ||
+    (!!gene.welfare_citations && gene.welfare_citations.length > 0)
 
   return (
     <div
@@ -408,7 +458,24 @@ function GeneRow({
               {GENE_TYPE_HINTS[gene.gene_type]}
             </p>
           </div>
+          {hasDetailContent && (
+            <button
+              type="button"
+              onClick={onToggleDetails}
+              aria-expanded={isDetailsExpanded}
+              aria-label={`${isDetailsExpanded ? 'Hide' : 'Show'} details for ${gene.common_name}`}
+              className="flex-shrink-0 text-[11px] uppercase tracking-wider text-neutral-400 hover:text-herp-teal border border-neutral-800 hover:border-herp-teal/40 px-2 py-1 rounded transition-colors"
+            >
+              {isDetailsExpanded ? '▾ About' : '▸ About'}
+            </button>
+          )}
         </div>
+
+        {isDetailsExpanded && hasDetailContent && (
+          <div className="mb-4">
+            <GeneDetails gene={gene} />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <ParentPicker
@@ -451,6 +518,130 @@ function GeneRow({
         </div>
       )}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Gene details — description, welfare notes, citations. Inline disclosure so
+// the keeper can verify every welfare claim without leaving the calculator.
+// ---------------------------------------------------------------------------
+
+function GeneDetails({ gene }: { gene: Gene }) {
+  const citations = gene.welfare_citations ?? []
+  const hasCitations = citations.length > 0
+  const sorted = hasCitations ? sortCitations(citations) : []
+  const reviewedAt = gene.content_last_reviewed_at
+
+  return (
+    <div className="rounded-md border border-neutral-800 bg-neutral-950/60 p-4 space-y-3">
+      {gene.description && (
+        <div>
+          <h4 className="text-[10px] uppercase tracking-wider text-neutral-500 mb-1">
+            What it does
+          </h4>
+          <p className="text-xs text-neutral-300 leading-relaxed">
+            {gene.description}
+          </p>
+        </div>
+      )}
+
+      {gene.welfare_flag && gene.welfare_notes && (
+        <div>
+          <h4 className="text-[10px] uppercase tracking-wider text-neutral-500 mb-1">
+            Welfare notes ({WELFARE_FLAG_LABELS[gene.welfare_flag]})
+          </h4>
+          <p
+            className={`text-xs leading-relaxed rounded border px-3 py-2 ${WELFARE_FLAG_STYLES[gene.welfare_flag]}`}
+          >
+            {gene.welfare_notes}
+          </p>
+        </div>
+      )}
+
+      {hasCitations ? (
+        <div>
+          <h4 className="text-[10px] uppercase tracking-wider text-neutral-500 mb-2">
+            References ({sorted.length})
+          </h4>
+          <ul className="space-y-2">
+            {sorted.map((c, i) => (
+              <CitationItem key={c.ref_key ?? c.url ?? i} citation={c} />
+            ))}
+          </ul>
+        </div>
+      ) : gene.welfare_flag ? (
+        <p className="text-[11px] text-amber-300/80 italic">
+          Welfare flag set but no citations attached yet. Flag this gene in
+          content review.
+        </p>
+      ) : null}
+
+      {reviewedAt && (
+        <p className="text-[10px] text-neutral-600 pt-2 border-t border-neutral-800">
+          Content last reviewed{' '}
+          {new Date(reviewedAt).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}
+          .
+        </p>
+      )}
+    </div>
+  )
+}
+
+function CitationItem({ citation }: { citation: WelfareCitation }) {
+  const year = extractYear(citation.publication_date)
+  const authorYear = [citation.author, year].filter(Boolean).join(', ')
+  const title = citation.title ?? citation.url ?? 'Reference'
+  const publication = citation.publication
+
+  const titleContent = citation.url ? (
+    <a
+      href={citation.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-herp-teal hover:text-herp-lime underline underline-offset-2 decoration-herp-teal/30 hover:decoration-herp-lime transition-colors"
+    >
+      {title}
+    </a>
+  ) : (
+    <span className="text-neutral-200">{title}</span>
+  )
+
+  const badgeClass = citation.source_type
+    ? SOURCE_TYPE_STYLES[citation.source_type]
+    : 'bg-neutral-900 border-neutral-800 text-neutral-500'
+  const badgeLabel = citation.source_type
+    ? SOURCE_TYPE_LABELS[citation.source_type]
+    : 'Reference'
+
+  return (
+    <li className="text-xs text-neutral-400 leading-relaxed">
+      <div className="flex items-start gap-2 flex-wrap">
+        <span
+          className={`text-[9px] uppercase tracking-wider border px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5 ${badgeClass}`}
+        >
+          {badgeLabel}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div>{titleContent}</div>
+          {(authorYear || publication) && (
+            <div className="text-[11px] text-neutral-500 mt-0.5">
+              {authorYear}
+              {authorYear && publication ? ' · ' : ''}
+              {publication && <em>{publication}</em>}
+            </div>
+          )}
+          {citation.summary && (
+            <div className="text-[11px] text-neutral-500 mt-1 italic">
+              &ldquo;{citation.summary}&rdquo;
+            </div>
+          )}
+        </div>
+      </div>
+    </li>
   )
 }
 
