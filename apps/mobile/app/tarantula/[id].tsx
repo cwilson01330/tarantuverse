@@ -24,6 +24,7 @@ import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { formatLocalDate } from '../../src/utils/date';
 // notifications imported dynamically below to avoid expo-notifications crashing at module load time
 
 interface TarantulaDetail {
@@ -458,9 +459,14 @@ export default function TarantulaDetailScreen() {
     return `${apiBase}${url}`;
   };
 
-  // Refetch logs when screen comes into focus (after adding a log)
+  // Refetch on focus — runs after returning from edit/add/delete child
+  // routes. Critical: include fetchTarantula() because edit mutates the
+  // tarantula itself (sex, husbandry, etc.), not just its logs. Without
+  // this the detail view shows stale state and the keeper sees the old
+  // value even though the backend was updated correctly.
   useFocusEffect(
     React.useCallback(() => {
+      fetchTarantula();
       fetchFeedingLogs();
       fetchMoltLogs();
       fetchSubstrateChanges();
@@ -560,7 +566,13 @@ export default function TarantulaDetailScreen() {
             {tarantula.sex && (
               <View style={styles.infoItem}>
                 <MaterialCommunityIcons
-                  name={tarantula.sex === 'female' ? 'gender-female' : 'gender-male'}
+                  name={
+                    tarantula.sex === 'female'
+                      ? 'gender-female'
+                      : tarantula.sex === 'male'
+                        ? 'gender-male'
+                        : 'help-circle-outline'
+                  }
                   size={20}
                   color={colors.primary}
                 />
@@ -582,7 +594,7 @@ export default function TarantulaDetailScreen() {
                 <MaterialCommunityIcons name="calendar-plus" size={20} color={colors.primary} />
                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Acquired</Text>
                 <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
-                  {new Date(tarantula.acquisition_date).toLocaleDateString()}
+                  {formatLocalDate(tarantula.acquisition_date)}
                 </Text>
               </View>
             )}
@@ -615,7 +627,7 @@ export default function TarantulaDetailScreen() {
                 <MaterialCommunityIcons name="food" size={20} color={colors.primary} />
                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Last Fed</Text>
                 <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
-                  {new Date(tarantula.last_fed).toLocaleDateString()}
+                  {formatLocalDate(tarantula.last_fed)}
                 </Text>
               </View>
             )}
@@ -624,7 +636,7 @@ export default function TarantulaDetailScreen() {
                 <MaterialCommunityIcons name="refresh" size={20} color={colors.primary} />
                 <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Last Molt</Text>
                 <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
-                  {new Date(tarantula.last_molt).toLocaleDateString()}
+                  {formatLocalDate(tarantula.last_molt)}
                 </Text>
               </View>
             )}
@@ -670,7 +682,7 @@ export default function TarantulaDetailScreen() {
                       {log.food_type || 'Unknown food'} {log.food_size ? `(${log.food_size})` : ''}
                     </Text>
                     <Text style={[styles.logDate, { color: colors.textSecondary }]}>
-                      {new Date(log.fed_at).toLocaleDateString()}
+                      {formatLocalDate(log.fed_at)}
                     </Text>
                     {log.notes && <Text style={[styles.logNotes, { color: colors.textSecondary }]}>{log.notes}</Text>}
                   </View>
@@ -712,7 +724,7 @@ export default function TarantulaDetailScreen() {
                   </View>
                   <View style={styles.logContent}>
                     <Text style={[styles.logTitle, { color: colors.textPrimary }]}>
-                      Molt on {new Date(log.molted_at).toLocaleDateString()}
+                      Molt on {formatLocalDate(log.molted_at)}
                     </Text>
                     {(log.leg_span_before || log.leg_span_after) && (
                       <Text style={[styles.logDate, { color: colors.textSecondary }]}>
@@ -762,7 +774,7 @@ export default function TarantulaDetailScreen() {
                       {change.substrate_type || 'Substrate changed'}
                     </Text>
                     <Text style={[styles.logDate, { color: colors.textSecondary }]}>
-                      {new Date(change.changed_at).toLocaleDateString()}
+                      {formatLocalDate(change.changed_at)}
                       {change.substrate_depth ? ` • ${change.substrate_depth}` : ''}
                     </Text>
                     {change.reason && (

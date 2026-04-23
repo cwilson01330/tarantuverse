@@ -16,6 +16,7 @@ import SpeciesAutocomplete from '../../src/components/SpeciesAutocomplete';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 const UpgradeModal = React.lazy(() => import('../../src/components/UpgradeModal'));
 
@@ -308,8 +309,8 @@ export default function AddTarantulaScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Date Acquired</Text>
         <DateInput
-          value={formData.date_acquired ? new Date(formData.date_acquired) : new Date()}
-          onChange={(date) => setFormData({ ...formData, date_acquired: date.toISOString().split('T')[0] })}
+          value={parseLocalDate(formData.date_acquired) ?? new Date()}
+          onChange={(date) => setFormData({ ...formData, date_acquired: toISODateLocal(date) })}
           maximumDate={new Date()}
           label="Date Acquired"
         />
@@ -389,8 +390,8 @@ export default function AddTarantulaScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Last Substrate Change</Text>
         <DateInput
-          value={formData.last_substrate_change ? new Date(formData.last_substrate_change) : new Date()}
-          onChange={(date) => setFormData({ ...formData, last_substrate_change: date.toISOString().split('T')[0] })}
+          value={parseLocalDate(formData.last_substrate_change) ?? new Date()}
+          onChange={(date) => setFormData({ ...formData, last_substrate_change: toISODateLocal(date) })}
           maximumDate={new Date()}
           label="Last Substrate Change"
         />

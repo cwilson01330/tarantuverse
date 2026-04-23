@@ -15,6 +15,7 @@ import { apiClient } from '../../src/services/api';
 import { scheduleSubstrateReminder } from '../../src/services/notifications';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { toISODateLocal } from '../../src/utils/date';
 
 const SUBSTRATE_TYPES = [
   'Coco Fiber',
@@ -89,7 +90,7 @@ export default function AddSubstrateChangeScreen() {
     setSaving(true);
     try {
       await apiClient.post(`/tarantulas/${id}/substrate-changes`, {
-        changed_at: date.toISOString().split('T')[0],
+        changed_at: toISODateLocal(date),
         substrate_type: substrateType,
         substrate_depth: substrateDepth || undefined,
         reason: reason || undefined,
