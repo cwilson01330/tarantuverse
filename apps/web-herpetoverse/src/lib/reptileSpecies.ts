@@ -50,6 +50,23 @@ export interface Citation {
   ref_key?: string
 }
 
+/**
+ * One row of the species feeding-ratio table (Sprint 5).
+ *
+ * Mirrors the JSONB shape validated in `apps/api/app/schemas/reptile_species.py`.
+ * The adult bracket uses `weight_g_max: null` to mean open-ended upper bound.
+ * Ratios are percentages of the snake's body weight; intervals are days
+ * between feedings.
+ */
+export interface LifeStageFeedingBracket {
+  stage: 'hatchling' | 'juvenile' | 'subadult' | 'adult'
+  weight_g_max: number | null
+  ratio_pct_min: number
+  ratio_pct_max: number
+  interval_days_min: number
+  interval_days_max: number
+}
+
 export interface ReptileSpecies {
   id: string
   scientific_name: string
@@ -106,6 +123,14 @@ export interface ReptileSpecies {
   feeding_frequency_juvenile: string | null
   feeding_frequency_adult: string | null
   supplementation_notes: string | null
+
+  // Sprint 5 — feeding intelligence. Decimals come through as strings; the
+  // life-stage array is JSONB so it arrives already parsed.
+  hatchling_weight_min_g: string | null
+  hatchling_weight_max_g: string | null
+  power_feeding_threshold_pct: string | null
+  weight_loss_concern_pct_30d: string | null
+  life_stage_feeding: LifeStageFeedingBracket[] | null
 
   water_bowl_description: string | null
   soaking_behavior: string | null
@@ -212,7 +237,7 @@ export function formatIntRange(
   return `${fmt(min)}–${fmt(max)}${unit}`
 }
 
-function trimZeros(v: string): string {
+export function trimZeros(v: string): string {
   // "72.00" → "72", "1.50" → "1.5"
   return v.replace(/\.?0+$/, '')
 }

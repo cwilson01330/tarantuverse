@@ -11,7 +11,9 @@ import {
   formatRange,
   HANDLEABILITY_LABELS,
   IUCN_LABELS,
+  LifeStageFeedingBracket,
   ReptileSpecies,
+  trimZeros,
   UVB_LABELS,
 } from '@/lib/reptileSpecies'
 import {
@@ -488,6 +490,17 @@ function DietBlock({ species }: { species: ReptileSpecies }) {
   const hasPrey = preyLadder.some(([, v]) => v != null)
   const hasFreq = freqLadder.some(([, v]) => v != null)
 
+  // Sprint 5 — feeding-ratio table + quantitative thresholds. Only render
+  // each when data exists; species without snake-style feeding math (e.g.
+  // insectivores) will fall back to the textual ladders above.
+  const hasRatioTable =
+    species.life_stage_feeding != null && species.life_stage_feeding.length > 0
+  const hasThresholds =
+    species.hatchling_weight_min_g != null ||
+    species.hatchling_weight_max_g != null ||
+    species.power_feeding_threshold_pct != null ||
+    species.weight_loss_concern_pct_30d != null
+
   return (
     <>
       {diet && <LabeledStat label="Dietary type" value={diet} />}
@@ -506,10 +519,152 @@ function DietBlock({ species }: { species: ReptileSpecies }) {
         />
       )}
 
+      {hasRatioTable && (
+        <FeedingRatioTable brackets={species.life_stage_feeding!} />
+      )}
+
+      {hasThresholds && <FeedingThresholds species={species} />}
+
       {species.supplementation_notes && (
         <Note title="Supplementation">{species.supplementation_notes}</Note>
       )}
     </>
+  )
+}
+
+// Sprint 5 — Species-level feeding math. Brackets come from the JSONB
+// `life_stage_feeding` column; we derive the lower weight bound from the
+// previous bracket's `weight_g_max`. An adult row with `weight_g_max: null`
+// renders as "X g+" to mean open-ended.
+const STAGE_ORDER: Record<LifeStageFeedingBracket['stage'], number> = {
+  hatchling: 0,
+  juvenile: 1,
+  subadult: 2,
+  adult: 3,
+}
+
+const STAGE_LABEL: Record<LifeStageFeedingBracket['stage'], string> = {
+  hatchling: 'Hatchling',
+  juvenile: 'Juvenile',
+  subadult: 'Subadult',
+  adult: 'Adult',
+}
+
+function formatRatioRange(min: number, max: number): string {
+  if (min === max) return `${min}%`
+  return `${min}–${max}%`
+}
+
+function formatIntervalRange(min: number, max: number): string {
+  if (min === max) return `${min} day${min === 1 ? '' : 's'}`
+  return `${min}–${max} days`
+}
+
+function formatWeightRange(
+  min: number | null,
+  max: number | null,
+): string {
+  if (min == null && max == null) return '—'
+  if (max == null) return `${min} g+`
+  if (min == null) return `up to ${max} g`
+  if (min === max) return `${min} g`
+  return `${min}–${max} g`
+}
+
+function FeedingRatioTable({
+  brackets,
+}: {
+  brackets: LifeStageFeedingBracket[]
+}) {
+  // Backend validators guarantee stage order and monotonic weights, but sort
+  // defensively so a future edit can't break the UI.
+  const sorted = [...brackets].sort(
+    (a, b) => STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage],
+  )
+
+  // Derive lower weight bound from the previous bracket's ceiling.
+  const rows = sorted.map((b, i) => {
+    const prevMax = i === 0 ? null : sorted[i - 1].weight_g_max
+    const weightMin = prevMax == null ? null : prevMax + 1
+    return {
+      stage: b.stage,
+      weightLabel: formatWeightRange(weightMin, b.weight_g_max),
+      ratioLabel: formatRatioRange(b.ratio_pct_min, b.ratio_pct_max),
+      intervalLabel: formatIntervalRange(
+        b.interval_days_min,
+        b.interval_days_max,
+      ),
+    }
+  })
+
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wider text-neutral-500 mb-2">
+        Prey ratio by body weight
+      </div>
+      <div className="rounded-md border border-neutral-800 bg-neutral-900/40 overflow-hidden">
+        <div className="grid grid-cols-[1fr_1.2fr_1fr_1fr] gap-x-3 px-3 py-2 text-[10px] uppercase tracking-wider text-neutral-500 border-b border-neutral-800 bg-neutral-900/60">
+          <div>Stage</div>
+          <div>Body weight</div>
+          <div>Prey (% BW)</div>
+          <div>Interval</div>
+        </div>
+        <ul>
+          {rows.map((r) => (
+            <li
+              key={r.stage}
+              className="grid grid-cols-[1fr_1.2fr_1fr_1fr] gap-x-3 px-3 py-2.5 text-sm text-neutral-200 border-b border-neutral-800/70 last:border-b-0"
+            >
+              <div className="text-neutral-300">{STAGE_LABEL[r.stage]}</div>
+              <div>{r.weightLabel}</div>
+              <div>{r.ratioLabel}</div>
+              <div>{r.intervalLabel}</div>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="text-[11px] text-neutral-500 mt-2 leading-relaxed">
+        Feed prey roughly the listed percentage of the snake's current weight,
+        at the listed interval. Use it as a starting point — adjust based on
+        body condition, not the calendar.
+      </p>
+    </div>
+  )
+}
+
+function FeedingThresholds({ species }: { species: ReptileSpecies }) {
+  const hatchling = formatRange(
+    species.hatchling_weight_min_g,
+    species.hatchling_weight_max_g,
+    'g',
+  )
+  const powerFeeding =
+    species.power_feeding_threshold_pct != null
+      ? `> ${trimZeros(species.power_feeding_threshold_pct)}% body weight`
+      : null
+  const concernLoss =
+    species.weight_loss_concern_pct_30d != null
+      ? `> ${trimZeros(species.weight_loss_concern_pct_30d)}% in 30 days`
+      : null
+
+  const cells: Array<[string, string]> = []
+  if (hatchling) cells.push(['Typical hatchling weight', hatchling])
+  if (powerFeeding) cells.push(['Power-feeding line', powerFeeding])
+  if (concernLoss) cells.push(['30-day weight-loss concern', concernLoss])
+
+  if (cells.length === 0) return null
+
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wider text-neutral-500 mb-2">
+        Feeding thresholds
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {cells.map(([label, value]) => (
+          <LabeledStat key={label} label={label} value={value} />
+        ))}
+      </div>
+    </div>
   )
 }
 
