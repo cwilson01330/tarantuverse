@@ -6,7 +6,7 @@ Every entry carries 3+ citations, at least one Tier A (peer-reviewed or
 veterinary) or authoritative keeper reference. Husbandry numbers are
 ranges, not single points, to reflect source variation.
 
-Scope: 10 starter species where we have solid multi-source confirmation.
+Scope: 11 starter species where we have solid multi-source confirmation.
 
 Snakes (5):
   - Python regius (ball python)
@@ -15,7 +15,7 @@ Snakes (5):
   - Heterodon nasicus (Western hognose)
   - Gongylophis colubrinus (Kenyan sand boa)
 
-Lizards (5) — added when the lizard subsystem reached API parity with
+Lizards (6) — added when the lizard subsystem reached API parity with
 snakes. Feeding intelligence caveat: `life_stage_feeding` was designed
 for the snake whole-prey-bolus model (ratio of prey weight to body
 weight). For insectivorous and omnivorous lizards the ratio fields are
@@ -24,6 +24,7 @@ crude proxies; authoritative feeding protocols live in
   - Eublepharis macularius (leopard gecko)
   - Hemitheconyx caudicinctus (African fat-tailed gecko)
   - Correlophus ciliatus (crested gecko)
+  - Rhacodactylus auriculatus (gargoyle gecko)
   - Pogona vitticeps (bearded dragon)
   - Tiliqua scincoides (blue-tongued skink)
 
@@ -294,6 +295,37 @@ CITES = {
         "url": "https://treeoflifeexotics.vet/education-resource-center/for-clients/lizards/crested-gecko-care",
         "publication_date": "2023-01-01",
         "summary": "Veterinary husbandry reference for Correlophus ciliatus.",
+    },
+    # Gargoyle gecko
+    "reptifiles_gargoyle_gecko": {
+        "source_type": "breeder_community",
+        "title": "Gargoyle Gecko Care Sheet",
+        "author": "ReptiFiles",
+        "url": "https://reptifiles.com/gargoyle-gecko-care-guide/",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Keeper reference for Rhacodactylus auriculatus with veterinary "
+            "cross-referenced husbandry ranges."
+        ),
+    },
+    "reptiles_magazine_gargoyle_gecko": {
+        "source_type": "breeder_community",
+        "title": "Gargoyle Gecko Care Sheet",
+        "author": "Reptiles Magazine",
+        "url": "https://reptilesmagazine.com/gargoyle-gecko-care-sheet/",
+        "publication_date": "2022-01-01",
+        "summary": "Industry magazine husbandry reference for Rhacodactylus auriculatus.",
+    },
+    "biodude_gargoyle_gecko": {
+        "source_type": "breeder_community",
+        "title": "Gargoyle Gecko Care Sheet and Bioactive Terrarium Maintenance",
+        "author": "The Bio Dude",
+        "url": "https://www.thebiodude.com/blogs/gecko-caresheets/gargoyle-gecko-care-sheet-and-maintenance",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Bioactive-focused husbandry reference for Rhacodactylus auriculatus "
+            "from a major substrate and vivarium industry supplier."
+        ),
     },
     # Bearded dragon
     "reptifiles_bearded_dragon": {
@@ -1190,6 +1222,134 @@ SPECIES_DATA = [
             "reptifiles_crested_gecko",
             "pangea_crested_gecko",
             "tree_of_life_crested_gecko",
+        ),
+    },
+    # -- Gargoyle gecko -----------------------------------------------------
+    {
+        "scientific_name": "Rhacodactylus auriculatus",
+        "common_names": ["Gargoyle Gecko", "Knob-headed Giant Gecko", "New Caledonian Bumpy Gecko"],
+        "genus": "Rhacodactylus",
+        "family": "Diplodactylidae",
+        "order_name": "Squamata",
+        "care_level": "beginner",
+        "handleability": "docile",
+        "activity_period": "nocturnal",
+        "native_region": "Southern Grande Terre, New Caledonia — humid subtropical forest and shrubland",
+        "adult_length_min_in": Decimal("8"),
+        "adult_length_max_in": Decimal("10"),
+        "adult_weight_min_g": Decimal("45"),
+        "adult_weight_max_g": Decimal("80"),
+        # Temperature profile mirrors crested gecko — room-temperature husbandry
+        # is standard and temperatures above ~82°F are actively harmful.
+        "temp_cool_min": Decimal("68"),
+        "temp_cool_max": Decimal("74"),
+        "temp_warm_min": Decimal("72"),
+        "temp_warm_max": Decimal("80"),
+        "temp_basking_min": Decimal("78"),
+        "temp_basking_max": Decimal("82"),
+        "temp_night_min": Decimal("65"),
+        "temp_night_max": Decimal("72"),
+        # Gargoyles tolerate (and often prefer) slightly drier conditions than
+        # cresteds — sources converge around 50–70% ambient with a nightly
+        # mist-driven spike.
+        "humidity_min": 50,
+        "humidity_max": 70,
+        "humidity_shed_boost_min": 70,
+        "humidity_shed_boost_max": 90,
+        "uvb_required": False,
+        "uvb_type": "T5_HO",
+        "uvb_distance_min_in": Decimal("12"),
+        "uvb_distance_max_in": Decimal("18"),
+        "uvb_replacement_months": 12,
+        "enclosure_type": "arboreal",
+        "enclosure_min_hatchling": "Kritter Keeper or 5-gallon equivalent (too large stresses young gargoyles)",
+        "enclosure_min_juvenile": "12\"L x 12\"W x 18\"H minimum",
+        "enclosure_min_adult": "18\"L x 18\"W x 24\"H (or 36\"H for a planted bioactive vivarium)",
+        "bioactive_suitable": True,
+        "substrate_safe_list": [
+            "coco fiber / topsoil blend",
+            "bioactive mix with sphagnum topper",
+            "paper towel (quarantine)",
+        ],
+        "substrate_avoid_list": ["calcium sand", "walnut shell", "cedar", "pine"],
+        "substrate_depth_min_in": Decimal("2"),
+        "substrate_depth_max_in": Decimal("4"),
+        "diet_type": "omnivore",
+        "prey_size_hatchling": "Pinhead crickets (rare treat)",
+        "prey_size_juvenile": "1/4\" crickets, small dubia (1–2× per week)",
+        "prey_size_adult": "Medium crickets, dubia, hornworms (1–2× per week)",
+        "feeding_frequency_hatchling": "MRP (Repashy, Pangea, Black Panther Zoological) nightly; insects 1× per week once feeding well",
+        "feeding_frequency_juvenile": "MRP 3–5× per week; live insects 1–2× per week",
+        "feeding_frequency_adult": "MRP 3× per week; live insects 1–2× per week",
+        # Same caveat as crested — `life_stage_feeding` ratio fields are crude
+        # proxies for an MRP-driven diet. Insect ratios are slightly higher
+        # than crested to reflect the documented protein preference.
+        "hatchling_weight_min_g": Decimal("2"),
+        "hatchling_weight_max_g": Decimal("4"),
+        "power_feeding_threshold_pct": Decimal("8.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 8, "ratio_pct_min": 3, "ratio_pct_max": 6, "interval_days_min": 1, "interval_days_max": 2},
+            {"stage": "juvenile", "weight_g_max": 25, "ratio_pct_min": 3, "ratio_pct_max": 6, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "subadult", "weight_g_max": 50, "ratio_pct_min": 2, "ratio_pct_max": 5, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 2, "ratio_pct_max": 4, "interval_days_min": 2, "interval_days_max": 3},
+        ],
+        "supplementation_notes": (
+            "Primary diet is a complete powdered gecko meal-replacement "
+            "(MRP) — Repashy, Pangea, or Black Panther Zoological are the "
+            "industry standards. Gargoyles are **more insect-driven than "
+            "crested geckos** and visibly thrive on 1–2 insect meals per "
+            "week in addition to the MRP staple. Dust insects with calcium "
+            "(no D3 needed if MRP is the primary diet). No calcium dusting "
+            "of MRP itself is necessary."
+        ),
+        "water_bowl_description": (
+            "Small bowl plus nightly misting — gargoyles drink from droplets "
+            "on leaves and glass. A light evening mist on one side of the "
+            "enclosure creates a brief humidity spike, with the enclosure "
+            "drying through the day."
+        ),
+        "brumation_required": False,
+        "defensive_displays": [
+            "tail drop (tail *does* regenerate, unlike crested geckos)",
+            "biting (mild, but more willing than crested geckos)",
+            "vocalizing (squeaks, barks)",
+            "cannibalism toward smaller conspecifics — adults will eat hatchlings and juveniles",
+        ],
+        "lifespan_captivity_min_yrs": 15,
+        "lifespan_captivity_max_yrs": 20,
+        "cites_appendix": None,
+        "iucn_status": "LC",  # Least Concern per IUCN (2011 assessment)
+        "wild_population_notes": (
+            "Endemic to southern Grande Terre and nearby islets in New "
+            "Caledonia. Listed as Least Concern by IUCN (assessed 2011) "
+            "with an estimated wild population exceeding 10,000 "
+            "individuals. Captive population is large and genetically "
+            "well-established; all animals in the pet trade should be "
+            "captive-bred."
+        ),
+        "has_morph_market": True,
+        "morph_complexity": "moderate",
+        "care_guide": (
+            "**Gargoyle Gecko (Rhacodactylus auriculatus)** — Close cousin "
+            "of the crested gecko, often described as a 'crestie with a "
+            "chunkier build and a calmer attitude'. Same room-temperature "
+            "husbandry (never exceed 82°F), the same MRP-based diet, and "
+            "the same vertically-oriented planted enclosure. **Key "
+            "differences from crested gecko:** (1) Gargoyles **regrow "
+            "their tail** after a drop — crested geckos do not. (2) "
+            "Gargoyles are more insect-driven — plan on 1–2 insect meals "
+            "per week instead of the crested's optional 0–1. (3) Gargoyles "
+            "are **cannibalistic** toward smaller geckos and must be "
+            "housed alone except for controlled breeding pairs. (4) "
+            "Slightly drier humidity preference (50–70%) and a slightly "
+            "larger adult size (45–80 g vs. the crested's 35–55 g). "
+            "Temperament is usually calmer and less jumpy than a crestie."
+        ),
+        "sources": cite(
+            "reptifiles_gargoyle_gecko",
+            "reptiles_magazine_gargoyle_gecko",
+            "biodude_gargoyle_gecko",
         ),
     },
     # -- Bearded dragon -----------------------------------------------------
