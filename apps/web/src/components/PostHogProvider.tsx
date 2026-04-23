@@ -29,8 +29,13 @@ import { useSession } from "next-auth/react"
 import posthog from "posthog-js"
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
-const POSTHOG_HOST =
-  process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com"
+// Route through our own /ingest path (see next.config.js rewrites).
+// First-party URL survives ad blockers that block us.i.posthog.com.
+const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "/ingest"
+// Where the PostHog dashboard lives — used so "view in PostHog" links
+// in the debug toolbar point to the real UI, not our proxy path.
+const POSTHOG_UI_HOST =
+  process.env.NEXT_PUBLIC_POSTHOG_UI_HOST || "https://us.posthog.com"
 
 let initialized = false
 
@@ -41,6 +46,7 @@ function initPostHog() {
 
   posthog.init(POSTHOG_KEY, {
     api_host: POSTHOG_HOST,
+    ui_host: POSTHOG_UI_HOST,
     // We send pageviews manually from PostHogPageviews below.
     capture_pageview: false,
     capture_pageleave: true,
