@@ -27,6 +27,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.database import SessionLocal
 from app.models.reptile_species import ReptileSpecies
+from app.utils.slugs import slugify_unique
 
 
 # ---------------------------------------------------------------------------
@@ -703,10 +704,18 @@ def seed():
     added = 0
     updated = 0
 
+    def _slug_taken(candidate: str, exclude_id=None) -> bool:
+        q = db.query(ReptileSpecies.id).filter(ReptileSpecies.slug == candidate)
+        if exclude_id is not None:
+            q = q.filter(ReptileSpecies.id != exclude_id)
+        return q.first() is not None
+
     try:
         for data in SPECIES_DATA:
             scientific_name = data["scientific_name"].strip()
             scientific_name_lower = scientific_name.lower()
+            common_names = data.get("common_names") or []
+            slug_source = (common_names[0] if common_names else None) or scientific_name
 
             existing = (
                 db.query(ReptileSpecies)
@@ -715,24 +724,42 @@ def seed():
             )
 
             if existing:
-                # Refresh content on re-run but preserve is_verified / submitted_by
+                # Refresh content on re-run but preserve is_verified /
+                # submitted_by. Also preserve any editorial slug override
+                # an admin may have applied through the UI — we only
+                # regenerate when slug is missing (fresh DB after backfill).
                 for field, value in data.items():
                     if field == "scientific_name":
                         continue
                     setattr(existing, field, value)
+                if not getattr(existing, "slug", None):
+                    existing.slug = slugify_unique(
+                        slug_source,
+                        is_taken=lambda s: _slug_taken(s, exclude_id=existing.id),
+                        fallback=f"species-{str(existing.id)[:8]}",
+                    )
                 updated += 1
-                print(f"  Updated: {scientific_name}")
+                print(f"  Updated: {scientific_name}  (slug={existing.slug})")
                 continue
 
+            new_id = uuid.uuid4()
+            slug_value = slugify_unique(
+                slug_source,
+                is_taken=_slug_taken,
+                fallback=f"species-{str(new_id)[:8]}",
+            )
             species = ReptileSpecies(
-                id=uuid.uuid4(),
+                id=new_id,
                 scientific_name_lower=scientific_name_lower,
+                slug=slug_value,
                 is_verified=True,
                 **data,
             )
             db.add(species)
+            # Flush so the next iteration's uniqueness check sees this row.
+            db.flush()
             added += 1
-            print(f"  Added:   {scientific_name}")
+            print(f"  Added:   {scientific_name}  (slug={slug_value})")
 
         db.commit()
         print(f"\nDone. Added {added}, updated {updated}.")

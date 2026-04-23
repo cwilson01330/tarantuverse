@@ -45,6 +45,11 @@ class ReptileSpecies(Base):
     scientific_name_lower = Column(
         String(255), unique=True, nullable=False, index=True
     )
+    # URL slug for public SEO care-sheet routes (`/species/{slug}`). Derived
+    # from common_names[0] falling back to scientific_name; backfilled +
+    # uniqueness-enforced by migration slg_20260423. Keep stable once
+    # published — inbound links + sitemap entries depend on it.
+    slug = Column(String(160), unique=True, nullable=False, index=True)
     common_names = Column(ARRAY(String), default=[])
     genus = Column(String(100), index=True)
     family = Column(String(100))

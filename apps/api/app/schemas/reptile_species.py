@@ -193,6 +193,15 @@ class ReptileSpeciesCreate(ReptileSpeciesBase):
 
 class ReptileSpeciesUpdate(BaseModel):
     """Schema for updating a reptile species (all fields optional)"""
+    # Editorial slug override. Admin-only at the router layer; pattern
+    # here mirrors slugify() output — lowercase alphanumerics separated
+    # by single hyphens, no leading/trailing hyphens, 1–160 chars.
+    slug: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=160,
+        pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$",
+    )
     common_names: Optional[List[str]] = None
     genus: Optional[str] = None
     family: Optional[str] = None
@@ -272,6 +281,11 @@ class ReptileSpeciesUpdate(BaseModel):
 
 class ReptileSpeciesResponse(ReptileSpeciesBase):
     id: uuid.UUID
+    # URL slug — always populated on read (DB NOT NULL after migration
+    # slg_20260423). The create path generates it server-side, so it's
+    # never accepted from clients; that's why it lives on Response and
+    # not on Base.
+    slug: str
     is_verified: bool
     submitted_by: Optional[uuid.UUID] = None
     verified_by: Optional[uuid.UUID] = None
@@ -289,6 +303,7 @@ class ReptileSpeciesResponse(ReptileSpeciesBase):
 class ReptileSpeciesSearchResult(BaseModel):
     """Compact shape for autocomplete — matches the Species pattern."""
     id: uuid.UUID
+    slug: str
     scientific_name: str
     common_names: List[str] = []
     care_level: Optional[str] = None

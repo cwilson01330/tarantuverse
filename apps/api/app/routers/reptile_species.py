@@ -31,6 +31,7 @@ from app.schemas.reptile_species import (
     ReptileSpeciesUpdate,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.slugs import slugify_unique
 
 
 router = APIRouter()
@@ -122,6 +123,29 @@ async def get_reptile_species_by_name(
     return species
 
 
+@router.get("/by-slug/{slug}", response_model=ReptileSpeciesResponse)
+async def get_reptile_species_by_slug(
+    slug: str,
+    db: Session = Depends(get_db),
+):
+    """Get a reptile species by URL slug. Public — powers the SEO-
+    indexed public care sheets at `/species/{slug}` on the web app.
+
+    Case-insensitive match: URLs mis-capitalized by paste or share-
+    button mangling still resolve. Stored form is always lowercase
+    so we normalize the input before lookup.
+    """
+    normalized = slug.strip().lower()
+    if not normalized:
+        raise HTTPException(status_code=404, detail="Reptile species not found")
+    species = (
+        db.query(ReptileSpecies).filter(ReptileSpecies.slug == normalized).first()
+    )
+    if not species:
+        raise HTTPException(status_code=404, detail="Reptile species not found")
+    return species
+
+
 @router.get("/{species_id}", response_model=ReptileSpeciesResponse)
 async def get_reptile_species(
     species_id: uuid.UUID,
@@ -134,6 +158,30 @@ async def get_reptile_species(
     if not species:
         raise HTTPException(status_code=404, detail="Reptile species not found")
     return species
+
+
+def _generate_slug_for(
+    db: Session,
+    common_names: List[str],
+    scientific_name: str,
+) -> str:
+    """Pick the best source string and disambiguate against existing rows.
+
+    Used by POST / and bulk-import. Mirrors the migration's backfill
+    logic so create-time slugs match what the backfill produced for
+    seeded rows.
+    """
+    source = (common_names[0] if common_names else None) or scientific_name
+
+    def is_taken(candidate: str) -> bool:
+        return (
+            db.query(ReptileSpecies.id)
+            .filter(ReptileSpecies.slug == candidate)
+            .first()
+            is not None
+        )
+
+    return slugify_unique(source, is_taken=is_taken, fallback="species")
 
 
 @router.post(
@@ -165,9 +213,16 @@ async def create_reptile_species(
     species_dict = species_data.model_dump()
     species_dict["scientific_name"] = scientific_name
 
+    # Server-generated slug — clients don't get to choose at create
+    # time. Editorial overrides happen through PUT (admin-only).
+    slug_value = _generate_slug_for(
+        db, species_dict.get("common_names") or [], scientific_name
+    )
+
     new_species = ReptileSpecies(
         **species_dict,
         scientific_name_lower=scientific_name_lower,
+        slug=slug_value,
         submitted_by=current_user.id,
         is_verified=False,
     )
@@ -225,9 +280,17 @@ async def bulk_import_reptile_species(
             data = payload.model_dump()
             data["scientific_name"] = scientific_name
 
+            # Generate slug the same way single-row create does. Flushes
+            # happen per row below so the uniqueness check sees previously
+            # inserted rows in this same batch.
+            slug_value = _generate_slug_for(
+                db, data.get("common_names") or [], scientific_name
+            )
+
             new_species = ReptileSpecies(
                 **data,
                 scientific_name_lower=scientific_name_lower,
+                slug=slug_value,
                 submitted_by=current_user.id,
                 is_verified=True,  # admin-imported → trusted at import time
                 verified_by=current_user.id,
@@ -290,6 +353,34 @@ async def update_reptile_species(
     if update_data.get("is_verified") is True and not species.is_verified:
         species.verified_by = current_user.id
         species.verified_at = func.now()
+
+    # Slug override — admins only. Silently drop for non-admin submitters
+    # so a community contributor can't squat a short/memorable slug.
+    # If an admin does supply a new slug, make sure it's not colliding
+    # with another row before committing.
+    if "slug" in update_data:
+        if not current_user.is_superuser:
+            update_data.pop("slug")
+        else:
+            new_slug = update_data["slug"].strip().lower()
+            if new_slug != species.slug:
+                conflict = (
+                    db.query(ReptileSpecies.id)
+                    .filter(
+                        ReptileSpecies.slug == new_slug,
+                        ReptileSpecies.id != species.id,
+                    )
+                    .first()
+                )
+                if conflict:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Slug '{new_slug}' is already in use",
+                    )
+                update_data["slug"] = new_slug
+            else:
+                # No-op — don't write the same value back.
+                update_data.pop("slug")
 
     for field, value in update_data.items():
         setattr(species, field, value)
