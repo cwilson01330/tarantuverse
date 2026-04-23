@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Herpetoverse",
+    "slug": "herpetoverse",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "sdkVersion": "54.0.0",
+    "entryPoint": "./index.js",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.herpetoverse.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Herpetoverse needs access to your photo library so you can attach photos to your reptile profiles — sheds, feedings, and growth over time.",
+        "NSCameraUsageDescription": "Herpetoverse needs access to your camera so you can photograph your reptiles, sheds, and enclosure setups directly within the app."
+      }
+    },
+    "android": {
+      "package": "com.herpetoverse.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0B0B0B"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "scheme": "herpetoverse",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "8f745ac0-847d-4a69-93b3-a3a31970d616"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "owner": "gwizard202"
+  }
+}
