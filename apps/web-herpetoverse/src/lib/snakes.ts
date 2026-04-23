@@ -156,6 +156,35 @@ export function getSnake(id: string): Promise<Snake> {
   return apiFetch<Snake>(`/api/v1/snakes/${encodeURIComponent(id)}`)
 }
 
+/**
+ * Payload for creating a snake. Mirrors SnakeCreate on the backend; every
+ * field is optional so the form can progressively disclose sections. Numeric
+ * fields accept either strings (straight from an <input>) or numbers —
+ * backend Pydantic coerces Decimal either way.
+ */
+export interface CreateSnakePayload {
+  name?: string | null
+  common_name?: string | null
+  scientific_name?: string | null
+  reptile_species_id?: string | null
+  sex?: Sex | null
+  hatch_date?: string | null
+  date_acquired?: string | null
+  source?: Source | null
+  source_breeder?: string | null
+  price_paid?: string | number | null
+  current_weight_g?: string | number | null
+  current_length_in?: string | number | null
+  notes?: string | null
+}
+
+export function createSnake(payload: CreateSnakePayload): Promise<Snake> {
+  return apiFetch<Snake>('/api/v1/snakes/', {
+    method: 'POST',
+    json: payload,
+  })
+}
+
 export function listWeightLogs(snakeId: string): Promise<WeightLog[]> {
   return apiFetch<WeightLog[]>(
     `/api/v1/snakes/${encodeURIComponent(snakeId)}/weight-logs`,

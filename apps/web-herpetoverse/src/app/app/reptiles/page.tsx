@@ -60,13 +60,12 @@ export default function ReptilesPage() {
             Weights, feedings, sheds — per animal.
           </p>
         </div>
-        <button
-          disabled
-          title="Adding reptiles from the web is coming soon — for now, add via the mobile app or Tarantuverse web."
-          className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-neutral-800 text-sm text-neutral-500 cursor-not-allowed"
+        <Link
+          href="/app/reptiles/add"
+          className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-herp-teal/40 bg-herp-teal/10 text-sm text-herp-teal hover:bg-herp-teal/20 hover:border-herp-teal/60 transition-colors"
         >
           <span aria-hidden="true">＋</span> Add reptile
-        </button>
+        </Link>
       </header>
 
       {error && (
@@ -169,14 +168,15 @@ function EmptyState() {
         No reptiles yet
       </h2>
       <p className="text-sm text-neutral-400 max-w-md mx-auto mb-6">
-        Herpetoverse shares your Tarantuverse account, but web-based reptile
-        add isn&rsquo;t wired up yet. Add a snake via the mobile app and it
-        will show up here.
+        Add your first snake to start tracking weights, feedings, and sheds.
+        Link it to a species to unlock prey suggestions.
       </p>
-      <p className="text-xs text-neutral-600">
-        We&rsquo;re testing the model first — web-based CRUD ships after the
-        detail page proves out.
-      </p>
+      <Link
+        href="/app/reptiles/add"
+        className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md herp-gradient-bg text-herp-dark font-bold tracking-wide transition-opacity hover:opacity-90"
+      >
+        <span aria-hidden="true">＋</span> Add your first reptile
+      </Link>
     </div>
   )
 }

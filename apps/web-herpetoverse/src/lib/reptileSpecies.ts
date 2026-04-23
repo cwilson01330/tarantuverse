@@ -205,6 +205,40 @@ export async function fetchReptileSpeciesById(
   }
 }
 
+/**
+ * Lightweight search result for the autocomplete picker. Matches
+ * ReptileSpeciesSearchResult on the backend. Kept separate from
+ * ReptileSpecies so we don't pay for the full care-sheet payload on every
+ * keystroke.
+ */
+export interface ReptileSpeciesSearchResult {
+  id: string
+  scientific_name: string
+  common_names: string[]
+  care_level: CareLevel | null
+  image_url: string | null
+}
+
+/**
+ * Autocomplete search — returns at most `limit` matches. Unauthenticated
+ * endpoint, so we use plain fetch (no bearer). Called client-side from the
+ * autocomplete component, so we skip Next's fetch cache.
+ */
+export async function searchReptileSpecies(
+  q: string,
+  limit = 10,
+): Promise<ReptileSpeciesSearchResult[]> {
+  if (q.trim().length < 2) return []
+  const url =
+    `${API_URL}/api/v1/reptile-species/search` +
+    `?q=${encodeURIComponent(q.trim())}&limit=${limit}`
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) {
+    throw new Error(`Search failed (${res.status})`)
+  }
+  return (await res.json()) as ReptileSpeciesSearchResult[]
+}
+
 // ---------------------------------------------------------------------------
 // Display helpers. Kept here so list + detail pages format consistently.
 // ---------------------------------------------------------------------------
