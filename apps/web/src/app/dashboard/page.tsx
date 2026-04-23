@@ -88,9 +88,10 @@ export default function DashboardHub() {
       const headers = { 'Authorization': `Bearer ${authToken}` }
 
       // Fetch tarantulas, enclosures, and subscription limits in parallel
+      // Dashboard only surfaces tarantula-purpose enclosures — feeder bins live at /dashboard/feeders
       const [tarantulasRes, enclosuresRes, limitsRes] = await Promise.all([
         fetch(`${API_URL}/api/v1/tarantulas/`, { headers }).catch(() => null),
-        fetch(`${API_URL}/api/v1/enclosures/`, { headers }).catch(() => null),
+        fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/promo-codes/me/limits`, { headers }).catch(() => null),
       ])
 

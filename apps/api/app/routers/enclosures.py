@@ -4,7 +4,7 @@ Enclosure routes for communal and solo tarantula setups
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone, date
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
@@ -65,13 +65,33 @@ def get_enclosure_with_computed_fields(enclosure: Enclosure, db: Session) -> dic
 
 @router.get("/", response_model=List[EnclosureListResponse])
 async def get_enclosures(
+    purpose: Optional[str] = Query(
+        None,
+        description="Filter by enclosure purpose. 'tarantula' (default collection view) or 'feeder' (feeder bins). Omit to return all.",
+        pattern="^(tarantula|feeder|all)$",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all enclosures for authenticated user"""
-    enclosures = db.query(Enclosure).filter(
-        Enclosure.user_id == current_user.id
-    ).order_by(Enclosure.created_at.desc()).all()
+    """Get all enclosures for authenticated user.
+
+    The `purpose` query param filters by the lightweight container tag
+    (Enclosure.purpose). This is separate from the FeederColony subsystem
+    and only excludes feeder-bin-tagged enclosures from the tarantula view.
+    Legacy rows with NULL purpose are treated as 'tarantula'.
+    """
+    query = db.query(Enclosure).filter(Enclosure.user_id == current_user.id)
+
+    if purpose == "tarantula":
+        # NULL purpose == legacy enclosure, default to tarantula view
+        query = query.filter(
+            (Enclosure.purpose == "tarantula") | (Enclosure.purpose.is_(None))
+        )
+    elif purpose == "feeder":
+        query = query.filter(Enclosure.purpose == "feeder")
+    # purpose == "all" or None → no additional filter
+
+    enclosures = query.order_by(Enclosure.created_at.desc()).all()
 
     result = []
     for enc in enclosures:

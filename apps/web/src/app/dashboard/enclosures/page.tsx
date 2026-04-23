@@ -13,6 +13,7 @@ interface Enclosure {
   name: string
   is_communal: boolean
   population_count: number | null
+  purpose: string | null
   species_name: string | null
   inhabitant_count: number
   days_since_last_feeding: number | null
@@ -45,7 +46,8 @@ export default function EnclosuresPage() {
     setError('')
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/enclosures/`, {
+      // Filter to tarantula-purpose enclosures only — feeder bins live at /dashboard/feeders
+      const response = await fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

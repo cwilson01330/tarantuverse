@@ -85,7 +85,7 @@ export default function DeleteAccountPage() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Delete Your Account</h1>
           <p className="text-gray-600 dark:text-gray-400 mb-8">
-            Tarantuverse by Tarantuverse LLC
+            Tarantuverse, operated by Appalachian Tarantulas, LLC
           </p>
 
           {/* What gets deleted */}
