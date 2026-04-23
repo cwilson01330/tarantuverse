@@ -313,11 +313,30 @@ export default function CollectionScreen() {
           )}
           {item.sex && (
             <View
-              style={[styles.sexBadge, item.sex === 'female' ? styles.femaleBadge : styles.maleBadge]}
-              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
+              style={[
+                styles.sexBadge,
+                item.sex === 'female'
+                  ? styles.femaleBadge
+                  : item.sex === 'male'
+                    ? styles.maleBadge
+                    : styles.unknownBadge,
+              ]}
+              accessibilityLabel={
+                item.sex === 'female'
+                  ? 'Female'
+                  : item.sex === 'male'
+                    ? 'Male'
+                    : 'Unknown sex'
+              }
             >
               <MaterialCommunityIcons
-                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
+                name={
+                  item.sex === 'female'
+                    ? 'gender-female'
+                    : item.sex === 'male'
+                      ? 'gender-male'
+                      : 'help-circle-outline'
+                }
                 size={16}
                 color="#fff"
               />
@@ -381,10 +400,28 @@ export default function CollectionScreen() {
             <Text style={styles.listName} numberOfLines={1}>{displayName}</Text>
             {item.sex && (
               <MaterialCommunityIcons
-                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
+                name={
+                  item.sex === 'female'
+                    ? 'gender-female'
+                    : item.sex === 'male'
+                      ? 'gender-male'
+                      : 'help-circle-outline'
+                }
                 size={18}
-                color={item.sex === 'female' ? '#ec4899' : '#3b82f6'}
-                accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
+                color={
+                  item.sex === 'female'
+                    ? '#ec4899'
+                    : item.sex === 'male'
+                      ? '#3b82f6'
+                      : '#9ca3af'
+                }
+                accessibilityLabel={
+                  item.sex === 'female'
+                    ? 'Female'
+                    : item.sex === 'male'
+                      ? 'Male'
+                      : 'Unknown sex'
+                }
               />
             )}
           </View>
@@ -643,6 +680,9 @@ export default function CollectionScreen() {
     },
     femaleBadge: {
       backgroundColor: '#ec4899',
+    },
+    unknownBadge: {
+      backgroundColor: '#9ca3af',
     },
     feedingBadge: {
       position: 'absolute',

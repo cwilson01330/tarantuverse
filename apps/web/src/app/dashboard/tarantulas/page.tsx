@@ -478,7 +478,7 @@ export default function TarantulasPage() {
                               <td className="px-4 py-3 hidden md:table-cell align-middle">
                                 {tarantula.sex ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
-                                    {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
+                                    {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '?'} {tarantula.sex}
                                   </span>
                                 ) : (
                                   <span className="text-theme-tertiary text-sm">—</span>
@@ -576,7 +576,7 @@ export default function TarantulasPage() {
                           <div className="flex flex-wrap gap-2">
                             {tarantula.sex && (
                               <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
-                                {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
+                                {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '?'} {tarantula.sex}
                               </span>
                             )}
                             {tarantula.date_acquired && (

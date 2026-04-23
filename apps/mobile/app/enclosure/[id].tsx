@@ -991,9 +991,21 @@ export default function EnclosureDetailScreen() {
               </View>
               {inhabitant.sex && (
                 <MaterialCommunityIcons
-                  name={inhabitant.sex === 'female' ? 'gender-female' : 'gender-male'}
+                  name={
+                    inhabitant.sex === 'female'
+                      ? 'gender-female'
+                      : inhabitant.sex === 'male'
+                        ? 'gender-male'
+                        : 'help-circle-outline'
+                  }
                   size={20}
-                  color={inhabitant.sex === 'female' ? '#ec4899' : '#3b82f6'}
+                  color={
+                    inhabitant.sex === 'female'
+                      ? '#ec4899'
+                      : inhabitant.sex === 'male'
+                        ? '#3b82f6'
+                        : '#9ca3af'
+                  }
                 />
               )}
               <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />

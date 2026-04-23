@@ -814,7 +814,7 @@ export default function TarantulaDetailPage() {
             <div className="flex flex-wrap gap-2">
               {tarantula.sex && (
                 <span className="px-4 py-2 rounded-full bg-white/90 backdrop-blur-sm text-purple-900 text-sm font-semibold inline-flex items-center gap-1">
-                  {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '⚧'} {tarantula.sex}
+                  {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '?'} {tarantula.sex}
                 </span>
               )}
               {daysSinceAcquired !== null && (

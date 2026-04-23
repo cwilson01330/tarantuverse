@@ -543,7 +543,7 @@ export default function KeeperProfilePage() {
                   <span className="text-lg font-bold">{stats.females}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-primary-100">⚧ Unsexed</span>
+                  <span className="text-primary-100">? Unsexed</span>
                   <span className="text-lg font-bold">{stats.unsexed}</span>
                 </div>
               </div>
@@ -625,7 +625,7 @@ export default function KeeperProfilePage() {
                         <div className="flex gap-2">
                           {tarantula.sex && (
                             <span className="px-2 py-1 bg-surface rounded text-xs font-semibold text-gray-700 dark:text-gray-300">
-                              {tarantula.sex === 'male' ? '♂️ Male' : tarantula.sex === 'female' ? '♀️ Female' : '⚧ Unsexed'}
+                              {tarantula.sex === 'male' ? '♂️ Male' : tarantula.sex === 'female' ? '♀️ Female' : '? Unsexed'}
                             </span>
                           )}
                           {tarantula.date_acquired && (
