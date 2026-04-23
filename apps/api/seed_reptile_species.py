@@ -1305,9 +1305,8 @@ SPECIES_DATA = [
         ),
         "water_bowl_description": (
             "Small bowl plus nightly misting — gargoyles drink from droplets "
-            "on leaves and glass. A light evening mist on one side of the "
-            "enclosure creates a brief humidity spike, with the enclosure "
-            "drying through the day."
+            "on leaves and glass. Light evening mist on one side creates a "
+            "brief humidity spike; the enclosure should dry through the day."
         ),
         "brumation_required": False,
         "defensive_displays": [
