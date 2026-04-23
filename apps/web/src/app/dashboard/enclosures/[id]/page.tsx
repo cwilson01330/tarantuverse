@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
+import { formatLocalDate } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -508,9 +509,7 @@ export default function EnclosureDetailPage() {
                 <div className="flex justify-between">
                   <dt className="text-gray-600 dark:text-gray-400">Last Changed</dt>
                   <dd className="text-gray-900 dark:text-white">
-                    {enclosure.last_substrate_change
-                      ? new Date(enclosure.last_substrate_change).toLocaleDateString()
-                      : '—'}
+                    {formatLocalDate(enclosure.last_substrate_change) || '—'}
                   </dd>
                 </div>
               </dl>
@@ -815,7 +814,7 @@ export default function EnclosureDetailPage() {
                           {s.substrate_depth && ` — ${s.substrate_depth}`}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {new Date(s.changed_at).toLocaleDateString()}
+                          {formatLocalDate(s.changed_at)}
                           {s.reason && ` · ${s.reason}`}
                         </p>
                       </div>

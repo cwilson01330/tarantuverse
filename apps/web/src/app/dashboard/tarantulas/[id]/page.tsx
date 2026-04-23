@@ -15,6 +15,7 @@ import UpgradeModal from '@/components/UpgradeModal'
 import PricingCard from '@/components/PricingCard'
 import PremoltPredictionSection from '@/components/PremoltPredictionSection'
 import apiClient from '@/lib/api'
+import { daysBetween, formatLocalDate } from '@/lib/date'
 
 interface Tarantula {
   id: string
@@ -760,10 +761,10 @@ export default function TarantulaDetailPage() {
     return null
   }
 
-  // Calculate time since acquired
-  const daysSinceAcquired = tarantula.date_acquired
-    ? Math.floor((new Date().getTime() - new Date(tarantula.date_acquired).getTime()) / (1000 * 60 * 60 * 24))
-    : null
+  // Calculate time since acquired — `date_acquired` is a DATE, so we
+  // must anchor it to the local calendar day to avoid a UTC rewind
+  // that would under-count by one day for anyone west of UTC.
+  const daysSinceAcquired = daysBetween(tarantula.date_acquired)
 
   return (
     <DashboardLayout
@@ -998,7 +999,7 @@ export default function TarantulaDetailPage() {
                   {tarantula.date_acquired && (
                     <div>
                       <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Date Acquired</p>
-                      <p className="text-lg text-gray-900 dark:text-white">{new Date(tarantula.date_acquired).toLocaleDateString()}</p>
+                      <p className="text-lg text-gray-900 dark:text-white">{formatLocalDate(tarantula.date_acquired)}</p>
                     </div>
                   )}
                   {tarantula.source && (
@@ -1042,7 +1043,7 @@ export default function TarantulaDetailPage() {
                                   {isFeeding ? `Fed ${item.food_type || 'food'}` : isMolt ? 'Molted' : 'Substrate Changed'}
                                 </p>
                                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                                  {new Date(item.fed_at || item.molted_at || item.changed_at).toLocaleDateString()}
+                                  {formatLocalDate(item.fed_at || item.molted_at || item.changed_at)}
                                 </p>
                               </div>
                             </div>
@@ -1614,7 +1615,7 @@ export default function TarantulaDetailPage() {
                           <div className="flex items-center gap-3 mb-2">
                             <span className="text-2xl">💨</span>
                             <p className="font-bold text-gray-900 dark:text-white">
-                              Changed: {new Date(change.changed_at).toLocaleDateString()}
+                              Changed: {formatLocalDate(change.changed_at)}
                             </p>
                           </div>
                           <div className="pl-11 space-y-1">
@@ -1685,7 +1686,7 @@ export default function TarantulaDetailPage() {
                 {tarantula.last_substrate_change && (
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
                     <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Last Substrate Change</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{new Date(tarantula.last_substrate_change).toLocaleDateString()}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatLocalDate(tarantula.last_substrate_change)}</p>
                   </div>
                 )}
                 {(tarantula.target_temp_min || tarantula.target_temp_max) && (
@@ -1723,7 +1724,7 @@ export default function TarantulaDetailPage() {
                 {tarantula.last_enclosure_cleaning && (
                   <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 p-4 rounded-xl">
                     <p className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Last Enclosure Cleaning</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{new Date(tarantula.last_enclosure_cleaning).toLocaleDateString()}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{formatLocalDate(tarantula.last_enclosure_cleaning)}</p>
                   </div>
                 )}
               </div>

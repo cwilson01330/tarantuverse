@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import AchievementBadge from '@/components/AchievementBadge'
+import { formatLocalDate } from '@/lib/date'
 
 interface Keeper {
   id: number
@@ -629,7 +630,7 @@ export default function KeeperProfilePage() {
                           )}
                           {tarantula.date_acquired && (
                             <span className="px-2 py-1 bg-surface rounded text-xs font-semibold text-gray-700 dark:text-gray-300">
-                              {new Date(tarantula.date_acquired).toLocaleDateString()}
+                              {formatLocalDate(tarantula.date_acquired)}
                             </span>
                           )}
                         </div>

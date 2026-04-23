@@ -8,6 +8,7 @@ import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonCard } from '@/components/ui/skeleton'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
+import { formatLocalDate } from '@/lib/date'
 
 interface Tarantula {
   id: string
@@ -580,7 +581,7 @@ export default function TarantulasPage() {
                             )}
                             {tarantula.date_acquired && (
                               <span className="px-3 py-1 rounded-lg bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-xs font-semibold border border-pink-200 dark:border-pink-500/30">
-                                📅 {new Date(tarantula.date_acquired).toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                                📅 {formatLocalDate(tarantula.date_acquired, { year: 'numeric', month: 'short' })}
                               </span>
                             )}
                           </div>
