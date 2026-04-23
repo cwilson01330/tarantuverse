@@ -31,9 +31,11 @@ import posthog from "posthog-js"
 import { useAuth } from "@/lib/auth"
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
-// Route through our own /ingest path (see next.config.js rewrites).
+// Route through our own /relay path (see next.config.js rewrites).
 // First-party URL survives ad blockers that block us.i.posthog.com.
-const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "/ingest"
+// We use /relay rather than /ingest because /ingest/* is on some
+// blocklists as a known PostHog proxy convention.
+const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "/relay"
 const POSTHOG_UI_HOST =
   process.env.NEXT_PUBLIC_POSTHOG_UI_HOST || "https://us.posthog.com"
 
@@ -51,6 +53,11 @@ function initPostHog() {
     capture_pageleave: true,
     autocapture: false,
     disable_session_recording: true,
+    // We don't use PostHog feature flags (Tarantuverse has its own
+    // admin-panel flag system). Disable the flag poll to remove a
+    // blocker-targeted request and skip a round-trip.
+    advanced_disable_feature_flags: true,
+    advanced_disable_feature_flags_on_first_load: true,
     persistence: "localStorage+cookie",
   })
   initialized = true

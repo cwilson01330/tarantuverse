@@ -29,9 +29,11 @@ import { useSession } from "next-auth/react"
 import posthog from "posthog-js"
 
 const POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY
-// Route through our own /ingest path (see next.config.js rewrites).
+// Route through our own /relay path (see next.config.js rewrites).
 // First-party URL survives ad blockers that block us.i.posthog.com.
-const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "/ingest"
+// We use /relay rather than /ingest because /ingest/* is on some
+// blocklists as a known PostHog proxy convention.
+const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "/relay"
 // Where the PostHog dashboard lives — used so "view in PostHog" links
 // in the debug toolbar point to the real UI, not our proxy path.
 const POSTHOG_UI_HOST =
@@ -55,6 +57,12 @@ function initPostHog() {
     // Sensible session recording defaults; off until we turn it on in
     // the PostHog project settings.
     disable_session_recording: true,
+    // We don't use PostHog feature flags (Tarantuverse has its own admin
+    // panel flag system via /api/v1/system/settings). Disabling the flag
+    // poll removes a request that some ad blockers target and shaves a
+    // round-trip on every page load.
+    advanced_disable_feature_flags: true,
+    advanced_disable_feature_flags_on_first_load: true,
     persistence: "localStorage+cookie",
     // Don't create a distinct_id until we have real telemetry to send.
     loaded: () => {

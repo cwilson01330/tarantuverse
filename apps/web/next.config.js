@@ -42,11 +42,11 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/ingest/static/:path*',
+        source: '/relay/static/:path*',
         destination: 'https://us-assets.i.posthog.com/static/:path*',
       },
       {
-        source: '/ingest/:path*',
+        source: '/relay/:path*',
         destination: 'https://us.i.posthog.com/:path*',
       },
     ]
