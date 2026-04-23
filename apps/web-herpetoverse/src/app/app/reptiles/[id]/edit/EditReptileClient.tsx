@@ -24,6 +24,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
 import {
@@ -45,6 +46,7 @@ interface FormState {
   commonName: string
   scientificName: string
   speciesId: string | null
+  enclosureId: string | null
   sex: Sex
   hatchDate: string
   dateAcquired: string
@@ -61,6 +63,7 @@ const EMPTY: FormState = {
   commonName: '',
   scientificName: '',
   speciesId: null,
+  enclosureId: null,
   sex: 'unknown',
   hatchDate: '',
   dateAcquired: '',
@@ -87,6 +90,7 @@ function snakeToForm(s: Snake): FormState {
     commonName: s.common_name ?? '',
     scientificName: s.scientific_name ?? '',
     speciesId: s.reptile_species_id,
+    enclosureId: s.enclosure_id,
     sex: (s.sex as Sex | null) ?? 'unknown',
     hatchDate: s.hatch_date ?? '',
     dateAcquired: s.date_acquired ?? '',
@@ -179,6 +183,7 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
       common_name: nullableStr(form.commonName),
       scientific_name: nullableStr(form.scientificName),
       reptile_species_id: form.speciesId,
+      enclosure_id: form.enclosureId,
       sex: form.sex,
       hatch_date: nullableStr(form.hatchDate),
       date_acquired: nullableStr(form.dateAcquired),
@@ -318,6 +323,19 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
                 className={INPUT_CLS}
               />
             </Field>
+
+            <div className="sm:col-span-2">
+              <Field
+                label="Enclosure"
+                hint="Optional — you can attach or change this later from the detail page."
+              >
+                <EnclosurePicker
+                  value={form.enclosureId}
+                  onChange={(next) => update('enclosureId', next)}
+                  className={INPUT_CLS}
+                />
+              </Field>
+            </div>
           </div>
         </section>
 

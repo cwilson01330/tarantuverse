@@ -167,6 +167,7 @@ export interface CreateSnakePayload {
   common_name?: string | null
   scientific_name?: string | null
   reptile_species_id?: string | null
+  enclosure_id?: string | null
   sex?: Sex | null
   hatch_date?: string | null
   date_acquired?: string | null
@@ -363,6 +364,21 @@ export function uploadPhoto(
 export function deletePhoto(photoId: string): Promise<void> {
   return apiFetch<void>(`/api/v1/photos/${encodeURIComponent(photoId)}`, {
     method: 'DELETE',
+  })
+}
+
+/**
+ * Update a photo's editable metadata. Only caption is mutable server-side
+ * right now; this helper wraps that single field and returns the refreshed
+ * Photo. Passing null or an empty string clears the caption.
+ */
+export function updatePhotoCaption(
+  photoId: string,
+  caption: string | null,
+): Promise<Photo> {
+  return apiFetch<Photo>(`/api/v1/photos/${encodeURIComponent(photoId)}`, {
+    method: 'PATCH',
+    json: { caption },
   })
 }
 

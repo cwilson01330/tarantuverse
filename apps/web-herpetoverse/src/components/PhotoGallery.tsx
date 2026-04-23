@@ -32,6 +32,7 @@ import {
   deletePhoto,
   listPhotos,
   setMainPhoto,
+  updatePhotoCaption,
   uploadPhoto,
 } from '@/lib/snakes'
 
@@ -319,6 +320,25 @@ export default function PhotoGallery({
     }
   }
 
+  /**
+   * Persist a caption change to the backend, then patch the local list so the
+   * change shows up immediately (the lightbox reads from photos[idx]).
+   *
+   * Returns void on success, throws on failure so the lightbox can show an
+   * inline error without us having to pipe state all the way back.
+   */
+  const handleSaveCaption = useCallback(
+    async (photoId: string, nextCaption: string | null) => {
+      const updated = await updatePhotoCaption(photoId, nextCaption)
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id === photoId ? { ...p, caption: updated.caption } : p,
+        ),
+      )
+    },
+    [],
+  )
+
   function dismissQueueItem(id: string) {
     setQueue((prev) => {
       const item = prev.find((q) => q.id === id)
@@ -340,6 +360,16 @@ export default function PhotoGallery({
   useEffect(() => {
     if (lightboxIdx == null) return
     function onKey(e: KeyboardEvent) {
+      // Don't steal arrows / Escape from the caption textarea. The editor
+      // handles its own Escape → cancel, and arrow keys should move the
+      // cursor inside the field, not navigate photos.
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) {
+          return
+        }
+      }
       if (e.key === 'Escape') {
         setLightboxIdx(null)
       } else if (e.key === 'ArrowRight') {
@@ -479,10 +509,11 @@ export default function PhotoGallery({
                 </span>
               )}
 
-              {/* Hover overlay: set-main + delete. On touch devices the group-
-                  hover trick breaks down — we accept that; long-press /
-                  tap behavior is future work. */}
-              <div className="absolute inset-x-0 bottom-0 flex items-stretch bg-black/70 backdrop-blur-sm opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+              {/* Action overlay: set-main + delete. On touch devices
+                  group-hover never fires, so we show the bar by default at
+                  the smallest breakpoint and gate it behind hover/focus only
+                  from `sm:` up, where hovering actually means something. */}
+              <div className="absolute inset-x-0 bottom-0 flex items-stretch bg-black/70 backdrop-blur-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
                 {!isMain && (
                   <button
                     type="button"
@@ -561,6 +592,7 @@ export default function PhotoGallery({
               ? () => setLightboxIdx(lightboxIdx + 1)
               : undefined
           }
+          onSaveCaption={handleSaveCaption}
         />
       )}
 
@@ -662,6 +694,7 @@ function Lightbox({
   onClose,
   onPrev,
   onNext,
+  onSaveCaption,
 }: {
   photo: Photo
   index: number
@@ -669,9 +702,53 @@ function Lightbox({
   onClose: () => void
   onPrev?: () => void
   onNext?: () => void
+  /** Throws on failure; caller already updates the photos list on success. */
+  onSaveCaption: (photoId: string, caption: string | null) => Promise<void>
 }) {
-  // Click on the backdrop (not the image) dismisses. We stop propagation on
-  // the image wrapper so zoom interactions don't leak to the backdrop.
+  // Caption editor state. Keyed on photo.id so navigating between photos
+  // resets the draft and cancels any in-flight editing.
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<string>(photo.caption ?? '')
+  const [saving, setSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Reset editor state when the user navigates to a different photo.
+    setEditing(false)
+    setDraft(photo.caption ?? '')
+    setSaving(false)
+    setEditError(null)
+  }, [photo.id, photo.caption])
+
+  async function commitCaption() {
+    if (saving) return
+    const trimmed = draft.trim()
+    const nextCaption = trimmed === '' ? null : trimmed
+    // No-op if nothing changed — don't bother the server.
+    if (nextCaption === (photo.caption ?? null)) {
+      setEditing(false)
+      return
+    }
+    setSaving(true)
+    setEditError(null)
+    try {
+      await onSaveCaption(photo.id, nextCaption)
+      setEditing(false)
+    } catch (err) {
+      setEditError(errMsg(err, 'Could not save caption.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function cancelCaption() {
+    setDraft(photo.caption ?? '')
+    setEditing(false)
+    setEditError(null)
+  }
+
+  // Click on the backdrop (not the image / controls) dismisses. We stop
+  // propagation on the image wrapper so zoom + caption editing don't leak.
   return (
     <div
       role="dialog"
@@ -689,7 +766,7 @@ function Lightbox({
         ✕
       </button>
 
-      {onPrev && (
+      {onPrev && !editing && (
         <button
           type="button"
           onClick={(e) => {
@@ -702,7 +779,7 @@ function Lightbox({
           ‹
         </button>
       )}
-      {onNext && (
+      {onNext && !editing && (
         <button
           type="button"
           onClick={(e) => {
@@ -724,17 +801,95 @@ function Lightbox({
         <img
           src={photo.url}
           alt={photo.caption || `Photo ${index + 1}`}
-          className="max-w-full max-h-[85vh] object-contain rounded-md"
+          className="max-w-full max-h-[75vh] sm:max-h-[80vh] object-contain rounded-md"
           draggable={false}
         />
-        <div className="flex items-center gap-3 text-xs text-neutral-400">
-          <span>
-            {index + 1} / {total}
-          </span>
-          {photo.caption && (
-            <span className="text-neutral-200 max-w-md truncate">
-              {photo.caption}
+
+        <div className="w-full max-w-xl flex flex-col items-center gap-2">
+          <div className="flex items-center gap-3 text-xs text-neutral-400">
+            <span>
+              {index + 1} / {total}
             </span>
+          </div>
+
+          {/* Caption editor — always rendered so there's a consistent affordance
+              for adding one when empty. Pencil click (or tap on the caption
+              text) enters edit mode. Enter commits, Escape cancels. */}
+          {editing ? (
+            <div className="w-full flex flex-col gap-2">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    void commitCaption()
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    cancelCaption()
+                  }
+                }}
+                rows={2}
+                maxLength={500}
+                placeholder="Add a caption (optional)…"
+                autoFocus
+                disabled={saving}
+                className="w-full px-3 py-2 text-sm rounded-md bg-neutral-900 border border-neutral-700 focus:border-herp-teal focus:outline-none focus:ring-1 focus:ring-herp-teal/50 text-neutral-100 placeholder-neutral-500 resize-y disabled:opacity-60"
+              />
+              {editError && (
+                <p role="alert" className="text-xs text-red-300">
+                  {editError}
+                </p>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-neutral-500">
+                  {draft.length}/500 · Enter saves · Esc cancels
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={cancelCaption}
+                    disabled={saving}
+                    className="px-3 py-1.5 text-xs rounded-md border border-neutral-700 text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void commitCaption()}
+                    disabled={saving}
+                    className="px-3 py-1.5 text-xs rounded-md bg-herp-teal text-herp-dark font-medium hover:bg-herp-lime disabled:opacity-50"
+                  >
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label={photo.caption ? 'Edit caption' : 'Add caption'}
+              className="w-full text-left px-3 py-2 rounded-md border border-transparent hover:border-neutral-700 hover:bg-neutral-900/50 focus:outline-none focus:ring-1 focus:ring-herp-teal/50 transition-colors"
+            >
+              <span className="flex items-start gap-2">
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 text-neutral-500 shrink-0"
+                >
+                  ✎
+                </span>
+                <span
+                  className={
+                    photo.caption
+                      ? 'text-sm text-neutral-200 break-words'
+                      : 'text-sm text-neutral-500 italic'
+                  }
+                >
+                  {photo.caption || 'Add a caption…'}
+                </span>
+              </span>
+            </button>
           )}
         </div>
       </div>

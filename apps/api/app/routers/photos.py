@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import Optional
 import logging
@@ -14,6 +15,18 @@ from app.models.user import User
 from app.services.storage import storage_service
 from app.config import settings
 from app.utils.file_validation import validate_image_bytes
+
+
+class PhotoUpdate(BaseModel):
+    """Partial-update body for photos.
+
+    Only `caption` is mutable via this endpoint — the file, thumbnails, and
+    taken_at are immutable once uploaded. Clients should send the field they
+    want to change; unset fields are preserved.
+    """
+
+    # Empty string and `null` are both valid — both clear the caption.
+    caption: Optional[str] = Field(default=None, max_length=500)
 
 logger = logging.getLogger(__name__)
 
@@ -321,6 +334,61 @@ async def delete_photo(
         db.rollback()
         logger.exception("Photo delete failed for photo %s", photo_id)
         raise HTTPException(status_code=500, detail="Failed to delete photo. Please try again.")
+
+
+@router.patch("/photos/{photo_id}")
+async def update_photo(
+    photo_id: str,
+    data: PhotoUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a photo's editable metadata (currently: caption only).
+
+    Polymorphic — same endpoint handles tarantula and snake photos. Ownership
+    is resolved through the parent animal via `_photo_owner_parent`.
+    """
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    parent = _photo_owner_parent(photo, db, current_user)
+    if parent is None:
+        raise HTTPException(status_code=403, detail="Not authorized to modify this photo")
+
+    # Only apply fields the client explicitly sent — preserves existing values
+    # for anything omitted. exclude_unset distinguishes "not sent" from
+    # "sent as null" (we allow clearing the caption with null or "").
+    updates = data.model_dump(exclude_unset=True)
+
+    try:
+        if "caption" in updates:
+            raw = updates["caption"]
+            # Normalize empty string to None for consistent DB state.
+            if raw is None or (isinstance(raw, str) and raw.strip() == ""):
+                photo.caption = None
+            else:
+                photo.caption = raw.strip()
+
+        db.commit()
+        db.refresh(photo)
+
+        return {
+            "id": photo.id,
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
+            "created_at": photo.created_at.isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Photo update failed for photo %s", photo_id)
+        raise HTTPException(status_code=500, detail="Failed to update photo. Please try again.")
 
 
 @router.patch("/photos/{photo_id}/set-main")

@@ -21,6 +21,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
 import {
@@ -35,6 +36,7 @@ interface FormState {
   commonName: string
   scientificName: string
   speciesId: string | null
+  enclosureId: string | null
   sex: Sex
   hatchDate: string
   dateAcquired: string
@@ -51,6 +53,7 @@ const INITIAL: FormState = {
   commonName: '',
   scientificName: '',
   speciesId: null,
+  enclosureId: null,
   sex: 'unknown',
   hatchDate: '',
   dateAcquired: '',
@@ -118,6 +121,7 @@ export default function AddReptilePage() {
       common_name: nullableStr(form.commonName),
       scientific_name: nullableStr(form.scientificName),
       reptile_species_id: form.speciesId,
+      enclosure_id: form.enclosureId,
       sex: form.sex,
       hatch_date: nullableStr(form.hatchDate),
       date_acquired: nullableStr(form.dateAcquired),
@@ -242,6 +246,19 @@ export default function AddReptilePage() {
                 className={INPUT_CLS}
               />
             </Field>
+
+            <div className="sm:col-span-2">
+              <Field
+                label="Enclosure"
+                hint="Optional — you can attach this later from the detail page."
+              >
+                <EnclosurePicker
+                  value={form.enclosureId}
+                  onChange={(next) => update('enclosureId', next)}
+                  className={INPUT_CLS}
+                />
+              </Field>
+            </div>
           </div>
         </section>
 
