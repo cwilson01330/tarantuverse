@@ -70,6 +70,12 @@ export interface LifeStageFeedingBracket {
 export interface ReptileSpecies {
   id: string
   scientific_name: string
+  /**
+   * URL slug for the public `/species/{slug}` care-sheet route. Backfilled
+   * by `slg_20260423` migration from common_names[0] → scientific_name.
+   * Stable once indexed — don't derive on the fly (see migration docstring).
+   */
+  slug: string
   common_names: string[]
   genus: string | null
   family: string | null
@@ -206,6 +212,32 @@ export async function fetchReptileSpeciesById(
 }
 
 /**
+ * Fetch a reptile species by its URL slug. Public, unauthenticated — backs
+ * the `/species/{slug}` SEO route. Backend normalizes via `.strip().lower()`
+ * and is case-insensitive, but we lowercase here too so the CDN cache key
+ * stays stable for visually-identical URLs.
+ *
+ * Returns null for 404 so the page can surface Next's `notFound()` without a
+ * Sentry error.
+ */
+export async function fetchReptileSpeciesBySlug(
+  slug: string,
+): Promise<ReptileSpecies | null> {
+  try {
+    const normalized = slug.trim().toLowerCase()
+    if (!normalized) return null
+    const res = await fetch(
+      `${API_URL}/api/v1/reptile-species/by-slug/${encodeURIComponent(normalized)}`,
+      { next: { revalidate: REVALIDATE_SECONDS } },
+    )
+    if (!res.ok) return null
+    return (await res.json()) as ReptileSpecies
+  } catch {
+    return null
+  }
+}
+
+/**
  * Lightweight search result for the autocomplete picker. Matches
  * ReptileSpeciesSearchResult on the backend. Kept separate from
  * ReptileSpecies so we don't pay for the full care-sheet payload on every
@@ -213,6 +245,7 @@ export async function fetchReptileSpeciesById(
  */
 export interface ReptileSpeciesSearchResult {
   id: string
+  slug: string
   scientific_name: string
   common_names: string[]
   care_level: CareLevel | null
@@ -274,6 +307,30 @@ export function formatIntRange(
 export function trimZeros(v: string): string {
   // "72.00" → "72", "1.50" → "1.5"
   return v.replace(/\.?0+$/, '')
+}
+
+/**
+ * URL-safe slug: lowercase, ASCII-folded, hyphen-separated. Mirrors the
+ * backend `app/utils/slugs.py` implementation so local sitemap fallbacks or
+ * optimistic link previews match what the server would produce.
+ *
+ * Used as a defensive fallback only — authoritative slugs come from the DB
+ * (`species.slug`). Don't use this to *generate* a canonical URL in a
+ * component: read it off `species.slug` so editorial overrides are honored.
+ */
+export function slugify(text: string): string {
+  if (!text) return ''
+  // NFKD normalize, strip combining marks, ASCII-fold. `normalize` is widely
+  // supported in modern Node + evergreen browsers — safe for server/client.
+  const ascii = text
+    .normalize('NFKD')
+    // Drop combining marks ("café" → "cafe") and anything non-ASCII.
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x00-\x7f]/g, '')
+    .toLowerCase()
+  return ascii
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
 }
 
 export const CARE_LEVEL_LABELS: Record<CareLevel, string> = {
