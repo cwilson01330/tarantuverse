@@ -252,6 +252,20 @@ SPECIES_DATA = [
         "feeding_frequency_hatchling": "Every 5–7 days",
         "feeding_frequency_juvenile": "Every 7–10 days",
         "feeding_frequency_adult": "Every 10–14 days",
+        # Sprint 5 feeding intelligence — ball pythons are the most-studied
+        # species for power feeding thresholds. Ratios drawn from the ReptiFiles
+        # and World of Ball Pythons feeding charts, with the 15% power-feeding
+        # line well-established across both vet and breeder sources.
+        "hatchling_weight_min_g": Decimal("50"),
+        "hatchling_weight_max_g": Decimal("100"),
+        "power_feeding_threshold_pct": Decimal("15.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 200, "ratio_pct_min": 10, "ratio_pct_max": 15, "interval_days_min": 5, "interval_days_max": 7},
+            {"stage": "juvenile", "weight_g_max": 700, "ratio_pct_min": 10, "ratio_pct_max": 12, "interval_days_min": 7, "interval_days_max": 10},
+            {"stage": "subadult", "weight_g_max": 1200, "ratio_pct_min": 8, "ratio_pct_max": 10, "interval_days_min": 10, "interval_days_max": 14},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 5, "ratio_pct_max": 10, "interval_days_min": 14, "interval_days_max": 28},
+        ],
         "supplementation_notes": (
             "Whole prey meets nutritional needs; no supplementation required "
             "for feeder-fed ball pythons. Variety across rat/mouse is acceptable."
@@ -337,6 +351,18 @@ SPECIES_DATA = [
         "feeding_frequency_hatchling": "Every 5–7 days",
         "feeding_frequency_juvenile": "Every 7 days",
         "feeding_frequency_adult": "Every 7–14 days",
+        # Sprint 5 feeding intelligence — corn snakes tolerate a similar ratio
+        # curve to ball pythons but reach maturity at a much lower weight.
+        "hatchling_weight_min_g": Decimal("6"),
+        "hatchling_weight_max_g": Decimal("15"),
+        "power_feeding_threshold_pct": Decimal("15.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 30, "ratio_pct_min": 10, "ratio_pct_max": 15, "interval_days_min": 5, "interval_days_max": 7},
+            {"stage": "juvenile", "weight_g_max": 200, "ratio_pct_min": 10, "ratio_pct_max": 12, "interval_days_min": 7, "interval_days_max": 7},
+            {"stage": "subadult", "weight_g_max": 500, "ratio_pct_min": 8, "ratio_pct_max": 10, "interval_days_min": 7, "interval_days_max": 10},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 5, "ratio_pct_max": 10, "interval_days_min": 7, "interval_days_max": 14},
+        ],
         "supplementation_notes": "None required with appropriately-sized whole prey.",
         "water_bowl_description": "Always available; large enough to soak during shed.",
         "soaking_behavior": (
@@ -418,6 +444,19 @@ SPECIES_DATA = [
         "feeding_frequency_hatchling": "Every 5–7 days",
         "feeding_frequency_juvenile": "Every 7 days",
         "feeding_frequency_adult": "Every 7–14 days",
+        # Sprint 5 feeding intelligence — cal kings sit in the same ratio band
+        # as corn snakes but run slightly more active and tolerate the shorter
+        # end of the interval range.
+        "hatchling_weight_min_g": Decimal("8"),
+        "hatchling_weight_max_g": Decimal("20"),
+        "power_feeding_threshold_pct": Decimal("15.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 30, "ratio_pct_min": 10, "ratio_pct_max": 15, "interval_days_min": 5, "interval_days_max": 7},
+            {"stage": "juvenile", "weight_g_max": 200, "ratio_pct_min": 10, "ratio_pct_max": 12, "interval_days_min": 7, "interval_days_max": 7},
+            {"stage": "subadult", "weight_g_max": 500, "ratio_pct_min": 8, "ratio_pct_max": 10, "interval_days_min": 7, "interval_days_max": 10},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 5, "ratio_pct_max": 10, "interval_days_min": 7, "interval_days_max": 14},
+        ],
         "supplementation_notes": "Whole prey adequate; no supplementation required.",
         "water_bowl_description": (
             "Large enough to soak. Cal kings are notorious escape artists — "
@@ -499,6 +538,20 @@ SPECIES_DATA = [
         "feeding_frequency_hatchling": "Every 5–7 days",
         "feeding_frequency_juvenile": "Every 7 days",
         "feeding_frequency_adult": "Every 7–10 days",
+        # Sprint 5 feeding intelligence — hognoses show the strongest sexual
+        # dimorphism of this starter set (males ≈ 70g, females up to 350g).
+        # The bracket shape holds; adult sits at the lower end of the ratio
+        # band because small males can trend toward obesity on larger prey.
+        "hatchling_weight_min_g": Decimal("5"),
+        "hatchling_weight_max_g": Decimal("15"),
+        "power_feeding_threshold_pct": Decimal("15.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 20, "ratio_pct_min": 10, "ratio_pct_max": 15, "interval_days_min": 5, "interval_days_max": 7},
+            {"stage": "juvenile", "weight_g_max": 80, "ratio_pct_min": 10, "ratio_pct_max": 12, "interval_days_min": 7, "interval_days_max": 7},
+            {"stage": "subadult", "weight_g_max": 200, "ratio_pct_min": 8, "ratio_pct_max": 10, "interval_days_min": 7, "interval_days_max": 10},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 5, "ratio_pct_max": 8, "interval_days_min": 7, "interval_days_max": 10},
+        ],
         "supplementation_notes": (
             "Whole prey adequate. Hognoses are toad specialists in the wild; "
             "captive-bred animals typically accept mice, but some refuse "
@@ -593,6 +646,20 @@ SPECIES_DATA = [
         "feeding_frequency_hatchling": "Every 5–7 days",
         "feeding_frequency_juvenile": "Every 7 days",
         "feeding_frequency_adult": "Every 10–14 days — sedentary; overfeeding is a common mistake",
+        # Sprint 5 feeding intelligence — sand boas get TIGHTER thresholds than
+        # the others because the captive population is already widely obese.
+        # Lower power-feeding line (12%) and longer adult intervals reflect
+        # their sedentary ambush lifestyle. If in doubt, feed less.
+        "hatchling_weight_min_g": Decimal("10"),
+        "hatchling_weight_max_g": Decimal("25"),
+        "power_feeding_threshold_pct": Decimal("12.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 30, "ratio_pct_min": 10, "ratio_pct_max": 12, "interval_days_min": 5, "interval_days_max": 7},
+            {"stage": "juvenile", "weight_g_max": 100, "ratio_pct_min": 8, "ratio_pct_max": 10, "interval_days_min": 7, "interval_days_max": 7},
+            {"stage": "subadult", "weight_g_max": 250, "ratio_pct_min": 7, "ratio_pct_max": 9, "interval_days_min": 10, "interval_days_max": 14},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 5, "ratio_pct_max": 8, "interval_days_min": 14, "interval_days_max": 21},
+        ],
         "supplementation_notes": (
             "Overfeeding is the most common husbandry error. Adults should be "
             "weight-monitored; obesity is widespread in captive sand boas."

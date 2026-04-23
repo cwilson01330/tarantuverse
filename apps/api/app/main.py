@@ -55,6 +55,7 @@ import app.routers.sheds as sheds  # Herpetoverse v1
 import app.routers.genes as genes  # Herpetoverse v1 — morph catalog
 import app.routers.reptile_species as reptile_species  # Herpetoverse v1
 import app.routers.animal_genotypes as animal_genotypes  # Herpetoverse v1
+import app.routers.weight_logs as weight_logs  # Herpetoverse v1 — Sprint 5
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -274,6 +275,11 @@ app.include_router(genes.router, prefix="/api/v1/genes", tags=["genes", "herpeto
 app.include_router(reptile_species.router, prefix="/api/v1/reptile-species", tags=["reptile_species", "herpetoverse"])
 # animal_genotypes routes are nested under /snakes/{id}/genotype — keep the generic /api/v1 prefix
 app.include_router(animal_genotypes.router, prefix="/api/v1", tags=["animal_genotypes", "herpetoverse"])
+
+# Sprint 5 — standalone weigh-ins + feeding advisory. Routes include both
+# /snakes/{id}/weight-logs/* and /weight-logs/{id}, so keep the /api/v1 prefix.
+print("[STARTUP] Registering weight logs router (Herpetoverse v1 Sprint 5)...")
+app.include_router(weight_logs.router, prefix="/api/v1", tags=["weight_logs", "herpetoverse"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

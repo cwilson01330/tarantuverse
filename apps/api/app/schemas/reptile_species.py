@@ -3,11 +3,74 @@
 Pydantic schemas for the reptile_species table. Parallel to `species` schemas
 but reptile-specific — multiple temp zones, UVB fields, CITES/IUCN, brumation.
 """
-from pydantic import BaseModel, Field
-from typing import Optional, List, Any
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Any, Dict
 from datetime import date, datetime
 from decimal import Decimal
 import uuid
+
+
+# Accepted life-stage values — kept in sync with seed data and snake
+# advisory logic. Open set intentionally: if a species later needs e.g.
+# 'neonate' or 'subadult-large', extend this tuple.
+_ALLOWED_LIFE_STAGES = ("hatchling", "juvenile", "subadult", "adult")
+
+
+def _validate_life_stage_feeding(value: Any) -> Any:
+    """Shape validator for ReptileSpecies.life_stage_feeding JSONB array.
+
+    Enforces the shape documented in the wgt_20260422 migration module:
+      [{
+          'stage': str,
+          'weight_g_max': Number | null,
+          'ratio_pct_min': Number,
+          'ratio_pct_max': Number,
+          'interval_days_min': Number,
+          'interval_days_max': Number,
+      }, …]
+
+    Nullable at the DB level — `None` passes through unchanged.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, list):
+        raise ValueError("life_stage_feeding must be a list of stage brackets")
+
+    required_keys = (
+        "stage",
+        "ratio_pct_min",
+        "ratio_pct_max",
+        "interval_days_min",
+        "interval_days_max",
+    )
+    for i, bracket in enumerate(value):
+        if not isinstance(bracket, dict):
+            raise ValueError(f"life_stage_feeding[{i}] must be an object")
+        for k in required_keys:
+            if k not in bracket:
+                raise ValueError(f"life_stage_feeding[{i}] missing required key '{k}'")
+        stage = bracket["stage"]
+        if stage not in _ALLOWED_LIFE_STAGES:
+            raise ValueError(
+                f"life_stage_feeding[{i}].stage must be one of "
+                f"{_ALLOWED_LIFE_STAGES}, got {stage!r}"
+            )
+        # weight_g_max can be null (open-ended top bracket) but must be
+        # present in the dict for explicit intent.
+        if "weight_g_max" not in bracket:
+            raise ValueError(
+                f"life_stage_feeding[{i}] missing 'weight_g_max' "
+                f"(use null for the open-ended adult bracket)"
+            )
+        if bracket["ratio_pct_min"] > bracket["ratio_pct_max"]:
+            raise ValueError(
+                f"life_stage_feeding[{i}].ratio_pct_min > ratio_pct_max"
+            )
+        if bracket["interval_days_min"] > bracket["interval_days_max"]:
+            raise ValueError(
+                f"life_stage_feeding[{i}].interval_days_min > interval_days_max"
+            )
+    return value
 
 
 class ReptileSpeciesBase(BaseModel):
@@ -81,6 +144,18 @@ class ReptileSpeciesBase(BaseModel):
     feeding_frequency_juvenile: Optional[str] = Field(None, max_length=100)
     feeding_frequency_adult: Optional[str] = Field(None, max_length=100)
     supplementation_notes: Optional[str] = None
+
+    # Feeding intelligence (Sprint 5 / wgt_20260422)
+    hatchling_weight_min_g: Optional[Decimal] = None
+    hatchling_weight_max_g: Optional[Decimal] = None
+    power_feeding_threshold_pct: Optional[Decimal] = Field(None, ge=0, le=99.9)
+    weight_loss_concern_pct_30d: Optional[Decimal] = Field(None, ge=0, le=99.9)
+    life_stage_feeding: Optional[List[Dict[str, Any]]] = None
+
+    @field_validator("life_stage_feeding")
+    @classmethod
+    def _check_life_stage_feeding(cls, v: Any) -> Any:
+        return _validate_life_stage_feeding(v)
 
     # Water & behavior
     water_bowl_description: Optional[str] = Field(None, max_length=200)
@@ -164,6 +239,17 @@ class ReptileSpeciesUpdate(BaseModel):
     feeding_frequency_juvenile: Optional[str] = None
     feeding_frequency_adult: Optional[str] = None
     supplementation_notes: Optional[str] = None
+    hatchling_weight_min_g: Optional[Decimal] = None
+    hatchling_weight_max_g: Optional[Decimal] = None
+    power_feeding_threshold_pct: Optional[Decimal] = Field(None, ge=0, le=99.9)
+    weight_loss_concern_pct_30d: Optional[Decimal] = Field(None, ge=0, le=99.9)
+    life_stage_feeding: Optional[List[Dict[str, Any]]] = None
+
+    @field_validator("life_stage_feeding")
+    @classmethod
+    def _check_life_stage_feeding(cls, v: Any) -> Any:
+        return _validate_life_stage_feeding(v)
+
     water_bowl_description: Optional[str] = None
     soaking_behavior: Optional[str] = None
     brumation_required: Optional[bool] = None

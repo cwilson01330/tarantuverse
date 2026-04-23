@@ -1,9 +1,10 @@
 """
 Feeding log schemas
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from decimal import Decimal
 import uuid
 
 
@@ -14,6 +15,10 @@ class FeedingLogBase(BaseModel):
     food_size: Optional[str] = None
     quantity: int = 1  # For group feedings: "fed 8 roaches"
     accepted: bool = True
+    # Snake-only: grams of prey. Populating this enables the prey-to-
+    # body-weight ratio advisory on the feeding form. Nullable because
+    # tarantula feedings never set it and snake keepers may not weigh.
+    prey_weight_g: Optional[Decimal] = Field(None, ge=0, le=999999.99)
     notes: Optional[str] = None
 
 
@@ -29,6 +34,7 @@ class FeedingLogUpdate(BaseModel):
     food_size: Optional[str] = None
     quantity: Optional[int] = None
     accepted: Optional[bool] = None
+    prey_weight_g: Optional[Decimal] = Field(None, ge=0, le=999999.99)
     notes: Optional[str] = None
 
 
@@ -37,6 +43,7 @@ class FeedingLogResponse(FeedingLogBase):
     id: uuid.UUID
     tarantula_id: Optional[uuid.UUID] = None  # Now optional - can be enclosure-level
     enclosure_id: Optional[uuid.UUID] = None  # For enclosure-level feedings
+    snake_id: Optional[uuid.UUID] = None  # Herpetoverse v1
     created_at: datetime
 
     class Config:

@@ -1,7 +1,7 @@
 """
 Feeding log model
 """
-from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, Text, CheckConstraint
+from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, Numeric, Text, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -36,6 +36,12 @@ class FeedingLog(Base):
     food_size = Column(String(50))  # e.g., "small", "medium", "large"
     quantity = Column(Integer, default=1)  # For group feedings: "fed 8 roaches"
     accepted = Column(Boolean, default=True)
+
+    # Snake-only: grams of prey fed. With snake.current_weight_g this is
+    # what powers the prey-size advisory on the snake feeding form. Null
+    # for tarantula feedings and for snake keepers who didn't weigh prey.
+    # See wgt_20260422 migration for rationale.
+    prey_weight_g = Column(Numeric(8, 2), nullable=True)
 
     notes = Column(Text)
 

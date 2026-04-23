@@ -113,6 +113,30 @@ class ReptileSpecies(Base):
     feeding_frequency_adult = Column(String(100))
     supplementation_notes = Column(Text)
 
+    # Feeding intelligence (wgt_20260422) — snake advisory lives here.
+    # All nullable; feature gracefully degrades when species hasn't been
+    # populated yet. See RUBRIC-care-sheet-content for guidance on
+    # sourcing these numbers (veterinary + breeder consensus).
+    hatchling_weight_min_g = Column(Numeric(8, 2))
+    hatchling_weight_max_g = Column(Numeric(8, 2))
+    # Percentage threshold. Prey > this % of snake body weight triggers a
+    # soft "power feeding" warning on the feeding form — not a hard block.
+    power_feeding_threshold_pct = Column(Numeric(4, 1))
+    # Percentage threshold. Weight loss > this % in 30 days (outside
+    # brumation / breeding) surfaces a dashboard alert.
+    weight_loss_concern_pct_30d = Column(Numeric(4, 1))
+    # JSONB array of life-stage brackets:
+    #   [{
+    #       "stage": "hatchling" | "juvenile" | "subadult" | "adult",
+    #       "weight_g_max": Number | null,   # null = open-ended (adult bracket)
+    #       "ratio_pct_min": Number,         # e.g. 10
+    #       "ratio_pct_max": Number,         # e.g. 15
+    #       "interval_days_min": Number,
+    #       "interval_days_max": Number,
+    #   }, …]
+    # Validated at the schema layer — no DB-level shape enforcement.
+    life_stage_feeding = Column(JSONB)
+
     # Water & behavior
     water_bowl_description = Column(String(200))
     soaking_behavior = Column(Text)
