@@ -185,6 +185,32 @@ export function createSnake(payload: CreateSnakePayload): Promise<Snake> {
   })
 }
 
+/**
+ * SnakeUpdate on the backend inherits SnakeBase (all fields optional) plus
+ * species/enclosure FKs. We reuse CreateSnakePayload here because the form
+ * surface is the same — the add page and edit page fill the same bag.
+ */
+export function updateSnake(
+  id: string,
+  payload: CreateSnakePayload,
+): Promise<Snake> {
+  return apiFetch<Snake>(`/api/v1/snakes/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    json: payload,
+  })
+}
+
+/**
+ * Soft-delete is *not* implemented on the backend — this is a hard delete
+ * that CASCADEs to weight logs, feedings, sheds, and photos. Callers should
+ * surface that clearly before calling.
+ */
+export function deleteSnake(id: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/snakes/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
 export function listWeightLogs(snakeId: string): Promise<WeightLog[]> {
   return apiFetch<WeightLog[]>(
     `/api/v1/snakes/${encodeURIComponent(snakeId)}/weight-logs`,
@@ -291,6 +317,64 @@ export function deleteShed(id: string): Promise<void> {
   return apiFetch<void>(`/api/v1/sheds/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
+}
+
+// ---------------------------------------------------------------------------
+// Photos — polymorphic. Backend accepts tarantula_id or snake_id on the
+// photos table; these helpers all route through the snake-scoped endpoints.
+// Upload is multipart; the browser sets Content-Type + boundary when we pass
+// FormData to fetch (apiClient leaves Content-Type unset unless `json` is
+// provided).
+// ---------------------------------------------------------------------------
+
+export interface Photo {
+  id: string
+  url: string
+  thumbnail_url: string | null
+  caption: string | null
+  taken_at: string | null
+  created_at: string
+}
+
+export function listPhotos(snakeId: string): Promise<Photo[]> {
+  return apiFetch<Photo[]>(
+    `/api/v1/snakes/${encodeURIComponent(snakeId)}/photos`,
+  )
+}
+
+export interface UploadPhotoOptions {
+  caption?: string | null
+}
+
+export function uploadPhoto(
+  snakeId: string,
+  file: File,
+  { caption }: UploadPhotoOptions = {},
+): Promise<Photo> {
+  const form = new FormData()
+  form.append('file', file)
+  if (caption && caption.trim()) form.append('caption', caption.trim())
+  return apiFetch<Photo>(
+    `/api/v1/snakes/${encodeURIComponent(snakeId)}/photos`,
+    { method: 'POST', body: form },
+  )
+}
+
+export function deletePhoto(photoId: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/photos/${encodeURIComponent(photoId)}`, {
+    method: 'DELETE',
+  })
+}
+
+/**
+ * Promote a photo to be the animal's main photo. Server responds with
+ * {message, photo_url}; we don't surface that — callers refetch the snake.
+ */
+export function setMainPhoto(photoId: string): Promise<void> {
+  return apiFetch<void>(
+    `/api/v1/photos/${encodeURIComponent(photoId)}/set-main`,
+    { method: 'PATCH' },
+  )
 }
 
 // ---------------------------------------------------------------------------

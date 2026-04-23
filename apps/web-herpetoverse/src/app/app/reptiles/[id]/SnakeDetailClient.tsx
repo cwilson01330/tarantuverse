@@ -33,6 +33,7 @@ import {
   YAxis,
 } from 'recharts'
 import { ApiError } from '@/lib/apiClient'
+import PhotoGallery from '@/components/PhotoGallery'
 import {
   CreateFeedingPayload,
   CreateShedPayload,
@@ -188,6 +189,20 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
     if (s.status === 'fulfilled') setSnake(s.value)
   }, [snakeId])
 
+  // Photo mutations don't touch weights, feedings, or sheds — they just shift
+  // Snake.photo_url when the main photo changes or the first upload auto-
+  // promotes. A snake-only refetch keeps the main-photo badge honest without
+  // re-pulling the whole page.
+  const refetchSnakeOnly = useCallback(async () => {
+    try {
+      const s = await getSnake(snakeId)
+      setSnake(s)
+    } catch {
+      // Swallow — the photo mutation itself already succeeded; worst case
+      // the main-photo highlight drifts until the next full refetch.
+    }
+  }, [snakeId])
+
   if (loading && !snake) return <LoadingShell />
   if (snakeError && !snake) {
     return (
@@ -208,6 +223,14 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
     <article className="max-w-4xl mx-auto space-y-8">
       <BackLink />
       <SnakeHeader snake={snake} suggestion={preySuggestion} />
+
+      <Section title="Photos">
+        <PhotoGallery
+          snakeId={snake.id}
+          snakeMainPhotoUrl={snake.photo_url}
+          onMainChanged={refetchSnakeOnly}
+        />
+      </Section>
 
       <Section title="Weight">
         {weightError && <InlineError message={weightError} />}
@@ -273,9 +296,17 @@ function SnakeHeader({
 
   return (
     <header>
-      <p className="text-xs tracking-[0.2em] uppercase text-herp-lime mb-3 font-medium">
-        Reptile
-      </p>
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <p className="text-xs tracking-[0.2em] uppercase text-herp-lime font-medium">
+          Reptile
+        </p>
+        <Link
+          href={`/app/reptiles/${snake.id}/edit`}
+          className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider px-3 py-1.5 rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-100 hover:border-neutral-700 transition-colors"
+        >
+          <span aria-hidden="true">✎</span> Edit
+        </Link>
+      </div>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-wide text-white mb-1 break-words">
