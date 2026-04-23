@@ -1,4 +1,11 @@
 /** @type {import('next').NextConfig} */
+//
+// Canonicalization note: we canonicalize on the APEX (herpetoverse.com),
+// not www. That redirect is handled at the Vercel domain-config layer
+// (www → 308 → apex). Do NOT add an app-level `redirects()` rule here
+// for host canonicalization — doing so duplicates the rule and, if the
+// direction disagrees with the Vercel domain, creates a redirect loop.
+//
 const nextConfig = {
   reactStrictMode: true,
   env: {
@@ -9,17 +16,6 @@ const nextConfig = {
   },
   eslint: {
     ignoreDuringBuilds: false,
-  },
-  async redirects() {
-    return [
-      // Canonicalize to www
-      {
-        source: '/:path*',
-        has: [{ type: 'host', value: 'herpetoverse.com' }],
-        destination: 'https://www.herpetoverse.com/:path*',
-        permanent: true,
-      },
-    ]
   },
 }
 
