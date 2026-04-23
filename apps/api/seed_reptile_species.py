@@ -6,12 +6,26 @@ Every entry carries 3+ citations, at least one Tier A (peer-reviewed or
 veterinary) or authoritative keeper reference. Husbandry numbers are
 ranges, not single points, to reflect source variation.
 
-Scope: 5 starter species where we have solid multi-source confirmation:
+Scope: 10 starter species where we have solid multi-source confirmation.
+
+Snakes (5):
   - Python regius (ball python)
   - Pantherophis guttatus (corn snake)
   - Lampropeltis californiae (California kingsnake)
   - Heterodon nasicus (Western hognose)
   - Gongylophis colubrinus (Kenyan sand boa)
+
+Lizards (5) — added when the lizard subsystem reached API parity with
+snakes. Feeding intelligence caveat: `life_stage_feeding` was designed
+for the snake whole-prey-bolus model (ratio of prey weight to body
+weight). For insectivorous and omnivorous lizards the ratio fields are
+crude proxies; authoritative feeding protocols live in
+`supplementation_notes` and `feeding_frequency_*`.
+  - Eublepharis macularius (leopard gecko)
+  - Hemitheconyx caudicinctus (African fat-tailed gecko)
+  - Correlophus ciliatus (crested gecko)
+  - Pogona vitticeps (bearded dragon)
+  - Tiliqua scincoides (blue-tongued skink)
 
 Future species should go through the rubric's review workflow before
 being added here with is_verified=True.
@@ -192,6 +206,153 @@ CITES = {
         "url": "https://reptilesmagazine.com/expert-care-for-the-kenyan-sand-boa/",
         "publication_date": "2020-01-01",
         "summary": "Industry magazine husbandry reference for Gongylophis colubrinus.",
+    },
+    # --- Lizard citations --------------------------------------------------
+    # Leopard gecko
+    "reptifiles_leopard_gecko": {
+        "source_type": "breeder_community",
+        "title": "Leopard Gecko Care Sheet",
+        "author": "ReptiFiles",
+        "url": "https://reptifiles.com/leopard-gecko-care/",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Well-referenced keeper guide for Eublepharis macularius, drawing "
+            "on veterinary sources and modern husbandry research."
+        ),
+    },
+    "tree_of_life_leopard_gecko": {
+        "source_type": "veterinary",
+        "title": "Leopard Gecko Care",
+        "author": "Tree of Life Exotic Pet Medical Center",
+        "url": "https://treeoflifeexotics.vet/education-resource-center/for-clients/lizards/leopard-gecko-care",
+        "publication_date": "2023-01-01",
+        "summary": "Veterinary husbandry reference for Eublepharis macularius.",
+    },
+    "biodude_leopard_gecko": {
+        "source_type": "breeder_community",
+        "title": "Leopard Gecko Care Sheet",
+        "author": "The Bio Dude",
+        "url": "https://www.thebiodude.com/blogs/lizard-caresheets/leopard-gecko-care-sheet",
+        "publication_date": "2023-01-01",
+        "summary": "Bioactive-oriented care reference for Eublepharis macularius.",
+    },
+    # African fat-tailed gecko
+    "reptifiles_fat_tailed_gecko": {
+        "source_type": "breeder_community",
+        "title": "African Fat-Tailed Gecko Care Sheet",
+        "author": "ReptiFiles",
+        "url": "https://reptifiles.com/african-fat-tailed-gecko-care/",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Husbandry ranges with veterinary cross-references for "
+            "Hemitheconyx caudicinctus."
+        ),
+    },
+    "biodude_fat_tailed_gecko": {
+        "source_type": "breeder_community",
+        "title": "African Fat-Tailed Gecko Care Sheet",
+        "author": "The Bio Dude",
+        "url": "https://www.thebiodude.com/blogs/lizard-caresheets/african-fat-tailed-gecko-care-sheet",
+        "publication_date": "2023-01-01",
+        "summary": "Bioactive care reference for Hemitheconyx caudicinctus.",
+    },
+    "reptiles_magazine_fat_tailed_gecko": {
+        "source_type": "breeder_community",
+        "title": "The African Fat-Tailed Gecko",
+        "author": "Reptiles Magazine",
+        "url": "https://reptilesmagazine.com/the-african-fat-tailed-gecko/",
+        "publication_date": "2019-01-01",
+        "summary": "Industry magazine husbandry reference for Hemitheconyx caudicinctus.",
+    },
+    # Crested gecko
+    "reptifiles_crested_gecko": {
+        "source_type": "breeder_community",
+        "title": "Crested Gecko Care Sheet",
+        "author": "ReptiFiles",
+        "url": "https://reptifiles.com/crested-gecko-care-sheet/",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Keeper reference for Correlophus ciliatus with veterinary "
+            "cross-referenced husbandry ranges."
+        ),
+    },
+    "pangea_crested_gecko": {
+        "source_type": "breeder_community",
+        "title": "Crested Gecko Care",
+        "author": "Pangea Reptile",
+        "url": "https://pangeareptile.com/pages/crested-gecko-care-sheet",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Industry reference from a major crested gecko breeder and MRP "
+            "manufacturer."
+        ),
+    },
+    "tree_of_life_crested_gecko": {
+        "source_type": "veterinary",
+        "title": "Crested Gecko Care",
+        "author": "Tree of Life Exotic Pet Medical Center",
+        "url": "https://treeoflifeexotics.vet/education-resource-center/for-clients/lizards/crested-gecko-care",
+        "publication_date": "2023-01-01",
+        "summary": "Veterinary husbandry reference for Correlophus ciliatus.",
+    },
+    # Bearded dragon
+    "reptifiles_bearded_dragon": {
+        "source_type": "breeder_community",
+        "title": "Bearded Dragon Care Sheet",
+        "author": "ReptiFiles",
+        "url": "https://reptifiles.com/bearded-dragon-care/",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Comprehensive keeper reference for Pogona vitticeps with extensive "
+            "veterinary and peer-reviewed sources."
+        ),
+    },
+    "tree_of_life_bearded_dragon": {
+        "source_type": "veterinary",
+        "title": "Bearded Dragon Care",
+        "author": "Tree of Life Exotic Pet Medical Center",
+        "url": "https://treeoflifeexotics.vet/education-resource-center/for-clients/lizards/bearded-dragon-care",
+        "publication_date": "2023-01-01",
+        "summary": "Veterinary husbandry reference for Pogona vitticeps.",
+    },
+    "rspca_bearded_dragon": {
+        "source_type": "veterinary",
+        "title": "Bearded Dragon Care Sheet",
+        "author": "RSPCA",
+        "url": "https://www.rspca.org.uk/adviceandwelfare/pets/other/beardeddragon",
+        "publication_date": "2020-01-01",
+        "summary": (
+            "Animal-welfare-charity care sheet with husbandry minimums for "
+            "Pogona vitticeps."
+        ),
+    },
+    # Blue-tongued skink
+    "reptifiles_blue_tongued_skink": {
+        "source_type": "breeder_community",
+        "title": "Blue-Tongue Skink Care Sheet",
+        "author": "ReptiFiles",
+        "url": "https://reptifiles.com/blue-tongue-skink-care/",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Keeper reference for Tiliqua scincoides with veterinary "
+            "cross-references."
+        ),
+    },
+    "biodude_blue_tongued_skink": {
+        "source_type": "breeder_community",
+        "title": "Blue Tongue Skink Care Sheet",
+        "author": "The Bio Dude",
+        "url": "https://www.thebiodude.com/blogs/lizard-caresheets/blue-tongue-skink-care-sheet",
+        "publication_date": "2023-01-01",
+        "summary": "Bioactive care reference for Tiliqua scincoides.",
+    },
+    "tree_of_life_blue_tongued_skink": {
+        "source_type": "veterinary",
+        "title": "Blue-Tongued Skink Care",
+        "author": "Tree of Life Exotic Pet Medical Center",
+        "url": "https://treeoflifeexotics.vet/education-resource-center/for-clients/lizards/blue-tongued-skink-care",
+        "publication_date": "2023-01-01",
+        "summary": "Veterinary husbandry reference for Tiliqua scincoides.",
     },
 }
 
@@ -691,6 +852,593 @@ SPECIES_DATA = [
             "bgsu_herpetarium_sand_boa",
             "researchgate_sand_boa",
             "reptiles_magazine_sand_boa",
+        ),
+    },
+    # =======================================================================
+    # LIZARDS — initial 5 species spanning beginner to intermediate care.
+    # Same rubric: 3+ citations, at least one veterinary source where
+    # available, husbandry numbers as ranges.
+    #
+    # Feeding intelligence caveat: the `life_stage_feeding` schema was
+    # designed around the snake whole-prey-bolus model (ratio of prey weight
+    # to animal body weight). For insectivorous lizards this maps awkwardly
+    # — cricket-based feeding is count-based, not weight-based. Where the
+    # ratio fields are populated for lizards, they should be read as crude
+    # conservative bounds; the authoritative feeding protocol lives in
+    # `supplementation_notes` and the per-life-stage frequency fields. The
+    # prey-suggestion endpoint will still return a plausible range, but
+    # keepers of insectivores should defer to insect-count guidance.
+    # =======================================================================
+    # -- Leopard gecko ------------------------------------------------------
+    {
+        "scientific_name": "Eublepharis macularius",
+        "common_names": ["Leopard Gecko"],
+        "genus": "Eublepharis",
+        "family": "Eublepharidae",
+        "order_name": "Squamata",
+        "care_level": "beginner",
+        "handleability": "docile",
+        "activity_period": "crepuscular",
+        "native_region": "Afghanistan, Pakistan, northwestern India — arid rocky scrubland",
+        "adult_length_min_in": Decimal("7"),
+        "adult_length_max_in": Decimal("11"),
+        "adult_weight_min_g": Decimal("45"),
+        "adult_weight_max_g": Decimal("90"),
+        # Temperature — leopard geckos are ground-warmth foragers; provide a
+        # belly-warm basking surface and a cool retreat.
+        "temp_cool_min": Decimal("70"),
+        "temp_cool_max": Decimal("75"),
+        "temp_warm_min": Decimal("80"),
+        "temp_warm_max": Decimal("85"),
+        "temp_basking_min": Decimal("90"),
+        "temp_basking_max": Decimal("95"),
+        "temp_night_min": Decimal("65"),
+        "temp_night_max": Decimal("72"),
+        "humidity_min": 30,
+        "humidity_max": 40,
+        "humidity_shed_boost_min": 60,
+        "humidity_shed_boost_max": 80,
+        # UVB — historically considered "not required" because of their
+        # crepuscular activity, but modern husbandry (ReptiFiles, Baines et
+        # al. studies on reptile UVB benefit) now recommends low-level UVB.
+        # Kept as required=False to respect existing keeper setups, but
+        # flagged as beneficial in care_guide.
+        "uvb_required": False,
+        "uvb_type": "T5_HO",
+        "uvb_distance_min_in": Decimal("12"),
+        "uvb_distance_max_in": Decimal("18"),
+        "uvb_replacement_months": 12,
+        "enclosure_type": "terrestrial",
+        "enclosure_min_hatchling": "10 gallon / 20\"L x 10\"W x 12\"H",
+        "enclosure_min_juvenile": "20 gallon long",
+        "enclosure_min_adult": "40 gallon / 36\"L x 18\"W x 18\"H minimum",
+        "bioactive_suitable": True,
+        "substrate_safe_list": [
+            "topsoil/play sand mix",
+            "excavator clay",
+            "ceramic tile",
+            "paper towel (quarantine)",
+        ],
+        "substrate_avoid_list": ["calcium sand", "walnut shell", "cedar", "pine"],
+        "substrate_depth_min_in": Decimal("2"),
+        "substrate_depth_max_in": Decimal("4"),
+        "diet_type": "insectivore",
+        "prey_size_hatchling": "1/4\" crickets, small dubia, pinhead locusts",
+        "prey_size_juvenile": "1/2\" crickets, medium dubia, small hornworms",
+        "prey_size_adult": "Adult crickets, medium dubia, hornworms, the occasional pinky",
+        "feeding_frequency_hatchling": "Daily; 5–10 appropriately-sized insects per feeding",
+        "feeding_frequency_juvenile": "Every other day; 5–7 insects per feeding",
+        "feeding_frequency_adult": "Every 3–4 days; 4–6 insects per feeding",
+        # Feeding intelligence — crude proxy values. Real protocol is insect
+        # count, not ratio. Ratio bounds are deliberately conservative.
+        "hatchling_weight_min_g": Decimal("2"),
+        "hatchling_weight_max_g": Decimal("5"),
+        "power_feeding_threshold_pct": Decimal("10.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 15, "ratio_pct_min": 5, "ratio_pct_max": 10, "interval_days_min": 1, "interval_days_max": 1},
+            {"stage": "juvenile", "weight_g_max": 35, "ratio_pct_min": 5, "ratio_pct_max": 8, "interval_days_min": 2, "interval_days_max": 2},
+            {"stage": "subadult", "weight_g_max": 55, "ratio_pct_min": 4, "ratio_pct_max": 7, "interval_days_min": 3, "interval_days_max": 3},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 3, "ratio_pct_max": 6, "interval_days_min": 3, "interval_days_max": 4},
+        ],
+        "supplementation_notes": (
+            "Dust insects with calcium + D3 at most feedings and a reptile "
+            "multivitamin (e.g. Repashy Calcium Plus, Arcadia EarthPro-A) "
+            "1–2× per week. Gut-load feeders 24–48 hours before use. MBD "
+            "(metabolic bone disease) is the most common preventable illness "
+            "in pet leopard geckos."
+        ),
+        "water_bowl_description": "Shallow bowl on the cool end; refresh daily.",
+        "brumation_required": False,
+        "brumation_notes": (
+            "Brumation not required for pet animals. Some keepers cycle "
+            "breeders through a 60°F rest period of 6–8 weeks."
+        ),
+        "defensive_displays": ["tail waving", "vocalizing", "tail drop (if severely stressed)"],
+        "lifespan_captivity_min_yrs": 15,
+        "lifespan_captivity_max_yrs": 20,
+        "cites_appendix": None,
+        "iucn_status": "LC",
+        "has_morph_market": True,
+        "morph_complexity": "complex",
+        "care_guide": (
+            "**Leopard Gecko (Eublepharis macularius)** — The most commonly "
+            "kept pet lizard. Docile, small, and hardy when the basics are "
+            "right: a thermal gradient with a warm belly spot, three hides "
+            "(warm, cool, and a humid hide for shedding), and a safe "
+            "substrate. Leopard geckos are one of the few geckos with "
+            "eyelids and are ground-dwelling rather than climbing. Historic "
+            "advice said \"no UVB needed\"; modern husbandry recommends "
+            "low-level UVB for long-term health. Watch for tail thickness as "
+            "a condition indicator — a thick, plump tail is a healthy tail. "
+            "**Never pull on the tail** — it will drop."
+        ),
+        "sources": cite(
+            "reptifiles_leopard_gecko",
+            "tree_of_life_leopard_gecko",
+            "biodude_leopard_gecko",
+        ),
+    },
+    # -- African fat-tailed gecko -------------------------------------------
+    {
+        "scientific_name": "Hemitheconyx caudicinctus",
+        "common_names": ["African Fat-Tailed Gecko", "Fat-Tail Gecko"],
+        "genus": "Hemitheconyx",
+        "family": "Eublepharidae",
+        "order_name": "Squamata",
+        "care_level": "beginner",
+        "handleability": "docile",
+        "activity_period": "nocturnal",
+        "native_region": "West Africa — savanna with dry season refugia, humid burrows",
+        "adult_length_min_in": Decimal("7"),
+        "adult_length_max_in": Decimal("9"),
+        "adult_weight_min_g": Decimal("45"),
+        "adult_weight_max_g": Decimal("75"),
+        "temp_cool_min": Decimal("72"),
+        "temp_cool_max": Decimal("78"),
+        "temp_warm_min": Decimal("80"),
+        "temp_warm_max": Decimal("85"),
+        "temp_basking_min": Decimal("88"),
+        "temp_basking_max": Decimal("92"),
+        "temp_night_min": Decimal("70"),
+        "temp_night_max": Decimal("75"),
+        # Higher humidity than leopard gecko — AFTs come from more humid
+        # burrow microclimates.
+        "humidity_min": 50,
+        "humidity_max": 70,
+        "humidity_shed_boost_min": 70,
+        "humidity_shed_boost_max": 85,
+        "uvb_required": False,
+        "uvb_type": "T5_HO",
+        "uvb_distance_min_in": Decimal("12"),
+        "uvb_distance_max_in": Decimal("18"),
+        "uvb_replacement_months": 12,
+        "enclosure_type": "terrestrial",
+        "enclosure_min_hatchling": "10 gallon",
+        "enclosure_min_juvenile": "20 gallon long",
+        "enclosure_min_adult": "36\"L x 18\"W x 18\"H minimum",
+        "bioactive_suitable": True,
+        "substrate_safe_list": [
+            "topsoil/coco fiber mix",
+            "cypress mulch",
+            "paper towel (quarantine)",
+        ],
+        "substrate_avoid_list": ["calcium sand", "walnut shell", "cedar", "pine"],
+        "substrate_depth_min_in": Decimal("2"),
+        "substrate_depth_max_in": Decimal("4"),
+        "diet_type": "insectivore",
+        "prey_size_hatchling": "1/4\" crickets, pinhead locusts, small dubia",
+        "prey_size_juvenile": "1/2\" crickets, medium dubia, small hornworms",
+        "prey_size_adult": "Adult crickets, medium dubia, hornworms",
+        "feeding_frequency_hatchling": "Daily; 5–8 insects per feeding",
+        "feeding_frequency_juvenile": "Every other day; 5–7 insects per feeding",
+        "feeding_frequency_adult": "Every 3–4 days; 4–6 insects per feeding",
+        "hatchling_weight_min_g": Decimal("3"),
+        "hatchling_weight_max_g": Decimal("6"),
+        "power_feeding_threshold_pct": Decimal("10.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 15, "ratio_pct_min": 5, "ratio_pct_max": 10, "interval_days_min": 1, "interval_days_max": 1},
+            {"stage": "juvenile", "weight_g_max": 35, "ratio_pct_min": 5, "ratio_pct_max": 8, "interval_days_min": 2, "interval_days_max": 2},
+            {"stage": "subadult", "weight_g_max": 50, "ratio_pct_min": 4, "ratio_pct_max": 7, "interval_days_min": 3, "interval_days_max": 3},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 3, "ratio_pct_max": 6, "interval_days_min": 3, "interval_days_max": 4},
+        ],
+        "supplementation_notes": (
+            "Dust insects with calcium + D3 at most feedings and a reptile "
+            "multivitamin 1–2× per week. Tail thickness is the condition "
+            "indicator — AFTs store fat in the tail like their leopard gecko "
+            "cousins. Gut-load feeders 24–48 hours before use."
+        ),
+        "water_bowl_description": (
+            "Shallow bowl. A humid hide with moist sphagnum is essential "
+            "for shed cycles — more so than for leopard geckos."
+        ),
+        "brumation_required": False,
+        "defensive_displays": ["vocalizing", "tail waving", "tail drop (if severely stressed)"],
+        "lifespan_captivity_min_yrs": 15,
+        "lifespan_captivity_max_yrs": 20,
+        "cites_appendix": None,
+        "iucn_status": "LC",
+        "has_morph_market": True,
+        "morph_complexity": "moderate",
+        "care_guide": (
+            "**African Fat-Tailed Gecko (Hemitheconyx caudicinctus)** — Close "
+            "cousin of the leopard gecko with two key differences: they need "
+            "higher humidity and tend toward shyer, less handling-tolerant "
+            "temperaments. Provide a humid hide with moist sphagnum — this "
+            "species gets stuck sheds more readily than leopard geckos if "
+            "humidity is too low. Otherwise similar husbandry: thermal "
+            "gradient, belly-warm basking surface, three hides, safe "
+            "loose substrate. Never pull on the tail."
+        ),
+        "sources": cite(
+            "reptifiles_fat_tailed_gecko",
+            "biodude_fat_tailed_gecko",
+            "reptiles_magazine_fat_tailed_gecko",
+        ),
+    },
+    # -- Crested gecko ------------------------------------------------------
+    {
+        "scientific_name": "Correlophus ciliatus",
+        "common_names": ["Crested Gecko", "Eyelash Gecko"],
+        "genus": "Correlophus",
+        "family": "Diplodactylidae",
+        "order_name": "Squamata",
+        "care_level": "beginner",
+        "handleability": "docile",
+        "activity_period": "nocturnal",
+        "native_region": "Southern New Caledonia — humid subtropical forest canopy",
+        "adult_length_min_in": Decimal("7"),
+        "adult_length_max_in": Decimal("9"),
+        "adult_weight_min_g": Decimal("35"),
+        "adult_weight_max_g": Decimal("55"),
+        # Crested geckos do NOT need supplemental heat in most homes —
+        # room-temperature husbandry is standard. Heat is harmful above ~82°F.
+        "temp_cool_min": Decimal("65"),
+        "temp_cool_max": Decimal("72"),
+        "temp_warm_min": Decimal("72"),
+        "temp_warm_max": Decimal("78"),
+        "temp_basking_min": Decimal("78"),
+        "temp_basking_max": Decimal("82"),
+        "temp_night_min": Decimal("65"),
+        "temp_night_max": Decimal("72"),
+        "humidity_min": 60,
+        "humidity_max": 80,
+        "humidity_shed_boost_min": 70,
+        "humidity_shed_boost_max": 90,
+        "uvb_required": False,
+        "uvb_type": "T5_HO",
+        "uvb_distance_min_in": Decimal("12"),
+        "uvb_distance_max_in": Decimal("18"),
+        "uvb_replacement_months": 12,
+        "enclosure_type": "arboreal",
+        "enclosure_min_hatchling": "Kritter Keeper or 5-gallon equivalent (too large stresses young crestes)",
+        "enclosure_min_juvenile": "12\"L x 12\"W x 18\"H minimum",
+        "enclosure_min_adult": "18\"L x 18\"W x 24\"H (or 36\"H for a lightly-planted vivarium)",
+        "bioactive_suitable": True,
+        "substrate_safe_list": [
+            "coco fiber / topsoil blend",
+            "bioactive mix with sphagnum topper",
+            "paper towel (quarantine)",
+        ],
+        "substrate_avoid_list": ["calcium sand", "walnut shell", "cedar", "pine"],
+        "substrate_depth_min_in": Decimal("2"),
+        "substrate_depth_max_in": Decimal("4"),
+        "diet_type": "omnivore",
+        "prey_size_hatchling": "Pinhead crickets (rare treat)",
+        "prey_size_juvenile": "1/4\" crickets, small dubia (1–2× per week)",
+        "prey_size_adult": "Small-to-medium crickets or dubia (treat, 1× per week at most)",
+        "feeding_frequency_hatchling": "MRP (e.g. Repashy, Pangea, Black Panther Zoological) nightly; insects optional",
+        "feeding_frequency_juvenile": "MRP 3–5× per week; live insects 1–2× per week",
+        "feeding_frequency_adult": "MRP 3× per week; live insects 0–1× per week",
+        # Crested gecko feeding is MRP-driven, not prey-based. Ratio fields
+        # below apply only to optional live-insect supplementation, and are
+        # intentionally very small.
+        "hatchling_weight_min_g": Decimal("2"),
+        "hatchling_weight_max_g": Decimal("4"),
+        "power_feeding_threshold_pct": Decimal("8.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 8, "ratio_pct_min": 3, "ratio_pct_max": 6, "interval_days_min": 1, "interval_days_max": 2},
+            {"stage": "juvenile", "weight_g_max": 20, "ratio_pct_min": 3, "ratio_pct_max": 5, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "subadult", "weight_g_max": 35, "ratio_pct_min": 2, "ratio_pct_max": 4, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 2, "ratio_pct_max": 4, "interval_days_min": 2, "interval_days_max": 3},
+        ],
+        "supplementation_notes": (
+            "Primary diet is a complete powdered gecko meal-replacement "
+            "(MRP) — Repashy, Pangea, or Black Panther Zoological are the "
+            "industry standards. MRP alone is nutritionally complete; no "
+            "calcium/D3 dusting needed when MRP is the primary diet. Live "
+            "insects are optional enrichment, 0–2× per week. Dust those "
+            "insects with calcium (no D3 needed if MRP is the staple)."
+        ),
+        "water_bowl_description": (
+            "Small bowl plus nightly misting — crestes drink from droplets "
+            "on leaves and glass. A fine mist 1–2× daily maintains humidity "
+            "while letting the enclosure dry between cycles (no stagnant damp)."
+        ),
+        "brumation_required": False,
+        "defensive_displays": [
+            "tail drop (common — tails do not regrow in this species)",
+            "vocalizing (squeaks, barks)",
+            "jumping",
+        ],
+        "lifespan_captivity_min_yrs": 15,
+        "lifespan_captivity_max_yrs": 20,
+        "cites_appendix": None,
+        "iucn_status": "VU",  # Vulnerable per IUCN; captive population is robust
+        "wild_population_notes": (
+            "Listed as Vulnerable by IUCN due to habitat loss in New "
+            "Caledonia. Captive population is large and genetically "
+            "well-established; all animals in the pet trade should be "
+            "captive-bred."
+        ),
+        "has_morph_market": True,
+        "morph_complexity": "moderate",
+        "care_guide": (
+            "**Crested Gecko (Correlophus ciliatus)** — Rediscovered in 1994 "
+            "after being thought extinct, now one of the most popular pet "
+            "lizards. Low-maintenance: room-temperature husbandry (no heat "
+            "needed in most homes — heat above 82°F is actively harmful), "
+            "a complete powdered MRP diet with optional live insects, and a "
+            "vertically-oriented planted enclosure. Crested geckos drop "
+            "their tails readily and, unlike most geckos, **do not regrow "
+            "them** — a tailless crestie is not a health issue but is "
+            "permanent. Mist nightly, let the enclosure dry during the day."
+        ),
+        "sources": cite(
+            "reptifiles_crested_gecko",
+            "pangea_crested_gecko",
+            "tree_of_life_crested_gecko",
+        ),
+    },
+    # -- Bearded dragon -----------------------------------------------------
+    {
+        "scientific_name": "Pogona vitticeps",
+        "common_names": ["Bearded Dragon", "Central Bearded Dragon", "Inland Bearded Dragon"],
+        "genus": "Pogona",
+        "family": "Agamidae",
+        "order_name": "Squamata",
+        "care_level": "intermediate",
+        "handleability": "docile",
+        "activity_period": "diurnal",
+        "native_region": "Central and eastern Australia — arid woodland, rocky desert, scrub",
+        "adult_length_min_in": Decimal("18"),
+        "adult_length_max_in": Decimal("24"),
+        "adult_weight_min_g": Decimal("350"),
+        "adult_weight_max_g": Decimal("600"),
+        # Temperature — high basking requirement; gradient is essential.
+        "temp_cool_min": Decimal("75"),
+        "temp_cool_max": Decimal("85"),
+        "temp_warm_min": Decimal("85"),
+        "temp_warm_max": Decimal("95"),
+        "temp_basking_min": Decimal("100"),
+        "temp_basking_max": Decimal("110"),
+        "temp_night_min": Decimal("65"),
+        "temp_night_max": Decimal("75"),
+        "humidity_min": 30,
+        "humidity_max": 40,
+        "humidity_shed_boost_min": 40,
+        "humidity_shed_boost_max": 50,
+        # UVB is MANDATORY for bearded dragons — MBD is a species-defining
+        # husbandry failure. T5 HO with appropriate UVI (3.0–4.0 in basking
+        # zone) is the modern standard.
+        "uvb_required": True,
+        "uvb_type": "T5_HO",
+        "uvb_distance_min_in": Decimal("12"),
+        "uvb_distance_max_in": Decimal("17"),
+        "uvb_replacement_months": 12,
+        "enclosure_type": "terrestrial",
+        "enclosure_min_hatchling": "20 gallon long (temporarily)",
+        "enclosure_min_juvenile": "40 gallon breeder / 36\"L x 18\"W x 18\"H",
+        "enclosure_min_adult": "4\"×2\"×2\" (120 gallon) minimum; 6\"×2\"×2\" preferred",
+        "bioactive_suitable": True,
+        "substrate_safe_list": [
+            "topsoil/play sand mix (60/40)",
+            "excavator clay",
+            "ceramic tile",
+            "non-adhesive shelf liner (quarantine)",
+        ],
+        "substrate_avoid_list": ["calcium sand", "walnut shell", "crushed walnut", "cedar", "pine"],
+        "substrate_depth_min_in": Decimal("2"),
+        "substrate_depth_max_in": Decimal("4"),
+        "diet_type": "omnivore",
+        "prey_size_hatchling": "Pinhead to 1/4\" crickets, small dubia; 80% insect / 20% greens",
+        "prey_size_juvenile": "1/2\" crickets, medium dubia, hornworms; 60% insect / 40% greens",
+        "prey_size_adult": "Adult dubia, hornworms, occasional pinky; 20% insect / 80% greens",
+        "feeding_frequency_hatchling": "2–3× daily; as many insects as they'll eat in 10–15 min, plus greens",
+        "feeding_frequency_juvenile": "Daily; insects in measured amount, greens always available",
+        "feeding_frequency_adult": "Greens daily; insects 2–3× per week",
+        # Bearded dragon feeding is diet-composition-driven, not ratio-driven.
+        # Values below are crude; supplementation_notes is authoritative.
+        "hatchling_weight_min_g": Decimal("2"),
+        "hatchling_weight_max_g": Decimal("5"),
+        "power_feeding_threshold_pct": Decimal("8.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 50, "ratio_pct_min": 5, "ratio_pct_max": 10, "interval_days_min": 1, "interval_days_max": 1},
+            {"stage": "juvenile", "weight_g_max": 150, "ratio_pct_min": 3, "ratio_pct_max": 6, "interval_days_min": 1, "interval_days_max": 1},
+            {"stage": "subadult", "weight_g_max": 350, "ratio_pct_min": 2, "ratio_pct_max": 4, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 1, "ratio_pct_max": 3, "interval_days_min": 2, "interval_days_max": 4},
+        ],
+        "supplementation_notes": (
+            "**Diet composition shifts with age:** hatchlings are 70–80% "
+            "insect / 20–30% plant, shifting to 20–30% insect / 70–80% "
+            "plant as adults. Daily salad of collard/turnip/mustard greens, "
+            "dandelion, squash; avoid spinach and kale as staples (oxalate/"
+            "goitrogen concerns). Dust insects with calcium (no D3 if UVB "
+            "is correct) at most feedings; reptile multivitamin 1× per week. "
+            "**UVB is non-negotiable** — MBD is the single most common "
+            "welfare failure in this species. Obesity in adults is almost "
+            "as common; cap the insect portion."
+        ),
+        "water_bowl_description": (
+            "Shallow bowl. Many individuals rarely drink from a bowl and "
+            "get hydration from greens and the occasional bath/mist."
+        ),
+        "brumation_required": False,
+        "brumation_notes": (
+            "Brumation is common and natural in captive adults during "
+            "autumn/winter (~6–12 weeks). Healthy brumating animals eat "
+            "little to nothing and are lethargic. Monitor weight — drop of "
+            ">10% warrants a vet check. Not required for pet animals; some "
+            "never brumate."
+        ),
+        "defensive_displays": [
+            "beard-flaring and darkening",
+            "gaping (open mouth)",
+            "head-bobbing (usually male dominance)",
+            "arm-waving (submission signal)",
+        ],
+        "lifespan_captivity_min_yrs": 10,
+        "lifespan_captivity_max_yrs": 15,
+        "cites_appendix": None,
+        "iucn_status": "LC",
+        "wild_population_notes": (
+            "Australia prohibits export of native wildlife; all bearded "
+            "dragons in the international pet trade are descended from "
+            "pre-ban animals and are captive-bred."
+        ),
+        "has_morph_market": True,
+        "morph_complexity": "moderate",
+        "care_guide": (
+            "**Bearded Dragon (Pogona vitticeps)** — Popular pet lizard "
+            "rightly considered intermediate, not beginner, because the "
+            "husbandry requirements are strict: high basking temperature "
+            "(100–110°F on the surface), mandatory quality T5 HO UVB with "
+            "correct distance and annual bulb replacement, a large "
+            "enclosure (minimum 4'×2'×2' for an adult), and a seasonally-"
+            "shifting diet. Get these right and you have a personable, "
+            "long-lived lizard that tolerates handling well. Get them wrong "
+            "— especially UVB — and metabolic bone disease sets in quickly. "
+            "**Beardies should NEVER be kept on calcium sand.**"
+        ),
+        "sources": cite(
+            "reptifiles_bearded_dragon",
+            "tree_of_life_bearded_dragon",
+            "rspca_bearded_dragon",
+        ),
+    },
+    # -- Blue-tongued skink -------------------------------------------------
+    {
+        "scientific_name": "Tiliqua scincoides",
+        "common_names": ["Blue-Tongued Skink", "Common Blue-Tongue", "Eastern Blue-Tongue"],
+        "genus": "Tiliqua",
+        "family": "Scincidae",
+        "order_name": "Squamata",
+        "care_level": "intermediate",
+        "handleability": "docile",
+        "activity_period": "diurnal",
+        "native_region": "Eastern and northern Australia, parts of Indonesia — woodland, grassland, suburbs",
+        "adult_length_min_in": Decimal("18"),
+        "adult_length_max_in": Decimal("24"),
+        "adult_weight_min_g": Decimal("350"),
+        "adult_weight_max_g": Decimal("700"),
+        "temp_cool_min": Decimal("70"),
+        "temp_cool_max": Decimal("78"),
+        "temp_warm_min": Decimal("80"),
+        "temp_warm_max": Decimal("90"),
+        "temp_basking_min": Decimal("95"),
+        "temp_basking_max": Decimal("105"),
+        "temp_night_min": Decimal("65"),
+        "temp_night_max": Decimal("75"),
+        # Humidity varies by locale: Northern/Irian-Jaya subspecies prefer
+        # higher humidity (60–80%); Eastern/Indonesian/Classic Northern
+        # variants are 40–60%. Mid-range set here for Tiliqua scincoides
+        # sensu lato; breed-specific adjustments should be applied.
+        "humidity_min": 40,
+        "humidity_max": 60,
+        "humidity_shed_boost_min": 60,
+        "humidity_shed_boost_max": 75,
+        "uvb_required": True,
+        "uvb_type": "T5_HO",
+        "uvb_distance_min_in": Decimal("12"),
+        "uvb_distance_max_in": Decimal("18"),
+        "uvb_replacement_months": 12,
+        "enclosure_type": "terrestrial",
+        "enclosure_min_hatchling": "20 gallon long (temporarily)",
+        "enclosure_min_juvenile": "40 gallon breeder",
+        "enclosure_min_adult": "4'×2'×1.5' (minimum); 6'×2'×2' strongly preferred",
+        "bioactive_suitable": True,
+        "substrate_safe_list": [
+            "topsoil/coco fiber mix",
+            "cypress mulch",
+            "aspen shavings (for locales with lower humidity needs)",
+            "bioactive with sphagnum layer",
+        ],
+        "substrate_avoid_list": ["calcium sand", "walnut shell", "cedar", "pine"],
+        "substrate_depth_min_in": Decimal("4"),
+        "substrate_depth_max_in": Decimal("6"),
+        "diet_type": "omnivore",
+        "prey_size_hatchling": "Pinky mice, small dubia, eggs, mixed greens",
+        "prey_size_juvenile": "Adult mice, medium dubia, mixed protein + greens",
+        "prey_size_adult": "Prepared wet food (dog/cat food reference), rodents, snails, greens",
+        "feeding_frequency_hatchling": "Daily; varied protein and plant matter",
+        "feeding_frequency_juvenile": "Every other day; balanced protein/greens",
+        "feeding_frequency_adult": "Every 3–5 days; 50% protein / 40% vegetables / 10% fruit by volume",
+        "hatchling_weight_min_g": Decimal("15"),
+        "hatchling_weight_max_g": Decimal("30"),
+        "power_feeding_threshold_pct": Decimal("8.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 80, "ratio_pct_min": 5, "ratio_pct_max": 10, "interval_days_min": 1, "interval_days_max": 1},
+            {"stage": "juvenile", "weight_g_max": 250, "ratio_pct_min": 4, "ratio_pct_max": 7, "interval_days_min": 2, "interval_days_max": 2},
+            {"stage": "subadult", "weight_g_max": 400, "ratio_pct_min": 3, "ratio_pct_max": 5, "interval_days_min": 3, "interval_days_max": 4},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 2, "ratio_pct_max": 4, "interval_days_min": 3, "interval_days_max": 5},
+        ],
+        "supplementation_notes": (
+            "**Balanced omnivore diet** is the defining husbandry concept. "
+            "Adults: 50% animal protein (quality canned dog/cat food used as "
+            "a reference staple, cooked lean meat, whole prey, snails, "
+            "eggs), 40% vegetables (collard greens, squash, green beans), "
+            "10% fruit (berries, melon — treat). Dust protein portion with "
+            "calcium at most feedings; reptile multivitamin 1× per week. "
+            "Obesity is the second-most-common husbandry failure after UVB "
+            "neglect — don't overfeed adults."
+        ),
+        "water_bowl_description": "Large enough to soak; replace daily.",
+        "brumation_required": False,
+        "brumation_notes": (
+            "Adults may brumate or significantly slow down over winter even "
+            "in captivity. Not required for pet animals but not a concern "
+            "if they self-regulate into a rest period with appropriate "
+            "lighting changes."
+        ),
+        "defensive_displays": [
+            "tongue-flashing (displays the blue tongue)",
+            "hissing",
+            "body-puffing",
+            "bite (powerful — capable of drawing blood in adults)",
+        ],
+        "lifespan_captivity_min_yrs": 15,
+        "lifespan_captivity_max_yrs": 20,
+        "cites_appendix": None,
+        "iucn_status": "LC",
+        "wild_population_notes": (
+            "Australian subspecies are export-restricted; most blue-tongued "
+            "skinks in the international trade are Indonesian (Tiliqua "
+            "scincoides chimaerea / Irian Jaya type) or captive-bred "
+            "Australian-descent animals."
+        ),
+        "has_morph_market": True,
+        "morph_complexity": "moderate",
+        "care_guide": (
+            "**Blue-Tongued Skink (Tiliqua scincoides)** — Heavy-bodied, "
+            "tongue-flashing omnivore with a reputation as a \"cat of the "
+            "reptile world\" — interactive, personable, food-motivated. "
+            "Intermediate-level husbandry because of the enclosure size "
+            "requirement (4 feet of floor space minimum for an adult), "
+            "mandatory UVB, deep substrate for the natural burrowing "
+            "behavior, and the balanced omnivore diet. Locale matters — "
+            "Northern, Eastern, Indonesian, and Irian Jaya types have "
+            "meaningfully different humidity preferences; confirm your "
+            "animal's locale and adjust husbandry accordingly. Bites from "
+            "adults are capable of drawing blood."
+        ),
+        "sources": cite(
+            "reptifiles_blue_tongued_skink",
+            "biodude_blue_tongued_skink",
+            "tree_of_life_blue_tongued_skink",
         ),
     },
 ]

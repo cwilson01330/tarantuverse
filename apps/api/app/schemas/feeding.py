@@ -39,11 +39,17 @@ class FeedingLogUpdate(BaseModel):
 
 
 class FeedingLogResponse(FeedingLogBase):
-    """Schema for feeding log response"""
+    """Schema for feeding log response.
+
+    Polymorphic parent — exactly one of tarantula_id / snake_id /
+    lizard_id / enclosure_id is populated. All Optional so Pydantic
+    serializes any variant without a 500.
+    """
     id: uuid.UUID
     tarantula_id: Optional[uuid.UUID] = None  # Now optional - can be enclosure-level
     enclosure_id: Optional[uuid.UUID] = None  # For enclosure-level feedings
     snake_id: Optional[uuid.UUID] = None  # Herpetoverse v1
+    lizard_id: Optional[uuid.UUID] = None  # Herpetoverse v1 — lizard parity
     created_at: datetime
 
     class Config:

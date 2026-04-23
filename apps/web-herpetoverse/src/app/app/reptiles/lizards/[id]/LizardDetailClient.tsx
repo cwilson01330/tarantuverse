@@ -1,23 +1,27 @@
 'use client'
 
 /**
- * Snake detail — the Sprint 5 spike.
+ * Lizard detail — mirror of the snake spike.
  *
- * Exercises the model end-to-end:
+ * Structure-for-structure twin of SnakeDetailClient:
  *   - Header: identity + current weight + life stage (server-computed)
- *   - Weight section: 30-day weight-loss alert, trend chart, log form, list
+ *   - Photos: polymorphic gallery, taxon="lizard"
+ *   - Weight: 30-day weight-loss alert, trend chart, log form, list
  *   - Feeding intelligence: consumes /prey-suggestion (server-computed)
  *   - Feeding log: form with live prey:BW ratio hint, history
  *   - Shed log: form + history
  *
- * Notes:
- *   - We lean on the backend for computed values (alert thresholds, stage,
- *     suggested ranges) — the UI is a renderer, not a calculator. This
- *     keeps the "how we compute" story consistent across mobile + web.
- *   - After any mutation we refetch the affected slices so derived values
- *     (trend, prey suggestion, last_fed_at) stay honest.
- *   - Error handling is per-section: one failing call shouldn't blank the
- *     page.
+ * Deliberate omissions vs. snakes:
+ *   - No genetics section. Lizard morphs exist (leopard gecko color morphs,
+ *     bearded dragon morphs) but the genes catalog is snake-scoped right now,
+ *     and wiring the morph calculator for lizards is a separate effort.
+ *
+ * Feeding-intelligence caveat for lizards:
+ *   The prey-suggestion endpoint is backed by the same life_stage_feeding
+ *   table as snakes — prey-weight / body-weight ratios. For insectivorous
+ *   lizards that number is a crude proxy (a single cricket is ~0.5g). The
+ *   "How we compute this" disclosure below calls that out; the authoritative
+ *   feeding protocol for a keeper still lives in the species care sheet.
  */
 
 import Link from 'next/link'
@@ -39,9 +43,9 @@ import {
   CreateShedPayload,
   CreateWeightLogPayload,
   FeedingLog,
+  Lizard,
   PreySuggestion,
   ShedLog,
-  Snake,
   WEIGHT_CONTEXT_LABELS,
   WeightContext,
   WeightLog,
@@ -55,24 +59,24 @@ import {
   fmtDate,
   fmtDecimal,
   fmtGrams,
+  getLizard,
   getPreySuggestion,
-  getSnake,
   getWeightTrend,
   listFeedings,
   listSheds,
   listWeightLogs,
+  lizardTitle,
   relativeDays,
-  snakeTitle,
-} from '@/lib/snakes'
+} from '@/lib/lizards'
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
-  // Snake record
-  const [snake, setSnake] = useState<Snake | null>(null)
-  const [snakeError, setSnakeError] = useState<string | null>(null)
+export default function LizardDetailClient({ lizardId }: { lizardId: string }) {
+  // Lizard record
+  const [lizard, setLizard] = useState<Lizard | null>(null)
+  const [lizardError, setLizardError] = useState<string | null>(null)
 
   // Weight slice
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([])
@@ -92,21 +96,21 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
   const [loading, setLoading] = useState(true)
 
   const refetchAll = useCallback(async () => {
-    const [snakeR, weightsR, trendR, preyR, feedingsR, shedsR] =
+    const [lizardR, weightsR, trendR, preyR, feedingsR, shedsR] =
       await Promise.allSettled([
-        getSnake(snakeId),
-        listWeightLogs(snakeId),
-        getWeightTrend(snakeId),
-        getPreySuggestion(snakeId),
-        listFeedings(snakeId),
-        listSheds(snakeId),
+        getLizard(lizardId),
+        listWeightLogs(lizardId),
+        getWeightTrend(lizardId),
+        getPreySuggestion(lizardId),
+        listFeedings(lizardId),
+        listSheds(lizardId),
       ])
 
-    if (snakeR.status === 'fulfilled') {
-      setSnake(snakeR.value)
-      setSnakeError(null)
+    if (lizardR.status === 'fulfilled') {
+      setLizard(lizardR.value)
+      setLizardError(null)
     } else {
-      setSnakeError(errMsg(snakeR.reason, 'Could not load this reptile.'))
+      setLizardError(errMsg(lizardR.reason, 'Could not load this reptile.'))
     }
 
     if (weightsR.status === 'fulfilled') {
@@ -141,7 +145,7 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
     } else {
       setShedError(errMsg(shedsR.reason, 'Could not load sheds.'))
     }
-  }, [snakeId])
+  }, [lizardId])
 
   useEffect(() => {
     let cancelled = false
@@ -157,54 +161,54 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
   // Mutation refetch helpers — scoped so a form doesn't have to refetch the
   // whole page for changes it can't affect.
   const refetchWeights = useCallback(async () => {
-    const [w, t, s, p] = await Promise.allSettled([
-      listWeightLogs(snakeId),
-      getWeightTrend(snakeId),
-      getSnake(snakeId),
-      getPreySuggestion(snakeId),
+    const [w, t, l, p] = await Promise.allSettled([
+      listWeightLogs(lizardId),
+      getWeightTrend(lizardId),
+      getLizard(lizardId),
+      getPreySuggestion(lizardId),
     ])
     if (w.status === 'fulfilled') setWeightLogs(w.value)
     if (t.status === 'fulfilled') setTrend(t.value)
-    if (s.status === 'fulfilled') setSnake(s.value)
+    if (l.status === 'fulfilled') setLizard(l.value)
     if (p.status === 'fulfilled') setPreySuggestion(p.value)
-  }, [snakeId])
+  }, [lizardId])
 
   const refetchFeedings = useCallback(async () => {
-    const [f, s, p] = await Promise.allSettled([
-      listFeedings(snakeId),
-      getSnake(snakeId),
-      getPreySuggestion(snakeId),
+    const [f, l, p] = await Promise.allSettled([
+      listFeedings(lizardId),
+      getLizard(lizardId),
+      getPreySuggestion(lizardId),
     ])
     if (f.status === 'fulfilled') setFeedings(f.value)
-    if (s.status === 'fulfilled') setSnake(s.value)
+    if (l.status === 'fulfilled') setLizard(l.value)
     if (p.status === 'fulfilled') setPreySuggestion(p.value)
-  }, [snakeId])
+  }, [lizardId])
 
   const refetchSheds = useCallback(async () => {
-    const [sh, s] = await Promise.allSettled([
-      listSheds(snakeId),
-      getSnake(snakeId),
+    const [sh, l] = await Promise.allSettled([
+      listSheds(lizardId),
+      getLizard(lizardId),
     ])
     if (sh.status === 'fulfilled') setSheds(sh.value)
-    if (s.status === 'fulfilled') setSnake(s.value)
-  }, [snakeId])
+    if (l.status === 'fulfilled') setLizard(l.value)
+  }, [lizardId])
 
   // Photo mutations don't touch weights, feedings, or sheds — they just shift
-  // Snake.photo_url when the main photo changes or the first upload auto-
-  // promotes. A snake-only refetch keeps the main-photo badge honest without
+  // Lizard.photo_url when the main photo changes or the first upload auto-
+  // promotes. A lizard-only refetch keeps the main-photo badge honest without
   // re-pulling the whole page.
-  const refetchSnakeOnly = useCallback(async () => {
+  const refetchLizardOnly = useCallback(async () => {
     try {
-      const s = await getSnake(snakeId)
-      setSnake(s)
+      const l = await getLizard(lizardId)
+      setLizard(l)
     } catch {
       // Swallow — the photo mutation itself already succeeded; worst case
       // the main-photo highlight drifts until the next full refetch.
     }
-  }, [snakeId])
+  }, [lizardId])
 
-  if (loading && !snake) return <LoadingShell />
-  if (snakeError && !snake) {
+  if (loading && !lizard) return <LoadingShell />
+  if (lizardError && !lizard) {
     return (
       <div className="max-w-3xl mx-auto">
         <BackLink />
@@ -212,24 +216,24 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
           role="alert"
           className="mt-6 p-4 rounded-md border border-red-500/40 bg-red-500/10 text-sm text-red-300"
         >
-          {snakeError}
+          {lizardError}
         </div>
       </div>
     )
   }
-  if (!snake) return null
+  if (!lizard) return null
 
   return (
     <article className="max-w-4xl mx-auto space-y-8">
       <BackLink />
-      <SnakeHeader snake={snake} suggestion={preySuggestion} />
+      <LizardHeader lizard={lizard} suggestion={preySuggestion} />
 
       <Section title="Photos">
         <PhotoGallery
-          animalId={snake.id}
-          taxon="snake"
-          mainPhotoUrl={snake.photo_url}
-          onMainChanged={refetchSnakeOnly}
+          animalId={lizard.id}
+          taxon="lizard"
+          mainPhotoUrl={lizard.photo_url}
+          onMainChanged={refetchLizardOnly}
         />
       </Section>
 
@@ -237,8 +241,8 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
         {weightError && <InlineError message={weightError} />}
         {trend && <WeightLossBanner trend={trend} />}
         <WeightChart logs={weightLogs} />
-        <WeightStats snake={snake} logs={weightLogs} trend={trend} />
-        <LogWeightForm snakeId={snake.id} onCreated={refetchWeights} />
+        <WeightStats lizard={lizard} logs={weightLogs} trend={trend} />
+        <LogWeightForm lizardId={lizard.id} onCreated={refetchWeights} />
         <WeightLogList logs={weightLogs} onDelete={refetchWeights} />
       </Section>
 
@@ -249,7 +253,7 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
         {preySuggestion && (
           <FeedingIntelligence
             suggestion={preySuggestion}
-            snake={snake}
+            lizard={lizard}
             feedings={feedings}
           />
         )}
@@ -257,21 +261,20 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
 
       <Section title="Feeding log">
         <LogFeedingForm
-          snake={snake}
+          lizard={lizard}
           suggestion={preySuggestion}
           onCreated={refetchFeedings}
         />
         <FeedingList
           feedings={feedings}
-          snakeWeightG={snake.current_weight_g}
-          powerFeedingThresholdPct={preySuggestion?.power_feeding_threshold_g ? null : null}
+          lizardWeightG={lizard.current_weight_g}
           onDelete={refetchFeedings}
         />
       </Section>
 
       <Section title="Sheds">
         {shedError && <InlineError message={shedError} />}
-        <LogShedForm snakeId={snake.id} onCreated={refetchSheds} />
+        <LogShedForm lizardId={lizard.id} onCreated={refetchSheds} />
         <ShedList sheds={sheds} onDelete={refetchSheds} />
       </Section>
     </article>
@@ -282,18 +285,18 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
 // Header
 // ---------------------------------------------------------------------------
 
-function SnakeHeader({
-  snake,
+function LizardHeader({
+  lizard,
   suggestion,
 }: {
-  snake: Snake
+  lizard: Lizard
   suggestion: PreySuggestion | null
 }) {
-  const weight = fmtGrams(snake.current_weight_g)
+  const weight = fmtGrams(lizard.current_weight_g)
   const stage = suggestion?.stage && suggestion.stage !== 'unknown'
     ? STAGE_LABEL[suggestion.stage]
     : null
-  const hatched = fmtDate(snake.hatch_date)
+  const hatched = fmtDate(lizard.hatch_date)
 
   return (
     <header>
@@ -302,7 +305,7 @@ function SnakeHeader({
           Reptile
         </p>
         <Link
-          href={`/app/reptiles/${snake.id}/edit`}
+          href={`/app/reptiles/lizards/${lizard.id}/edit`}
           className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider px-3 py-1.5 rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-100 hover:border-neutral-700 transition-colors"
         >
           <span aria-hidden="true">✎</span> Edit
@@ -311,19 +314,19 @@ function SnakeHeader({
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-wide text-white mb-1 break-words">
-            {snakeTitle(snake)}
+            {lizardTitle(lizard)}
           </h1>
-          {snake.scientific_name && (
+          {lizard.scientific_name && (
             <p className="text-sm italic text-neutral-400">
-              {snake.reptile_species_id ? (
+              {lizard.reptile_species_id ? (
                 <Link
-                  href={`/app/species/${snake.reptile_species_id}`}
+                  href={`/app/species/${lizard.reptile_species_id}`}
                   className="text-herp-teal hover:text-herp-lime transition-colors"
                 >
-                  {snake.scientific_name}
+                  {lizard.scientific_name}
                 </Link>
               ) : (
-                snake.scientific_name
+                lizard.scientific_name
               )}
             </p>
           )}
@@ -332,7 +335,7 @@ function SnakeHeader({
         <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <Stat label="Weight" value={weight || '—'} />
           <Stat label="Stage" value={stage || '—'} />
-          <Stat label="Sex" value={capitalize(snake.sex) || '—'} />
+          <Stat label="Sex" value={capitalize(lizard.sex) || '—'} />
           <Stat label="Hatched" value={hatched || '—'} />
         </dl>
       </div>
@@ -448,15 +451,15 @@ function ChartTooltip({ active, payload }: TooltipProps<number, string>) {
 }
 
 function WeightStats({
-  snake,
+  lizard,
   logs,
   trend,
 }: {
-  snake: Snake
+  lizard: Lizard
   logs: WeightLog[]
   trend: WeightTrendResponse | null
 }) {
-  const latest = trend?.latest_weight_g ?? snake.current_weight_g
+  const latest = trend?.latest_weight_g ?? lizard.current_weight_g
   const latestLog = useMemo(() => {
     const sorted = [...logs].sort(
       (a, b) =>
@@ -490,10 +493,10 @@ function WeightStats({
 }
 
 function LogWeightForm({
-  snakeId,
+  lizardId,
   onCreated,
 }: {
-  snakeId: string
+  lizardId: string
   onCreated: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -529,7 +532,7 @@ function LogWeightForm({
         context,
         notes: notes.trim() || null,
       }
-      await createWeightLog(snakeId, payload)
+      await createWeightLog(lizardId, payload)
       reset()
       setOpen(false)
       onCreated()
@@ -575,7 +578,7 @@ function LogWeightForm({
             value={grams}
             onChange={(e) => setGrams(e.target.value)}
             required
-            placeholder="e.g. 650"
+            placeholder="e.g. 65"
             className={INPUT_CLS}
           />
         </Field>
@@ -601,7 +604,7 @@ function LogWeightForm({
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           className={INPUT_CLS}
-          placeholder="Pre-feed, looked a little thin, etc."
+          placeholder="Pre-feed, tail fat looks low, etc."
         />
       </Field>
       {error && <InlineError message={error} />}
@@ -699,13 +702,67 @@ const STAGE_LABEL: Record<string, string> = {
 
 function FeedingIntelligence({
   suggestion,
-  snake,
+  lizard,
   feedings,
 }: {
   suggestion: PreySuggestion
-  snake: Snake
+  lizard: Lizard
   feedings: FeedingLog[]
 }) {
+  // Next-feed window has to be memoised even when the early-return branches
+  // below would skip it — hooks must run in the same order on every render.
+  const nextWindow = useMemo(() => {
+    if (!lizard.last_fed_at || suggestion.interval_days_min == null)
+      return null
+    const last = new Date(lizard.last_fed_at)
+    const min = new Date(last)
+    min.setDate(min.getDate() + (suggestion.interval_days_min ?? 0))
+    const max = new Date(last)
+    max.setDate(
+      max.getDate() +
+        (suggestion.interval_days_max ?? suggestion.interval_days_min ?? 0),
+    )
+    return { min, max }
+  }, [lizard.last_fed_at, suggestion])
+
+  const overdue = useMemo(() => {
+    if (!nextWindow) return false
+    return Date.now() > nextWindow.max.getTime()
+  }, [nextWindow])
+
+  // Power-feeding check against the most recent accepted feeding — if its
+  // prey_weight_g / lizard weight exceeds the threshold, flag it. Note: for
+  // most insectivorous lizards the threshold rarely triggers because a single
+  // feeder weighs well under the bound; this is here for taxon parity and
+  // becomes meaningful for larger prey (pinkies fed to tegus, etc.).
+  const powerWarning = useMemo(() => {
+    const lastAccepted = feedings
+      .filter((f) => f.accepted && f.prey_weight_g != null)
+      .sort(
+        (a, b) =>
+          new Date(b.fed_at).getTime() - new Date(a.fed_at).getTime(),
+      )[0]
+    if (
+      !lastAccepted ||
+      !lastAccepted.prey_weight_g ||
+      !suggestion.power_feeding_threshold_g ||
+      !suggestion.snake_weight_g
+    ) {
+      return null
+    }
+    const prey = Number(lastAccepted.prey_weight_g)
+    const thresholdG = Number(suggestion.power_feeding_threshold_g)
+    if (!Number.isFinite(prey) || !Number.isFinite(thresholdG)) return null
+    if (prey < thresholdG) return null
+    const bw = Number(suggestion.snake_weight_g)
+    const pct = bw > 0 ? (prey / bw) * 100 : null
+    return {
+      preyG: prey,
+      pct: pct != null ? Number(pct.toFixed(1)) : null,
+      date: fmtDate(lastAccepted.fed_at),
+    }
+  }, [feedings, suggestion])
+
   if (!suggestion.is_data_available) {
     return (
       <div className="p-4 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-400">
@@ -738,56 +795,6 @@ function FeedingIntelligence({
         ? `${suggestion.interval_days_min} days`
         : `${suggestion.interval_days_min}–${suggestion.interval_days_max} days`
       : null
-
-  // Next-feed window: last_fed_at + interval_days_min .. last_fed_at + interval_days_max
-  const nextWindow = useMemo(() => {
-    if (!snake.last_fed_at || suggestion.interval_days_min == null)
-      return null
-    const last = new Date(snake.last_fed_at)
-    const min = new Date(last)
-    min.setDate(min.getDate() + (suggestion.interval_days_min ?? 0))
-    const max = new Date(last)
-    max.setDate(
-      max.getDate() +
-        (suggestion.interval_days_max ?? suggestion.interval_days_min ?? 0),
-    )
-    return { min, max }
-  }, [snake.last_fed_at, suggestion])
-
-  const overdue = useMemo(() => {
-    if (!nextWindow) return false
-    return Date.now() > nextWindow.max.getTime()
-  }, [nextWindow])
-
-  // Power-feeding check against the most recent accepted feeding — if its
-  // prey_weight_g / snake weight exceeds the threshold, flag it.
-  const powerWarning = useMemo(() => {
-    const lastAccepted = feedings
-      .filter((f) => f.accepted && f.prey_weight_g != null)
-      .sort(
-        (a, b) =>
-          new Date(b.fed_at).getTime() - new Date(a.fed_at).getTime(),
-      )[0]
-    if (
-      !lastAccepted ||
-      !lastAccepted.prey_weight_g ||
-      !suggestion.power_feeding_threshold_g ||
-      !suggestion.snake_weight_g
-    ) {
-      return null
-    }
-    const prey = Number(lastAccepted.prey_weight_g)
-    const thresholdG = Number(suggestion.power_feeding_threshold_g)
-    if (!Number.isFinite(prey) || !Number.isFinite(thresholdG)) return null
-    if (prey < thresholdG) return null
-    const bw = Number(suggestion.snake_weight_g)
-    const pct = bw > 0 ? (prey / bw) * 100 : null
-    return {
-      preyG: prey,
-      pct: pct != null ? Number(pct.toFixed(1)) : null,
-      date: fmtDate(lastAccepted.fed_at),
-    }
-  }, [feedings, suggestion])
 
   return (
     <div className="p-4 rounded-md border border-herp-teal/30 bg-neutral-900/40 space-y-3">
@@ -823,8 +830,8 @@ function FeedingIntelligence({
 
       {overdue && (
         <p className="text-xs text-amber-300">
-          ⚠ Overdue against the upper interval. Refusal is often fine —
-          check body condition + temps before pushing another offer.
+          ⚠ Overdue against the upper interval. Check appetite, temps, and
+          supplementation before pushing another offer.
         </p>
       )}
 
@@ -849,11 +856,13 @@ function FeedingIntelligence({
         </summary>
         <div className="mt-2 leading-relaxed">
           Stage is derived from current weight against the species&rsquo;
-          life-stage brackets. Prey weight range = snake weight ×
+          life-stage brackets. Prey weight range = body weight ×
           bracket&rsquo;s min/max percentage. Interval comes from the same
-          bracket. The power-feeding line is a species-level percentage; any
-          prey that heavy triggers the warning. Everything is advisory —
-          body condition over calendar.
+          bracket. For insectivorous lizards the ratio numbers are a crude
+          proxy — a single cricket weighs well under a gram — and the
+          authoritative feeding protocol lives in the species care sheet
+          (frequency, variety, supplementation). Body condition over
+          calendar, always.
         </div>
       </details>
     </div>
@@ -885,11 +894,11 @@ function InfoBlock({
 // ---------------------------------------------------------------------------
 
 function LogFeedingForm({
-  snake,
+  lizard,
   suggestion,
   onCreated,
 }: {
-  snake: Snake
+  lizard: Lizard
   suggestion: PreySuggestion | null
   onCreated: () => void
 }) {
@@ -905,17 +914,24 @@ function LogFeedingForm({
   // Live prey:BW hint
   const preyHint = useMemo(() => {
     const preyG = Number(preyWeight)
-    const bwG = Number(snake.current_weight_g)
+    const bwG = Number(lizard.current_weight_g)
     if (!Number.isFinite(preyG) || preyG <= 0) return null
     if (!Number.isFinite(bwG) || bwG <= 0)
-      return { tone: 'neutral' as const, text: 'No snake weight on file — log a weight to see the ratio.' }
+      return {
+        tone: 'neutral' as const,
+        text: 'No lizard weight on file — log a weight to see the ratio.',
+      }
     const pct = (preyG / bwG) * 100
     const pctLabel = pct.toFixed(1).replace(/\.?0+$/, '')
     const thresholdG = suggestion?.power_feeding_threshold_g
       ? Number(suggestion.power_feeding_threshold_g)
       : null
-    const min = suggestion?.suggested_min_g ? Number(suggestion.suggested_min_g) : null
-    const max = suggestion?.suggested_max_g ? Number(suggestion.suggested_max_g) : null
+    const min = suggestion?.suggested_min_g
+      ? Number(suggestion.suggested_min_g)
+      : null
+    const max = suggestion?.suggested_max_g
+      ? Number(suggestion.suggested_max_g)
+      : null
 
     if (thresholdG != null && preyG >= thresholdG) {
       return {
@@ -933,7 +949,7 @@ function LogFeedingForm({
       tone: 'ok' as const,
       text: `${pctLabel}% of body weight.`,
     }
-  }, [preyWeight, snake.current_weight_g, suggestion])
+  }, [preyWeight, lizard.current_weight_g, suggestion])
 
   const reset = () => {
     setDate(todayISO())
@@ -960,7 +976,7 @@ function LogFeedingForm({
             ? `Regurgitation. ${notes.trim()}`.trim()
             : notes.trim() || null,
       }
-      await createFeeding(snake.id, payload)
+      await createFeeding(lizard.id, payload)
       reset()
       setOpen(false)
       onCreated()
@@ -1002,7 +1018,7 @@ function LogFeedingForm({
             type="text"
             value={foodType}
             onChange={(e) => setFoodType(e.target.value)}
-            placeholder="e.g. frozen-thawed rat"
+            placeholder="e.g. dubia roaches, crickets, repashy"
             className={INPUT_CLS}
           />
         </Field>
@@ -1029,7 +1045,7 @@ function LogFeedingForm({
           min="0"
           value={preyWeight}
           onChange={(e) => setPreyWeight(e.target.value)}
-          placeholder="e.g. 52"
+          placeholder="combined prey weight"
           className={INPUT_CLS}
         />
         {preyHint && (
@@ -1055,7 +1071,7 @@ function LogFeedingForm({
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           className={INPUT_CLS}
-          placeholder="Struck fast, took twenty minutes to coil, etc."
+          placeholder="Count (8 crickets), supplementation, appetite, etc."
         />
       </Field>
 
@@ -1086,13 +1102,11 @@ function LogFeedingForm({
 
 function FeedingList({
   feedings,
-  snakeWeightG,
+  lizardWeightG,
   onDelete,
 }: {
   feedings: FeedingLog[]
-  snakeWeightG: string | null
-  // Kept for future iteration — per-row retroactive ratio badges.
-  powerFeedingThresholdPct: string | null
+  lizardWeightG: string | null
   onDelete: () => void
 }) {
   const sorted = useMemo(
@@ -1106,7 +1120,7 @@ function FeedingList({
   const visible = sorted.slice(0, 10)
   if (visible.length === 0) return null
 
-  const bwG = snakeWeightG ? Number(snakeWeightG) : null
+  const bwG = lizardWeightG ? Number(lizardWeightG) : null
 
   return (
     <div className="space-y-1.5">
@@ -1175,10 +1189,10 @@ function FeedingList({
 // ---------------------------------------------------------------------------
 
 function LogShedForm({
-  snakeId,
+  lizardId,
   onCreated,
 }: {
-  snakeId: string
+  lizardId: string
   onCreated: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -1209,7 +1223,7 @@ function LogShedForm({
         has_retained_shed: retained,
         notes: notes.trim() || null,
       }
-      await createShed(snakeId, payload)
+      await createShed(lizardId, payload)
       reset()
       setOpen(false)
       onCreated()
@@ -1252,18 +1266,18 @@ function LogShedForm({
             onChange={(e) => setComplete(e.target.value === 'yes')}
             className={INPUT_CLS}
           >
-            <option value="yes">One piece</option>
-            <option value="no">Broken up</option>
+            <option value="yes">Clean shed</option>
+            <option value="no">Patchy / broken</option>
           </select>
         </Field>
-        <Field label="Retained stuck shed?">
+        <Field label="Retained shed?">
           <select
             value={retained ? 'yes' : 'no'}
             onChange={(e) => setRetained(e.target.value === 'yes')}
             className={INPUT_CLS}
           >
             <option value="no">No</option>
-            <option value="yes">Yes</option>
+            <option value="yes">Yes (toes / tail tip)</option>
           </select>
         </Field>
       </div>
@@ -1273,7 +1287,7 @@ function LogShedForm({
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
           className={INPUT_CLS}
-          placeholder="Soaked overnight, eye caps retained, etc."
+          placeholder="Humid hide bumped, toe shed soaked off, etc."
         />
       </Field>
       {error && <InlineError message={error} />}
@@ -1339,7 +1353,7 @@ function ShedList({
                   : 'bg-amber-500/20 text-amber-300'
               }`}
             >
-              {s.is_complete_shed ? 'One piece' : 'Broken up'}
+              {s.is_complete_shed ? 'Clean' : 'Patchy'}
             </span>
             {s.has_retained_shed && (
               <span className="text-[10px] uppercase tracking-wider text-amber-300 px-1.5 py-0.5 rounded bg-amber-500/10 flex-shrink-0">
@@ -1427,9 +1441,8 @@ function DeleteRowButton({
     try {
       await onDelete()
     } catch {
-      // Swallow — caller surfaces errors through refetch state. A spike
-      // shouldn't have per-row error toasts; we'll add them when building
-      // the production page.
+      // Swallow — caller surfaces errors through refetch state. We'll add
+      // per-row error toasts when the production page gets its polish pass.
     } finally {
       setBusy(false)
     }

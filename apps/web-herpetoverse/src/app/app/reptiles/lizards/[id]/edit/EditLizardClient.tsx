@@ -1,53 +1,47 @@
 'use client'
 
 /**
- * Add Reptile form.
+ * Edit Lizard form + Danger Zone.
  *
- * Entry point for every keeper-created reptile in Herpetoverse — there
- * is no mobile-side create flow yet, so everything comes through here.
- * The form is taxon-aware: a segmented toggle at the top switches
- * between snake and lizard creation. All other fields are identical
- * because the LizardBase schema is a literal field-for-field mirror of
- * SnakeBase.
+ * Direct mirror of /app/reptiles/[id]/edit for the snake taxon — same sections,
+ * same INPUT_CLS, same nullableStr/nullableNum helpers, same typed-confirm
+ * delete modal. Differences:
  *
- * Design notes:
- *  - Sane defaults: sex=unknown, no required fields except a common name.
- *  - Species picker is encouraged (not forced) — without a
- *    reptile_species_id the prey-suggestion endpoint can't compute
- *    stage/interval/ranges, so we nudge in UI rather than block submit.
- *    The species library is shared across taxa; today nothing prevents
- *    a keeper from picking a snake species for a lizard record. That's
- *    a known rough edge — intentional for v1 so the search surface
- *    stays simple. Taxon-filtered search is a follow-up.
- *  - Starting weight is offered inline so the weight trend chart has a
- *    data point day one.
+ *  - Data layer is `@/lib/lizards` instead of `@/lib/snakes` (different
+ *    endpoints: /api/v1/lizards/...).
+ *  - Naming: `lizardId`, `lizard`, `Lizard`, `CreateLizardPayload`,
+ *    `lizardTitle`.
+ *  - BackLink + success redirect route into the `lizards/` subpath so we
+ *    don't 404 on the old snake detail URL.
+ *  - Genetics section is intentionally omitted — the genes catalog is
+ *    ball-python-scoped; lizard morphs (leopard gecko, bearded dragon)
+ *    are a separate effort.
  *
- * On success: router.push to the appropriate detail page
- * (/app/reptiles/{id} for snakes, /app/reptiles/lizards/{id} for
- * lizards) so the keeper immediately sees the record they just created.
+ * Delete success routes to /app/reptiles (the shared collection list) so
+ * the keeper lands on a valid page; deleted lizard URLs are gone.
  */
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
 import {
-  createSnake,
-  type CreateSnakePayload,
+  type CreateLizardPayload,
+  deleteLizard,
+  getLizard,
+  type Lizard,
+  lizardTitle,
   type Sex,
   type Source,
-} from '@/lib/snakes'
-import {
-  createLizard,
-  type CreateLizardPayload,
+  updateLizard,
 } from '@/lib/lizards'
 
-type Taxon = 'snake' | 'lizard'
-
+// Form state mirrors the add flow — all strings so input round-tripping stays
+// predictable. `null`s from the wire get normalized to '' here; we reverse
+// that on submit via nullableStr/nullableNum.
 interface FormState {
-  taxon: Taxon
   name: string
   commonName: string
   scientificName: string
@@ -64,8 +58,7 @@ interface FormState {
   notes: string
 }
 
-const INITIAL: FormState = {
-  taxon: 'snake',
+const EMPTY: FormState = {
   name: '',
   commonName: '',
   scientificName: '',
@@ -82,7 +75,8 @@ const INITIAL: FormState = {
   notes: '',
 }
 
-// Shared input styling — matches the dark palette used elsewhere.
+// Shared styling — kept in sync with the snake edit + /add forms so the
+// three surfaces feel identical.
 const INPUT_CLS =
   'w-full px-3 py-2.5 rounded-md bg-neutral-950 border border-neutral-800 focus:border-herp-teal focus:outline-none focus:ring-1 focus:ring-herp-teal/50 text-neutral-100 placeholder-neutral-600 disabled:opacity-50'
 const LABEL_CLS =
@@ -90,17 +84,70 @@ const LABEL_CLS =
 const SECTION_HDR_CLS =
   'text-[11px] uppercase tracking-[0.18em] text-herp-lime/80 font-medium mb-4'
 
-export default function AddReptilePage() {
+/** Lizard → FormState. Strings stay strings; nulls become ''. */
+function lizardToForm(l: Lizard): FormState {
+  return {
+    name: l.name ?? '',
+    commonName: l.common_name ?? '',
+    scientificName: l.scientific_name ?? '',
+    speciesId: l.reptile_species_id,
+    enclosureId: l.enclosure_id,
+    sex: (l.sex as Sex | null) ?? 'unknown',
+    hatchDate: l.hatch_date ?? '',
+    dateAcquired: l.date_acquired ?? '',
+    source: (l.source as Source | null) ?? '',
+    sourceBreeder: l.source_breeder ?? '',
+    pricePaid: l.price_paid ?? '',
+    currentWeightG: l.current_weight_g ?? '',
+    currentLengthIn: l.current_length_in ?? '',
+    notes: l.notes ?? '',
+  }
+}
+
+export default function EditLizardClient({ lizardId }: { lizardId: string }) {
   const router = useRouter()
-  const [form, setForm] = useState<FormState>(INITIAL)
+  const [lizard, setLizard] = useState<Lizard | null>(null)
+  const [form, setForm] = useState<FormState>(EMPTY)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Load the lizard once on mount. The auth layout above has already gated
+  // on sign-in, so 401s here mean the token went stale — the apiClient
+  // handles that with a session clear and re-login redirect.
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getLizard(lizardId)
+      .then((l) => {
+        if (cancelled) return
+        setLizard(l)
+        setForm(lizardToForm(l))
+        setLoadError(null)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        if (err instanceof ApiError && err.status === 404) {
+          setLoadError('Reptile not found.')
+        } else if (err instanceof ApiError && err.status !== 401) {
+          setLoadError(err.message)
+        } else if (!(err instanceof ApiError)) {
+          setLoadError('Could not load this reptile.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [lizardId])
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  // Convert "" to null — backend prefers absent over empty strings.
   function nullableStr(s: string): string | null {
     const trimmed = s.trim()
     return trimmed === '' ? null : trimmed
@@ -109,7 +156,6 @@ export default function AddReptilePage() {
   function nullableNum(s: string): string | null {
     const trimmed = s.trim()
     if (trimmed === '') return null
-    // Let Pydantic validate — sending the raw string is fine for Decimal fields.
     return trimmed
   }
 
@@ -118,12 +164,12 @@ export default function AddReptilePage() {
     if (submitting) return
     setError(null)
 
-    // Light client-side guard: if the user typed a weight/price/length that
-    // isn't a number, catch it before hitting the server.
+    // Same client-side numeric guard as /add — catches fat-fingered weight
+    // before it round-trips to Pydantic.
     const numericFields: Array<[keyof FormState, string]> = [
       ['pricePaid', 'Price paid'],
-      ['currentWeightG', 'Starting weight'],
-      ['currentLengthIn', 'Starting length'],
+      ['currentWeightG', 'Current weight'],
+      ['currentLengthIn', 'Current length'],
     ]
     for (const [key, label] of numericFields) {
       const v = (form[key] as string).trim()
@@ -133,11 +179,7 @@ export default function AddReptilePage() {
       }
     }
 
-    // Snake and lizard create payloads are structurally identical —
-    // both extend the same `SnakeBase`-shaped surface on the backend.
-    // The only reason they're typed separately is the two call sites
-    // route through different endpoints.
-    const payload: CreateSnakePayload & CreateLizardPayload = {
+    const payload: CreateLizardPayload = {
       name: nullableStr(form.name),
       common_name: nullableStr(form.commonName),
       scientific_name: nullableStr(form.scientificName),
@@ -156,16 +198,11 @@ export default function AddReptilePage() {
 
     setSubmitting(true)
     try {
-      if (form.taxon === 'snake') {
-        const snake = await createSnake(payload)
-        router.push(`/app/reptiles/${snake.id}`)
-      } else {
-        const lizard = await createLizard(payload)
-        router.push(`/app/reptiles/lizards/${lizard.id}`)
-      }
+      await updateLizard(lizardId, payload)
+      router.push(`/app/reptiles/lizards/${lizardId}`)
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message || 'Could not save. Please try again.')
+        setError(err.message || 'Could not save changes.')
       } else {
         setError('Could not save. Check your connection and try again.')
       }
@@ -173,30 +210,37 @@ export default function AddReptilePage() {
     }
   }
 
+  if (loading) return <LoadingShell />
+  if (loadError || !lizard) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <BackLink lizardId={lizardId} />
+        <div
+          role="alert"
+          className="mt-6 p-4 rounded-md border border-red-500/40 bg-red-500/10 text-sm text-red-300"
+        >
+          {loadError || 'Could not load this reptile.'}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-3xl mx-auto">
-      <header className="mb-8">
+      <BackLink lizardId={lizardId} />
+      <header className="mt-6 mb-8">
         <p className="text-xs tracking-[0.2em] uppercase text-herp-lime mb-3 font-medium">
-          New reptile
+          Edit reptile
         </p>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-wide text-white mb-2">
-          Add a reptile
+          Edit {lizardTitle(lizard)}
         </h1>
         <p className="text-neutral-400 text-sm">
-          The basics are enough to get started — you can always fill in more
-          from the detail page.
+          Changes save to the detail page. Deleting is permanent.
         </p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
-        {/* ------------------------------------------------------------- */}
-        {/* Taxon picker — drives endpoint routing and the post-save URL. */}
-        {/* ------------------------------------------------------------- */}
-        <TaxonToggle
-          value={form.taxon}
-          onChange={(next) => update('taxon', next)}
-        />
-
         {/* ------------------------------------------------------------- */}
         {/* Identity */}
         {/* ------------------------------------------------------------- */}
@@ -209,10 +253,9 @@ export default function AddReptilePage() {
                 type="text"
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
-                placeholder={form.taxon === 'snake' ? 'Samson' : 'Kiwi'}
+                placeholder="Mushu"
                 maxLength={100}
                 className={INPUT_CLS}
-                autoFocus
               />
             </Field>
 
@@ -248,7 +291,8 @@ export default function AddReptilePage() {
                     }))
                   }}
                   onPick={(species) => {
-                    // Auto-fill common name only if the keeper hasn't typed one.
+                    // Only overwrite common name if it was blank — we don't
+                    // want the picker to stomp a keeper's custom label.
                     setForm((prev) => ({
                       ...prev,
                       commonName:
@@ -257,11 +301,6 @@ export default function AddReptilePage() {
                           : prev.commonName,
                     }))
                   }}
-                  placeholder={
-                    form.taxon === 'snake'
-                      ? 'Python regius'
-                      : 'Eublepharis macularius'
-                  }
                 />
               </Field>
             </div>
@@ -271,9 +310,7 @@ export default function AddReptilePage() {
                 type="text"
                 value={form.commonName}
                 onChange={(e) => update('commonName', e.target.value)}
-                placeholder={
-                  form.taxon === 'snake' ? 'Ball python' : 'Leopard gecko'
-                }
+                placeholder="Leopard gecko"
                 maxLength={100}
                 className={INPUT_CLS}
               />
@@ -291,7 +328,7 @@ export default function AddReptilePage() {
             <div className="sm:col-span-2">
               <Field
                 label="Enclosure"
-                hint="Optional — you can attach this later from the detail page."
+                hint="Optional — you can attach or change this later from the detail page."
               >
                 <EnclosurePicker
                   value={form.enclosureId}
@@ -304,17 +341,18 @@ export default function AddReptilePage() {
         </section>
 
         {/* ------------------------------------------------------------- */}
-        {/* Starting measurements */}
+        {/* Measurements */}
         {/* ------------------------------------------------------------- */}
         <section className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
-          <h2 className={SECTION_HDR_CLS}>Starting measurements</h2>
+          <h2 className={SECTION_HDR_CLS}>Current measurements</h2>
           <p className="text-xs text-neutral-500 mb-4">
-            If you have them. A starting weight seeds the trend chart so the
-            first real log has something to compare against.
+            These are the denormalized values shown on the card. Weight is
+            typically kept in sync by logging a weigh-in on the detail page —
+            edit here only if you&rsquo;re correcting a data issue.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Starting weight (g)">
+            <Field label="Current weight (g)">
               <input
                 type="number"
                 inputMode="decimal"
@@ -322,12 +360,12 @@ export default function AddReptilePage() {
                 min="0"
                 value={form.currentWeightG}
                 onChange={(e) => update('currentWeightG', e.target.value)}
-                placeholder={form.taxon === 'snake' ? '145' : '60'}
+                placeholder="65"
                 className={INPUT_CLS}
               />
             </Field>
 
-            <Field label="Starting length (in)">
+            <Field label="Current length (in)">
               <input
                 type="number"
                 inputMode="decimal"
@@ -335,7 +373,7 @@ export default function AddReptilePage() {
                 min="0"
                 value={form.currentLengthIn}
                 onChange={(e) => update('currentLengthIn', e.target.value)}
-                placeholder={form.taxon === 'snake' ? '24' : '8'}
+                placeholder="9"
                 className={INPUT_CLS}
               />
             </Field>
@@ -392,7 +430,7 @@ export default function AddReptilePage() {
                 min="0"
                 value={form.pricePaid}
                 onChange={(e) => update('pricePaid', e.target.value)}
-                placeholder="150.00"
+                placeholder="75.00"
                 className={INPUT_CLS}
               />
             </Field>
@@ -426,7 +464,7 @@ export default function AddReptilePage() {
 
         <div className="flex items-center justify-between gap-4 pt-2">
           <Link
-            href="/app/reptiles"
+            href={`/app/reptiles/lizards/${lizardId}`}
             className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
           >
             ← Cancel
@@ -436,18 +474,173 @@ export default function AddReptilePage() {
             disabled={submitting}
             className="herp-gradient-bg text-herp-dark font-bold px-6 py-2.5 rounded-md tracking-wide disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
-            {submitting
-              ? 'Saving…'
-              : `Save ${form.taxon === 'snake' ? 'snake' : 'lizard'}`}
+            {submitting ? 'Saving…' : 'Save changes'}
           </button>
         </div>
       </form>
+
+      {/* ------------------------------------------------------------- */}
+      {/* Danger Zone — separated from the form on purpose so it can't be */}
+      {/* activated by an Enter keypress inside an input.                 */}
+      {/* ------------------------------------------------------------- */}
+      <DangerZone lizard={lizard} />
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Local primitives
+// Danger Zone — typed-confirm delete
+// ---------------------------------------------------------------------------
+
+function DangerZone({ lizard }: { lizard: Lizard }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <section className="mt-12 p-6 rounded-lg border border-red-500/30 bg-red-500/5">
+      <h2 className="text-[11px] uppercase tracking-[0.18em] text-red-300/90 font-medium mb-3">
+        Danger zone
+      </h2>
+      <p className="text-sm text-neutral-300 mb-1">
+        Delete this reptile permanently.
+      </p>
+      <p className="text-xs text-neutral-500 mb-4 max-w-xl">
+        This removes the record plus every weight log, feeding, shed, and
+        photo attached to it. We don&rsquo;t keep a backup you can restore
+        from. If you&rsquo;re rehoming, consider exporting first.
+      </p>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-sm font-medium px-4 py-2 rounded-md border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:border-red-500/60 transition-colors"
+      >
+        Delete this reptile…
+      </button>
+
+      {open && (
+        <DeleteConfirmModal
+          lizard={lizard}
+          onCancel={() => setOpen(false)}
+          onDeleted={() => {
+            // After deletion the lizard detail URL 404s, so punt back to the
+            // shared collection list (which is still at /app/reptiles).
+            router.replace('/app/reptiles')
+          }}
+        />
+      )}
+    </section>
+  )
+}
+
+function DeleteConfirmModal({
+  lizard,
+  onCancel,
+  onDeleted,
+}: {
+  lizard: Lizard
+  onCancel: () => void
+  onDeleted: () => void
+}) {
+  const title = lizardTitle(lizard)
+  const [typed, setTyped] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const matches = typed.trim() === title
+
+  async function handleDelete() {
+    if (!matches || submitting) return
+    setError(null)
+    setSubmitting(true)
+    try {
+      await deleteLizard(lizard.id)
+      onDeleted()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message || 'Could not delete. Try again.')
+      } else {
+        setError('Could not delete. Check your connection and try again.')
+      }
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-heading"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      onClick={(e) => {
+        // Click on the backdrop only — not on the modal body.
+        if (e.target === e.currentTarget && !submitting) onCancel()
+      }}
+    >
+      <div className="w-full max-w-md rounded-lg border border-red-500/40 bg-neutral-950 p-6 shadow-xl">
+        <h3
+          id="delete-heading"
+          className="text-lg font-semibold text-white mb-2"
+        >
+          Delete {title}?
+        </h3>
+        <p className="text-sm text-neutral-400 mb-1">
+          This cannot be undone. All logs and photos attached to this reptile
+          will be removed.
+        </p>
+        <p className="text-sm text-neutral-400 mb-4">
+          Type{' '}
+          <span className="font-mono text-red-300 px-1 py-0.5 rounded bg-red-500/10">
+            {title}
+          </span>{' '}
+          to confirm.
+        </p>
+
+        <input
+          type="text"
+          autoFocus
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          placeholder={title}
+          disabled={submitting}
+          className="w-full px-3 py-2 rounded-md bg-neutral-900 border border-neutral-800 focus:border-red-500/60 focus:outline-none focus:ring-1 focus:ring-red-500/40 text-neutral-100 placeholder-neutral-600 disabled:opacity-50"
+        />
+
+        {error && (
+          <div
+            role="alert"
+            className="mt-3 p-2.5 rounded-md border border-red-500/40 bg-red-500/10 text-xs text-red-300"
+          >
+            {error}
+          </div>
+        )}
+
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className="text-sm text-neutral-400 hover:text-neutral-200 px-3 py-2 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={!matches || submitting}
+            className="text-sm font-semibold px-4 py-2 rounded-md bg-red-500/80 text-white hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {submitting ? 'Deleting…' : 'Delete permanently'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Local primitives (kept local to this file — they match the add-form and
+// snake edit ones, but importing across page boundaries would mean hoisting
+// INPUT_CLS too, and the duplication is tiny)
 // ---------------------------------------------------------------------------
 
 function Field({
@@ -468,65 +661,30 @@ function Field({
   )
 }
 
-/**
- * Segmented two-option toggle. Rendered as radio buttons under the hood
- * (group labeled "Taxon") so keyboard + screen reader users get a
- * proper grouped-control experience, not two disconnected buttons.
- */
-function TaxonToggle({
-  value,
-  onChange,
-}: {
-  value: Taxon
-  onChange: (next: Taxon) => void
-}) {
-  const options: Array<{ value: Taxon; label: string; glyph: string }> = [
-    { value: 'snake', label: 'Snake', glyph: '🐍' },
-    { value: 'lizard', label: 'Lizard', glyph: '🦎' },
-  ]
-
+function BackLink({ lizardId }: { lizardId: string }) {
   return (
-    <fieldset className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
-      <legend className={`${SECTION_HDR_CLS} px-2`}>What are you adding?</legend>
+    <Link
+      href={`/app/reptiles/lizards/${lizardId}`}
+      className="inline-flex items-center gap-1.5 text-sm text-herp-teal hover:text-herp-lime transition-colors"
+    >
+      <span aria-hidden="true">←</span> Back to detail
+    </Link>
+  )
+}
+
+function LoadingShell() {
+  return (
+    <div className="max-w-3xl mx-auto">
       <div
-        role="radiogroup"
-        aria-label="Animal type"
-        className="grid grid-cols-2 gap-3"
+        className="mt-6 space-y-6"
+        aria-busy="true"
+        aria-live="polite"
       >
-        {options.map((opt) => {
-          const active = opt.value === value
-          return (
-            <label
-              key={opt.value}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-md border cursor-pointer transition-colors ${
-                active
-                  ? 'border-herp-teal bg-herp-teal/10 text-herp-teal'
-                  : 'border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-900'
-              }`}
-            >
-              <input
-                type="radio"
-                name="taxon"
-                value={opt.value}
-                checked={active}
-                onChange={() => onChange(opt.value)}
-                className="sr-only"
-              />
-              <span aria-hidden="true" className="text-base">
-                {opt.glyph}
-              </span>
-              <span className="text-sm font-medium tracking-wide">
-                {opt.label}
-              </span>
-            </label>
-          )
-        })}
+        <div className="h-8 w-1/3 bg-neutral-900 rounded animate-pulse" />
+        <div className="h-4 w-1/2 bg-neutral-900/70 rounded animate-pulse" />
+        <div className="h-60 bg-neutral-900 rounded animate-pulse" />
+        <div className="h-40 bg-neutral-900/70 rounded animate-pulse" />
       </div>
-      <p className="mt-3 text-[11px] text-neutral-500 px-1">
-        Don&apos;t worry — you can still log feedings, weights, sheds, and
-        photos for either one. This just routes your new record to the right
-        collection.
-      </p>
-    </fieldset>
+    </div>
   )
 }

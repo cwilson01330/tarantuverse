@@ -37,6 +37,7 @@ from app.models.waitlist import WaitlistSignup
 # imported before snake so SQLAlchemy sees the target of the FK.
 from app.models.reptile_species import ReptileSpecies
 from app.models.snake import Snake
+from app.models.lizard import Lizard
 from app.models.shed_log import ShedLog
 from app.models.weight_log import WeightLog
 from app.models.gene import Gene
@@ -82,6 +83,7 @@ __all__ = [
     "WaitlistSignup",
     "ReptileSpecies",
     "Snake",
+    "Lizard",
     "ShedLog",
     "WeightLog",
     "Gene",

@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.snake import Snake
+from app.models.lizard import Lizard
 from app.models.reptile_species import ReptileSpecies
 from app.models.weight_log import WeightLog
 from app.schemas.weight_log import (
@@ -68,20 +69,47 @@ def _get_owned_snake(db: Session, snake_id: uuid.UUID, user: User) -> Snake:
     return snake
 
 
+def _get_owned_lizard(db: Session, lizard_id: uuid.UUID, user: User) -> Lizard:
+    lizard = (
+        db.query(Lizard)
+        .filter(Lizard.id == lizard_id, Lizard.user_id == user.id)
+        .first()
+    )
+    if not lizard:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Lizard not found"
+        )
+    return lizard
+
+
 def _get_owned_weight_log(
     db: Session, weight_log_id: uuid.UUID, user: User
 ) -> WeightLog:
+    """Fetch a weight log and verify the owning animal belongs to the caller.
+
+    Dispatches on snake_id vs lizard_id — weight_logs is polymorphic since
+    Sprint 6c (Herpetoverse v1). Raises 404 for missing log, 403 for not-yours.
+    """
     log = db.query(WeightLog).filter(WeightLog.id == weight_log_id).first()
     if not log:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Weight log not found"
         )
-    owner_snake = (
-        db.query(Snake)
-        .filter(Snake.id == log.snake_id, Snake.user_id == user.id)
-        .first()
-    )
-    if not owner_snake:
+
+    if log.snake_id:
+        owner = (
+            db.query(Snake)
+            .filter(Snake.id == log.snake_id, Snake.user_id == user.id)
+            .first()
+        )
+    else:
+        owner = (
+            db.query(Lizard)
+            .filter(Lizard.id == log.lizard_id, Lizard.user_id == user.id)
+            .first()
+        )
+
+    if not owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
         )
@@ -95,6 +123,17 @@ def _species_for_snake(db: Session, snake: Snake) -> ReptileSpecies | None:
     return (
         db.query(ReptileSpecies)
         .filter(ReptileSpecies.id == snake.reptile_species_id)
+        .first()
+    )
+
+
+def _species_for_lizard(db: Session, lizard: Lizard) -> ReptileSpecies | None:
+    """Fetch the lizard's species sheet if one is linked. None otherwise."""
+    if lizard.reptile_species_id is None:
+        return None
+    return (
+        db.query(ReptileSpecies)
+        .filter(ReptileSpecies.id == lizard.reptile_species_id)
         .first()
     )
 
@@ -350,6 +389,220 @@ async def prey_suggestion(
     return PreySuggestion(
         stage=suggestion["stage"],
         snake_weight_g=snake_weight,
+        suggested_min_g=suggestion["suggested_min_g"],
+        suggested_max_g=suggestion["suggested_max_g"],
+        interval_days_min=suggestion["interval_days_min"],
+        interval_days_max=suggestion["interval_days_max"],
+        power_feeding_threshold_g=power_threshold_g,
+        is_data_available=suggestion["is_data_available"],
+        warning=warning,
+    )
+
+
+# ─────────────────────────── Lizard parents ───────────────────────────
+#
+# Mirror of the snake block. Shape identical — the weight series, trend,
+# and prey-suggestion logic are species-agnostic and reuse the same
+# services in app.services.snake_feeding_advisory. The module name says
+# "snake" for historical reasons but the math is just grams + stage
+# ratios; it applies just as well to lizards.
+
+@router.get(
+    "/lizards/{lizard_id}/weight-logs",
+    response_model=List[WeightLogResponse],
+)
+async def list_lizard_weight_logs(
+    lizard_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List weigh-ins for a lizard, most recent first."""
+    _get_owned_lizard(db, lizard_id, current_user)
+    return (
+        db.query(WeightLog)
+        .filter(WeightLog.lizard_id == lizard_id)
+        .order_by(WeightLog.weighed_at.desc())
+        .all()
+    )
+
+
+@router.get(
+    "/lizards/{lizard_id}/weight-logs/latest",
+    response_model=WeightLogResponse | None,
+)
+async def latest_lizard_weight_log(
+    lizard_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the most recent weigh-in, or null if the lizard has none."""
+    _get_owned_lizard(db, lizard_id, current_user)
+    return (
+        db.query(WeightLog)
+        .filter(WeightLog.lizard_id == lizard_id)
+        .order_by(WeightLog.weighed_at.desc())
+        .first()
+    )
+
+
+@router.get(
+    "/lizards/{lizard_id}/weight-logs/trend",
+    response_model=WeightTrendResponse,
+)
+async def lizard_weight_trend(
+    lizard_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the full weight series + a 30-day loss alert for a lizard.
+
+    Brumation suppression applies here too — e.g., bearded dragons and
+    temperate geckos genuinely drop weight during brumation and that's
+    not a health concern.
+    """
+    lizard = _get_owned_lizard(db, lizard_id, current_user)
+    species = _species_for_lizard(db, lizard)
+
+    logs = (
+        db.query(WeightLog)
+        .filter(WeightLog.lizard_id == lizard_id)
+        .order_by(WeightLog.weighed_at.asc())
+        .all()
+    )
+
+    series = [
+        WeightTrendPoint(weighed_at=l.weighed_at, weight_g=l.weight_g)
+        for l in logs
+    ]
+    latest_weight = logs[-1].weight_g if logs else None
+
+    loss_pct = compute_weight_loss_30d((l.weighed_at, l.weight_g) for l in logs)
+
+    alert_threshold = species.weight_loss_concern_pct_30d if species else None
+    alert = False
+    if (
+        loss_pct is not None
+        and loss_pct > 0
+        and alert_threshold is not None
+        and loss_pct >= alert_threshold
+        and not lizard.brumation_active
+    ):
+        alert = True
+
+    return WeightTrendResponse(
+        series=series,
+        latest_weight_g=latest_weight,
+        loss_pct_30d=loss_pct,
+        alert=alert,
+        alert_threshold_pct=alert_threshold,
+    )
+
+
+@router.post(
+    "/lizards/{lizard_id}/weight-logs",
+    response_model=WeightLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_lizard_weight_log(
+    lizard_id: uuid.UUID,
+    payload: WeightLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a weigh-in for a lizard.
+
+    Same denormalization rule as the snake route: only move
+    `lizards.current_weight_g` forward when this weigh-in is the newest,
+    so backfilling history doesn't stomp the dashboard hint.
+    """
+    lizard = _get_owned_lizard(db, lizard_id, current_user)
+
+    new_log = WeightLog(lizard_id=lizard_id, **payload.model_dump())
+    db.add(new_log)
+    db.flush()
+
+    latest_existing = (
+        db.query(func.max(WeightLog.weighed_at))
+        .filter(
+            WeightLog.lizard_id == lizard_id,
+            WeightLog.id != new_log.id,
+        )
+        .scalar()
+    )
+    if latest_existing is None or new_log.weighed_at >= latest_existing:
+        lizard.current_weight_g = new_log.weight_g
+
+    db.commit()
+    db.refresh(new_log)
+    return new_log
+
+
+@router.get(
+    "/lizards/{lizard_id}/prey-suggestion",
+    response_model=PreySuggestion,
+)
+async def lizard_prey_suggestion(
+    lizard_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the suggested prey weight range for a lizard.
+
+    Mirrors the snake advisory. Lizards that are obligate insectivores
+    (crested geckos, leopard geckos) will get species sheets whose
+    life_stage_feeding describes prey count rather than prey grams —
+    the UI is expected to adapt its presentation based on the species'
+    feeding_unit hint. The backend math here is unit-neutral: it just
+    passes the numbers the species sheet provides.
+    """
+    lizard = _get_owned_lizard(db, lizard_id, current_user)
+    species = _species_for_lizard(db, lizard)
+
+    latest_log = (
+        db.query(WeightLog)
+        .filter(WeightLog.lizard_id == lizard_id)
+        .order_by(WeightLog.weighed_at.desc())
+        .first()
+    )
+    lizard_weight = (
+        latest_log.weight_g if latest_log is not None else lizard.current_weight_g
+    )
+
+    life_stage_feeding = species.life_stage_feeding if species else None
+    suggestion = suggest_prey_range(lizard_weight, life_stage_feeding)
+
+    power_threshold_g = None
+    if (
+        species is not None
+        and species.power_feeding_threshold_pct is not None
+        and lizard_weight is not None
+    ):
+        from decimal import Decimal as _Dec
+        power_threshold_g = (
+            lizard_weight * species.power_feeding_threshold_pct / _Dec("100")
+        ).quantize(_Dec("0.01"))
+
+    warning = None
+    if not suggestion["is_data_available"]:
+        if lizard_weight is None:
+            warning = (
+                "Log a weigh-in for this lizard to see species-specific "
+                "feeding recommendations."
+            )
+        elif species is None:
+            warning = (
+                "Link this lizard to a species from the care sheet "
+                "database to see feeding recommendations."
+            )
+        else:
+            warning = (
+                "Feeding ratio data for this species hasn't been "
+                "published yet. We'll add it as we verify sources."
+            )
+
+    return PreySuggestion(
+        stage=suggestion["stage"],
+        snake_weight_g=lizard_weight,  # schema field name is snake-legacy; value is the lizard's weight
         suggested_min_g=suggestion["suggested_min_g"],
         suggested_max_g=suggestion["suggested_max_g"],
         interval_days_min=suggestion["interval_days_min"],

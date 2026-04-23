@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.snake import Snake
+from app.models.lizard import Lizard
 from app.models.feeding_log import FeedingLog
 from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate, FeedingLogResponse
 from app.schemas.feeding_reminder import FeedingReminderSummary
@@ -27,8 +28,8 @@ def _feeding_owner_taxon(feeding: FeedingLog, db: Session, user: User):
     feeding log. Returns (None, None) if not authorized.
 
     Polymorphic parent lookup — feeding_logs can now be parented by
-    tarantula, snake, or enclosure. Centralized so update/delete don't
-    duplicate the branching logic.
+    tarantula, snake, lizard, or enclosure. Centralized so update/delete
+    don't duplicate the branching logic.
     """
     if feeding.tarantula_id:
         row = db.query(Tarantula).filter(
@@ -42,6 +43,12 @@ def _feeding_owner_taxon(feeding: FeedingLog, db: Session, user: User):
             Snake.user_id == user.id,
         ).first()
         return (Snake, row) if row else (None, None)
+    if feeding.lizard_id:
+        row = db.query(Lizard).filter(
+            Lizard.id == feeding.lizard_id,
+            Lizard.user_id == user.id,
+        ).first()
+        return (Lizard, row) if row else (None, None)
     # enclosure-parented feedings aren't ownership-checked here (feeders);
     # they're handled by their own router.
     return (None, None)
@@ -189,6 +196,74 @@ async def create_snake_feeding_log(
     return new_feeding
 
 
+@router.get("/lizards/{lizard_id}/feedings", response_model=List[FeedingLogResponse])
+async def get_lizard_feeding_logs(
+    lizard_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List feeding logs for a lizard, most recent first."""
+    lizard = db.query(Lizard).filter(
+        Lizard.id == lizard_id,
+        Lizard.user_id == current_user.id,
+    ).first()
+
+    if not lizard:
+        raise HTTPException(status_code=404, detail="Lizard not found")
+
+    return (
+        db.query(FeedingLog)
+        .filter(FeedingLog.lizard_id == lizard_id)
+        .order_by(FeedingLog.fed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/lizards/{lizard_id}/feedings",
+    response_model=FeedingLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_lizard_feeding_log(
+    lizard_id: uuid.UUID,
+    feeding_data: FeedingLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a feeding for a lizard.
+
+    Mirrors the snake path. Denormalizes `lizards.last_fed_at` forward-only
+    so dashboards don't have to rescan history on every render. Backfilling
+    an older feeding doesn't regress the badge.
+
+    Note: `prey_weight_g` is snake-only in v1 (carried forward from Sprint
+    5). Lizard feeds leave it null. If the mobile/web form ever needs to
+    record prey count or insect species, that's a feeding_log schema
+    extension — not a column repurposing.
+    """
+    lizard = db.query(Lizard).filter(
+        Lizard.id == lizard_id,
+        Lizard.user_id == current_user.id,
+    ).first()
+
+    if not lizard:
+        raise HTTPException(status_code=404, detail="Lizard not found")
+
+    new_feeding = FeedingLog(lizard_id=lizard_id, **feeding_data.model_dump())
+    db.add(new_feeding)
+
+    fed_at = new_feeding.fed_at
+    if fed_at and (lizard.last_fed_at is None or fed_at > lizard.last_fed_at):
+        lizard.last_fed_at = fed_at
+
+    db.commit()
+    db.refresh(new_feeding)
+
+    # TODO(post-v1): emit activity feed "feeding" for lizards once reptile
+    # actions ship. Tarantula feedings emit via create_activity above.
+    return new_feeding
+
+
 @router.put("/feedings/{feeding_id}", response_model=FeedingLogResponse)
 async def update_feeding_log(
     feeding_id: uuid.UUID,
@@ -196,7 +271,7 @@ async def update_feeding_log(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Update a feeding log (polymorphic — tarantula or snake parent)."""
+    """Update a feeding log (polymorphic — tarantula, snake, or lizard parent)."""
     feeding = db.query(FeedingLog).filter(FeedingLog.id == feeding_id).first()
 
     if not feeding:
@@ -222,7 +297,7 @@ async def delete_feeding_log(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete a feeding log (polymorphic — tarantula or snake parent).
+    """Delete a feeding log (polymorphic — tarantula, snake, or lizard parent).
 
     Does NOT recompute denormalized `last_fed_at` on the parent — matches
     the `sheds.py` pattern: the denorm column is a dashboard hint, not

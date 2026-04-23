@@ -45,9 +45,15 @@ class WeightLogUpdate(BaseModel):
 
 
 class WeightLogResponse(WeightLogBase):
-    """Response schema includes server-managed fields."""
+    """Response schema includes server-managed fields.
+
+    Polymorphic parent: exactly one of `snake_id` / `lizard_id` is set.
+    The DB CHECK constraint guarantees this invariant; both are Optional
+    here so Pydantic can serialize lizard-parented logs without a 500.
+    """
     id: uuid.UUID
-    snake_id: uuid.UUID
+    snake_id: Optional[uuid.UUID] = None
+    lizard_id: Optional[uuid.UUID] = None
     created_at: datetime
 
     class Config:

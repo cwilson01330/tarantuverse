@@ -26,6 +26,7 @@ from app.database import get_db
 from app.models.qr_upload_session import QRUploadSession
 from app.models.tarantula import Tarantula
 from app.models.snake import Snake
+from app.models.lizard import Lizard
 from app.models.photo import Photo
 from app.models.user import User
 from app.models.feeding_log import FeedingLog
@@ -69,18 +70,31 @@ def _snake_display_name(s: Snake) -> str:
     return " ".join(parts) or "Unknown"
 
 
+def _lizard_display_name(l: Lizard) -> str:
+    """Parallel helper for lizards — same shape as snake/tarantula."""
+    parts = []
+    if l.name:
+        parts.append(l.name)
+    label = l.common_name or l.scientific_name
+    if label:
+        parts.append(f"({label})" if l.name else label)
+    return " ".join(parts) or "Unknown"
+
+
 def _session_parent(session: QRUploadSession) -> tuple[str, object | None]:
     """Return (taxon, parent_row) for a session.
 
-    Returns ('tarantula' | 'snake', row) — callers that need the canonical
-    parent shouldn't have to re-query. `row` may be None only if the parent
-    was hard-deleted after session creation (shouldn't happen — both FKs
-    are CASCADE — but defensive).
+    Returns ('tarantula' | 'snake' | 'lizard', row) — callers that need
+    the canonical parent shouldn't have to re-query. `row` may be None
+    only if the parent was hard-deleted after session creation (shouldn't
+    happen — all FKs are CASCADE — but defensive).
     """
     if session.tarantula_id:
         return ("tarantula", session.tarantula)
     if session.snake_id:
         return ("snake", session.snake)
+    if session.lizard_id:
+        return ("lizard", session.lizard)
     return ("unknown", None)
 
 
@@ -205,6 +219,56 @@ async def create_snake_upload_session(
     }
 
 
+@router.post("/lizards/{lizard_id}/upload-session")
+async def create_lizard_upload_session(
+    lizard_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a short-lived QR upload session for a lizard — mirror of the
+    tarantula/snake endpoints. Phone browser uses the returned token to
+    upload photos without being logged in.
+    """
+    lizard = db.query(Lizard).filter(
+        Lizard.id == lizard_id,
+        Lizard.user_id == current_user.id,
+    ).first()
+    if not lizard:
+        raise HTTPException(status_code=404, detail="Lizard not found")
+
+    db.query(QRUploadSession).filter(
+        QRUploadSession.lizard_id == lizard_id,
+        QRUploadSession.user_id == current_user.id,
+        QRUploadSession.is_active == True,
+    ).update({"is_active": False})
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=SESSION_TTL_MINUTES)
+
+    session = QRUploadSession(
+        token=token,
+        lizard_id=lizard_id,
+        user_id=current_user.id,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    web_base = getattr(settings, "FRONTEND_URL", "https://tarantuverse.com")
+    upload_url = f"{web_base}/upload/{token}"
+
+    return {
+        "token": token,
+        "upload_url": upload_url,
+        "expires_at": expires_at.isoformat(),
+        "expires_in_minutes": SESSION_TTL_MINUTES,
+        "taxon": "lizard",
+        "lizard_name": _lizard_display_name(lizard),
+    }
+
+
 @router.get("/upload-sessions/{token}")
 async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
     """
@@ -230,10 +294,12 @@ async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
         # CASCADE delete should have killed the session too; defensive branch.
         raise HTTPException(status_code=404, detail="Upload session parent no longer exists")
 
-    display_name = (
-        _tarantula_display_name(parent) if taxon == "tarantula"
-        else _snake_display_name(parent)
-    )
+    if taxon == "tarantula":
+        display_name = _tarantula_display_name(parent)
+    elif taxon == "snake":
+        display_name = _snake_display_name(parent)
+    else:
+        display_name = _lizard_display_name(parent)
 
     payload = {
         "valid": True,
@@ -328,20 +394,24 @@ async def upload_photo_via_token(
         }
         if taxon == "tarantula":
             photo_kwargs["tarantula_id"] = str(session.tarantula_id)
-        else:
+        elif taxon == "snake":
             photo_kwargs["snake_id"] = str(session.snake_id)
+        else:
+            photo_kwargs["lizard_id"] = str(session.lizard_id)
 
         photo = Photo(**photo_kwargs)
         db.add(photo)
 
-        # Set as main photo if none exists (both Tarantula and Snake expose photo_url).
+        # Set as main photo if none exists (Tarantula, Snake, and Lizard all expose photo_url).
         if not parent.photo_url:
             parent.photo_url = photo_url
 
-        display_name = (
-            _tarantula_display_name(parent) if taxon == "tarantula"
-            else _snake_display_name(parent)
-        )
+        if taxon == "tarantula":
+            display_name = _tarantula_display_name(parent)
+        elif taxon == "snake":
+            display_name = _snake_display_name(parent)
+        else:
+            display_name = _lizard_display_name(parent)
 
         session.used_count = (session.used_count or 0) + 1
         # Auto-deactivate on the last allowed upload so the token becomes dead.
@@ -639,6 +709,139 @@ async def get_public_snake_profile(
         base["source"] = snake.source.value if snake.source else None
         base["source_breeder"] = snake.source_breeder
         base["notes"] = snake.notes
+
+    return base
+
+
+# ─── Public Lizard Profile (/l/{id}) ──────────────────────────────────────────
+
+@router.get("/l/{lizard_id}")
+async def get_public_lizard_profile(
+    lizard_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(_optional_user),
+):
+    """Permanent public profile for a lizard — the lizard QR destination.
+
+    Parallels `/s/{snake_id}`. Biology is close enough to snakes that the
+    payload shape mirrors the snake one — sheds, weight, length — though
+    some lizard species (geckos, bearded dragons) shed less dramatically
+    than snakes. If a linked species sheet exists, it surfaces care
+    parameters so a visitor with no context can still read the card.
+    """
+    try:
+        l_uuid = uuid.UUID(lizard_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid lizard ID")
+
+    lizard = db.query(Lizard).filter(Lizard.id == l_uuid).first()
+    if not lizard:
+        raise HTTPException(status_code=404, detail="Lizard not found")
+
+    is_owner = current_user and str(current_user.id) == str(lizard.user_id)
+
+    owner = db.query(User).filter(User.id == lizard.user_id).first()
+    collection_public = owner and owner.collection_visibility == "public"
+
+    if not is_owner and not collection_public:
+        raise HTTPException(status_code=403, detail="This collection is private")
+
+    species_data = None
+    if lizard.reptile_species_id:
+        try:
+            from app.models.reptile_species import ReptileSpecies
+            rsp = db.query(ReptileSpecies).filter(
+                ReptileSpecies.id == lizard.reptile_species_id
+            ).first()
+            if rsp:
+                species_data = {
+                    "id": str(rsp.id),
+                    "scientific_name": rsp.scientific_name,
+                    "common_names": getattr(rsp, "common_names", None) or [],
+                    "care_level": getattr(rsp, "care_level", None),
+                    "temperament": getattr(rsp, "temperament", None),
+                    "adult_size": getattr(rsp, "adult_size", None),
+                    "temperature_min": float(rsp.temperature_min) if getattr(rsp, "temperature_min", None) else None,
+                    "temperature_max": float(rsp.temperature_max) if getattr(rsp, "temperature_max", None) else None,
+                    "humidity_min": float(rsp.humidity_min) if getattr(rsp, "humidity_min", None) else None,
+                    "humidity_max": float(rsp.humidity_max) if getattr(rsp, "humidity_max", None) else None,
+                    "image_url": getattr(rsp, "image_url", None),
+                }
+        except Exception:
+            species_data = None
+
+    last_feeding = (
+        db.query(FeedingLog)
+        .filter(FeedingLog.lizard_id == l_uuid)
+        .order_by(FeedingLog.fed_at.desc())
+        .first()
+    )
+
+    last_shed = (
+        db.query(ShedLog)
+        .filter(ShedLog.lizard_id == l_uuid)
+        .order_by(ShedLog.shed_at.desc())
+        .first()
+    )
+
+    photos = (
+        db.query(Photo)
+        .filter(Photo.lizard_id == l_uuid)
+        .order_by(Photo.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    base = {
+        "id": str(lizard.id),
+        "taxon": "lizard",
+        "name": lizard.name,
+        "common_name": lizard.common_name,
+        "scientific_name": lizard.scientific_name,
+        "display_name": _lizard_display_name(lizard),
+        "sex": lizard.sex.value if lizard.sex else None,
+        "photo_url": lizard.photo_url,
+        "is_owner": is_owner,
+        "owner_username": owner.username if owner else None,
+        "species": species_data,
+        "current_weight_g": float(lizard.current_weight_g) if lizard.current_weight_g else None,
+        "current_length_in": float(lizard.current_length_in) if lizard.current_length_in else None,
+        "photos": [
+            {
+                "id": str(p.id),
+                "url": p.url,
+                "thumbnail_url": p.thumbnail_url,
+                "caption": p.caption,
+                "taken_at": p.taken_at.isoformat() if p.taken_at else None,
+            }
+            for p in photos
+        ],
+        "last_feeding": {
+            "date": last_feeding.fed_at.isoformat(),
+            "food_type": last_feeding.food_type,
+            "food_size": last_feeding.food_size,
+            "accepted": last_feeding.accepted,
+        } if last_feeding else None,
+        "last_shed": {
+            "date": last_shed.shed_at.isoformat() if last_shed.shed_at else None,
+            "is_complete_shed": last_shed.is_complete_shed,
+            "has_retained_shed": last_shed.has_retained_shed,
+        } if last_shed else None,
+    }
+
+    if is_owner:
+        base["husbandry"] = {
+            "feeding_schedule": lizard.feeding_schedule,
+            "last_fed_at": lizard.last_fed_at.isoformat() if lizard.last_fed_at else None,
+            "last_shed_at": lizard.last_shed_at.isoformat() if lizard.last_shed_at else None,
+            "brumation_active": lizard.brumation_active,
+            "brumation_started_at": lizard.brumation_started_at.isoformat() if lizard.brumation_started_at else None,
+        }
+        base["date_acquired"] = lizard.date_acquired.isoformat() if lizard.date_acquired else None
+        base["hatch_date"] = lizard.hatch_date.isoformat() if lizard.hatch_date else None
+        base["source"] = lizard.source.value if lizard.source else None
+        base["source_breeder"] = lizard.source_breeder
+        base["notes"] = lizard.notes
 
     return base
 

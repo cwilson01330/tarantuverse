@@ -4,16 +4,27 @@
  * PhotoGallery — reptile photo management.
  *
  * Responsibilities:
- *   - List photos for a snake (polymorphic photos table, snake-scoped routes).
+ *   - List photos for a snake or lizard (polymorphic photos table, taxon-
+ *     scoped collection routes for list/upload).
  *   - Upload new photos with drag-and-drop + click-to-select, multi-file.
- *   - Set a photo as the animal's main photo (updates Snake.photo_url).
+ *   - Set a photo as the animal's main photo (updates the parent's photo_url).
  *   - Delete a photo (CASCADE cleans up storage on backend).
  *   - Minimal inline lightbox — no library, no dependencies.
  *
+ * Taxon awareness:
+ *   The photos table is polymorphic on the backend — a row has exactly one
+ *   of tarantula_id / snake_id / lizard_id / enclosure_id set. The list +
+ *   upload routes are nested under the parent (`/snakes/{id}/photos`,
+ *   `/lizards/{id}/photos`), so this component dispatches based on `taxon`
+ *   to the matching data-layer module. The standalone per-photo operations
+ *   (delete, set-main, update-caption) are taxon-neutral on the server, so
+ *   we can safely import those from either module — we use the snake module
+ *   to avoid duplication.
+ *
  * Notes on identifying "main":
- *   The Snake record carries `photo_url` as a denormalized copy of the main
+ *   The parent record carries `photo_url` as a denormalized copy of the main
  *   photo's URL. The backend's `PATCH /photos/{id}/set-main` endpoint copies
- *   the photo's URL onto the parent. We compare photo.url === snakeMainPhotoUrl
+ *   the photo's URL onto the parent. We compare photo.url === mainPhotoUrl
  *   to decide which thumb shows the "main" marker. This is a display-only
  *   check; the server is authoritative.
  *
@@ -25,16 +36,26 @@
  */
 
 import Image from 'next/image'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError } from '@/lib/apiClient'
+// Shared per-photo operations (polymorphic on the server).
 import {
   Photo,
   deletePhoto,
-  listPhotos,
   setMainPhoto,
   updatePhotoCaption,
-  uploadPhoto,
 } from '@/lib/snakes'
+// Taxon-specific collection endpoints.
+import {
+  listPhotos as listSnakePhotos,
+  uploadPhoto as uploadSnakePhoto,
+} from '@/lib/snakes'
+import {
+  listPhotos as listLizardPhotos,
+  uploadPhoto as uploadLizardPhoto,
+} from '@/lib/lizards'
+
+export type PhotoGalleryTaxon = 'snake' | 'lizard'
 
 // ---------------------------------------------------------------------------
 // Upload queue types
@@ -69,14 +90,28 @@ const MAX_BYTES = 15 * 1024 * 1024
 // ---------------------------------------------------------------------------
 
 export default function PhotoGallery({
-  snakeId,
-  snakeMainPhotoUrl,
+  animalId,
+  taxon,
+  mainPhotoUrl,
   onMainChanged,
 }: {
-  snakeId: string
-  snakeMainPhotoUrl: string | null
+  /** Snake or lizard id — used for the taxon-scoped list/upload endpoints. */
+  animalId: string
+  taxon: PhotoGalleryTaxon
+  /** Current denormalized main-photo URL on the parent record. */
+  mainPhotoUrl: string | null
   onMainChanged?: () => void
 }) {
+  // Bind taxon → data-layer calls once. `useMemo` keeps the identity stable
+  // across renders so the refetch + upload effects don't re-fire on every
+  // parent render.
+  const { listPhotos, uploadPhoto } = useMemo(
+    () =>
+      taxon === 'lizard'
+        ? { listPhotos: listLizardPhotos, uploadPhoto: uploadLizardPhoto }
+        : { listPhotos: listSnakePhotos, uploadPhoto: uploadSnakePhoto },
+    [taxon],
+  )
   const [photos, setPhotos] = useState<Photo[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -100,7 +135,7 @@ export default function PhotoGallery({
 
   const refetch = useCallback(async () => {
     try {
-      const next = await listPhotos(snakeId)
+      const next = await listPhotos(animalId)
       // Sort by created_at descending — newest first feels right for a log,
       // but the main photo (if any) always wins the top slot below.
       next.sort(
@@ -113,7 +148,7 @@ export default function PhotoGallery({
     } catch (err) {
       setLoadError(errMsg(err, 'Could not load photos.'))
     }
-  }, [snakeId])
+  }, [animalId, listPhotos])
 
   useEffect(() => {
     let cancelled = false
@@ -162,7 +197,7 @@ export default function PhotoGallery({
       prev.map((q) => (q.id === next.id ? { ...q, status: 'uploading' } : q)),
     )
 
-    uploadPhoto(snakeId, next.file)
+    uploadPhoto(animalId, next.file)
       .then((created) => {
         // Optimistic insert — prepend so it shows up immediately even before
         // the refetch lands.
@@ -174,7 +209,7 @@ export default function PhotoGallery({
           // ignore
         }
         // If this was the first photo ever uploaded, the backend auto-
-        // promotes it to main. Nudge the parent so Snake.photo_url reflects.
+        // promotes it to main. Nudge the parent so its photo_url reflects.
         if (photos.length === 0) {
           onMainChanged?.()
         }
@@ -192,7 +227,7 @@ export default function PhotoGallery({
           ),
         )
       })
-  }, [queue, snakeId, photos.length, onMainChanged])
+  }, [queue, animalId, uploadPhoto, photos.length, onMainChanged])
 
   // -------------------------------------------------------------------------
   // File handling
@@ -300,10 +335,10 @@ export default function PhotoGallery({
     try {
       await deletePhoto(photo.id)
       setPhotos((prev) => prev.filter((p) => p.id !== photo.id))
-      // If we just deleted the main photo, Snake.photo_url is now stale. The
-      // backend doesn't auto-promote a replacement on delete, so we just
-      // tell the parent to refetch — Snake.photo_url will be null.
-      if (photo.url === snakeMainPhotoUrl) {
+      // If we just deleted the main photo, the parent's photo_url is now
+      // stale. The backend doesn't auto-promote a replacement on delete, so
+      // we just tell the parent to refetch — its photo_url will be null.
+      if (photo.url === mainPhotoUrl) {
         onMainChanged?.()
       }
       // If the lightbox was showing this photo, close it.
@@ -403,7 +438,7 @@ export default function PhotoGallery({
   }
 
   const mainPhoto: Photo | null =
-    photos.find((p) => p.url === snakeMainPhotoUrl) ?? photos[0] ?? null
+    photos.find((p) => p.url === mainPhotoUrl) ?? photos[0] ?? null
 
   return (
     <div className="space-y-3">
@@ -452,7 +487,10 @@ export default function PhotoGallery({
             )}
           </button>
         ) : (
-          <EmptyState onPick={() => fileInputRef.current?.click()} />
+          <EmptyState
+            taxon={taxon}
+            onPick={() => fileInputRef.current?.click()}
+          />
         )}
 
         {dragging && (
@@ -477,7 +515,7 @@ export default function PhotoGallery({
       {/* Thumbnail strip + upload tile */}
       <div className="flex flex-wrap gap-2">
         {photos.map((photo, idx) => {
-          const isMain = photo.url === snakeMainPhotoUrl
+          const isMain = photo.url === mainPhotoUrl
           const isBusy = busyPhotoId === photo.id
           return (
             <div
@@ -608,7 +646,14 @@ export default function PhotoGallery({
 // Subcomponents
 // ---------------------------------------------------------------------------
 
-function EmptyState({ onPick }: { onPick: () => void }) {
+function EmptyState({
+  taxon,
+  onPick,
+}: {
+  taxon: PhotoGalleryTaxon
+  onPick: () => void
+}) {
+  const glyph = taxon === 'lizard' ? '🦎' : '🐍'
   return (
     <button
       type="button"
@@ -617,7 +662,7 @@ function EmptyState({ onPick }: { onPick: () => void }) {
       aria-label="Upload first photo"
     >
       <span className="text-4xl" aria-hidden="true">
-        🐍
+        {glyph}
       </span>
       <span className="text-sm font-medium text-neutral-300">
         No photos yet

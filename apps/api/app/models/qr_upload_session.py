@@ -1,10 +1,12 @@
 """
 QR upload session model — short-lived token that allows a phone browser
-to upload a photo to a specific tarantula or snake without being logged in.
+to upload a photo to a specific tarantula, snake, or lizard without being
+logged in.
 
-Polymorphic parent: exactly one of `tarantula_id` / `snake_id` is set.
-Enforced by DB CHECK constraint added in
-qrp_20260421_extend_qr_sessions_polymorphic.
+Polymorphic parent: exactly one of `tarantula_id` / `snake_id` / `lizard_id`
+is set. Enforced by DB CHECK constraint — two-parent version added in
+qrp_20260421_extend_qr_sessions_polymorphic, three-parent version added in
+lzp_20260423_extend_polymorphic_tables.
 """
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
@@ -18,7 +20,7 @@ class QRUploadSession(Base):
     __tablename__ = "qr_upload_sessions"
     __table_args__ = (
         CheckConstraint(
-            'num_nonnulls(tarantula_id, snake_id) = 1',
+            'num_nonnulls(tarantula_id, snake_id, lizard_id) = 1',
             name='qr_upload_sessions_must_have_exactly_one_parent',
         ),
     )
@@ -37,6 +39,12 @@ class QRUploadSession(Base):
         nullable=True,
         index=True,
     )
+    lizard_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("lizards.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     # Allow multiple uploads per session (e.g. a whole photo shoot)
@@ -49,8 +57,9 @@ class QRUploadSession(Base):
     # Relationships
     tarantula = relationship("Tarantula")
     snake = relationship("Snake")
+    lizard = relationship("Lizard")
     user = relationship("User")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.snake_id
+        parent = self.tarantula_id or self.snake_id or self.lizard_id
         return f"<QRUploadSession {self.token[:8]}... parent={parent}>"

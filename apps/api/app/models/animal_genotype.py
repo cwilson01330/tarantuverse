@@ -1,18 +1,19 @@
 """Animal genotype model — per-gene zygosity record for a single animal.
 
-Data layer for the morph calculator that lands in Sprint 5 (PRD §5.4).
-Each row represents a single gene on a single animal at a specific
-zygosity. Multiple rows per animal = the animal's full genotype.
+Data layer for the morph calculator (PRD §5.4). Each row represents a
+single gene on a single animal at a specific zygosity. Multiple rows per
+animal = the animal's full genotype.
 
-Polymorphic parent: snake-only for v1 (lizard_id added in a later sprint
-when the lizards table exists). See migration
-gen_20260421_add_animal_genotypes_table for the rationale.
+Polymorphic parent: exactly one of `snake_id` / `lizard_id` is set.
+Originally snake-only with NOT NULL on snake_id; extended to polymorphic
+in lzp_20260423_extend_polymorphic_tables. Ball python / boa / colubrid
+morph math runs through snake_id; gecko morph math (leopard gecko,
+crested gecko) runs through lizard_id.
 
-`gene_id` is a UUID column without a foreign-key constraint in v1 because
-the `genes` table hasn't been created yet — that's Sprint 3. Sprint 3's
-migration will add the FK retroactively. Do not add the FK here.
+`gene_id` references genes.id but doesn't enforce the FK at this layer —
+see gns_20260422 for the historical reason (genes table arrived after).
 """
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -22,13 +23,25 @@ from app.database import Base
 
 class AnimalGenotype(Base):
     __tablename__ = "animal_genotypes"
+    __table_args__ = (
+        CheckConstraint(
+            'num_nonnulls(snake_id, lizard_id) = 1',
+            name='animal_genotypes_must_have_exactly_one_parent',
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     snake_id = Column(
         UUID(as_uuid=True),
         ForeignKey("snakes.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    lizard_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("lizards.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
 
@@ -53,6 +66,8 @@ class AnimalGenotype(Base):
 
     # Relationships
     snake = relationship("Snake", backref="genotypes")
+    lizard = relationship("Lizard", backref="genotypes")
 
     def __repr__(self):
-        return f"<AnimalGenotype snake={self.snake_id} gene={self.gene_id} {self.zygosity}>"
+        parent = self.snake_id or self.lizard_id
+        return f"<AnimalGenotype parent={parent} gene={self.gene_id} {self.zygosity}>"

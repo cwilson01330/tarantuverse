@@ -1,14 +1,19 @@
 """Shed log model
 
-Snake ecdysis tracking — the reptile analogue to `molt_logs`. Parallel table
-per ADR-002 §D1 because shed semantics differ from molt semantics (no leg span,
-no unidentified parent case, shed-quality observations are a first-class
-husbandry signal).
+Reptile ecdysis tracking — snake and lizard alike. Parallel to `molt_logs`
+per ADR-002 §D1 because shed semantics differ from molt semantics (no leg
+span, shed-quality observations are a first-class husbandry signal).
 
-Only `snake_id` parent for v1. Future polymorphic parents (e.g., `lizard_id`)
-will follow the same add-nullable-column + CHECK constraint pattern that
-`feeding_logs` / `molt_logs` used when they went polymorphic in the
-s0t1u2v3w4x5_add_enclosures migration.
+Polymorphic parent: exactly one of `snake_id` / `lizard_id` is set.
+Originally snake-only with NOT NULL on snake_id; extended to polymorphic
+in lzp_20260423_extend_polymorphic_tables using the same nullable-column
++ CHECK pattern as feeding_logs / photos / qr_upload_sessions.
+
+Lizard sheds are patchier than snake sheds — the `is_complete_shed` field
+is less meaningful for geckos (who shed in pieces and eat them) but the
+keeper-useful `has_retained_shed` signal still applies (stuck toe-tips on
+a gecko is the exact same humidity-too-low red flag as retained eye caps
+on a snake).
 """
 from sqlalchemy import (
     Column,
@@ -18,6 +23,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     String,
+    CheckConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -28,12 +34,24 @@ from app.database import Base
 
 class ShedLog(Base):
     __tablename__ = "shed_logs"
+    __table_args__ = (
+        CheckConstraint(
+            'num_nonnulls(snake_id, lizard_id) = 1',
+            name='shed_logs_must_have_exactly_one_parent',
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     snake_id = Column(
         UUID(as_uuid=True),
         ForeignKey("snakes.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+        index=True,
+    )
+    lizard_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("lizards.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
 
@@ -64,6 +82,8 @@ class ShedLog(Base):
 
     # Relationships
     snake = relationship("Snake", backref="shed_logs")
+    lizard = relationship("Lizard", backref="shed_logs")
 
     def __repr__(self):
-        return f"<ShedLog snake={self.snake_id} @ {self.shed_at}>"
+        parent = self.snake_id or self.lizard_id
+        return f"<ShedLog parent={parent} @ {self.shed_at}>"
