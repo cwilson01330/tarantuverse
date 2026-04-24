@@ -596,18 +596,43 @@ export default function KeeperProfilePage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {tarantulas.map((tarantula) => (
-                    <div
+                    <Link
                       key={tarantula.id}
-                      className="bg-surface-elevated rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 border border-theme"
+                      href={`/t/${tarantula.id}`}
+                      className="group bg-surface-elevated rounded-xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 focus:ring-2 focus:ring-primary-500 focus:outline-none transition-all duration-200 border border-theme block"
+                      aria-label={`View ${tarantula.common_name || tarantula.scientific_name || 'tarantula'} profile`}
                     >
                       {tarantula.photo_url ? (
                         <div className="relative h-48">
                           <img
                             src={tarantula.photo_url}
                             alt={tarantula.common_name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                          {/* Sex badge overlaid on the image corner for
+                              better visual hierarchy than the footer
+                              pill pattern. */}
+                          {tarantula.sex && (
+                            <span
+                              className={`absolute top-2 right-2 inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-base shadow ${
+                                tarantula.sex === 'female'
+                                  ? 'bg-pink-500'
+                                  : tarantula.sex === 'male'
+                                    ? 'bg-blue-500'
+                                    : 'bg-gray-400'
+                              }`}
+                              aria-label={
+                                tarantula.sex === 'female'
+                                  ? 'Female'
+                                  : tarantula.sex === 'male'
+                                    ? 'Male'
+                                    : 'Unknown sex'
+                              }
+                            >
+                              {tarantula.sex === 'female' ? '♀' : tarantula.sex === 'male' ? '♂' : '?'}
+                            </span>
+                          )}
                           <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
                             <h3 className="font-bold text-lg">{tarantula.common_name}</h3>
                             <p className="text-sm italic opacity-90">{tarantula.scientific_name}</p>
@@ -622,10 +647,13 @@ export default function KeeperProfilePage() {
                       )}
 
                       <div className="p-4">
-                        <div className="flex gap-2">
-                          {tarantula.sex && (
+                        <div className="flex gap-2 flex-wrap">
+                          {/* Sex pill kept in the footer only when there's
+                              no image; with a photo the corner badge is
+                              the primary sex indicator. */}
+                          {tarantula.sex && !tarantula.photo_url && (
                             <span className="px-2 py-1 bg-surface rounded text-xs font-semibold text-gray-700 dark:text-gray-300">
-                              {tarantula.sex === 'male' ? '♂️ Male' : tarantula.sex === 'female' ? '♀️ Female' : '? Unsexed'}
+                              {tarantula.sex === 'male' ? '♂ Male' : tarantula.sex === 'female' ? '♀ Female' : '? Unsexed'}
                             </span>
                           )}
                           {tarantula.date_acquired && (
@@ -635,7 +663,7 @@ export default function KeeperProfilePage() {
                           )}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}

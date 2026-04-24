@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Linking, Alert, ActionSheetIOS, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
@@ -291,6 +292,46 @@ export default function KeeperProfileScreen() {
     router.push(`/messages/${username}`);
   };
 
+  // Overflow menu replaces the standalone Block / Report buttons. Uses
+  // the platform-native sheet on iOS and Alert.alert on Android so the
+  // destructive "Block" action gets the right visual weight everywhere.
+  const handleOverflowMenu = () => {
+    const blockLabel = isBlocked ? 'Unblock User' : 'Block User';
+    const reportLabel = 'Report User';
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [blockLabel, reportLabel, 'Cancel'],
+          destructiveButtonIndex: isBlocked ? undefined : 0,
+          cancelButtonIndex: 2,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 0) handleBlockUser();
+          else if (buttonIndex === 1) setReportModalVisible(true);
+        },
+      );
+    } else {
+      Alert.alert('Profile options', undefined, [
+        {
+          text: blockLabel,
+          onPress: handleBlockUser,
+          style: isBlocked ? 'default' : 'destructive',
+        },
+        { text: reportLabel, onPress: () => setReportModalVisible(true) },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
+  // Tapping a tarantula card takes the visitor to that tarantula's
+  // public profile. Uses the existing /tarantula/public/[username]/[name]
+  // route. Pet name is URL-encoded to tolerate spaces and special chars.
+  const openTarantulaProfile = (tarantula: Tarantula) => {
+    const slug = tarantula.name || tarantula.id;
+    router.push(`/tarantula/public/${username}/${encodeURIComponent(slug)}` as never);
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     fetchData();
@@ -362,8 +403,10 @@ export default function KeeperProfileScreen() {
       marginBottom: 16,
     },
     headerBackground: {
-      height: 120,
-      backgroundColor: colors.primary,
+      height: 140,
+    },
+    headerGradient: {
+      flex: 1,
     },
     profileContent: {
       alignItems: 'center',
@@ -411,26 +454,34 @@ export default function KeeperProfileScreen() {
       marginBottom: 16,
       width: '100%',
       paddingHorizontal: 20,
+      alignItems: 'stretch',
     },
     followButton: {
-      flex: 1,
+      flex: 2,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
       backgroundColor: colors.primary,
-      paddingVertical: 10,
+      paddingVertical: 12,
       borderRadius: 12,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 3,
     },
     followButtonText: {
       color: '#ffffff',
-      fontSize: 14,
-      fontWeight: '600',
+      fontSize: 15,
+      fontWeight: '700',
     },
     followingButton: {
       backgroundColor: colors.surface,
       borderWidth: 2,
       borderColor: colors.primary,
+      shadowOpacity: 0,
+      elevation: 0,
     },
     followingButtonText: {
       color: colors.primary,
@@ -442,49 +493,24 @@ export default function KeeperProfileScreen() {
       justifyContent: 'center',
       gap: 6,
       backgroundColor: colors.surface,
-      borderWidth: 2,
-      borderColor: colors.primary,
-      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 12,
       borderRadius: 12,
     },
     messageButtonText: {
-      color: colors.primary,
+      color: colors.textPrimary,
       fontSize: 14,
       fontWeight: '600',
     },
-    blockButton: {
-      flex: 1,
-      flexDirection: 'row',
+    overflowButton: {
+      width: 44,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
       backgroundColor: colors.surface,
-      borderWidth: 2,
-      borderColor: '#dc2626',
-      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
       borderRadius: 12,
-    },
-    blockButtonText: {
-      color: '#dc2626',
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    reportButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      backgroundColor: colors.surface,
-      borderWidth: 2,
-      borderColor: '#f59e0b',
-      paddingVertical: 10,
-      borderRadius: 12,
-    },
-    reportButtonText: {
-      color: '#f59e0b',
-      fontSize: 14,
-      fontWeight: '600',
     },
     profileInfo: {
       flexDirection: 'row',
@@ -543,30 +569,47 @@ export default function KeeperProfileScreen() {
     socialLink: {
       padding: 8,
     },
-    statsContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
+    statsSection: {
       paddingHorizontal: 16,
       marginBottom: 16,
-      gap: 8,
     },
-    statCard: {
-      width: '48%',
+    statsGroupLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textTertiary,
+      marginBottom: 8,
+      marginTop: 8,
+      letterSpacing: 0.8,
+    },
+    statsRow: {
+      flexDirection: 'row',
       backgroundColor: colors.surface,
-      padding: 16,
-      borderRadius: 12,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    statCell: {
+      flex: 1,
+      paddingVertical: 14,
+      paddingHorizontal: 8,
       alignItems: 'center',
     },
+    statCellDivider: {
+      width: 1,
+      backgroundColor: colors.border,
+      marginVertical: 8,
+    },
     statValue: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: colors.primary,
-      marginBottom: 4,
+      fontSize: 22,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: 2,
     },
     statLabel: {
-      fontSize: 12,
+      fontSize: 11,
       color: colors.textSecondary,
+      fontWeight: '500',
+      textTransform: 'uppercase',
+      letterSpacing: 0.3,
     },
     tabs: {
       flexDirection: 'row',
@@ -602,24 +645,44 @@ export default function KeeperProfileScreen() {
     tarantulaCard: {
       width: '48%',
       backgroundColor: colors.surface,
-      borderRadius: 12,
+      borderRadius: 14,
       overflow: 'hidden',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 3,
-      elevation: 2,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    tarantulaCardPressed: {
+      opacity: 0.7,
+    },
+    tarantulaImageWrap: {
+      position: 'relative',
     },
     tarantulaImage: {
       width: '100%',
-      height: 120,
+      height: 140,
     },
     tarantulaPlaceholder: {
       width: '100%',
-      height: 120,
+      height: 140,
       backgroundColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    sexBadgeOverlay: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.3,
+      shadowRadius: 2,
     },
     tarantulaEmoji: {
       fontSize: 40,
@@ -773,7 +836,14 @@ export default function KeeperProfileScreen() {
       >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <View style={styles.headerBackground} />
+          <View style={styles.headerBackground}>
+            <LinearGradient
+              colors={[colors.primary, colors.secondary || colors.accent || colors.primary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.headerGradient}
+            />
+          </View>
           <View style={styles.profileContent}>
             <View style={styles.avatarSection}>
               {profile.avatar_url ? (
@@ -790,39 +860,41 @@ export default function KeeperProfileScreen() {
 
             {/* Action Buttons - Show for other users */}
             {currentUser && !isViewingOwnProfile && (
-              <>
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity
-                    style={[styles.followButton, isFollowing && styles.followingButton]}
-                    onPress={handleFollowToggle}
-                  >
-                    <MaterialCommunityIcons
-                      name={isFollowing ? "account-check" : "account-plus"}
-                      size={18}
-                      color={isFollowing ? colors.primary : "#ffffff"}
-                    />
-                    <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
-                      {isFollowing ? 'Following' : 'Follow'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.messageButton} onPress={handleMessage}>
-                    <MaterialCommunityIcons name="message" size={18} color={colors.primary} />
-                    <Text style={styles.messageButtonText}>Message</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Moderation Buttons */}
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity style={styles.blockButton} onPress={handleBlockUser}>
-                    <MaterialCommunityIcons name="block-helper" size={18} color="#dc2626" />
-                    <Text style={styles.blockButtonText}>{isBlocked ? 'Unblock' : 'Block'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.reportButton} onPress={() => setReportModalVisible(true)}>
-                    <MaterialCommunityIcons name="alert" size={18} color="#f59e0b" />
-                    <Text style={styles.reportButtonText}>Report</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={[styles.followButton, isFollowing && styles.followingButton]}
+                  onPress={handleFollowToggle}
+                  accessibilityLabel={isFollowing ? 'Unfollow this keeper' : 'Follow this keeper'}
+                >
+                  <MaterialCommunityIcons
+                    name={isFollowing ? 'account-check' : 'account-plus'}
+                    size={18}
+                    color={isFollowing ? colors.primary : '#ffffff'}
+                  />
+                  <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>
+                    {isFollowing ? 'Following' : 'Follow'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.messageButton}
+                  onPress={handleMessage}
+                  accessibilityLabel="Send a message"
+                >
+                  <MaterialCommunityIcons name="message-outline" size={18} color={colors.textPrimary} />
+                  <Text style={styles.messageButtonText}>Message</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.overflowButton}
+                  onPress={handleOverflowMenu}
+                  accessibilityLabel="More profile options"
+                >
+                  <MaterialCommunityIcons
+                    name="dots-horizontal"
+                    size={22}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             )}
 
             {/* Profile Info */}
@@ -892,38 +964,52 @@ export default function KeeperProfileScreen() {
           </View>
         </View>
 
-        {/* Stats */}
+        {/* Stats — grouped into two unified rows instead of six separate cards */}
         {(stats || followStats) && (
-          <View style={styles.statsContainer}>
+          <View style={styles.statsSection}>
             {followStats && (
               <>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{followStats.followers_count}</Text>
-                  <Text style={styles.statLabel}>Followers</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{followStats.following_count}</Text>
-                  <Text style={styles.statLabel}>Following</Text>
+                <Text style={styles.statsGroupLabel}>COMMUNITY</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statCell}>
+                    <Text style={styles.statValue}>{followStats.followers_count}</Text>
+                    <Text style={styles.statLabel}>Followers</Text>
+                  </View>
+                  <View style={styles.statCellDivider} />
+                  <View style={styles.statCell}>
+                    <Text style={styles.statValue}>{followStats.following_count}</Text>
+                    <Text style={styles.statLabel}>Following</Text>
+                  </View>
                 </View>
               </>
             )}
             {stats && (
               <>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.total_public}</Text>
-                  <Text style={styles.statLabel}>Tarantulas</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.unique_species}</Text>
-                  <Text style={styles.statLabel}>Species</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.sex_distribution.female}</Text>
-                  <Text style={styles.statLabel}>Females</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.sex_distribution.male}</Text>
-                  <Text style={styles.statLabel}>Males</Text>
+                <Text style={styles.statsGroupLabel}>COLLECTION</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statCell}>
+                    <Text style={styles.statValue}>{stats.total_public}</Text>
+                    <Text style={styles.statLabel}>Spiders</Text>
+                  </View>
+                  <View style={styles.statCellDivider} />
+                  <View style={styles.statCell}>
+                    <Text style={styles.statValue}>{stats.unique_species}</Text>
+                    <Text style={styles.statLabel}>Species</Text>
+                  </View>
+                  <View style={styles.statCellDivider} />
+                  <View style={styles.statCell}>
+                    <Text style={[styles.statValue, { color: '#ec4899' }]}>
+                      {stats.sex_distribution.female}
+                    </Text>
+                    <Text style={styles.statLabel}>♀ Female</Text>
+                  </View>
+                  <View style={styles.statCellDivider} />
+                  <View style={styles.statCell}>
+                    <Text style={[styles.statValue, { color: '#3b82f6' }]}>
+                      {stats.sex_distribution.male}
+                    </Text>
+                    <Text style={styles.statLabel}>♂ Male</Text>
+                  </View>
                 </View>
               </>
             )}
@@ -956,39 +1042,64 @@ export default function KeeperProfileScreen() {
             collection.length > 0 ? (
               <View style={styles.collectionGrid}>
                 {collection.map((tarantula) => (
-                  <View key={tarantula.id} style={styles.tarantulaCard}>
-                    {tarantula.photo_url ? (
-                      <Image source={{ uri: tarantula.photo_url }} style={styles.tarantulaImage} />
-                    ) : (
-                      <View style={styles.tarantulaPlaceholder}>
-                        <Text style={styles.tarantulaEmoji}>🕷️</Text>
-                      </View>
-                    )}
+                  <TouchableOpacity
+                    key={tarantula.id}
+                    style={styles.tarantulaCard}
+                    activeOpacity={0.85}
+                    onPress={() => openTarantulaProfile(tarantula)}
+                    accessibilityRole="link"
+                    accessibilityLabel={`View ${tarantula.name} profile`}
+                  >
+                    <View style={styles.tarantulaImageWrap}>
+                      {tarantula.photo_url ? (
+                        <Image source={{ uri: tarantula.photo_url }} style={styles.tarantulaImage} />
+                      ) : (
+                        <View style={styles.tarantulaPlaceholder}>
+                          <Text style={styles.tarantulaEmoji}>🕷️</Text>
+                        </View>
+                      )}
+                      {/* Sex badge overlaid on the image corner — frees up
+                          the footer for the name + species + age row. */}
+                      {tarantula.sex && (
+                        <View
+                          style={[
+                            styles.sexBadgeOverlay,
+                            {
+                              backgroundColor:
+                                tarantula.sex === 'female'
+                                  ? '#ec4899'
+                                  : tarantula.sex === 'male'
+                                    ? '#3b82f6'
+                                    : '#9ca3af',
+                            },
+                          ]}
+                        >
+                          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>
+                            {tarantula.sex === 'female'
+                              ? '♀'
+                              : tarantula.sex === 'male'
+                                ? '♂'
+                                : '?'}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
                     <View style={styles.tarantulaInfo}>
                       <Text style={styles.tarantulaName} numberOfLines={1}>{tarantula.name}</Text>
                       {tarantula.species_name && (
-                        <Text style={styles.tarantulaSpecies} numberOfLines={1}>{tarantula.species_name}</Text>
+                        <Text style={styles.tarantulaSpecies} numberOfLines={1}>
+                          {tarantula.species_name}
+                        </Text>
                       )}
-                      <View style={styles.tarantulaMeta}>
-                        {tarantula.sex && (
-                          <View style={[
-                            styles.tarantulaBadge,
-                            tarantula.sex === 'female' ? styles.femaleBadge :
-                              tarantula.sex === 'male' ? styles.maleBadge : styles.unknownBadge
-                          ]}>
-                            <Text style={styles.badgeTextSmall}>
-                              {tarantula.sex === 'female' ? '♀' : tarantula.sex === 'male' ? '♂' : '?'}
-                            </Text>
-                          </View>
-                        )}
-                        {tarantula.age_months !== undefined && (
+                      {tarantula.age_months !== undefined && (
+                        <View style={styles.tarantulaMeta}>
                           <View style={styles.ageBadge}>
                             <Text style={styles.badgeTextSmall}>{tarantula.age_months}mo</Text>
                           </View>
-                        )}
-                      </View>
+                        </View>
+                      )}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             ) : (
