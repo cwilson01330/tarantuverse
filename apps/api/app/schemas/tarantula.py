@@ -35,6 +35,13 @@ class TarantulaBase(BaseModel):
 
     photo_url: Optional[str] = Field(None, max_length=500)
     is_public: bool = False
+    # Per-tarantula visibility on public keeper profiles. `public` means
+    # visible to visitors when the owner's profile is also public;
+    # `private` hides this individual tarantula even on a public profile.
+    # Default at the API level is None — the create endpoint inherits
+    # from the owner's collection_visibility so new tarantulas follow
+    # the profile's stance unless the client explicitly overrides.
+    visibility: Optional[str] = Field(None, pattern="^(public|private)$")
     notes: Optional[str] = None
 
 
@@ -44,7 +51,13 @@ class TarantulaCreate(TarantulaBase):
 
 
 class TarantulaUpdate(TarantulaBase):
-    """Schema for updating a tarantula (all fields optional)"""
+    """Schema for updating a tarantula (all fields optional)
+
+    Note: `visibility` here lets keepers hide individual tarantulas
+    from their public profile even while their profile remains public
+    — the "opt out per spider" toggle that pairs with the public-by-
+    default behavior inherited from the profile.
+    """
     species_id: Optional[uuid.UUID] = None
 
 

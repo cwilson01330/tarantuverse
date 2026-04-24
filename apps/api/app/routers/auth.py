@@ -251,7 +251,7 @@ async def update_profile(
     """
     # Update only provided fields
     update_data = profile_data.model_dump(exclude_unset=True)
-    
+
     # Validate collection_visibility if provided
     if 'collection_visibility' in update_data:
         if update_data['collection_visibility'] not in ['private', 'public']:
@@ -259,7 +259,7 @@ async def update_profile(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="collection_visibility must be 'private' or 'public'"
             )
-    
+
     # Validate experience_level if provided
     valid_experience_levels = ['beginner', 'intermediate', 'advanced', 'expert']
     if 'profile_experience_level' in update_data:
@@ -268,14 +268,36 @@ async def update_profile(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"profile_experience_level must be one of: {', '.join(valid_experience_levels)}"
             )
-    
+
+    # Detect a private→public flip so we can cascade to tarantulas below.
+    previous_visibility = current_user.collection_visibility
+    flipping_to_public = (
+        'collection_visibility' in update_data
+        and update_data['collection_visibility'] == 'public'
+        and previous_visibility != 'public'
+    )
+
     # Update user fields
     for field, value in update_data.items():
         setattr(current_user, field, value)
-    
+
+    # Cascade: when a keeper goes public, flip all their currently-
+    # private tarantulas to public so their profile isn't empty. This
+    # matches the "public by default" expectation when the profile
+    # itself is public. Keepers can still hide individual tarantulas
+    # afterwards via the edit form (per-tarantula visibility toggle).
+    # Going public→private does NOT cascade — we preserve individual
+    # hides so they survive a future re-opening.
+    if flipping_to_public:
+        from app.models.tarantula import Tarantula
+        db.query(Tarantula).filter(
+            Tarantula.user_id == current_user.id,
+            Tarantula.visibility == 'private',
+        ).update({Tarantula.visibility: 'public'}, synchronize_session=False)
+
     db.commit()
     db.refresh(current_user)
-    
+
     return UserResponse.from_orm(current_user)
 
 
@@ -289,8 +311,28 @@ async def update_visibility(
     Quick toggle for collection visibility
 
     - **collection_visibility**: 'private' or 'public'
+
+    When flipping private→public, any tarantulas currently marked
+    private are cascaded to public so the keeper's profile isn't
+    empty for visitors. Individual tarantulas can still be hidden
+    afterwards via the edit form. Flipping public→private does not
+    cascade — per-tarantula hide choices are preserved.
     """
-    current_user.collection_visibility = visibility_data.collection_visibility
+    previous_visibility = current_user.collection_visibility
+    new_visibility = visibility_data.collection_visibility
+    flipping_to_public = (
+        new_visibility == 'public' and previous_visibility != 'public'
+    )
+
+    current_user.collection_visibility = new_visibility
+
+    if flipping_to_public:
+        from app.models.tarantula import Tarantula
+        db.query(Tarantula).filter(
+            Tarantula.user_id == current_user.id,
+            Tarantula.visibility == 'private',
+        ).update({Tarantula.visibility: 'public'}, synchronize_session=False)
+
     db.commit()
     db.refresh(current_user)
 

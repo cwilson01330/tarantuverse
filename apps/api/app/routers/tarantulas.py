@@ -99,6 +99,17 @@ async def create_tarantula(
         except ValueError:
             pass
 
+    # Default visibility to the owner's profile visibility. A public-
+    # profile keeper adding a new tarantula gets it visible on their
+    # profile by default; a private-profile keeper's tarantula is only
+    # visible to themselves regardless. If the client explicitly passed
+    # a `visibility` value, respect it — this lets keepers opt a new
+    # tarantula into being hidden at creation time.
+    if 'visibility' not in tarantula_dict or tarantula_dict.get('visibility') is None:
+        tarantula_dict['visibility'] = (
+            'public' if current_user.collection_visibility == 'public' else 'private'
+        )
+
     new_tarantula = Tarantula(
         user_id=current_user.id,
         **tarantula_dict
