@@ -1,12 +1,15 @@
-name: Keep Render APIs Warm
+name: Keep Render API Warm
 
 # Render free tier spins services down after ~15 min of inactivity.
 # A cold start takes 20-30 seconds during which every user request hangs
 # or times out. This workflow pings /health every 10 min to keep the
-# containers running, so real users never see a cold start.
+# container running, so real users never see a cold start.
+#
+# Note: Tarantuverse and Herpetoverse (web + mobile) share one API —
+# tarantuverse-api.onrender.com — so we only need to warm a single host.
 #
 # GitHub-hosted runners are free and this job takes ~5 seconds. If the
-# job fails we don't block anything — we just log and try again next cycle.
+# ping fails we don't block anything — we just log and try again next cycle.
 
 on:
   schedule:
@@ -20,22 +23,14 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     timeout-minutes: 2
-    strategy:
-      fail-fast: false
-      matrix:
-        api:
-          - name: tarantuverse
-            url: https://tarantuverse-api.onrender.com/health
-          - name: herpetoverse
-            url: https://herpetoverse-api.onrender.com/health
     steps:
-      - name: Ping ${{ matrix.api.name }}
+      - name: Ping Tarantuverse API
         run: |
-          echo "Pinging ${{ matrix.api.name }} at ${{ matrix.api.url }}"
+          URL="https://tarantuverse-api.onrender.com/health"
+          echo "Pinging $URL"
           # -f fails on 4xx/5xx, --max-time caps the wait at 60s (covers
           # a full cold start), -s silences progress, -S shows errors.
           # We retry 3 times with a 15s gap so a single transient 502
           # doesn't mark the job as failed and spam our notifications.
-          curl -fsS --max-time 60 --retry 3 --retry-delay 15 \
-            "${{ matrix.api.url }}" \
-            || echo "::warning::${{ matrix.api.name }} did not respond — container may be cold-starting"
+          curl -fsS --max-time 60 --retry 3 --retry-delay 15 "$URL" \
+            || echo "::warning::Tarantuverse API did not respond — container may be cold-starting"
