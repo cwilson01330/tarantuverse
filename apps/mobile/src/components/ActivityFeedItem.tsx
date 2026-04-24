@@ -63,6 +63,24 @@ export default function ActivityFeedItem({ activity }: Props) {
     const meta = activity.activity_metadata ?? {};
     const displayName = activity.display_name || activity.username;
 
+    // Tarantula-related activities (new_tarantula / molt / feeding) tap
+    // through to the PUBLIC profile route `/tarantula/public/[username]/[name]`
+    // rather than the owner-only `/tarantula/[id]`. The owner-only
+    // route filters by `user_id == current_user.id` at the API level,
+    // so non-owners would get a 404 — the most common case in a feed
+    // is seeing someone else's activity. The public profile works for
+    // both own and visitor views. We skip the tap if the activity is
+    // missing the tarantula_name metadata so we don't route to a
+    // broken URL.
+    const openTarantulaProfile = () => {
+      const name = meta.tarantula_name ?? meta.name;
+      if (!activity.username || !name) return undefined;
+      return () =>
+        router.push(
+          `/tarantula/public/${activity.username}/${encodeURIComponent(String(name))}` as never,
+        );
+    };
+
     switch (activity.action_type) {
       case 'new_tarantula':
         return {
@@ -71,7 +89,7 @@ export default function ActivityFeedItem({ activity }: Props) {
           speciesName: meta.species_name ?? meta.common_name ?? meta.scientific_name,
           thumbnailUrl: meta.thumbnail_url,
           subtitle: undefined,
-          onPress: () => router.push(`/tarantula/${meta.tarantula_id ?? activity.target_id}`),
+          onPress: openTarantulaProfile(),
         };
 
       case 'molt':
@@ -81,7 +99,7 @@ export default function ActivityFeedItem({ activity }: Props) {
           speciesName: meta.species_name,
           thumbnailUrl: meta.thumbnail_url,
           subtitle: meta.leg_span_after ? `New leg span: ${meta.leg_span_after}"` : undefined,
-          onPress: () => router.push(`/tarantula/${meta.tarantula_id ?? activity.target_id}`),
+          onPress: openTarantulaProfile(),
         };
 
       case 'feeding': {
@@ -95,18 +113,26 @@ export default function ActivityFeedItem({ activity }: Props) {
             ? `${meta.food_type} — ${accepted ? '✓ Accepted' : '✗ Rejected'}`
             : undefined,
           subtitleColor: accepted ? '#10b981' : '#ef4444',
-          onPress: () => router.push(`/tarantula/${meta.tarantula_id ?? activity.target_id}`),
+          onPress: openTarantulaProfile(),
         };
       }
 
       case 'follow':
+        // Tap target: the user who was followed. Mobile keeper profiles
+        // live at /community/[username] — there is no /keeper/ route on
+        // mobile, so the old `/keeper/` path produced a hard 404.
+        // Guard against missing metadata too: if followed_username isn't
+        // in the activity_metadata (older activity rows), disable the
+        // tap so we don't route to /community/undefined.
         return {
-          verb: `${displayName} followed ${meta.followed_username}`,
+          verb: `${displayName} followed ${meta.followed_display_name || meta.followed_username || 'someone'}`,
           tarantulaName: undefined,
           speciesName: undefined,
           thumbnailUrl: undefined,
           subtitle: undefined,
-          onPress: () => router.push(`/keeper/${meta.followed_username}`),
+          onPress: meta.followed_username
+            ? () => router.push(`/community/${meta.followed_username}`)
+            : undefined,
         };
 
       case 'forum_thread':

@@ -69,6 +69,24 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
     const username = activity.display_name || activity.username;
     const metadata = activity.activity_metadata || {};
 
+    // Public tarantula profile route; works for both own and visitor
+    // views thanks to the context-aware /t/[id] page. We guard with a
+    // non-null id so activities missing the target_id + tarantula_id
+    // metadata don't render a broken <Link href="/t/undefined">.
+    const tarantulaId: string | null =
+      (metadata.tarantula_id as string | undefined) || activity.target_id || null;
+    const tarantulaName =
+      metadata.tarantula_name || metadata.name || "Unnamed";
+
+    const TarantulaLink = ({ className }: { className: string }) =>
+      tarantulaId ? (
+        <Link href={`/t/${tarantulaId}`} className={className}>
+          {tarantulaName}
+        </Link>
+      ) : (
+        <span className={className}>{tarantulaName}</span>
+      );
+
     switch (activity.action_type) {
       case "new_tarantula":
         return (
@@ -80,9 +98,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
               {username}
             </Link>
             <span className="text-gray-300"> added a new tarantula: </span>
-            <span className="font-semibold text-gray-100">
-              {metadata.tarantula_name || metadata.name || "Unnamed"}
-            </span>
+            <TarantulaLink className="font-semibold text-gray-100 hover:text-neon-pink-300 hover:underline" />
             {(metadata.species_name || metadata.common_name || metadata.scientific_name) && (
               <span className="text-gray-500 text-sm ml-1">
                 ({metadata.species_name || metadata.common_name || metadata.scientific_name})
@@ -101,9 +117,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
               {username}
             </Link>
             <span className="text-gray-300"> logged a molt for </span>
-            <span className="font-semibold text-gray-100">
-              {metadata.tarantula_name || "a tarantula"}
-            </span>
+            <TarantulaLink className="font-semibold text-gray-100 hover:text-electric-blue-300 hover:underline" />
           </>
         );
 
@@ -121,9 +135,7 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
               {username}
             </Link>
             <span className="text-gray-300"> fed </span>
-            <span className="font-semibold text-gray-100">
-              {metadata.tarantula_name || "a tarantula"}
-            </span>
+            <TarantulaLink className="font-semibold text-gray-100 hover:text-green-300 hover:underline" />
             {(metadata.food_type || metadata.prey_type) && (
               <span className="text-gray-300">
                 {" "}
