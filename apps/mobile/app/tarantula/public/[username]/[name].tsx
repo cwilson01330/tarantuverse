@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ScrollView, View, Text, Image, TouchableOpacity, Share, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '../../../../src/contexts/ThemeContext'
 
 interface TarantulaPublicProfile {
@@ -56,6 +57,11 @@ export default function PublicTarantulaProfile() {
   const params = useLocalSearchParams()
   const router = useRouter()
   const { colors: theme } = useTheme()
+  // Used so the header respects the iOS status bar / Dynamic Island
+  // inset and the bottom scroll edge respects the home indicator.
+  // This screen doesn't live under a tab navigator (it's pushed from
+  // a keeper profile), so the insets aren't handled automatically.
+  const insets = useSafeAreaInsets()
   const username = params.username as string
   const name = params.name as string
 
@@ -192,10 +198,27 @@ export default function PublicTarantulaProfile() {
     : null
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* Header */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: theme.border }}>
-        <TouchableOpacity onPress={() => router.back()}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.background }}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
+    >
+      {/* Header — paddingTop uses the measured safe-area inset so the
+          Back / Share row clears the iOS status bar and Dynamic Island
+          without hardcoding a magic number for each device. */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingTop: insets.top + 8,
+          paddingBottom: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.border,
+          backgroundColor: theme.background,
+        }}
+      >
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={{ color: theme.primary, fontSize: 18, fontWeight: 'bold' }}>← Back</Text>
         </TouchableOpacity>
         <TouchableOpacity
