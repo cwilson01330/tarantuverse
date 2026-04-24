@@ -81,6 +81,12 @@ class Species(Base):
     # Documentation
     care_guide = Column(Text)  # Markdown formatted care guide
     image_url = Column(String(500))
+    # Human-readable photo credit line — rendered verbatim beneath the
+    # care-sheet image. Stored as TEXT because CC-BY-SA attributions can
+    # run long ("Photo: Ryosuke Kuwahara (CC BY-SA 4.0) via Wikimedia
+    # Commons — cropped"). Nullable: not every image needs attribution
+    # (public-domain or staff-taken photos don't strictly require it).
+    image_attribution = Column(Text, nullable=True)
     source_url = Column(String(500))  # Where the info came from
 
     # Community & Verification

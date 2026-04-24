@@ -59,6 +59,10 @@ class SpeciesBase(BaseModel):
     # Documentation
     care_guide: Optional[str] = None
     image_url: Optional[str] = None
+    # Human-readable photo credit, e.g. "Photo: Jane Doe (CC BY-SA 4.0)
+    # via Wikimedia Commons". Rendered verbatim on the care sheet so we
+    # satisfy CC-BY / CC-BY-SA attribution requirements.
+    image_attribution: Optional[str] = None
     source_url: Optional[str] = None
 
 
@@ -103,6 +107,7 @@ class SpeciesUpdate(BaseModel):
     activity_level: Optional[str] = None
     care_guide: Optional[str] = None
     image_url: Optional[str] = None
+    image_attribution: Optional[str] = None
     source_url: Optional[str] = None
 
 

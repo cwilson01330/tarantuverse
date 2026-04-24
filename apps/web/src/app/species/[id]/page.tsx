@@ -41,6 +41,10 @@ interface Species {
   // Documentation
   care_guide?: string
   image_url?: string
+  // Human-readable photo credit line (e.g. "Photo: Jane Doe (CC BY-SA 4.0)
+  // via Wikimedia Commons"). Rendered verbatim under the hero image so
+  // we satisfy CC-BY attribution requirements.
+  image_attribution?: string
   source_url?: string
   is_verified?: boolean
   times_kept?: number
@@ -291,6 +295,23 @@ export default function EnhancedSpeciesDetailPage() {
           </div>
         </div>
       </div>
+
+      {/*
+        Photo credit. Satisfies CC-BY / CC-BY-SA attribution for the
+        Wikimedia-sourced care-sheet images, and makes the editorial
+        provenance obvious for any image (staff-taken, user-submitted,
+        PD). Rendered only when image_attribution is populated so
+        species without images don't show a stray empty line.
+      */}
+      {species.image_url && species.image_attribution && (
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+            <p className="text-xs text-gray-500 dark:text-gray-400 italic text-center sm:text-left">
+              {species.image_attribution}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 shadow-sm">

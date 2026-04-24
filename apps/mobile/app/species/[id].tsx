@@ -51,6 +51,9 @@ interface Species {
   // Documentation
   care_guide?: string;
   image_url?: string;
+  // Photo credit line — rendered under the hero so CC-BY attribution
+  // is visible on the species detail page.
+  image_attribution?: string;
   source_url?: string;
   is_verified?: boolean;
   times_kept?: number;
@@ -197,6 +200,34 @@ export default function SpeciesDetailScreen() {
             </View>
           </View>
         </View>
+
+        {/*
+          Photo credit — satisfies CC-BY attribution for Wikimedia-sourced
+          images and makes editorial provenance obvious. Rendered only
+          when both image AND attribution are present so species without
+          hero images don't show a stray line.
+        */}
+        {species.image_url && species.image_attribution && (
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 6,
+              backgroundColor: colors.surface,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11,
+                fontStyle: 'italic',
+                color: colors.textTertiary,
+              }}
+            >
+              {species.image_attribution}
+            </Text>
+          </View>
+        )}
 
         {/* Content */}
         <View style={{ padding: 16 }}>
