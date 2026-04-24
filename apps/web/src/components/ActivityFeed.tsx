@@ -194,16 +194,30 @@ export default function ActivityFeed({
 
       {/* Activity Items */}
       {activities.length === 0 ? (
-        <div className="bg-dark-50 rounded-lg shadow-lg border border-electric-blue-500/20 p-8 text-center">
+        <div className="bg-surface rounded-2xl shadow-lg border border-theme p-10 text-center">
           <div className="text-6xl mb-4">🕷️</div>
-          <h3 className="text-xl font-semibold text-gray-100 mb-2">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             No activity yet
           </h3>
-          <p className="text-gray-400">
+          <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
             {feedType === "personalized"
-              ? "Follow other keepers to see their activity here!"
-              : "Check back later for updates from the community."}
+              ? "Your feed is personalized — follow other keepers to see their feedings, molts, and new tarantulas show up here."
+              : "Log feedings, molts, or add tarantulas to start seeing community activity."}
           </p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            <a
+              href="/community"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-semibold"
+            >
+              Browse Keepers
+            </a>
+            <a
+              href="/dashboard"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface border border-theme text-gray-900 dark:text-white rounded-lg hover:bg-surface-elevated transition font-semibold"
+            >
+              My Collection
+            </a>
+          </div>
         </div>
       ) : (
         <>

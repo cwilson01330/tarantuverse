@@ -1032,7 +1032,7 @@ export default function CollectionScreen() {
           <MaterialCommunityIcons name="spider" size={64} color={colors.textTertiary} />
           <Text style={styles.emptyTitle}>No Tarantulas Yet</Text>
           <Text style={styles.emptyText}>
-            Start building your collection by adding your first tarantula
+            Start building your collection by adding your first tarantula. Not sure which species to pick? Browse our care sheets first.
           </Text>
           <PrimaryButton
             onPress={() => router.push('/tarantula/add')}
@@ -1041,6 +1041,25 @@ export default function CollectionScreen() {
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
             <Text style={styles.addButtonText}>Add Tarantula</Text>
           </PrimaryButton>
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/species')}
+            style={[
+              styles.addButton,
+              {
+                marginTop: 12,
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderColor: colors.border,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Browse species care sheets"
+          >
+            <MaterialCommunityIcons name="book-open-variant" size={20} color={colors.textPrimary} />
+            <Text style={[styles.addButtonText, { color: colors.textPrimary }]}>
+              Browse Species
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>

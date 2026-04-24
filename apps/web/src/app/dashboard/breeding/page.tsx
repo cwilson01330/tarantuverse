@@ -319,7 +319,19 @@ export default function BreedingPage() {
                 </Link>
               </div>
               {pairings.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400">No pairings recorded yet. Create your first pairing to start tracking breeding.</p>
+                <div className="text-center py-12 px-4">
+                  <div className="text-5xl mb-4">💑</div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No pairings yet</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                    Record your first pairing to track cohabitation dates, type, and outcome across breeding attempts.
+                  </p>
+                  <Link
+                    href="/dashboard/breeding/pairings/add"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+                  >
+                    + Record First Pairing
+                  </Link>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {pairings.map((pairing) => (
@@ -352,7 +364,19 @@ export default function BreedingPage() {
                 </Link>
               </div>
               {eggSacs.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400">No egg sacs recorded yet.</p>
+                <div className="text-center py-12 px-4">
+                  <div className="text-5xl mb-4">🥚</div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No egg sacs recorded</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                    Log egg sacs from a successful pairing — track laid date, spiderling count, and hatch outcome.
+                  </p>
+                  <Link
+                    href="/dashboard/breeding/egg-sacs/add"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+                  >
+                    + Log First Egg Sac
+                  </Link>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {eggSacs.map((sac) => (
@@ -382,7 +406,19 @@ export default function BreedingPage() {
                 </Link>
               </div>
               {offspring.length === 0 ? (
-                <p className="text-gray-600 dark:text-gray-400">No offspring recorded yet.</p>
+                <div className="text-center py-12 px-4">
+                  <div className="text-5xl mb-4">🕷️</div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No offspring recorded</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                    Track individual slings after hatching — status (available, sold, kept), sale prices, and buyer notes.
+                  </p>
+                  <Link
+                    href="/dashboard/breeding/offspring/add"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
+                  >
+                    + Record First Offspring
+                  </Link>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {offspring.map((child) => (

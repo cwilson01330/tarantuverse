@@ -246,10 +246,24 @@ export default function CommunityScreen() {
             {keepers.length === 0 ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyEmoji}>🔍</Text>
-                <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No keepers found</Text>
-                <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                  {searchQuery ? 'Try a different search' : 'Be the first to make your profile public!'}
+                <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+                  {searchQuery ? 'No keepers found' : 'Be the first to go public'}
                 </Text>
+                <Text style={[styles.emptySubtitle, { color: colors.textSecondary, marginBottom: 20 }]}>
+                  {searchQuery
+                    ? 'Try a different search term.'
+                    : 'Make your collection public in Settings to connect with other keepers and show off your spiders.'}
+                </Text>
+                {!searchQuery && (
+                  <TouchableOpacity
+                    style={[styles.openBoardButton, { backgroundColor: colors.primary }]}
+                    onPress={() => router.push('/settings')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Go to settings to make profile public"
+                  >
+                    <Text style={styles.openBoardButtonText}>Make Profile Public</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               <View style={styles.keeperList}>
@@ -360,10 +374,28 @@ export default function CommunityScreen() {
           ) : activities.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>📊</Text>
-              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No Activity Yet</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                Activity from the community will appear here
+              <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No activity yet</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary, marginBottom: 20, paddingHorizontal: 24 }]}>
+                Follow other keepers to see their feedings, molts, and new tarantulas appear here. Or add your own to start contributing.
               </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                <TouchableOpacity
+                  style={[styles.openBoardButton, { backgroundColor: colors.primary, marginBottom: 0 }]}
+                  onPress={() => setActiveTab('keepers')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Browse keepers to follow"
+                >
+                  <Text style={styles.openBoardButtonText}>Browse Keepers</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.backButton, { borderColor: colors.border }]}
+                  onPress={() => router.push('/(tabs)/collection')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Go to your collection"
+                >
+                  <Text style={[styles.backButtonText, { color: colors.textPrimary }]}>My Collection</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <>
