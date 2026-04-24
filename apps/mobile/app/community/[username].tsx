@@ -23,6 +23,10 @@ interface KeeperProfile {
     instagram?: string;
     youtube?: string;
     website?: string;
+    tiktok?: string;
+    facebook?: string;
+    morphmarket?: string;
+    arachnoboards?: string;
   };
   collection_visibility: string;
 }
@@ -559,7 +563,8 @@ export default function KeeperProfileScreen() {
     },
     socialLinks: {
       flexDirection: 'row',
-      gap: 16,
+      flexWrap: 'wrap',
+      gap: 10,
       paddingTop: 16,
       borderTopWidth: 1,
       borderTopColor: colors.border,
@@ -568,6 +573,18 @@ export default function KeeperProfileScreen() {
     },
     socialLink: {
       padding: 8,
+    },
+    socialIconButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.12,
+      shadowRadius: 2,
+      elevation: 2,
     },
     statsSection: {
       paddingHorizontal: 16,
@@ -932,31 +949,72 @@ export default function KeeperProfileScreen() {
               </View>
             )}
 
-            {/* Social Links */}
-            {profile.social_links && Object.keys(profile.social_links).length > 0 && (
+            {/* Social Links — brand-colored circles so each platform
+                is recognizable at a glance. Any link with a value
+                renders; otherwise the whole section collapses. */}
+            {profile.social_links && Object.values(profile.social_links).some(v => v) && (
               <View style={styles.socialLinks}>
                 {profile.social_links.instagram && (
                   <TouchableOpacity
-                    style={styles.socialLink}
+                    style={[styles.socialIconButton, { backgroundColor: '#E1306C' }]}
                     onPress={() => Linking.openURL(profile.social_links!.instagram!)}
+                    accessibilityLabel="Instagram"
                   >
-                    <MaterialCommunityIcons name="instagram" size={24} color={colors.primary} />
+                    <MaterialCommunityIcons name="instagram" size={22} color="#fff" />
                   </TouchableOpacity>
                 )}
                 {profile.social_links.youtube && (
                   <TouchableOpacity
-                    style={styles.socialLink}
+                    style={[styles.socialIconButton, { backgroundColor: '#FF0000' }]}
                     onPress={() => Linking.openURL(profile.social_links!.youtube!)}
+                    accessibilityLabel="YouTube"
                   >
-                    <MaterialCommunityIcons name="youtube" size={24} color={colors.primary} />
+                    <MaterialCommunityIcons name="youtube" size={22} color="#fff" />
+                  </TouchableOpacity>
+                )}
+                {profile.social_links.tiktok && (
+                  <TouchableOpacity
+                    style={[styles.socialIconButton, { backgroundColor: '#000000' }]}
+                    onPress={() => Linking.openURL(profile.social_links!.tiktok!)}
+                    accessibilityLabel="TikTok"
+                  >
+                    <MaterialCommunityIcons name="music-note" size={22} color="#fff" />
+                  </TouchableOpacity>
+                )}
+                {profile.social_links.facebook && (
+                  <TouchableOpacity
+                    style={[styles.socialIconButton, { backgroundColor: '#1877F2' }]}
+                    onPress={() => Linking.openURL(profile.social_links!.facebook!)}
+                    accessibilityLabel="Facebook"
+                  >
+                    <MaterialCommunityIcons name="facebook" size={22} color="#fff" />
+                  </TouchableOpacity>
+                )}
+                {profile.social_links.morphmarket && (
+                  <TouchableOpacity
+                    style={[styles.socialIconButton, { backgroundColor: '#F47C1F' }]}
+                    onPress={() => Linking.openURL(profile.social_links!.morphmarket!)}
+                    accessibilityLabel="MorphMarket"
+                  >
+                    <MaterialCommunityIcons name="storefront" size={22} color="#fff" />
+                  </TouchableOpacity>
+                )}
+                {profile.social_links.arachnoboards && (
+                  <TouchableOpacity
+                    style={[styles.socialIconButton, { backgroundColor: '#5E3023' }]}
+                    onPress={() => Linking.openURL(profile.social_links!.arachnoboards!)}
+                    accessibilityLabel="Arachnoboards"
+                  >
+                    <MaterialCommunityIcons name="spider-web" size={22} color="#fff" />
                   </TouchableOpacity>
                 )}
                 {profile.social_links.website && (
                   <TouchableOpacity
-                    style={styles.socialLink}
+                    style={[styles.socialIconButton, { backgroundColor: colors.surfaceRaised || '#374151' }]}
                     onPress={() => Linking.openURL(profile.social_links!.website!)}
+                    accessibilityLabel="Website"
                   >
-                    <MaterialCommunityIcons name="web" size={24} color={colors.primary} />
+                    <MaterialCommunityIcons name="web" size={22} color={colors.textPrimary} />
                   </TouchableOpacity>
                 )}
               </View>

@@ -37,6 +37,10 @@ export default function ProfileSettingsPage() {
       instagram: '',
       youtube: '',
       website: '',
+      tiktok: '',
+      facebook: '',
+      morphmarket: '',
+      arachnoboards: '',
     },
     collection_visibility: 'private',
   })
@@ -98,6 +102,10 @@ export default function ProfileSettingsPage() {
           instagram: data.social_links?.instagram || '',
           youtube: data.social_links?.youtube || '',
           website: data.social_links?.website || '',
+          tiktok: data.social_links?.tiktok || '',
+          facebook: data.social_links?.facebook || '',
+          morphmarket: data.social_links?.morphmarket || '',
+          arachnoboards: data.social_links?.arachnoboards || '',
         },
         collection_visibility: data.collection_visibility || 'private',
       })
@@ -243,11 +251,18 @@ export default function ProfileSettingsPage() {
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-      // Build social links object only if at least one link is provided
+      // Build social links object only if at least one link is provided.
+      // New platforms are additive — any new key stored here is picked up
+      // by the display without needing a schema change since social_links
+      // is a JSONB column.
       const socialLinksData = {
         instagram: formData.social_links.instagram || undefined,
         youtube: formData.social_links.youtube || undefined,
         website: formData.social_links.website || undefined,
+        tiktok: formData.social_links.tiktok || undefined,
+        facebook: formData.social_links.facebook || undefined,
+        morphmarket: formData.social_links.morphmarket || undefined,
+        arachnoboards: formData.social_links.arachnoboards || undefined,
       }
       const hasSocialLinks = Object.values(socialLinksData).some(v => v !== undefined)
 
@@ -594,6 +609,66 @@ export default function ProfileSettingsPage() {
                   })}
                   className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
                   placeholder="https://yourwebsite.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">TikTok</label>
+                <input
+                  type="url"
+                  value={formData.social_links.tiktok}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    social_links: { ...formData.social_links, tiktok: e.target.value }
+                  })}
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
+                  placeholder="https://tiktok.com/@username"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Facebook</label>
+                <input
+                  type="url"
+                  value={formData.social_links.facebook}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    social_links: { ...formData.social_links, facebook: e.target.value }
+                  })}
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
+                  placeholder="https://facebook.com/username"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  MorphMarket <span className="text-xs text-theme-tertiary font-normal">(breeders)</span>
+                </label>
+                <input
+                  type="url"
+                  value={formData.social_links.morphmarket}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    social_links: { ...formData.social_links, morphmarket: e.target.value }
+                  })}
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
+                  placeholder="https://www.morphmarket.com/stores/your-store"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Arachnoboards <span className="text-xs text-theme-tertiary font-normal">(profile)</span>
+                </label>
+                <input
+                  type="url"
+                  value={formData.social_links.arachnoboards}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    social_links: { ...formData.social_links, arachnoboards: e.target.value }
+                  })}
+                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
+                  placeholder="https://arachnoboards.com/members/username"
                 />
               </div>
             </div>

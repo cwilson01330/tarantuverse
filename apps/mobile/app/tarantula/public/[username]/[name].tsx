@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ScrollView, View, Text, Image, TouchableOpacity, Share, ActivityIndicator } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useTheme } from '../../../../src/contexts/ThemeContext'
 
 interface TarantulaPublicProfile {
@@ -68,6 +69,24 @@ export default function PublicTarantulaProfile() {
   const [profile, setProfile] = useState<TarantulaPublicProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Tri-state: null = still checking, false = signed out, true = signed in.
+  // We gate the bottom CTA on this so we never flash "Sign Up Free" at
+  // a keeper who's already logged in.
+  const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    AsyncStorage.getItem('auth_token')
+      .then((token) => {
+        if (mounted) setIsSignedIn(Boolean(token))
+      })
+      .catch(() => {
+        if (mounted) setIsSignedIn(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -674,24 +693,32 @@ export default function PublicTarantulaProfile() {
         </View>
       )}
 
-      {/* CTA Banner */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 32 }}>
-        <View style={{ backgroundColor: theme.primary, borderRadius: 12, padding: 24, alignItems: 'center' }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white', marginBottom: 8, textAlign: 'center' }}>
-            Track Your Own Tarantulas
-          </Text>
-          <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 16, textAlign: 'center' }}>
-            Join Tarantuverse and start tracking your entire collection.
-          </Text>
-          <TouchableOpacity
-            style={{ paddingHorizontal: 20, paddingVertical: 12, backgroundColor: 'white', borderRadius: 8 }}
-          >
-            <Text style={{ color: theme.primary, fontWeight: 'bold', textAlign: 'center' }}>
-              Sign Up Free
+      {/* CTA Banner — only shown to signed-out visitors. Signed-in
+          keepers don't need an acquisition prompt; we also skip during
+          the initial auth check so the CTA doesn't flash on screen
+          for logged-in users. */}
+      {isSignedIn === false && (
+        <View style={{ paddingHorizontal: 16, marginBottom: 32 }}>
+          <View style={{ backgroundColor: theme.primary, borderRadius: 12, padding: 24, alignItems: 'center' }}>
+            <Text style={{ fontSize: 20, fontWeight: 'bold', color: 'white', marginBottom: 8, textAlign: 'center' }}>
+              Track Your Own Tarantulas
             </Text>
-          </TouchableOpacity>
+            <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 16, textAlign: 'center' }}>
+              Join Tarantuverse and start tracking your entire collection.
+            </Text>
+            <TouchableOpacity
+              style={{ paddingHorizontal: 20, paddingVertical: 12, backgroundColor: 'white', borderRadius: 8 }}
+              onPress={() => router.push('/register' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Sign up for Tarantuverse"
+            >
+              <Text style={{ color: theme.primary, fontWeight: 'bold', textAlign: 'center' }}>
+                Sign Up Free
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
     </ScrollView>
   )
 }

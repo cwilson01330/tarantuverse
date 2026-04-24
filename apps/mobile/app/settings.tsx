@@ -64,6 +64,10 @@ export default function SettingsScreen() {
       instagram: '',
       youtube: '',
       website: '',
+      tiktok: '',
+      facebook: '',
+      morphmarket: '',
+      arachnoboards: '',
     },
   });
 
@@ -81,6 +85,10 @@ export default function SettingsScreen() {
           instagram: user.social_links?.instagram || '',
           youtube: user.social_links?.youtube || '',
           website: user.social_links?.website || '',
+          tiktok: user.social_links?.tiktok || '',
+          facebook: user.social_links?.facebook || '',
+          morphmarket: user.social_links?.morphmarket || '',
+          arachnoboards: user.social_links?.arachnoboards || '',
         },
       });
     }
@@ -187,11 +195,17 @@ export default function SettingsScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Build social links object only if at least one link is provided
+      // Build social links object only if at least one link is provided.
+      // social_links is a JSONB column, so new platforms here are picked
+      // up by the display without a backend schema change.
       const socialLinksData = {
         instagram: formData.social_links.instagram || undefined,
         youtube: formData.social_links.youtube || undefined,
         website: formData.social_links.website || undefined,
+        tiktok: formData.social_links.tiktok || undefined,
+        facebook: formData.social_links.facebook || undefined,
+        morphmarket: formData.social_links.morphmarket || undefined,
+        arachnoboards: formData.social_links.arachnoboards || undefined,
       };
       const hasSocialLinks = Object.values(socialLinksData).some(v => v !== undefined);
 
@@ -661,6 +675,62 @@ export default function SettingsScreen() {
               social_links: { ...formData.social_links, website: text }
             })}
             placeholder="https://yourwebsite.com"
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+
+          <Text style={styles.label}>TikTok</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.social_links.tiktok}
+            onChangeText={(text) => setFormData({
+              ...formData,
+              social_links: { ...formData.social_links, tiktok: text }
+            })}
+            placeholder="https://tiktok.com/@username"
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+
+          <Text style={styles.label}>Facebook</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.social_links.facebook}
+            onChangeText={(text) => setFormData({
+              ...formData,
+              social_links: { ...formData.social_links, facebook: text }
+            })}
+            placeholder="https://facebook.com/username"
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+
+          <Text style={styles.label}>MorphMarket (breeders)</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.social_links.morphmarket}
+            onChangeText={(text) => setFormData({
+              ...formData,
+              social_links: { ...formData.social_links, morphmarket: text }
+            })}
+            placeholder="https://www.morphmarket.com/stores/your-store"
+            placeholderTextColor={colors.textTertiary}
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+
+          <Text style={styles.label}>Arachnoboards</Text>
+          <TextInput
+            style={styles.input}
+            value={formData.social_links.arachnoboards}
+            onChangeText={(text) => setFormData({
+              ...formData,
+              social_links: { ...formData.social_links, arachnoboards: text }
+            })}
+            placeholder="https://arachnoboards.com/members/username"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
             keyboardType="url"

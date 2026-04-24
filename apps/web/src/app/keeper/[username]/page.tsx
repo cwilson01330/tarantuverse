@@ -21,6 +21,10 @@ interface Keeper {
     instagram?: string
     youtube?: string
     website?: string
+    tiktok?: string
+    facebook?: string
+    morphmarket?: string
+    arachnoboards?: string
   }
 }
 
@@ -453,15 +457,18 @@ export default function KeeperProfilePage() {
                 </div>
               )}
 
-              {/* Social Links */}
+              {/* Social Links — brand-colored row so each platform is
+                  recognizable at a glance. Each button is its own <a>
+                  so visitors can tap directly without hunting. */}
               {keeper.social_links && (Object.values(keeper.social_links).some(link => link)) && (
-                <div className="flex gap-3">
+                <div className="flex gap-2 flex-wrap">
                   {keeper.social_links.instagram && (
                     <a
                       href={keeper.social_links.instagram}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition font-medium"
+                      aria-label="Instagram"
+                      className="px-4 py-2 bg-gradient-to-tr from-[#833AB4] via-[#E1306C] to-[#F77737] hover:brightness-110 text-white rounded-lg transition font-medium"
                     >
                       📷 Instagram
                     </a>
@@ -471,9 +478,54 @@ export default function KeeperProfilePage() {
                       href={keeper.social_links.youtube}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition font-medium"
+                      aria-label="YouTube"
+                      className="px-4 py-2 bg-[#FF0000] hover:bg-[#CC0000] text-white rounded-lg transition font-medium"
                     >
                       🎥 YouTube
+                    </a>
+                  )}
+                  {keeper.social_links.tiktok && (
+                    <a
+                      href={keeper.social_links.tiktok}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="TikTok"
+                      className="px-4 py-2 bg-black hover:bg-gray-800 text-white rounded-lg transition font-medium"
+                    >
+                      🎵 TikTok
+                    </a>
+                  )}
+                  {keeper.social_links.facebook && (
+                    <a
+                      href={keeper.social_links.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Facebook"
+                      className="px-4 py-2 bg-[#1877F2] hover:bg-[#166fe5] text-white rounded-lg transition font-medium"
+                    >
+                      📘 Facebook
+                    </a>
+                  )}
+                  {keeper.social_links.morphmarket && (
+                    <a
+                      href={keeper.social_links.morphmarket}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="MorphMarket"
+                      className="px-4 py-2 bg-[#F47C1F] hover:bg-[#e06b0f] text-white rounded-lg transition font-medium"
+                    >
+                      🦎 MorphMarket
+                    </a>
+                  )}
+                  {keeper.social_links.arachnoboards && (
+                    <a
+                      href={keeper.social_links.arachnoboards}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Arachnoboards"
+                      className="px-4 py-2 bg-[#5E3023] hover:bg-[#4a2619] text-white rounded-lg transition font-medium"
+                    >
+                      🕸️ Arachnoboards
                     </a>
                   )}
                   {keeper.social_links.website && (
@@ -481,6 +533,7 @@ export default function KeeperProfilePage() {
                       href={keeper.social_links.website}
                       target="_blank"
                       rel="noopener noreferrer"
+                      aria-label="Website"
                       className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg transition font-medium"
                     >
                       🌐 Website
