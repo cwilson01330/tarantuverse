@@ -8,6 +8,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
+import { socialUrl } from '../../src/utils/social-links';
 
 interface KeeperProfile {
   id: number;
@@ -963,7 +964,7 @@ export default function KeeperProfileScreen() {
                 {profile.social_links.instagram && (
                   <TouchableOpacity
                     style={[styles.socialIconButton, { backgroundColor: '#E1306C' }]}
-                    onPress={() => Linking.openURL(profile.social_links!.instagram!)}
+                    onPress={() => Linking.openURL(socialUrl('instagram', profile.social_links!.instagram)!)}
                     accessibilityLabel="Instagram"
                   >
                     <MaterialCommunityIcons name="instagram" size={22} color="#fff" />
@@ -972,7 +973,7 @@ export default function KeeperProfileScreen() {
                 {profile.social_links.youtube && (
                   <TouchableOpacity
                     style={[styles.socialIconButton, { backgroundColor: '#FF0000' }]}
-                    onPress={() => Linking.openURL(profile.social_links!.youtube!)}
+                    onPress={() => Linking.openURL(socialUrl('youtube', profile.social_links!.youtube)!)}
                     accessibilityLabel="YouTube"
                   >
                     <MaterialCommunityIcons name="youtube" size={22} color="#fff" />
@@ -981,7 +982,7 @@ export default function KeeperProfileScreen() {
                 {profile.social_links.tiktok && (
                   <TouchableOpacity
                     style={[styles.socialIconButton, { backgroundColor: '#000000' }]}
-                    onPress={() => Linking.openURL(profile.social_links!.tiktok!)}
+                    onPress={() => Linking.openURL(socialUrl('tiktok', profile.social_links!.tiktok)!)}
                     accessibilityLabel="TikTok"
                   >
                     <MaterialCommunityIcons name="music-note" size={22} color="#fff" />
@@ -990,7 +991,7 @@ export default function KeeperProfileScreen() {
                 {profile.social_links.facebook && (
                   <TouchableOpacity
                     style={[styles.socialIconButton, { backgroundColor: '#1877F2' }]}
-                    onPress={() => Linking.openURL(profile.social_links!.facebook!)}
+                    onPress={() => Linking.openURL(socialUrl('facebook', profile.social_links!.facebook)!)}
                     accessibilityLabel="Facebook"
                   >
                     <MaterialCommunityIcons name="facebook" size={22} color="#fff" />
@@ -999,7 +1000,7 @@ export default function KeeperProfileScreen() {
                 {profile.social_links.morphmarket && (
                   <TouchableOpacity
                     style={[styles.socialIconButton, { backgroundColor: '#F47C1F' }]}
-                    onPress={() => Linking.openURL(profile.social_links!.morphmarket!)}
+                    onPress={() => Linking.openURL(socialUrl('morphmarket', profile.social_links!.morphmarket)!)}
                     accessibilityLabel="MorphMarket"
                   >
                     <MaterialCommunityIcons name="storefront" size={22} color="#fff" />
@@ -1008,7 +1009,7 @@ export default function KeeperProfileScreen() {
                 {profile.social_links.arachnoboards && (
                   <TouchableOpacity
                     style={[styles.socialIconButton, { backgroundColor: '#5E3023' }]}
-                    onPress={() => Linking.openURL(profile.social_links!.arachnoboards!)}
+                    onPress={() => Linking.openURL(socialUrl('arachnoboards', profile.social_links!.arachnoboards)!)}
                     accessibilityLabel="Arachnoboards"
                   >
                     <MaterialCommunityIcons name="spider-web" size={22} color="#fff" />
@@ -1017,7 +1018,7 @@ export default function KeeperProfileScreen() {
                 {profile.social_links.website && (
                   <TouchableOpacity
                     style={[styles.socialIconButton, { backgroundColor: colors.surfaceRaised || '#374151' }]}
-                    onPress={() => Linking.openURL(profile.social_links!.website!)}
+                    onPress={() => Linking.openURL(socialUrl('website', profile.social_links!.website)!)}
                     accessibilityLabel="Website"
                   >
                     <MaterialCommunityIcons name="web" size={22} color={colors.textPrimary} />

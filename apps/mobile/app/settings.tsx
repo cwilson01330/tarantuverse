@@ -7,6 +7,7 @@ import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { AppHeader } from '../src/components/AppHeader';
 import { apiClient } from '../src/services/api';
+import { normalizeSocialHandle } from '../src/utils/social-links';
 
 const specialtyOptions = [
   { value: 'terrestrial', label: 'Terrestrial' },
@@ -196,16 +197,21 @@ export default function SettingsScreen() {
     setSaving(true);
     try {
       // Build social links object only if at least one link is provided.
-      // social_links is a JSONB column, so new platforms here are picked
-      // up by the display without a backend schema change.
+      // Handle-only inputs are normalized via normalizeSocialHandle so
+      // keepers who paste a full URL end up storing just the handle,
+      // matching the web normalization path. The display layer rebuilds
+      // URLs from the handle per platform.
+      const norm = (p: 'instagram' | 'youtube' | 'tiktok' | 'facebook' | 'morphmarket' | 'arachnoboards' | 'website', v: string) =>
+        v ? normalizeSocialHandle(p, v) || undefined : undefined;
+
       const socialLinksData = {
-        instagram: formData.social_links.instagram || undefined,
-        youtube: formData.social_links.youtube || undefined,
-        website: formData.social_links.website || undefined,
-        tiktok: formData.social_links.tiktok || undefined,
-        facebook: formData.social_links.facebook || undefined,
-        morphmarket: formData.social_links.morphmarket || undefined,
-        arachnoboards: formData.social_links.arachnoboards || undefined,
+        instagram: norm('instagram', formData.social_links.instagram),
+        youtube: norm('youtube', formData.social_links.youtube),
+        website: norm('website', formData.social_links.website),
+        tiktok: norm('tiktok', formData.social_links.tiktok),
+        facebook: norm('facebook', formData.social_links.facebook),
+        morphmarket: norm('morphmarket', formData.social_links.morphmarket),
+        arachnoboards: norm('arachnoboards', formData.social_links.arachnoboards),
       };
       const hasSocialLinks = Object.values(socialLinksData).some(v => v !== undefined);
 
@@ -638,7 +644,10 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Social Links</Text>
 
-          <Text style={styles.label}>Instagram</Text>
+          {/* Social Links — handles only; full URLs also accepted and
+              normalized on save. Small prefix hint on each label so
+              keepers know what we're going to wrap around their handle. */}
+          <Text style={styles.label}>Instagram <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>· instagram.com/</Text></Text>
           <TextInput
             style={styles.input}
             value={formData.social_links.instagram}
@@ -646,13 +655,13 @@ export default function SettingsScreen() {
               ...formData,
               social_links: { ...formData.social_links, instagram: text }
             })}
-            placeholder="https://instagram.com/username"
+            placeholder="spiderkeeper"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            keyboardType="url"
+            autoCorrect={false}
           />
 
-          <Text style={styles.label}>YouTube</Text>
+          <Text style={styles.label}>YouTube <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>· youtube.com/@</Text></Text>
           <TextInput
             style={styles.input}
             value={formData.social_links.youtube}
@@ -660,10 +669,10 @@ export default function SettingsScreen() {
               ...formData,
               social_links: { ...formData.social_links, youtube: text }
             })}
-            placeholder="https://youtube.com/@channel"
+            placeholder="spiderkeeper"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            keyboardType="url"
+            autoCorrect={false}
           />
 
           <Text style={styles.label}>Website</Text>
@@ -680,7 +689,7 @@ export default function SettingsScreen() {
             keyboardType="url"
           />
 
-          <Text style={styles.label}>TikTok</Text>
+          <Text style={styles.label}>TikTok <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>· tiktok.com/@</Text></Text>
           <TextInput
             style={styles.input}
             value={formData.social_links.tiktok}
@@ -688,13 +697,13 @@ export default function SettingsScreen() {
               ...formData,
               social_links: { ...formData.social_links, tiktok: text }
             })}
-            placeholder="https://tiktok.com/@username"
+            placeholder="spiderkeeper"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            keyboardType="url"
+            autoCorrect={false}
           />
 
-          <Text style={styles.label}>Facebook</Text>
+          <Text style={styles.label}>Facebook <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>· facebook.com/</Text></Text>
           <TextInput
             style={styles.input}
             value={formData.social_links.facebook}
@@ -702,13 +711,13 @@ export default function SettingsScreen() {
               ...formData,
               social_links: { ...formData.social_links, facebook: text }
             })}
-            placeholder="https://facebook.com/username"
+            placeholder="spiderkeeper"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            keyboardType="url"
+            autoCorrect={false}
           />
 
-          <Text style={styles.label}>MorphMarket (breeders)</Text>
+          <Text style={styles.label}>MorphMarket <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>· morphmarket.com/stores/</Text></Text>
           <TextInput
             style={styles.input}
             value={formData.social_links.morphmarket}
@@ -716,13 +725,13 @@ export default function SettingsScreen() {
               ...formData,
               social_links: { ...formData.social_links, morphmarket: text }
             })}
-            placeholder="https://www.morphmarket.com/stores/your-store"
+            placeholder="your-store"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            keyboardType="url"
+            autoCorrect={false}
           />
 
-          <Text style={styles.label}>Arachnoboards</Text>
+          <Text style={styles.label}>Arachnoboards <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>· arachnoboards.com/members/</Text></Text>
           <TextInput
             style={styles.input}
             value={formData.social_links.arachnoboards}
@@ -730,10 +739,10 @@ export default function SettingsScreen() {
               ...formData,
               social_links: { ...formData.social_links, arachnoboards: text }
             })}
-            placeholder="https://arachnoboards.com/members/username"
+            placeholder="username.12345"
             placeholderTextColor={colors.textTertiary}
             autoCapitalize="none"
-            keyboardType="url"
+            autoCorrect={false}
           />
         </View>
 

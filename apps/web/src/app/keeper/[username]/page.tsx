@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import AchievementBadge from '@/components/AchievementBadge'
 import { formatLocalDate } from '@/lib/date'
+import { socialUrl } from '@/lib/social-links'
 
 interface Keeper {
   id: number
@@ -464,7 +465,7 @@ export default function KeeperProfilePage() {
                 <div className="flex gap-2 flex-wrap">
                   {keeper.social_links.instagram && (
                     <a
-                      href={keeper.social_links.instagram}
+                      href={socialUrl('instagram', keeper.social_links.instagram)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="Instagram"
@@ -475,7 +476,7 @@ export default function KeeperProfilePage() {
                   )}
                   {keeper.social_links.youtube && (
                     <a
-                      href={keeper.social_links.youtube}
+                      href={socialUrl('youtube', keeper.social_links.youtube)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="YouTube"
@@ -486,7 +487,7 @@ export default function KeeperProfilePage() {
                   )}
                   {keeper.social_links.tiktok && (
                     <a
-                      href={keeper.social_links.tiktok}
+                      href={socialUrl('tiktok', keeper.social_links.tiktok)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="TikTok"
@@ -497,7 +498,7 @@ export default function KeeperProfilePage() {
                   )}
                   {keeper.social_links.facebook && (
                     <a
-                      href={keeper.social_links.facebook}
+                      href={socialUrl('facebook', keeper.social_links.facebook)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="Facebook"
@@ -508,7 +509,7 @@ export default function KeeperProfilePage() {
                   )}
                   {keeper.social_links.morphmarket && (
                     <a
-                      href={keeper.social_links.morphmarket}
+                      href={socialUrl('morphmarket', keeper.social_links.morphmarket)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="MorphMarket"
@@ -519,7 +520,7 @@ export default function KeeperProfilePage() {
                   )}
                   {keeper.social_links.arachnoboards && (
                     <a
-                      href={keeper.social_links.arachnoboards}
+                      href={socialUrl('arachnoboards', keeper.social_links.arachnoboards)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="Arachnoboards"
@@ -530,7 +531,7 @@ export default function KeeperProfilePage() {
                   )}
                   {keeper.social_links.website && (
                     <a
-                      href={keeper.social_links.website}
+                      href={socialUrl('website', keeper.social_links.website)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="Website"

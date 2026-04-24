@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import { normalizeSocialHandle } from '@/lib/social-links'
 
 export default function ProfileSettingsPage() {
   const router = useRouter()
@@ -254,15 +255,20 @@ export default function ProfileSettingsPage() {
       // Build social links object only if at least one link is provided.
       // New platforms are additive — any new key stored here is picked up
       // by the display without needing a schema change since social_links
-      // is a JSONB column.
+      // is a JSONB column. We run each value through normalizeSocialHandle
+      // so keepers who paste a full URL end up with just the handle
+      // stored, keeping the data format consistent going forward.
+      const normalize = (platform: 'instagram' | 'youtube' | 'tiktok' | 'facebook' | 'morphmarket' | 'arachnoboards' | 'website', value: string) =>
+        value ? normalizeSocialHandle(platform, value) || undefined : undefined
+
       const socialLinksData = {
-        instagram: formData.social_links.instagram || undefined,
-        youtube: formData.social_links.youtube || undefined,
-        website: formData.social_links.website || undefined,
-        tiktok: formData.social_links.tiktok || undefined,
-        facebook: formData.social_links.facebook || undefined,
-        morphmarket: formData.social_links.morphmarket || undefined,
-        arachnoboards: formData.social_links.arachnoboards || undefined,
+        instagram: normalize('instagram', formData.social_links.instagram),
+        youtube: normalize('youtube', formData.social_links.youtube),
+        website: normalize('website', formData.social_links.website),
+        tiktok: normalize('tiktok', formData.social_links.tiktok),
+        facebook: normalize('facebook', formData.social_links.facebook),
+        morphmarket: normalize('morphmarket', formData.social_links.morphmarket),
+        arachnoboards: normalize('arachnoboards', formData.social_links.arachnoboards),
       }
       const hasSocialLinks = Object.values(socialLinksData).some(v => v !== undefined)
 
@@ -565,37 +571,50 @@ export default function ProfileSettingsPage() {
             </div>
           </div>
 
-          {/* Social Links */}
+          {/* Social Links — just usernames / handles; the display layer
+              builds the full URL per platform (see lib/social-links.ts).
+              Full-URL paste is tolerated for convenience, but the form
+              normalizes on save. */}
           <div className="bg-surface border border-theme rounded-lg p-6">
             <h2 className="text-2xl font-bold mb-4 text-theme-primary">Social Links</h2>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Instagram</label>
-                <input
-                  type="url"
-                  value={formData.social_links.instagram}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    social_links: { ...formData.social_links, instagram: e.target.value }
-                  })}
-                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
-                  placeholder="https://instagram.com/username"
-                />
+                <div className="flex items-center rounded-lg border border-theme bg-surface-elevated focus-within:ring-2 focus-within:ring-primary-600">
+                  <span className="pl-3 pr-1 text-sm text-theme-tertiary select-none">instagram.com/</span>
+                  <input
+                    type="text"
+                    value={formData.social_links.instagram}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      social_links: { ...formData.social_links, instagram: e.target.value }
+                    })}
+                    className="flex-1 px-1 py-2 bg-transparent focus:outline-none text-theme-primary"
+                    placeholder="spiderkeeper"
+                    autoCapitalize="none"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1">YouTube</label>
-                <input
-                  type="url"
-                  value={formData.social_links.youtube}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    social_links: { ...formData.social_links, youtube: e.target.value }
-                  })}
-                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
-                  placeholder="https://youtube.com/@channel"
-                />
+                <div className="flex items-center rounded-lg border border-theme bg-surface-elevated focus-within:ring-2 focus-within:ring-primary-600">
+                  <span className="pl-3 pr-1 text-sm text-theme-tertiary select-none">youtube.com/@</span>
+                  <input
+                    type="text"
+                    value={formData.social_links.youtube}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      social_links: { ...formData.social_links, youtube: e.target.value }
+                    })}
+                    className="flex-1 px-1 py-2 bg-transparent focus:outline-none text-theme-primary"
+                    placeholder="spiderkeeper"
+                    autoCapitalize="none"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
 
               <div>
@@ -614,62 +633,82 @@ export default function ProfileSettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-1">TikTok</label>
-                <input
-                  type="url"
-                  value={formData.social_links.tiktok}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    social_links: { ...formData.social_links, tiktok: e.target.value }
-                  })}
-                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
-                  placeholder="https://tiktok.com/@username"
-                />
+                <div className="flex items-center rounded-lg border border-theme bg-surface-elevated focus-within:ring-2 focus-within:ring-primary-600">
+                  <span className="pl-3 pr-1 text-sm text-theme-tertiary select-none">tiktok.com/@</span>
+                  <input
+                    type="text"
+                    value={formData.social_links.tiktok}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      social_links: { ...formData.social_links, tiktok: e.target.value }
+                    })}
+                    className="flex-1 px-1 py-2 bg-transparent focus:outline-none text-theme-primary"
+                    placeholder="spiderkeeper"
+                    autoCapitalize="none"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1">Facebook</label>
-                <input
-                  type="url"
-                  value={formData.social_links.facebook}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    social_links: { ...formData.social_links, facebook: e.target.value }
-                  })}
-                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
-                  placeholder="https://facebook.com/username"
-                />
+                <div className="flex items-center rounded-lg border border-theme bg-surface-elevated focus-within:ring-2 focus-within:ring-primary-600">
+                  <span className="pl-3 pr-1 text-sm text-theme-tertiary select-none">facebook.com/</span>
+                  <input
+                    type="text"
+                    value={formData.social_links.facebook}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      social_links: { ...formData.social_links, facebook: e.target.value }
+                    })}
+                    className="flex-1 px-1 py-2 bg-transparent focus:outline-none text-theme-primary"
+                    placeholder="spiderkeeper"
+                    autoCapitalize="none"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1">
                   MorphMarket <span className="text-xs text-theme-tertiary font-normal">(breeders)</span>
                 </label>
-                <input
-                  type="url"
-                  value={formData.social_links.morphmarket}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    social_links: { ...formData.social_links, morphmarket: e.target.value }
-                  })}
-                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
-                  placeholder="https://www.morphmarket.com/stores/your-store"
-                />
+                <div className="flex items-center rounded-lg border border-theme bg-surface-elevated focus-within:ring-2 focus-within:ring-primary-600">
+                  <span className="pl-3 pr-1 text-sm text-theme-tertiary select-none">morphmarket.com/stores/</span>
+                  <input
+                    type="text"
+                    value={formData.social_links.morphmarket}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      social_links: { ...formData.social_links, morphmarket: e.target.value }
+                    })}
+                    className="flex-1 px-1 py-2 bg-transparent focus:outline-none text-theme-primary"
+                    placeholder="your-store"
+                    autoCapitalize="none"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Arachnoboards <span className="text-xs text-theme-tertiary font-normal">(profile)</span>
                 </label>
-                <input
-                  type="url"
-                  value={formData.social_links.arachnoboards}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    social_links: { ...formData.social_links, arachnoboards: e.target.value }
-                  })}
-                  className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
-                  placeholder="https://arachnoboards.com/members/username"
-                />
+                <div className="flex items-center rounded-lg border border-theme bg-surface-elevated focus-within:ring-2 focus-within:ring-primary-600">
+                  <span className="pl-3 pr-1 text-sm text-theme-tertiary select-none">arachnoboards.com/members/</span>
+                  <input
+                    type="text"
+                    value={formData.social_links.arachnoboards}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      social_links: { ...formData.social_links, arachnoboards: e.target.value }
+                    })}
+                    className="flex-1 px-1 py-2 bg-transparent focus:outline-none text-theme-primary"
+                    placeholder="username.12345"
+                    autoCapitalize="none"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
             </div>
           </div>
