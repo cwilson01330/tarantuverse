@@ -506,7 +506,11 @@ async def get_public_link(
             detail="Tarantula not found"
         )
 
-    if not tarantula.is_public:
+    # visibility is the source of truth for per-tarantula public/private
+    # (see vis_20260424 migration + routers/auth.py cascade). The legacy
+    # is_public boolean was never migrated alongside and is effectively
+    # dead for tarantulas — always check `visibility == 'public'`.
+    if tarantula.visibility != 'public':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This tarantula is not public. Make it public first."
@@ -545,17 +549,27 @@ async def get_public_tarantula(
             detail="Keeper not found"
         )
 
-    # Find matching public tarantula by name slug
-    # Normalize the slug to match against tarantula names
+    # Find matching public tarantula by name slug.
+    #
+    # - Filter by `visibility == 'public'` (not the legacy is_public
+    #   boolean) so this matches the rest of the visibility plumbing.
+    # - Normalize the incoming slug the same way as the stored slug
+    #   (lowercase + spaces → dashes) so clients that pass the raw
+    #   pet name ("Rampart") match tarantulas whose slug is "rampart".
+    # - Also accept a direct UUID match so the mobile/web activity
+    #   feed can deep-link with either pet name OR the tarantula id
+    #   without the client having to decide.
+    normalized_slug = tarantula_slug.lower().replace(" ", "-")
+
     user_tarantulas = db.query(Tarantula).filter(
         Tarantula.user_id == user.id,
-        Tarantula.is_public == True
+        Tarantula.visibility == 'public',
     ).all()
 
     matching_tarantula = None
     for t in user_tarantulas:
         t_slug = (t.name or t.common_name or "tarantula").lower().replace(" ", "-")
-        if t_slug == tarantula_slug:
+        if t_slug == normalized_slug or str(t.id) == tarantula_slug:
             matching_tarantula = t
             break
 
