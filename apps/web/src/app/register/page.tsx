@@ -102,7 +102,31 @@ function RegisterForm() {
         throw new Error(data.detail || 'Registration failed')
       }
 
-      setSuccessMessage(data.message || 'Registration successful. Your account is active and ready to log in.')
+      // Step 2: Auto-sign-in so the user lands in the dashboard with one
+      // action instead of being forced to re-enter email + password on a
+      // login page. If email verification is required the API will
+      // respond with a non-verified user and signIn will surface that
+      // error — we fall back to the success screen so the user can
+      // check their inbox.
+      const signInResult = await signIn('credentials', {
+        email: formData.email,
+        password: formData.password,
+        redirect: false,
+      })
+
+      if (signInResult?.ok) {
+        // Prefer the ?redirect=... param when present (e.g. user clicked
+        // Sign up from a gated page); otherwise drop them at the dashboard.
+        const target = redirectTo || '/dashboard'
+        router.push(target)
+        router.refresh()
+        return
+      }
+
+      // Auto-login didn't succeed (email verification required, or
+      // a transient sign-in error). Show the success screen so they
+      // still have a clear next step.
+      setSuccessMessage(data.message || 'Registration successful. Check your inbox if email verification is required, then log in.')
       setSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
@@ -141,9 +165,12 @@ function RegisterForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-24">
+    <div className="flex min-h-screen items-center justify-center p-6 sm:p-12 md:p-24">
       <div className="w-full max-w-md">
-        <h1 className="text-4xl font-bold mb-8 text-center">Create Account</h1>
+        <h1 className="text-4xl font-bold mb-2 text-center">Create Account</h1>
+        <p className="text-center text-sm text-theme-secondary mb-6">
+          Free forever for up to 15 tarantulas · No credit card required
+        </p>
 
         {error && (
           <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-400 rounded-xl">
@@ -191,17 +218,6 @@ function RegisterForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Display Name (Optional)</label>
-            <input
-              type="text"
-              value={formData.display_name}
-              onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
-              placeholder="Your Name"
-            />
-          </div>
-
-          <div>
             <label className="block text-sm font-medium mb-1">Password</label>
             <input
               type="password"
@@ -215,52 +231,89 @@ function RegisterForm() {
             <p className="text-xs text-theme-tertiary mt-1">At least 8 characters</p>
           </div>
 
-          {/* Referral Code */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Referral Code (Optional)</label>
-            <input
-              type="text"
-              value={formData.referral_code}
-              onChange={(e) => {
-                const code = e.target.value.toUpperCase()
-                setFormData({ ...formData, referral_code: code })
-                if (code.length >= 8) {
-                  validateReferralCode(code)
-                } else {
-                  setReferrerInfo(null)
-                }
-              }}
-              className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
-              placeholder="ABCD1234"
-              maxLength={12}
-            />
-            {validatingReferral && (
-              <p className="text-xs text-theme-tertiary mt-1">Validating referral code...</p>
-            )}
-            {referrerInfo && !validatingReferral && (
-              <div className={`mt-2 p-2 rounded-lg text-sm ${
-                referrerInfo.valid
-                  ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-                  : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
-              }`}>
-                {referrerInfo.valid ? (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span>Referred by <strong>@{referrerInfo.referrer_username}</strong></span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    <span>{referrerInfo.message || 'Invalid referral code'}</span>
+          {/*
+            Optional fields are collapsed behind a disclosure by default —
+            the core form is email/username/password, and every visible
+            field costs conversion. `open` auto-expands when we've received
+            a referral code via ?ref=... so the user can see the green
+            "Referred by @..." confirmation without having to hunt for it.
+          */}
+          <details
+            open={Boolean(formData.referral_code)}
+            className="rounded-xl border border-theme bg-surface"
+          >
+            <summary className="cursor-pointer select-none px-3 py-2.5 text-sm font-medium text-theme-secondary hover:text-theme-primary flex items-center justify-between">
+              <span>Add a display name or referral code (optional)</span>
+              <svg
+                className="w-4 h-4 transition-transform"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="px-3 pb-3 pt-1 space-y-4 border-t border-theme">
+              <div>
+                <label className="block text-sm font-medium mb-1 mt-3">Display Name</label>
+                <input
+                  type="text"
+                  value={formData.display_name}
+                  onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
+                  placeholder="Your Name"
+                />
+                <p className="text-xs text-theme-tertiary mt-1">Shown on your keeper profile. Defaults to your username.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Referral Code</label>
+                <input
+                  type="text"
+                  value={formData.referral_code}
+                  onChange={(e) => {
+                    const code = e.target.value.toUpperCase()
+                    setFormData({ ...formData, referral_code: code })
+                    if (code.length >= 8) {
+                      validateReferralCode(code)
+                    } else {
+                      setReferrerInfo(null)
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
+                  placeholder="ABCD1234"
+                  maxLength={12}
+                />
+                {validatingReferral && (
+                  <p className="text-xs text-theme-tertiary mt-1">Validating referral code...</p>
+                )}
+                {referrerInfo && !validatingReferral && (
+                  <div className={`mt-2 p-2 rounded-lg text-sm ${
+                    referrerInfo.valid
+                      ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                      : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
+                  }`}>
+                    {referrerInfo.valid ? (
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Referred by <strong>@{referrerInfo.referrer_username}</strong></span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                        </svg>
+                        <span>{referrerInfo.message || 'Invalid referral code'}</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          </details>
 
           <button
             type="submit"
@@ -290,6 +343,34 @@ function RegisterForm() {
               </span>
             </div>
           )}
+
+          {/*
+            Legal acceptance lives here (not behind an extra checkbox) —
+            click-wrap acceptance tied to the Register action satisfies
+            most jurisdictions while keeping conversion friction to zero.
+            Links open in new tabs so the user doesn't lose their form.
+          */}
+          <p className="mt-3 text-center text-xs text-theme-tertiary leading-relaxed">
+            By creating an account, you agree to our{' '}
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-theme-primary"
+            >
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-theme-primary"
+            >
+              Privacy Policy
+            </a>
+            .
+          </p>
         </form>
 
         <p className="mt-6 text-center text-sm text-theme-secondary">

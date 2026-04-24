@@ -123,8 +123,42 @@ export default function SearchScreen() {
     }
   }, [query, performSearch])
 
+  /**
+   * Translate web-canonical URLs from the /search API to the equivalent
+   * mobile expo-router paths. The search backend is a single endpoint
+   * shared by web + mobile; some of its URLs (e.g. /dashboard/tarantulas/<id>,
+   * /keeper/<u>) don't exist on mobile and would 404 if pushed raw. This
+   * helper keeps the API free of client-specific logic while still
+   * letting mobile navigate every result type.
+   *
+   * NOTE: /keeper/<u> is handled on the backend now by rewriting to
+   * /community/<u> (which is the canonical keeper route on both platforms),
+   * but we translate it here too as a belt-and-suspenders guard for users
+   * on older API clients or cached results.
+   */
+  const toMobilePath = (url: string): string => {
+    if (!url) return url
+
+    // /dashboard/tarantulas/<id>  →  /tarantula/<id>  (singular + no dashboard prefix)
+    const tarantulaMatch = url.match(/^\/dashboard\/tarantulas\/([^/?#]+)/)
+    if (tarantulaMatch) return `/tarantula/${tarantulaMatch[1]}`
+
+    // /keeper/<u>  →  /community/<u>  (mobile has no /keeper/ route)
+    const keeperMatch = url.match(/^\/keeper\/([^/?#]+)/)
+    if (keeperMatch) return `/community/${keeperMatch[1]}`
+
+    // /community/forums/thread/<id>  →  /forums/thread/<id>
+    // Mobile's forums live at the top level, not under /community.
+    const threadMatch = url.match(/^\/community\/forums\/thread\/([^/?#]+)/)
+    if (threadMatch) return `/forums/thread/${threadMatch[1]}`
+
+    // Everything else (species detail, QR public profiles, etc.)
+    // already uses paths that match on both platforms.
+    return url
+  }
+
   const handleSelectResult = (result: SearchResult) => {
-    router.push(result.url as any)
+    router.push(toMobilePath(result.url) as any)
   }
 
   const renderItem = ({ item }: { item: SearchResult }) => (

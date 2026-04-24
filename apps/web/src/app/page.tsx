@@ -28,7 +28,9 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-dark">
+    // pb-24 on mobile reserves space for the sticky CTA bar so the footer
+    // content isn't hidden behind it. md+ has no bar so no padding needed.
+    <div className="min-h-screen bg-gradient-dark pb-24 md:pb-0">
 
       {/* ── Navigation ──────────────────────────────────────────── */}
       <nav className="bg-dark-50/50 backdrop-blur-md border-b border-electric-blue-500/20 sticky top-0 z-50">
@@ -93,13 +95,26 @@ export default function Home() {
               juggling spreadsheets.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 mb-8">
-              <Link href="/register" className="px-8 py-4 bg-gradient-primary text-white rounded-xl hover:shadow-2xl hover:shadow-electric-blue-500/30 transform hover:scale-105 transition font-semibold text-lg text-center">
-                Start Free 🚀
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
+              {/* Primary CTA — specific and action-oriented. "Start Free 🚀"
+                  is vague; "Create your free account" tells the user exactly
+                  what happens when they click. */}
+              <Link
+                href="/register"
+                className="px-8 py-4 bg-gradient-primary text-white rounded-xl hover:shadow-2xl hover:shadow-electric-blue-500/30 transform hover:scale-105 transition font-semibold text-lg text-center"
+              >
+                Create your free account →
               </Link>
-              <Link href="#keepers" className="px-8 py-4 bg-dark-50 border-2 border-electric-blue-500/30 text-electric-blue-300 rounded-xl hover:border-electric-blue-500/50 hover:shadow-lg transition font-semibold text-lg text-center">
-                See the Features
-              </Link>
+              {/* Secondary is now a text link, not a button. Two equal-weight
+                  buttons compete for attention and cut conversion; an obvious
+                  text link preserves the explore-first option without stealing
+                  clicks from the primary CTA. */}
+              <a
+                href="#keepers"
+                className="text-electric-blue-300 hover:text-electric-blue-200 font-medium text-base underline-offset-4 hover:underline transition text-center sm:text-left"
+              >
+                Or see the features first ↓
+              </a>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-6 text-sm text-gray-400">
@@ -946,6 +961,25 @@ export default function Home() {
           <p className="mt-6 text-white/60 text-sm">Free forever for up to 15 tarantulas · Premium from $4.99/mo</p>
         </div>
       </section>
+
+      {/* ── Mobile Sticky CTA ──────────────────────────────────────
+          Persistent signup button on small viewports. The long landing
+          page means mobile scrollers would otherwise have to scroll all
+          the way back up or all the way down to find a CTA — this keeps
+          one tap-target within reach at all times. Hidden on md+ screens
+          where the top nav's "Get Started" button stays visible.
+      */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-dark/95 backdrop-blur-md border-t border-electric-blue-500/20 px-4 py-3 shadow-2xl shadow-black/40">
+        <Link
+          href="/register"
+          className="block w-full py-3.5 bg-gradient-primary text-white rounded-xl font-bold text-center text-base shadow-lg shadow-electric-blue-500/30"
+        >
+          Create your free account →
+        </Link>
+        <p className="text-center text-xs text-gray-400 mt-1.5">
+          Free forever · No credit card · 15 tarantulas included
+        </p>
+      </div>
 
       {/* ── Footer ──────────────────────────────────────────────── */}
       <footer className="bg-dark border-t border-electric-blue-500/10 py-12">

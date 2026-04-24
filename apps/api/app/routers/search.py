@@ -111,6 +111,11 @@ async def global_search(
         ).limit(5).all()
 
         for keeper in keepers:
+            # Use /community/{username} because it's the canonical keeper
+            # profile route on BOTH web and mobile. Web has /keeper/<u>
+            # as a legacy alias too, but mobile only has /community/<u>,
+            # so returning /keeper/ here 404s every keeper tap in mobile
+            # search (same class of bug as the follow-target fix).
             results.keepers.append(
                 SearchResult(
                     id=str(keeper.id),
@@ -118,7 +123,7 @@ async def global_search(
                     title=keeper.display_name or keeper.username,
                     subtitle=f"@{keeper.username}",
                     image_url=keeper.avatar_url,
-                    url=f"/keeper/{keeper.username}"
+                    url=f"/community/{keeper.username}"
                 )
             )
 
