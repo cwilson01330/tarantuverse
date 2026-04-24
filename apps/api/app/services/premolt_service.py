@@ -60,9 +60,14 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
             datetime.now(timezone.utc) - last_molt.molted_at
         ).days if last_molt.molted_at else None
 
-    # Calculate average molt interval (requires at least 2 molts)
+    # Calculate average molt interval. Requires at least 3 molts (so we
+    # get 2+ intervals) before we trust the average — a single interval
+    # is too unreliable, especially around life-stage transitions where
+    # intervals can jump from weeks to months. For keepers with just 2
+    # molts logged we leave this None and the downstream branches skip
+    # any interval-based prediction.
     average_molt_interval = None
-    if len(molt_logs) >= 2:
+    if len(molt_logs) >= 3:
         intervals = []
         for i in range(len(molt_logs) - 1):
             if molt_logs[i].molted_at and molt_logs[i + 1].molted_at:
@@ -78,10 +83,26 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
     if average_molt_interval and days_since_last_molt is not None:
         molt_interval_progress = (days_since_last_molt / average_molt_interval) * 100
 
-    # Calculate recent refusal streak (consecutive refusals from most recent backwards)
+    # Calculate recent refusal streak (consecutive refusals from most
+    # recent backwards). Refusals older than the cutoff don't count —
+    # the cutoff is the later of (60 days ago) or (last molt date),
+    # because:
+    #   - refusals older than ~2 months are too stale to indicate
+    #     current premolt state (the spider has probably moved on), and
+    #   - refusals from before the last logged molt are definitionally
+    #     obsolete — the spider has since molted.
+    # Without this bound, a keeper who logged 3 refusals six months ago
+    # and hasn't tried feeding since would see "3 refusals → likely
+    # premolt" today, which is misleading.
     recent_refusal_streak = 0
     if feeding_logs:
+        refusal_cutoff = datetime.now(timezone.utc) - timedelta(days=60)
+        if molt_logs and molt_logs[0].molted_at and molt_logs[0].molted_at > refusal_cutoff:
+            refusal_cutoff = molt_logs[0].molted_at
+
         for feeding in feeding_logs:
+            if feeding.fed_at and feeding.fed_at < refusal_cutoff:
+                break  # Too old to count toward current streak
             if not feeding.accepted:
                 recent_refusal_streak += 1
             else:
@@ -99,15 +120,29 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
         else:
             refusal_rate_last_30_days = 0.0
 
-    # Determine if premolt is likely
+    # Determine if premolt is likely. Three branches:
+    #   1. Strong behavioral signal: 3+ recent consecutive refusals.
+    #   2. Moderate behavioral + temporal signal: 2+ refusals AND >60%
+    #      through the average molt interval.
+    #   3. Temporal-only signal (new): spider is meaningfully overdue
+    #      (>110% of average, and at least 30 days since last molt)
+    #      with no refusals logged. Some adults — particularly stockier
+    #      New World females — eat right through premolt, so a strong
+    #      interval signal with no refusals is still informative.
     is_premolt_likely = False
     if recent_refusal_streak >= 3:
         is_premolt_likely = True
     elif (recent_refusal_streak >= 2 and molt_interval_progress
           and molt_interval_progress >= 60):
         is_premolt_likely = True
+    elif (molt_interval_progress and molt_interval_progress >= 110
+          and days_since_last_molt is not None and days_since_last_molt > 30):
+        is_premolt_likely = True
 
-    # Determine confidence level
+    # Determine confidence level. Refusal + high progress → high.
+    # Refusal + moderate progress → medium. Overdue-only (no refusals)
+    # → low, because adult eat-through-premolt behavior is common but
+    # not universal.
     confidence = "low"
     if recent_refusal_streak >= 3 and molt_interval_progress and molt_interval_progress >= 80:
         confidence = "high"
