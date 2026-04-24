@@ -18,6 +18,7 @@ import { useAuth, isGoogleSignInAvailable } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { apiClient } from '../src/services/api';
 import GoogleLogo from '../src/components/GoogleLogo';
+import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
 
 interface ReferrerInfo {
   valid: boolean;
@@ -52,6 +53,16 @@ export default function RegisterScreen() {
       validateReferralCode(params.ref);
     }
   }, [params.ref]);
+
+  // Fire a warmup ping on mount so by the time the user fills the form
+  // and hits Register, the Render container is already hot.
+  useEffect(() => {
+    warmupApi();
+  }, []);
+
+  // Show a "Waking up server…" hint if any auth request takes >3s.
+  const anyRegisterPending = loading || oauthLoading !== null;
+  const showColdStartHint = useColdStartIndicator(anyRegisterPending, 3000);
 
   const validateReferralCode = async (code: string) => {
     if (!code || code.length < 8) {
@@ -474,6 +485,28 @@ export default function RegisterScreen() {
                 <Text style={styles.buttonText}>Create Account</Text>
               )}
             </TouchableOpacity>
+
+            {showColdStartHint && (
+              <View
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  backgroundColor: colors.primary + '15',
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: colors.primary + '40',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+                accessibilityLiveRegion="polite"
+              >
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+                  Waking up our server — this can take 20-30 seconds if it's been idle. Hang tight!
+                </Text>
+              </View>
+            )}
 
             {/* Divider */}
             <View style={styles.divider}>

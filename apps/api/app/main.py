@@ -312,8 +312,30 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
+    """Detailed health check.
+
+    Exercises the DB connection pool so the warmup cron and uptime
+    monitors catch a broken database even when the container itself
+    is up. Returns 200 even if the DB ping fails — we want external
+    pings to still wake the container — but we surface the failure
+    in the response body so monitoring can alert on `database != ok`.
+    """
+    from sqlalchemy import text
+    from app.database import SessionLocal
+
+    db_status = "ok"
+    db = SessionLocal()
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001 — surface any DB issue
+        # Don't raise — we want cold-start pings to still return 200
+        # so the GitHub Actions warmup doesn't fail every cycle when
+        # the DB is reconnecting. The response body tells us what's up.
+        db_status = f"error: {type(exc).__name__}"
+    finally:
+        db.close()
+
     return {
         "status": "healthy",
-        "database": "connected",  # TODO: Add actual DB health check
+        "database": db_status,
     }

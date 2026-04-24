@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuth, isGoogleSignInAvailable } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import GoogleLogo from '../src/components/GoogleLogo';
+import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -24,6 +25,17 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
+
+  // Kick the Render container awake the moment this screen mounts. By the
+  // time the user finishes typing credentials, the API is likely warm and
+  // their login request hits an already-hot worker.
+  useEffect(() => {
+    warmupApi();
+  }, []);
+
+  // Surface "Waking up server…" messaging if any auth request takes >3s.
+  const anyAuthPending = loading || oauthLoading !== null;
+  const showColdStartHint = useColdStartIndicator(anyAuthPending, 3000);
 
   const handleLogin = async () => {
     const trimmedEmail = email.trim();
@@ -172,6 +184,23 @@ export default function LoginScreen() {
       height: 50,
       marginBottom: 12,
     },
+    warmingHint: {
+      marginTop: 12,
+      padding: 12,
+      backgroundColor: colors.primary + '15',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.primary + '40',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    warmingText: {
+      flex: 1,
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 18,
+    },
   });
 
   return (
@@ -216,6 +245,15 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>Login</Text>
             )}
           </TouchableOpacity>
+
+          {showColdStartHint && (
+            <View style={styles.warmingHint} accessibilityLiveRegion="polite">
+              <ActivityIndicator color={colors.primary} size="small" />
+              <Text style={styles.warmingText}>
+                Waking up our server — this can take 20-30 seconds if it's been idle. Hang tight!
+              </Text>
+            </View>
+          )}
 
           <TouchableOpacity
             style={styles.linkButton}

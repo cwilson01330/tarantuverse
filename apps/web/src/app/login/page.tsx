@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
+import { warmupApi, useColdStartIndicator } from '@/lib/cold-start'
 
 function LoginForm() {
   const router = useRouter()
@@ -17,6 +18,16 @@ function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [showResend, setShowResend] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
+
+  // Kick the Render container awake the moment the login page loads so
+  // the first real request hits a warm worker. Keeps first-visit logins
+  // from hanging for 20-30 seconds.
+  useEffect(() => {
+    warmupApi()
+  }, [])
+
+  // If login takes >3s, surface a friendly "waking up server" message.
+  const showColdStartHint = useColdStartIndicator(loading, 3000)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -136,6 +147,27 @@ function LoginForm() {
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
+
+          {showColdStartHint && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-3 flex items-start gap-3 rounded-xl border border-primary-500/40 bg-primary-500/10 p-3 text-sm text-theme-secondary"
+            >
+              <svg
+                className="mt-0.5 h-4 w-4 flex-shrink-0 animate-spin text-primary-500"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              <span>
+                Waking up our server — this can take 20-30 seconds if it's been idle. Hang tight!
+              </span>
+            </div>
+          )}
         </form>
 
         <p className="mt-6 text-center text-sm text-theme-secondary">
