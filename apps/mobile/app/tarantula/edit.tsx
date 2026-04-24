@@ -36,6 +36,10 @@ interface TarantulaData {
   water_dish?: boolean;
   misting_schedule?: string;
   notes?: string;
+  // Per-tarantula visibility on the keeper's public profile.
+  // `public` shows this tarantula to visitors when the owner's
+  // profile is public; `private` hides it.
+  visibility?: 'public' | 'private';
 }
 
 export default function EditTarantulaScreen() {
@@ -65,6 +69,7 @@ export default function EditTarantulaScreen() {
     water_dish: undefined,
     misting_schedule: undefined,
     notes: undefined,
+    visibility: 'public',
   });
 
   useEffect(() => {
@@ -95,6 +100,7 @@ export default function EditTarantulaScreen() {
         water_dish: data.water_dish,
         misting_schedule: data.misting_schedule,
         notes: data.notes,
+        visibility: data.visibility === 'private' ? 'private' : 'public',
       });
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load tarantula details');
@@ -427,6 +433,38 @@ export default function EditTarantulaScreen() {
               textAlignVertical="top"
             />
           </View>
+        </View>
+
+        {/* Visibility — mirrors the web edit form. Only meaningful when
+            the keeper's profile is public; private-profile owners are
+            already fully hidden via the profile-level gate. */}
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Profile visibility</Text>
+          <TouchableOpacity
+            style={styles.checkboxRow}
+            onPress={() =>
+              setFormData({
+                ...formData,
+                visibility: formData.visibility === 'private' ? 'public' : 'private',
+              })
+            }
+          >
+            <View style={[styles.checkbox, { borderColor: colors.border }]}>
+              {formData.visibility === 'private' && (
+                <MaterialCommunityIcons name="check" size={18} color={colors.primary} />
+              )}
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={[styles.checkboxLabel, { color: colors.textPrimary }]}>
+                Hide from my public profile
+              </Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, lineHeight: 18 }}>
+                Other keepers won&apos;t see this tarantula when viewing your
+                profile. Only matters when your collection is public — private
+                collections hide everything automatically.
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={{ height: 40 }} />

@@ -47,6 +47,12 @@ export default function EditTarantulaPage() {
     misting_schedule: '',
     last_enclosure_cleaning: '',
     enclosure_notes: '',
+    // Per-tarantula visibility on the keeper's public profile. `public`
+    // shows this tarantula to visitors when the owner's profile is
+    // public; `private` hides this individual tarantula even on a
+    // public profile. Defaults to 'public' in the form; overridden
+    // by the API response on load.
+    visibility: 'public' as 'public' | 'private',
   })
   const [selectedSpecies, setSelectedSpecies] = useState<SelectedSpecies | null>(null)
   const [error, setError] = useState('')
@@ -103,6 +109,7 @@ export default function EditTarantulaPage() {
         misting_schedule: data.misting_schedule || '',
         last_enclosure_cleaning: data.last_enclosure_cleaning || '',
         enclosure_notes: data.enclosure_notes || '',
+        visibility: data.visibility === 'private' ? 'private' : 'public',
       })
       // If species_id exists, we could optionally fetch and set selectedSpecies
       // but it's not necessary for the form to work
@@ -163,6 +170,7 @@ export default function EditTarantulaPage() {
         misting_schedule: formData.misting_schedule || null,
         last_enclosure_cleaning: formData.last_enclosure_cleaning || null,
         enclosure_notes: formData.enclosure_notes || null,
+        visibility: formData.visibility,
       }
 
       const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
@@ -502,6 +510,34 @@ export default function EditTarantulaPage() {
               className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="Any additional information about this tarantula..."
             />
+          </div>
+
+          {/* Per-tarantula visibility. Only meaningful when the keeper's
+              profile is public — on a private profile, the profile-level
+              gate already hides every tarantula regardless of this
+              setting. Copy is written to explain that relationship. */}
+          <div className="rounded-xl border border-theme bg-surface p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.visibility === 'private'}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    visibility: e.target.checked ? 'private' : 'public',
+                  })
+                }
+                className="mt-1 w-4 h-4 text-blue-600 border-theme rounded focus:ring-blue-500"
+              />
+              <div>
+                <span className="block text-sm font-medium">Hide from my public profile</span>
+                <span className="block text-xs text-theme-tertiary mt-0.5">
+                  Other keepers won&apos;t see this tarantula when viewing your
+                  profile. Only relevant when your collection is set to public
+                  — private collections are always fully hidden.
+                </span>
+              </div>
+            </label>
           </div>
 
           <div className="flex gap-4">
