@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000';
@@ -26,7 +27,7 @@ interface ForumCategory {
   post_count: number;
 }
 
-export default function ForumsScreen() {
+function ForumsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [categories, setCategories] = useState<ForumCategory[]>([]);
@@ -293,3 +294,5 @@ const styles = StyleSheet.create({
     marginLeft: 5,
   },
 });
+
+export default withErrorBoundary(ForumsScreen, 'forums');

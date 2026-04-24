@@ -20,6 +20,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import TarantulaCardSkeleton from '../../src/components/TarantulaCardSkeleton';
 import PremoltAlertCard from '../../src/components/PremoltAlertCard';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 
 interface Tarantula {
   id: string;
@@ -55,7 +56,7 @@ interface CollectionStats {
   };
 }
 
-export default function CollectionScreen() {
+function CollectionScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
@@ -1149,3 +1150,5 @@ export default function CollectionScreen() {
     </View>
   );
 }
+
+export default withErrorBoundary(CollectionScreen, 'collection');

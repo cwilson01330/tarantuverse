@@ -18,6 +18,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 
 const WalkthroughableView = walkthroughable(View);
 
@@ -57,7 +58,7 @@ interface Enclosure {
   enclosure_type: string | null;
 }
 
-export default function DashboardHubWrapper() {
+function DashboardHubWrapper() {
   const { colors } = useTheme();
   return (
     <CopilotProvider
@@ -908,3 +909,5 @@ function DashboardHubScreen() {
     </View>
   );
 }
+
+export default withErrorBoundary(DashboardHubWrapper, 'dashboard');

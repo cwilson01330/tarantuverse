@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { KeeperCardSkeleton, CategoryCardSkeleton } from '../../src/components/CommunitySkeletons';
 import ActivityFeedItem, { ActivityFeedItemData } from '../../src/components/ActivityFeedItem';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Keeper {
@@ -33,7 +34,7 @@ interface ForumCategory {
   updated_at: string;
 }
 
-export default function CommunityScreen() {
+function CommunityScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [keepers, setKeepers] = useState<Keeper[]>([]);
@@ -696,3 +697,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export default withErrorBoundary(CommunityScreen, 'community');

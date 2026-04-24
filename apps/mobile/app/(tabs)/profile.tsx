@@ -8,8 +8,9 @@ import { useCallback, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../../src/services/api';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 
-export default function ProfileScreen() {
+function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
   const { theme, toggleTheme, colors } = useTheme();
   const router = useRouter();
@@ -752,4 +753,6 @@ export default function ProfileScreen() {
     </ScrollView>
   );
 }
+
+export default withErrorBoundary(ProfileScreen, 'profile');
 
