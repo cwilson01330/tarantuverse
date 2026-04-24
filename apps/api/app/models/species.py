@@ -67,6 +67,17 @@ class Species(Base):
     urticating_hairs = Column(Boolean, default=False)
     medically_significant_venom = Column(Boolean, default=False)
 
+    # Extended husbandry fields consumed by Appalachian Tarantulas care sheets.
+    # appalachiantarantulas.com reads the TV species API as its sole source of
+    # truth, and these fields existed in appts's legacy Prisma schema. Keeping
+    # them here means TV admins can edit appts's care sheets from the TV admin
+    # panel, and any species we add via seed gets a complete care sheet on
+    # both surfaces without a sync step.
+    venom_potency = Column(String(50))  # "Mild", "Moderate", "Medically Significant"
+    lifespan_male = Column(String(50))  # e.g., "4-7 years"
+    lifespan_female = Column(String(50))  # e.g., "20-30 years"
+    activity_level = Column(String(50))  # "Pet Rock", "Low", "Moderate", "High"
+
     # Documentation
     care_guide = Column(Text)  # Markdown formatted care guide
     image_url = Column(String(500))

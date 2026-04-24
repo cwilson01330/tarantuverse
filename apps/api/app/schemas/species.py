@@ -47,6 +47,15 @@ class SpeciesBase(BaseModel):
     urticating_hairs: bool = True  # New World tarantulas
     medically_significant_venom: bool = False  # Old World arboreals
 
+    # Extended care-sheet fields surfaced to the Appalachian Tarantulas
+    # (appts) site, which reads this API as its sole source of truth for
+    # care sheets. All optional — existing species rows with NULL values
+    # just render those sections as blank on appts's detail page.
+    venom_potency: Optional[str] = Field(None, max_length=50)
+    lifespan_male: Optional[str] = Field(None, max_length=50)
+    lifespan_female: Optional[str] = Field(None, max_length=50)
+    activity_level: Optional[str] = Field(None, max_length=50)
+
     # Documentation
     care_guide: Optional[str] = None
     image_url: Optional[str] = None
@@ -88,6 +97,10 @@ class SpeciesUpdate(BaseModel):
     burrowing: Optional[bool] = None
     urticating_hairs: Optional[bool] = None
     medically_significant_venom: Optional[bool] = None
+    venom_potency: Optional[str] = None
+    lifespan_male: Optional[str] = None
+    lifespan_female: Optional[str] = None
+    activity_level: Optional[str] = None
     care_guide: Optional[str] = None
     image_url: Optional[str] = None
     source_url: Optional[str] = None
