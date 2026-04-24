@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useSubscription } from '@/hooks/useSubscription'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
+import { formatLocalDate } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -325,7 +326,7 @@ export default function BreedingPage() {
                     <div key={pairing.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">Paired: {new Date(pairing.paired_date).toLocaleDateString()}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Paired: {formatLocalDate(pairing.paired_date)}</p>
                           <p className="text-sm text-gray-900 dark:text-white">Type: <span className="capitalize">{pairing.pairing_type}</span></p>
                           <p className="text-sm text-gray-900 dark:text-white">Outcome: <span className="capitalize">{pairing.outcome}</span></p>
                           {pairing.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{pairing.notes}</p>}
@@ -356,10 +357,10 @@ export default function BreedingPage() {
                 <div className="space-y-4">
                   {eggSacs.map((sac) => (
                     <div key={sac.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Laid: {new Date(sac.laid_date).toLocaleDateString()}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Laid: {formatLocalDate(sac.laid_date)}</p>
                       {sac.spiderling_count && <p className="text-sm text-gray-900 dark:text-white">Count: {sac.spiderling_count} spiderlings</p>}
                       {sac.viable_count && <p className="text-sm text-gray-900 dark:text-white">Viable: {sac.viable_count}</p>}
-                      {sac.hatch_date && <p className="text-sm text-gray-600 dark:text-gray-400">Hatched: {new Date(sac.hatch_date).toLocaleDateString()}</p>}
+                      {sac.hatch_date && <p className="text-sm text-gray-600 dark:text-gray-400">Hatched: {formatLocalDate(sac.hatch_date)}</p>}
                       {sac.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{sac.notes}</p>}
                     </div>
                   ))}
@@ -387,7 +388,7 @@ export default function BreedingPage() {
                   {offspring.map((child) => (
                     <div key={child.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
                       <p className="text-sm text-gray-900 dark:text-white">Status: <span className="capitalize">{child.status.replace('_', ' ')}</span></p>
-                      {child.status_date && <p className="text-sm text-gray-600 dark:text-gray-400">{new Date(child.status_date).toLocaleDateString()}</p>}
+                      {child.status_date && <p className="text-sm text-gray-600 dark:text-gray-400">{formatLocalDate(child.status_date)}</p>}
                       {child.price_sold && <p className="text-sm text-gray-900 dark:text-white">Sold for: ${child.price_sold}</p>}
                       {child.buyer_info && <p className="text-sm text-gray-600 dark:text-gray-400">Buyer: {child.buyer_info}</p>}
                       {child.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{child.notes}</p>}

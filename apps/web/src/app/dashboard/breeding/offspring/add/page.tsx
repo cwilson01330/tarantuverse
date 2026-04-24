@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
+import { formatLocalDate } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -203,7 +204,7 @@ export default function AddOffspringPage() {
                 <option value="">Select an egg sac...</option>
                 {eggSacs.map((sac) => (
                   <option key={sac.id} value={sac.id}>
-                    {new Date(sac.laid_date).toLocaleDateString()} {sac.spiderling_count ? `(${sac.spiderling_count} spiderlings)` : ''}
+                    {formatLocalDate(sac.laid_date)} {sac.spiderling_count ? `(${sac.spiderling_count} spiderlings)` : ''}
                   </option>
                 ))}
               </select>

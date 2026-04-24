@@ -659,8 +659,23 @@ export default function EnclosureDetailPage() {
                       </p>
                     </div>
                     {t.sex && (
-                      <span className={`text-lg shrink-0 ${t.sex === 'female' ? 'text-pink-500' : 'text-blue-500'}`}>
-                        {t.sex === 'female' ? '♀' : '♂'}
+                      <span
+                        className={`text-lg shrink-0 ${
+                          t.sex === 'female'
+                            ? 'text-pink-500'
+                            : t.sex === 'male'
+                              ? 'text-blue-500'
+                              : 'text-gray-400'
+                        }`}
+                        aria-label={
+                          t.sex === 'female'
+                            ? 'Female'
+                            : t.sex === 'male'
+                              ? 'Male'
+                              : 'Unknown sex'
+                        }
+                      >
+                        {t.sex === 'female' ? '♀' : t.sex === 'male' ? '♂' : '?'}
                       </span>
                     )}
                     <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

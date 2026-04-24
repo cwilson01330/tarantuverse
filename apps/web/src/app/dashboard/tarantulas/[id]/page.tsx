@@ -1873,13 +1873,13 @@ export default function TarantulaDetailPage() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-12">
                             <div>
                               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Paired Date</p>
-                              <p className="text-sm text-gray-900 dark:text-white">{new Date(pairing.paired_date).toLocaleDateString()}</p>
+                              <p className="text-sm text-gray-900 dark:text-white">{formatLocalDate(pairing.paired_date)}</p>
                             </div>
 
                             {pairing.separated_date && (
                               <div>
                                 <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Separated Date</p>
-                                <p className="text-sm text-gray-900 dark:text-white">{new Date(pairing.separated_date).toLocaleDateString()}</p>
+                                <p className="text-sm text-gray-900 dark:text-white">{formatLocalDate(pairing.separated_date)}</p>
                               </div>
                             )}
 
