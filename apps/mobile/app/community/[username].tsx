@@ -34,6 +34,12 @@ interface KeeperProfile {
 interface Tarantula {
   id: string;
   name: string;
+  // The keeper collection endpoint returns full TarantulaResponse, so
+  // common_name and scientific_name are both available here. We use
+  // them as fallbacks when pet name is missing — otherwise the card
+  // would render as a blank title with just the sex badge.
+  common_name?: string;
+  scientific_name?: string;
   species_name?: string;
   sex?: string;
   photo_url?: string;
@@ -1143,12 +1149,32 @@ export default function KeeperProfileScreen() {
                       )}
                     </View>
                     <View style={styles.tarantulaInfo}>
-                      <Text style={styles.tarantulaName} numberOfLines={1}>{tarantula.name}</Text>
-                      {tarantula.species_name && (
-                        <Text style={styles.tarantulaSpecies} numberOfLines={1}>
-                          {tarantula.species_name}
-                        </Text>
-                      )}
+                      {/* Title fallback chain: pet name -> common name
+                          -> scientific name -> "Unnamed". This way a
+                          nameless sling still shows its species in the
+                          primary slot instead of rendering an empty
+                          row next to the sex badge. */}
+                      <Text style={styles.tarantulaName} numberOfLines={1}>
+                        {tarantula.name ||
+                          tarantula.common_name ||
+                          tarantula.scientific_name ||
+                          tarantula.species_name ||
+                          'Unnamed'}
+                      </Text>
+                      {/* Secondary line: show the species only when it
+                          adds information (i.e., pet name is set and
+                          the species differs). Otherwise we'd be
+                          rendering the same string twice. */}
+                      {tarantula.name &&
+                        (tarantula.common_name ||
+                          tarantula.scientific_name ||
+                          tarantula.species_name) && (
+                          <Text style={styles.tarantulaSpecies} numberOfLines={1}>
+                            {tarantula.common_name ||
+                              tarantula.scientific_name ||
+                              tarantula.species_name}
+                          </Text>
+                        )}
                       {tarantula.age_months !== undefined && (
                         <View style={styles.tarantulaMeta}>
                           <View style={styles.ageBadge}>
