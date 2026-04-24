@@ -153,6 +153,44 @@ export default function PublicTarantulaProfile() {
       )
     : null
 
+  // Calculate age label from date_acquired. We treat this as a local
+  // date to avoid the UTC rewind we fixed elsewhere — the value is a
+  // pure "YYYY-MM-DD" from the backend.
+  let ageLabel: string | null = null
+  if (t.date_acquired) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t.date_acquired)
+    if (m) {
+      const [, y, mo, d] = m
+      const acquired = new Date(Number(y), Number(mo) - 1, Number(d))
+      const days = Math.floor((Date.now() - acquired.getTime()) / (1000 * 60 * 60 * 24))
+      if (days < 30) ageLabel = `${days}d kept`
+      else if (days < 365) ageLabel = `${Math.floor(days / 30)}mo kept`
+      else {
+        const years = (days / 365).toFixed(1).replace('.0', '')
+        ageLabel = `${years}y kept`
+      }
+    }
+  }
+
+  // Most recent molt's leg-span, if the keeper logged one.
+  const latestMolt = profile.molt_timeline[0]
+  const legSpan = latestMolt?.leg_span_after
+    ? `${latestMolt.leg_span_after}" leg span`
+    : null
+
+  // Type from species catalog (terrestrial / arboreal / fossorial).
+  const habitatType = profile.species?.type
+    ? profile.species.type.charAt(0).toUpperCase() + profile.species.type.slice(1)
+    : null
+
+  const sexPill = t.sex
+    ? {
+        label: t.sex.charAt(0).toUpperCase() + t.sex.slice(1),
+        symbol: t.sex === 'female' ? '♀' : t.sex === 'male' ? '♂' : '?',
+        color: t.sex === 'female' ? '#ec4899' : t.sex === 'male' ? '#3b82f6' : '#9ca3af',
+      }
+    : null
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Header */}
@@ -168,68 +206,251 @@ export default function PublicTarantulaProfile() {
         </TouchableOpacity>
       </View>
 
-      {/* Main Photo */}
-      {t.photo_url && (
-        <Image
-          source={{ uri: t.photo_url }}
-          style={{ width: '100%', height: 300 }}
-          resizeMode="cover"
-        />
-      )}
+      {/* Hero — main photo with name overlaid for better first impression */}
+      <View style={{ position: 'relative' }}>
+        {t.photo_url ? (
+          <Image
+            source={{ uri: t.photo_url }}
+            style={{ width: '100%', height: 320 }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View
+            style={{
+              width: '100%',
+              height: 240,
+              backgroundColor: theme.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ fontSize: 80 }}>🕷️</Text>
+          </View>
+        )}
+        {/* Gradient overlay + title. Pure RN LinearGradient import adds
+            weight; a layered semi-transparent View keeps the binary
+            smaller and still reads well in dark mode. */}
+        {t.photo_url && (
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 140,
+              backgroundColor: 'rgba(0,0,0,0.55)',
+            }}
+          />
+        )}
+        <View style={{ position: 'absolute', left: 16, right: 16, bottom: 16 }}>
+          <Text
+            style={{
+              fontSize: 30,
+              fontWeight: '800',
+              color: t.photo_url ? '#fff' : theme.textPrimary,
+              marginBottom: 2,
+            }}
+          >
+            {t.name || t.common_name || 'Tarantula'}
+          </Text>
+          {t.common_name && t.name !== t.common_name && (
+            <Text
+              style={{
+                fontSize: 15,
+                color: t.photo_url ? 'rgba(255,255,255,0.85)' : theme.textSecondary,
+              }}
+            >
+              {t.common_name}
+            </Text>
+          )}
+          {t.scientific_name && (
+            <Text
+              style={{
+                fontSize: 13,
+                fontStyle: 'italic',
+                color: t.photo_url ? 'rgba(255,255,255,0.7)' : theme.textTertiary,
+                marginTop: 2,
+              }}
+            >
+              {t.scientific_name}
+            </Text>
+          )}
+        </View>
+      </View>
 
-      {/* Tarantula Info Card */}
-      <View style={{ padding: 16 }}>
-        <Text style={{ fontSize: 28, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 4 }}>
-          {t.name}
-        </Text>
-        {t.common_name && (
-          <Text style={{ fontSize: 16, color: theme.textSecondary, marginBottom: 16 }}>
-            {t.common_name}
+      {/* Quick Facts — glanceable stats in a single card. Replaces the
+          old scattered "Sex / Acquired" rows with everything a visitor
+          needs up front: sex, age, habitat type, and latest leg-span. */}
+      <View style={{ paddingHorizontal: 16, marginTop: 16, marginBottom: 16 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 10,
+          }}
+        >
+          {sexPill && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 999,
+                backgroundColor: sexPill.color + '22',
+                borderWidth: 1,
+                borderColor: sexPill.color + '55',
+              }}
+            >
+              <Text style={{ fontSize: 16, color: sexPill.color, fontWeight: '800' }}>
+                {sexPill.symbol}
+              </Text>
+              <Text style={{ fontSize: 13, color: sexPill.color, fontWeight: '700' }}>
+                {sexPill.label}
+              </Text>
+            </View>
+          )}
+          {ageLabel && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 999,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}
+            >
+              <Text style={{ fontSize: 14 }}>📅</Text>
+              <Text style={{ fontSize: 13, color: theme.textPrimary, fontWeight: '600' }}>
+                {ageLabel}
+              </Text>
+            </View>
+          )}
+          {habitatType && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 999,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}
+            >
+              <Text style={{ fontSize: 14 }}>🌿</Text>
+              <Text style={{ fontSize: 13, color: theme.textPrimary, fontWeight: '600' }}>
+                {habitatType}
+              </Text>
+            </View>
+          )}
+          {legSpan && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 999,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}
+            >
+              <Text style={{ fontSize: 14 }}>📏</Text>
+              <Text style={{ fontSize: 13, color: theme.textPrimary, fontWeight: '600' }}>
+                {legSpan}
+              </Text>
+            </View>
+          )}
+          {profile.species?.adult_size && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 999,
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}
+            >
+              <Text style={{ fontSize: 14 }}>📐</Text>
+              <Text style={{ fontSize: 13, color: theme.textPrimary, fontWeight: '600' }}>
+                Adult: {profile.species.adult_size}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Owner info — kept but compacted, since the name/scientific
+            moved up into the hero. Also tappable so visitors can jump
+            straight to the keeper's profile. */}
+        {t.date_acquired && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: theme.textTertiary,
+              marginTop: 12,
+            }}
+          >
+            Acquired {formatDate(t.date_acquired)}
           </Text>
         )}
 
-        {/* Quick Info */}
-        <View style={{ marginBottom: 16 }}>
-          {t.sex && (
-            <View style={{ marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>Sex</Text>
-              <Text style={{ fontSize: 16, color: theme.textPrimary, fontWeight: 'bold', textTransform: 'capitalize' }}>
-                {t.sex}
-              </Text>
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            marginTop: 16,
+            paddingTop: 16,
+            borderTopWidth: 1,
+            borderTopColor: theme.border,
+          }}
+          onPress={() => router.push(`/community/${profile.owner.username}` as never)}
+          accessibilityRole="link"
+          accessibilityLabel={`View ${profile.owner.display_name || profile.owner.username}'s profile`}
+        >
+          {profile.owner.avatar_url ? (
+            <Image
+              source={{ uri: profile.owner.avatar_url }}
+              style={{ width: 40, height: 40, borderRadius: 20 }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: theme.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>🕷️</Text>
             </View>
           )}
-          {t.date_acquired && (
-            <View>
-              <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600' }}>Acquired</Text>
-              <Text style={{ fontSize: 16, color: theme.textPrimary, fontWeight: 'bold' }}>
-                {formatDate(t.date_acquired)}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Owner Info */}
-        <View style={{ borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 16 }}>
-          <Text style={{ fontSize: 12, color: theme.textSecondary, fontWeight: '600', marginBottom: 8 }}>
-            Keeper
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            {profile.owner.avatar_url && (
-              <Image
-                source={{ uri: profile.owner.avatar_url }}
-                style={{ width: 40, height: 40, borderRadius: 20 }}
-              />
-            )}
-            <View>
-              <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textPrimary }}>
-                {profile.owner.display_name || profile.owner.username}
-              </Text>
-              <Text style={{ fontSize: 12, color: theme.textSecondary }}>
-                @{profile.owner.username}
-              </Text>
-            </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, color: theme.textSecondary, fontWeight: '600', marginBottom: 2 }}>
+              KEEPER
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.textPrimary }}>
+              {profile.owner.display_name || profile.owner.username}
+            </Text>
           </View>
-        </View>
+          <Text style={{ fontSize: 18, color: theme.textSecondary }}>›</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Species Info */}
@@ -362,20 +583,55 @@ export default function PublicTarantulaProfile() {
         </View>
       )}
 
-      {/* Photo Gallery */}
+      {/* Photo Gallery — two-column layout with larger tiles and
+          optional captions. The hero photo is the first photo when
+          the owner hasn't designated a different profile photo, so we
+          keep the full gallery here (including the hero) rather than
+          skipping the first entry. Captions display when present. */}
       {profile.photos.length > 0 && (
         <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.textPrimary, marginBottom: 12 }}>
-            Photo Gallery ({profile.photos.length})
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: 'bold',
+              color: theme.textPrimary,
+              marginBottom: 12,
+            }}
+          >
+            Photos ({profile.photos.length})
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
             {profile.photos.map((photo) => (
-              <Image
+              <View
                 key={photo.id}
-                source={{ uri: photo.thumbnail_url || photo.url }}
-                style={{ width: '32%', aspectRatio: 1, borderRadius: 8 }}
-                resizeMode="cover"
-              />
+                style={{
+                  width: '48.5%',
+                  backgroundColor: theme.surface,
+                  borderRadius: 12,
+                  overflow: 'hidden',
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                }}
+              >
+                <Image
+                  source={{ uri: photo.thumbnail_url || photo.url }}
+                  style={{ width: '100%', aspectRatio: 1 }}
+                  resizeMode="cover"
+                />
+                {photo.caption && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: theme.textSecondary,
+                      padding: 8,
+                      lineHeight: 16,
+                    }}
+                    numberOfLines={2}
+                  >
+                    {photo.caption}
+                  </Text>
+                )}
+              </View>
             ))}
           </View>
         </View>

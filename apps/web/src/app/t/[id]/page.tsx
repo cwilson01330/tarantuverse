@@ -29,6 +29,9 @@ interface SpeciesData {
   urticating_hairs: boolean
   medically_significant_venom: boolean
   image_url: string | null
+  // Optional enrichment the backend may include; rendered in the
+  // Quick Facts pill row when present.
+  adult_size?: string | null
 }
 
 interface ProfileData {
@@ -70,6 +73,24 @@ interface ProfileData {
 
 function daysSince(iso: string): number {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+}
+
+/**
+ * Derive a friendly "how long kept" label from a DATE string. Parses
+ * the "YYYY-MM-DD" value as a local date to dodge the UTC rewind bug
+ * fixed elsewhere in the codebase.
+ */
+function ageLabelFromAcquired(dateAcquired: string | null | undefined): string | null {
+  if (!dateAcquired) return null
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateAcquired)
+  if (!match) return null
+  const [, y, mo, d] = match
+  const acquired = new Date(Number(y), Number(mo) - 1, Number(d))
+  const days = Math.floor((Date.now() - acquired.getTime()) / 86400000)
+  if (days < 30) return `${days}d kept`
+  if (days < 365) return `${Math.floor(days / 30)}mo kept`
+  const years = (days / 365).toFixed(1).replace('.0', '')
+  return `${years}y kept`
 }
 
 function careColor(level: string | null) {
@@ -210,6 +231,39 @@ export default function PublicProfilePage() {
               </div>
             </div>
           </div>
+
+          {/* Quick Facts — glanceable pill row mirroring the mobile
+              public profile. Shows only the stats we actually have
+              data for, so a spider with no molts doesn't render an
+              awkward "— leg span" placeholder. */}
+          {(profile.date_acquired || sp?.type || profile.last_molt?.leg_span_after || sp?.adult_size) && (
+            <div className="flex flex-wrap gap-2">
+              {ageLabelFromAcquired(profile.date_acquired) && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span>📅</span>
+                  {ageLabelFromAcquired(profile.date_acquired)}
+                </span>
+              )}
+              {sp?.type && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                  <span>🌿</span>
+                  {sp.type}
+                </span>
+              )}
+              {profile.last_molt?.leg_span_after && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span>📏</span>
+                  {profile.last_molt.leg_span_after}&quot; leg span
+                </span>
+              )}
+              {sp?.adult_size && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <span>📐</span>
+                  Adult: {sp.adult_size}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Safety badges */}
           {sp && (sp.medically_significant_venom || sp.urticating_hairs) && (
