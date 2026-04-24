@@ -397,38 +397,51 @@ function CollectionScreen() {
           )}
         </View>
         <View style={styles.listContent}>
-          <View style={styles.listHeader}>
-            <Text style={styles.listName} numberOfLines={1}>{displayName}</Text>
-            {item.sex && (
-              <MaterialCommunityIcons
-                name={
-                  item.sex === 'female'
-                    ? 'gender-female'
-                    : item.sex === 'male'
-                      ? 'gender-male'
-                      : 'help-circle-outline'
-                }
-                size={18}
-                color={
-                  item.sex === 'female'
-                    ? '#ec4899'
-                    : item.sex === 'male'
-                      ? '#3b82f6'
-                      : '#9ca3af'
-                }
-                accessibilityLabel={
-                  item.sex === 'female'
-                    ? 'Female'
-                    : item.sex === 'male'
-                      ? 'Male'
-                      : 'Unknown sex'
-                }
-              />
-            )}
-          </View>
+          {/* Text-only column. The sex indicator used to live here, which
+              put it at the name's vertical center (line 1 of 2) while the
+              feeding pill was centered against the whole 50pt row —
+              that mismatch was the "wonky alignment" that made the cards
+              read unprofessional. Now the right-side column owns every
+              indicator so they all land on the same horizontal line. */}
+          <Text style={styles.listName} numberOfLines={1}>{displayName}</Text>
           <Text style={styles.listScientificName} numberOfLines={1}>{item.scientific_name}</Text>
         </View>
         <View style={styles.listBadges}>
+          {/* Sex chip — always rendered so the right edge of every row
+              has a consistent indicator. Same pill chrome as the feeding
+              badge (circular, same height) so they visually rhyme. */}
+          <View
+            style={[
+              styles.sexChip,
+              {
+                backgroundColor:
+                  item.sex === 'female'
+                    ? '#ec489920' // pink tint
+                    : item.sex === 'male'
+                      ? '#3b82f620' // blue tint
+                      : colors.border,
+              },
+            ]}
+            accessibilityLabel={sexLabel}
+          >
+            <MaterialCommunityIcons
+              name={
+                item.sex === 'female'
+                  ? 'gender-female'
+                  : item.sex === 'male'
+                    ? 'gender-male'
+                    : 'help-circle-outline'
+              }
+              size={14}
+              color={
+                item.sex === 'female'
+                  ? '#ec4899'
+                  : item.sex === 'male'
+                    ? '#3b82f6'
+                    : colors.textTertiary
+              }
+            />
+          </View>
           {days !== undefined && (
             <View
               style={[styles.listBadge, { backgroundColor: feedingColor }]}
@@ -876,18 +889,37 @@ function CollectionScreen() {
     },
     listBadges: {
       flexDirection: 'row',
+      alignItems: 'center',
       gap: 6,
       marginRight: 8,
     },
+    // Shared pill dimensions so the sex chip, feeding pill, and any
+    // future badges line up at the same baseline and height. Any badge
+    // in this row should set height:22 to stay on the line.
     listBadge: {
+      height: 22,
+      minWidth: 22,
       paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 10,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     listBadgeText: {
       color: '#fff',
       fontSize: 11,
-      fontWeight: '600',
+      fontWeight: '700',
+      lineHeight: 13,
+    },
+    // Sex chip has the same footprint as listBadge but a tinted
+    // background (rather than saturated) so the saturated feeding pill
+    // stays the attention-grabber. Icon inside is 14pt to read as a
+    // companion, not a peer.
+    sexChip: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     // Stats header with toggle
     statsHeaderRow: {
