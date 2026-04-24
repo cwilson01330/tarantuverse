@@ -116,7 +116,8 @@ export default function SpeciesAutocomplete({ onSelect, initialValue = '', place
                   <span className={`text-xs px-2 py-1 rounded ${
                     species.care_level === 'beginner' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' :
                     species.care_level === 'intermediate' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' :
-                    'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
+                    species.care_level === 'advanced' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400' :
+                    'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
                   }`}>
                     {species.care_level}
                   </span>

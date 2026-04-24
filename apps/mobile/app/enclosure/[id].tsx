@@ -11,12 +11,13 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { AppHeader } from '../../src/components/AppHeader';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { toISODateLocal } from '../../src/utils/date';
 
 interface EnclosureDetail {
   id: string;
@@ -150,6 +151,18 @@ export default function EnclosureDetailScreen() {
     fetchAll();
   }, [id]);
 
+  // Refetch on focus — runs after returning from edit/add/inhabitant
+  // child routes. Without this, mutating the enclosure (renaming, moving
+  // inhabitants in/out, etc.) leaves stale data on screen and the
+  // keeper thinks their save didn't take. Same bug class we hit on the
+  // tarantula detail screen.
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]),
+  );
+
   const fetchAll = async () => {
     await Promise.all([
       fetchEnclosure(),
@@ -279,7 +292,7 @@ export default function EnclosureDetailScreen() {
       await apiClient.post(`/enclosures/${id}/incidents`, {
         incident_type: incidentType,
         severity: SEVERITY_TYPES.includes(incidentType) ? incidentSeverity : null,
-        occurred_at: new Date().toISOString().split('T')[0],
+        occurred_at: toISODateLocal(new Date()),
         description: incidentDescription.trim() || null,
         outcome: incidentOutcome.trim() || null,
       });

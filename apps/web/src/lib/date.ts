@@ -45,6 +45,19 @@ export function formatLocalDate(
 }
 
 /**
+ * Format a local Date as a `YYYY-MM-DD` string for sending to the API.
+ * Avoids the `.toISOString().split('T')[0]` trap, which converts local
+ * → UTC and can flip the day forward when local time is late enough
+ * in the day (e.g., 8pm EST on Mar 4 becomes 2026-03-05Z).
+ */
+export function toISODateLocal(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
  * Whole-day diff between a DATE (or DATETIME) and now, in the keeper's
  * local calendar. Useful for "X days since acquisition" math that
  * previously drifted by the UTC offset.

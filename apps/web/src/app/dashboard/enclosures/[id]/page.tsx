@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
-import { formatLocalDate } from '@/lib/date'
+import { formatLocalDate, toISODateLocal } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -236,7 +236,7 @@ export default function EnclosureDetailPage() {
         body: JSON.stringify({
           incident_type: incidentForm.incident_type,
           severity: SEVERITY_TYPES.includes(incidentForm.incident_type) ? incidentForm.severity : null,
-          occurred_at: new Date().toISOString().split('T')[0],
+          occurred_at: toISODateLocal(new Date()),
           description: incidentForm.description || null,
           outcome: incidentForm.outcome || null,
         }),

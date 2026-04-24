@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
+import { toISODateLocal } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -28,7 +29,7 @@ export default function AddEggSacPage() {
   // Form state
   const [formData, setFormData] = useState({
     pairing_id: '',
-    laid_date: new Date().toISOString().split('T')[0],
+    laid_date: toISODateLocal(new Date()),
     pulled_date: '',
     hatch_date: '',
     incubation_temp_min: '',

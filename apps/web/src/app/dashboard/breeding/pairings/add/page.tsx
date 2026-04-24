@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
+import { toISODateLocal } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -28,7 +29,7 @@ export default function AddPairingPage() {
   const [formData, setFormData] = useState({
     male_id: '',
     female_id: '',
-    paired_date: new Date().toISOString().split('T')[0],
+    paired_date: toISODateLocal(new Date()),
     separated_date: '',
     pairing_type: 'natural',
     outcome: 'in_progress',
