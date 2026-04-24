@@ -229,11 +229,18 @@ def validate_receipt(
     """
     # Map product IDs to subscription plans
     # All premium products map to the "premium" plan (monthly/yearly/lifetime are billing periods)
+    # iOS App Store Connect uses the `.v2` suffix on the monthly and yearly
+    # products (both approved 2026-04 — Tarantuverse Premium Group). Android
+    # products keep the original IDs. Any new platform IDs added on App
+    # Store Connect MUST be added to both maps below or receipt validation
+    # will reject the purchase with a 400 and the user will be charged by
+    # Apple without getting premium access.
     product_to_plan_map = {
         "com.tarantuverse.premium.monthly": "premium",
-        "com.tarantuverse.premium.monthly.v2": "premium",  # New iOS product ID
+        "com.tarantuverse.premium.monthly.v2": "premium",   # iOS monthly
         "com.tarantuverse.premium.yearly": "premium",
-        "com.tarantuverse.lifetime": "premium"
+        "com.tarantuverse.premium.yearly.v2": "premium",    # iOS yearly
+        "com.tarantuverse.lifetime": "premium",
     }
 
     # Determine billing period for expiry calculation
@@ -241,7 +248,8 @@ def validate_receipt(
         "com.tarantuverse.premium.monthly": "monthly",
         "com.tarantuverse.premium.monthly.v2": "monthly",
         "com.tarantuverse.premium.yearly": "yearly",
-        "com.tarantuverse.lifetime": "lifetime"
+        "com.tarantuverse.premium.yearly.v2": "yearly",
+        "com.tarantuverse.lifetime": "lifetime",
     }
 
     plan_name = product_to_plan_map.get(receipt_data.product_id)

@@ -27,13 +27,20 @@ const getIAP = async () => {
   return ExpoIAP;
 };
 
-// Product IDs (must match App Store Connect)
+// Product IDs (must match App Store Connect / Google Play Console).
+// Apple approved both monthly and yearly v2 products — listing both so
+// the purchase sheet can offer users the yearly tier too. If a new
+// product is added in App Store Connect, add it here AND in the
+// backend product_to_plan_map in subscriptions.py (otherwise the user
+// will be charged by Apple but the backend will reject the receipt).
 export const SUBSCRIPTION_SKUS = Platform.select({
   ios: [
-    'com.tarantuverse.premium.monthly.v2', // Monthly subscription
+    'com.tarantuverse.premium.monthly.v2',
+    'com.tarantuverse.premium.yearly.v2',
   ],
   android: [
     'com.tarantuverse.premium.monthly',
+    'com.tarantuverse.premium.yearly',
   ],
 }) || [];
 
