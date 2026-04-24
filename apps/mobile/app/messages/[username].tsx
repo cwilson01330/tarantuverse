@@ -42,6 +42,15 @@ export default function ConversationScreen() {
   const [blocking, setBlocking] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tracks the last-seen message count so we only auto-scroll when new
+  // messages actually arrive. Without this, every 10s poll creates a new
+  // messages array reference and triggers scrollToEnd, yanking users back
+  // to the bottom while they're scrolled up reading older history.
+  const lastMessageCountRef = useRef(0);
+  // Set when the user scrolls up from the bottom; suppresses auto-scroll
+  // during their reading session even if new messages arrive. Cleared when
+  // they scroll back within ~100px of the bottom or send a message.
+  const userScrolledUpRef = useRef(false);
 
   useEffect(() => {
     if (username) {
@@ -77,14 +86,46 @@ export default function ConversationScreen() {
     return () => subscription.remove();
   }, [username]);
 
+  // Auto-scroll policy:
+  //   1. On first render where messages appear (initial load) — jump to bottom, no animation.
+  //   2. When the count grows AND the user is still pinned near the bottom — smooth scroll.
+  //   3. When the user has scrolled up to read history — do NOT scroll. Respect their position.
+  // Tracking is on the count rather than the array reference so polling
+  // (which creates a new array every 10s even when nothing changed) doesn't
+  // trigger scroll.
   useEffect(() => {
-    scrollToBottom();
+    const count = conversation?.messages.length ?? 0;
+    if (count === 0) {
+      lastMessageCountRef.current = 0;
+      return;
+    }
+
+    const grew = count > lastMessageCountRef.current;
+    const isInitialLoad = lastMessageCountRef.current === 0;
+    lastMessageCountRef.current = count;
+
+    if (isInitialLoad) {
+      scrollToBottom(false);
+    } else if (grew && !userScrolledUpRef.current) {
+      scrollToBottom(true);
+    }
+    // If the user has scrolled up and new messages arrived, we intentionally
+    // leave their view alone. They'll see new messages when they scroll back.
   }, [conversation?.messages]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (animated = true) => {
     setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
+      scrollViewRef.current?.scrollToEnd({ animated });
     }, 100);
+  };
+
+  // Called by ScrollView onScroll. If the user is within ~120px of the
+  // bottom we treat them as "pinned" and re-enable auto-scroll; otherwise
+  // we treat them as actively reading and suppress it.
+  const handleScroll = (e: { nativeEvent: { contentOffset: { y: number }, contentSize: { height: number }, layoutMeasurement: { height: number } } }) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    userScrolledUpRef.current = distanceFromBottom > 120;
   };
 
   const fetchConversation = async (silent = false) => {
@@ -105,20 +146,57 @@ export default function ConversationScreen() {
   };
 
   const handleSend = async () => {
-    if (!newMessage.trim() || sending) return;
+    const trimmed = newMessage.trim();
+    if (!trimmed || sending) return;
+
+    // Optimistic append: show the message in the bubble stream immediately
+    // with a temporary client-side id. Without this the user waits for
+    // POST + 300ms + full conversation GET (~500-1000ms) before seeing
+    // their own message, which feels laggy. We reconcile with the server
+    // on the next fetch: the real message replaces the placeholder.
+    const tempId = `pending-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: tempId,
+      content: trimmed,
+      sender_id: 'me', // placeholder — is_own flag below is what the UI reads
+      is_read: false,
+      created_at: new Date().toISOString(),
+      is_own: true,
+    };
+
+    // Snapshot so we can restore the typed text if the send fails.
+    const previousText = newMessage;
+
+    setConversation((prev) =>
+      prev
+        ? { ...prev, messages: [...prev.messages, optimisticMessage] }
+        : prev,
+    );
+    setNewMessage('');
+    // The user is sending — they definitely want to see their own message
+    // pinned at the bottom, even if they'd previously scrolled up.
+    userScrolledUpRef.current = false;
 
     setSending(true);
     setError('');
     try {
       await apiClient.post('/messages/direct/send', {
         recipient_username: username,
-        content: newMessage,
+        content: trimmed,
       });
 
-      setNewMessage('');
-      // Small delay to let backend commit before fetching
+      // Let the backend commit, then pull the canonical list which will
+      // replace the optimistic entry with the real server-side message.
       setTimeout(() => fetchConversation(true), 300);
     } catch (err: any) {
+      // Rollback the optimistic append so we don't lie about delivery.
+      setConversation((prev) =>
+        prev
+          ? { ...prev, messages: prev.messages.filter((m) => m.id !== tempId) }
+          : prev,
+      );
+      // Restore their typed text so they can retry without retyping.
+      setNewMessage(previousText);
       const message = err.response?.data?.detail || err.message || 'Failed to send message';
       setError(message);
     } finally {
@@ -285,7 +363,10 @@ export default function ConversationScreen() {
           ref={scrollViewRef}
           style={styles.messagesContainer}
           contentContainerStyle={styles.messagesContent}
-          onContentSizeChange={scrollToBottom}
+          onScroll={handleScroll}
+          // 100ms feels instantaneous for the near-bottom pin detection
+          // without saturating the JS thread on every scroll event.
+          scrollEventThrottle={100}
         >
           {error && (
             <View style={styles.errorBanner}>
