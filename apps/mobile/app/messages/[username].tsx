@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActionSheetIOS, AppState } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -30,6 +31,7 @@ export default function ConversationScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const { colors, layout } = useTheme();
+  const insets = useSafeAreaInsets();
   const username = params.username as string;
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -345,11 +347,22 @@ export default function ConversationScreen() {
           headerBackTitle: 'Messages',
           ...headerOptions,
           headerRight: () => (
+            // Explicit width:44/height:44 on a header button causes the
+            // native header-button pill on iOS to offset oddly against
+            // the gradient — the kebab then reads as vertically off.
+            // Using padding-based sizing + hitSlop lets the header center
+            // the icon naturally while still meeting Apple's 44pt hit
+            // target. dots-vertical (MCI) also has a slightly top-heavy
+            // glyph; paddingVertical:8 compensates so the visible dots
+            // land at the vertical midline of the header.
             <TouchableOpacity
               onPress={showActions}
-              style={{ marginRight: 8, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={{ paddingHorizontal: 10, paddingVertical: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Conversation actions"
             >
-              <MaterialCommunityIcons name="dots-vertical" size={24} color={headerTintColor} />
+              <MaterialCommunityIcons name="dots-vertical" size={22} color={headerTintColor} />
             </TouchableOpacity>
           ),
         }}
@@ -420,23 +433,58 @@ export default function ConversationScreen() {
           )}
         </ScrollView>
 
-        {/* Message Input */}
-        <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-          <TextInput
-            style={[styles.textInput, { backgroundColor: colors.background, color: colors.textPrimary }]}
-            placeholder="Type a message..."
-            placeholderTextColor={colors.textTertiary}
-            value={newMessage}
-            onChangeText={setNewMessage}
-            multiline
-            maxLength={1000}
-          />
+        {/*
+          Message input bar.
+          - Bottom padding respects the device's safe-area inset so the
+            home-indicator zone on iOS doesn't swallow the input. Minimum
+            of 12px so Android (inset=0) still has breathing room.
+          - The field itself is a pill inside a floating bar — feels less
+            like a utilitarian form and more like iMessage/Telegram.
+          - Send button is circular and slightly elevated to give the
+            primary action visual weight.
+        */}
+        <View
+          style={[
+            styles.inputContainer,
+            {
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+              paddingBottom: Math.max(insets.bottom, 12),
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.inputPill,
+              {
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <TextInput
+              style={[styles.textInput, { color: colors.textPrimary }]}
+              placeholder="Type a message..."
+              placeholderTextColor={colors.textTertiary}
+              value={newMessage}
+              onChangeText={setNewMessage}
+              multiline
+              maxLength={1000}
+            />
+          </View>
           <TouchableOpacity
-            style={[styles.sendButton, { backgroundColor: colors.primary }, (!newMessage.trim() || sending) && styles.sendButtonDisabled]}
+            style={[
+              styles.sendButton,
+              { backgroundColor: colors.primary },
+              (!newMessage.trim() || sending) && styles.sendButtonDisabled,
+            ]}
             onPress={handleSend}
             disabled={!newMessage.trim() || sending}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityState={{ disabled: !newMessage.trim() || sending }}
           >
-            <MaterialCommunityIcons name="send" size={24} color="white" />
+            <MaterialCommunityIcons name="send" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -469,7 +517,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messagesContent: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    // Extra bottom breathing room so the last bubble doesn't butt up
+    // against the input bar; the bar's shadow gives visual separation
+    // but 8px of gap reinforces the hierarchy.
+    paddingBottom: 8,
   },
   errorBanner: {
     backgroundColor: '#fee2e2',
@@ -543,30 +596,58 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 16,
-    borderTopWidth: 1,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    // paddingBottom is set dynamically from safe-area insets in the JSX
+    // so the home-indicator zone doesn't eat the input on notched iOS.
+    borderTopWidth: StyleSheet.hairlineWidth,
     alignItems: 'flex-end',
+    gap: 8,
+    // Subtle top shadow lifts the input bar off the message list so the
+    // transition from scroll content to input feels intentional, not
+    // like the input is floating directly on top of the dark canvas.
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  textInput: {
+  inputPill: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginRight: 12,
-    fontSize: 15,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: 'rgba(128,128,128,0.2)',
-  },
-  sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
+    paddingVertical: Platform.OS === 'ios' ? 10 : 6,
+    maxHeight: 120,
     justifyContent: 'center',
   },
+  textInput: {
+    fontSize: 15,
+    lineHeight: 20,
+    // No border / padding here — the pill wrapper owns the chrome so
+    // the TextInput just contributes its text metrics. This fixes the
+    // double-border look the previous version had.
+    padding: 0,
+    margin: 0,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Tiny lift so the send action reads as primary.
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+    marginBottom: 2,
+  },
   sendButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   loadingEmoji: {
     fontSize: 64,
