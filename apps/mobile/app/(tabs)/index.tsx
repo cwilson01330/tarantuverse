@@ -58,6 +58,16 @@ interface Enclosure {
   enclosure_type: string | null;
 }
 
+// Mirrors apps/api/app/routers/analytics.py::get_collection_analytics().
+// We only consume total_molts here; keeping the rest of the shape so any
+// future stat we want to surface on the hub is a one-line change.
+interface CollectionStats {
+  total_tarantulas: number;
+  unique_species: number;
+  total_feedings: number;
+  total_molts: number;
+}
+
 function DashboardHubWrapper() {
   const { colors } = useTheme();
   return (
@@ -87,6 +97,7 @@ function DashboardHubScreen() {
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
+  const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tourChecked, setTourChecked] = useState(false);
@@ -135,9 +146,15 @@ function DashboardHubScreen() {
 
   const fetchDashboardData = async () => {
     try {
-      const [tarantulasRes, enclosuresRes] = await Promise.all([
+      // /analytics/collection returns total_molts (and other aggregate
+      // stats) computed server-side. Previously the dashboard derived
+      // a "Total Molts" value from premolt predictions, which is a
+      // completely different quantity — that's what the user reported
+      // as the bug. Now we read the real count.
+      const [tarantulasRes, enclosuresRes, statsRes] = await Promise.all([
         apiClient.get('/tarantulas/').catch(() => null),
         apiClient.get('/enclosures/').catch(() => null),
+        apiClient.get('/analytics/collection').catch(() => null),
       ]);
 
       if (tarantulasRes?.data) {
@@ -148,6 +165,10 @@ function DashboardHubScreen() {
 
       if (enclosuresRes?.data) {
         setEnclosures(enclosuresRes.data);
+      }
+
+      if (statsRes?.data) {
+        setCollectionStats(statsRes.data);
       }
     } catch {
       // Dashboard data fetch failed
@@ -693,10 +714,14 @@ function DashboardHubScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Total Molts */}
+          {/* Total Molts —
+              Reads the real count from /analytics/collection.total_molts.
+              Falls back to '—' when stats haven't loaded yet (vs. '0' which
+              would imply "you've logged zero molts" and look broken on
+              first paint). */}
           <View
             style={styles.statCard}
-            accessibilityLabel={`Premolt tracking: ${Array.from(premoltPredictions.values()).filter(p => p.probability > 0).length} specimens tracked.`}
+            accessibilityLabel={`Total molts logged across your collection: ${collectionStats?.total_molts ?? 0}.`}
           >
             <View style={styles.statIconRow}>
               <PrimaryButton iconBox size={40} style={styles.statIconBox}>
@@ -705,9 +730,9 @@ function DashboardHubScreen() {
               <Text style={styles.statLabel}>Total Molts</Text>
             </View>
             <Text style={styles.statValue}>
-              {Array.from(premoltPredictions.values()).filter(p => p.probability > 0).length || '—'}
+              {collectionStats ? collectionStats.total_molts : '—'}
             </Text>
-            <Text style={styles.statFooter}>Tracked specimens</Text>
+            <Text style={styles.statFooter}>Logged across collection</Text>
           </View>
 
           {/* Premolt Alerts */}

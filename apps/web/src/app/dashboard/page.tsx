@@ -54,6 +54,10 @@ export default function DashboardHub() {
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
   const [enclosures, setEnclosures] = useState<Enclosure[]>([])
+  // Real collection-level aggregate from /analytics/collection. Replaces
+  // the bogus "Total Molts" derivation that was reading premolt predictions
+  // (a count of in-premolt specimens, NOT a count of logged molts).
+  const [collectionStats, setCollectionStats] = useState<{ total_molts: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null)
   const [showWarning, setShowWarning] = useState(true)
@@ -87,12 +91,17 @@ export default function DashboardHub() {
     try {
       const headers = { 'Authorization': `Bearer ${authToken}` }
 
-      // Fetch tarantulas, enclosures, and subscription limits in parallel
-      // Dashboard only surfaces tarantula-purpose enclosures — feeder bins live at /dashboard/feeders
-      const [tarantulasRes, enclosuresRes, limitsRes] = await Promise.all([
+      // Fetch tarantulas, enclosures, subscription limits, and collection
+      // analytics in parallel.
+      // Dashboard only surfaces tarantula-purpose enclosures — feeder bins live at /dashboard/feeders.
+      // /analytics/collection gives us total_molts (server-aggregated) for
+      // the "Total Molts" stat card; pulling it here keeps the dashboard
+      // to a single round-trip for above-the-fold data.
+      const [tarantulasRes, enclosuresRes, limitsRes, statsRes] = await Promise.all([
         fetch(`${API_URL}/api/v1/tarantulas/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/promo-codes/me/limits`, { headers }).catch(() => null),
+        fetch(`${API_URL}/api/v1/analytics/collection`, { headers }).catch(() => null),
       ])
 
       // If the primary fetch returned 401, token is expired — redirect to login
@@ -115,6 +124,10 @@ export default function DashboardHub() {
 
       if (limitsRes?.ok) {
         setSubscriptionLimits(await limitsRes.json())
+      }
+
+      if (statsRes?.ok) {
+        setCollectionStats(await statsRes.json())
       }
     } catch {
       // Dashboard data fetch failed
@@ -392,7 +405,10 @@ export default function DashboardHub() {
             </p>
           </button>
 
-          {/* Recent Molts */}
+          {/* Total Molts — server-aggregated count of all logged molts
+              across the user's collection. Falls back to '—' before stats
+              load (vs '0' which would imply "you've logged none" and look
+              wrong on first paint). */}
           <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center text-2xl shadow-lg">
@@ -401,14 +417,11 @@ export default function DashboardHub() {
               <div>
                 <p className="text-sm text-theme-secondary font-medium">Total Molts</p>
                 <p className="text-3xl font-bold text-theme-primary">
-                  {Array.from(premoltPredictions.values()).length > 0
-                    ? Array.from(premoltPredictions.values()).filter(p => p.probability > 0).length
-                    : '—'
-                  }
+                  {collectionStats ? collectionStats.total_molts : '—'}
                 </p>
               </div>
             </div>
-            <p className="mt-3 text-sm text-theme-tertiary">Tracked specimens</p>
+            <p className="mt-3 text-sm text-theme-tertiary">Logged across collection</p>
           </div>
 
           {/* Premolt Alerts */}
