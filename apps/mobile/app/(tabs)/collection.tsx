@@ -134,11 +134,18 @@ function CollectionScreen() {
 
   const fetchAllFeedingStatuses = async (tarantulasList: Tarantula[]) => {
     const statusMap = new Map<string, FeedingStatus>();
-    
+    // Pass tz offset so days_since_last_feeding reflects calendar days
+    // in the user's zone (otherwise evening feedings flip from "0d" to
+    // "1d" only at UTC midnight, not local midnight).
+    const tzOffset = new Date().getTimezoneOffset();
+
     await Promise.all(
       tarantulasList.map(async (t) => {
         try {
-          const response = await apiClient.get(`/tarantulas/${t.id}/feeding-stats`);
+          const response = await apiClient.get(
+            `/tarantulas/${t.id}/feeding-stats`,
+            { params: { tz_offset_minutes: tzOffset } },
+          );
           statusMap.set(t.id, {
             tarantula_id: t.id,
             days_since_last_feeding: response.data.days_since_last_feeding,

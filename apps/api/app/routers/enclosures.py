@@ -3,7 +3,7 @@ Enclosure routes for communal and solo tarantula setups
 """
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -30,8 +30,20 @@ from app.utils.dependencies import get_current_user
 router = APIRouter()
 
 
-def get_enclosure_with_computed_fields(enclosure: Enclosure, db: Session) -> dict:
-    """Add computed fields to enclosure response"""
+def get_enclosure_with_computed_fields(
+    enclosure: Enclosure,
+    db: Session,
+    tz_offset_minutes: Optional[int] = None,
+) -> dict:
+    """Add computed fields to enclosure response.
+
+    `tz_offset_minutes` controls how `days_since_last_feeding` is computed:
+    when supplied (in JS getTimezoneOffset() form — positive for zones
+    west of UTC), it does a calendar-day diff in the user's local
+    timezone instead of a UTC time-delta floor. Without that, an evening
+    feeding reads as "0 days ago" the next morning — see Brooke-on-EST
+    bug from 2026-04-24.
+    """
     # Get inhabitant count
     inhabitant_count = db.query(Tarantula).filter(
         Tarantula.enclosure_id == enclosure.id
@@ -50,8 +62,18 @@ def get_enclosure_with_computed_fields(enclosure: Enclosure, db: Session) -> dic
         FeedingLog.enclosure_id == enclosure.id
     ).order_by(FeedingLog.fed_at.desc()).first()
     if last_feeding:
-        delta = datetime.now(timezone.utc) - last_feeding.fed_at.replace(tzinfo=timezone.utc)
-        days_since_last_feeding = delta.days
+        now_utc = datetime.now(timezone.utc)
+        # `.replace(tzinfo=...)` is preserved — older rows in this table
+        # were inserted as naive UTC and need the explicit tag for the
+        # subtraction to work.
+        fed_utc = last_feeding.fed_at.replace(tzinfo=timezone.utc)
+        if tz_offset_minutes is not None:
+            local_shift = timedelta(minutes=-tz_offset_minutes)
+            days_since_last_feeding = (
+                (now_utc + local_shift).date() - (fed_utc + local_shift).date()
+            ).days
+        else:
+            days_since_last_feeding = (now_utc - fed_utc).days
 
     return {
         **{c.name: getattr(enclosure, c.name) for c in enclosure.__table__.columns},
@@ -69,6 +91,15 @@ async def get_enclosures(
         None,
         description="Filter by enclosure purpose. 'tarantula' (default collection view) or 'feeder' (feeder bins). Omit to return all.",
         pattern="^(tarantula|feeder|all)$",
+    ),
+    tz_offset_minutes: Optional[int] = Query(
+        None,
+        description=(
+            "User's local timezone offset in minutes (JS getTimezoneOffset "
+            "form: positive west of UTC; EDT=240). When provided, "
+            "days_since_last_feeding is a calendar-day diff in that zone "
+            "instead of a UTC delta. Optional for backwards compat."
+        ),
     ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -95,7 +126,7 @@ async def get_enclosures(
 
     result = []
     for enc in enclosures:
-        data = get_enclosure_with_computed_fields(enc, db)
+        data = get_enclosure_with_computed_fields(enc, db, tz_offset_minutes)
         result.append(EnclosureListResponse(**data))
     return result
 

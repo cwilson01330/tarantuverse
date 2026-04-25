@@ -97,9 +97,12 @@ export default function DashboardHub() {
       // /analytics/collection gives us total_molts (server-aggregated) for
       // the "Total Molts" stat card; pulling it here keeps the dashboard
       // to a single round-trip for above-the-fold data.
+      // Send the browser's TZ offset to endpoints that compute
+      // calendar-day metrics (days_since_last_feeding on enclosures).
+      const tzOffset = new Date().getTimezoneOffset()
       const [tarantulasRes, enclosuresRes, limitsRes, statsRes] = await Promise.all([
         fetch(`${API_URL}/api/v1/tarantulas/`, { headers }).catch(() => null),
-        fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula`, { headers }).catch(() => null),
+        fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula&tz_offset_minutes=${tzOffset}`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/promo-codes/me/limits`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/analytics/collection`, { headers }).catch(() => null),
       ])
@@ -138,12 +141,18 @@ export default function DashboardHub() {
 
   const fetchAllFeedingStatuses = async (authToken: string, tarantulasList: Tarantula[]) => {
     const statusMap = new Map<string, FeedingStatus>()
+    // Pass the browser's local TZ offset so the server computes
+    // days_since_last_feeding as a calendar-day diff in the user's
+    // zone. Without it, evening feedings show as "0 days ago" the
+    // next morning until UTC midnight rolls over (Brooke-on-EST bug).
+    const tzOffset = new Date().getTimezoneOffset()
     await Promise.all(
       tarantulasList.map(async (t) => {
         try {
-          const response = await fetch(`${API_URL}/api/v1/tarantulas/${t.id}/feeding-stats`, {
-            headers: { 'Authorization': `Bearer ${authToken}` },
-          })
+          const response = await fetch(
+            `${API_URL}/api/v1/tarantulas/${t.id}/feeding-stats?tz_offset_minutes=${tzOffset}`,
+            { headers: { 'Authorization': `Bearer ${authToken}` } },
+          )
           if (response.ok) {
             const data = await response.json()
             statusMap.set(t.id, {

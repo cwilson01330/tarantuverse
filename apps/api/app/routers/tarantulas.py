@@ -1,11 +1,11 @@
 """
 Tarantula routes
 """
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone, timedelta, date
 from collections import Counter
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
@@ -378,15 +378,63 @@ async def get_tarantula_growth(
     )
 
 
+def _calendar_day_diff(later: datetime, earlier: datetime, tz_offset_minutes: Optional[int]) -> int:
+    """Calendar-day difference between two timezone-aware datetimes,
+    expressed in the user's local timezone.
+
+    The previous implementation used `(later - earlier).days`, which is a
+    floored UTC time delta. For a user in EDT (UTC-4) who fed their
+    tarantula at 8 PM yesterday, the feeding's UTC timestamp is 00:00
+    today; if "now" is 5 PM EDT (21:00 UTC), the delta is 21 hours and
+    `.days` floors to 0 — so the dashboard says "fed today" even though
+    the user perceives it as yesterday. That's the Brooke-on-EST bug
+    reported 2026-04-24.
+
+    Fix: convert both timestamps to the user's local time, take the date
+    portion of each, and subtract calendar days. Falls back to UTC when
+    the client doesn't pass an offset (preserving old behavior for legacy
+    clients during rollout).
+
+    Args:
+        later: A timezone-aware datetime later in time (typically `now`).
+        earlier: A timezone-aware datetime earlier in time (the event).
+        tz_offset_minutes: The user's local offset from UTC in minutes,
+            as produced by JS's `new Date().getTimezoneOffset()` — note
+            that JS returns the inverse sign vs the IANA convention,
+            i.e. EDT (UTC-4) returns 240 (positive). Pass it through
+            unchanged from the client; we negate internally below.
+    """
+    if tz_offset_minutes is None:
+        return (later - earlier).days
+
+    # JS's getTimezoneOffset returns offset_to_get_to_utc, so for EDT
+    # it's +240. We need the offset_from_utc (which is -240 for EDT) to
+    # shift UTC into local time, hence the negation.
+    local_delta = timedelta(minutes=-tz_offset_minutes)
+    later_local_date = (later + local_delta).date()
+    earlier_local_date = (earlier + local_delta).date()
+    return (later_local_date - earlier_local_date).days
+
+
 @router.get("/{tarantula_id}/feeding-stats", response_model=FeedingStats)
 async def get_feeding_stats(
     tarantula_id: UUID,
+    tz_offset_minutes: Optional[int] = Query(
+        None,
+        description=(
+            "User's local timezone offset in minutes, as produced by "
+            "JS Date.getTimezoneOffset() (positive for zones west of UTC: "
+            "EDT=240, PST=480). When provided, days_since_last_feeding "
+            "and inter-feeding gaps are computed in calendar days in the "
+            "user's zone instead of UTC. Optional for backwards compat."
+        ),
+    ),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get feeding statistics and analytics for a tarantula
-    
+
     Returns feeding patterns, acceptance rates, prey distribution,
     and predictions for next feeding.
     """
@@ -424,21 +472,33 @@ async def get_feeding_stats(
     total_refused = total_feedings - total_accepted
     acceptance_rate = (total_accepted / total_feedings * 100) if total_feedings > 0 else 0.0
 
-    # Calculate days between feedings
+    # Calculate days between feedings (in the user's local timezone so
+    # back-to-back evening feedings across midnight don't collapse to "0
+    # days apart" — same calendar-day reasoning as below).
     days_between = []
     for i in range(1, len(feeding_logs)):
         previous_feeding = feeding_logs[i - 1]
         current_feeding = feeding_logs[i]
-        gap = (current_feeding.fed_at - previous_feeding.fed_at).days
+        gap = _calendar_day_diff(
+            current_feeding.fed_at,
+            previous_feeding.fed_at,
+            tz_offset_minutes,
+        )
         days_between.append(gap)
 
     average_days_between = sum(days_between) / len(days_between) if days_between else None
     longest_gap = max(days_between) if days_between else None
 
-    # Last feeding info
+    # Last feeding info — calendar-day diff in user's local timezone so
+    # an evening feeding doesn't read as "0 days ago" the next morning.
+    # See _calendar_day_diff for full background.
     last_feeding = feeding_logs[-1]
     last_feeding_date = last_feeding.fed_at
-    days_since_last_feeding = (datetime.now(timezone.utc) - last_feeding_date).days
+    days_since_last_feeding = _calendar_day_diff(
+        datetime.now(timezone.utc),
+        last_feeding_date,
+        tz_offset_minutes,
+    )
 
     # Predict next feeding
     next_feeding_prediction = None

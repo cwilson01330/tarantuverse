@@ -151,9 +151,13 @@ function DashboardHubScreen() {
       // a "Total Molts" value from premolt predictions, which is a
       // completely different quantity — that's what the user reported
       // as the bug. Now we read the real count.
+      // Send the device's TZ offset to endpoints that compute
+      // calendar-day metrics (days_since_last_feeding). Cheap to send
+      // even to endpoints that ignore it.
+      const tzOffset = new Date().getTimezoneOffset();
       const [tarantulasRes, enclosuresRes, statsRes] = await Promise.all([
         apiClient.get('/tarantulas/').catch(() => null),
-        apiClient.get('/enclosures/').catch(() => null),
+        apiClient.get('/enclosures/', { params: { tz_offset_minutes: tzOffset } }).catch(() => null),
         apiClient.get('/analytics/collection').catch(() => null),
       ]);
 
@@ -179,10 +183,18 @@ function DashboardHubScreen() {
 
   const fetchAllFeedingStatuses = async (tarantulasList: Tarantula[]) => {
     const statusMap = new Map<string, FeedingStatus>();
+    // Pass the device's local offset so the API computes
+    // days_since_last_feeding as a calendar-day diff in the user's
+    // timezone, not a UTC delta. Without this, evening feedings show
+    // as "0 days ago" the next morning until UTC midnight rolls over.
+    const tzOffset = new Date().getTimezoneOffset();
     await Promise.all(
       tarantulasList.map(async (t) => {
         try {
-          const response = await apiClient.get(`/tarantulas/${t.id}/feeding-stats`);
+          const response = await apiClient.get(
+            `/tarantulas/${t.id}/feeding-stats`,
+            { params: { tz_offset_minutes: tzOffset } },
+          );
           statusMap.set(t.id, {
             tarantula_id: t.id,
             days_since_last_feeding: response.data.days_since_last_feeding,
