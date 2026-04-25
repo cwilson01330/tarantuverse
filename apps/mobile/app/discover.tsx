@@ -249,7 +249,12 @@ export default function DiscoverScreen() {
               discover.trending_threads.map((thread) => (
                 <TouchableOpacity
                   key={thread.id}
-                  onPress={() => router.push(`/community/forums/thread/${thread.id}`)}
+                  // Mobile forum threads live at /forums/thread/<id>, not
+                  // /community/forums/thread/<id> — the latter is the web
+                  // path and 404s on mobile (same class as the universal-
+                  // search keeper bug). Going forward, prefer the
+                  // toMobilePath helper for any server-issued URL.
+                  onPress={() => router.push(`/forums/thread/${thread.id}`)}
                   style={{
                     backgroundColor: colors.surface,
                     borderRadius: 12,

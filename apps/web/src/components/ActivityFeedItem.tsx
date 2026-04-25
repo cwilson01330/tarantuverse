@@ -87,6 +87,31 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
         <span className={className}>{tarantulaName}</span>
       );
 
+    /**
+     * Same pattern as TarantulaLink, generalized: render a Link when the
+     * target id is present, fall back to a plain span otherwise. Null
+     * target_id / thread_id / followed_username are real cases for older
+     * activity rows or activities whose target was deleted — without
+     * this guard we'd render hrefs like `/forums/thread/null` or
+     * `/community/undefined` that 404 on tap.
+     */
+    const SafeLink = ({
+      href,
+      className,
+      children,
+    }: {
+      href: string | null | undefined;
+      className: string;
+      children: React.ReactNode;
+    }) =>
+      href ? (
+        <Link href={href} className={className}>
+          {children}
+        </Link>
+      ) : (
+        <span className={className}>{children}</span>
+      );
+
     switch (activity.action_type) {
       case "new_tarantula":
         return (
@@ -156,12 +181,16 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
               {username}
             </Link>
             <span className="text-gray-300"> started following </span>
-            <Link
-              href={`/community/${metadata.followed_username}`}
+            <SafeLink
+              href={
+                metadata.followed_username
+                  ? `/community/${metadata.followed_username}`
+                  : null
+              }
               className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
-              {metadata.followed_display_name || metadata.followed_username}
-            </Link>
+              {metadata.followed_display_name || metadata.followed_username || "someone"}
+            </SafeLink>
           </>
         );
 
@@ -175,12 +204,16 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
               {username}
             </Link>
             <span className="text-gray-300"> created a thread: </span>
-            <Link
-              href={`/community/forums/thread/${activity.target_id}`}
+            <SafeLink
+              href={
+                activity.target_id
+                  ? `/community/forums/thread/${activity.target_id}`
+                  : null
+              }
               className="font-semibold text-electric-blue-400 hover:text-electric-blue-300"
             >
               {metadata.title || "Untitled"}
-            </Link>
+            </SafeLink>
             {metadata.category && (
               <span className="text-gray-500 text-sm ml-1">
                 in {metadata.category}
@@ -199,12 +232,16 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
               {username}
             </Link>
             <span className="text-gray-300"> replied to </span>
-            <Link
-              href={`/community/forums/thread/${metadata.thread_id}`}
+            <SafeLink
+              href={
+                metadata.thread_id
+                  ? `/community/forums/thread/${metadata.thread_id}`
+                  : null
+              }
               className="font-semibold text-neon-pink-400 hover:text-neon-pink-300"
             >
               {metadata.thread_title || "a thread"}
-            </Link>
+            </SafeLink>
           </>
         );
 

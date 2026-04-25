@@ -136,23 +136,33 @@ export default function ActivityFeedItem({ activity }: Props) {
         };
 
       case 'forum_thread':
+        // Guard against missing target_id on older activity rows — without
+        // this we'd push /forums/thread/null which lands on a hard 404
+        // and looks like a broken app, not a missing dataset.
         return {
           verb: `${displayName} started a thread`,
           tarantulaName: meta.thread_title,
           speciesName: `in ${meta.category_name}`,
           thumbnailUrl: undefined,
           subtitle: undefined,
-          onPress: () => router.push(`/forums/thread/${activity.target_id}`),
+          onPress: activity.target_id
+            ? () => router.push(`/forums/thread/${activity.target_id}`)
+            : undefined,
         };
 
       case 'forum_post':
+        // Same null guard — meta.thread_id can be missing on old rows
+        // or where the parent thread was deleted. Disable tap rather
+        // than route to /forums/thread/undefined.
         return {
           verb: `${displayName} replied to`,
           tarantulaName: meta.thread_title,
           speciesName: undefined,
           thumbnailUrl: undefined,
           subtitle: undefined,
-          onPress: () => router.push(`/forums/thread/${meta.thread_id}`),
+          onPress: meta.thread_id
+            ? () => router.push(`/forums/thread/${meta.thread_id}`)
+            : undefined,
         };
 
       default:
