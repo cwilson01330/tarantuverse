@@ -574,7 +574,19 @@ export default function KeeperProfilePage() {
             collection.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {collection.map((tarantula) => (
-                  <div key={tarantula.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition">
+                  // Each card is a Link to the public tarantula profile
+                  // (/t/<id>). The sibling /keeper/<username> route already
+                  // does this; this page was missing it, so users landing
+                  // here from universal search or the community directory
+                  // saw a static grid of cards that did nothing on click.
+                  // Adding focus-visible ring for keyboard nav since the
+                  // <Link> is now the focusable element.
+                  <Link
+                    key={tarantula.id}
+                    href={`/t/${tarantula.id}`}
+                    className="group bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+                    aria-label={`View ${tarantula.name || tarantula.species_name || 'tarantula'} profile`}
+                  >
                     {tarantula.photo_url ? (
                       <img
                         src={tarantula.photo_url}
@@ -587,7 +599,9 @@ export default function KeeperProfilePage() {
                       </div>
                     )}
                     <div className="p-4">
-                      <h3 className="font-bold text-lg mb-1 dark:text-white">{tarantula.name}</h3>
+                      <h3 className="font-bold text-lg mb-1 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                        {tarantula.name}
+                      </h3>
                       {tarantula.species_name && (
                         <p className="text-sm text-gray-600 dark:text-gray-400 italic mb-2">{tarantula.species_name}</p>
                       )}
@@ -608,7 +622,7 @@ export default function KeeperProfilePage() {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
