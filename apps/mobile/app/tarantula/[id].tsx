@@ -157,6 +157,13 @@ export default function TarantulaDetailScreen() {
   const [feedingLogs, setFeedingLogs] = useState<FeedingLog[]>([]);
   const [moltLogs, setMoltLogs] = useState<MoltLog[]>([]);
   const [substrateChanges, setSubstrateChanges] = useState<SubstrateChange[]>([]);
+  // Per-section "expanded" flags. False shows the 5 most recent; true
+  // shows the full history. The View All button toggles the relevant
+  // flag and updates its label to "Show Less" while expanded.
+  const [showAllFeedings, setShowAllFeedings] = useState(false);
+  const [showAllMolts, setShowAllMolts] = useState(false);
+  const [showAllSubstrate, setShowAllSubstrate] = useState(false);
+  const PREVIEW_COUNT = 5;
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null);
   const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null);
@@ -199,11 +206,16 @@ export default function TarantulaDetailScreen() {
     }
   };
 
+  // Logs are stored in full so the "View All" toggle has data to expand
+  // into. Display-side slicing in the JSX below limits the visible rows
+  // to 5 by default; tapping "View All" flips the corresponding
+  // `showAll*` flag and renders the rest. Previously the loaders sliced
+  // to 5 themselves and the View All button had no onPress, so users
+  // had no way to ever see older logs — that was the reported bug.
   const fetchFeedingLogs = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/feedings`);
-      // Get only the 5 most recent logs
-      setFeedingLogs(response.data.slice(0, 5));
+      setFeedingLogs(response.data);
     } catch (error: any) {
       // Silently fail - feeding logs are optional
     }
@@ -212,8 +224,7 @@ export default function TarantulaDetailScreen() {
   const fetchMoltLogs = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/molts`);
-      // Get only the 5 most recent logs
-      setMoltLogs(response.data.slice(0, 5));
+      setMoltLogs(response.data);
     } catch (error: any) {
       // Silently fail - molt logs are optional
     }
@@ -222,8 +233,7 @@ export default function TarantulaDetailScreen() {
   const fetchSubstrateChanges = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/substrate-changes`);
-      // Get only the 5 most recent logs
-      setSubstrateChanges(response.data.slice(0, 5));
+      setSubstrateChanges(response.data);
     } catch (error: any) {
       // Silently fail - substrate changes are optional
     }
@@ -647,9 +657,22 @@ export default function TarantulaDetailScreen() {
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Feeding History</Text>
-            {feedingLogs.length > 0 && (
-              <TouchableOpacity>
-                <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
+            {/* Only render the toggle when there's something hidden to
+                reveal — no point teasing "View All" when 5 or fewer
+                logs are already showing. */}
+            {feedingLogs.length > PREVIEW_COUNT && (
+              <TouchableOpacity
+                onPress={() => setShowAllFeedings((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showAllFeedings
+                    ? `Show only the most recent ${PREVIEW_COUNT} feedings`
+                    : `Show all ${feedingLogs.length} feedings`
+                }
+              >
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                  {showAllFeedings ? 'Show Less' : `View All (${feedingLogs.length})`}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -668,12 +691,12 @@ export default function TarantulaDetailScreen() {
             </View>
           ) : (
             <View style={styles.logList}>
-              {feedingLogs.map((log) => (
+              {(showAllFeedings ? feedingLogs : feedingLogs.slice(0, PREVIEW_COUNT)).map((log) => (
                 <View key={log.id} style={[styles.logItem, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                   <View style={styles.logIcon}>
-                    <MaterialCommunityIcons 
-                      name={log.accepted ? "check-circle" : "close-circle"} 
-                      size={20} 
+                    <MaterialCommunityIcons
+                      name={log.accepted ? "check-circle" : "close-circle"}
+                      size={20}
                       color={log.accepted ? colors.success : colors.error}
                     />
                   </View>
@@ -696,9 +719,19 @@ export default function TarantulaDetailScreen() {
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Molt History</Text>
-            {moltLogs.length > 0 && (
-              <TouchableOpacity>
-                <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
+            {moltLogs.length > PREVIEW_COUNT && (
+              <TouchableOpacity
+                onPress={() => setShowAllMolts((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showAllMolts
+                    ? `Show only the most recent ${PREVIEW_COUNT} molts`
+                    : `Show all ${moltLogs.length} molts`
+                }
+              >
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                  {showAllMolts ? 'Show Less' : `View All (${moltLogs.length})`}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -717,7 +750,7 @@ export default function TarantulaDetailScreen() {
             </View>
           ) : (
             <View style={styles.logList}>
-              {moltLogs.map((log) => (
+              {(showAllMolts ? moltLogs : moltLogs.slice(0, PREVIEW_COUNT)).map((log) => (
                 <View key={log.id} style={[styles.logItem, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                   <View style={styles.logIcon}>
                     <MaterialCommunityIcons name="reload" size={20} color={colors.primary} />
@@ -743,9 +776,19 @@ export default function TarantulaDetailScreen() {
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Substrate Changes</Text>
-            {substrateChanges.length > 0 && (
-              <TouchableOpacity>
-                <Text style={[styles.viewAllText, { color: colors.primary }]}>View All</Text>
+            {substrateChanges.length > PREVIEW_COUNT && (
+              <TouchableOpacity
+                onPress={() => setShowAllSubstrate((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showAllSubstrate
+                    ? `Show only the most recent ${PREVIEW_COUNT} substrate changes`
+                    : `Show all ${substrateChanges.length} substrate changes`
+                }
+              >
+                <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                  {showAllSubstrate ? 'Show Less' : `View All (${substrateChanges.length})`}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -764,7 +807,7 @@ export default function TarantulaDetailScreen() {
             </View>
           ) : (
             <View style={styles.logList}>
-              {substrateChanges.map((change) => (
+              {(showAllSubstrate ? substrateChanges : substrateChanges.slice(0, PREVIEW_COUNT)).map((change) => (
                 <View key={change.id} style={[styles.logItem, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
                   <View style={styles.logIcon}>
                     <MaterialCommunityIcons name="layers" size={20} color={colors.primary} />
