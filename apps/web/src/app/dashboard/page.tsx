@@ -27,11 +27,20 @@ interface FeedingStatus {
   acceptance_rate: number
 }
 
+// Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction.
+// We previously hit the legacy /tarantulas/<id>/premolt-prediction
+// endpoint (probability + confidence_level), but that's a DIFFERENT
+// algorithm from the one PremoltAlertCard / mobile uses. The two
+// surfaces could disagree (dashboard "2 alerts" vs collection card
+// "All Clear"). All surfaces now read /premolt/dashboard.
 interface PremoltPrediction {
   tarantula_id: string
-  probability: number
-  confidence_level: string
-  status_text: string
+  tarantula_name: string
+  is_premolt_likely: boolean
+  confidence: 'high' | 'medium' | 'low' | 'none'
+  recent_refusal_streak: number
+  days_since_last_molt: number | null
+  data_quality: 'good' | 'fair' | 'insufficient'
 }
 
 interface Enclosure {
@@ -167,26 +176,25 @@ export default function DashboardHub() {
     setFeedingStatuses(statusMap)
   }
 
-  const fetchAllPremoltPredictions = async (authToken: string, tarantulasList: Tarantula[]) => {
+  const fetchAllPremoltPredictions = async (authToken: string, _tarantulasList: Tarantula[]) => {
+    // Single batch call to /premolt/dashboard — the canonical predictor
+    // shared with PremoltAlertCard / mobile dashboard. Replaces N calls
+    // to the legacy /tarantulas/<id>/premolt-prediction endpoint, which
+    // ran a different algorithm and made the dashboard disagree with
+    // the collection screen ("2 alerts" vs "All Clear").
     const predictionMap = new Map<string, PremoltPrediction>()
-    await Promise.all(
-      tarantulasList.map(async (t) => {
-        try {
-          const response = await fetch(`${API_URL}/api/v1/tarantulas/${t.id}/premolt-prediction`, {
-            headers: { 'Authorization': `Bearer ${authToken}` },
-          })
-          if (response.ok) {
-            const data = await response.json()
-            predictionMap.set(t.id, {
-              tarantula_id: t.id,
-              probability: data.probability,
-              confidence_level: data.confidence_level,
-              status_text: data.status_text,
-            })
-          }
-        } catch { /* skip */ }
+    try {
+      const response = await fetch(`${API_URL}/api/v1/premolt/dashboard`, {
+        headers: { 'Authorization': `Bearer ${authToken}` },
       })
-    )
+      if (response.ok) {
+        const data = await response.json()
+        const predictions: PremoltPrediction[] = data?.predictions ?? []
+        for (const p of predictions) {
+          predictionMap.set(p.tarantula_id, p)
+        }
+      }
+    } catch { /* leave empty on error; UI shows zero alerts */ }
     setPremoltPredictions(predictionMap)
   }
 
@@ -200,9 +208,12 @@ export default function DashboardHub() {
     return daysB - daysA
   })
 
+  // Source of truth: the canonical `is_premolt_likely` boolean from
+  // /premolt/dashboard. Same flag PremoltAlertCard / mobile use, so
+  // the dashboard count agrees with what the collection screen says.
   const premoltAlerts = tarantulas.filter(t => {
     const prediction = premoltPredictions.get(t.id)
-    return prediction && prediction.confidence_level !== 'low'
+    return prediction?.is_premolt_likely === true
   })
 
   const communalEnclosures = enclosures.filter(e => e.is_communal)
@@ -595,12 +606,16 @@ export default function DashboardHub() {
                             <p className="text-sm text-theme-secondary italic">{t.scientific_name}</p>
                           </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white ${
-                          prediction.confidence_level === 'very_high' ? 'bg-red-500' :
-                          prediction.confidence_level === 'high' ? 'bg-orange-500' :
+                        {/* Canonical predictor exposes confidence tier
+                            (high/medium/low/none), not a 0-100 probability.
+                            Render the tier label so the badge still tells
+                            the user "how sure are we?" at a glance. */}
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold text-white capitalize ${
+                          prediction.confidence === 'high' ? 'bg-red-500' :
+                          prediction.confidence === 'medium' ? 'bg-orange-500' :
                           'bg-yellow-500'
                         }`}>
-                          🦋 {prediction.probability}%
+                          🦋 {prediction.confidence}
                         </span>
                       </div>
                     )

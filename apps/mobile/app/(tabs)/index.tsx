@@ -39,11 +39,21 @@ interface FeedingStatus {
   acceptance_rate: number;
 }
 
+// Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction. We
+// previously hit the legacy /tarantulas/<id>/premolt-prediction
+// endpoint (probability + confidence_level), but that's a DIFFERENT
+// algorithm from the one PremoltAlertCard uses on the collection
+// screen — they would disagree (e.g. dashboard "2 alerts" while
+// collection card said "All Clear"). Both surfaces now read from the
+// canonical /premolt/dashboard service so counts agree.
 interface PremoltPrediction {
   tarantula_id: string;
-  probability: number;
-  confidence_level: string;
-  status_text: string;
+  tarantula_name: string;
+  is_premolt_likely: boolean;
+  confidence: 'high' | 'medium' | 'low' | 'none';
+  recent_refusal_streak: number;
+  days_since_last_molt: number | null;
+  data_quality: 'good' | 'fair' | 'insufficient';
 }
 
 interface Enclosure {
@@ -208,23 +218,22 @@ function DashboardHubScreen() {
     setFeedingStatuses(statusMap);
   };
 
-  const fetchAllPremoltPredictions = async (tarantulasList: Tarantula[]) => {
+  const fetchAllPremoltPredictions = async (_tarantulasList: Tarantula[]) => {
+    // Single batch call to /premolt/dashboard — the canonical predictor
+    // shared with PremoltAlertCard on the collection screen. Replaces N
+    // calls to the legacy /tarantulas/<id>/premolt-prediction endpoint
+    // (which used a different algorithm and produced disagreeing counts
+    // between the two surfaces — the "All Clear vs 2 alerts" bug).
     const predictionMap = new Map<string, PremoltPrediction>();
-    await Promise.all(
-      tarantulasList.map(async (t) => {
-        try {
-          const response = await apiClient.get(`/tarantulas/${t.id}/premolt-prediction`);
-          predictionMap.set(t.id, {
-            tarantula_id: t.id,
-            probability: response.data.probability,
-            confidence_level: response.data.confidence_level,
-            status_text: response.data.status_text,
-          });
-        } catch {
-          // skip
-        }
-      })
-    );
+    try {
+      const response = await apiClient.get('/premolt/dashboard');
+      const predictions: PremoltPrediction[] = response.data?.predictions ?? [];
+      for (const p of predictions) {
+        predictionMap.set(p.tarantula_id, p);
+      }
+    } catch {
+      // Leave map empty on error; UI gracefully renders zero alerts.
+    }
     setPremoltPredictions(predictionMap);
   };
 
@@ -244,9 +253,13 @@ function DashboardHubScreen() {
     return daysB - daysA;
   });
 
-  const premoltAlerts = tarantulas.filter(t => {
+  // Source of truth: the canonical `is_premolt_likely` boolean from
+  // the premolt service. PremoltAlertCard on the collection screen uses
+  // the same flag, so the two surfaces agree (was the original bug:
+  // dashboard "2 alerts" while collection card said "All Clear").
+  const premoltAlerts = tarantulas.filter((t) => {
     const prediction = premoltPredictions.get(t.id);
-    return prediction && prediction.confidence_level !== 'low';
+    return prediction?.is_premolt_likely === true;
   });
 
   const communalEnclosures = enclosures.filter(e => e.is_communal);
@@ -257,9 +270,12 @@ function DashboardHubScreen() {
     return '#eab308';
   };
 
+  // Maps the new 'high' | 'medium' | 'low' | 'none' confidence to the
+  // existing badge palette. We stopped using 'very_high' when we
+  // switched to /premolt/dashboard; treat 'high' as the most urgent.
   const getPremoltBadgeColor = (confidence: string) => {
-    if (confidence === 'very_high') return '#ef4444';
-    if (confidence === 'high') return '#f97316';
+    if (confidence === 'high') return '#ef4444';
+    if (confidence === 'medium') return '#f97316';
     return '#eab308';
   };
 
@@ -892,9 +908,15 @@ function DashboardHubScreen() {
                   </View>
                   <View style={[
                     styles.premoltBadge,
-                    { backgroundColor: getPremoltBadgeColor(prediction.confidence_level) },
+                    { backgroundColor: getPremoltBadgeColor(prediction.confidence) },
                   ]}>
-                    <Text style={styles.premoltBadgeText}>🦋 {prediction.probability}%</Text>
+                    {/* The canonical predictor doesn't expose a 0-100
+                        probability, just the confidence tier. Render the
+                        tier capitalized + indicator counts so the badge
+                        still conveys "how sure are we?" at a glance. */}
+                    <Text style={styles.premoltBadgeText}>
+                      🦋 {prediction.confidence.charAt(0).toUpperCase() + prediction.confidence.slice(1)}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               );
