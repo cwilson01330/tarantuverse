@@ -489,20 +489,36 @@ async def get_feeding_stats(
     average_days_between = sum(days_between) / len(days_between) if days_between else None
     longest_gap = max(days_between) if days_between else None
 
-    # Last feeding info — calendar-day diff in user's local timezone so
-    # an evening feeding doesn't read as "0 days ago" the next morning.
-    # See _calendar_day_diff for full background.
-    last_feeding = feeding_logs[-1]
-    last_feeding_date = last_feeding.fed_at
-    days_since_last_feeding = _calendar_day_diff(
-        datetime.now(timezone.utc),
-        last_feeding_date,
-        tz_offset_minutes,
-    )
+    # Last feeding info — refers to the last ACCEPTED feeding, not the
+    # last attempt. A refused feeding is still a tracked event (it
+    # contributes to refusal streak / premolt detection) but from a
+    # husbandry perspective the spider hasn't actually been fed since
+    # its last successful meal. The "Brooke fed her spider, it refused,
+    # but the badge says 'fed today'" bug (2026-04-24) was caused by
+    # using the most recent attempt regardless of acceptance.
+    #
+    # When every feeding has been refused (e.g. a brand-new specimen
+    # that hasn't eaten in our care yet), last_feeding_date is None and
+    # days_since_last_feeding stays None — UI surfaces this as "—" or
+    # "Not fed yet" rather than misleading the keeper.
+    accepted_logs = [log for log in feeding_logs if log.accepted]
+    if accepted_logs:
+        last_feeding = accepted_logs[-1]
+        last_feeding_date = last_feeding.fed_at
+        days_since_last_feeding = _calendar_day_diff(
+            datetime.now(timezone.utc),
+            last_feeding_date,
+            tz_offset_minutes,
+        )
+    else:
+        last_feeding = None
+        last_feeding_date = None
+        days_since_last_feeding = None
 
-    # Predict next feeding
+    # Predict next feeding — only meaningful when we have a real anchor
+    # (an accepted feeding) AND a known cadence.
     next_feeding_prediction = None
-    if average_days_between:
+    if average_days_between and last_feeding_date is not None:
         predicted_days = int(average_days_between)
         next_feeding_prediction = (last_feeding_date + timedelta(days=predicted_days)).date()
 

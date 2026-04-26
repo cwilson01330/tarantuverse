@@ -57,9 +57,15 @@ def get_enclosure_with_computed_fields(
             species_name = species.scientific_name
 
     # Get days since last feeding
+    # "Days since last feeding" reflects the last ACCEPTED feeding, not
+    # the last attempt. A refusal is meaningful data (premolt signal) but
+    # the spider wasn't actually fed — the badge would otherwise read
+    # "fed today" right after a refusal, which keepers find misleading.
+    # See the matching fix in tarantulas.py::get_feeding_stats.
     days_since_last_feeding = None
     last_feeding = db.query(FeedingLog).filter(
-        FeedingLog.enclosure_id == enclosure.id
+        FeedingLog.enclosure_id == enclosure.id,
+        FeedingLog.accepted.is_(True),
     ).order_by(FeedingLog.fed_at.desc()).first()
     if last_feeding:
         now_utc = datetime.now(timezone.utc)
