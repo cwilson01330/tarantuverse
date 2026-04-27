@@ -5,6 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import apiClient from '@/lib/api'
+// Social links are stored as bare handles (e.g. "lolths.sworn"). If we
+// hand that straight to <a href>, the browser treats it as a relative
+// URL and links back to tarantuverse.com — that's the bug Cory caught
+// 2026-04-24 (https://www.tarantuverse.com/community/lolths.sworn).
+// socialUrl() rebuilds the canonical platform URL, tolerating legacy
+// full-URL entries too.
+import { socialUrl } from '@/lib/social-links'
 
 interface KeeperProfile {
   id: number
@@ -470,12 +477,14 @@ export default function KeeperProfilePage() {
               </div>
             )}
 
-            {/* Social Links */}
+            {/* Social Links — every href runs through socialUrl() so a bare
+                handle like "lolths.sworn" becomes a real instagram.com URL
+                instead of resolving relative to the current page. */}
             {profile.social_links && Object.keys(profile.social_links).length > 0 && (
               <div className="flex gap-4 pt-4 border-t dark:border-gray-700">
                 {profile.social_links.instagram && (
                   <a
-                    href={profile.social_links.instagram}
+                    href={socialUrl('instagram', profile.social_links.instagram) ?? '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition"
@@ -485,7 +494,7 @@ export default function KeeperProfilePage() {
                 )}
                 {profile.social_links.youtube && (
                   <a
-                    href={profile.social_links.youtube}
+                    href={socialUrl('youtube', profile.social_links.youtube) ?? '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition"
@@ -495,7 +504,7 @@ export default function KeeperProfilePage() {
                 )}
                 {profile.social_links.website && (
                   <a
-                    href={profile.social_links.website}
+                    href={socialUrl('website', profile.social_links.website) ?? '#'}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition"

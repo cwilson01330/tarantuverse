@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
 import { format } from 'date-fns';
+// Lucide icons replace inline emoji glyphs for these pills + buttons.
+// Color emojis like ✓ / 💎 / ❌ / 🗑️ render at a larger metric box than
+// surrounding text on most browsers, so they visually escape pill bounds
+// (especially with rounded-full + tight padding) and read as "broken
+// badge stuck on the pill" rather than as a coherent pill. SVG icons
+// respect text-baseline and font-size cleanly.
+import { Check, AlertTriangle, Gem, X, Trash2 } from 'lucide-react';
 
 interface User {
     id: string;
@@ -417,9 +424,13 @@ export default function ManageUsersPage() {
                         <button
                             onClick={handleVerifyAll}
                             disabled={verifyAllLoading}
-                            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition disabled:opacity-50 whitespace-nowrap"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition disabled:opacity-50 whitespace-nowrap"
                         >
-                            {verifyAllLoading ? 'Verifying...' : `✓ Verify All (${users.filter(u => !u.is_verified).length})`}
+                            {verifyAllLoading ? (
+                                'Verifying...'
+                            ) : (
+                                <><Check className="w-4 h-4" aria-hidden="true" /> Verify All ({users.filter(u => !u.is_verified).length})</>
+                            )}
                         </button>
                     )}
                 </div>
@@ -474,11 +485,15 @@ export default function ManageUsersPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${user.is_verified
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full leading-none ${user.is_verified
                                                 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                                 : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                                                 }`}>
-                                                {user.is_verified ? '✓ Verified' : '⚠ Unverified'}
+                                                {user.is_verified ? (
+                                                    <><Check className="w-3 h-3" aria-hidden="true" /> Verified</>
+                                                ) : (
+                                                    <><AlertTriangle className="w-3 h-3" aria-hidden="true" /> Unverified</>
+                                                )}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
@@ -490,11 +505,15 @@ export default function ManageUsersPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${user.is_premium
+                                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full leading-none ${user.is_premium
                                                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
                                                 : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                                 }`}>
-                                                {user.is_premium ? '💎 Premium' : 'Free'}
+                                                {user.is_premium ? (
+                                                    <><Gem className="w-3 h-3" aria-hidden="true" /> Premium</>
+                                                ) : (
+                                                    <>Free</>
+                                                )}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
@@ -507,9 +526,13 @@ export default function ManageUsersPage() {
                                                         <button
                                                             onClick={() => handleManualVerify(user.id, user.email)}
                                                             disabled={manualVerifyLoading === user.id}
-                                                            className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
+                                                            className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
                                                         >
-                                                            {manualVerifyLoading === user.id ? 'Verifying...' : '✓ Manual Verify'}
+                                                            {manualVerifyLoading === user.id ? (
+                                                                'Verifying...'
+                                                            ) : (
+                                                                <><Check className="w-4 h-4" aria-hidden="true" /> Manual Verify</>
+                                                            )}
                                                         </button>
                                                         <button
                                                             onClick={() => handleResendVerification(user.id, user.email)}
@@ -531,17 +554,25 @@ export default function ManageUsersPage() {
                                                     <button
                                                         onClick={() => handleRevokePremium(user.id, user.username)}
                                                         disabled={revokeLoading === user.id}
-                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50"
+                                                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50"
                                                     >
-                                                        {revokeLoading === user.id ? 'Revoking...' : '❌ Revoke Premium'}
+                                                        {revokeLoading === user.id ? (
+                                                            'Revoking...'
+                                                        ) : (
+                                                            <><X className="w-4 h-4" aria-hidden="true" /> Revoke Premium</>
+                                                        )}
                                                     </button>
                                                 ) : (
                                                     <button
                                                         onClick={() => handleGrantPremium(user.id, user.username)}
                                                         disabled={grantLoading === user.id}
-                                                        className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
+                                                        className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
                                                     >
-                                                        {grantLoading === user.id ? 'Granting...' : '💎 Grant Premium'}
+                                                        {grantLoading === user.id ? (
+                                                            'Granting...'
+                                                        ) : (
+                                                            <><Gem className="w-4 h-4" aria-hidden="true" /> Grant Premium</>
+                                                        )}
                                                     </button>
                                                 )}
                                                 {/* Delete user - don't allow deleting yourself */}
@@ -549,9 +580,13 @@ export default function ManageUsersPage() {
                                                     <button
                                                         onClick={() => handleDeleteUser(user.id, user.username, user.email)}
                                                         disabled={deleteLoading === user.id}
-                                                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600"
+                                                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600"
                                                     >
-                                                        {deleteLoading === user.id ? 'Deleting...' : '🗑️ Delete User'}
+                                                        {deleteLoading === user.id ? (
+                                                            'Deleting...'
+                                                        ) : (
+                                                            <><Trash2 className="w-4 h-4" aria-hidden="true" /> Delete User</>
+                                                        )}
                                                     </button>
                                                 )}
                                             </div>
