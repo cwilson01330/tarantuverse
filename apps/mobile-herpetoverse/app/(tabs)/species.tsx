@@ -6,8 +6,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 
-export default function SpeciesScreen() {
+function SpeciesScreen() {
   const { colors, layout } = useTheme();
 
   return (
@@ -64,3 +65,5 @@ const styles = StyleSheet.create({
   },
   placeholderText: { fontSize: 13, textAlign: 'center' },
 });
+
+export default withErrorBoundary(SpeciesScreen, 'species');

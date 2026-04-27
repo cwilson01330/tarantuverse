@@ -6,7 +6,7 @@
  * keeper on the Collection tab via the `/(tabs)` route.
  */
 import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { captureEvent } from '../src/services/posthog';
+import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -32,6 +33,17 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Kick the Render container awake the moment this screen mounts. By
+  // the time the user finishes typing credentials, the API is likely
+  // warm and the real login hits a hot worker. Same fix we shipped on
+  // Tarantuverse mobile.
+  useEffect(() => {
+    warmupApi();
+  }, []);
+
+  // If login takes >3s, surface a "Waking up server" hint.
+  const showColdStartHint = useColdStartIndicator(submitting, 3000);
 
   async function handleSubmit() {
     if (submitting) return;
@@ -147,6 +159,28 @@ export default function LoginScreen() {
                 <Text style={styles.primaryButtonText}>Sign in</Text>
               )}
             </TouchableOpacity>
+
+            {showColdStartHint && (
+              <View
+                style={{
+                  marginTop: 12,
+                  padding: 12,
+                  backgroundColor: colors.primary + '15',
+                  borderRadius: layout.radius.md,
+                  borderWidth: 1,
+                  borderColor: colors.primary + '40',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+                accessibilityLiveRegion="polite"
+              >
+                <ActivityIndicator color={colors.primary} size="small" />
+                <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+                  Waking up our server — this can take 20-30 seconds if it's been idle. Hang tight!
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.footer}>

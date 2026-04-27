@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import {
   identifyUser,
   initPostHog,
@@ -72,11 +73,16 @@ function RootLayoutContent() {
 }
 
 export default function RootLayout() {
+  // Top-level ErrorBoundary — last line of defense. Any render crash
+  // that escapes the per-tab boundaries surfaces here with a "Try again"
+  // button so the app isn't permanently wedged on a blank screen.
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <RootLayoutContent />
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary scope="app-root">
+      <ThemeProvider>
+        <AuthProvider>
+          <RootLayoutContent />
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

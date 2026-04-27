@@ -9,15 +9,40 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { EventEmitter } from 'events';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
 
 export const TOKEN_KEY = 'hv_token';
 export const USER_KEY = 'hv_user';
 
+/**
+ * Tiny event emitter — replaces Node's `events.EventEmitter`, which
+ * doesn't ship in React Native's runtime. Older Expo SDKs polyfilled it
+ * via Metro; SDK 54+ doesn't, and EAS production builds break on the
+ * missing import (we hit this on Tarantuverse mobile 2026-04-24). We
+ * only use .on/.off/.emit with no payload, so a 15-line implementation
+ * covers the contract without a polyfill.
+ */
+type AuthEventHandler = () => void;
+class AuthEventEmitter {
+  private handlers = new Map<string, Set<AuthEventHandler>>();
+
+  on(event: string, fn: AuthEventHandler) {
+    if (!this.handlers.has(event)) this.handlers.set(event, new Set());
+    this.handlers.get(event)!.add(fn);
+  }
+
+  off(event: string, fn: AuthEventHandler) {
+    this.handlers.get(event)?.delete(fn);
+  }
+
+  emit(event: string) {
+    this.handlers.get(event)?.forEach((fn) => fn());
+  }
+}
+
 /** Emitted when a 401 is received — AuthContext listens and forces logout. */
-export const authEvents = new EventEmitter();
+export const authEvents = new AuthEventEmitter();
 export const AUTH_EXPIRED_EVENT = 'auth:expired';
 
 /**

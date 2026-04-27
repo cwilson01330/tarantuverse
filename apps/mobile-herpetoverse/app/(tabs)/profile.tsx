@@ -16,8 +16,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { captureEvent } from '../../src/services/posthog';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 
-export default function ProfileScreen() {
+function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { colors, layout } = useTheme();
@@ -168,3 +169,5 @@ const styles = StyleSheet.create({
   },
   signOutText: { fontSize: 15, fontWeight: '600' },
 });
+
+export default withErrorBoundary(ProfileScreen, 'profile');

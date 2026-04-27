@@ -640,10 +640,16 @@ async def get_public_snake_profile(
             # ReptileSpecies schema is still evolving — missing columns shouldn't 500 the profile page.
             species_data = None
 
-    # Most recent feeding
+    # Most recent ACCEPTED feeding — refusals shouldn't reset the
+    # "last fed" indicator on the public profile. Same Brooke-on-EST
+    # bug class fixed in tarantulas.py + enclosures.py + the tarantula
+    # public profile above (2026-04-24).
     last_feeding = (
         db.query(FeedingLog)
-        .filter(FeedingLog.snake_id == s_uuid)
+        .filter(
+            FeedingLog.snake_id == s_uuid,
+            FeedingLog.accepted.is_(True),
+        )
         .order_by(FeedingLog.fed_at.desc())
         .first()
     )
@@ -775,9 +781,15 @@ async def get_public_lizard_profile(
         except Exception:
             species_data = None
 
+    # Most recent ACCEPTED feeding — see tarantula + snake versions
+    # above. Refusals are tracked separately and shouldn't masquerade
+    # as a fed event on the public profile.
     last_feeding = (
         db.query(FeedingLog)
-        .filter(FeedingLog.lizard_id == l_uuid)
+        .filter(
+            FeedingLog.lizard_id == l_uuid,
+            FeedingLog.accepted.is_(True),
+        )
         .order_by(FeedingLog.fed_at.desc())
         .first()
     )

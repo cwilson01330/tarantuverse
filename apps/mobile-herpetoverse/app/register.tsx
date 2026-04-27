@@ -7,7 +7,7 @@
  * email" state on success rather than trying to auto-sign-in.
  */
 import { Link, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -23,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { captureEvent } from '../src/services/posthog';
+import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -35,6 +36,14 @@ export default function RegisterScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+
+  // Warm the Render container while the user fills the form so the
+  // submit hits a hot worker.
+  useEffect(() => {
+    warmupApi();
+  }, []);
+
+  const showColdStartHint = useColdStartIndicator(submitting, 3000);
 
   async function handleSubmit() {
     if (submitting) return;
@@ -187,6 +196,28 @@ export default function RegisterScreen() {
                   <Text style={styles.primaryButtonText}>Create account</Text>
                 )}
               </TouchableOpacity>
+
+              {showColdStartHint && (
+                <View
+                  style={{
+                    marginTop: 12,
+                    padding: 12,
+                    backgroundColor: colors.primary + '15',
+                    borderRadius: layout.radius.md,
+                    borderWidth: 1,
+                    borderColor: colors.primary + '40',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                  accessibilityLiveRegion="polite"
+                >
+                  <ActivityIndicator color={colors.primary} size="small" />
+                  <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+                    Waking up our server — this can take 20-30 seconds if it's been idle. Hang tight!
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 

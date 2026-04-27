@@ -8,8 +8,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 
-export default function CollectionScreen() {
+function CollectionScreen() {
   const { user } = useAuth();
   const { colors, layout } = useTheme();
 
@@ -69,3 +70,5 @@ const styles = StyleSheet.create({
   },
   placeholderText: { fontSize: 13, textAlign: 'center' },
 });
+
+export default withErrorBoundary(CollectionScreen, 'collection');
