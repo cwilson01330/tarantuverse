@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import Link from 'next/link'
 
 /**
  * Community-scoped error boundary. Catches crashes in `/community/*`
@@ -38,12 +39,12 @@ export default function CommunityError({
           >
             Try again
           </button>
-          <a
+          <Link
             href="/community"
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface border border-theme text-gray-900 dark:text-white rounded-xl hover:bg-surface-elevated transition font-semibold"
           >
             Browse Keepers
-          </a>
+          </Link>
         </div>
         {error.digest && (
           <p className="mt-6 text-xs text-gray-500 dark:text-gray-500 font-mono">

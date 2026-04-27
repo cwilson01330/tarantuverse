@@ -330,14 +330,19 @@ export default function KeeperProfilePage() {
     }
   }
 
+  // Experience-level badges. The original palette was light-bg + dark-text
+  // only (e.g. bg-blue-100 + text-blue-800), which against the dark-gradient
+  // hero rendered as near-invisible "blue on blue" — Cory caught this on
+  // a public profile 2026-04-24. Each level now ships a dark-mode pair
+  // (deep tinted bg + light text) so contrast holds in both themes.
   const getExperienceBadge = (level?: string) => {
     const badges = {
-      beginner: { label: 'Beginner', color: 'bg-green-100 text-green-800' },
-      intermediate: { label: 'Intermediate', color: 'bg-blue-100 text-blue-800' },
-      advanced: { label: 'Advanced', color: 'bg-purple-100 text-purple-800' },
-      expert: { label: 'Expert', color: 'bg-amber-100 text-amber-800' }
+      beginner: { label: 'Beginner', color: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' },
+      intermediate: { label: 'Intermediate', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200' },
+      advanced: { label: 'Advanced', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200' },
+      expert: { label: 'Expert', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200' }
     }
-    return badges[level as keyof typeof badges] || { label: level, color: 'bg-gray-100 text-gray-800' }
+    return badges[level as keyof typeof badges] || { label: level, color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' }
   }
 
   if (loading) {

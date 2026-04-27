@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
@@ -375,9 +376,9 @@ function RegisterForm() {
 
         <p className="mt-6 text-center text-sm text-theme-secondary">
           Already have an account?{' '}
-          <a href="/login" className="text-primary-600 hover:underline">
+          <Link href="/login" className="text-primary-600 hover:underline">
             Login
-          </a>
+          </Link>
         </p>
       </div>
     </div>

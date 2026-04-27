@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
@@ -171,16 +172,16 @@ function LoginForm() {
         </form>
 
         <p className="mt-6 text-center text-sm text-theme-secondary">
-          <a href="/reset-password" className="text-primary-600 hover:underline">
+          <Link href="/reset-password" className="text-primary-600 hover:underline">
             Forgot your password?
-          </a>
+          </Link>
         </p>
 
         <p className="mt-3 text-center text-sm text-theme-secondary">
           Don't have an account?{' '}
-          <a href="/register" className="text-primary-600 hover:underline">
+          <Link href="/register" className="text-primary-600 hover:underline">
             Register
-          </a>
+          </Link>
         </p>
       </div>
     </div>

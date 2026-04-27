@@ -303,13 +303,21 @@ export default function KeeperProfilePage() {
     }
   }
 
+  // Light-bg/dark-text only collapsed to near-invisible "blue on blue"
+  // against the dark hero gradient. Pair each level with a deep tinted
+  // dark-mode bg + light text so contrast holds in both themes.
   const getExperienceBadgeColor = (level?: string) => {
     switch (level) {
-      case 'beginner': return 'bg-green-100 text-green-800'
-      case 'intermediate': return 'bg-blue-100 text-blue-800'
-      case 'advanced': return 'bg-purple-100 text-purple-800'
-      case 'expert': return 'bg-amber-100 text-amber-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'beginner':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+      case 'intermediate':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'
+      case 'advanced':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200'
+      case 'expert':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
     }
   }
 

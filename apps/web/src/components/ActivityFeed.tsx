@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import ActivityFeedItem, {
   ActivityFeedItemData,
@@ -205,18 +206,20 @@ export default function ActivityFeed({
               : "Log feedings, molts, or add tarantulas to start seeing community activity."}
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
-            <a
+            {/* next/link for internal routes — Vercel's no-html-link-for-pages
+                rule fails the build with raw <a href="/community">. */}
+            <Link
               href="/community"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition font-semibold"
             >
               Browse Keepers
-            </a>
-            <a
+            </Link>
+            <Link
               href="/dashboard"
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-surface border border-theme text-gray-900 dark:text-white rounded-lg hover:bg-surface-elevated transition font-semibold"
             >
               My Collection
-            </a>
+            </Link>
           </div>
         </div>
       ) : (

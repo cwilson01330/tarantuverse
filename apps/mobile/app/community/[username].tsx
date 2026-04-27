@@ -67,8 +67,12 @@ export default function KeeperProfileScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const username = params.username as string;
-  const { colors, layout } = useTheme();
+  const { colors, layout, theme } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  // Detect dark mode so getExperienceBadge can pick a contrast-safe pair.
+  // Light-only (#dbeafe bg + #1e40af text) reads as "blue on blue" against
+  // the dark gradient hero — Cory caught this on a public profile.
+  const isDark = theme === 'dark';
 
   const [profile, setProfile] = useState<KeeperProfile | null>(null);
   const [collection, setCollection] = useState<Tarantula[]>([]);
@@ -348,14 +352,29 @@ export default function KeeperProfileScreen() {
     fetchData();
   };
 
+  // Light pair = light bg + dark text (good on light theme)
+  // Dark pair  = deep tinted bg @ ~30% opacity + light text (good on
+  //              dark theme; contrast was failing as plain bg-100 +
+  //              text-800 on the dark gradient hero)
   const getExperienceBadge = (level?: string) => {
     const badges = {
-      beginner: { label: 'Beginner', bg: '#dcfce7', text: '#166534' },
-      intermediate: { label: 'Intermediate', bg: '#dbeafe', text: '#1e40af' },
-      advanced: { label: 'Advanced', bg: '#f3e8ff', text: '#6b21a8' },
-      expert: { label: 'Expert', bg: '#fef3c7', text: '#92400e' }
+      beginner: isDark
+        ? { label: 'Beginner', bg: 'rgba(20,83,45,0.4)', text: '#bbf7d0' }
+        : { label: 'Beginner', bg: '#dcfce7', text: '#166534' },
+      intermediate: isDark
+        ? { label: 'Intermediate', bg: 'rgba(30,58,138,0.4)', text: '#bfdbfe' }
+        : { label: 'Intermediate', bg: '#dbeafe', text: '#1e40af' },
+      advanced: isDark
+        ? { label: 'Advanced', bg: 'rgba(88,28,135,0.4)', text: '#e9d5ff' }
+        : { label: 'Advanced', bg: '#f3e8ff', text: '#6b21a8' },
+      expert: isDark
+        ? { label: 'Expert', bg: 'rgba(120,53,15,0.4)', text: '#fde68a' }
+        : { label: 'Expert', bg: '#fef3c7', text: '#92400e' },
     };
-    return badges[level as keyof typeof badges] || { label: level, bg: '#f3f4f6', text: '#374151' };
+    const fallback = isDark
+      ? { label: level, bg: 'rgba(55,65,81,0.5)', text: '#e5e7eb' }
+      : { label: level, bg: '#f3f4f6', text: '#374151' };
+    return badges[level as keyof typeof badges] || fallback;
   };
 
   const formatSpecialty = (specialty: string) => {
