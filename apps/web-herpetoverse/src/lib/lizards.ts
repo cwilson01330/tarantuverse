@@ -459,13 +459,22 @@ export function fmtDate(iso: string | null | undefined): string | null {
   })
 }
 
-/** "2 days ago" / "Today" / "Yesterday". */
+/**
+ * "2 days ago" / "Today" / "Yesterday".
+ *
+ * Calendar-day diff in the user's local timezone — see snakes.ts for
+ * the full reasoning (Brooke-on-EST bug class, 2026-04-24).
+ */
 export function relativeDays(iso: string | null | undefined): string | null {
   if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const diffMs = Date.now() - d.getTime()
-  const diffDays = Math.floor(diffMs / 86_400_000)
+  const then = new Date(iso)
+  if (Number.isNaN(then.getTime())) return null
+
+  const now = new Date()
+  const thenLocal = new Date(then.getFullYear(), then.getMonth(), then.getDate())
+  const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffDays = Math.round((nowLocal.getTime() - thenLocal.getTime()) / 86_400_000)
+
   if (diffDays <= 0) return 'Today'
   if (diffDays === 1) return 'Yesterday'
   return `${diffDays} days ago`

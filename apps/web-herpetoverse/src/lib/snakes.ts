@@ -434,13 +434,33 @@ export function fmtDate(iso: string | null | undefined): string | null {
   })
 }
 
-/** "2 days ago" / "Today" / "Yesterday". */
+/**
+ * "2 days ago" / "Today" / "Yesterday".
+ *
+ * Calendar-day diff in the user's local timezone — NOT a UTC time-delta
+ * floor. The naïve `Math.floor((now - then) / 86_400_000)` flips at UTC
+ * midnight, not local midnight, so a snake fed at 8 PM EDT reads as
+ * "Today" until UTC midnight (4 AM EDT next day), then jumps straight
+ * to "Yesterday". Same Brooke-on-EST bug we fixed on Tarantuverse
+ * (api/routers/tarantulas.py + enclosures.py 2026-04-24).
+ *
+ * Browser already knows the user's zone, so unlike the API helper we
+ * don't need an offset param — `Date#getFullYear/Month/Date` on a
+ * locally-parsed Date returns the calendar values in local time.
+ */
 export function relativeDays(iso: string | null | undefined): string | null {
   if (!iso) return null
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return null
-  const diffMs = Date.now() - d.getTime()
-  const diffDays = Math.floor(diffMs / 86_400_000)
+  const then = new Date(iso)
+  if (Number.isNaN(then.getTime())) return null
+
+  const now = new Date()
+  // Build "calendar dates" by resetting time-of-day to local midnight
+  // for both anchors, then subtracting. UTC method would flip on UTC
+  // midnight; the local-Date constructors below flip on local midnight.
+  const thenLocal = new Date(then.getFullYear(), then.getMonth(), then.getDate())
+  const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffDays = Math.round((nowLocal.getTime() - thenLocal.getTime()) / 86_400_000)
+
   if (diffDays <= 0) return 'Today'
   if (diffDays === 1) return 'Yesterday'
   return `${diffDays} days ago`
