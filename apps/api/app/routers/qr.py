@@ -500,9 +500,14 @@ async def get_public_tarantula_profile(
                 "image_url": sp.image_url,
             }
 
-    # Most recent feeding
+    # Most recent ACCEPTED feeding — refused offers shouldn't reset the
+    # "last fed" indicator on the public profile (same Brooke-on-EST
+    # bug class fixed in tarantulas.py + enclosures.py 2026-04-24).
+    # Surfacing a refusal as "fed today" misleads viewers about whether
+    # the spider is actually being fed on schedule.
     last_feeding = db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id == t_uuid
+        FeedingLog.tarantula_id == t_uuid,
+        FeedingLog.accepted.is_(True),
     ).order_by(FeedingLog.fed_at.desc()).first()
 
     # Most recent molt

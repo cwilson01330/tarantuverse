@@ -19,6 +19,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
+import { getImageUrl } from '../../src/utils/image-url';
 
 const WalkthroughableView = walkthroughable(View);
 
@@ -112,11 +113,8 @@ function DashboardHubScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [tourChecked, setTourChecked] = useState(false);
 
-  const getImageUrl = (url?: string | null) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    return `https://tarantuverse-api.onrender.com${url}`;
-  };
+  // getImageUrl moved to src/utils/image-url.ts so dev/staging builds
+  // honor EXPO_PUBLIC_API_URL instead of always hitting prod.
 
   useEffect(() => {
     fetchDashboardData();

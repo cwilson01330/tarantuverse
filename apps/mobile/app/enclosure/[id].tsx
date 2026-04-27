@@ -18,6 +18,7 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { toISODateLocal } from '../../src/utils/date';
+import { getImageUrl } from '../../src/utils/image-url';
 
 interface EnclosureDetail {
   id: string;
@@ -141,11 +142,7 @@ export default function EnclosureDetailScreen() {
   const [incidentOutcome, setIncidentOutcome] = useState('');
   const [submittingIncident, setSubmittingIncident] = useState(false);
 
-  const getImageUrl = (url?: string | null) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    return `https://tarantuverse-api.onrender.com${url}`;
-  };
+  // getImageUrl moved to src/utils/image-url.ts; honors EXPO_PUBLIC_API_URL.
 
   useEffect(() => {
     fetchAll();

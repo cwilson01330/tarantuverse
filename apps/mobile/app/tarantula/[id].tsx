@@ -25,6 +25,7 @@ import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleto
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { formatLocalDate } from '../../src/utils/date';
+import { getImageUrl } from '../../src/utils/image-url';
 // notifications imported dynamically below to avoid expo-notifications crashing at module load time
 
 interface TarantulaDetail {
@@ -457,17 +458,8 @@ export default function TarantulaDetailScreen() {
     );
   };
 
-  // Helper to get full image URL (handles both R2 and local storage URLs)
-  const getImageUrl = (url: string | undefined): string => {
-    if (!url) return '';
-    // If URL starts with http, it's already absolute (R2)
-    if (url.startsWith('http')) {
-      return url;
-    }
-    // Otherwise it's local storage, prepend API base
-    const apiBase = 'https://tarantuverse-api.onrender.com';
-    return `${apiBase}${url}`;
-  };
+  // getImageUrl moved to src/utils/image-url.ts so dev/staging builds
+  // honor EXPO_PUBLIC_API_URL instead of always hitting prod.
 
   // Refetch on focus — runs after returning from edit/add/delete child
   // routes. Critical: include fetchTarantula() because edit mutates the

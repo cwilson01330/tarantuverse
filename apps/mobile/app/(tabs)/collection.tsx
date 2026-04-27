@@ -21,6 +21,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import TarantulaCardSkeleton from '../../src/components/TarantulaCardSkeleton';
 import PremoltAlertCard from '../../src/components/PremoltAlertCard';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
+import { getImageUrl } from '../../src/utils/image-url';
 
 interface Tarantula {
   id: string;
@@ -95,15 +96,8 @@ function CollectionScreen() {
   };
 
   // Helper function to handle both R2 (absolute) and local (relative) URLs
-  const getImageUrl = (url?: string) => {
-    if (!url) return '';
-    // If URL starts with http, it's already absolute (R2)
-    if (url.startsWith('http')) {
-      return url;
-    }
-    // Otherwise, it's a local path - prepend the API base URL
-    return `https://tarantuverse-api.onrender.com${url}`;
-  };
+  // getImageUrl now lives in src/utils/image-url.ts so dev/staging
+  // builds use EXPO_PUBLIC_API_URL instead of the hardcoded prod host.
 
   useEffect(() => {
     fetchTarantulas();

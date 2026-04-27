@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { getImageUrl } from '../../src/utils/image-url';
 
 interface Enclosure {
   id: string;
@@ -32,12 +33,6 @@ export default function EnclosuresScreen() {
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  const getImageUrl = (url?: string | null) => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    return `https://tarantuverse-api.onrender.com${url}`;
-  };
 
   useEffect(() => {
     fetchEnclosures();

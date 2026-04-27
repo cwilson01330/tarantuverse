@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { getImageUrl } from '../utils/image-url';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,16 +38,8 @@ export default function PhotoViewer({ visible, photos, initialIndex, onClose }: 
     setCurrentIndex(initialIndex);
   }, [initialIndex]);
 
-  // Helper to get full image URL (handles both R2 and local storage URLs)
-  const getImageUrl = (url: string | undefined): string => {
-    if (!url) return '';
-    // If URL starts with http, it's already absolute (R2)
-    if (url.startsWith('http')) {
-      return url;
-    }
-    // Otherwise it's local storage, prepend API base
-    return `https://tarantuverse-api.onrender.com${url}`;
-  };
+  // getImageUrl moved to src/utils/image-url.ts so dev/staging builds
+  // honor EXPO_PUBLIC_API_URL instead of always hitting prod.
 
   if (photos.length === 0) return null;
 
