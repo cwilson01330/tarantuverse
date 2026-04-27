@@ -643,8 +643,14 @@ function WeightLogList({
       ),
     [logs],
   )
-  const visible = sorted.slice(0, 10)
-  if (visible.length === 0) return null
+  // Preview slice. Toggle below the list lets a keeper see the full
+  // history when they want it instead of only the most recent N.
+  // (Replaces the silent "Showing most recent 10 of N" footer that
+  // gave no way to reveal the rest.)
+  const PREVIEW_COUNT = 10
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? sorted : sorted.slice(0, PREVIEW_COUNT)
+  if (sorted.length === 0) return null
 
   return (
     <div className="space-y-1.5">
@@ -676,10 +682,16 @@ function WeightLogList({
           </li>
         ))}
       </ul>
-      {sorted.length > 10 && (
-        <p className="text-xs text-neutral-600">
-          Showing most recent 10 of {sorted.length}.
-        </p>
+      {sorted.length > PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-xs text-neutral-400 hover:text-neutral-200 underline-offset-2 hover:underline"
+        >
+          {showAll
+            ? `Show only the most recent ${PREVIEW_COUNT}`
+            : `Show all ${sorted.length}`}
+        </button>
       )}
     </div>
   )
@@ -1103,8 +1115,11 @@ function FeedingList({
       ),
     [feedings],
   )
-  const visible = sorted.slice(0, 10)
-  if (visible.length === 0) return null
+  // Preview slice + toggle, matching the weigh-ins section pattern.
+  const PREVIEW_COUNT = 10
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? sorted : sorted.slice(0, PREVIEW_COUNT)
+  if (sorted.length === 0) return null
 
   const bwG = snakeWeightG ? Number(snakeWeightG) : null
 
@@ -1161,10 +1176,16 @@ function FeedingList({
           )
         })}
       </ul>
-      {sorted.length > 10 && (
-        <p className="text-xs text-neutral-600">
-          Showing most recent 10 of {sorted.length}.
-        </p>
+      {sorted.length > PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-xs text-neutral-400 hover:text-neutral-200 underline-offset-2 hover:underline"
+        >
+          {showAll
+            ? `Show only the most recent ${PREVIEW_COUNT}`
+            : `Show all ${sorted.length}`}
+        </button>
       )}
     </div>
   )
@@ -1315,8 +1336,13 @@ function ShedList({
       ),
     [sheds],
   )
-  const visible = sorted.slice(0, 5)
-  if (visible.length === 0) return null
+  // Sheds preview at 5 (lower than weigh-ins/feedings since sheds
+  // are rarer events and the full list is more reasonable to expose
+  // by default once a keeper has been at it for years).
+  const PREVIEW_COUNT = 5
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? sorted : sorted.slice(0, PREVIEW_COUNT)
+  if (sorted.length === 0) return null
 
   return (
     <div className="space-y-1.5">
@@ -1356,6 +1382,17 @@ function ShedList({
           </li>
         ))}
       </ul>
+      {sorted.length > PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-xs text-neutral-400 hover:text-neutral-200 underline-offset-2 hover:underline"
+        >
+          {showAll
+            ? `Show only the most recent ${PREVIEW_COUNT}`
+            : `Show all ${sorted.length}`}
+        </button>
+      )}
     </div>
   )
 }

@@ -646,8 +646,11 @@ function WeightLogList({
       ),
     [logs],
   )
-  const visible = sorted.slice(0, 10)
-  if (visible.length === 0) return null
+  // Preview slice + toggle — see SnakeDetailClient for the rationale.
+  const PREVIEW_COUNT = 10
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? sorted : sorted.slice(0, PREVIEW_COUNT)
+  if (sorted.length === 0) return null
 
   return (
     <div className="space-y-1.5">
@@ -679,10 +682,16 @@ function WeightLogList({
           </li>
         ))}
       </ul>
-      {sorted.length > 10 && (
-        <p className="text-xs text-neutral-600">
-          Showing most recent 10 of {sorted.length}.
-        </p>
+      {sorted.length > PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-xs text-neutral-400 hover:text-neutral-200 underline-offset-2 hover:underline"
+        >
+          {showAll
+            ? `Show only the most recent ${PREVIEW_COUNT}`
+            : `Show all ${sorted.length}`}
+        </button>
       )}
     </div>
   )
@@ -1117,8 +1126,11 @@ function FeedingList({
       ),
     [feedings],
   )
-  const visible = sorted.slice(0, 10)
-  if (visible.length === 0) return null
+  // Preview slice + toggle, matches weigh-ins pattern.
+  const PREVIEW_COUNT = 10
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? sorted : sorted.slice(0, PREVIEW_COUNT)
+  if (sorted.length === 0) return null
 
   const bwG = lizardWeightG ? Number(lizardWeightG) : null
 
@@ -1175,10 +1187,16 @@ function FeedingList({
           )
         })}
       </ul>
-      {sorted.length > 10 && (
-        <p className="text-xs text-neutral-600">
-          Showing most recent 10 of {sorted.length}.
-        </p>
+      {sorted.length > PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-xs text-neutral-400 hover:text-neutral-200 underline-offset-2 hover:underline"
+        >
+          {showAll
+            ? `Show only the most recent ${PREVIEW_COUNT}`
+            : `Show all ${sorted.length}`}
+        </button>
       )}
     </div>
   )
@@ -1329,8 +1347,11 @@ function ShedList({
       ),
     [sheds],
   )
-  const visible = sorted.slice(0, 5)
-  if (visible.length === 0) return null
+  // Sheds preview at 5; toggle reveals the full history.
+  const PREVIEW_COUNT = 5
+  const [showAll, setShowAll] = useState(false)
+  const visible = showAll ? sorted : sorted.slice(0, PREVIEW_COUNT)
+  if (sorted.length === 0) return null
 
   return (
     <div className="space-y-1.5">
@@ -1370,6 +1391,17 @@ function ShedList({
           </li>
         ))}
       </ul>
+      {sorted.length > PREVIEW_COUNT && (
+        <button
+          type="button"
+          onClick={() => setShowAll((v) => !v)}
+          className="text-xs text-neutral-400 hover:text-neutral-200 underline-offset-2 hover:underline"
+        >
+          {showAll
+            ? `Show only the most recent ${PREVIEW_COUNT}`
+            : `Show all ${sorted.length}`}
+        </button>
+      )}
     </div>
   )
 }
