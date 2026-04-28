@@ -60,6 +60,9 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "gwizard202"
+    "owner": "gwizard202",
+    "updates": {
+      "url": "https://u.expo.dev/8f745ac0-847d-4a69-93b3-a3a31970d616"
+    }
   }
 }

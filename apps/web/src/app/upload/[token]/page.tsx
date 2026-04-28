@@ -2,8 +2,34 @@
 
 /**
  * Mobile browser photo upload page.
- * Opened by scanning a QR code — no login required.
- * Designed to be used entirely on a phone screen.
+ *
+ * Opened by scanning a QR code from any of:
+ *   - Tarantuverse mobile (tarantula sessions)
+ *   - Herpetoverse mobile (snake / lizard sessions)
+ *
+ * No login required — the URL token is the credential. Page is designed
+ * to be used entirely on a phone screen, so styles are inline + dense
+ * to avoid render flashes from external CSS during cold starts.
+ *
+ * Why a single page handles all three taxa instead of separate routes
+ * per brand: the QR session token is created against a single API +
+ * single database. Routing by taxon would require either a backend
+ * URL-resolution change or a bunch of redirect hops. This page reads
+ * the taxon from the session-info response and switches glyph, brand
+ * label, and gradient palette accordingly.
+ *
+ * Backend contract — `GET /upload-sessions/{token}` returns:
+ *   {
+ *     valid: true,
+ *     taxon: 'tarantula' | 'snake' | 'lizard',
+ *     display_name: string,        // server-formatted, name|common|sci
+ *     common_name: string | null,
+ *     scientific_name: string | null,
+ *     photo_url: string | null,
+ *     expires_at: string,
+ *     uploads_so_far: number,
+ *     tarantula_name?: string,     // back-compat, only for tarantula taxon
+ *   }
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -11,9 +37,14 @@ import { useParams } from 'next/navigation'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
 
+type Taxon = 'tarantula' | 'snake' | 'lizard'
+
 interface SessionInfo {
   valid: boolean
-  tarantula_name: string
+  taxon?: Taxon
+  display_name?: string
+  /** Legacy field, only present for tarantula sessions. */
+  tarantula_name?: string
   common_name: string | null
   scientific_name: string | null
   photo_url: string | null
@@ -21,7 +52,65 @@ interface SessionInfo {
   uploads_so_far: number
 }
 
-type PageState = 'loading' | 'ready' | 'uploading' | 'success' | 'expired' | 'error'
+type PageState =
+  | 'loading'
+  | 'ready'
+  | 'uploading'
+  | 'success'
+  | 'expired'
+  | 'error'
+
+// ---------------------------------------------------------------------------
+// Branding — taxon-aware glyph, brand label, and gradient. Tarantuverse
+// keeps the original purple/pink palette; snake + lizard adopt the
+// Herpetoverse emerald palette so the upload page reads on-brand
+// regardless of which mobile app generated the QR.
+// ---------------------------------------------------------------------------
+
+interface Branding {
+  glyph: string
+  brand: string
+  pageGradient: string
+  buttonGradient: string
+}
+
+function brandingFor(taxon: Taxon | undefined): Branding {
+  switch (taxon) {
+    case 'snake':
+      return {
+        glyph: '🐍',
+        brand: 'Herpetoverse',
+        pageGradient:
+          'linear-gradient(135deg, #06140e 0%, #0f3325 50%, #06140e 100%)',
+        buttonGradient: 'linear-gradient(135deg,#10b981,#34d399)',
+      }
+    case 'lizard':
+      return {
+        glyph: '🦎',
+        brand: 'Herpetoverse',
+        pageGradient:
+          'linear-gradient(135deg, #06140e 0%, #0f3325 50%, #06140e 100%)',
+        buttonGradient: 'linear-gradient(135deg,#10b981,#34d399)',
+      }
+    // Default: tarantula (also handles legacy/missing taxon field).
+    default:
+      return {
+        glyph: '🕷️',
+        brand: 'Tarantuverse',
+        pageGradient:
+          'linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 50%, #1a0a2e 100%)',
+        buttonGradient: 'linear-gradient(135deg,#a855f7,#ec4899)',
+      }
+  }
+}
+
+// Resolve a display name from any of the response shapes — `display_name`
+// is the modern field, `tarantula_name` is the legacy one. Final fallback
+// is "this animal" so we never render "undefined" in the success copy.
+function displayNameFrom(info: SessionInfo | null): string {
+  if (!info) return 'this animal'
+  return info.display_name || info.tarantula_name || 'this animal'
+}
 
 export default function UploadPage() {
   const { token } = useParams<{ token: string }>()
@@ -67,11 +156,24 @@ export default function UploadPage() {
     form.append('file', selectedFile)
 
     try {
-      const res = await fetch(`${API}/api/v1/upload-sessions/${token}/photo`, {
-        method: 'POST',
-        body: form,
-      })
-      if (res.status === 410) { setPageState('expired'); return }
+      const res = await fetch(
+        `${API}/api/v1/upload-sessions/${token}/photo`,
+        {
+          method: 'POST',
+          body: form,
+        },
+      )
+      if (res.status === 410) {
+        setPageState('expired')
+        return
+      }
+      if (res.status === 429) {
+        // Per-session upload cap reached — surface honestly, the keeper
+        // can generate a new session if they need more.
+        setErrorMsg('This QR session has hit its upload limit. Generate a new QR to keep going.')
+        setPageState('ready')
+        return
+      }
       if (!res.ok) throw new Error('Upload failed')
       const data = await res.json()
       setUploadCount(data.uploads_this_session)
@@ -85,14 +187,22 @@ export default function UploadPage() {
   const handleAnother = () => {
     setSelectedFile(null)
     setPreview(null)
+    setErrorMsg('')
     setPageState('ready')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  // Resolve branding once per render — `sessionInfo?.taxon` is undefined
+  // during loading/error states; `brandingFor` defaults to Tarantuverse
+  // for those, which is fine because the loading screen only shows the
+  // glyph for ~200ms.
+  const branding = brandingFor(sessionInfo?.taxon)
+  const animalName = displayNameFrom(sessionInfo)
+
   // ── styles (inline so this page is fully self-contained) ──────────────────
   const page: React.CSSProperties = {
     minHeight: '100dvh',
-    background: 'linear-gradient(135deg, #1a0a2e 0%, #2d1b4e 50%, #1a0a2e 100%)',
+    background: branding.pageGradient,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -122,12 +232,12 @@ export default function UploadPage() {
     letterSpacing: '1px',
     textTransform: 'uppercase',
   }
-  const spiderName: React.CSSProperties = {
+  const animalNameStyle: React.CSSProperties = {
     fontSize: '22px',
     fontWeight: '700',
     marginBottom: '4px',
   }
-  const spiderSci: React.CSSProperties = {
+  const animalSci: React.CSSProperties = {
     fontSize: '14px',
     fontStyle: 'italic',
     opacity: 0.6,
@@ -168,7 +278,7 @@ export default function UploadPage() {
     return (
       <div style={page}>
         <div style={card}>
-          <div style={logo}>🕷️</div>
+          <div style={logo}>{branding.glyph}</div>
           <p style={{ opacity: 0.6 }}>Loading session…</p>
         </div>
       </div>
@@ -182,7 +292,8 @@ export default function UploadPage() {
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏱️</div>
           <h2 style={{ marginBottom: '8px' }}>Session Expired</h2>
           <p style={{ opacity: 0.6, fontSize: '15px' }}>
-            This QR code has expired. Go back to the web app and generate a new one.
+            This QR code has expired. Go back to the app and generate a new
+            one — sessions last 20 minutes.
           </p>
         </div>
       </div>
@@ -196,7 +307,8 @@ export default function UploadPage() {
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>❌</div>
           <h2 style={{ marginBottom: '8px' }}>Invalid Link</h2>
           <p style={{ opacity: 0.6, fontSize: '15px' }}>
-            This upload link is invalid or has already been used. Please scan a fresh QR code.
+            This upload link is invalid or has already been used. Please scan
+            a fresh QR code.
           </p>
         </div>
       </div>
@@ -208,15 +320,21 @@ export default function UploadPage() {
       <div style={page}>
         <div style={card}>
           <div style={{ fontSize: '56px', marginBottom: '16px' }}>✅</div>
-          <h2 style={{ marginBottom: '8px', fontSize: '22px' }}>Photo Added!</h2>
+          <h2 style={{ marginBottom: '8px', fontSize: '22px' }}>
+            Photo Added!
+          </h2>
           <p style={{ opacity: 0.7, fontSize: '15px', marginBottom: '24px' }}>
-            {sessionInfo?.tarantula_name} now has {uploadCount} photo{uploadCount !== 1 ? 's' : ''} this session.
+            {animalName} now has {uploadCount} photo
+            {uploadCount !== 1 ? 's' : ''} this session.
           </p>
-          <button style={btn('linear-gradient(135deg,#a855f7,#ec4899)')} onClick={handleAnother}>
+          <button
+            style={btn(branding.buttonGradient)}
+            onClick={handleAnother}
+          >
             📸 Add Another Photo
           </button>
           <p style={{ opacity: 0.4, fontSize: '13px', marginTop: '8px' }}>
-            Photos appear in the web app instantly.
+            Photos appear in the app instantly.
           </p>
         </div>
       </div>
@@ -227,22 +345,31 @@ export default function UploadPage() {
   return (
     <div style={page}>
       <div style={card}>
-        <div style={logo}>🕷️</div>
-        <p style={brand}>Tarantuverse</p>
+        <div style={logo}>{branding.glyph}</div>
+        <p style={brand}>{branding.brand}</p>
 
-        <p style={spiderName}>{sessionInfo?.tarantula_name}</p>
+        <p style={animalNameStyle}>{animalName}</p>
         {sessionInfo?.scientific_name && (
-          <p style={spiderSci}>{sessionInfo.scientific_name}</p>
+          <p style={animalSci}>{sessionInfo.scientific_name}</p>
         )}
 
         {uploadCount > 0 && (
           <span style={badge}>
-            {uploadCount} photo{uploadCount !== 1 ? 's' : ''} uploaded this session
+            {uploadCount} photo{uploadCount !== 1 ? 's' : ''} uploaded this
+            session
           </span>
         )}
 
         {errorMsg && (
-          <p style={{ color: '#ff6b6b', fontSize: '14px', marginBottom: '12px' }}>{errorMsg}</p>
+          <p
+            style={{
+              color: '#ff6b6b',
+              fontSize: '14px',
+              marginBottom: '12px',
+            }}
+          >
+            {errorMsg}
+          </p>
         )}
 
         {preview ? (
@@ -250,11 +377,15 @@ export default function UploadPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={preview} alt="Preview" style={previewImg} />
             <button
-              style={btn(pageState === 'uploading' ? '#666' : 'linear-gradient(135deg,#a855f7,#ec4899)')}
+              style={btn(
+                pageState === 'uploading' ? '#666' : branding.buttonGradient,
+              )}
               onClick={handleUpload}
               disabled={pageState === 'uploading'}
             >
-              {pageState === 'uploading' ? '⏳ Uploading…' : '⬆️ Upload This Photo'}
+              {pageState === 'uploading'
+                ? '⏳ Uploading…'
+                : '⬆️ Upload This Photo'}
             </button>
             <button
               style={{ ...btn('rgba(255,255,255,0.1)'), marginBottom: 0 }}
@@ -267,7 +398,7 @@ export default function UploadPage() {
         ) : (
           <>
             <button
-              style={btn('linear-gradient(135deg,#a855f7,#ec4899)')}
+              style={btn(branding.buttonGradient)}
               onClick={() => fileInputRef.current?.click()}
             >
               📷 Take or Choose Photo
