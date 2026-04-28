@@ -20,7 +20,7 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Alert,
@@ -54,6 +54,7 @@ import {
 } from '../lib/photos';
 
 export function ReptilePhotoGalleryScreen({ taxon }: { taxon: PhotoTaxon }) {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
 
@@ -297,18 +298,47 @@ export function ReptilePhotoGalleryScreen({ taxon }: { taxon: PhotoTaxon }) {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.pickerRow}>
-              <PickerButton
-                icon="camera"
-                label="Camera"
-                onPress={pickFromCamera}
-              />
-              <PickerButton
-                icon="image-multiple"
-                label="Library"
-                onPress={pickFromLibrary}
-              />
-            </View>
+            <>
+              <View style={styles.pickerRow}>
+                <PickerButton
+                  icon="camera"
+                  label="Camera"
+                  onPress={pickFromCamera}
+                />
+                <PickerButton
+                  icon="image-multiple"
+                  label="Library"
+                  onPress={pickFromLibrary}
+                />
+              </View>
+              {/* QR upload session — for handing off to another device.
+                  Pinned below the picker so it's discoverable but doesn't
+                  crowd the primary path (camera/library). */}
+              <TouchableOpacity
+                onPress={() => {
+                  if (!id) return;
+                  const path =
+                    taxon === 'snake'
+                      ? `/reptile/qr/${id}`
+                      : `/lizard/qr/${id}`;
+                  router.push(path as never);
+                }}
+                style={styles.qrShortcut}
+                accessibilityRole="button"
+                accessibilityLabel="Share an upload link"
+              >
+                <MaterialCommunityIcons
+                  name="qrcode-scan"
+                  size={16}
+                  color={colors.primary}
+                />
+                <Text
+                  style={[styles.qrShortcutText, { color: colors.primary }]}
+                >
+                  Share a 20-min upload link →
+                </Text>
+              </TouchableOpacity>
+            </>
           )}
 
           {pickedUri && (
@@ -585,6 +615,18 @@ const styles = StyleSheet.create({
   },
   pickerBtnLabel: {
     fontSize: 13,
+    fontWeight: '600',
+  },
+  qrShortcut: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingVertical: 6,
+  },
+  qrShortcutText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   previewWrap: {
