@@ -497,21 +497,33 @@ function WeightStats({
     return sorted[0] || null
   }, [logs])
 
-  const loss30d = trend?.loss_pct_30d
-    ? fmtDecimal(trend.loss_pct_30d, 1)
+  // Backend semantics: `loss_pct_30d` is POSITIVE when the snake lost
+  // weight, NEGATIVE when it gained. Convert to a properly-signed
+  // change-percent and display "+X%" / "−X%" / "0%" so a keeper can
+  // tell a gain from a loss at a glance. The previous render leaned
+  // on the leading minus character for both cases — visually
+  // indistinguishable.
+  const lossPct = trend?.loss_pct_30d != null
+    ? Number(trend.loss_pct_30d)
     : null
+  const changeDisplay =
+    lossPct == null || !Number.isFinite(lossPct)
+      ? '—'
+      : lossPct === 0
+        ? '0%'
+        : lossPct > 0
+          ? `−${fmtDecimal(lossPct, 1)}%`        // lost
+          : `+${fmtDecimal(Math.abs(lossPct), 1)}%` // gained
 
   return (
     <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
       <Stat label="Latest" value={fmtGrams(latest) || '—'} />
-      <Stat
-        label="30-day change"
-        value={
-          loss30d != null
-            ? `${Number(loss30d) > 0 ? '−' : ''}${loss30d}%`
-            : '—'
-        }
-      />
+      {/* Label says "30-day" but the backend actually compares against the
+          OLDEST point within the last 30 days — for a snake with two
+          weeks of data, this is a 14-day change. Calling it "Net change"
+          honestly reflects what we're computing without lying about the
+          window. */}
+      <Stat label="Net change" value={changeDisplay} />
       <Stat label="Logs" value={String(logs.length)} />
       <Stat
         label="Last weighed"
