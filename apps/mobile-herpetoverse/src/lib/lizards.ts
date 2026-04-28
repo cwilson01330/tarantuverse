@@ -1,17 +1,34 @@
 /**
  * Lizard API client — mirrors web-herpetoverse/src/lib/lizards.ts.
  *
- * Same surface as snakes.ts. Bundle 4 will add create/delete methods.
+ * Same surface as snakes.ts. Bundle 4 adds create/delete methods.
  *
  * Note on polymorphic logs: WeightLog / FeedingLog / ShedLog rows have
  * both `snake_id` and `lizard_id` columns; exactly one is non-null on
  * any given row. The lizard-context fetchers below filter to lizard
  * rows on the server side, so the response is shape-clean for UI use.
+ *
+ * Note on weight-log path: API uses `/weight-logs`, NOT `/weights`.
+ * Bundle 3 had this wrong and detail screens silently failed to load
+ * weight history.
  */
 import { apiClient } from '../services/api';
-import type { Sex, Source, Visibility, WeightContext } from './snakes';
+import type {
+  CreateFeedingPayload,
+  CreateShedPayload,
+  CreateWeightLogPayload,
+  Sex,
+  Source,
+  Visibility,
+  WeightContext,
+} from './snakes';
 
 export type { Sex, Source, Visibility, WeightContext };
+export type {
+  CreateFeedingPayload,
+  CreateShedPayload,
+  CreateWeightLogPayload,
+};
 
 export interface Lizard {
   id: string;
@@ -100,7 +117,7 @@ export async function getLizard(id: string): Promise<Lizard> {
 
 export async function listWeightLogs(lizardId: string): Promise<WeightLog[]> {
   const { data } = await apiClient.get<WeightLog[]>(
-    `/lizards/${encodeURIComponent(lizardId)}/weights`,
+    `/lizards/${encodeURIComponent(lizardId)}/weight-logs`,
   );
   return data;
 }
@@ -118,6 +135,85 @@ export async function listSheds(lizardId: string): Promise<ShedLog[]> {
   );
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Mutations — Bundle 4
+// ---------------------------------------------------------------------------
+
+export interface CreateLizardPayload {
+  name?: string | null;
+  common_name?: string | null;
+  scientific_name?: string | null;
+  reptile_species_id?: string | null;
+  enclosure_id?: string | null;
+  sex?: Sex | null;
+  hatch_date?: string | null;
+  date_acquired?: string | null;
+  source?: Source | null;
+  current_weight_g?: string | number | null;
+  notes?: string | null;
+}
+
+export async function createLizard(payload: CreateLizardPayload): Promise<Lizard> {
+  const { data } = await apiClient.post<Lizard>('/lizards/', payload);
+  return data;
+}
+
+/**
+ * Update a lizard. Reuses CreateLizardPayload because the form surface
+ * is the same — backend LizardUpdate inherits LizardBase (all fields
+ * optional).
+ */
+export async function updateLizard(
+  id: string,
+  payload: CreateLizardPayload,
+): Promise<Lizard> {
+  const { data } = await apiClient.put<Lizard>(
+    `/lizards/${encodeURIComponent(id)}`,
+    payload,
+  );
+  return data;
+}
+
+export async function deleteLizard(id: string): Promise<void> {
+  await apiClient.delete(`/lizards/${encodeURIComponent(id)}`);
+}
+
+export async function createWeightLog(
+  lizardId: string,
+  payload: CreateWeightLogPayload,
+): Promise<WeightLog> {
+  const { data } = await apiClient.post<WeightLog>(
+    `/lizards/${encodeURIComponent(lizardId)}/weight-logs`,
+    payload,
+  );
+  return data;
+}
+
+export async function createFeeding(
+  lizardId: string,
+  payload: CreateFeedingPayload,
+): Promise<FeedingLog> {
+  const { data } = await apiClient.post<FeedingLog>(
+    `/lizards/${encodeURIComponent(lizardId)}/feedings`,
+    payload,
+  );
+  return data;
+}
+
+export async function createShed(
+  lizardId: string,
+  payload: CreateShedPayload,
+): Promise<ShedLog> {
+  const { data } = await apiClient.post<ShedLog>(
+    `/lizards/${encodeURIComponent(lizardId)}/sheds`,
+    payload,
+  );
+  return data;
+}
+
+// Delete endpoints are global (no taxon prefix) so reuse from snakes.ts.
+export { deleteFeeding, deleteShed, deleteWeightLog } from './snakes';
 
 // ---------------------------------------------------------------------------
 // Display helpers

@@ -12,9 +12,10 @@
  * via a hard-error state if the snake fetch fails since there's nothing
  * to render below it.
  */
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -22,6 +23,7 @@ import {
   FeedingsList,
   LoadingShell,
   LogActions,
+  PhotosStrip,
   ReptileHero,
   RetryError,
   Section,
@@ -39,6 +41,7 @@ import {
   listWeightLogs,
   snakeTitle,
 } from '../../src/lib/snakes';
+import { type Photo, listPhotos } from '../../src/lib/photos';
 
 function SnakeDetailScreen() {
   const router = useRouter();
@@ -50,17 +53,20 @@ function SnakeDetailScreen() {
   const [weights, setWeights] = useState<WeightLog[]>([]);
   const [feedings, setFeedings] = useState<FeedingLog[]>([]);
   const [sheds, setSheds] = useState<ShedLog[]>([]);
+  const [photos, setPhotos] = useState<Photo[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
-    const [snakeR, weightsR, feedingsR, shedsR] = await Promise.allSettled([
-      getSnake(id),
-      listWeightLogs(id),
-      listFeedings(id),
-      listSheds(id),
-    ]);
+    const [snakeR, weightsR, feedingsR, shedsR, photosR] =
+      await Promise.allSettled([
+        getSnake(id),
+        listWeightLogs(id),
+        listFeedings(id),
+        listSheds(id),
+        listPhotos('snake', id),
+      ]);
 
     if (snakeR.status === 'fulfilled') {
       setSnake(snakeR.value);
@@ -71,18 +77,24 @@ function SnakeDetailScreen() {
     if (weightsR.status === 'fulfilled') setWeights(weightsR.value);
     if (feedingsR.status === 'fulfilled') setFeedings(feedingsR.value);
     if (shedsR.status === 'fulfilled') setSheds(shedsR.value);
+    if (photosR.status === 'fulfilled') setPhotos(photosR.value);
   }, [id]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    fetchAll().finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchAll]);
+  // useFocusEffect re-fires when the user returns from a log-entry
+  // screen (Bundle 4), so the just-saved row shows up without forcing
+  // a manual pull-to-refresh.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setLoading(true);
+      fetchAll().finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [fetchAll]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -127,6 +139,22 @@ function SnakeDetailScreen() {
         options={{
           title: snakeTitle(snake),
           headerBackTitle: 'Back',
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() =>
+                router.push(`/reptile/edit/${snake.id}` as never)
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Edit reptile"
+              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
+            >
+              <MaterialCommunityIcons
+                name="pencil-outline"
+                size={22}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          ),
         }}
       />
       <ScrollView
@@ -152,13 +180,25 @@ function SnakeDetailScreen() {
         />
 
         <LogActions
-          // Bundle 4 will replace these with screens that prefill the
-          // taxon + animal id from this route. For now they fall through
-          // to the add-reptile stub so we keep one navigation surface.
-          onLogFeeding={() => router.push('/reptile/add' as never)}
-          onLogWeight={() => router.push('/reptile/add' as never)}
-          onLogShed={() => router.push('/reptile/add' as never)}
+          onLogFeeding={() =>
+            router.push(`/reptile/log-feeding/${snake.id}` as never)
+          }
+          onLogWeight={() =>
+            router.push(`/reptile/log-weight/${snake.id}` as never)
+          }
+          onLogShed={() =>
+            router.push(`/reptile/log-shed/${snake.id}` as never)
+          }
         />
+
+        <Section title="Photos">
+          <PhotosStrip
+            photos={photos}
+            onOpenGallery={() =>
+              router.push(`/reptile/photos/${snake.id}` as never)
+            }
+          />
+        </Section>
 
         <Section title="Recent weigh-ins">
           <WeighInsList logs={weights} />
