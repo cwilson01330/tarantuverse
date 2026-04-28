@@ -437,7 +437,12 @@ export default function ManageUsersPage() {
 
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        {/* min-w-[1100px] forces the table to keep its full
+                            content width on narrow viewports; the overflow
+                            wrapper above provides horizontal scrolling so
+                            the Actions column never gets squeezed into
+                            one-character-per-line wrap territory. */}
+                        <table className="w-full min-w-[1100px]">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -526,7 +531,7 @@ export default function ManageUsersPage() {
                                                         <button
                                                             onClick={() => handleManualVerify(user.id, user.email)}
                                                             disabled={manualVerifyLoading === user.id}
-                                                            className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
+                                                            className="inline-flex items-center gap-1 whitespace-nowrap text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
                                                         >
                                                             {manualVerifyLoading === user.id ? (
                                                                 'Verifying...'
@@ -537,7 +542,7 @@ export default function ManageUsersPage() {
                                                         <button
                                                             onClick={() => handleResendVerification(user.id, user.email)}
                                                             disabled={verifyLoading === user.id}
-                                                            className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
+                                                            className="whitespace-nowrap text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
                                                         >
                                                             {verifyLoading === user.id ? 'Sending...' : 'Resend Verification'}
                                                         </button>
@@ -546,7 +551,7 @@ export default function ManageUsersPage() {
                                                 <button
                                                     onClick={() => handleResetPassword(user.id, user.email)}
                                                     disabled={resetLoading === user.id}
-                                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium disabled:opacity-50"
+                                                    className="whitespace-nowrap text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium disabled:opacity-50"
                                                 >
                                                     {resetLoading === user.id ? 'Sending...' : 'Send Reset Email'}
                                                 </button>
@@ -554,7 +559,7 @@ export default function ManageUsersPage() {
                                                     <button
                                                         onClick={() => handleRevokePremium(user.id, user.username)}
                                                         disabled={revokeLoading === user.id}
-                                                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50"
+                                                        className="inline-flex items-center gap-1 whitespace-nowrap text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50"
                                                     >
                                                         {revokeLoading === user.id ? (
                                                             'Revoking...'
@@ -566,7 +571,7 @@ export default function ManageUsersPage() {
                                                     <button
                                                         onClick={() => handleGrantPremium(user.id, user.username)}
                                                         disabled={grantLoading === user.id}
-                                                        className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
+                                                        className="inline-flex items-center gap-1 whitespace-nowrap text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
                                                     >
                                                         {grantLoading === user.id ? (
                                                             'Granting...'
@@ -580,7 +585,7 @@ export default function ManageUsersPage() {
                                                     <button
                                                         onClick={() => handleDeleteUser(user.id, user.username, user.email)}
                                                         disabled={deleteLoading === user.id}
-                                                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600"
+                                                        className="inline-flex items-center gap-1 whitespace-nowrap text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600"
                                                     >
                                                         {deleteLoading === user.id ? (
                                                             'Deleting...'
