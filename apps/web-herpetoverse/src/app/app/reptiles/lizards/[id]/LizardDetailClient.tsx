@@ -38,6 +38,7 @@ import {
 } from 'recharts'
 import { ApiError } from '@/lib/apiClient'
 import PhotoGallery from '@/components/PhotoGallery'
+import ReptileQRModal from '@/components/ReptileQRModal'
 import {
   CreateFeedingPayload,
   CreateShedPayload,
@@ -94,6 +95,9 @@ export default function LizardDetailClient({ lizardId }: { lizardId: string }) {
 
   // Loading flags, coarse
   const [loading, setLoading] = useState(true)
+
+  // QR upload-session modal
+  const [qrOpen, setQrOpen] = useState(false)
 
   const refetchAll = useCallback(async () => {
     const [lizardR, weightsR, trendR, preyR, feedingsR, shedsR] =
@@ -228,14 +232,42 @@ export default function LizardDetailClient({ lizardId }: { lizardId: string }) {
       <BackLink />
       <LizardHeader lizard={lizard} suggestion={preySuggestion} />
 
-      <Section title="Photos">
+      {/* Photos section — heading + QR action live in a flex row so the
+          existing PhotoGallery styling stays untouched. The QR button
+          opens a modal that generates a 20-min upload session a guest
+          can scan from another phone. */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-herp-lime font-medium">
+            Photos
+          </h2>
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-800 text-xs font-medium text-neutral-300 hover:text-herp-lime hover:border-herp-teal/40 transition-colors"
+            aria-label="Generate QR code for photo upload"
+          >
+            <span aria-hidden="true">📱</span>
+            QR upload
+          </button>
+        </div>
         <PhotoGallery
           animalId={lizard.id}
           taxon="lizard"
           mainPhotoUrl={lizard.photo_url}
           onMainChanged={refetchLizardOnly}
         />
-      </Section>
+      </section>
+
+      {qrOpen && (
+        <ReptileQRModal
+          taxon="lizard"
+          animalId={lizard.id}
+          animalName={lizardTitle(lizard)}
+          onClose={() => setQrOpen(false)}
+          onPhotoAdded={refetchLizardOnly}
+        />
+      )}
 
       <Section title="Weight">
         {weightError && <InlineError message={weightError} />}
