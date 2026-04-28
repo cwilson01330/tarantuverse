@@ -11,7 +11,16 @@ import { format } from 'date-fns';
 // (especially with rounded-full + tight padding) and read as "broken
 // badge stuck on the pill" rather than as a coherent pill. SVG icons
 // respect text-baseline and font-size cleanly.
-import { Check, AlertTriangle, Gem, X, Trash2 } from 'lucide-react';
+import {
+    Check,
+    AlertTriangle,
+    Gem,
+    X,
+    Trash2,
+    MoreVertical,
+    Mail,
+    KeyRound,
+} from 'lucide-react';
 
 interface User {
     id: string;
@@ -37,6 +46,57 @@ export default function ManageUsersPage() {
     const [verifyAllLoading, setVerifyAllLoading] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Per-row action menu — collapses the 4–6 action buttons that used to
+    // overflow horizontally into a single ⋮ trigger that opens a fixed-
+    // positioned dropdown next to the button. Tracking the bounding rect
+    // (instead of using absolute positioning inside the cell) avoids the
+    // table's `overflow-hidden` clipping the menu.
+    const [openMenu, setOpenMenu] = useState<{
+        userId: string;
+        // Anchor point so the menu can render right-aligned with the
+        // trigger button in fixed coordinates.
+        x: number;
+        y: number;
+    } | null>(null);
+
+    // Close the action menu on outside click or Escape, and on scroll
+    // (otherwise the menu floats away from its row when the page scrolls,
+    // which is more confusing than just closing it).
+    useEffect(() => {
+        if (!openMenu) return;
+        function close() {
+            setOpenMenu(null);
+        }
+        function onKey(e: KeyboardEvent) {
+            if (e.key === 'Escape') close();
+        }
+        document.addEventListener('mousedown', close);
+        document.addEventListener('scroll', close, true);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('mousedown', close);
+            document.removeEventListener('scroll', close, true);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [openMenu]);
+
+    function handleOpenMenu(
+        userId: string,
+        e: React.MouseEvent<HTMLButtonElement>,
+    ) {
+        // Stop propagation so the document mousedown listener (which would
+        // immediately close it) doesn't fire on the same click.
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        // Menu width is ~14rem (w-56). Right-align with the button.
+        const MENU_WIDTH = 224;
+        const x = Math.max(8, rect.right - MENU_WIDTH);
+        const y = rect.bottom + 4;
+        setOpenMenu((prev) =>
+            prev?.userId === userId ? null : { userId, x, y },
+        );
+    }
 
     useEffect(() => {
         if (authLoading) return;
@@ -437,12 +497,12 @@ export default function ManageUsersPage() {
 
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
                     <div className="overflow-x-auto">
-                        {/* min-w-[1100px] forces the table to keep its full
-                            content width on narrow viewports; the overflow
-                            wrapper above provides horizontal scrolling so
-                            the Actions column never gets squeezed into
-                            one-character-per-line wrap territory. */}
-                        <table className="w-full min-w-[1100px]">
+                        {/* Actions are now consolidated into a per-row ⋮
+                            dropdown so the table doesn't need horizontal
+                            scrolling at typical desktop widths. The wrapper
+                            keeps overflow-x-auto as a defensive fallback
+                            for narrow tablets. */}
+                        <table className="w-full">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -463,7 +523,7 @@ export default function ManageUsersPage() {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Joined
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Actions
                                     </th>
                                 </tr>
@@ -524,77 +584,31 @@ export default function ManageUsersPage() {
                                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                             {format(new Date(user.created_at), 'MMM d, yyyy')}
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-2">
-                                                {!user.is_verified && (
-                                                    <>
-                                                        <button
-                                                            onClick={() => handleManualVerify(user.id, user.email)}
-                                                            disabled={manualVerifyLoading === user.id}
-                                                            className="inline-flex items-center gap-1 whitespace-nowrap text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
-                                                        >
-                                                            {manualVerifyLoading === user.id ? (
-                                                                'Verifying...'
-                                                            ) : (
-                                                                <><Check className="w-4 h-4" aria-hidden="true" /> Manual Verify</>
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleResendVerification(user.id, user.email)}
-                                                            disabled={verifyLoading === user.id}
-                                                            className="whitespace-nowrap text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 text-sm font-medium disabled:opacity-50"
-                                                        >
-                                                            {verifyLoading === user.id ? 'Sending...' : 'Resend Verification'}
-                                                        </button>
-                                                    </>
-                                                )}
-                                                <button
-                                                    onClick={() => handleResetPassword(user.id, user.email)}
-                                                    disabled={resetLoading === user.id}
-                                                    className="whitespace-nowrap text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium disabled:opacity-50"
-                                                >
-                                                    {resetLoading === user.id ? 'Sending...' : 'Send Reset Email'}
-                                                </button>
-                                                {user.is_premium ? (
-                                                    <button
-                                                        onClick={() => handleRevokePremium(user.id, user.username)}
-                                                        disabled={revokeLoading === user.id}
-                                                        className="inline-flex items-center gap-1 whitespace-nowrap text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50"
-                                                    >
-                                                        {revokeLoading === user.id ? (
-                                                            'Revoking...'
-                                                        ) : (
-                                                            <><X className="w-4 h-4" aria-hidden="true" /> Revoke Premium</>
-                                                        )}
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleGrantPremium(user.id, user.username)}
-                                                        disabled={grantLoading === user.id}
-                                                        className="inline-flex items-center gap-1 whitespace-nowrap text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium disabled:opacity-50"
-                                                    >
-                                                        {grantLoading === user.id ? (
-                                                            'Granting...'
-                                                        ) : (
-                                                            <><Gem className="w-4 h-4" aria-hidden="true" /> Grant Premium</>
-                                                        )}
-                                                    </button>
-                                                )}
-                                                {/* Delete user - don't allow deleting yourself */}
-                                                {user.id !== authUser?.id && (
-                                                    <button
-                                                        onClick={() => handleDeleteUser(user.id, user.username, user.email)}
-                                                        disabled={deleteLoading === user.id}
-                                                        className="inline-flex items-center gap-1 whitespace-nowrap text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium disabled:opacity-50 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600"
-                                                    >
-                                                        {deleteLoading === user.id ? (
-                                                            'Deleting...'
-                                                        ) : (
-                                                            <><Trash2 className="w-4 h-4" aria-hidden="true" /> Delete User</>
-                                                        )}
-                                                    </button>
-                                                )}
-                                            </div>
+                                        <td className="px-6 py-4 text-right">
+                                            {/* Compact per-row action trigger — full menu opens
+                                                via the ⋮ button. A row that has any in-flight
+                                                action (verify/grant/etc.) shows the row-level
+                                                spinner via the busy state on the trigger so
+                                                the keeper still gets feedback while the menu
+                                                is closed. */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleOpenMenu(user.id, e)}
+                                                aria-haspopup="menu"
+                                                aria-expanded={openMenu?.userId === user.id}
+                                                aria-label={`Actions for ${user.username}`}
+                                                className="inline-flex items-center justify-center w-8 h-8 rounded-md text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                                                disabled={
+                                                    resetLoading === user.id ||
+                                                    verifyLoading === user.id ||
+                                                    manualVerifyLoading === user.id ||
+                                                    grantLoading === user.id ||
+                                                    revokeLoading === user.id ||
+                                                    deleteLoading === user.id
+                                                }
+                                            >
+                                                <MoreVertical className="w-5 h-5" aria-hidden="true" />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -603,6 +617,134 @@ export default function ManageUsersPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Per-row action menu — rendered as a fixed-positioned popover
+                outside the table so it isn't clipped by the table's
+                rounded-overflow wrapper. The trigger button computes the
+                anchor coordinates on click; closing happens via the
+                document-level mousedown/scroll/Escape listeners wired up
+                in the useEffect above.
+
+                stopPropagation on the inner div keeps a click inside the
+                menu from immediately closing it. Each menu item closes the
+                menu before invoking its handler so the popover doesn't
+                linger over a row that's about to mutate. */}
+            {openMenu &&
+                (() => {
+                    const u = users.find((x) => x.id === openMenu.userId);
+                    if (!u) return null;
+                    const close = () => setOpenMenu(null);
+                    return (
+                        <div
+                            role="menu"
+                            onMouseDown={(e) => e.stopPropagation()}
+                            style={{
+                                position: 'fixed',
+                                left: openMenu.x,
+                                top: openMenu.y,
+                                width: 224,
+                                zIndex: 50,
+                            }}
+                            className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl py-1 text-sm"
+                        >
+                            {!u.is_verified && (
+                                <>
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            close();
+                                            handleManualVerify(u.id, u.email);
+                                        }}
+                                        disabled={manualVerifyLoading === u.id}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                                    >
+                                        <Check className="w-4 h-4" aria-hidden="true" />
+                                        {manualVerifyLoading === u.id ? 'Verifying…' : 'Manual Verify'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            close();
+                                            handleResendVerification(u.id, u.email);
+                                        }}
+                                        disabled={verifyLoading === u.id}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                                    >
+                                        <Mail className="w-4 h-4" aria-hidden="true" />
+                                        {verifyLoading === u.id ? 'Sending…' : 'Resend Verification'}
+                                    </button>
+                                    <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                                </>
+                            )}
+
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    close();
+                                    handleResetPassword(u.id, u.email);
+                                }}
+                                disabled={resetLoading === u.id}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-left text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                            >
+                                <KeyRound className="w-4 h-4" aria-hidden="true" />
+                                {resetLoading === u.id ? 'Sending…' : 'Send Password Reset'}
+                            </button>
+
+                            {u.is_premium ? (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                        close();
+                                        handleRevokePremium(u.id, u.username);
+                                    }}
+                                    disabled={revokeLoading === u.id}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                                >
+                                    <X className="w-4 h-4" aria-hidden="true" />
+                                    {revokeLoading === u.id ? 'Revoking…' : 'Revoke Premium'}
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                        close();
+                                        handleGrantPremium(u.id, u.username);
+                                    }}
+                                    disabled={grantLoading === u.id}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                                >
+                                    <Gem className="w-4 h-4" aria-hidden="true" />
+                                    {grantLoading === u.id ? 'Granting…' : 'Grant Premium'}
+                                </button>
+                            )}
+
+                            {/* Don't allow deleting yourself */}
+                            {u.id !== authUser?.id && (
+                                <>
+                                    <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            close();
+                                            handleDeleteUser(u.id, u.username, u.email);
+                                        }}
+                                        disabled={deleteLoading === u.id}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                                    >
+                                        <Trash2 className="w-4 h-4" aria-hidden="true" />
+                                        {deleteLoading === u.id ? 'Deleting…' : 'Delete User'}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    );
+                })()}
         </DashboardLayout>
     );
 }
