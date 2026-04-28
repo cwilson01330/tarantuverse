@@ -20,6 +20,7 @@ import { ReactNode, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -28,6 +29,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext';
 import { relativeDays } from '../../utils/relative-days';
 import type { Sex, WeightContext } from '../../lib/snakes';
+import type { Photo } from '../../lib/photos';
 
 // Minimal structural types — shared between snake (snakes.ts has
 // `snake_id: string`) and lizard (lizards.ts has both snake_id and
@@ -212,6 +214,153 @@ function SexChip({ sex }: { sex: Sex | null }) {
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Photos strip — horizontal scroll preview with tap-to-gallery + add CTA.
+// ---------------------------------------------------------------------------
+
+export function PhotosStrip({
+  photos,
+  onOpenGallery,
+}: {
+  photos: Photo[] | null;
+  /** Tapping any thumb or the add tile opens the gallery screen. */
+  onOpenGallery: () => void;
+}) {
+  const { colors, layout } = useTheme();
+
+  // Limit to a recent slice — the gallery has the full set. Mirrors web,
+  // where the detail page surfaces ~6 photos and a "View all" link.
+  const PREVIEW = 6;
+  const visible = photos ? photos.slice(0, PREVIEW) : [];
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={photoStripStyles.row}
+    >
+      {/* Add tile — always first so it's reachable when there are
+          already 6+ photos and the rest scroll off-screen. */}
+      <TouchableOpacity
+        onPress={onOpenGallery}
+        style={[
+          photoStripStyles.addTile,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            borderRadius: layout.radius.md,
+          },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Add photo"
+      >
+        <MaterialCommunityIcons
+          name="camera-plus-outline"
+          size={26}
+          color={colors.primary}
+        />
+        <Text
+          style={[photoStripStyles.addTileLabel, { color: colors.textSecondary }]}
+        >
+          Add
+        </Text>
+      </TouchableOpacity>
+
+      {visible.map((p) => (
+        <TouchableOpacity
+          key={p.id}
+          onPress={onOpenGallery}
+          style={[
+            photoStripStyles.thumb,
+            { borderColor: colors.border, borderRadius: layout.radius.md },
+          ]}
+          accessibilityRole="imagebutton"
+          accessibilityLabel={p.caption ?? 'Reptile photo'}
+        >
+          <Image
+            source={{ uri: p.thumbnail_url ?? p.url }}
+            style={photoStripStyles.thumbImage}
+          />
+        </TouchableOpacity>
+      ))}
+
+      {photos && photos.length > PREVIEW && (
+        <TouchableOpacity
+          onPress={onOpenGallery}
+          style={[
+            photoStripStyles.viewAllTile,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: layout.radius.md,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`View all ${photos.length} photos`}
+        >
+          <Text
+            style={[photoStripStyles.viewAllText, { color: colors.textPrimary }]}
+          >
+            View all
+          </Text>
+          <Text
+            style={[photoStripStyles.viewAllCount, { color: colors.textTertiary }]}
+          >
+            {photos.length}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </ScrollView>
+  );
+}
+
+const photoStripStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  addTile: {
+    width: 84,
+    height: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    gap: 4,
+  },
+  addTileLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  thumb: {
+    width: 84,
+    height: 84,
+    borderWidth: 1,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  viewAllTile: {
+    width: 84,
+    height: 84,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    gap: 2,
+  },
+  viewAllText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  viewAllCount: {
+    fontSize: 11,
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Action row — Log feeding / Log weight / Log shed
