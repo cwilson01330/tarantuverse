@@ -226,8 +226,45 @@ export default function SubscriptionScreen() {
   };
 
   const formatPrice = (product: any) => {
-    // expo-iap uses localizedPrice or price
-    return product.localizedPrice || product.price || 'N/A';
+    // expo-iap exposes a pre-localized price string under different
+    // field names depending on platform + SDK version:
+    //   - iOS (expo-iap 2.7+): `displayPrice` → "$4.99"
+    //   - Android / legacy:    `localizedPrice` → "$4.99"
+    //   - Some shapes:         `priceString`
+    // Prefer the formatted string; only fall back to the raw number if
+    // none of those fields are populated. The previous version went
+    // straight to `product.price` on iOS, which is a float — JS would
+    // stringify it as "4.990000000001" or similar precision artifact
+    // and render that into the UI.
+    const localized =
+      product?.displayPrice ||
+      product?.localizedPrice ||
+      product?.priceString;
+    if (typeof localized === 'string' && localized.trim().length > 0) {
+      return localized;
+    }
+
+    // Raw-number fallback — coerce to number (iOS returns a number,
+    // Android sometimes returns a string), then format with the
+    // product's currency code so rounding + symbol are right.
+    const rawNumber =
+      typeof product?.price === 'number'
+        ? product.price
+        : typeof product?.price === 'string'
+          ? Number(product.price)
+          : NaN;
+    if (!Number.isFinite(rawNumber)) return 'N/A';
+
+    const currency = product?.currency || product?.currencyCode || 'USD';
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency,
+      }).format(rawNumber);
+    } catch {
+      // Unknown currency code — last-resort plain dollar formatting.
+      return `$${rawNumber.toFixed(2)}`;
+    }
   };
 
   const styles = StyleSheet.create({
