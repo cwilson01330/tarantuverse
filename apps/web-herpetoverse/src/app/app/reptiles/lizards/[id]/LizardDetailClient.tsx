@@ -265,6 +265,8 @@ export default function LizardDetailClient({ lizardId }: { lizardId: string }) {
           animalId={lizard.id}
           animalName={lizardTitle(lizard)}
           scientificName={lizard.scientific_name}
+          commonName={lizard.common_name}
+          sex={lizard.sex}
           onClose={() => setQrOpen(false)}
           onPhotoAdded={refetchLizardOnly}
         />

@@ -22,10 +22,9 @@
 import { QRCodeSVG } from 'qrcode.react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-/** Tiny HTML-escape — only used for label text inserted into the print
- *  popup's <title>. Animal names that contain `<` or `&` would otherwise
- *  produce a malformed document title or, worst case, an injection
- *  vector into the popup. */
+/** Tiny HTML-escape — used for label text inserted into the print
+ *  popup. Animal names that contain `<` or `&` would otherwise produce
+ *  a malformed document or, worst case, an injection vector. */
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -33,6 +32,240 @@ function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+}
+
+// ---------------------------------------------------------------------------
+// Label customization — sizes, fonts, color themes
+// ---------------------------------------------------------------------------
+
+interface LabelSize {
+  id: string
+  label: string
+  description: string
+  width: string
+  height: string
+  qrSize: number
+  /** Preview scale via CSS transform — keeps the on-screen label readable
+   *  while the printed dimensions stay accurate. */
+  previewScale: number
+  fontSize: { name: number; sci: number; meta: number; tag: number }
+}
+
+const LABEL_SIZES: LabelSize[] = [
+  {
+    id: 'small',
+    label: 'Small',
+    description: 'Hatchling tub',
+    width: '2in',
+    height: '1.25in',
+    qrSize: 60,
+    previewScale: 1.9,
+    fontSize: { name: 9, sci: 7, meta: 6, tag: 5.5 },
+  },
+  {
+    id: 'medium',
+    label: 'Medium',
+    description: 'Standard enclosure',
+    width: '3in',
+    height: '1.5in',
+    qrSize: 80,
+    previewScale: 1.3,
+    fontSize: { name: 11, sci: 8, meta: 7, tag: 6.5 },
+  },
+  {
+    id: 'large',
+    label: 'Large',
+    description: 'Display / XL tank',
+    width: '4in',
+    height: '2in',
+    qrSize: 110,
+    previewScale: 1.0,
+    fontSize: { name: 14, sci: 10, meta: 8, tag: 7.5 },
+  },
+]
+
+interface LabelFont {
+  id: string
+  label: string
+  stack: string
+}
+
+const LABEL_FONTS: LabelFont[] = [
+  { id: 'sans', label: 'Clean', stack: 'Arial, Helvetica, sans-serif' },
+  { id: 'serif', label: 'Classic', stack: 'Georgia, "Times New Roman", serif' },
+  { id: 'mono', label: 'Mono', stack: '"Courier New", Courier, monospace' },
+  { id: 'rounded', label: 'Round', stack: '"Trebuchet MS", "Segoe UI", sans-serif' },
+]
+
+interface LabelTheme {
+  id: string
+  border: string
+  /** Sex badge / domain text / decorative accents. */
+  accent: string
+  /** Color of the swatch button in the picker. */
+  swatch: string
+}
+
+const LABEL_THEMES: LabelTheme[] = [
+  // Default keeps the label legible without competing with the
+  // Herpetoverse green — useful when keepers print on colored stock.
+  { id: 'default', border: '#000', accent: '#555', swatch: '#111' },
+  // Herpetoverse emerald — primary brand color.
+  { id: 'emerald', border: '#10b981', accent: '#10b981', swatch: '#10b981' },
+  // Cool teal — pairs with the lime accent we use elsewhere on the site.
+  { id: 'teal', border: '#0d9488', accent: '#0d9488', swatch: '#0d9488' },
+  { id: 'rose', border: '#e11d48', accent: '#e11d48', swatch: '#e11d48' },
+  { id: 'slate', border: '#475569', accent: '#475569', swatch: '#475569' },
+]
+
+const SEX_LABEL: Record<
+  string,
+  { symbol: string; text: string }
+> = {
+  male: { symbol: '♂', text: 'Male' },
+  female: { symbol: '♀', text: 'Female' },
+  unknown: { symbol: '?', text: 'Unknown' },
+}
+
+// ---------------------------------------------------------------------------
+// Pure label-HTML builder — the print window writes this verbatim. Kept
+// outside the component so it's testable as a pure function later if we
+// add unit tests for label rendering.
+// ---------------------------------------------------------------------------
+
+interface RenderLabelOptions {
+  animalName: string
+  scientificName: string | null
+  commonName: string | null
+  sex: string | null
+  size: LabelSize
+  font: LabelFont
+  theme: LabelTheme
+  showSex: boolean
+  showSciName: boolean
+  showCommonName: boolean
+  showDomain: boolean
+  /** Pre-rendered inline QR SVG markup pulled from the live preview. */
+  qrSvgMarkup: string
+}
+
+function renderLabelHTML(opts: RenderLabelOptions): string {
+  const {
+    animalName,
+    scientificName,
+    commonName,
+    sex,
+    size,
+    font,
+    theme,
+    showSex,
+    showSciName,
+    showCommonName,
+    showDomain,
+    qrSvgMarkup,
+  } = opts
+
+  const sexInfo = sex && SEX_LABEL[sex] ? SEX_LABEL[sex] : null
+
+  return `
+    <div style="
+      width: ${size.width};
+      height: ${size.height};
+      border: 1.5px solid ${theme.border};
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      padding: 6px;
+      gap: 6px;
+      background: #fff;
+      flex-shrink: 0;
+      font-family: ${font.stack};
+    ">
+      ${qrSvgMarkup}
+      <div style="flex: 1; overflow: hidden;">
+        <div style="font-size: ${size.fontSize.name}px; font-weight: 700; color: #111; line-height: 1.2;">
+          ${escapeHtml(animalName)}
+        </div>
+        ${
+          showSex && sexInfo
+            ? `
+          <div style="font-size: ${size.fontSize.sci}px; color: ${theme.accent}; font-weight: 600; line-height: 1.3; letter-spacing: 0.01em;">
+            ${escapeHtml(sexInfo.symbol)} ${escapeHtml(sexInfo.text)}
+          </div>
+        `
+            : ''
+        }
+        ${
+          showSciName && scientificName
+            ? `
+          <div style="font-size: ${size.fontSize.sci}px; font-style: italic; color: #555; line-height: 1.2;">
+            ${escapeHtml(scientificName)}
+          </div>
+        `
+            : ''
+        }
+        ${
+          showCommonName && commonName
+            ? `
+          <div style="font-size: ${size.fontSize.meta}px; color: #777; line-height: 1.2;">
+            ${escapeHtml(commonName)}
+          </div>
+        `
+            : ''
+        }
+        ${
+          showDomain
+            ? `
+          <div style="font-size: ${size.fontSize.tag}px; color: ${theme.accent}; opacity: 0.65; margin-top: 2px;">
+            herpetoverse
+          </div>
+        `
+            : ''
+        }
+      </div>
+    </div>
+  `
+}
+
+// ---------------------------------------------------------------------------
+// Pref persistence — keepers print labels rarely, but when they do it's
+// usually a batch. Persisting the last-used size/font/theme/toggle set
+// avoids re-picking on every print.
+// ---------------------------------------------------------------------------
+
+const PREFS_KEY = 'hv_qr_label_prefs'
+
+interface StoredPrefs {
+  sizeId?: string
+  fontId?: string
+  themeId?: string
+  showSex?: boolean
+  showSciName?: boolean
+  showCommonName?: boolean
+  showDomain?: boolean
+}
+
+function loadPrefs(): StoredPrefs {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(PREFS_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object') return parsed as StoredPrefs
+    return {}
+  } catch {
+    return {}
+  }
+}
+
+function savePrefs(prefs: StoredPrefs): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+  } catch {
+    // Storage quota / privacy mode — silent. The pickers still work,
+    // they just don't persist between sessions.
+  }
 }
 
 import { ApiError } from '@/lib/apiClient'
@@ -49,8 +282,12 @@ interface Props {
   animalId: string
   /** For copy in the modal header. Falls back to a generic if absent. */
   animalName: string | null
-  /** Optional — italicized under the name on the printed label. */
+  /** Italicized line on the printed label when "Scientific name" is on. */
   scientificName?: string | null
+  /** Common-name line on the printed label when "Common name" is on. */
+  commonName?: string | null
+  /** Sex code — drives the Sex toggle's badge on the printed label. */
+  sex?: 'male' | 'female' | 'unknown' | null
   onClose: () => void
   /** Fires when a photo is detected as uploaded against the open session. */
   onPhotoAdded?: () => void
@@ -77,6 +314,8 @@ export default function ReptileQRModal({
   animalId,
   animalName,
   scientificName,
+  commonName,
+  sex,
   onClose,
   onPhotoAdded,
 }: Props) {
@@ -87,6 +326,65 @@ export default function ReptileQRModal({
   // pipe its outerHTML into the print window — guarantees the printer
   // gets vector-quality, not a screenshot.
   const labelPreviewRef = useRef<HTMLDivElement>(null)
+
+  // Label picker state — initialized from defaults; restored from
+  // localStorage in a useEffect below to dodge SSR mismatch warnings.
+  const [labelSize, setLabelSize] = useState<LabelSize>(LABEL_SIZES[1])
+  const [labelFont, setLabelFont] = useState<LabelFont>(LABEL_FONTS[0])
+  const [labelTheme, setLabelTheme] = useState<LabelTheme>(LABEL_THEMES[0])
+  const [showSex, setShowSex] = useState(true)
+  const [showSciName, setShowSciName] = useState(true)
+  const [showCommonName, setShowCommonName] = useState(false)
+  const [showDomain, setShowDomain] = useState(true)
+  const [prefsLoaded, setPrefsLoaded] = useState(false)
+
+  // Restore the keeper's last-used label config on mount.
+  useEffect(() => {
+    const prefs = loadPrefs()
+    if (prefs.sizeId) {
+      const s = LABEL_SIZES.find((x) => x.id === prefs.sizeId)
+      if (s) setLabelSize(s)
+    }
+    if (prefs.fontId) {
+      const f = LABEL_FONTS.find((x) => x.id === prefs.fontId)
+      if (f) setLabelFont(f)
+    }
+    if (prefs.themeId) {
+      const t = LABEL_THEMES.find((x) => x.id === prefs.themeId)
+      if (t) setLabelTheme(t)
+    }
+    if (typeof prefs.showSex === 'boolean') setShowSex(prefs.showSex)
+    if (typeof prefs.showSciName === 'boolean') setShowSciName(prefs.showSciName)
+    if (typeof prefs.showCommonName === 'boolean')
+      setShowCommonName(prefs.showCommonName)
+    if (typeof prefs.showDomain === 'boolean') setShowDomain(prefs.showDomain)
+    setPrefsLoaded(true)
+  }, [])
+
+  // Persist whenever a pref changes, but only after the initial restore
+  // completes — otherwise we'd overwrite the saved prefs with defaults
+  // on first render.
+  useEffect(() => {
+    if (!prefsLoaded) return
+    savePrefs({
+      sizeId: labelSize.id,
+      fontId: labelFont.id,
+      themeId: labelTheme.id,
+      showSex,
+      showSciName,
+      showCommonName,
+      showDomain,
+    })
+  }, [
+    prefsLoaded,
+    labelSize,
+    labelFont,
+    labelTheme,
+    showSex,
+    showSciName,
+    showCommonName,
+    showDomain,
+  ])
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -243,63 +541,92 @@ export default function ReptileQRModal({
       : `${window.location.origin}${publicProfilePath}`
 
   function handlePrint() {
-    const node = labelPreviewRef.current
-    if (!node) return
-    // Read the preview's exact outerHTML so the printed label matches
-    // what the keeper saw in the modal — including the rendered QR SVG.
-    // Stripping any zoom transform that exists for screen-size preview
-    // would go here if we add a "fit-to-preview" scale; the v1 preview
-    // is already at 1:1 print size.
-    const labelHtml = node.outerHTML
+    // Pull the rendered SVG out of the live preview rather than
+    // re-rendering qrcode.react outside React. This guarantees the
+    // printed QR matches what the keeper just confirmed visually —
+    // same value, same fg color, same size.
+    const qrSvgMarkup =
+      labelPreviewRef.current?.querySelector('svg')?.outerHTML ?? ''
+
+    const labelHtml = renderLabelHTML({
+      animalName: animalName ?? (taxon === 'snake' ? 'Snake' : 'Lizard'),
+      scientificName: scientificName ?? null,
+      commonName: commonName ?? null,
+      sex: sex ?? null,
+      size: labelSize,
+      font: labelFont,
+      theme: labelTheme,
+      showSex,
+      showSciName,
+      showCommonName,
+      showDomain,
+      qrSvgMarkup,
+    })
+
     const win = window.open(
       '',
       '_blank',
-      'width=420,height=320,scrollbars=no,toolbar=no,menubar=no',
+      'width=600,height=400,scrollbars=no,toolbar=no,menubar=no',
     )
     if (!win) {
-      // Pop-up blocked — fall back to the parent window's print dialog
-      // with a print stylesheet that hides everything else. Less robust
-      // (relies on the keeper's print settings) but always available.
+      // Pop-up blocked — fall back to parent-window print() with a
+      // print stylesheet hiding everything except the preview. Less
+      // robust than the popup path but always available.
       window.print()
       return
     }
+    const safeTitle = escapeHtml(animalName ?? 'Reptile')
     win.document.write(`<!DOCTYPE html>
 <html>
-<head>
-  <title>Reptile label — ${escapeHtml(animalName ?? 'Reptile')}</title>
-  <style>
-    @page { size: auto; margin: 0; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #fff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 12px;
-    }
-    /* The label itself is sized inline — body padding gives the
-       printer a small margin so adhesive labels don't crop content
-       at the edge. */
-  </style>
-</head>
-<body>${labelHtml}</body>
+  <head>
+    <meta charset="utf-8">
+    <title>Herpetoverse Label — ${safeTitle}</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { background: #fff; }
+      /* @page sized to the chosen label so the printer treats
+         the whole sheet as one label, no extra margins. */
+      @page { size: ${labelSize.width} ${labelSize.height}; margin: 0; }
+    </style>
+  </head>
+  <body>${labelHtml}</body>
 </html>`)
     win.document.close()
-    // Wait for the document to layout before triggering print —
-    // some browsers will print before the SVG renders otherwise.
-    win.onload = () => {
-      win.focus()
+    win.focus()
+    // Brief delay lets the SVG layout before the print dialog opens
+    // — without this, Chrome/macOS sometimes prints a blank label.
+    setTimeout(() => {
       win.print()
-      // Don't auto-close: let the user use the browser's own
-      // print preview UI (cancel, pick destination, save as PDF…).
-      // Closing the window prematurely cancels the dialog on some
-      // browsers (Chrome/macOS).
-    }
+      win.close()
+    }, 500)
   }
+
+  // Wrapper preserves layout space the transform: scale() doesn't.
+  const previewWrapperStyle: React.CSSProperties = {
+    width: `calc(${labelSize.width} * ${labelSize.previewScale})`,
+    height: `calc(${labelSize.height} * ${labelSize.previewScale})`,
+    position: 'relative',
+  }
+  const previewLabelStyle: React.CSSProperties = {
+    width: labelSize.width,
+    height: labelSize.height,
+    border: `1.5px solid ${labelTheme.border}`,
+    borderRadius: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    padding: '6px',
+    gap: '6px',
+    background: '#fff',
+    flexShrink: 0,
+    fontFamily: labelFont.stack,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    transform: `scale(${labelSize.previewScale})`,
+    transformOrigin: 'top left',
+  }
+
+  const sexInfo = sex && SEX_LABEL[sex] ? SEX_LABEL[sex] : null
 
   // ---------------------------------------------------------------------------
   // Render
@@ -473,110 +800,238 @@ export default function ReptileQRModal({
 
         {tab === 'label' && (
         <>
-          <div className="px-5 py-6 flex flex-col items-center gap-4">
-            {/* Label preview — rendered at print size (3" × 1.5") so the
-                keeper sees exactly what comes out of the printer.
-                Background pinned to white so it stays readable on dark
-                modal styles AND prints cleanly. The DOM node is what
-                handlePrint reads via outerHTML. */}
-            <div
-              ref={labelPreviewRef}
-              style={{
-                width: '288px', // 3 inches at 96 DPI
-                height: '144px', // 1.5 inches at 96 DPI
-                background: '#ffffff',
-                color: '#111',
-                border: '1.5px solid #2a2a2a',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '8px',
-                fontFamily:
-                  '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
-              }}
-            >
-              <div style={{ flexShrink: 0 }}>
-                <QRCodeSVG
-                  value={publicProfileUrl || publicProfilePath}
-                  size={120}
-                  level="M"
-                  includeMargin={false}
-                />
+          <div className="px-5 py-5 space-y-4">
+            {/* Size */}
+            <fieldset>
+              <legend className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+                Size
+              </legend>
+              <div className="flex gap-2" role="radiogroup" aria-label="Label size">
+                {LABEL_SIZES.map((s) => {
+                  const selected = labelSize.id === s.id
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setLabelSize(s)}
+                      className={`flex-1 py-2 px-2 rounded-md border text-xs transition-colors ${
+                        selected
+                          ? 'border-herp-teal/60 bg-herp-teal/10 text-herp-lime'
+                          : 'border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+                      }`}
+                    >
+                      <div className="font-semibold">{s.label}</div>
+                      <div className="opacity-70 text-[10px]">{s.description}</div>
+                    </button>
+                  )
+                })}
               </div>
-              <div
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '2px',
-                }}
-              >
+            </fieldset>
+
+            {/* Font */}
+            <fieldset>
+              <legend className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+                Font
+              </legend>
+              <div className="flex gap-2" role="radiogroup" aria-label="Label font">
+                {LABEL_FONTS.map((f) => {
+                  const selected = labelFont.id === f.id
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setLabelFont(f)}
+                      style={{ fontFamily: f.stack }}
+                      className={`flex-1 py-1.5 rounded-md border text-xs transition-colors ${
+                        selected
+                          ? 'border-herp-teal/60 bg-herp-teal/10 text-herp-lime'
+                          : 'border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </fieldset>
+
+            {/* Color */}
+            <fieldset>
+              <legend className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+                Color
+              </legend>
+              <div className="flex gap-3 items-center" role="radiogroup" aria-label="Label color theme">
+                {LABEL_THEMES.map((t) => {
+                  const selected = labelTheme.id === t.id
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={`${t.id} color theme`}
+                      title={t.id}
+                      onClick={() => setLabelTheme(t)}
+                      style={{ backgroundColor: t.swatch }}
+                      className={`w-7 h-7 rounded-full border-2 transition-all ${
+                        selected
+                          ? 'border-herp-teal ring-2 ring-herp-teal/40 scale-110'
+                          : 'border-neutral-700 hover:scale-105'
+                      }`}
+                    />
+                  )
+                })}
+              </div>
+            </fieldset>
+
+            {/* Field toggles — only show options whose underlying data
+                exists, so a snake without a sex doesn't see a useless
+                "Sex" toggle. */}
+            <fieldset>
+              <legend className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider mb-1.5">
+                Fields
+              </legend>
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                {[
+                  {
+                    label: 'Sex',
+                    checked: showSex,
+                    set: setShowSex,
+                    show: !!sex && sex !== 'unknown',
+                  },
+                  {
+                    label: 'Scientific name',
+                    checked: showSciName,
+                    set: setShowSciName,
+                    show: !!scientificName,
+                  },
+                  {
+                    label: 'Common name',
+                    checked: showCommonName,
+                    set: setShowCommonName,
+                    show: !!commonName,
+                  },
+                  {
+                    label: 'Domain',
+                    checked: showDomain,
+                    set: setShowDomain,
+                    show: true,
+                  },
+                ]
+                  .filter((f) => f.show)
+                  .map((f) => (
+                    <label
+                      key={f.label}
+                      className="inline-flex items-center gap-1.5 cursor-pointer select-none"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={f.checked}
+                        onChange={(e) => f.set(e.target.checked)}
+                        className="w-3.5 h-3.5 accent-herp-teal cursor-pointer"
+                      />
+                      <span className="text-xs text-neutral-300">{f.label}</span>
+                    </label>
+                  ))}
+              </div>
+            </fieldset>
+
+            {/* Live preview — scaled with CSS transform for cross-browser
+                fidelity (CSS zoom is non-standard). The wrapper reserves
+                visual space the transform doesn't, so the preview block
+                doesn't collapse. */}
+            <div className="flex justify-center overflow-hidden rounded-lg bg-neutral-900/40 p-3 border border-neutral-800">
+              <div style={previewWrapperStyle} aria-label="Label preview">
                 <div
-                  style={{
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    lineHeight: 1.2,
-                    color: '#111',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
+                  ref={labelPreviewRef}
+                  style={previewLabelStyle}
                 >
-                  {animalName || (taxon === 'snake' ? 'Snake' : 'Lizard')}
-                </div>
-                {scientificName && (
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      fontStyle: 'italic',
-                      color: '#555',
-                      lineHeight: 1.2,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {scientificName}
+                  <QRCodeSVG
+                    value={publicProfileUrl || publicProfilePath}
+                    size={labelSize.qrSize}
+                    level="M"
+                    fgColor={labelTheme.border}
+                  />
+
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    {/* Name */}
+                    <div
+                      style={{
+                        fontSize: labelSize.fontSize.name,
+                        fontWeight: 700,
+                        color: '#111',
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {animalName ||
+                        (taxon === 'snake' ? 'Snake' : 'Lizard')}
+                    </div>
+
+                    {showSex && sexInfo && (
+                      <div
+                        style={{
+                          fontSize: labelSize.fontSize.sci,
+                          color: labelTheme.accent,
+                          fontWeight: 600,
+                          lineHeight: 1.3,
+                          letterSpacing: '0.01em',
+                        }}
+                      >
+                        {sexInfo.symbol} {sexInfo.text}
+                      </div>
+                    )}
+
+                    {showSciName && scientificName && (
+                      <div
+                        style={{
+                          fontSize: labelSize.fontSize.sci,
+                          fontStyle: 'italic',
+                          color: '#555',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {scientificName}
+                      </div>
+                    )}
+
+                    {showCommonName && commonName && (
+                      <div
+                        style={{
+                          fontSize: labelSize.fontSize.meta,
+                          color: '#777',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {commonName}
+                      </div>
+                    )}
+
+                    {showDomain && (
+                      <div
+                        style={{
+                          fontSize: labelSize.fontSize.tag,
+                          color: labelTheme.accent,
+                          opacity: 0.65,
+                          marginTop: 2,
+                        }}
+                      >
+                        herpetoverse
+                      </div>
+                    )}
                   </div>
-                )}
-                <div
-                  style={{
-                    fontSize: '10px',
-                    color: '#888',
-                    marginTop: '4px',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  Scan for care info
-                </div>
-                <div
-                  style={{
-                    fontSize: '9px',
-                    color: '#10b981',
-                    marginTop: '2px',
-                    fontWeight: 600,
-                  }}
-                >
-                  herpetoverse
                 </div>
               </div>
             </div>
 
-            {/* Hint copy */}
-            <p className="text-xs text-neutral-400 text-center leading-relaxed max-w-xs">
-              When you scan this you&rsquo;ll jump to quick log buttons.
-              When a friend scans it, they see a read-only profile with
-              the species, photos, and care basics — no login.
-            </p>
-
-            <p
-              className="text-[11px] font-mono text-neutral-500 text-center break-all select-all"
-              aria-label="Public profile URL"
-            >
-              {publicProfileUrl}
+            <p className="text-[11px] text-neutral-500 text-center leading-relaxed">
+              QR links permanently to{' '}
+              {animalName ?? 'this reptile'}&rsquo;s public profile.
+              Owner scans jump to quick-action buttons; visitors see a
+              read-only card.
             </p>
           </div>
 
