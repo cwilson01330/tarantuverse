@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 export default function AppHomePage() {
   return (
     <div className="max-w-5xl mx-auto">
@@ -23,38 +25,46 @@ export default function AppHomePage() {
       </header>
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <EmptyCard
+        <DashCard
           icon="🦎"
           title="Your reptiles"
           body="Add your first animal to start tracking environments, feedings, and sheds."
+          href="/app/reptiles"
         />
-        <EmptyCard
+        <DashCard
           icon="📖"
           title="Species library"
           body="Browse care sheets for geckos, snakes, monitors, and more."
+          href="/app/species"
         />
-        <EmptyCard
+        <DashCard
+          icon="🧬"
+          title="Genetics & morphs"
+          body="Punnett-square morph predictor for ball pythons. More species coming."
+          href="/app/breeding"
+        />
+        <DashCard
+          icon="🏆"
+          title="Achievements"
+          body="Track milestones across both Tarantuverse and Herpetoverse — your account, one trophy case."
+          href="/app/achievements"
+        />
+        <DashCard
           icon="🌡️"
           title="Habitat monitoring"
           body="Dial in temperature gradients and humidity for every enclosure."
           soon
         />
-        <EmptyCard
+        <DashCard
           icon="🥚"
           title="Breeding records"
-          body="Track pairings, clutches, and offspring with full lineage."
+          body="Pair logs, clutches, hatch dates, and offspring lineage. In design now."
           soon
         />
-        <EmptyCard
+        <DashCard
           icon="🌐"
           title="Community"
           body="Shared with Tarantuverse — forums, keepers, and discovery."
-          soon
-        />
-        <EmptyCard
-          icon="🏆"
-          title="Achievements"
-          body="Same badge system Tarantuverse uses — reptile-specific milestones coming."
           soon
         />
       </section>
@@ -62,27 +72,29 @@ export default function AppHomePage() {
   )
 }
 
-function EmptyCard({
+/**
+ * Dashboard card. With `href` it renders as a clickable Link; with `soon`
+ * it renders as a muted, non-interactive tile with a SOON badge.
+ *
+ * Live cards still use the same dimensions / vertical rhythm as soon
+ * cards so the grid doesn't reflow when a card lights up — only the
+ * border/hover state and clickability change.
+ */
+function DashCard({
   icon,
   title,
   body,
+  href,
   soon,
 }: {
   icon: string
   title: string
   body: string
+  href?: string
   soon?: boolean
 }) {
-  return (
-    <div
-      className={`
-        relative p-5 rounded-lg border transition-colors
-        ${soon
-          ? 'border-neutral-800 bg-neutral-900/30 opacity-60'
-          : 'border-neutral-800 bg-neutral-900/50 hover:border-herp-teal/30'
-        }
-      `}
-    >
+  const inner = (
+    <>
       {soon && (
         <span className="absolute top-3 right-3 text-[10px] uppercase tracking-widest text-neutral-500">
           Soon
@@ -93,6 +105,31 @@ function EmptyCard({
       </div>
       <h3 className="text-base font-semibold text-white mb-1">{title}</h3>
       <p className="text-sm text-neutral-400 leading-relaxed">{body}</p>
+    </>
+  )
+
+  // Live (linked) card — full-bleed Link so the entire tile is clickable.
+  if (href && !soon) {
+    return (
+      <Link
+        href={href}
+        className="relative block p-5 rounded-lg border border-neutral-800 bg-neutral-900/50 hover:border-herp-teal/40 hover:bg-neutral-900/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-herp-teal/60"
+      >
+        {inner}
+      </Link>
+    )
+  }
+
+  // SOON or unlinked — non-interactive tile.
+  return (
+    <div
+      className={`relative p-5 rounded-lg border transition-colors ${
+        soon
+          ? 'border-neutral-800 bg-neutral-900/30 opacity-60'
+          : 'border-neutral-800 bg-neutral-900/50 hover:border-herp-teal/30'
+      }`}
+    >
+      {inner}
     </div>
   )
 }
