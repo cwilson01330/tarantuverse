@@ -42,6 +42,18 @@ from app.models.shed_log import ShedLog
 from app.models.weight_log import WeightLog
 from app.models.gene import Gene
 from app.models.animal_genotype import AnimalGenotype
+# Reptile breeding records — pairings must be imported before clutches +
+# offspring so the FKs resolve at registration time.
+from app.models.reptile_pairing import (
+    ReptilePairing,
+    ReptilePairingType,
+    ReptilePairingOutcome,
+)
+from app.models.clutch import Clutch
+from app.models.reptile_offspring import (
+    ReptileOffspring,
+    ReptileOffspringStatus,
+)
 
 __all__ = [
     "User",
@@ -88,4 +100,10 @@ __all__ = [
     "WeightLog",
     "Gene",
     "AnimalGenotype",
+    "ReptilePairing",
+    "ReptilePairingType",
+    "ReptilePairingOutcome",
+    "Clutch",
+    "ReptileOffspring",
+    "ReptileOffspringStatus",
 ]

@@ -57,6 +57,9 @@ import app.routers.genes as genes  # Herpetoverse v1 — morph catalog
 import app.routers.reptile_species as reptile_species  # Herpetoverse v1
 import app.routers.animal_genotypes as animal_genotypes  # Herpetoverse v1
 import app.routers.weight_logs as weight_logs  # Herpetoverse v1 — Sprint 5
+import app.routers.reptile_pairings as reptile_pairings  # Herpetoverse breeding
+import app.routers.clutches as clutches  # Herpetoverse breeding
+import app.routers.reptile_offspring as reptile_offspring  # Herpetoverse breeding
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -284,6 +287,15 @@ app.include_router(animal_genotypes.router, prefix="/api/v1", tags=["animal_geno
 # /snakes/{id}/weight-logs/* and /weight-logs/{id}, so keep the /api/v1 prefix.
 print("[STARTUP] Registering weight logs router (Herpetoverse v1 Sprint 5)...")
 app.include_router(weight_logs.router, prefix="/api/v1", tags=["weight_logs", "herpetoverse"])
+
+# Reptile breeding records — pairings + clutches + offspring. Pairings
+# router prefixes with /reptile-pairings; clutches + offspring use bare
+# /api/v1 because their routes mount at multiple roots
+# (/reptile-pairings/.../clutches, /clutches/{id}, etc.)
+print("[STARTUP] Registering reptile breeding routers (pairings/clutches/offspring)...")
+app.include_router(reptile_pairings.router, prefix="/api/v1/reptile-pairings", tags=["reptile_breeding", "herpetoverse"])
+app.include_router(clutches.router, prefix="/api/v1", tags=["reptile_breeding", "herpetoverse"])
+app.include_router(reptile_offspring.router, prefix="/api/v1", tags=["reptile_breeding", "herpetoverse"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"
