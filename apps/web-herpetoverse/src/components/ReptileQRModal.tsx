@@ -127,6 +127,31 @@ const SEX_LABEL: Record<
   unknown: { symbol: '?', text: 'Unknown' },
 }
 
+/**
+ * Slim shed shape for the printed label. The detail clients already
+ * track full ShedLog rows in state — we only need shed_at and an
+ * optional post-shed length, so we accept this minimal projection
+ * to keep the prop contract narrow.
+ */
+export interface LabelShed {
+  id: string
+  shed_at: string
+  /** Length after shed, when measured. Stringified Decimal from API. */
+  length_after_in?: string | null
+}
+
+/** "Apr 2026" — short month + year for tight label real estate. */
+function formatShedDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: 'short',
+      year: 'numeric',
+    })
+  } catch {
+    return iso.slice(0, 7)
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Pure label-HTML builder — the print window writes this verbatim. Kept
 // outside the component so it's testable as a pure function later if we
@@ -138,15 +163,28 @@ interface RenderLabelOptions {
   scientificName: string | null
   commonName: string | null
   sex: string | null
+  sheds: LabelShed[]
   size: LabelSize
   font: LabelFont
   theme: LabelTheme
   showSex: boolean
   showSciName: boolean
   showCommonName: boolean
+  showSheds: boolean
   showDomain: boolean
   /** Pre-rendered inline QR SVG markup pulled from the live preview. */
   qrSvgMarkup: string
+}
+
+/** Sort sheds newest-first and take the most recent N — same shape used
+ *  by the live preview and the print HTML so they don't drift. */
+function topRecentSheds(sheds: LabelShed[], n = 3): LabelShed[] {
+  return [...sheds]
+    .sort(
+      (a, b) =>
+        new Date(b.shed_at).getTime() - new Date(a.shed_at).getTime(),
+    )
+    .slice(0, n)
 }
 
 function renderLabelHTML(opts: RenderLabelOptions): string {
@@ -155,17 +193,36 @@ function renderLabelHTML(opts: RenderLabelOptions): string {
     scientificName,
     commonName,
     sex,
+    sheds,
     size,
     font,
     theme,
     showSex,
     showSciName,
     showCommonName,
+    showSheds,
     showDomain,
     qrSvgMarkup,
   } = opts
 
   const sexInfo = sex && SEX_LABEL[sex] ? SEX_LABEL[sex] : null
+  const recentSheds = topRecentSheds(sheds, 3)
+
+  // "Apr 2026 (38\") · Mar 2026 · Feb 2026 (35\")" — length suffix only
+  // when measured. Length-shedded snakes can be a couple feet long
+  // so we use the inch suffix to keep the line skimmable.
+  const shedsHtml = recentSheds
+    .map((s, i) => {
+      const date = escapeHtml(formatShedDate(s.shed_at))
+      const lenRaw = s.length_after_in ? Number(s.length_after_in) : null
+      const len =
+        lenRaw != null && Number.isFinite(lenRaw)
+          ? ` (${lenRaw.toString().replace(/\.0+$/, '')}")`
+          : ''
+      const sep = i < recentSheds.length - 1 ? ' · ' : ''
+      return `${date}${escapeHtml(len)}${sep}`
+    })
+    .join('')
 
   return `
     <div style="
@@ -214,6 +271,15 @@ function renderLabelHTML(opts: RenderLabelOptions): string {
             : ''
         }
         ${
+          showSheds && recentSheds.length > 0
+            ? `
+          <div style="font-size: ${size.fontSize.tag}px; color: #777; margin-top: 2px; line-height: 1.3; border-top: 0.5px solid ${theme.border}22; padding-top: 2px;">
+            <span style="font-weight: 600; color: ${theme.accent};">Sheds: </span>${shedsHtml}
+          </div>
+        `
+            : ''
+        }
+        ${
           showDomain
             ? `
           <div style="font-size: ${size.fontSize.tag}px; color: ${theme.accent}; opacity: 0.65; margin-top: 2px;">
@@ -242,6 +308,7 @@ interface StoredPrefs {
   showSex?: boolean
   showSciName?: boolean
   showCommonName?: boolean
+  showSheds?: boolean
   showDomain?: boolean
 }
 
@@ -288,6 +355,8 @@ interface Props {
   commonName?: string | null
   /** Sex code — drives the Sex toggle's badge on the printed label. */
   sex?: 'male' | 'female' | 'unknown' | null
+  /** Shed history — most recent 3 are surfaced when "Sheds" toggle is on. */
+  sheds?: LabelShed[]
   onClose: () => void
   /** Fires when a photo is detected as uploaded against the open session. */
   onPhotoAdded?: () => void
@@ -316,6 +385,7 @@ export default function ReptileQRModal({
   scientificName,
   commonName,
   sex,
+  sheds = [],
   onClose,
   onPhotoAdded,
 }: Props) {
@@ -335,6 +405,9 @@ export default function ReptileQRModal({
   const [showSex, setShowSex] = useState(true)
   const [showSciName, setShowSciName] = useState(true)
   const [showCommonName, setShowCommonName] = useState(false)
+  // Sheds default-off so a snake/lizard with a long history doesn't
+  // overflow the small label without the keeper opting in.
+  const [showSheds, setShowSheds] = useState(false)
   const [showDomain, setShowDomain] = useState(true)
   const [prefsLoaded, setPrefsLoaded] = useState(false)
 
@@ -357,6 +430,7 @@ export default function ReptileQRModal({
     if (typeof prefs.showSciName === 'boolean') setShowSciName(prefs.showSciName)
     if (typeof prefs.showCommonName === 'boolean')
       setShowCommonName(prefs.showCommonName)
+    if (typeof prefs.showSheds === 'boolean') setShowSheds(prefs.showSheds)
     if (typeof prefs.showDomain === 'boolean') setShowDomain(prefs.showDomain)
     setPrefsLoaded(true)
   }, [])
@@ -373,6 +447,7 @@ export default function ReptileQRModal({
       showSex,
       showSciName,
       showCommonName,
+      showSheds,
       showDomain,
     })
   }, [
@@ -383,6 +458,7 @@ export default function ReptileQRModal({
     showSex,
     showSciName,
     showCommonName,
+    showSheds,
     showDomain,
   ])
 
@@ -553,12 +629,14 @@ export default function ReptileQRModal({
       scientificName: scientificName ?? null,
       commonName: commonName ?? null,
       sex: sex ?? null,
+      sheds,
       size: labelSize,
       font: labelFont,
       theme: labelTheme,
       showSex,
       showSciName,
       showCommonName,
+      showSheds,
       showDomain,
       qrSvgMarkup,
     })
@@ -627,6 +705,9 @@ export default function ReptileQRModal({
   }
 
   const sexInfo = sex && SEX_LABEL[sex] ? SEX_LABEL[sex] : null
+  // Same recent slice the print HTML uses — kept in sync so the
+  // preview shows exactly what comes out of the printer.
+  const recentSheds = topRecentSheds(sheds, 3)
 
   // ---------------------------------------------------------------------------
   // Render
@@ -916,6 +997,18 @@ export default function ReptileQRModal({
                     show: !!commonName,
                   },
                   {
+                    // Show count when there are sheds so the keeper
+                    // knows what fits — printed label always uses
+                    // the most recent 3.
+                    label:
+                      recentSheds.length > 0
+                        ? `Sheds (last ${recentSheds.length})`
+                        : 'Sheds',
+                    checked: showSheds,
+                    set: setShowSheds,
+                    show: sheds.length > 0,
+                  },
+                  {
                     label: 'Domain',
                     checked: showDomain,
                     set: setShowDomain,
@@ -1007,6 +1100,44 @@ export default function ReptileQRModal({
                         }}
                       >
                         {commonName}
+                      </div>
+                    )}
+
+                    {showSheds && recentSheds.length > 0 && (
+                      <div
+                        style={{
+                          fontSize: labelSize.fontSize.tag,
+                          color: '#777',
+                          marginTop: 2,
+                          lineHeight: 1.3,
+                          borderTop: `0.5px solid ${labelTheme.border}22`,
+                          paddingTop: 2,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: labelTheme.accent,
+                          }}
+                        >
+                          Sheds:{' '}
+                        </span>
+                        {recentSheds.map((s, i) => {
+                          const lenRaw = s.length_after_in
+                            ? Number(s.length_after_in)
+                            : null
+                          const len =
+                            lenRaw != null && Number.isFinite(lenRaw)
+                              ? ` (${lenRaw.toString().replace(/\.0+$/, '')}")`
+                              : ''
+                          return (
+                            <span key={s.id}>
+                              {formatShedDate(s.shed_at)}
+                              {len}
+                              {i < recentSheds.length - 1 ? ' · ' : ''}
+                            </span>
+                          )
+                        })}
                       </div>
                     )}
 

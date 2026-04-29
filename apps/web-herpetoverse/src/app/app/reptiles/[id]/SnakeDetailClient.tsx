@@ -263,6 +263,7 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
           scientificName={snake.scientific_name}
           commonName={snake.common_name}
           sex={snake.sex}
+          sheds={sheds}
           onClose={() => setQrOpen(false)}
           onPhotoAdded={refetchSnakeOnly}
         />
