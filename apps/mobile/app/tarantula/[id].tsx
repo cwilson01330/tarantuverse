@@ -684,7 +684,28 @@ export default function TarantulaDetailScreen() {
           ) : (
             <View style={styles.logList}>
               {(showAllFeedings ? feedingLogs : feedingLogs.slice(0, PREVIEW_COUNT)).map((log) => (
-                <View key={log.id} style={[styles.logItem, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                <TouchableOpacity
+                  key={log.id}
+                  // Tap a row to edit it. Wrapping the whole row keeps
+                  // a fat-finger-friendly target without adding a tiny
+                  // pencil icon column. Long-press could open delete in
+                  // a future iteration.
+                  onPress={() =>
+                    router.push(
+                      `/tarantula/add-feeding?id=${id}&feedingId=${log.id}`,
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit feeding from ${formatLocalDate(log.fed_at)}`}
+                  style={[
+                    styles.logItem,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.logIcon}>
                     <MaterialCommunityIcons
                       name={log.accepted ? "check-circle" : "close-circle"}
@@ -701,7 +722,12 @@ export default function TarantulaDetailScreen() {
                     </Text>
                     {log.notes && <Text style={[styles.logNotes, { color: colors.textSecondary }]}>{log.notes}</Text>}
                   </View>
-                </View>
+                  <MaterialCommunityIcons
+                    name="pencil-outline"
+                    size={16}
+                    color={colors.textTertiary}
+                  />
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -743,7 +769,24 @@ export default function TarantulaDetailScreen() {
           ) : (
             <View style={styles.logList}>
               {(showAllMolts ? moltLogs : moltLogs.slice(0, PREVIEW_COUNT)).map((log) => (
-                <View key={log.id} style={[styles.logItem, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                <TouchableOpacity
+                  key={log.id}
+                  onPress={() =>
+                    router.push(
+                      `/tarantula/add-molt?id=${id}&moltId=${log.id}`,
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit molt from ${formatLocalDate(log.molted_at)}`}
+                  style={[
+                    styles.logItem,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.logIcon}>
                     <MaterialCommunityIcons name="reload" size={20} color={colors.primary} />
                   </View>
@@ -758,7 +801,12 @@ export default function TarantulaDetailScreen() {
                     )}
                     {log.notes && <Text style={[styles.logNotes, { color: colors.textSecondary }]}>{log.notes}</Text>}
                   </View>
-                </View>
+                  <MaterialCommunityIcons
+                    name="pencil-outline"
+                    size={16}
+                    color={colors.textTertiary}
+                  />
+                </TouchableOpacity>
               ))}
             </View>
           )}

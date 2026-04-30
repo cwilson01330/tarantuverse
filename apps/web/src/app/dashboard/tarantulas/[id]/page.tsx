@@ -169,6 +169,25 @@ interface Pairing {
   created_at: string
 }
 
+/**
+ * Convert a backend ISO timestamp ("2026-04-29T18:23:00Z" or
+ * "2026-04-29T18:23:00") into the slice-16 form datetime-local inputs
+ * accept ("2026-04-29T18:23"). Used by the edit-mode pre-fill for
+ * feedings + molts; the create-mode forms initialize from
+ * `new Date().toISOString().slice(0, 16)` which already matches.
+ */
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return ''
+  // Trim seconds + Z. If the source has TZ info, the displayed local
+  // time still reflects the user's tz because the <input> renders in
+  // local — we just need the canonical YYYY-MM-DDTHH:MM shape.
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  // Build local-time slice manually so DST + tz offsets resolve right.
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 export default function TarantulaDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -192,6 +211,10 @@ export default function TarantulaDetailPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'logs' | 'husbandry' | 'photos' | 'growth' | 'breeding'>('overview')
   const [showFeedingForm, setShowFeedingForm] = useState(false)
   const [showMoltForm, setShowMoltForm] = useState(false)
+  // When set, the inline form is in edit mode for that row id. POST →
+  // PUT, header copy flips, save calls /feedings/{id} or /molts/{id}.
+  const [editingFeedingId, setEditingFeedingId] = useState<string | null>(null)
+  const [editingMoltId, setEditingMoltId] = useState<string | null>(null)
   const [showSubstrateForm, setShowSubstrateForm] = useState(false)
   const [showPhotoUpload, setShowPhotoUpload] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
@@ -290,8 +313,16 @@ export default function TarantulaDetailPage() {
       if (!token) return
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/feedings`, {
-        method: 'POST',
+      // Edit mode (when editingFeedingId is set) routes to PUT
+      // /feedings/{id}; create mode routes to POST under the parent.
+      // The form's body shape is identical so we just swap method + URL.
+      const isEditing = Boolean(editingFeedingId)
+      const url = isEditing
+        ? `${API_URL}/api/v1/feedings/${editingFeedingId}`
+        : `${API_URL}/api/v1/tarantulas/${id}/feedings`
+
+      const response = await fetch(url, {
+        method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -300,10 +331,12 @@ export default function TarantulaDetailPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to add feeding log')
+        throw new Error(
+          isEditing ? "Couldn't save changes" : 'Failed to add feeding log',
+        )
       }
 
-      // Reset form and refresh
+      // Reset form, exit edit mode, refresh
       setFeedingFormData({
         fed_at: new Date().toISOString().slice(0, 16),
         food_type: '',
@@ -312,10 +345,39 @@ export default function TarantulaDetailPage() {
         notes: '',
       })
       setShowFeedingForm(false)
+      setEditingFeedingId(null)
       fetchFeedings(token)
     } catch (err: any) {
-      setError(err.message || 'Failed to add feeding')
+      setError(err.message || 'Failed to save feeding')
     }
+  }
+
+  /** Open the inline feeding form pre-filled with the row's current
+   *  values. The form auto-scrolls into view via the existing show/hide
+   *  flow. Conversion of fed_at to datetime-local format strips the
+   *  trailing seconds + Z so the <input> renders the value. */
+  const handleEditFeeding = (feeding: FeedingLog) => {
+    setEditingFeedingId(feeding.id)
+    setFeedingFormData({
+      fed_at: toDatetimeLocal(feeding.fed_at),
+      food_type: feeding.food_type ?? '',
+      food_size: feeding.food_size ?? '',
+      accepted: feeding.accepted ?? true,
+      notes: feeding.notes ?? '',
+    })
+    setShowFeedingForm(true)
+  }
+
+  const handleCancelFeedingEdit = () => {
+    setEditingFeedingId(null)
+    setShowFeedingForm(false)
+    setFeedingFormData({
+      fed_at: new Date().toISOString().slice(0, 16),
+      food_type: '',
+      food_size: '',
+      accepted: true,
+      notes: '',
+    })
   }
 
   const handleDeleteFeeding = async (feedingId: string) => {
@@ -376,8 +438,14 @@ export default function TarantulaDetailPage() {
         image_url: moltFormData.image_url || null,
       }
 
-      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/molts`, {
-        method: 'POST',
+      // Edit mode toggles to PUT /molts/{id}; create stays POST.
+      const isEditing = Boolean(editingMoltId)
+      const url = isEditing
+        ? `${API_URL}/api/v1/molts/${editingMoltId}`
+        : `${API_URL}/api/v1/tarantulas/${id}/molts`
+
+      const response = await fetch(url, {
+        method: isEditing ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -386,10 +454,12 @@ export default function TarantulaDetailPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to add molt log')
+        throw new Error(
+          isEditing ? "Couldn't save changes" : 'Failed to add molt log',
+        )
       }
 
-      // Reset form and refresh
+      // Reset form, exit edit mode, refresh
       setMoltFormData({
         molted_at: new Date().toISOString().slice(0, 16),
         premolt_started_at: '',
@@ -401,10 +471,43 @@ export default function TarantulaDetailPage() {
         image_url: '',
       })
       setShowMoltForm(false)
+      setEditingMoltId(null)
       fetchMolts(token)
     } catch (err: any) {
-      setError(err.message || 'Failed to add molt')
+      setError(err.message || 'Failed to save molt')
     }
+  }
+
+  const handleEditMolt = (molt: MoltLog) => {
+    setEditingMoltId(molt.id)
+    setMoltFormData({
+      molted_at: toDatetimeLocal(molt.molted_at),
+      premolt_started_at: molt.premolt_started_at
+        ? toDatetimeLocal(molt.premolt_started_at)
+        : '',
+      leg_span_before: molt.leg_span_before != null ? String(molt.leg_span_before) : '',
+      leg_span_after: molt.leg_span_after != null ? String(molt.leg_span_after) : '',
+      weight_before: molt.weight_before != null ? String(molt.weight_before) : '',
+      weight_after: molt.weight_after != null ? String(molt.weight_after) : '',
+      notes: molt.notes ?? '',
+      image_url: molt.image_url ?? '',
+    })
+    setShowMoltForm(true)
+  }
+
+  const handleCancelMoltEdit = () => {
+    setEditingMoltId(null)
+    setShowMoltForm(false)
+    setMoltFormData({
+      molted_at: new Date().toISOString().slice(0, 16),
+      premolt_started_at: '',
+      leg_span_before: '',
+      leg_span_after: '',
+      weight_before: '',
+      weight_after: '',
+      notes: '',
+      image_url: '',
+    })
   }
 
   const handleDeleteMolt = async (moltId: string) => {
@@ -1201,7 +1304,16 @@ export default function TarantulaDetailPage() {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">🍴 Feeding Logs</h2>
                 <button
-                  onClick={() => setShowFeedingForm(!showFeedingForm)}
+                  onClick={() => {
+                    if (showFeedingForm) {
+                      // Cancel — also wipe edit state so reopening
+                      // doesn't show stale pre-fill from the row that
+                      // was being edited.
+                      handleCancelFeedingEdit()
+                    } else {
+                      setShowFeedingForm(true)
+                    }
+                  }}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm font-medium shadow-sm"
                 >
                   {showFeedingForm ? 'Cancel' : '+ Add Feeding'}
@@ -1272,7 +1384,7 @@ export default function TarantulaDetailPage() {
                     type="submit"
                     className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold shadow-sm"
                   >
-                    💾 Save Feeding Log
+                    💾 {editingFeedingId ? 'Save Changes' : 'Save Feeding Log'}
                   </button>
                 </form>
               )}
@@ -1316,12 +1428,20 @@ export default function TarantulaDetailPage() {
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 pl-11">{feeding.notes}</p>
                           )}
                         </div>
-                        <button
-                          onClick={() => handleDeleteFeeding(feeding.id)}
-                          className="ml-4 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-sm font-medium transition"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center gap-1 ml-4">
+                          <button
+                            onClick={() => handleEditFeeding(feeding)}
+                            className="px-3 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg text-sm font-medium transition"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFeeding(feeding.id)}
+                            className="px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-sm font-medium transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -1334,7 +1454,13 @@ export default function TarantulaDetailPage() {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">🔄 Molt Logs</h2>
                 <button
-                  onClick={() => setShowMoltForm(!showMoltForm)}
+                  onClick={() => {
+                    if (showMoltForm) {
+                      handleCancelMoltEdit()
+                    } else {
+                      setShowMoltForm(true)
+                    }
+                  }}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium shadow-sm"
                 >
                   {showMoltForm ? 'Cancel' : '+ Add Molt'}
@@ -1436,7 +1562,7 @@ export default function TarantulaDetailPage() {
                     type="submit"
                     className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold shadow-sm"
                   >
-                    💾 Save Molt Log
+                    💾 {editingMoltId ? 'Save Changes' : 'Save Molt Log'}
                   </button>
                 </form>
               )}
@@ -1501,12 +1627,20 @@ export default function TarantulaDetailPage() {
                             )}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleDeleteMolt(molt.id)}
-                          className="ml-4 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-sm font-medium transition"
-                        >
-                          Delete
-                        </button>
+                        <div className="flex items-center gap-1 ml-4">
+                          <button
+                            onClick={() => handleEditMolt(molt)}
+                            className="px-3 py-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg text-sm font-medium transition"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMolt(molt.id)}
+                            className="px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg text-sm font-medium transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))

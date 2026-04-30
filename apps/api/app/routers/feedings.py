@@ -264,6 +264,28 @@ async def create_lizard_feeding_log(
     return new_feeding
 
 
+@router.get("/feedings/{feeding_id}", response_model=FeedingLogResponse)
+async def get_feeding_log(
+    feeding_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Read a single feeding log (polymorphic — tarantula, snake, or lizard).
+
+    Powers edit forms on web + mobile so the form can pre-fill from a
+    deep link without first fetching the parent's whole history list.
+    Ownership is checked through `_feeding_owner_taxon` — same gate as
+    update + delete.
+    """
+    feeding = db.query(FeedingLog).filter(FeedingLog.id == feeding_id).first()
+    if not feeding:
+        raise HTTPException(status_code=404, detail="Feeding log not found")
+    _parent_model, parent_row = _feeding_owner_taxon(feeding, db, current_user)
+    if parent_row is None:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return feeding
+
+
 @router.put("/feedings/{feeding_id}", response_model=FeedingLogResponse)
 async def update_feeding_log(
     feeding_id: uuid.UUID,

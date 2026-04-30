@@ -86,6 +86,27 @@ async def create_molt_log(
     return new_molt
 
 
+@router.get("/molts/{molt_id}", response_model=MoltLogResponse)
+async def get_molt_log(
+    molt_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Read a single molt log. Powers edit forms — without it the
+    edit screen would have to scan the parent's whole molt history
+    to find the row by id."""
+    molt = db.query(MoltLog).filter(MoltLog.id == molt_id).first()
+    if not molt:
+        raise HTTPException(status_code=404, detail="Molt log not found")
+    tarantula = db.query(Tarantula).filter(
+        Tarantula.id == molt.tarantula_id,
+        Tarantula.user_id == current_user.id,
+    ).first()
+    if not tarantula:
+        raise HTTPException(status_code=404, detail="Not authorized")
+    return molt
+
+
 @router.put("/molts/{molt_id}", response_model=MoltLogResponse)
 async def update_molt_log(
     molt_id: uuid.UUID,

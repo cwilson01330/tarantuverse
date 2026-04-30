@@ -31,7 +31,18 @@ const FOOD_SIZES = ['Small', 'Medium', 'Large'];
 
 export default function AddFeedingScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  // `id` is the tarantula id (always present). `feedingId` is set when
+  // we're editing an existing entry — toggles the form into edit mode:
+  //   - title flips to "Edit Feeding"
+  //   - we GET the existing feeding to pre-fill state
+  //   - save dispatches PUT instead of POST
+  //   - we skip the post-save reminder schedule (an edit isn't a
+  //     fresh feeding event from the keeper's perspective)
+  const { id, feedingId } = useLocalSearchParams<{
+    id?: string;
+    feedingId?: string;
+  }>();
+  const isEdit = Boolean(feedingId);
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [date, setDate] = useState(new Date());
@@ -40,6 +51,7 @@ export default function AddFeedingScreen() {
   const [accepted, setAccepted] = useState(true);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(isEdit);
   const [tarantulaName, setTarantulaName] = useState('');
   const [notificationPreferences, setNotificationPreferences] = useState<any>(null);
 
@@ -47,7 +59,29 @@ export default function AddFeedingScreen() {
     // Load tarantula details and notification preferences
     loadTarantulaDetails();
     loadNotificationPreferences();
-  }, [id]);
+    // In edit mode, also fetch the existing feeding to pre-fill.
+    if (isEdit && feedingId) {
+      loadExistingFeeding(feedingId as string);
+    }
+  }, [id, feedingId]);
+
+  const loadExistingFeeding = async (fid: string) => {
+    try {
+      const response = await apiClient.get(`/feedings/${fid}`);
+      const f = response.data;
+      if (f.fed_at) setDate(new Date(f.fed_at));
+      setFoodType(f.food_type ?? '');
+      setFoodSize(f.food_size ?? '');
+      setAccepted(f.accepted !== false);
+      setNotes(f.notes ?? '');
+    } catch (error) {
+      console.error('Failed to load feeding for edit:', error);
+      Alert.alert('Error', "Couldn't load this feeding to edit.");
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadTarantulaDetails = async () => {
     try {
@@ -75,29 +109,37 @@ export default function AddFeedingScreen() {
 
     setSaving(true);
     try {
-      await apiClient.post(`/tarantulas/${id}/feedings`, {
+      const payload = {
         fed_at: date.toISOString(),
         food_type: foodType,
         food_size: foodSize || undefined,
         accepted,
         notes: notes.trim() || undefined,
-      });
+      };
 
-      // Schedule feeding reminder if enabled
-      if (notificationPreferences?.feeding_reminders_enabled && accepted && tarantulaName) {
-        const hours = notificationPreferences.feeding_reminder_hours || 24;
-        await scheduleFeedingReminder(
-          id as string,
-          tarantulaName,
-          hours
-        );
+      if (isEdit && feedingId) {
+        // Edit mode — PUT to /feedings/{id}. Skip the reminder
+        // scheduling: an edit is a correction, not a fresh feeding
+        // event, so re-arming the reminder would be wrong.
+        await apiClient.put(`/feedings/${feedingId}`, payload);
+        Alert.alert('Saved', 'Feeding log updated');
+      } else {
+        await apiClient.post(`/tarantulas/${id}/feedings`, payload);
+        // Schedule feeding reminder if enabled (create-only)
+        if (notificationPreferences?.feeding_reminders_enabled && accepted && tarantulaName) {
+          const hours = notificationPreferences.feeding_reminder_hours || 24;
+          await scheduleFeedingReminder(
+            id as string,
+            tarantulaName,
+            hours
+          );
+        }
+        Alert.alert('Success', 'Feeding log added successfully');
       }
-
-      Alert.alert('Success', 'Feeding log added successfully');
       router.back();
     } catch (error: any) {
       console.error('Failed to save feeding log:', error);
-      Alert.alert('Error', 'Failed to save feeding log');
+      Alert.alert('Error', isEdit ? "Couldn't save changes" : 'Failed to save feeding log');
     } finally {
       setSaving(false);
     }
@@ -123,7 +165,7 @@ export default function AddFeedingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader title="Log Feeding" leftAction={closeAction} rightAction={saveAction} />
+      <AppHeader title={isEdit ? 'Edit Feeding' : 'Log Feeding'} leftAction={closeAction} rightAction={saveAction} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Date */}

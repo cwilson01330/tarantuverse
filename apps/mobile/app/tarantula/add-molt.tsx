@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,13 @@ import { AppHeader } from '../../src/components/AppHeader';
 
 export default function AddMoltScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  // `id` is the tarantula id; `moltId` is set in edit mode and flips
+  // the screen to PUT/edit semantics.
+  const { id, moltId } = useLocalSearchParams<{
+    id?: string;
+    moltId?: string;
+  }>();
+  const isEdit = Boolean(moltId);
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [moltDate, setMoltDate] = useState(new Date());
@@ -29,10 +35,33 @@ export default function AddMoltScreen() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (isEdit && moltId) loadExistingMolt(moltId as string);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moltId]);
+
+  const loadExistingMolt = async (mid: string) => {
+    try {
+      const response = await apiClient.get(`/molts/${mid}`);
+      const m = response.data;
+      if (m.molted_at) setMoltDate(new Date(m.molted_at));
+      if (m.premolt_started_at) setPremoltDate(new Date(m.premolt_started_at));
+      if (m.leg_span_before != null) setLegSpanBefore(String(m.leg_span_before));
+      if (m.leg_span_after != null) setLegSpanAfter(String(m.leg_span_after));
+      if (m.weight_before != null) setWeightBefore(String(m.weight_before));
+      if (m.weight_after != null) setWeightAfter(String(m.weight_after));
+      setNotes(m.notes ?? '');
+    } catch (error) {
+      console.error('Failed to load molt for edit:', error);
+      Alert.alert('Error', "Couldn't load this molt to edit.");
+      router.back();
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      await apiClient.post(`/tarantulas/${id}/molts`, {
+      const payload = {
         molted_at: moltDate.toISOString(),
         premolt_started_at: premoltDate?.toISOString() || undefined,
         leg_span_before: legSpanBefore ? parseFloat(legSpanBefore) : undefined,
@@ -40,13 +69,19 @@ export default function AddMoltScreen() {
         weight_before: weightBefore ? parseFloat(weightBefore) : undefined,
         weight_after: weightAfter ? parseFloat(weightAfter) : undefined,
         notes: notes.trim() || undefined,
-      });
+      };
 
-      Alert.alert('Success', 'Molt log added successfully');
+      if (isEdit && moltId) {
+        await apiClient.put(`/molts/${moltId}`, payload);
+        Alert.alert('Saved', 'Molt log updated');
+      } else {
+        await apiClient.post(`/tarantulas/${id}/molts`, payload);
+        Alert.alert('Success', 'Molt log added successfully');
+      }
       router.back();
     } catch (error: any) {
       console.error('Failed to save molt log:', error);
-      Alert.alert('Error', 'Failed to save molt log');
+      Alert.alert('Error', isEdit ? "Couldn't save changes" : 'Failed to save molt log');
     } finally {
       setSaving(false);
     }
@@ -72,7 +107,7 @@ export default function AddMoltScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader title="Log Molt" leftAction={closeAction} rightAction={saveAction} />
+      <AppHeader title={isEdit ? 'Edit Molt' : 'Log Molt'} leftAction={closeAction} rightAction={saveAction} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Molt Date */}
