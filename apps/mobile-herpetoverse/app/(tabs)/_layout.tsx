@@ -9,7 +9,6 @@
  * scope for mobile v1 per the sprint plan.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Redirect, Tabs } from 'expo-router';
 import { View } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -17,7 +16,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 
 export default function TabsLayout() {
   const { user, isLoading } = useAuth();
-  const { colors, layout } = useTheme();
+  const { colors } = useTheme();
 
   // If somehow we arrive here unauthenticated (stale deep link, cleared
   // session during background), bounce to login. `isLoading` is already
@@ -26,6 +25,11 @@ export default function TabsLayout() {
     return <Redirect href="/login" />;
   }
 
+  // NOTE: We intentionally avoid expo-linear-gradient here. The TestFlight
+  // binary shipped with a broken `ExpoLinearGradient` native link
+  // (Invariant Violation: View config getter callback ... must be a
+  // function), so any `<LinearGradient>` render crashes the app. Until
+  // the next native rebuild we use a flat surface fallback.
   return (
     <Tabs
       screenOptions={{
@@ -35,24 +39,16 @@ export default function TabsLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
         },
-        headerBackground: () =>
-          layout.useGradient ? (
-            <LinearGradient
-              colors={[colors.surface, colors.background]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={{ flex: 1 }}
-            />
-          ) : (
-            <View
-              style={{
-                flex: 1,
-                backgroundColor: colors.surface,
-                borderBottomWidth: 1,
-                borderBottomColor: colors.border,
-              }}
-            />
-          ),
+        headerBackground: () => (
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: colors.surface,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          />
+        ),
         headerTintColor: colors.textPrimary,
         headerTitleStyle: {
           fontWeight: '700',
