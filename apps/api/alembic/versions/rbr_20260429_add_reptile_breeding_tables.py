@@ -33,44 +33,43 @@ depends_on = None
 
 def upgrade() -> None:
     # ────────────────────────────────────────────────────────────────────
-    # Enums — created at module level so they can be reused across the
-    # three tables. Use values_callable=lambda x: [e.value for e in x]
-    # to keep DB enum casing aligned with the Python enum string values.
+    # Enums. Truly idempotent via raw `DO $$ ... EXCEPTION ... END $$`
+    # blocks — Postgres doesn't have CREATE TYPE IF NOT EXISTS, and the
+    # SQLAlchemy `checkfirst=True` path was unreliable on Render across
+    # partial-rollback retries (the original 2026-05-01 outage).
+    #
+    # Column references below use `postgresql.ENUM(name=..., create_type=False)`
+    # rather than `sa.Enum(...)` because the cross-DB `sa.Enum` doesn't
+    # actually suppress the per-table before_create event — the PG-native
+    # one does. That distinction was the second half of the bug.
     # ────────────────────────────────────────────────────────────────────
-    pairing_type = postgresql.ENUM(
-        "natural",
-        "cohabitation",
-        "assisted",
-        "ai",
-        name="reptile_pairing_type",
-        create_type=True,
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE reptile_pairing_type AS ENUM
+                ('natural','cohabitation','assisted','ai');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+        """
     )
-    pairing_type.create(op.get_bind(), checkfirst=True)
-
-    pairing_outcome = postgresql.ENUM(
-        "in_progress",
-        "successful",
-        "unsuccessful",
-        "abandoned",
-        "unknown",
-        name="reptile_pairing_outcome",
-        create_type=True,
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE reptile_pairing_outcome AS ENUM
+                ('in_progress','successful','unsuccessful','abandoned','unknown');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+        """
     )
-    pairing_outcome.create(op.get_bind(), checkfirst=True)
-
-    offspring_status = postgresql.ENUM(
-        "hatched",
-        "kept",
-        "available",
-        "sold",
-        "traded",
-        "gifted",
-        "deceased",
-        "unknown",
-        name="reptile_offspring_status",
-        create_type=True,
+    op.execute(
+        """
+        DO $$ BEGIN
+            CREATE TYPE reptile_offspring_status AS ENUM
+                ('hatched','kept','available','sold','traded','gifted','deceased','unknown');
+        EXCEPTION WHEN duplicate_object THEN null;
+        END $$;
+        """
     )
-    offspring_status.create(op.get_bind(), checkfirst=True)
 
     # ────────────────────────────────────────────────────────────────────
     # reptile_pairings
@@ -120,7 +119,7 @@ def upgrade() -> None:
         sa.Column("separated_date", sa.Date, nullable=True),
         sa.Column(
             "pairing_type",
-            sa.Enum(
+            postgresql.ENUM(
                 "natural",
                 "cohabitation",
                 "assisted",
@@ -133,7 +132,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "outcome",
-            sa.Enum(
+            postgresql.ENUM(
                 "in_progress",
                 "successful",
                 "unsuccessful",
@@ -329,7 +328,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            sa.Enum(
+            postgresql.ENUM(
                 "hatched",
                 "kept",
                 "available",

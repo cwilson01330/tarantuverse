@@ -26,6 +26,7 @@ interface TarantulaData {
   scientific_name: string;
   species_id?: string;
   sex?: string;
+  life_stage?: string;
   date_acquired?: string;
   source?: string;
   enclosure_type?: string;
@@ -62,6 +63,7 @@ export default function AddTarantulaScreen() {
     common_name: '',
     scientific_name: '',
     sex: undefined,
+    life_stage: undefined,
     date_acquired: undefined,
     source: undefined,
     enclosure_type: undefined,
@@ -172,6 +174,7 @@ export default function AddTarantulaScreen() {
     // Fields
     inputGroup: { marginBottom: 16 },
     label: { fontSize: 14, fontWeight: '500', color: colors.textSecondary, marginBottom: 6 },
+    hint: { fontSize: 11, marginTop: 6, lineHeight: 15 },
     input: {
       borderWidth: 1,
       borderColor: colors.border,
@@ -304,6 +307,32 @@ export default function AddTarantulaScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      <View style={styles.inputGroup}>
+        <Text style={styles.label}>Life stage</Text>
+        <View style={styles.optionRow}>
+          {[{ label: 'Sling', value: 'sling' }, { label: 'Juvenile', value: 'juvenile' }, { label: 'Adult', value: 'adult' }].map((o) => (
+            <TouchableOpacity
+              key={o.value}
+              style={[styles.optionButton, formData.life_stage === o.value && styles.optionButtonActive]}
+              onPress={() =>
+                setFormData({
+                  ...formData,
+                  // Tap the active chip again to clear — life_stage is optional.
+                  life_stage: formData.life_stage === o.value ? undefined : o.value,
+                })
+              }
+            >
+              <Text style={[styles.optionButtonText, formData.life_stage === o.value && styles.optionButtonTextActive]}>
+                {o.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={[styles.hint, { color: colors.textSecondary }]}>
+          Optional. Set this to enable feeding-cadence reminders sourced from the species care sheet.
+        </Text>
       </View>
 
       <View style={styles.inputGroup}>

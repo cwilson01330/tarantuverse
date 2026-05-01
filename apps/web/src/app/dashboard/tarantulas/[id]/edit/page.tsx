@@ -27,6 +27,7 @@ export default function EditTarantulaPage() {
     common_name: '',
     scientific_name: '',
     sex: '',
+    life_stage: '',
     date_acquired: '',
     source: '',
     price_paid: '',
@@ -89,6 +90,7 @@ export default function EditTarantulaPage() {
         common_name: data.common_name || '',
         scientific_name: data.scientific_name || '',
         sex: data.sex || '',
+        life_stage: data.life_stage || '',
         date_acquired: data.date_acquired || '',
         source: data.source || '',
         price_paid: data.price_paid ? String(data.price_paid) : '',
@@ -151,6 +153,7 @@ export default function EditTarantulaPage() {
         scientific_name: formData.scientific_name || null,
         species_id: formData.species_id || null,
         sex: formData.sex || null,
+        life_stage: formData.life_stage || null,
         date_acquired: formData.date_acquired || null,
         source: formData.source || null,
         price_paid: formData.price_paid ? parseFloat(formData.price_paid) : null,
@@ -293,6 +296,23 @@ export default function EditTarantulaPage() {
                 <option value="female">Female</option>
                 <option value="unknown">Unknown</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Life stage</label>
+              <select
+                value={formData.life_stage}
+                onChange={(e) => setFormData({ ...formData, life_stage: e.target.value })}
+                className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
+              >
+                <option value="">Not set</option>
+                <option value="sling">Sling</option>
+                <option value="juvenile">Juvenile</option>
+                <option value="adult">Adult</option>
+              </select>
+              <p className="mt-1 text-xs text-theme-secondary">
+                Set this to enable feeding-cadence reminders sourced from the species care sheet.
+              </p>
             </div>
           </div>
 

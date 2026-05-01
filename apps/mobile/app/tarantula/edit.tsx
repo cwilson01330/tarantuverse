@@ -22,6 +22,7 @@ interface TarantulaData {
   common_name: string;
   scientific_name: string;
   sex?: string;
+  life_stage?: string;
   date_acquired?: string;
   source?: string;
   enclosure_type?: string;
@@ -55,6 +56,7 @@ export default function EditTarantulaScreen() {
     common_name: '',
     scientific_name: '',
     sex: undefined,
+    life_stage: undefined,
     date_acquired: undefined,
     source: undefined,
     enclosure_type: undefined,
@@ -86,6 +88,7 @@ export default function EditTarantulaScreen() {
         common_name: data.common_name || '',
         scientific_name: data.scientific_name || '',
         sex: data.sex,
+        life_stage: data.life_stage,
         date_acquired: data.date_acquired,
         source: data.source,
         enclosure_type: data.enclosure_type,
@@ -224,6 +227,40 @@ export default function EditTarantulaScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Life stage</Text>
+            <View style={styles.sexButtons}>
+              {[{ label: 'Sling', value: 'sling' }, { label: 'Juvenile', value: 'juvenile' }, { label: 'Adult', value: 'adult' }].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.sexButton,
+                    { borderColor: colors.border },
+                    formData.life_stage === option.value && { backgroundColor: colors.primary, borderColor: colors.primary }
+                  ]}
+                  onPress={() =>
+                    setFormData({
+                      ...formData,
+                      // Tap the active chip again to clear — life_stage is optional.
+                      life_stage: formData.life_stage === option.value ? undefined : option.value,
+                    })
+                  }
+                >
+                  <Text style={[
+                    styles.sexButtonText,
+                    { color: colors.textSecondary },
+                    formData.life_stage === option.value && { color: '#fff' }
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 6, lineHeight: 15 }}>
+              Optional. Set this to enable feeding-cadence reminders sourced from the species care sheet.
+            </Text>
           </View>
 
           <View style={styles.inputGroup}>
