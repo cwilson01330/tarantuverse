@@ -275,6 +275,21 @@ async def create_weight_log(
     return new_log
 
 
+@router.get(
+    "/weight-logs/{weight_log_id}",
+    response_model=WeightLogResponse,
+)
+async def get_weight_log(
+    weight_log_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fetch a single weight log by id. Used by the mobile + web edit forms
+    to pre-fill fields. Ownership checked via owning snake or lizard.
+    """
+    return _get_owned_weight_log(db, weight_log_id, current_user)
+
+
 @router.put(
     "/weight-logs/{weight_log_id}",
     response_model=WeightLogResponse,

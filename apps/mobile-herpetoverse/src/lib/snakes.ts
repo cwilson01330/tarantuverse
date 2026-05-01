@@ -205,6 +205,24 @@ export async function deleteWeightLog(id: string): Promise<void> {
   await apiClient.delete(`/weight-logs/${encodeURIComponent(id)}`);
 }
 
+export async function getWeightLog(id: string): Promise<WeightLog> {
+  const { data } = await apiClient.get<WeightLog>(
+    `/weight-logs/${encodeURIComponent(id)}`,
+  );
+  return data;
+}
+
+export async function updateWeightLog(
+  id: string,
+  payload: Partial<CreateWeightLogPayload>,
+): Promise<WeightLog> {
+  const { data } = await apiClient.put<WeightLog>(
+    `/weight-logs/${encodeURIComponent(id)}`,
+    payload,
+  );
+  return data;
+}
+
 export interface CreateFeedingPayload {
   fed_at: string;
   food_type?: string | null;
@@ -230,6 +248,24 @@ export async function deleteFeeding(id: string): Promise<void> {
   await apiClient.delete(`/feedings/${encodeURIComponent(id)}`);
 }
 
+export async function getFeeding(id: string): Promise<FeedingLog> {
+  const { data } = await apiClient.get<FeedingLog>(
+    `/feedings/${encodeURIComponent(id)}`,
+  );
+  return data;
+}
+
+export async function updateFeeding(
+  id: string,
+  payload: Partial<CreateFeedingPayload>,
+): Promise<FeedingLog> {
+  const { data } = await apiClient.put<FeedingLog>(
+    `/feedings/${encodeURIComponent(id)}`,
+    payload,
+  );
+  return data;
+}
+
 export interface CreateShedPayload {
   shed_at: string;
   in_blue_started_at?: string | null;
@@ -252,6 +288,24 @@ export async function createShed(
 
 export async function deleteShed(id: string): Promise<void> {
   await apiClient.delete(`/sheds/${encodeURIComponent(id)}`);
+}
+
+export async function getShed(id: string): Promise<ShedLog> {
+  const { data } = await apiClient.get<ShedLog>(
+    `/sheds/${encodeURIComponent(id)}`,
+  );
+  return data;
+}
+
+export async function updateShed(
+  id: string,
+  payload: Partial<CreateShedPayload>,
+): Promise<ShedLog> {
+  const { data } = await apiClient.put<ShedLog>(
+    `/sheds/${encodeURIComponent(id)}`,
+    payload,
+  );
+  return data;
 }
 
 // ---------------------------------------------------------------------------

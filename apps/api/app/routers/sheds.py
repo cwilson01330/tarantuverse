@@ -145,6 +145,18 @@ async def create_shed(
     return new_shed
 
 
+@router.get("/sheds/{shed_id}", response_model=ShedLogResponse)
+async def get_shed(
+    shed_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fetch a single shed log by id. Used by the mobile + web edit forms
+    to pre-fill fields. Ownership checked via owning snake or lizard.
+    """
+    return _get_owned_shed(db, shed_id, current_user)
+
+
 @router.put("/sheds/{shed_id}", response_model=ShedLogResponse)
 async def update_shed(
     shed_id: uuid.UUID,

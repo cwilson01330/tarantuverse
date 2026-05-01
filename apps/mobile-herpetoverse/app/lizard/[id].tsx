@@ -197,15 +197,36 @@ function LizardDetailScreen() {
         </Section>
 
         <Section title="Recent weigh-ins">
-          <WeighInsList logs={weights} />
+          <WeighInsList
+            logs={weights}
+            onEditItem={(weightId) =>
+              router.push(
+                `/lizard/log-weight/${lizard.id}?weightId=${weightId}` as never,
+              )
+            }
+          />
         </Section>
 
         <Section title="Recent feedings">
-          <FeedingsList feedings={feedings} />
+          <FeedingsList
+            feedings={feedings}
+            onEditItem={(feedingId) =>
+              router.push(
+                `/lizard/log-feeding/${lizard.id}?feedingId=${feedingId}` as never,
+              )
+            }
+          />
         </Section>
 
         <Section title="Recent sheds">
-          <ShedsList sheds={sheds} />
+          <ShedsList
+            sheds={sheds}
+            onEditItem={(shedId) =>
+              router.push(
+                `/lizard/log-shed/${lizard.id}?shedId=${shedId}` as never,
+              )
+            }
+          />
         </Section>
       </ScrollView>
     </SafeAreaView>

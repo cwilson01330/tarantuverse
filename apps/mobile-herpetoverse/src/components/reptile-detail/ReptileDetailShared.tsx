@@ -490,7 +490,14 @@ const WEIGHT_CONTEXT_LABELS: Record<WeightContext, string> = {
   other: 'Other',
 };
 
-export function WeighInsList({ logs }: { logs: WeightLogView[] }) {
+export function WeighInsList({
+  logs,
+  onEditItem,
+}: {
+  logs: WeightLogView[];
+  /** When provided, each row is tappable and routes to the edit form. */
+  onEditItem?: (id: string) => void;
+}) {
   const { colors, layout } = useTheme();
   const sorted = useMemo(
     () =>
@@ -518,37 +525,49 @@ export function WeighInsList({ logs }: { logs: WeightLogView[] }) {
           { borderColor: colors.border, borderRadius: layout.radius.md },
         ]}
       >
-        {visible.map((l, idx) => (
-          <View
-            key={l.id}
-            style={[
-              sharedStyles.listRow,
-              {
-                borderBottomColor: colors.border,
-                borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
-              },
-            ]}
-          >
-            <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
-              {fmtShortDate(l.weighed_at)}
-            </Text>
-            <Text style={[sharedStyles.rowPrimary, { color: colors.textPrimary }]}>
-              {fmtDecimal(l.weight_g, 1)} g
-            </Text>
-            <View
+        {visible.map((l, idx) => {
+          const RowWrapper: any = onEditItem ? TouchableOpacity : View;
+          const wrapperProps = onEditItem
+            ? {
+                onPress: () => onEditItem(l.id),
+                activeOpacity: 0.7,
+                accessibilityRole: 'button' as const,
+                accessibilityLabel: `Edit weigh-in from ${fmtShortDate(l.weighed_at)}`,
+              }
+            : {};
+          return (
+            <RowWrapper
+              key={l.id}
+              {...wrapperProps}
               style={[
-                sharedStyles.rowChip,
-                { backgroundColor: colors.surfaceRaised },
+                sharedStyles.listRow,
+                {
+                  borderBottomColor: colors.border,
+                  borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
+                },
               ]}
             >
-              <Text
-                style={[sharedStyles.rowChipText, { color: colors.textSecondary }]}
-              >
-                {WEIGHT_CONTEXT_LABELS[l.context] ?? l.context}
+              <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
+                {fmtShortDate(l.weighed_at)}
               </Text>
-            </View>
-          </View>
-        ))}
+              <Text style={[sharedStyles.rowPrimary, { color: colors.textPrimary }]}>
+                {fmtDecimal(l.weight_g, 1)} g
+              </Text>
+              <View
+                style={[
+                  sharedStyles.rowChip,
+                  { backgroundColor: colors.surfaceRaised },
+                ]}
+              >
+                <Text
+                  style={[sharedStyles.rowChipText, { color: colors.textSecondary }]}
+                >
+                  {WEIGHT_CONTEXT_LABELS[l.context] ?? l.context}
+                </Text>
+              </View>
+            </RowWrapper>
+          );
+        })}
       </View>
       <ViewAllToggle
         total={sorted.length}
@@ -564,7 +583,14 @@ export function WeighInsList({ logs }: { logs: WeightLogView[] }) {
 // Feedings list
 // ---------------------------------------------------------------------------
 
-export function FeedingsList({ feedings }: { feedings: FeedingLogView[] }) {
+export function FeedingsList({
+  feedings,
+  onEditItem,
+}: {
+  feedings: FeedingLogView[];
+  /** When provided, each row is tappable and routes to the edit form. */
+  onEditItem?: (id: string) => void;
+}) {
   const { colors, layout } = useTheme();
   const sorted = useMemo(
     () =>
@@ -590,50 +616,62 @@ export function FeedingsList({ feedings }: { feedings: FeedingLogView[] }) {
           { borderColor: colors.border, borderRadius: layout.radius.md },
         ]}
       >
-        {visible.map((f, idx) => (
-          <View
-            key={f.id}
-            style={[
-              sharedStyles.listRow,
-              {
-                borderBottomColor: colors.border,
-                borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
-              },
-            ]}
-          >
-            <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
-              {fmtShortDate(f.fed_at)}
-            </Text>
-            <View
+        {visible.map((f, idx) => {
+          const RowWrapper: any = onEditItem ? TouchableOpacity : View;
+          const wrapperProps = onEditItem
+            ? {
+                onPress: () => onEditItem(f.id),
+                activeOpacity: 0.7,
+                accessibilityRole: 'button' as const,
+                accessibilityLabel: `Edit feeding from ${fmtShortDate(f.fed_at)}`,
+              }
+            : {};
+          return (
+            <RowWrapper
+              key={f.id}
+              {...wrapperProps}
               style={[
-                sharedStyles.rowChip,
+                sharedStyles.listRow,
                 {
-                  backgroundColor: f.accepted ? '#10b98120' : colors.surfaceRaised,
+                  borderBottomColor: colors.border,
+                  borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
                 },
               ]}
             >
-              <Text
+              <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
+                {fmtShortDate(f.fed_at)}
+              </Text>
+              <View
                 style={[
-                  sharedStyles.rowChipText,
-                  { color: f.accepted ? '#34d399' : colors.textSecondary },
+                  sharedStyles.rowChip,
+                  {
+                    backgroundColor: f.accepted ? '#10b98120' : colors.surfaceRaised,
+                  },
                 ]}
               >
-                {f.accepted ? 'Accepted' : 'Refused'}
+                <Text
+                  style={[
+                    sharedStyles.rowChipText,
+                    { color: f.accepted ? '#34d399' : colors.textSecondary },
+                  ]}
+                >
+                  {f.accepted ? 'Accepted' : 'Refused'}
+                </Text>
+              </View>
+              <Text
+                style={[sharedStyles.rowSecondary, { color: colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                {[
+                  f.food_type,
+                  f.prey_weight_g ? `${fmtDecimal(f.prey_weight_g, 1)} g` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || '—'}
               </Text>
-            </View>
-            <Text
-              style={[sharedStyles.rowSecondary, { color: colors.textSecondary }]}
-              numberOfLines={1}
-            >
-              {[
-                f.food_type,
-                f.prey_weight_g ? `${fmtDecimal(f.prey_weight_g, 1)} g` : null,
-              ]
-                .filter(Boolean)
-                .join(' · ') || '—'}
-            </Text>
-          </View>
-        ))}
+            </RowWrapper>
+          );
+        })}
       </View>
       <ViewAllToggle
         total={sorted.length}
@@ -649,7 +687,14 @@ export function FeedingsList({ feedings }: { feedings: FeedingLogView[] }) {
 // Sheds list
 // ---------------------------------------------------------------------------
 
-export function ShedsList({ sheds }: { sheds: ShedLogView[] }) {
+export function ShedsList({
+  sheds,
+  onEditItem,
+}: {
+  sheds: ShedLogView[];
+  /** When provided, each row is tappable and routes to the edit form. */
+  onEditItem?: (id: string) => void;
+}) {
   const { colors, layout } = useTheme();
   const sorted = useMemo(
     () =>
@@ -676,61 +721,73 @@ export function ShedsList({ sheds }: { sheds: ShedLogView[] }) {
           { borderColor: colors.border, borderRadius: layout.radius.md },
         ]}
       >
-        {visible.map((s, idx) => (
-          <View
-            key={s.id}
-            style={[
-              sharedStyles.listRow,
-              {
-                borderBottomColor: colors.border,
-                borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
-              },
-            ]}
-          >
-            <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
-              {fmtShortDate(s.shed_at)}
-            </Text>
-            <View
+        {visible.map((s, idx) => {
+          const RowWrapper: any = onEditItem ? TouchableOpacity : View;
+          const wrapperProps = onEditItem
+            ? {
+                onPress: () => onEditItem(s.id),
+                activeOpacity: 0.7,
+                accessibilityRole: 'button' as const,
+                accessibilityLabel: `Edit shed from ${fmtShortDate(s.shed_at)}`,
+              }
+            : {};
+          return (
+            <RowWrapper
+              key={s.id}
+              {...wrapperProps}
               style={[
-                sharedStyles.rowChip,
+                sharedStyles.listRow,
                 {
-                  backgroundColor: s.is_complete_shed
-                    ? '#10b98120'
-                    : '#f59e0b20',
+                  borderBottomColor: colors.border,
+                  borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
                 },
               ]}
             >
-              <Text
-                style={[
-                  sharedStyles.rowChipText,
-                  {
-                    color: s.is_complete_shed ? '#34d399' : '#fbbf24',
-                  },
-                ]}
-              >
-                {s.is_complete_shed ? 'One piece' : 'Broken up'}
+              <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
+                {fmtShortDate(s.shed_at)}
               </Text>
-            </View>
-            {s.has_retained_shed && (
               <View
                 style={[
                   sharedStyles.rowChip,
-                  { backgroundColor: '#f43f5e20' },
+                  {
+                    backgroundColor: s.is_complete_shed
+                      ? '#10b98120'
+                      : '#f59e0b20',
+                  },
                 ]}
               >
-                <Text style={[sharedStyles.rowChipText, { color: '#fb7185' }]}>
-                  Retained
+                <Text
+                  style={[
+                    sharedStyles.rowChipText,
+                    {
+                      color: s.is_complete_shed ? '#34d399' : '#fbbf24',
+                    },
+                  ]}
+                >
+                  {s.is_complete_shed ? 'One piece' : 'Broken up'}
                 </Text>
               </View>
-            )}
-            <Text
-              style={[sharedStyles.rowSecondary, { color: colors.textSecondary }]}
-              numberOfLines={1}
-            >
-              {s.notes ?? ''}
-            </Text>
-          </View>
-        ))}
+              {s.has_retained_shed && (
+                <View
+                  style={[
+                    sharedStyles.rowChip,
+                    { backgroundColor: '#f43f5e20' },
+                  ]}
+                >
+                  <Text style={[sharedStyles.rowChipText, { color: '#fb7185' }]}>
+                    Retained
+                  </Text>
+                </View>
+              )}
+              <Text
+                style={[sharedStyles.rowSecondary, { color: colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                {s.notes ?? ''}
+              </Text>
+            </RowWrapper>
+          );
+        })}
       </View>
       <ViewAllToggle
         total={sorted.length}

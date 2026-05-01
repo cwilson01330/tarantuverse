@@ -199,15 +199,36 @@ function SnakeDetailScreen() {
         </Section>
 
         <Section title="Recent weigh-ins">
-          <WeighInsList logs={weights} />
+          <WeighInsList
+            logs={weights}
+            onEditItem={(weightId) =>
+              router.push(
+                `/reptile/log-weight/${snake.id}?weightId=${weightId}` as never,
+              )
+            }
+          />
         </Section>
 
         <Section title="Recent feedings">
-          <FeedingsList feedings={feedings} />
+          <FeedingsList
+            feedings={feedings}
+            onEditItem={(feedingId) =>
+              router.push(
+                `/reptile/log-feeding/${snake.id}?feedingId=${feedingId}` as never,
+              )
+            }
+          />
         </Section>
 
         <Section title="Recent sheds">
-          <ShedsList sheds={sheds} />
+          <ShedsList
+            sheds={sheds}
+            onEditItem={(shedId) =>
+              router.push(
+                `/reptile/log-shed/${snake.id}?shedId=${shedId}` as never,
+              )
+            }
+          />
         </Section>
       </ScrollView>
     </SafeAreaView>

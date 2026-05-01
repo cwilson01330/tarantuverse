@@ -1,5 +1,5 @@
 /**
- * Log shed — shared screen for snake and lizard.
+ * Log shed — shared screen for snake and lizard, also handles edit.
  *
  * Lighter than weight + feeding because shed entries are simpler: a
  * date, whether the shed came off cleanly, whether anything retained,
@@ -7,14 +7,21 @@
  * detail are gated behind an "Advanced" disclosure since they're not
  * commonly logged on phone — keepers usually have a scale + tape on a
  * desk anyway.
+ *
+ * EDIT MODE: when the route includes a `shedId` query param, pre-fill
+ * via GET /sheds/{id} and PUT on save. Edit dispatches taxon-agnostically
+ * since /sheds/{id} resolves polymorphism via the row's snake_id /
+ * lizard_id.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
@@ -33,6 +40,8 @@ import {
 import {
   type CreateShedPayload,
   createShed as createShedSnake,
+  getShed,
+  updateShed,
 } from '../lib/snakes';
 import { createShed as createShedLizard } from '../lib/lizards';
 
@@ -46,9 +55,23 @@ const RETAINED_OPTIONS = [
   { value: 'yes' as const, label: 'Yes' },
 ];
 
+/** Format an ISO datetime as YYYY-MM-DD in the user's local TZ. */
+function isoToYMD(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return todayISO();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function LogShedScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, shedId } = useLocalSearchParams<{
+    id?: string;
+    shedId?: string;
+  }>();
+  const isEdit = Boolean(shedId);
   const { colors } = useTheme();
 
   const [date, setDate] = useState(() => todayISO());
@@ -57,10 +80,38 @@ export function LogShedScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   const [retainedNotes, setRetainedNotes] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit mode — pre-fill from existing shed.
+  useEffect(() => {
+    if (!isEdit || !shedId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const s = await getShed(shedId as string);
+        if (cancelled) return;
+        setDate(isoToYMD(s.shed_at));
+        setComplete(s.is_complete_shed ? 'yes' : 'no');
+        setRetained(s.has_retained_shed ? 'yes' : 'no');
+        setRetainedNotes(s.retained_shed_notes ?? '');
+        setNotes(s.notes ?? '');
+      } catch (err) {
+        if (!cancelled) {
+          setError(extractErrorMessage(err, "Couldn't load this shed."));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit, shedId]);
+
   async function handleSubmit() {
-    if (!id || submitting) return;
+    if (submitting) return;
+    if (!isEdit && !id) return;
     setError(null);
 
     const shedIso = dateToISO(date);
@@ -80,10 +131,12 @@ export function LogShedScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
 
     setSubmitting(true);
     try {
-      if (taxon === 'snake') {
-        await createShedSnake(id, payload);
+      if (isEdit && shedId) {
+        await updateShed(shedId as string, payload);
+      } else if (taxon === 'snake') {
+        await createShedSnake(id as string, payload);
       } else {
-        await createShedLizard(id, payload);
+        await createShedLizard(id as string, payload);
       }
       router.back();
     } catch (err) {
@@ -97,12 +150,20 @@ export function LogShedScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
       edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <AppHeader title="Log shed" leftAction={<HeaderBackButton />} />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flex}
-      >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <AppHeader
+        title={isEdit ? 'Edit shed' : 'Log shed'}
+        leftAction={<HeaderBackButton />}
+      />
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.flex}
+        >
+          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <Field label="Date" required hint="YYYY-MM-DD">
             <ThemedInput
               value={date}
@@ -158,12 +219,13 @@ export function LogShedScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
           {error && <FormErrorBanner message={error} />}
 
           <SubmitButton
-            label="Save shed"
+            label={isEdit ? 'Save changes' : 'Save shed'}
             busy={submitting}
             onPress={handleSubmit}
           />
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      )}
     </SafeAreaView>
   );
 }
@@ -171,6 +233,7 @@ export function LogShedScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   flex: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: {
     padding: 16,
     paddingBottom: 48,
