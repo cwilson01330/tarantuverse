@@ -89,6 +89,41 @@ function ProfileScreen() {
         </View>
 
         <TouchableOpacity
+          onPress={() => router.push('/morph-calculator' as never)}
+          style={[
+            styles.toolButton,
+            {
+              borderColor: colors.border,
+              borderRadius: layout.radius.md,
+              backgroundColor: colors.surface,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Open the morph calculator"
+        >
+          <MaterialCommunityIcons
+            name="calculator-variant"
+            size={20}
+            color={colors.primary}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.toolButtonTitle, { color: colors.textPrimary }]}>
+              Morph calculator
+            </Text>
+            <Text
+              style={[styles.toolButtonSubtitle, { color: colors.textSecondary }]}
+            >
+              Predict offspring from any pairing.
+            </Text>
+          </View>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={20}
+            color={colors.textTertiary}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
           onPress={handleSignOut}
           style={[
             styles.signOutButton,
@@ -159,8 +194,19 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 14 },
   rowValue: { fontSize: 14, fontWeight: '500' },
   divider: { height: 1 },
+  toolButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  toolButtonTitle: { fontSize: 15, fontWeight: '600' },
+  toolButtonSubtitle: { fontSize: 12, marginTop: 2 },
   signOutButton: {
-    marginTop: 24,
+    marginTop: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,

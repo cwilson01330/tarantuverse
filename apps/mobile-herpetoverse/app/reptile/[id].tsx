@@ -15,11 +15,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
+import { GenotypeSection } from '../../src/components/GenotypeSection';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
   FeedingsList,
@@ -230,6 +231,50 @@ function SnakeDetailScreen() {
             }
           />
         </Section>
+
+        <Section title="Genetics">
+          <GenotypeSection
+            snakeId={snake.id}
+            scientificName={snake.scientific_name}
+          />
+          <TouchableOpacity
+            onPress={() =>
+              router.push(
+                `/morph-calculator?snakeId=${snake.id}` as never,
+              )
+            }
+            style={[
+              styles.calculatorLink,
+              {
+                borderColor: colors.border,
+                borderRadius: 8,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Open the morph calculator with this snake as Parent A"
+          >
+            <MaterialCommunityIcons
+              name="calculator-variant"
+              size={18}
+              color={colors.primary}
+            />
+            <Text
+              style={{
+                color: colors.primary,
+                fontSize: 14,
+                fontWeight: '600',
+                flex: 1,
+              }}
+            >
+              Open morph calculator
+            </Text>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={18}
+              color={colors.textTertiary}
+            />
+          </TouchableOpacity>
+        </Section>
       </ScrollView>
     </SafeAreaView>
   );
@@ -241,6 +286,15 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 48,
     gap: 16,
+  },
+  calculatorLink: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
   },
 });
 

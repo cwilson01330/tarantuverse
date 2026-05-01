@@ -1,0 +1,791 @@
+/**
+ * Morph calculator — standalone Punnett-square tool.
+ *
+ * Works offline once the gene catalog is cached. Two parent panels;
+ * each holds a list of (gene, allele state) entries you build up via
+ * the same shared modal pattern as GenotypeSection. Predicted offspring
+ * panel below shows the top outcomes ranked by probability, with lethal
+ * outcomes flagged and pushed to the bottom.
+ *
+ * The calculator can be opened standalone (empty parents) OR pre-filled
+ * from a snake's recorded genotype via the `snakeId` query param.
+ *
+ * Currently only ball pythons have enough seeded gene data to be useful
+ * — the species picker is a no-op until we expand the catalog. Web has
+ * the same constraint.
+ */
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader } from '../src/components/AppHeader';
+import { HeaderBackButton } from '../src/components/HeaderBackButton';
+import { withErrorBoundary } from '../src/components/ErrorBoundary';
+import { useTheme } from '../src/contexts/ThemeContext';
+import {
+  CALCULATOR_SPECIES,
+  type AlleleState,
+  type Gene,
+  type GeneInput,
+  combineOffspring,
+  describeOutcome,
+  fetchGenesForSpecies,
+  formatProbability,
+  listSnakeGenotype,
+  stateLabel,
+  stateToCount,
+  validStatesForGene,
+  zygosityToCount,
+} from '../src/lib/genes';
+
+interface ParentEntry {
+  gene: Gene;
+  state: AlleleState;
+}
+
+const TOP_N = 12;
+
+function MorphCalculatorScreen() {
+  const { colors, layout } = useTheme();
+  const { snakeId } = useLocalSearchParams<{ snakeId?: string }>();
+
+  const species = CALCULATOR_SPECIES[0]; // Ball python only for now
+
+  const [genes, setGenes] = useState<Gene[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [parentA, setParentA] = useState<ParentEntry[]>([]);
+  const [parentB, setParentB] = useState<ParentEntry[]>([]);
+  const [activeParent, setActiveParent] = useState<'A' | 'B' | null>(null);
+
+  // Fetch the gene catalog once.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await fetchGenesForSpecies(species.scientific_name);
+        if (cancelled) return;
+        setGenes(list ?? []);
+        setLoadError(null);
+      } catch {
+        if (!cancelled) setLoadError("Couldn't load the gene catalog.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [species.scientific_name]);
+
+  // Pre-fill parent A from a snake's genotype when arriving with ?snakeId=...
+  useEffect(() => {
+    if (!snakeId || !genes) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listSnakeGenotype(snakeId as string);
+        if (cancelled) return;
+        const entries: ParentEntry[] = rows
+          .map((row) => {
+            const g = genes.find((gx) => gx.id === row.gene_id);
+            if (!g) return null;
+            // Map the snake's recorded zygosity to the calculator's
+            // AlleleState. zygosityToCount returns 0/1/2; we then map
+            // back to a state appropriate for the gene type.
+            const count = zygosityToCount(row.zygosity, g.gene_type);
+            const state: AlleleState =
+              count === 0
+                ? 'absent'
+                : count === 2
+                  ? g.gene_type === 'recessive' || g.gene_type === 'dominant'
+                    ? 'visual'
+                    : 'super'
+                  : g.gene_type === 'recessive'
+                    ? 'het'
+                    : 'visual';
+            return { gene: g, state };
+          })
+          .filter(Boolean) as ParentEntry[];
+        if (entries.length > 0) setParentA(entries);
+      } catch {
+        // Non-fatal — calculator still works empty.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [snakeId, genes]);
+
+  // Combine parent entries into GeneInput[] for the math layer.
+  // If a gene appears on only one parent, the other is implicitly absent.
+  const offspringInputs = useMemo<GeneInput[]>(() => {
+    if (!genes) return [];
+    const map = new Map<string, GeneInput>();
+    parentA.forEach((e) => {
+      map.set(e.gene.id, {
+        gene: e.gene,
+        parentA: stateToCount(e.state, e.gene.gene_type),
+        parentB: 0,
+      });
+    });
+    parentB.forEach((e) => {
+      const existing = map.get(e.gene.id);
+      const cnt = stateToCount(e.state, e.gene.gene_type);
+      if (existing) {
+        existing.parentB = cnt;
+      } else {
+        map.set(e.gene.id, {
+          gene: e.gene,
+          parentA: 0,
+          parentB: cnt,
+        });
+      }
+    });
+    // Drop genes where both parents are absent — they don't affect math.
+    return Array.from(map.values()).filter(
+      (g) => g.parentA !== 0 || g.parentB !== 0,
+    );
+  }, [parentA, parentB, genes]);
+
+  const outcomes = useMemo(
+    () => combineOffspring(offspringInputs),
+    [offspringInputs],
+  );
+
+  const inputGenes = offspringInputs.map((g) => g.gene);
+
+  const handleAddToParent = (parent: 'A' | 'B', entry: ParentEntry) => {
+    const setter = parent === 'A' ? setParentA : setParentB;
+    setter((prev) => {
+      // Replace if gene already in this parent's list, otherwise append.
+      const exists = prev.some((e) => e.gene.id === entry.gene.id);
+      if (exists) {
+        return prev.map((e) =>
+          e.gene.id === entry.gene.id ? entry : e,
+        );
+      }
+      return [...prev, entry];
+    });
+  };
+
+  const handleRemoveFromParent = (parent: 'A' | 'B', geneId: string) => {
+    const setter = parent === 'A' ? setParentA : setParentB;
+    setter((prev) => prev.filter((e) => e.gene.id !== geneId));
+  };
+
+  const handleClear = (parent: 'A' | 'B') => {
+    if (parent === 'A') setParentA([]);
+    else setParentB([]);
+  };
+
+  return (
+    <SafeAreaView
+      edges={['left', 'right', 'bottom']}
+      style={[styles.safe, { backgroundColor: colors.background }]}
+    >
+      <AppHeader
+        title="Morph calculator"
+        subtitle={species.common_name}
+        leftAction={<HeaderBackButton />}
+      />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {loadError ? (
+          <Text style={{ color: colors.danger }}>{loadError}</Text>
+        ) : !genes ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : (
+          <>
+            <ParentPanel
+              label="Parent A"
+              entries={parentA}
+              onAdd={() => setActiveParent('A')}
+              onRemove={(id) => handleRemoveFromParent('A', id)}
+              onClear={() => handleClear('A')}
+            />
+            <ParentPanel
+              label="Parent B"
+              entries={parentB}
+              onAdd={() => setActiveParent('B')}
+              onRemove={(id) => handleRemoveFromParent('B', id)}
+              onClear={() => handleClear('B')}
+            />
+
+            <Text
+              style={[
+                styles.sectionLabel,
+                { color: colors.textSecondary, marginTop: 18 },
+              ]}
+            >
+              Predicted offspring
+            </Text>
+            {outcomes.length === 0 ? (
+              <Text style={[styles.note, { color: colors.textSecondary }]}>
+                Add at least one gene to a parent to see predicted offspring.
+              </Text>
+            ) : (
+              <View
+                style={[
+                  styles.outcomeBox,
+                  {
+                    borderColor: colors.border,
+                    borderRadius: layout.radius.md,
+                  },
+                ]}
+              >
+                {outcomes.slice(0, TOP_N).map((o, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.outcomeRow,
+                      {
+                        borderBottomColor: colors.border,
+                        borderBottomWidth:
+                          idx < Math.min(outcomes.length, TOP_N) - 1 ? 1 : 0,
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          color: o.isLethal
+                            ? colors.danger
+                            : colors.textPrimary,
+                          fontWeight: '600',
+                          fontSize: 14,
+                        }}
+                        numberOfLines={2}
+                      >
+                        {describeOutcome(o, inputGenes)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
+                      {formatProbability(o.probability)}
+                    </Text>
+                  </View>
+                ))}
+                {outcomes.length > TOP_N ? (
+                  <Text
+                    style={[
+                      styles.note,
+                      {
+                        color: colors.textTertiary,
+                        padding: 12,
+                        textAlign: 'center',
+                      },
+                    ]}
+                  >
+                    + {outcomes.length - TOP_N} less likely outcome
+                    {outcomes.length - TOP_N === 1 ? '' : 's'} not shown
+                  </Text>
+                ) : null}
+              </View>
+            )}
+
+            <Text
+              style={[
+                styles.disclaimer,
+                { color: colors.textTertiary, marginTop: 16 },
+              ]}
+            >
+              Probabilities assume independent assortment, no epistasis,
+              no linkage — same model as MorphMarket / genecalc /
+              World of Ball Pythons. Real clutches vary.
+            </Text>
+          </>
+        )}
+      </ScrollView>
+
+      <PickGeneModal
+        visible={activeParent !== null}
+        onClose={() => setActiveParent(null)}
+        genes={genes ?? []}
+        existingForParent={
+          activeParent === 'A'
+            ? parentA
+            : activeParent === 'B'
+              ? parentB
+              : []
+        }
+        onPick={(entry) => {
+          if (activeParent) handleAddToParent(activeParent, entry);
+          setActiveParent(null);
+        }}
+      />
+    </SafeAreaView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Parent panel — chips with state + remove button
+// ---------------------------------------------------------------------------
+
+function ParentPanel({
+  label,
+  entries,
+  onAdd,
+  onRemove,
+  onClear,
+}: {
+  label: string;
+  entries: ParentEntry[];
+  onAdd: () => void;
+  onRemove: (geneId: string) => void;
+  onClear: () => void;
+}) {
+  const { colors, layout } = useTheme();
+  return (
+    <View
+      style={[
+        styles.panel,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          borderRadius: layout.radius.md,
+        },
+      ]}
+    >
+      <View style={styles.panelHeader}>
+        <Text style={[styles.panelLabel, { color: colors.textPrimary }]}>
+          {label}
+        </Text>
+        {entries.length > 0 ? (
+          <TouchableOpacity onPress={onClear} hitSlop={8}>
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+              Clear
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {entries.length === 0 ? (
+        <Text
+          style={[
+            styles.note,
+            { color: colors.textTertiary, marginVertical: 4 },
+          ]}
+        >
+          Wild type. Add a gene to start.
+        </Text>
+      ) : (
+        <View style={styles.chipsWrap}>
+          {entries.map((e) => (
+            <TouchableOpacity
+              key={e.gene.id}
+              onPress={() => onRemove(e.gene.id)}
+              style={[
+                styles.parentChip,
+                {
+                  backgroundColor: colors.surfaceRaised,
+                  borderColor: colors.border,
+                  borderRadius: layout.radius.sm,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${e.gene.common_name}`}
+            >
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontWeight: '600',
+                  fontSize: 13,
+                }}
+              >
+                {e.gene.common_name}
+              </Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
+                {stateLabel(e.state, e.gene.gene_type)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      <TouchableOpacity
+        onPress={onAdd}
+        style={[
+          styles.addButton,
+          {
+            borderColor: colors.primary,
+            borderRadius: layout.radius.sm,
+          },
+        ]}
+      >
+        <MaterialCommunityIcons
+          name="plus"
+          size={16}
+          color={colors.primary}
+        />
+        <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
+          Add gene
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PickGeneModal — search a gene, then pick its allele state
+// ---------------------------------------------------------------------------
+
+interface PickGeneModalProps {
+  visible: boolean;
+  onClose: () => void;
+  genes: Gene[];
+  existingForParent: ParentEntry[];
+  onPick: (entry: ParentEntry) => void;
+}
+
+function PickGeneModal({
+  visible,
+  onClose,
+  genes,
+  existingForParent,
+  onPick,
+}: PickGeneModalProps) {
+  const { colors, layout } = useTheme();
+
+  const [query, setQuery] = useState('');
+  const [picked, setPicked] = useState<Gene | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      setQuery('');
+      setPicked(null);
+    }
+  }, [visible]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    let list = [...genes];
+    if (q) {
+      list = list.filter(
+        (g) =>
+          g.common_name.toLowerCase().includes(q) ||
+          (g.symbol ?? '').toLowerCase().includes(q),
+      );
+    }
+    list.sort((a, b) => a.common_name.localeCompare(b.common_name));
+    return list;
+  }, [genes, query]);
+
+  const states = picked ? validStatesForGene(picked.gene_type) : [];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable
+          style={[
+            styles.modalCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderTopLeftRadius: layout.radius.lg,
+              borderTopRightRadius: layout.radius.lg,
+            },
+          ]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <SafeAreaView edges={['bottom']}>
+            <View style={styles.modalHeader}>
+              {picked ? (
+                <TouchableOpacity onPress={() => setPicked(null)} hitSlop={8}>
+                  <MaterialCommunityIcons
+                    name="chevron-left"
+                    size={24}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
+              ) : (
+                <View style={{ width: 24 }} />
+              )}
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                {picked ? picked.common_name : 'Pick a gene'}
+              </Text>
+              <TouchableOpacity onPress={onClose} hitSlop={8}>
+                <MaterialCommunityIcons
+                  name="close"
+                  size={22}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {!picked ? (
+              <View style={{ paddingTop: 4, paddingBottom: 8 }}>
+                <View
+                  style={[
+                    styles.searchWrap,
+                    {
+                      backgroundColor: colors.surfaceRaised,
+                      borderColor: colors.border,
+                      borderRadius: layout.radius.md,
+                    },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="magnify"
+                    size={18}
+                    color={colors.textTertiary}
+                  />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search — e.g. Pastel, Albino"
+                    placeholderTextColor={colors.textTertiary}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    style={[styles.searchInput, { color: colors.textPrimary }]}
+                  />
+                </View>
+
+                <ScrollView
+                  style={{ maxHeight: 380 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {filtered.length === 0 ? (
+                    <Text
+                      style={[
+                        styles.note,
+                        { color: colors.textSecondary, padding: 16 },
+                      ]}
+                    >
+                      No genes match. Try a different name.
+                    </Text>
+                  ) : (
+                    filtered.map((g) => {
+                      const inUse = existingForParent.some(
+                        (e) => e.gene.id === g.id,
+                      );
+                      return (
+                        <TouchableOpacity
+                          key={g.id}
+                          onPress={() => setPicked(g)}
+                          style={[
+                            styles.geneRow,
+                            { borderBottomColor: colors.border },
+                          ]}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{
+                                color: colors.textPrimary,
+                                fontWeight: '600',
+                                fontSize: 15,
+                              }}
+                            >
+                              {g.common_name}
+                            </Text>
+                            <Text
+                              style={{
+                                color: colors.textSecondary,
+                                fontSize: 12,
+                                marginTop: 2,
+                              }}
+                            >
+                              {g.gene_type.replace('_', ' ')}
+                              {g.lethal_homozygous ? ' · lethal homozygous' : ''}
+                              {inUse ? ' · already on this parent' : ''}
+                            </Text>
+                          </View>
+                          <MaterialCommunityIcons
+                            name="chevron-right"
+                            size={18}
+                            color={colors.textTertiary}
+                          />
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </View>
+            ) : (
+              <View style={{ paddingTop: 8, paddingBottom: 12, gap: 10 }}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  How does Parent carry this gene?
+                </Text>
+                {states.map((s) => (
+                  <TouchableOpacity
+                    key={s}
+                    onPress={() => onPick({ gene: picked, state: s })}
+                    style={[
+                      styles.stateRow,
+                      {
+                        backgroundColor: colors.surfaceRaised,
+                        borderColor: colors.border,
+                        borderRadius: layout.radius.md,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={{
+                        color: colors.textPrimary,
+                        fontWeight: '600',
+                        fontSize: 14,
+                        flex: 1,
+                      }}
+                    >
+                      {stateLabel(s, picked.gene_type)}
+                    </Text>
+                    <MaterialCommunityIcons
+                      name="chevron-right"
+                      size={18}
+                      color={colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </SafeAreaView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1 },
+  scroll: { padding: 16, gap: 12, paddingBottom: 48 },
+  center: { paddingVertical: 40, alignItems: 'center' },
+  note: { fontSize: 13, lineHeight: 19 },
+  disclaimer: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontStyle: 'italic',
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+
+  panel: {
+    padding: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  panelLabel: { fontSize: 14, fontWeight: '700' },
+
+  chipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  parentChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  addButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+  },
+
+  outcomeBox: {
+    borderWidth: 1,
+  },
+  outcomeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 12,
+  },
+
+  // Modal shared with GenotypeSection's add modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  modalTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    height: 42,
+    borderWidth: 1,
+    gap: 8,
+    marginBottom: 8,
+  },
+  searchInput: { flex: 1, fontSize: 14, padding: 0 },
+  geneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  stateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+  },
+});
+
+export default withErrorBoundary(MorphCalculatorScreen, 'morph-calculator');
