@@ -107,7 +107,7 @@ function LizardDetailScreen() {
   if (loading && !lizard) {
     return (
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <Stack.Screen options={{ title: 'Lizard', headerBackTitle: 'Back' }} />
@@ -118,7 +118,7 @@ function LizardDetailScreen() {
   if (lizardError && !lizard) {
     return (
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <Stack.Screen options={{ title: 'Lizard', headerBackTitle: 'Back' }} />
@@ -130,7 +130,7 @@ function LizardDetailScreen() {
 
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
+      edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
       <Stack.Screen

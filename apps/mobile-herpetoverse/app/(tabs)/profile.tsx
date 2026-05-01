@@ -40,7 +40,7 @@ function ProfileScreen() {
 
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
+      edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
       <ScrollView contentContainerStyle={styles.content}>

@@ -238,7 +238,7 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   if (loading && !animal) {
     return (
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <Stack.Screen
@@ -253,7 +253,7 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   if (loadError && !animal) {
     return (
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <Stack.Screen
@@ -269,7 +269,7 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
 
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
+      edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
       <Stack.Screen

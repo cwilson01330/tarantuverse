@@ -97,7 +97,7 @@ function SpeciesScreen() {
 
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
+      edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
       {/* Search bar */}

@@ -135,7 +135,7 @@ function CollectionScreen() {
   if (rows === null) {
     return (
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <View style={styles.centerContent}>
@@ -149,7 +149,7 @@ function CollectionScreen() {
   if (rows.length === 0) {
     return (
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <View style={styles.emptyState}>
@@ -186,7 +186,7 @@ function CollectionScreen() {
   // ---------- List ----------
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
+      edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
       <FlatList

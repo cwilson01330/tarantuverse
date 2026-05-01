@@ -88,7 +88,7 @@ export function LogWeightScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
 
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
+      edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
       <Stack.Screen options={{ title: 'Log weight', headerBackTitle: 'Back' }} />

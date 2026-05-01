@@ -84,7 +84,7 @@ function SpeciesDetailScreen() {
   if (loading && !species) {
     return (
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <Stack.Screen
@@ -100,7 +100,7 @@ function SpeciesDetailScreen() {
   if (loadError && !species) {
     return (
       <SafeAreaView
-        edges={['left', 'right', 'bottom']}
+        edges={['top', 'left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
         <Stack.Screen
@@ -117,7 +117,7 @@ function SpeciesDetailScreen() {
 
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
+      edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
       <Stack.Screen

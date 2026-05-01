@@ -113,7 +113,7 @@ export function QRUploadSessionScreen({ taxon }: { taxon: QRTaxon }) {
 
   return (
     <SafeAreaView
-      edges={['left', 'right', 'bottom']}
+      edges={['top', 'left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
       <Stack.Screen
