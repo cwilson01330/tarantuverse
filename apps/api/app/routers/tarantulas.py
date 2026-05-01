@@ -472,13 +472,23 @@ async def get_feeding_stats(
     total_refused = total_feedings - total_accepted
     acceptance_rate = (total_accepted / total_feedings * 100) if total_feedings > 0 else 0.0
 
-    # Calculate days between feedings (in the user's local timezone so
-    # back-to-back evening feedings across midnight don't collapse to "0
-    # days apart" — same calendar-day reasoning as below).
+    # Calculate intervals — but ONLY between accepted feedings. A
+    # refused feeding doesn't represent an actual meal, so the gap from
+    # an accepted feeding to a refusal isn't an "interval between
+    # feedings" — it's just two attempts. Including refusals here used
+    # to inflate the average (and the prediction): Brooke's spider had
+    # 3 logs (2 accepted, 1 refused) with one 171-day gap involving the
+    # refusal, and the prediction said "next feeding in ~100 days" for
+    # a sling that should eat every few days (2026-05-01).
+    #
+    # Calendar-day diffs use the user's local TZ so back-to-back evening
+    # feedings across midnight don't collapse to "0 days apart."
+    accepted_logs = [log for log in feeding_logs if log.accepted]
+
     days_between = []
-    for i in range(1, len(feeding_logs)):
-        previous_feeding = feeding_logs[i - 1]
-        current_feeding = feeding_logs[i]
+    for i in range(1, len(accepted_logs)):
+        previous_feeding = accepted_logs[i - 1]
+        current_feeding = accepted_logs[i]
         gap = _calendar_day_diff(
             current_feeding.fed_at,
             previous_feeding.fed_at,
@@ -486,7 +496,13 @@ async def get_feeding_stats(
         )
         days_between.append(gap)
 
-    average_days_between = sum(days_between) / len(days_between) if days_between else None
+    # Require ≥ 2 intervals (= 3 accepted feedings) before showing an
+    # average. A single interval can be wildly unrepresentative —
+    # especially right after acquiring a new spider that refused for
+    # months before settling in.
+    average_days_between = (
+        sum(days_between) / len(days_between) if len(days_between) >= 2 else None
+    )
     longest_gap = max(days_between) if days_between else None
 
     # Last feeding info — refers to the last ACCEPTED feeding, not the
@@ -501,7 +517,6 @@ async def get_feeding_stats(
     # that hasn't eaten in our care yet), last_feeding_date is None and
     # days_since_last_feeding stays None — UI surfaces this as "—" or
     # "Not fed yet" rather than misleading the keeper.
-    accepted_logs = [log for log in feeding_logs if log.accepted]
     if accepted_logs:
         last_feeding = accepted_logs[-1]
         last_feeding_date = last_feeding.fed_at
@@ -515,12 +530,28 @@ async def get_feeding_stats(
         last_feeding_date = None
         days_since_last_feeding = None
 
-    # Predict next feeding — only meaningful when we have a real anchor
-    # (an accepted feeding) AND a known cadence.
+    # Predict next feeding — uses the MEDIAN of accepted-only intervals
+    # rather than the mean. Mean is wrecked by outliers: one 6-month
+    # gap from a sick or premolting spider would push the prediction
+    # months out even after the keeper resumed normal feeding. Median
+    # ignores that outlier and tracks the typical cadence.
+    #
+    # Suppressed entirely when we have < 2 intervals — see the same
+    # threshold used for average_days_between above. UI shows "—".
     next_feeding_prediction = None
-    if average_days_between and last_feeding_date is not None:
-        predicted_days = int(average_days_between)
-        next_feeding_prediction = (last_feeding_date + timedelta(days=predicted_days)).date()
+    if len(days_between) >= 2 and last_feeding_date is not None:
+        sorted_intervals = sorted(days_between)
+        n = len(sorted_intervals)
+        if n % 2 == 1:
+            median_interval = sorted_intervals[n // 2]
+        else:
+            median_interval = (
+                sorted_intervals[n // 2 - 1] + sorted_intervals[n // 2]
+            ) / 2
+        predicted_days = max(1, int(round(median_interval)))
+        next_feeding_prediction = (
+            last_feeding_date + timedelta(days=predicted_days)
+        ).date()
 
     # Calculate current acceptance streak
     current_streak = 0
