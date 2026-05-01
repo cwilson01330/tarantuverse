@@ -18,7 +18,7 @@
  * collapse to nothing. The aim is "scrollable but never empty-padded."
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,6 +33,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
+import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { FormErrorBanner } from '../../src/components/forms/FormPrimitives';
 import {
@@ -84,12 +86,10 @@ function SpeciesDetailScreen() {
   if (loading && !species) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen
-          options={{ title: 'Care sheet', headerBackTitle: 'Back' }}
-        />
+        <AppHeader title="Care sheet" leftAction={<HeaderBackButton />} />
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -100,12 +100,10 @@ function SpeciesDetailScreen() {
   if (loadError && !species) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen
-          options={{ title: 'Care sheet', headerBackTitle: 'Back' }}
-        />
+        <AppHeader title="Care sheet" leftAction={<HeaderBackButton />} />
         <View style={styles.center}>
           <FormErrorBanner message={loadError} />
         </View>
@@ -117,14 +115,12 @@ function SpeciesDetailScreen() {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <Stack.Screen
-        options={{
-          title: species.common_names[0] || species.scientific_name,
-          headerBackTitle: 'Back',
-        }}
+      <AppHeader
+        title={species.common_names[0] || species.scientific_name}
+        leftAction={<HeaderBackButton />}
       />
       <ScrollView
         contentContainerStyle={styles.scroll}

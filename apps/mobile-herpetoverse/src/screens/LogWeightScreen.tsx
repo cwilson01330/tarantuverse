@@ -6,7 +6,7 @@
  * is the most recent one, so the detail screen will see the updated
  * weight on next refresh.
  */
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { AppHeader } from '../components/AppHeader';
+import { HeaderBackButton } from '../components/HeaderBackButton';
 import {
   ChipGroup,
   Field,
@@ -88,10 +90,10 @@ export function LogWeightScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <Stack.Screen options={{ title: 'Log weight', headerBackTitle: 'Back' }} />
+      <AppHeader title="Log weight" leftAction={<HeaderBackButton />} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}

@@ -10,7 +10,6 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
-import { View } from 'react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 
@@ -25,34 +24,18 @@ export default function TabsLayout() {
     return <Redirect href="/login" />;
   }
 
-  // NOTE: We intentionally avoid expo-linear-gradient here. The TestFlight
-  // binary shipped with a broken `ExpoLinearGradient` native link
-  // (Invariant Violation: View config getter callback ... must be a
-  // function), so any `<LinearGradient>` render crashes the app. Until
-  // the next native rebuild we use a flat surface fallback.
+  // Each tab screen owns its own AppHeader, so we suppress the native
+  // Tabs header here. (We also can't use expo-linear-gradient on this
+  // build — see _layout.tsx's previous note.)
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-        },
-        headerBackground: () => (
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: colors.surface,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border,
-            }}
-          />
-        ),
-        headerTintColor: colors.textPrimary,
-        headerTitleStyle: {
-          fontWeight: '700',
-          color: colors.textPrimary,
         },
         sceneStyle: { backgroundColor: colors.background },
       }}

@@ -22,7 +22,7 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -35,6 +35,8 @@ import {
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { AppHeader } from '../components/AppHeader';
+import { HeaderBackButton } from '../components/HeaderBackButton';
 import {
   FormErrorBanner,
   extractErrorMessage,
@@ -113,12 +115,10 @@ export function QRUploadSessionScreen({ taxon }: { taxon: QRTaxon }) {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <Stack.Screen
-        options={{ title: 'QR upload', headerBackTitle: 'Back' }}
-      />
+      <AppHeader title="QR upload" leftAction={<HeaderBackButton />} />
       <View style={styles.scroll}>
         {/* Intro */}
         <View

@@ -13,11 +13,13 @@
  * to render below it.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
+import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
   FeedingsList,
@@ -109,10 +111,10 @@ function SnakeDetailScreen() {
   if (loading && !snake) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen options={{ title: 'Snake', headerBackTitle: 'Back' }} />
+        <AppHeader title="Snake" leftAction={<HeaderBackButton />} />
         <LoadingShell />
       </SafeAreaView>
     );
@@ -120,10 +122,10 @@ function SnakeDetailScreen() {
   if (snakeError && !snake) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen options={{ title: 'Snake', headerBackTitle: 'Back' }} />
+        <AppHeader title="Snake" leftAction={<HeaderBackButton />} />
         <RetryError message={snakeError} onRetry={onRefresh} />
       </SafeAreaView>
     );
@@ -132,30 +134,26 @@ function SnakeDetailScreen() {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <Stack.Screen
-        options={{
-          title: snakeTitle(snake),
-          headerBackTitle: 'Back',
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() =>
-                router.push(`/reptile/edit/${snake.id}` as never)
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Edit reptile"
-              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
-            >
-              <MaterialCommunityIcons
-                name="pencil-outline"
-                size={22}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-          ),
-        }}
+      <AppHeader
+        title={snakeTitle(snake)}
+        leftAction={<HeaderBackButton />}
+        rightAction={
+          <TouchableOpacity
+            onPress={() => router.push(`/reptile/edit/${snake.id}` as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Edit reptile"
+            hitSlop={8}
+          >
+            <MaterialCommunityIcons
+              name="pencil-outline"
+              size={22}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        }
       />
       <ScrollView
         contentContainerStyle={styles.scrollContent}

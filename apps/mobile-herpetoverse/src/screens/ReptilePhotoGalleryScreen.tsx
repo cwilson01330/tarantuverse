@@ -20,7 +20,7 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Alert,
@@ -36,6 +36,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { AppHeader } from '../components/AppHeader';
+import { HeaderBackButton } from '../components/HeaderBackButton';
 import {
   Field,
   FormErrorBanner,
@@ -257,10 +259,10 @@ export function ReptilePhotoGalleryScreen({ taxon }: { taxon: PhotoTaxon }) {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <Stack.Screen options={{ title: 'Photos', headerBackTitle: 'Back' }} />
+      <AppHeader title="Photos" leftAction={<HeaderBackButton />} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         refreshControl={

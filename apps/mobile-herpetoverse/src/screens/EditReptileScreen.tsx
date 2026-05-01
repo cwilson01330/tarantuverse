@@ -15,7 +15,7 @@
  * TODO(bundle 6+): Extract shared form body into `<ReptileForm />` so
  * add + edit don't drift in field shape, validation, or copy.
  */
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,6 +30,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { AppHeader } from '../components/AppHeader';
+import { HeaderBackButton } from '../components/HeaderBackButton';
 import {
   ChipGroup,
   Field,
@@ -238,12 +240,10 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   if (loading && !animal) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen
-          options={{ title: 'Edit reptile', headerBackTitle: 'Back' }}
-        />
+        <AppHeader title="Edit reptile" leftAction={<HeaderBackButton />} />
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -253,12 +253,10 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   if (loadError && !animal) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen
-          options={{ title: 'Edit reptile', headerBackTitle: 'Back' }}
-        />
+        <AppHeader title="Edit reptile" leftAction={<HeaderBackButton />} />
         <View style={styles.center}>
           <FormErrorBanner message={loadError} />
         </View>
@@ -269,15 +267,10 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <Stack.Screen
-        options={{
-          title: 'Edit reptile',
-          headerBackTitle: 'Back',
-        }}
-      />
+      <AppHeader title="Edit reptile" leftAction={<HeaderBackButton />} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}

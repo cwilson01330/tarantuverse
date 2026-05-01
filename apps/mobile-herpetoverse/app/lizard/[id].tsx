@@ -12,11 +12,13 @@
  * shape-clean for UI use — see src/lib/lizards.ts for the type defs.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
+import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
   FeedingsList,
@@ -107,10 +109,10 @@ function LizardDetailScreen() {
   if (loading && !lizard) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen options={{ title: 'Lizard', headerBackTitle: 'Back' }} />
+        <AppHeader title="Lizard" leftAction={<HeaderBackButton />} />
         <LoadingShell />
       </SafeAreaView>
     );
@@ -118,10 +120,10 @@ function LizardDetailScreen() {
   if (lizardError && !lizard) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <Stack.Screen options={{ title: 'Lizard', headerBackTitle: 'Back' }} />
+        <AppHeader title="Lizard" leftAction={<HeaderBackButton />} />
         <RetryError message={lizardError} onRetry={onRefresh} />
       </SafeAreaView>
     );
@@ -130,30 +132,26 @@ function LizardDetailScreen() {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <Stack.Screen
-        options={{
-          title: lizardTitle(lizard),
-          headerBackTitle: 'Back',
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() =>
-                router.push(`/lizard/edit/${lizard.id}` as never)
-              }
-              accessibilityRole="button"
-              accessibilityLabel="Edit reptile"
-              style={{ paddingHorizontal: 8, paddingVertical: 4 }}
-            >
-              <MaterialCommunityIcons
-                name="pencil-outline"
-                size={22}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-          ),
-        }}
+      <AppHeader
+        title={lizardTitle(lizard)}
+        leftAction={<HeaderBackButton />}
+        rightAction={
+          <TouchableOpacity
+            onPress={() => router.push(`/lizard/edit/${lizard.id}` as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Edit reptile"
+            hitSlop={8}
+          >
+            <MaterialCommunityIcons
+              name="pencil-outline"
+              size={22}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        }
       />
       <ScrollView
         contentContainerStyle={styles.scrollContent}

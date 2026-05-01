@@ -26,6 +26,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { apiClient } from '../../src/services/api';
+import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { daysSince, relativeDays } from '../../src/utils/relative-days';
 
@@ -135,9 +136,10 @@ function CollectionScreen() {
   if (rows === null) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
+        <AppHeader title="Collection" />
         <View style={styles.centerContent}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -149,9 +151,10 @@ function CollectionScreen() {
   if (rows.length === 0) {
     return (
       <SafeAreaView
-        edges={['top', 'left', 'right', 'bottom']}
+        edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
+        <AppHeader title="Collection" />
         <View style={styles.emptyState}>
           <MaterialCommunityIcons
             name="snake"
@@ -186,9 +189,10 @@ function CollectionScreen() {
   // ---------- List ----------
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
+      <AppHeader title="Collection" />
       <FlatList
         data={rows}
         keyExtractor={(r) => `${r.taxon}:${r.id}`}

@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { captureEvent } from '../../src/services/posthog';
+import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 
 function ProfileScreen() {
@@ -40,9 +41,10 @@ function ProfileScreen() {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
+      <AppHeader title="Profile" />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.avatarWrap}>
           <View

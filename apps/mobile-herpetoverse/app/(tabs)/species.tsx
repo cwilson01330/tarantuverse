@@ -27,6 +27,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { ThemedInput } from '../../src/components/forms/FormPrimitives';
 import {
@@ -97,9 +98,10 @@ function SpeciesScreen() {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right', 'bottom']}
+      edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
+      <AppHeader title="Species" />
       {/* Search bar */}
       <View
         style={[styles.searchBarWrap, { borderBottomColor: colors.border }]}
