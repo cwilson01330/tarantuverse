@@ -78,16 +78,57 @@ def _parse(text: Optional[str]) -> Optional[Tuple[int, int]]:
         return (1, 1)
     if s == "every other day":
         return (2, 2)
-    if s in ("weekly", "once a week", "once weekly", "every week"):
+    if s in (
+        "weekly",
+        "once a week",
+        "once weekly",
+        "once per week",  # found on prod 2026-05-01
+        "every week",
+    ):
         return (7, 7)
     if s in ("biweekly", "bi-weekly", "every 2 weeks", "every two weeks"):
         return (14, 14)
-    if s == "twice a week":
-        return (3, 4)
-    if s in ("twice weekly", "2x weekly", "2x per week"):
+    if s in (
+        "twice a week",
+        "twice weekly",
+        "twice per week",  # found on prod 2026-05-01
+        "2x weekly",
+        "2x per week",
+        "2x a week",
+    ):
         return (3, 4)
     if s in ("monthly", "once a month"):
         return (28, 30)
+
+    # ── "once or twice <per/a> week" / "1-2 times <per/a> week" ────────
+    # Range case: 1 feeding/week → 7-day interval, 2 feedings/week → 3-4
+    # day interval. Combined window is "every 3-7 days."
+    if s in (
+        "once or twice a week",
+        "once or twice per week",
+        "1-2 times a week",
+        "1-2 times per week",
+        "1 to 2 times per week",
+        "1 to 2 times a week",
+    ):
+        return (3, 7)
+
+    # ── "N-M times <per/a> week" ───────────────────────────────────────
+    # Convert frequency range → interval range. More feedings/week →
+    # SHORTER interval, so the high frequency bound gives the min
+    # interval and vice versa.
+    m = re.fullmatch(
+        rf"{_NUM}\s*(?:-|to|or)\s*{_NUM}\s*(?:x|times?)(?:\s+per\s+|\s+a\s+|\s+)week",
+        s,
+    )
+    if m:
+        a, b = int(m.group(1)), int(m.group(2))
+        lo, hi = min(a, b), max(a, b)
+        if lo <= 0:
+            return None
+        min_interval = max(1, math.floor(7 / hi))
+        max_interval = max(1, math.ceil(7 / lo))
+        return (min_interval, max_interval)
 
     # ── "N times per week" / "N times a week" ──────────────────────────
     m = re.fullmatch(rf"{_NUM}\s*(?:x|times?)(?:\s+per\s+|\s+a\s+|\s+)week", s)
@@ -141,8 +182,12 @@ _TESTS = [
     ("Every 7 days", (7, 7)),
     ("weekly", (7, 7)),
     ("Once a week", (7, 7)),
+    ("Once per week", (7, 7)),  # prod variant
     ("twice a week", (3, 4)),
+    ("Twice per week", (3, 4)),  # prod variant
     ("3 times per week", (2, 3)),
+    ("Once or twice per week", (3, 7)),  # prod variant
+    ("2-3 times per week", (2, 4)),  # prod variant
     ("every other day", (2, 2)),
     ("every 2 weeks", (14, 14)),
     ("biweekly", (14, 14)),
