@@ -530,28 +530,22 @@ async def get_feeding_stats(
         last_feeding_date = None
         days_since_last_feeding = None
 
-    # Predict next feeding — uses the MEDIAN of accepted-only intervals
-    # rather than the mean. Mean is wrecked by outliers: one 6-month
-    # gap from a sick or premolting spider would push the prediction
-    # months out even after the keeper resumed normal feeding. Median
-    # ignores that outlier and tracks the typical cadence.
+    # Next-feeding prediction is intentionally NOT computed from the
+    # keeper's feeding history. Even with accepted-only intervals and
+    # a median-of-medians, the signal is too noisy:
+    #   - sparse data (a sling logged twice during platform setup) →
+    #     "feed in 100 days" predictions (Cory + Brooke, 2026-05-01)
+    #   - life-stage mismatches (juvie cadence on an adult-history feed) →
+    #     wrong even with rich data
+    #   - intentional schedule changes (post-acquisition, post-rehouse)
+    #     poison the average for months
     #
-    # Suppressed entirely when we have < 2 intervals — see the same
-    # threshold used for average_days_between above. UI shows "—".
+    # The honest answer is "we don't predict from history." A future
+    # bundle will compute predictions from curated species cadence
+    # data (Species.feeding_interval_*_days, gated by Tarantula.life_stage)
+    # and re-introduce the field with a trustworthy source. Until then,
+    # the field stays None and the UI hides the tile.
     next_feeding_prediction = None
-    if len(days_between) >= 2 and last_feeding_date is not None:
-        sorted_intervals = sorted(days_between)
-        n = len(sorted_intervals)
-        if n % 2 == 1:
-            median_interval = sorted_intervals[n // 2]
-        else:
-            median_interval = (
-                sorted_intervals[n // 2 - 1] + sorted_intervals[n // 2]
-            ) / 2
-        predicted_days = max(1, int(round(median_interval)))
-        next_feeding_prediction = (
-            last_feeding_date + timedelta(days=predicted_days)
-        ).date()
 
     # Calculate current acceptance streak
     current_streak = 0
