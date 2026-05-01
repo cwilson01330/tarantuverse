@@ -17,6 +17,10 @@ class TarantulaBase(BaseModel):
     date_acquired: Optional[date] = None
     source: Optional[str] = Field(None, pattern="^(bred|bought|wild_caught)$")
     price_paid: Optional[Decimal] = None
+    # Life-stage drives species-cadence-based feeding predictions when
+    # set. Nullable — keepers don't have to classify, but they get
+    # better recommendations when they do. Added 2026-05-01.
+    life_stage: Optional[str] = Field(None, pattern="^(sling|juvenile|adult)$")
 
     # Husbandry
     enclosure_type: Optional[str] = Field(None, pattern="^(terrestrial|arboreal|fossorial)$")

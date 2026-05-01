@@ -28,6 +28,18 @@ class EnclosureType(str, enum.Enum):
     FOSSORIAL = "fossorial"
 
 
+class LifeStage(str, enum.Enum):
+    """Spider age class — drives species-cadence-based feeding predictions.
+
+    Lowercase DB values (matching the recent reptile_pairing_type
+    convention from rbr_20260429), not the uppercase UPPERCASE_LEGACY
+    of sex/source. Created in migration lst_20260501.
+    """
+    SLING = "sling"
+    JUVENILE = "juvenile"
+    ADULT = "adult"
+
+
 class Tarantula(Base):
     __tablename__ = "tarantulas"
 
@@ -46,6 +58,14 @@ class Tarantula(Base):
     date_acquired = Column(Date)
     source = Column(SQLEnum(Source))
     price_paid = Column(Numeric(10, 2))
+
+    # Life stage — nullable. When set + species has cadence data, the
+    # feeding-stats endpoint computes a species-recommended next-feeding
+    # date. Created in migration lst_20260501.
+    life_stage = Column(
+        SQLEnum(LifeStage, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=True,
+    )
 
     # Husbandry
     # enclosure_type DB enum was created with lowercase values (terrestrial/arboreal/fossorial)

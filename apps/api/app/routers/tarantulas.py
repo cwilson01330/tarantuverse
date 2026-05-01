@@ -530,22 +530,46 @@ async def get_feeding_stats(
         last_feeding_date = None
         days_since_last_feeding = None
 
-    # Next-feeding prediction is intentionally NOT computed from the
-    # keeper's feeding history. Even with accepted-only intervals and
-    # a median-of-medians, the signal is too noisy:
-    #   - sparse data (a sling logged twice during platform setup) →
-    #     "feed in 100 days" predictions (Cory + Brooke, 2026-05-01)
-    #   - life-stage mismatches (juvie cadence on an adult-history feed) →
-    #     wrong even with rich data
-    #   - intentional schedule changes (post-acquisition, post-rehouse)
-    #     poison the average for months
+    # Next-feeding prediction. Sourced ONLY from curated species
+    # cadence data — never from the keeper's feeding history. History
+    # is too noisy for prediction (sparse data, life-stage mismatches,
+    # post-acquisition schedule shifts), so we punt unless we have:
     #
-    # The honest answer is "we don't predict from history." A future
-    # bundle will compute predictions from curated species cadence
-    # data (Species.feeding_interval_*_days, gated by Tarantula.life_stage)
-    # and re-introduce the field with a trustworthy source. Until then,
-    # the field stays None and the UI hides the tile.
+    #   1. a species linked to this tarantula
+    #   2. a life_stage set on the tarantula (sling/juvenile/adult)
+    #   3. the species sheet's interval_max_days for that stage
+    #   4. an accepted feeding to anchor "next feeding from when"
+    #
+    # When all four are present, predict `last_fed + interval_max_days`
+    # (the upper bound of the recommended window — keepers will see it
+    # as the latest the spider should go before its next meal).
+    # Otherwise: None, and the UI hides the tile.
     next_feeding_prediction = None
+    if (
+        tarantula.species_id
+        and tarantula.life_stage
+        and last_feeding_date is not None
+    ):
+        linked_species = (
+            db.query(Species)
+            .filter(Species.id == tarantula.species_id)
+            .first()
+        )
+        if linked_species:
+            stage_value = (
+                tarantula.life_stage.value
+                if hasattr(tarantula.life_stage, "value")
+                else tarantula.life_stage
+            )
+            interval_max = getattr(
+                linked_species,
+                f"feeding_interval_max_days_{stage_value}",
+                None,
+            )
+            if interval_max is not None and interval_max > 0:
+                next_feeding_prediction = (
+                    last_feeding_date + timedelta(days=int(interval_max))
+                ).date()
 
     # Calculate current acceptance streak
     current_streak = 0

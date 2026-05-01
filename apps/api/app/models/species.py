@@ -53,6 +53,19 @@ class Species(Base):
     feeding_frequency_juvenile = Column(String(100))
     feeding_frequency_adult = Column(String(100))
 
+    # Structured feeding cadence (added 2026-05-01 in fcd_20260501).
+    # The strings above stay as the human-readable copy on care sheets;
+    # these numeric columns power the next-feeding prediction. Nullable
+    # because not every species sheet has an explicit min/max yet —
+    # backfilled from the strings via scripts/backfill_species_feeding
+    # _intervals.py, which is allowed to skip ambiguous matches.
+    feeding_interval_min_days_sling = Column(Integer)
+    feeding_interval_max_days_sling = Column(Integer)
+    feeding_interval_min_days_juvenile = Column(Integer)
+    feeding_interval_max_days_juvenile = Column(Integer)
+    feeding_interval_min_days_adult = Column(Integer)
+    feeding_interval_max_days_adult = Column(Integer)
+
     # Additional Care
     water_dish_required = Column(Boolean, default=True)
     webbing_amount = Column(String(50))  # "light", "moderate", "heavy"

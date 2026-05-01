@@ -38,6 +38,16 @@ class SpeciesBase(BaseModel):
     feeding_frequency_juvenile: Optional[str] = None
     feeding_frequency_adult: Optional[str] = None
 
+    # Structured feeding cadence per life stage — added 2026-05-01.
+    # The strings above stay as the human-readable copy; these numeric
+    # fields drive the next-feeding prediction in feeding-stats.
+    feeding_interval_min_days_sling: Optional[int] = None
+    feeding_interval_max_days_sling: Optional[int] = None
+    feeding_interval_min_days_juvenile: Optional[int] = None
+    feeding_interval_max_days_juvenile: Optional[int] = None
+    feeding_interval_min_days_adult: Optional[int] = None
+    feeding_interval_max_days_adult: Optional[int] = None
+
     # Additional Care
     water_dish_required: bool = True
     webbing_amount: Optional[str] = None
@@ -96,6 +106,12 @@ class SpeciesUpdate(BaseModel):
     feeding_frequency_sling: Optional[str] = None
     feeding_frequency_juvenile: Optional[str] = None
     feeding_frequency_adult: Optional[str] = None
+    feeding_interval_min_days_sling: Optional[int] = None
+    feeding_interval_max_days_sling: Optional[int] = None
+    feeding_interval_min_days_juvenile: Optional[int] = None
+    feeding_interval_max_days_juvenile: Optional[int] = None
+    feeding_interval_min_days_adult: Optional[int] = None
+    feeding_interval_max_days_adult: Optional[int] = None
     water_dish_required: Optional[bool] = None
     webbing_amount: Optional[str] = None
     burrowing: Optional[bool] = None
