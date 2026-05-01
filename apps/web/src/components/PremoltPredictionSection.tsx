@@ -184,7 +184,7 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
           <div className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-gray-800 bg-opacity-50">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Refusal rate (30d)</span>
             <span className="text-lg font-bold text-gray-900 dark:text-white">
-              {(prediction.refusal_rate_last_30_days * 100).toFixed(0)}%
+              {prediction.refusal_rate_last_30_days.toFixed(0)}%
             </span>
           </div>
         )}

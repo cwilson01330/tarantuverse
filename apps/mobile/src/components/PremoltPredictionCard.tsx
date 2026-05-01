@@ -213,7 +213,7 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
               Refusal rate (30d)
             </Text>
             <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
-              {(prediction.refusal_rate_last_30_days * 100).toFixed(0)}%
+              {prediction.refusal_rate_last_30_days.toFixed(0)}%
             </Text>
           </View>
         )}
