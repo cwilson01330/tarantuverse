@@ -14,11 +14,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
+import { ReptileShareSheet } from '../../src/components/ReptileShareSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
   FeedingsList,
@@ -57,6 +58,7 @@ function LizardDetailScreen() {
   const [photos, setPhotos] = useState<Photo[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -139,18 +141,32 @@ function LizardDetailScreen() {
         title={lizardTitle(lizard)}
         leftAction={<HeaderBackButton />}
         rightAction={
-          <TouchableOpacity
-            onPress={() => router.push(`/lizard/edit/${lizard.id}` as never)}
-            accessibilityRole="button"
-            accessibilityLabel="Edit reptile"
-            hitSlop={8}
-          >
-            <MaterialCommunityIcons
-              name="pencil-outline"
-              size={22}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => setShareOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Share public profile"
+              hitSlop={8}
+            >
+              <MaterialCommunityIcons
+                name="share-variant"
+                size={22}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push(`/lizard/edit/${lizard.id}` as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Edit reptile"
+              hitSlop={8}
+            >
+              <MaterialCommunityIcons
+                name="pencil-outline"
+                size={22}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          </View>
         }
       />
       <ScrollView
@@ -229,6 +245,14 @@ function LizardDetailScreen() {
           />
         </Section>
       </ScrollView>
+
+      <ReptileShareSheet
+        visible={shareOpen}
+        onClose={() => setShareOpen(false)}
+        taxon="lizard"
+        animalId={lizard.id}
+        animalName={lizardTitle(lizard)}
+      />
     </SafeAreaView>
   );
 }
@@ -238,6 +262,11 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 48,
+    gap: 16,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 16,
   },
 });
