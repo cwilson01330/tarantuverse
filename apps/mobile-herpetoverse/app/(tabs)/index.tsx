@@ -1,5 +1,5 @@
 /**
- * Reptile collection — Sprint 8 Bundle 2.
+ * Reptile collection.
  *
  * Displays every snake + lizard the keeper owns, merged into a single
  * scrollable list (matches the web /app/reptiles UX). Taxon stays on
@@ -9,13 +9,6 @@
  * Error handling is permissive: if one taxon fetch fails we still show
  * whatever loaded; the partial-failure state is surfaced via a banner
  * but the list remains usable.
- *
- * Notes for future bundles:
- *   - Bundle 3 will build /reptile/<id> snake detail and /lizard/<id>
- *     lizard detail. Until then the row tap routes to a placeholder
- *     screen that explains the screen's coming.
- *   - Bundle 4 wires the add-reptile flow that the empty-state CTA and
- *     the "+" FAB will navigate to (`/reptile/add`).
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';

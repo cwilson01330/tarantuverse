@@ -1135,9 +1135,37 @@ export default function TarantulaDetailPage() {
                           const isFeeding = 'fed_at' in item
                           const isMolt = 'molted_at' in item
                           const isSubstrate = 'changed_at' in item
-                          
+
+                          // Feeding + molt rows are clickable — opens
+                          // the Logs tab with the row pre-filled in the
+                          // edit form. Substrate stays read-only here
+                          // until handleEditSubstrate ships in a follow-up.
+                          const editable = isFeeding || isMolt
+                          const handleRowClick = () => {
+                            if (!editable) return
+                            setActiveTab('logs')
+                            if (isFeeding) handleEditFeeding(item as FeedingLog)
+                            else if (isMolt) handleEditMolt(item as MoltLog)
+                          }
+
+                          const Wrapper: any = editable ? 'button' : 'div'
+
                           return (
-                            <div key={index} className="flex gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition">
+                            <Wrapper
+                              key={index}
+                              {...(editable
+                                ? {
+                                    type: 'button',
+                                    onClick: handleRowClick,
+                                    'aria-label': `Edit ${isFeeding ? 'feeding' : 'molt'} from ${formatLocalDate(item.fed_at || item.molted_at)}`,
+                                  }
+                                : {})}
+                              className={`flex gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 transition w-full text-left ${
+                                editable
+                                  ? 'hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer'
+                                  : ''
+                              }`}
+                            >
                               <div className="text-3xl">
                                 {isFeeding ? '🍴' : isMolt ? '🔄' : '💨'}
                               </div>
@@ -1149,7 +1177,15 @@ export default function TarantulaDetailPage() {
                                   {formatLocalDate(item.fed_at || item.molted_at || item.changed_at)}
                                 </p>
                               </div>
-                            </div>
+                              {editable && (
+                                <span
+                                  aria-hidden="true"
+                                  className="self-center text-blue-500 dark:text-blue-400 text-sm font-medium opacity-60 group-hover:opacity-100"
+                                >
+                                  ✎ Edit
+                                </span>
+                              )}
+                            </Wrapper>
                           )
                         })}
                     </>
