@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
+import { FeedingStatusBanner } from '../../src/components/FeedingStatusBanner';
 import { GenotypeSection } from '../../src/components/GenotypeSection';
 import { ReptileShareSheet } from '../../src/components/ReptileShareSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -192,6 +193,12 @@ function SnakeDetailScreen() {
           lastShedAt={snake.last_shed_at}
           brumationActive={snake.brumation_active}
           fallbackGlyph="🐍"
+        />
+
+        <FeedingStatusBanner
+          taxon="snake"
+          animalId={snake.id}
+          refreshKey={feedings.length}
         />
 
         <LogActions

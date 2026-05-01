@@ -101,3 +101,38 @@ class PreySuggestion(BaseModel):
     # shows a "we don't have data for this species yet" banner.
     is_data_available: bool = True
     warning: Optional[str] = None
+
+
+class FeedingStatus(BaseModel):
+    """Smart feeding indicator — when does this animal need feeding next?
+
+    Combines the species' interval_days_min/max (from life_stage_feeding
+    + current weight) with the most recent ACCEPTED feeding to surface a
+    "due / overdue / upcoming" status the mobile and web UIs can render
+    as a colored banner.
+
+    `status` semantics:
+      - 'no_data'     : species has no interval data OR no weight to pick a stage
+      - 'no_feedings' : the animal has no feeding history yet
+      - 'paused'      : animal is currently in brumation — reminders silenced
+      - 'upcoming'    : elapsed < interval_min  → "next feeding in N days"
+      - 'due'         : interval_min <= elapsed <= interval_max → "feeding due"
+      - 'overdue'     : elapsed > interval_max → "overdue by N days"
+
+    `days_until_due` is the number of days until elapsed reaches
+    interval_min. Negative means the lower bound has passed; large
+    negative means we're past interval_max (overdue).
+
+    Refusals do NOT reset the clock. We use the most recent ACCEPTED
+    feeding for last_fed_at — same Brooke-on-EST class fix from
+    `feedback_last_feeding_means_accepted.md`.
+    """
+    status: str  # no_data | no_feedings | paused | upcoming | due | overdue
+    last_fed_at: Optional[datetime] = None
+    interval_days_min: Optional[int] = None
+    interval_days_max: Optional[int] = None
+    next_feeding_due_at: Optional[datetime] = None
+    next_feeding_overdue_at: Optional[datetime] = None
+    days_until_due: Optional[int] = None
+    is_data_available: bool = True
+    note: Optional[str] = None

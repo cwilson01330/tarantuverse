@@ -18,6 +18,7 @@ import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { FeedingStatusBanner } from '../../src/components/FeedingStatusBanner';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { ReptileShareSheet } from '../../src/components/ReptileShareSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -189,6 +190,12 @@ function LizardDetailScreen() {
           lastShedAt={lizard.last_shed_at}
           brumationActive={lizard.brumation_active}
           fallbackGlyph="🦎"
+        />
+
+        <FeedingStatusBanner
+          taxon="lizard"
+          animalId={lizard.id}
+          refreshKey={feedings.length}
         />
 
         <LogActions
