@@ -126,12 +126,18 @@ export async function scheduleFeedingReminder(
     // Cancel existing reminders for this tarantula
     await cancelFeedingReminder(tarantulaId);
 
-    // Schedule new reminder
+    // Schedule new reminder. Trigger MUST include the explicit
+    // SchedulableTriggerInputTypes.TIME_INTERVAL `type` field — the
+    // SDK 52-era `{ seconds: N }` shorthand was dropped in SDK 53+.
+    // Without the type field the SDK silently drops the delay and the
+    // notification fires immediately. Cory 2026-05-01: "popup
+    // immediately after feeding telling me it's been 24 hours."
     const notificationId = await scheduleLocalNotification(
       `Time to feed ${tarantulaName}`,
       `It's been ${hoursUntilReminder} hours since ${tarantulaName}'s last feeding.`,
       {
-        seconds: hoursUntilReminder * 3600, // Convert hours to seconds
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: hoursUntilReminder * 3600,
       },
       {
         type: 'feeding_reminder',
@@ -179,7 +185,8 @@ export async function scheduleSubstrateReminder(
       `Substrate change for ${tarantulaName}`,
       `It's been ${daysUntilReminder} days since ${tarantulaName}'s last substrate change.`,
       {
-        seconds: daysUntilReminder * 86400, // Convert days to seconds
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: daysUntilReminder * 86400,
       },
       {
         type: 'substrate_reminder',
@@ -229,7 +236,8 @@ export async function scheduleMoltPredictionNotification(
       `${tarantulaName} may be in premolt! 🦋`,
       `${probability}% chance of premolt. Watch for signs: darker abdomen, webbing, refusing food. Check again in ${daysUntilCheck} days.`,
       {
-        seconds: daysUntilCheck * 86400, // Convert days to seconds
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: daysUntilCheck * 86400,
       },
       {
         type: 'molt_prediction',
@@ -286,7 +294,8 @@ export async function scheduleMaintenanceReminder(
       `Maintenance: ${tarantulaName}`,
       messages[maintenanceType] || messages.general,
       {
-        seconds: daysUntilReminder * 86400, // Convert days to seconds
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: daysUntilReminder * 86400,
       },
       {
         type: 'maintenance_reminder',
