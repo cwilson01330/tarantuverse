@@ -241,10 +241,13 @@ function DashboardHubScreen() {
     setRefreshing(false);
   }, []);
 
-  // Computed stats
+  // Computed stats. `!= null` excludes both null (spider has no
+  // accepted feedings yet) and undefined (status hasn't loaded). Old
+  // `!== undefined` worked by accident (null >= 7 is false) but read
+  // as a bug.
   const overdueFeedings = tarantulas.filter(t => {
     const status = feedingStatuses.get(t.id);
-    return status && status.days_since_last_feeding !== undefined && status.days_since_last_feeding >= 7;
+    return status && status.days_since_last_feeding != null && status.days_since_last_feeding >= 7;
   }).sort((a, b) => {
     const daysA = feedingStatuses.get(a.id)?.days_since_last_feeding ?? 0;
     const daysB = feedingStatuses.get(b.id)?.days_since_last_feeding ?? 0;

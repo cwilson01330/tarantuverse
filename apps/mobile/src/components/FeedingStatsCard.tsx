@@ -65,8 +65,10 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
     <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>🍽️ Feeding Stats</Text>
 
-      {/* Status Banner */}
-      {data.days_since_last_feeding !== undefined && (
+      {/* Status Banner — `!= null` covers both null (no accepted feedings yet)
+          and undefined (data still loading). Previous `!== undefined` let
+          null through and rendered "null days ago" on new spiders. */}
+      {data.days_since_last_feeding != null && (
         <View style={[styles.statusBanner, statusColorStyle]}>
           <View style={styles.statusRow}>
             <View style={styles.statusLeft}>

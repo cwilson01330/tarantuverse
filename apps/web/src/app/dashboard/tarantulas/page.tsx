@@ -184,7 +184,10 @@ export default function TarantulasPage() {
 
   const getFeedingStatusBadge = (tarantulaId: string) => {
     const status = feedingStatuses.get(tarantulaId)
-    if (!status || status.days_since_last_feeding === undefined) return null
+    // `== null` catches both null (spider has no feedings yet) AND
+    // undefined (status hasn't loaded). The previous `=== undefined`
+    // let null through and rendered "Fed nulld ago" on new spiders.
+    if (!status || status.days_since_last_feeding == null) return null
 
     const days = status.days_since_last_feeding
     let bgColor = 'bg-green-500/90'
@@ -485,7 +488,7 @@ export default function TarantulasPage() {
                                 )}
                               </td>
                               <td className="px-4 py-3 align-middle">
-                                {feedingStatus?.days_since_last_feeding !== undefined ? (
+                                {feedingStatus?.days_since_last_feeding != null ? (
                                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                                     feedingStatus.days_since_last_feeding >= 21 ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
                                     feedingStatus.days_since_last_feeding >= 14 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
@@ -495,7 +498,7 @@ export default function TarantulasPage() {
                                     {feedingStatus.days_since_last_feeding}d ago
                                   </span>
                                 ) : (
-                                  <span className="text-theme-tertiary text-sm">No data</span>
+                                  <span className="text-theme-tertiary text-sm">Not fed yet</span>
                                 )}
                               </td>
                               <td className="px-4 py-3 hidden lg:table-cell align-middle">

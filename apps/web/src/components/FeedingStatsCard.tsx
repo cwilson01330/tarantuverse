@@ -92,8 +92,10 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
         </span>
       </div>
 
-      {/* Status Banner */}
-      {data.days_since_last_feeding !== undefined && (
+      {/* Status Banner — `!= null` covers both null (no accepted feedings yet)
+          and undefined (data still loading). The previous `!== undefined`
+          let null through and rendered "null days ago" on new spiders. */}
+      {data.days_since_last_feeding != null && (
         <div className={`rounded-xl p-4 border-2 ${colorClasses[statusColor]}`}>
           <div className="flex items-center justify-between">
             <div>
