@@ -35,6 +35,9 @@ class LizardBase(BaseModel):
     feeding_schedule: Optional[str] = Field(None, max_length=200)
     brumation_active: bool = False
     brumation_started_at: Optional[date] = None
+    # Feeding pause — see pse_20260502 migration. Same shape as snake.
+    feeding_paused_reason: Optional[str] = Field(None, max_length=40)
+    feeding_paused_until: Optional[date] = None
 
     # Media
     photo_url: Optional[str] = Field(None, max_length=500)

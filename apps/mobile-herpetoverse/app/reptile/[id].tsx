@@ -22,6 +22,7 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { FeedingStatusBanner } from '../../src/components/FeedingStatusBanner';
 import { GenotypeSection } from '../../src/components/GenotypeSection';
+import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { ReptileShareSheet } from '../../src/components/ReptileShareSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
@@ -62,6 +63,7 @@ function SnakeDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -198,8 +200,50 @@ function SnakeDetailScreen() {
         <FeedingStatusBanner
           taxon="snake"
           animalId={snake.id}
-          refreshKey={feedings.length}
+          refreshKey={`${feedings.length}-${snake.feeding_paused_reason ?? ''}-${snake.feeding_paused_until ?? ''}`}
         />
+
+        <TouchableOpacity
+          onPress={() => setPauseOpen(true)}
+          style={[
+            styles.pauseLink,
+            {
+              borderColor: colors.border,
+              backgroundColor: snake.feeding_paused_reason
+                ? colors.surfaceRaised
+                : 'transparent',
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            snake.feeding_paused_reason
+              ? 'Edit feeding pause'
+              : 'Pause feeding reminders'
+          }
+        >
+          <MaterialCommunityIcons
+            name={snake.feeding_paused_reason ? 'pause-circle' : 'pause-circle-outline'}
+            size={18}
+            color={snake.feeding_paused_reason ? colors.info : colors.textSecondary}
+          />
+          <Text
+            style={{
+              color: snake.feeding_paused_reason ? colors.info : colors.textSecondary,
+              fontSize: 13,
+              fontWeight: '600',
+              flex: 1,
+            }}
+          >
+            {snake.feeding_paused_reason
+              ? 'Feeding reminders paused — tap to edit or resume'
+              : 'Pause feeding reminders'}
+          </Text>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={16}
+            color={colors.textTertiary}
+          />
+        </TouchableOpacity>
 
         <LogActions
           onLogFeeding={() =>
@@ -307,6 +351,17 @@ function SnakeDetailScreen() {
         animalId={snake.id}
         animalName={snakeTitle(snake)}
       />
+
+      <PauseFeedingSheet
+        visible={pauseOpen}
+        onClose={() => setPauseOpen(false)}
+        taxon="snake"
+        animalId={snake.id}
+        animalName={snakeTitle(snake)}
+        currentReason={snake.feeding_paused_reason}
+        currentUntil={snake.feeding_paused_until}
+        onChange={onRefresh}
+      />
     </SafeAreaView>
   );
 }
@@ -331,6 +386,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+  },
+  pauseLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    marginTop: -4,
   },
 });
 

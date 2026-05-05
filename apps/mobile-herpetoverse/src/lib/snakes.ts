@@ -60,6 +60,10 @@ export interface Snake {
   feeding_schedule: string | null;
   brumation_active: boolean;
   brumation_started_at: string | null;
+  /** Canonical reasons: hunger_strike | post_rehouse | recovering | breeding_season | other */
+  feeding_paused_reason: string | null;
+  /** ISO date (YYYY-MM-DD) — pause auto-resumes after this date. Null = indefinite. */
+  feeding_paused_until: string | null;
 
   photo_url: string | null;
 
@@ -182,6 +186,55 @@ export async function updateSnake(
 export async function deleteSnake(id: string): Promise<void> {
   await apiClient.delete(`/snakes/${encodeURIComponent(id)}`);
 }
+
+/**
+ * Pause feeding reminders for an animal. The backend's
+ * `_compute_feeding_status` will return `status='paused'` while this
+ * is active. Reason values from the canonical list (hunger_strike,
+ * post_rehouse, recovering, breeding_season, other) get translated
+ * to friendly prose; other strings pass through verbatim.
+ *
+ * `until` is an ISO date (YYYY-MM-DD). Pass `null` for indefinite —
+ * keeper resumes manually. Pass a future date for a self-clearing
+ * pause.
+ *
+ * Same payload shape works for snakes and lizards since the columns
+ * are identical; we expose a unified helper that picks the route.
+ */
+export async function pauseFeeding(
+  taxon: 'snake' | 'lizard',
+  animalId: string,
+  reason: string,
+  until: string | null,
+): Promise<Snake | LizardLike> {
+  const path =
+    taxon === 'snake'
+      ? `/snakes/${encodeURIComponent(animalId)}`
+      : `/lizards/${encodeURIComponent(animalId)}`;
+  const { data } = await apiClient.put(path, {
+    feeding_paused_reason: reason,
+    feeding_paused_until: until,
+  });
+  return data;
+}
+
+export async function resumeFeeding(
+  taxon: 'snake' | 'lizard',
+  animalId: string,
+): Promise<Snake | LizardLike> {
+  const path =
+    taxon === 'snake'
+      ? `/snakes/${encodeURIComponent(animalId)}`
+      : `/lizards/${encodeURIComponent(animalId)}`;
+  const { data } = await apiClient.put(path, {
+    feeding_paused_reason: null,
+    feeding_paused_until: null,
+  });
+  return data;
+}
+
+/** Loose shape — we don't import lizard types from here to avoid a cycle. */
+type LizardLike = Snake;
 
 export interface CreateWeightLogPayload {
   weighed_at: string;

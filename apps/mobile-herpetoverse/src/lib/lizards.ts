@@ -51,6 +51,10 @@ export interface Lizard {
   feeding_schedule: string | null;
   brumation_active: boolean;
   brumation_started_at: string | null;
+  /** Canonical reasons: hunger_strike | post_rehouse | recovering | breeding_season | other */
+  feeding_paused_reason: string | null;
+  /** ISO date (YYYY-MM-DD) — pause auto-resumes after this date. Null = indefinite. */
+  feeding_paused_until: string | null;
 
   photo_url: string | null;
 

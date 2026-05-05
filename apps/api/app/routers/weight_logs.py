@@ -23,7 +23,7 @@ Side-effects on POST:
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 import uuid
 
@@ -446,12 +446,37 @@ def _last_accepted_feeding(
     return q.order_by(FeedingLog.fed_at.desc()).first()
 
 
+_REASON_LABELS = {
+    "hunger_strike": "Hunger strike",
+    "post_rehouse": "Post-rehouse fasting",
+    "recovering": "Recovering",
+    "breeding_season": "Breeding season",
+    "other": "Paused",
+}
+
+
+def _render_pause_note(reason: str, until: Optional[date]) -> str:
+    """Build the user-facing detail line for a paused state.
+
+    Translates the canonical reason values from the mobile picker into
+    human prose. Free-form reasons (anything not in _REASON_LABELS)
+    pass through verbatim — the column accepts any short string and
+    keepers may have entered something specific.
+    """
+    label = _REASON_LABELS.get(reason, reason)
+    if until is None:
+        return f"{label}. Reminders paused until you resume."
+    return f"{label}. Reminders paused until {until.isoformat()}."
+
+
 def _compute_feeding_status(
     *,
     last_fed_at: Optional[datetime],
     interval_days_min: Optional[int],
     interval_days_max: Optional[int],
     brumation_active: bool = False,
+    feeding_paused_reason: Optional[str] = None,
+    feeding_paused_until: Optional[date] = None,
 ) -> FeedingStatus:
     """Pure function — combines inputs into the canonical FeedingStatus.
 
@@ -459,10 +484,36 @@ def _compute_feeding_status(
     fine for "due in N days" precision; we don't need TZ correctness
     here the way we do for "last fed N days ago" since this number is
     advisory, not a stat the keeper reports as "off by a day."
+
+    Pause precedence (top → bottom):
+      1. Manual feeding_paused_reason set + (until is null OR in future)
+         → status='paused' with the keeper's reason
+      2. brumation_active=True
+         → status='paused' with brumation note
+    Anything else falls through to the standard cadence math.
     """
-    # Brumation overrides everything — the keeper has decided not to
-    # feed. Show a neutral "paused" state instead of escalating to
-    # overdue.
+    # Manual pause takes precedence — keepers might pause feeding for
+    # reasons UNRELATED to brumation (hunger strike, post-rehouse,
+    # post-shed wait, recovery from regurgitation). A stale `until`
+    # date in the past is treated as auto-resumed: the keeper meant
+    # to pause for a while, the window passed, the cadence math
+    # picks back up. We don't auto-clear the column though — the
+    # reason stays as a record until the keeper explicitly resumes.
+    today = datetime.now(timezone.utc).date()
+    if feeding_paused_reason and (
+        feeding_paused_until is None or feeding_paused_until >= today
+    ):
+        note = _render_pause_note(feeding_paused_reason, feeding_paused_until)
+        return FeedingStatus(
+            status="paused",
+            last_fed_at=last_fed_at,
+            interval_days_min=interval_days_min,
+            interval_days_max=interval_days_max,
+            is_data_available=True,
+            note=note,
+        )
+
+    # Brumation override — same status, different note.
     if brumation_active:
         return FeedingStatus(
             status="paused",
@@ -558,6 +609,8 @@ async def snake_feeding_status(
         interval_days_min=suggestion["interval_days_min"],
         interval_days_max=suggestion["interval_days_max"],
         brumation_active=bool(getattr(snake, "brumation_active", False)),
+        feeding_paused_reason=getattr(snake, "feeding_paused_reason", None),
+        feeding_paused_until=getattr(snake, "feeding_paused_until", None),
     )
 
 
@@ -813,4 +866,6 @@ async def lizard_feeding_status(
         interval_days_min=suggestion["interval_days_min"],
         interval_days_max=suggestion["interval_days_max"],
         brumation_active=bool(getattr(lizard, "brumation_active", False)),
+        feeding_paused_reason=getattr(lizard, "feeding_paused_reason", None),
+        feeding_paused_until=getattr(lizard, "feeding_paused_until", None),
     )

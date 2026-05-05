@@ -88,6 +88,10 @@ class Lizard(Base):
     brumation_active = Column(Boolean, default=False)
     brumation_started_at = Column(Date, nullable=True)
 
+    # Feeding pause — see snake.py + pse_20260502.
+    feeding_paused_reason = Column(String(40), nullable=True)
+    feeding_paused_until = Column(Date, nullable=True)
+
     # Media
     photo_url = Column(String(500))
 

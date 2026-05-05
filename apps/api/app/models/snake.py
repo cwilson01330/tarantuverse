@@ -90,6 +90,13 @@ class Snake(Base):
     brumation_active = Column(Boolean, default=False)
     brumation_started_at = Column(Date, nullable=True)
 
+    # Feeding pause — for hunger strikes, post-rehouse fasting,
+    # post-shed waits, or any keeper-known reason to suppress reminders.
+    # See pse_20260502 for semantics. Brumation has its own flag above
+    # since it's a longer/seasonal state with its own lifecycle.
+    feeding_paused_reason = Column(String(40), nullable=True)
+    feeding_paused_until = Column(Date, nullable=True)
+
     # Media
     photo_url = Column(String(500))
 

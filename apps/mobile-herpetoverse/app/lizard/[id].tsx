@@ -20,6 +20,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { FeedingStatusBanner } from '../../src/components/FeedingStatusBanner';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
+import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { ReptileShareSheet } from '../../src/components/ReptileShareSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
@@ -60,6 +61,7 @@ function LizardDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -195,8 +197,50 @@ function LizardDetailScreen() {
         <FeedingStatusBanner
           taxon="lizard"
           animalId={lizard.id}
-          refreshKey={feedings.length}
+          refreshKey={`${feedings.length}-${lizard.feeding_paused_reason ?? ''}-${lizard.feeding_paused_until ?? ''}`}
         />
+
+        <TouchableOpacity
+          onPress={() => setPauseOpen(true)}
+          style={[
+            styles.pauseLink,
+            {
+              borderColor: colors.border,
+              backgroundColor: lizard.feeding_paused_reason
+                ? colors.surfaceRaised
+                : 'transparent',
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={
+            lizard.feeding_paused_reason
+              ? 'Edit feeding pause'
+              : 'Pause feeding reminders'
+          }
+        >
+          <MaterialCommunityIcons
+            name={lizard.feeding_paused_reason ? 'pause-circle' : 'pause-circle-outline'}
+            size={18}
+            color={lizard.feeding_paused_reason ? colors.info : colors.textSecondary}
+          />
+          <Text
+            style={{
+              color: lizard.feeding_paused_reason ? colors.info : colors.textSecondary,
+              fontSize: 13,
+              fontWeight: '600',
+              flex: 1,
+            }}
+          >
+            {lizard.feeding_paused_reason
+              ? 'Feeding reminders paused — tap to edit or resume'
+              : 'Pause feeding reminders'}
+          </Text>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={16}
+            color={colors.textTertiary}
+          />
+        </TouchableOpacity>
 
         <LogActions
           onLogFeeding={() =>
@@ -260,6 +304,17 @@ function LizardDetailScreen() {
         animalId={lizard.id}
         animalName={lizardTitle(lizard)}
       />
+
+      <PauseFeedingSheet
+        visible={pauseOpen}
+        onClose={() => setPauseOpen(false)}
+        taxon="lizard"
+        animalId={lizard.id}
+        animalName={lizardTitle(lizard)}
+        currentReason={lizard.feeding_paused_reason}
+        currentUntil={lizard.feeding_paused_until}
+        onChange={onRefresh}
+      />
     </SafeAreaView>
   );
 }
@@ -275,6 +330,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+  },
+  pauseLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    marginTop: -4,
   },
 });
 
