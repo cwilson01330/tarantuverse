@@ -526,27 +526,22 @@ export function WeighInsList({
         ]}
       >
         {visible.map((l, idx) => {
-          const RowWrapper: any = onEditItem ? TouchableOpacity : View;
-          const wrapperProps = onEditItem
-            ? {
-                onPress: () => onEditItem(l.id),
-                activeOpacity: 0.7,
-                accessibilityRole: 'button' as const,
-                accessibilityLabel: `Edit weigh-in from ${fmtShortDate(l.weighed_at)}`,
-              }
-            : {};
-          return (
-            <RowWrapper
-              key={l.id}
-              {...wrapperProps}
-              style={[
-                sharedStyles.listRow,
-                {
-                  borderBottomColor: colors.border,
-                  borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
-                },
-              ]}
-            >
+          // Static conditional render — the dynamic `RowWrapper: any`
+          // pattern (TouchableOpacity vs View based on onEditItem)
+          // crashes Hermes prod-mode minification with "Cannot call a
+          // class as a function" on existing reptiles with logs.
+          // Cory + Brooke 2026-05-01: existing snake/lizard detail
+          // screens crashed in TestFlight while empty-state rows
+          // worked fine. Static branches sidestep the issue.
+          const rowStyle = [
+            sharedStyles.listRow,
+            {
+              borderBottomColor: colors.border,
+              borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
+            },
+          ];
+          const rowContent = (
+            <>
               <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
                 {fmtShortDate(l.weighed_at)}
               </Text>
@@ -565,7 +560,26 @@ export function WeighInsList({
                   {WEIGHT_CONTEXT_LABELS[l.context] ?? l.context}
                 </Text>
               </View>
-            </RowWrapper>
+            </>
+          );
+          if (onEditItem) {
+            return (
+              <TouchableOpacity
+                key={l.id}
+                onPress={() => onEditItem(l.id)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit weigh-in from ${fmtShortDate(l.weighed_at)}`}
+                style={rowStyle}
+              >
+                {rowContent}
+              </TouchableOpacity>
+            );
+          }
+          return (
+            <View key={l.id} style={rowStyle}>
+              {rowContent}
+            </View>
           );
         })}
       </View>
@@ -617,27 +631,16 @@ export function FeedingsList({
         ]}
       >
         {visible.map((f, idx) => {
-          const RowWrapper: any = onEditItem ? TouchableOpacity : View;
-          const wrapperProps = onEditItem
-            ? {
-                onPress: () => onEditItem(f.id),
-                activeOpacity: 0.7,
-                accessibilityRole: 'button' as const,
-                accessibilityLabel: `Edit feeding from ${fmtShortDate(f.fed_at)}`,
-              }
-            : {};
-          return (
-            <RowWrapper
-              key={f.id}
-              {...wrapperProps}
-              style={[
-                sharedStyles.listRow,
-                {
-                  borderBottomColor: colors.border,
-                  borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
-                },
-              ]}
-            >
+          // Static conditional render — see WeighInsList for context.
+          const rowStyle = [
+            sharedStyles.listRow,
+            {
+              borderBottomColor: colors.border,
+              borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
+            },
+          ];
+          const rowContent = (
+            <>
               <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
                 {fmtShortDate(f.fed_at)}
               </Text>
@@ -669,7 +672,26 @@ export function FeedingsList({
                   .filter(Boolean)
                   .join(' · ') || '—'}
               </Text>
-            </RowWrapper>
+            </>
+          );
+          if (onEditItem) {
+            return (
+              <TouchableOpacity
+                key={f.id}
+                onPress={() => onEditItem(f.id)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit feeding from ${fmtShortDate(f.fed_at)}`}
+                style={rowStyle}
+              >
+                {rowContent}
+              </TouchableOpacity>
+            );
+          }
+          return (
+            <View key={f.id} style={rowStyle}>
+              {rowContent}
+            </View>
           );
         })}
       </View>
@@ -722,27 +744,16 @@ export function ShedsList({
         ]}
       >
         {visible.map((s, idx) => {
-          const RowWrapper: any = onEditItem ? TouchableOpacity : View;
-          const wrapperProps = onEditItem
-            ? {
-                onPress: () => onEditItem(s.id),
-                activeOpacity: 0.7,
-                accessibilityRole: 'button' as const,
-                accessibilityLabel: `Edit shed from ${fmtShortDate(s.shed_at)}`,
-              }
-            : {};
-          return (
-            <RowWrapper
-              key={s.id}
-              {...wrapperProps}
-              style={[
-                sharedStyles.listRow,
-                {
-                  borderBottomColor: colors.border,
-                  borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
-                },
-              ]}
-            >
+          // Static conditional render — see WeighInsList for context.
+          const rowStyle = [
+            sharedStyles.listRow,
+            {
+              borderBottomColor: colors.border,
+              borderBottomWidth: idx < visible.length - 1 ? 1 : 0,
+            },
+          ];
+          const rowContent = (
+            <>
               <Text style={[sharedStyles.rowDate, { color: colors.textTertiary }]}>
                 {fmtShortDate(s.shed_at)}
               </Text>
@@ -785,7 +796,26 @@ export function ShedsList({
               >
                 {s.notes ?? ''}
               </Text>
-            </RowWrapper>
+            </>
+          );
+          if (onEditItem) {
+            return (
+              <TouchableOpacity
+                key={s.id}
+                onPress={() => onEditItem(s.id)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit shed from ${fmtShortDate(s.shed_at)}`}
+                style={rowStyle}
+              >
+                {rowContent}
+              </TouchableOpacity>
+            );
+          }
+          return (
+            <View key={s.id} style={rowStyle}>
+              {rowContent}
+            </View>
           );
         })}
       </View>
