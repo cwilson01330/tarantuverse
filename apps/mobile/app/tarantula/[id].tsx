@@ -941,66 +941,16 @@ export default function TarantulaDetailScreen() {
           </View>
         )}
 
-        {/* Feeding Stats */}
+        {/* Feeding Stats — when paused, the indigo banner inside is
+            tappable so the keeper can resume/edit without leaving the
+            detail screen. New keepers find the entry point in the
+            log-feeding flow (more discoverable). */}
         {feedingStats && (
           <View style={styles.section}>
-            {/* Pause / resume toggle. Shows above the stats card so the
-                keeper can mute the overdue treatment without scrolling
-                past the red banner first. Wired to pst_20260502 cols. */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'flex-end',
-                marginBottom: 8,
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => setShowPauseSheet(true)}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 6,
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: tarantula?.feeding_paused_reason
-                    ? colors.primary
-                    : colors.border,
-                  backgroundColor: tarantula?.feeding_paused_reason
-                    ? colors.surfaceElevated
-                    : 'transparent',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                }}
-              >
-                <MaterialCommunityIcons
-                  name={
-                    tarantula?.feeding_paused_reason
-                      ? 'pause-circle'
-                      : 'pause-circle-outline'
-                  }
-                  size={14}
-                  color={
-                    tarantula?.feeding_paused_reason
-                      ? colors.primary
-                      : colors.textSecondary
-                  }
-                />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '600',
-                    color: tarantula?.feeding_paused_reason
-                      ? colors.primary
-                      : colors.textSecondary,
-                  }}
-                >
-                  {tarantula?.feeding_paused_reason
-                    ? 'Paused — edit'
-                    : 'Pause feedings'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <FeedingStatsCard data={feedingStats} />
+            <FeedingStatsCard
+              data={feedingStats}
+              onPausedPress={() => setShowPauseSheet(true)}
+            />
           </View>
         )}
 

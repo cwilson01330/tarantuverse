@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,17 @@ import { apiClient } from '../../src/services/api';
 import { scheduleFeedingReminder } from '../../src/services/notifications';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+const PauseFeedingSheet = React.lazy(
+  () => import('../../src/components/PauseFeedingSheet'),
+);
+
+const PAUSE_REASON_LABELS: Record<string, string> = {
+  premolt: 'In premolt',
+  post_rehouse: 'Settling after rehouse',
+  recovering: 'Recovering',
+  mating_season: 'Mating-season pause',
+  other: 'Paused',
+};
 
 const FOOD_TYPES = [
   'Cricket',
@@ -54,6 +65,13 @@ export default function AddFeedingScreen() {
   const [loading, setLoading] = useState(isEdit);
   const [tarantulaName, setTarantulaName] = useState('');
   const [notificationPreferences, setNotificationPreferences] = useState<any>(null);
+  // Feeding-pause state read off the tarantula record. Surfaced inline
+  // so the keeper can pause/resume during the same flow as logging a
+  // refusal — see migration pst_20260502.
+  const [pausedReason, setPausedReason] = useState<string | null>(null);
+  const [pausedUntil, setPausedUntil] = useState<string | null>(null);
+  const [showPauseSheet, setShowPauseSheet] = useState(false);
+  const [showPauseHelp, setShowPauseHelp] = useState(false);
 
   useEffect(() => {
     // Load tarantula details and notification preferences
@@ -87,6 +105,8 @@ export default function AddFeedingScreen() {
     try {
       const response = await apiClient.get(`/tarantulas/${id}`);
       setTarantulaName(response.data.name || response.data.common_name || 'Tarantula');
+      setPausedReason(response.data.feeding_paused_reason ?? null);
+      setPausedUntil(response.data.feeding_paused_until ?? null);
     } catch (error) {
       console.error('Failed to load tarantula details:', error);
     }
@@ -303,8 +323,117 @@ export default function AddFeedingScreen() {
           />
         </View>
 
+        {/* Pause feeding row — surfaces in-context with the log-feeding
+            flow, since "she just refused / she's been refusing" is the
+            natural moment to think about pausing. Backed by migration
+            pst_20260502. */}
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <View style={styles.pauseLabelRow}>
+            <Text style={[styles.label, { color: colors.textPrimary, marginBottom: 0 }]}>
+              {pausedReason ? 'Feeding paused' : 'Going off feed?'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowPauseHelp((v) => !v)}
+              hitSlop={8}
+              accessibilityLabel="What does this do?"
+            >
+              <MaterialCommunityIcons
+                name="information-outline"
+                size={18}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+          {showPauseHelp && (
+            <View
+              style={[
+                styles.tooltip,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.tooltipText, { color: colors.textSecondary }]}>
+                Tarantulas in premolt, recovering from a fall, or settling
+                after a rehouse can refuse food for weeks or months. Pause
+                feedings to mute overdue alerts so they don't drown out
+                real ones on your other spiders. You can resume any time.
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            onPress={() => setShowPauseSheet(true)}
+            style={[
+              styles.pauseRow,
+              {
+                backgroundColor: pausedReason
+                  ? colors.surfaceElevated
+                  : 'transparent',
+                borderColor: pausedReason ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={pausedReason ? 'pause-circle' : 'pause-circle-outline'}
+              size={22}
+              color={pausedReason ? colors.primary : colors.textSecondary}
+            />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: '600',
+                }}
+              >
+                {pausedReason
+                  ? PAUSE_REASON_LABELS[pausedReason] ?? 'Paused'
+                  : 'Pause feedings'}
+              </Text>
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: 12,
+                  marginTop: 2,
+                }}
+              >
+                {pausedReason
+                  ? pausedUntil
+                    ? `Auto-resumes ${new Date(pausedUntil).toLocaleDateString()} — tap to edit`
+                    : 'Indefinite — tap to edit or resume'
+                  : 'Mute overdue alerts during premolt or fasting'}
+              </Text>
+            </View>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
+
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Pause-feedings sheet — same component used on the detail
+          screen. onChange refetches the tarantula so the row above
+          reflects the new state without needing to back out. */}
+      <Suspense fallback={null}>
+        {showPauseSheet && id && (
+          <PauseFeedingSheet
+            visible={showPauseSheet}
+            onClose={() => setShowPauseSheet(false)}
+            tarantulaId={id as string}
+            tarantulaName={tarantulaName || null}
+            currentReason={pausedReason}
+            currentUntil={pausedUntil}
+            onChange={() => {
+              loadTarantulaDetails();
+            }}
+          />
+        )}
+      </Suspense>
     </View>
   );
 }
@@ -403,5 +532,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     fontSize: 15,
     minHeight: 100,
+  },
+  pauseLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  tooltip: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  tooltipText: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  pauseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 12,
   },
 });

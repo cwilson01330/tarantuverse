@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface PreyTypeCount {
@@ -43,9 +44,14 @@ function pauseReasonLabel(reason?: string | null): string {
 
 interface FeedingStatsCardProps {
   data: FeedingStats;
+  /** When the spider is paused, the paused banner becomes tappable.
+   *  Wire this to open the PauseFeedingSheet so the keeper can edit
+   *  or resume directly from the detail screen without backing out
+   *  to the log-feeding flow. */
+  onPausedPress?: () => void;
 }
 
-const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
+const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data, onPausedPress }) => {
   const { colors } = useTheme();
   
   // Determine feeding status color
@@ -85,9 +91,16 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
 
       {/* Paused banner takes priority over the overdue red banner.
           A 7-month premolt sling shouldn't see her "Last Fed: 200 days
-          ago" pulsing red — the keeper already knows. */}
-      {data.is_feeding_paused ? (
-        <View style={[styles.statusBanner, styles.statusPaused]}>
+          ago" pulsing red — the keeper already knows.
+
+          When `onPausedPress` is provided, the banner becomes tappable
+          (so the keeper can edit/resume directly from the detail
+          screen). We branch with static JSX rather than a dynamic
+          `: any` component variable — that pattern crashes Hermes
+          prod with "Cannot call a class as a function" via
+          `_classCallCheck`. See feedback memory dated 2026-05-01. */}
+      {data.is_feeding_paused ? (() => {
+        const pausedInner = (
           <View style={styles.statusRow}>
             <View style={styles.statusLeft}>
               <Text style={styles.statusLabel}>FEEDING PAUSED</Text>
@@ -100,21 +113,44 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
                 </Text>
               )}
             </View>
-            {data.feeding_paused_until ? (
-              <View style={styles.statusRight}>
-                <Text style={styles.statusLabel}>UNTIL</Text>
-                <Text style={styles.statusSmallValue}>
-                  {new Date(data.feeding_paused_until).toLocaleDateString()}
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.statusRight}>
+            <View style={styles.statusRight}>
+              {data.feeding_paused_until ? (
+                <>
+                  <Text style={styles.statusLabel}>UNTIL</Text>
+                  <Text style={styles.statusSmallValue}>
+                    {new Date(data.feeding_paused_until).toLocaleDateString()}
+                  </Text>
+                </>
+              ) : (
                 <Text style={styles.statusSubtle}>Indefinite</Text>
-              </View>
-            )}
+              )}
+              {onPausedPress && (
+                <View style={styles.pauseEditHint}>
+                  <Text style={styles.pauseEditHintText}>Tap to edit</Text>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={14}
+                    color="#4b5563"
+                  />
+                </View>
+              )}
+            </View>
           </View>
-        </View>
-      ) : (
+        );
+        return onPausedPress ? (
+          <TouchableOpacity
+            onPress={onPausedPress}
+            activeOpacity={0.7}
+            style={[styles.statusBanner, styles.statusPaused]}
+          >
+            {pausedInner}
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.statusBanner, styles.statusPaused]}>
+            {pausedInner}
+          </View>
+        );
+      })() : (
         /* Status Banner — `!= null` covers both null (no accepted feedings yet)
             and undefined (data still loading). Previous `!== undefined` let
             null through and rendered "null days ago" on new spiders. */
@@ -274,6 +310,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#4b5563',
     marginTop: 4,
+  },
+  pauseEditHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 6,
+  },
+  pauseEditHintText: {
+    fontSize: 10,
+    color: '#4b5563',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   statusRow: {
     flexDirection: 'row',
