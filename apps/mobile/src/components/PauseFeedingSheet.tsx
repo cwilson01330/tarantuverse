@@ -22,6 +22,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -130,19 +131,34 @@ export function PauseFeedingSheet({
       // apiClient.baseURL already includes /api/v1 — don't double-prefix.
       // Bug 2026-05-06: prod logs showed PUT /api/v1/api/v1/tarantulas/...
       // 404 because the path was prefixed twice.
-      await apiClient.put(`/tarantulas/${tarantulaId}`, {
+      const res = await apiClient.put(`/tarantulas/${tarantulaId}`, {
         feeding_paused_reason: reason,
         feeding_paused_until: until.trim() || null,
       });
-      onChange();
+      // Sanity log — surfaces in `npx expo start --dev-client` console
+      // so we can see the call landed even when the UI doesn't change.
+      console.log('[pause] save ok', res?.status, res?.data?.feeding_paused_reason);
+      // Await onChange so the parent's refetches finish (and the
+      // tarantula state has the new pause flag) BEFORE we close. If we
+      // close first, there's a brief window where the parent re-renders
+      // with stale data and the keeper sees no visible effect.
+      await Promise.resolve(onChange());
       onClose();
     } catch (err: any) {
-      setError(
+      const detail =
         err?.response?.data?.detail ||
           err?.message ||
-          'Could not save. Try again?',
-      );
+          'Could not save. Try again?';
+      const status = err?.response?.status;
+      console.warn('[pause] save failed', status, detail, err?.config?.url);
+      setError(detail);
       setSubmitting(false);
+      // Loud failure so we know the button is being heard. The error
+      // text inside the sheet was being missed.
+      Alert.alert(
+        'Pause failed',
+        status ? `(${status}) ${detail}` : String(detail),
+      );
     }
   }
 
@@ -150,19 +166,26 @@ export function PauseFeedingSheet({
     setError(null);
     setSubmitting(true);
     try {
-      await apiClient.put(`/tarantulas/${tarantulaId}`, {
+      const res = await apiClient.put(`/tarantulas/${tarantulaId}`, {
         feeding_paused_reason: null,
         feeding_paused_until: null,
       });
-      onChange();
+      console.log('[pause] resume ok', res?.status);
+      await Promise.resolve(onChange());
       onClose();
     } catch (err: any) {
-      setError(
+      const detail =
         err?.response?.data?.detail ||
           err?.message ||
-          'Could not resume. Try again?',
-      );
+          'Could not resume. Try again?';
+      const status = err?.response?.status;
+      console.warn('[pause] resume failed', status, detail, err?.config?.url);
+      setError(detail);
       setSubmitting(false);
+      Alert.alert(
+        'Resume failed',
+        status ? `(${status}) ${detail}` : String(detail),
+      );
     }
   }
 
