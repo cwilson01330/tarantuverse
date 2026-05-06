@@ -22,17 +22,23 @@ interface Props {
 
 interface State {
   error: Error | null;
+  componentStack: string | null;
   resetKey: number;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null, resetKey: 0 };
+  state: State = { error: null, componentStack: null, resetKey: 0 };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    // Stash the component stack so the in-app fallback can show it.
+    // Surfacing the actual JS frames + component tree on the crash
+    // screen turns "TypeError: Cannot call a class as a function" from
+    // a dead-end into something a keeper can paste back to us.
+    this.setState({ componentStack: info.componentStack ?? null });
     try {
       captureEvent('$exception', {
         $exception_message: error.message,
@@ -50,7 +56,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState((prev) => ({ error: null, resetKey: prev.resetKey + 1 }));
+    this.setState((prev) => ({
+      error: null,
+      componentStack: null,
+      resetKey: prev.resetKey + 1,
+    }));
   };
 
   render() {
@@ -58,6 +68,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <ErrorFallback
           error={this.state.error}
+          componentStack={this.state.componentStack}
           onReset={this.handleReset}
           scope={this.props.scope}
         />
@@ -69,16 +80,37 @@ export class ErrorBoundary extends Component<Props, State> {
 
 function ErrorFallback({
   error,
+  componentStack,
   onReset,
   scope,
 }: {
   error: Error;
+  componentStack: string | null;
   onReset: () => void;
   scope?: string;
 }) {
   // Hardcoded colors — if the Theme provider itself crashes, the fallback
   // must still render. Using the Herpetoverse green primary instead of
   // Tarantuverse's brown.
+
+  // Trim the JS stack to the first ~8 frames — anything past that is
+  // usually React internals and adds noise without helping diagnose.
+  // Keep `apps/mobile-herpetoverse/...` frames and a few node_modules
+  // frames so we can see where the call chain entered library code.
+  const trimmedStack = (error.stack ?? '')
+    .split('\n')
+    .slice(0, 12)
+    .join('\n');
+
+  // Component stack already starts with "    in <ComponentName>" lines.
+  // Trim to the first ~10 — that gets us through SnakeDetailScreen and
+  // its parent stack.
+  const trimmedComponentStack = (componentStack ?? '')
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .slice(0, 10)
+    .join('\n');
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -103,9 +135,29 @@ function ErrorFallback({
         </TouchableOpacity>
         <View style={styles.detailsBox}>
           <Text style={styles.detailsLabel}>Technical details</Text>
-          <Text style={styles.detailsText} numberOfLines={6}>
+          <Text style={styles.detailsText} selectable>
             {error.name}: {error.message}
           </Text>
+          {trimmedComponentStack ? (
+            <>
+              <Text style={[styles.detailsLabel, styles.detailsLabelSpaced]}>
+                Component stack
+              </Text>
+              <Text style={styles.detailsText} selectable>
+                {trimmedComponentStack}
+              </Text>
+            </>
+          ) : null}
+          {trimmedStack ? (
+            <>
+              <Text style={[styles.detailsLabel, styles.detailsLabelSpaced]}>
+                JS stack
+              </Text>
+              <Text style={styles.detailsText} selectable>
+                {trimmedStack}
+              </Text>
+            </>
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -174,5 +226,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: 'uppercase',
   },
-  detailsText: { fontSize: 12, color: '#374151', fontFamily: 'monospace' },
+  detailsLabelSpaced: { marginTop: 12 },
+  detailsText: { fontSize: 11, color: '#374151', fontFamily: 'monospace', lineHeight: 16 },
 });
