@@ -127,7 +127,10 @@ export function PauseFeedingSheet({
     setError(null);
     setSubmitting(true);
     try {
-      await apiClient.put(`/api/v1/tarantulas/${tarantulaId}`, {
+      // apiClient.baseURL already includes /api/v1 — don't double-prefix.
+      // Bug 2026-05-06: prod logs showed PUT /api/v1/api/v1/tarantulas/...
+      // 404 because the path was prefixed twice.
+      await apiClient.put(`/tarantulas/${tarantulaId}`, {
         feeding_paused_reason: reason,
         feeding_paused_until: until.trim() || null,
       });
@@ -147,7 +150,7 @@ export function PauseFeedingSheet({
     setError(null);
     setSubmitting(true);
     try {
-      await apiClient.put(`/api/v1/tarantulas/${tarantulaId}`, {
+      await apiClient.put(`/tarantulas/${tarantulaId}`, {
         feeding_paused_reason: null,
         feeding_paused_until: null,
       });
