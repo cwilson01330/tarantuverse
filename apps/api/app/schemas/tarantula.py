@@ -36,6 +36,11 @@ class TarantulaBase(BaseModel):
     misting_schedule: Optional[str] = Field(None, max_length=100)
     last_enclosure_cleaning: Optional[date] = None
     enclosure_notes: Optional[str] = None
+    # Feeding pause — see pst_20260502. Canonical reasons (premolt /
+    # post_rehouse / recovering / mating_season / other) get translated
+    # to friendly prose by the UI; free-form strings render verbatim.
+    feeding_paused_reason: Optional[str] = Field(None, max_length=40)
+    feeding_paused_until: Optional[date] = None
 
     photo_url: Optional[str] = Field(None, max_length=500)
     is_public: bool = False
@@ -128,6 +133,14 @@ class FeedingStats(BaseModel):
     longest_gap_days: Optional[int] = None
     current_streak_accepted: int = 0
     prey_type_distribution: list[PreyTypeCount] = []
+    # Feeding-pause state — derived from the tarantula's pause columns
+    # and copied here so the FeedingStats card can render the pause
+    # indicator without a second fetch. `is_feeding_paused` is True when
+    # `feeding_paused_reason` is set AND `feeding_paused_until` is either
+    # NULL (indefinite) or in the future. See pst_20260502.
+    is_feeding_paused: bool = False
+    feeding_paused_reason: Optional[str] = None
+    feeding_paused_until: Optional[date] = None
 
     class Config:
         from_attributes = True

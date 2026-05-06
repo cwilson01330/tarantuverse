@@ -23,6 +23,12 @@ interface FeedingStatus {
   tarantula_id: string
   days_since_last_feeding?: number
   acceptance_rate: number
+  // Pause state — see pst_20260502. When paused, the collection grid
+  // shows a quiet purple "Paused" pill instead of the red "X days
+  // overdue" treatment so a 7-month premolt sling doesn't read as a
+  // husbandry emergency.
+  is_feeding_paused?: boolean
+  feeding_paused_reason?: string | null
 }
 
 interface PremoltPrediction {
@@ -142,6 +148,8 @@ export default function TarantulasPage() {
               tarantula_id: t.id,
               days_since_last_feeding: data.days_since_last_feeding,
               acceptance_rate: data.acceptance_rate,
+              is_feeding_paused: data.is_feeding_paused,
+              feeding_paused_reason: data.feeding_paused_reason,
             })
           }
         } catch {
@@ -184,10 +192,22 @@ export default function TarantulasPage() {
 
   const getFeedingStatusBadge = (tarantulaId: string) => {
     const status = feedingStatuses.get(tarantulaId)
+    if (!status) return null
+
+    // Paused trumps everything. Don't surface a red "21d overdue" pill
+    // on a tarantula the keeper has flagged as in-premolt.
+    if (status.is_feeding_paused) {
+      return (
+        <span className="px-3 py-1 rounded-full bg-indigo-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
+          \u23F8 Paused
+        </span>
+      )
+    }
+
     // `== null` catches both null (spider has no feedings yet) AND
     // undefined (status hasn't loaded). The previous `=== undefined`
     // let null through and rendered "Fed nulld ago" on new spiders.
-    if (!status || status.days_since_last_feeding == null) return null
+    if (status.days_since_last_feeding == null) return null
 
     const days = status.days_since_last_feeding
     let bgColor = 'bg-green-500/90'
@@ -488,7 +508,11 @@ export default function TarantulasPage() {
                                 )}
                               </td>
                               <td className="px-4 py-3 align-middle">
-                                {feedingStatus?.days_since_last_feeding != null ? (
+                                {feedingStatus?.is_feeding_paused ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
+                                    ⏸ Paused
+                                  </span>
+                                ) : feedingStatus?.days_since_last_feeding != null ? (
                                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                                     feedingStatus.days_since_last_feeding >= 21 ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
                                     feedingStatus.days_since_last_feeding >= 14 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :

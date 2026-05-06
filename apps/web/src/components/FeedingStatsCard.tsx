@@ -19,6 +19,27 @@ interface FeedingStats {
   longest_gap_days?: number;
   current_streak_accepted: number;
   prey_type_distribution: PreyTypeCount[];
+  // Pause state — see pst_20260502. When true, suppress the
+  // overdue-style "Last Fed" red banner and prediction tile, and
+  // surface a quiet paused indicator instead.
+  is_feeding_paused?: boolean;
+  feeding_paused_reason?: string | null;
+  feeding_paused_until?: string | null;
+}
+
+// Canonical reason → friendly prose. Free-form values fall through
+// verbatim so a custom reason like "shipped in" still renders.
+const PAUSE_REASON_LABELS: Record<string, string> = {
+  premolt: "In premolt",
+  post_rehouse: "Settling after rehouse",
+  recovering: "Recovering",
+  mating_season: "Mating-season pause",
+  other: "Feeding paused",
+};
+
+function pauseReasonLabel(reason?: string | null): string {
+  if (!reason) return "Feeding paused";
+  return PAUSE_REASON_LABELS[reason] ?? reason;
 }
 
 interface FeedingStatsCardProps {
@@ -92,32 +113,71 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
         </span>
       </div>
 
-      {/* Status Banner — `!= null` covers both null (no accepted feedings yet)
-          and undefined (data still loading). The previous `!== undefined`
-          let null through and rendered "null days ago" on new spiders. */}
-      {data.days_since_last_feeding != null && (
-        <div className={`rounded-xl p-4 border-2 ${colorClasses[statusColor]}`}>
-          <div className="flex items-center justify-between">
+      {/* Paused banner — takes priority over the overdue red banner.
+          When the keeper has flagged a known fasting reason (premolt,
+          post-rehouse, recovering, etc.) we don't want a 200-day-old
+          last feeding flashing red; we want a quiet "she's in premolt,
+          we know" tile. */}
+      {data.is_feeding_paused ? (
+        <div className="rounded-xl p-4 border-2 border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-900 dark:text-indigo-200">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-80">
-                Last Fed
+                Feeding Paused
               </div>
-              <div className="text-2xl font-bold">
-                {data.days_since_last_feeding} days ago
+              <div className="text-lg font-semibold">
+                {pauseReasonLabel(data.feeding_paused_reason)}
               </div>
+              {data.days_since_last_feeding != null && (
+                <div className="text-xs opacity-80 mt-1">
+                  Last fed {data.days_since_last_feeding} days ago
+                </div>
+              )}
             </div>
-            {data.next_feeding_prediction && (
+            {data.feeding_paused_until ? (
               <div className="text-right">
                 <div className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-80">
-                  Next Feeding
+                  Until
                 </div>
-                <div className="text-lg font-semibold">
-                  {new Date(data.next_feeding_prediction).toLocaleDateString()}
+                <div className="text-sm font-semibold">
+                  {new Date(data.feeding_paused_until).toLocaleDateString()}
                 </div>
+              </div>
+            ) : (
+              <div className="text-right text-xs opacity-70">
+                Indefinite
               </div>
             )}
           </div>
         </div>
+      ) : (
+        /* Status Banner — `!= null` covers both null (no accepted feedings yet)
+            and undefined (data still loading). The previous `!== undefined`
+            let null through and rendered "null days ago" on new spiders. */
+        data.days_since_last_feeding != null && (
+          <div className={`rounded-xl p-4 border-2 ${colorClasses[statusColor]}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-80">
+                  Last Fed
+                </div>
+                <div className="text-2xl font-bold">
+                  {data.days_since_last_feeding} days ago
+                </div>
+              </div>
+              {data.next_feeding_prediction && (
+                <div className="text-right">
+                  <div className="text-xs font-semibold uppercase tracking-wide mb-1 opacity-80">
+                    Next Feeding
+                  </div>
+                  <div className="text-lg font-semibold">
+                    {new Date(data.next_feeding_prediction).toLocaleDateString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
       )}
 
       {/* Key Metrics Grid */}

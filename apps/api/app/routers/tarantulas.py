@@ -454,6 +454,22 @@ async def get_feeding_stats(
         FeedingLog.tarantula_id == tarantula_id
     ).order_by(FeedingLog.fed_at).all()
 
+    # Pause state — see pst_20260502. A paused tarantula (premolt /
+    # post-rehouse / recovering / mating_season / other) shouldn't
+    # trigger overdue alerts or "next feeding" predictions even when the
+    # accepted-feeding history is otherwise complete. Compute once and
+    # reuse for both empty-history and full-history branches below.
+    today_local = (
+        datetime.now(timezone.utc) + timedelta(minutes=-(tz_offset_minutes or 0))
+    ).date() if tz_offset_minutes is not None else datetime.now(timezone.utc).date()
+    is_feeding_paused = bool(
+        tarantula.feeding_paused_reason
+        and (
+            tarantula.feeding_paused_until is None
+            or tarantula.feeding_paused_until >= today_local
+        )
+    )
+
     if not feeding_logs:
         # Return empty stats if no feedings recorded
         return FeedingStats(
@@ -463,7 +479,10 @@ async def get_feeding_stats(
             total_refused=0,
             acceptance_rate=0.0,
             current_streak_accepted=0,
-            prey_type_distribution=[]
+            prey_type_distribution=[],
+            is_feeding_paused=is_feeding_paused,
+            feeding_paused_reason=tarantula.feeding_paused_reason,
+            feeding_paused_until=tarantula.feeding_paused_until,
         )
 
     # Calculate basic stats
@@ -544,9 +563,13 @@ async def get_feeding_stats(
     # (the upper bound of the recommended window — keepers will see it
     # as the latest the spider should go before its next meal).
     # Otherwise: None, and the UI hides the tile.
+    # Skip species-cadence prediction when the keeper has explicitly
+    # paused feedings. A 7-month premolt tarantula doesn't need a
+    # "next feeding by 2026-05-09" tile telling them they're behind.
     next_feeding_prediction = None
     if (
-        tarantula.species_id
+        not is_feeding_paused
+        and tarantula.species_id
         and tarantula.life_stage
         and last_feeding_date is not None
     ):
@@ -604,7 +627,10 @@ async def get_feeding_stats(
         next_feeding_prediction=next_feeding_prediction,
         longest_gap_days=longest_gap,
         current_streak_accepted=current_streak,
-        prey_type_distribution=prey_distribution
+        prey_type_distribution=prey_distribution,
+        is_feeding_paused=is_feeding_paused,
+        feeding_paused_reason=tarantula.feeding_paused_reason,
+        feeding_paused_until=tarantula.feeding_paused_until,
     )
 
 

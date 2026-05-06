@@ -36,6 +36,10 @@ interface FeedingStatus {
   tarantula_id: string;
   days_since_last_feeding?: number;
   acceptance_rate: number;
+  // Pause flag — see migration pst_20260502. When true, the
+  // collection grid renders a quiet "Paused" pill instead of the
+  // red overdue treatment.
+  is_feeding_paused?: boolean;
 }
 
 interface PremoltPrediction {
@@ -144,6 +148,7 @@ function CollectionScreen() {
             tarantula_id: t.id,
             days_since_last_feeding: response.data.days_since_last_feeding,
             acceptance_rate: response.data.acceptance_rate,
+            is_feeding_paused: response.data.is_feeding_paused,
           });
         } catch (error) {
           // Silently fail for individual tarantulas
@@ -178,7 +183,22 @@ function CollectionScreen() {
 
   const getFeedingStatusBadge = (tarantulaId: string) => {
     const status = feedingStatuses.get(tarantulaId);
-    if (!status || status.days_since_last_feeding === undefined) return null;
+    if (!status) return null;
+
+    // Paused trumps everything. A 7-month premolt sling shouldn't
+    // see her tile flashing red every day.
+    if (status.is_feeding_paused) {
+      return (
+        <View
+          style={[styles.feedingBadge, styles.feedingBadgePaused]}
+          accessibilityLabel="Feeding paused"
+        >
+          <Text style={styles.feedingBadgeText}>⏸ Paused</Text>
+        </View>
+      );
+    }
+
+    if (status.days_since_last_feeding === undefined) return null;
 
     const days = status.days_since_last_feeding;
     let badgeStyle = styles.feedingBadgeGreen;
@@ -718,6 +738,9 @@ function CollectionScreen() {
     },
     feedingBadgeRed: {
       backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    },
+    feedingBadgePaused: {
+      backgroundColor: 'rgba(99, 102, 241, 0.9)',
     },
     feedingBadgeText: {
       color: '#fff',

@@ -25,6 +25,9 @@ interface FeedingStatus {
   tarantula_id: string
   days_since_last_feeding?: number
   acceptance_rate: number
+  // Pause flag from feeding-stats endpoint — see pst_20260502. Used
+  // to keep paused tarantulas out of the dashboard "overdue" list.
+  is_feeding_paused?: boolean
 }
 
 // Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction.
@@ -168,6 +171,7 @@ export default function DashboardHub() {
               tarantula_id: t.id,
               days_since_last_feeding: data.days_since_last_feeding,
               acceptance_rate: data.acceptance_rate,
+              is_feeding_paused: data.is_feeding_paused,
             })
           }
         } catch { /* skip */ }
@@ -203,9 +207,17 @@ export default function DashboardHub() {
   // brand-new spider has no overdue cadence yet, so it shouldn't
   // surface in this list. The old `!== undefined && >= 7` worked by
   // accident (null >= 7 is false in JS) but read as a bug.
+  // Paused tarantulas (premolt / post-rehouse / etc.) are excluded —
+  // a 7-month premolt sling shouldn't headline the dashboard's
+  // "overdue" widget.
   const overdueFeedings = tarantulas.filter(t => {
     const status = feedingStatuses.get(t.id)
-    return status && status.days_since_last_feeding != null && status.days_since_last_feeding >= 7
+    return (
+      status &&
+      !status.is_feeding_paused &&
+      status.days_since_last_feeding != null &&
+      status.days_since_last_feeding >= 7
+    )
   }).sort((a, b) => {
     const daysA = feedingStatuses.get(a.id)?.days_since_last_feeding ?? 0
     const daysB = feedingStatuses.get(b.id)?.days_since_last_feeding ?? 0

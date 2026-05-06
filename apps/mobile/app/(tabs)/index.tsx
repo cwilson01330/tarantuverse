@@ -38,6 +38,9 @@ interface FeedingStatus {
   tarantula_id: string;
   days_since_last_feeding?: number;
   acceptance_rate: number;
+  // Exclude paused tarantulas from the dashboard's "overdue" widget —
+  // see migration pst_20260502.
+  is_feeding_paused?: boolean;
 }
 
 // Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction. We
@@ -207,6 +210,7 @@ function DashboardHubScreen() {
             tarantula_id: t.id,
             days_since_last_feeding: response.data.days_since_last_feeding,
             acceptance_rate: response.data.acceptance_rate,
+            is_feeding_paused: response.data.is_feeding_paused,
           });
         } catch {
           // skip
@@ -247,7 +251,14 @@ function DashboardHubScreen() {
   // as a bug.
   const overdueFeedings = tarantulas.filter(t => {
     const status = feedingStatuses.get(t.id);
-    return status && status.days_since_last_feeding != null && status.days_since_last_feeding >= 7;
+    // Paused tarantulas (premolt / post-rehouse / etc.) are excluded —
+    // a 7-month premolt sling shouldn't headline this widget.
+    return (
+      status &&
+      !status.is_feeding_paused &&
+      status.days_since_last_feeding != null &&
+      status.days_since_last_feeding >= 7
+    );
   }).sort((a, b) => {
     const daysA = feedingStatuses.get(a.id)?.days_since_last_feeding ?? 0;
     const daysB = feedingStatuses.get(b.id)?.days_since_last_feeding ?? 0;

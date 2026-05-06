@@ -21,6 +21,24 @@ interface FeedingStats {
   longest_gap_days?: number;
   current_streak_accepted: number;
   prey_type_distribution: PreyTypeCount[];
+  // Pause state — see migration pst_20260502. When true, FeedingStatsCard
+  // swaps the red "X days ago" treatment for a quiet paused indicator.
+  is_feeding_paused?: boolean;
+  feeding_paused_reason?: string | null;
+  feeding_paused_until?: string | null;
+}
+
+const PAUSE_REASON_LABELS: Record<string, string> = {
+  premolt: 'In premolt',
+  post_rehouse: 'Settling after rehouse',
+  recovering: 'Recovering',
+  mating_season: 'Mating-season pause',
+  other: 'Feeding paused',
+};
+
+function pauseReasonLabel(reason?: string | null): string {
+  if (!reason) return 'Feeding paused';
+  return PAUSE_REASON_LABELS[reason] ?? reason;
 }
 
 interface FeedingStatsCardProps {
@@ -65,28 +83,61 @@ const FeedingStatsCard: React.FC<FeedingStatsCardProps> = ({ data }) => {
     <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>🍽️ Feeding Stats</Text>
 
-      {/* Status Banner — `!= null` covers both null (no accepted feedings yet)
-          and undefined (data still loading). Previous `!== undefined` let
-          null through and rendered "null days ago" on new spiders. */}
-      {data.days_since_last_feeding != null && (
-        <View style={[styles.statusBanner, statusColorStyle]}>
+      {/* Paused banner takes priority over the overdue red banner.
+          A 7-month premolt sling shouldn't see her "Last Fed: 200 days
+          ago" pulsing red — the keeper already knows. */}
+      {data.is_feeding_paused ? (
+        <View style={[styles.statusBanner, styles.statusPaused]}>
           <View style={styles.statusRow}>
             <View style={styles.statusLeft}>
-              <Text style={styles.statusLabel}>LAST FED</Text>
+              <Text style={styles.statusLabel}>FEEDING PAUSED</Text>
               <Text style={styles.statusValue}>
-                {data.days_since_last_feeding} days ago
+                {pauseReasonLabel(data.feeding_paused_reason)}
               </Text>
-            </View>
-            {data.next_feeding_prediction && (
-              <View style={styles.statusRight}>
-                <Text style={styles.statusLabel}>NEXT FEEDING</Text>
-                <Text style={styles.statusSmallValue}>
-                  {new Date(data.next_feeding_prediction).toLocaleDateString()}
+              {data.days_since_last_feeding != null && (
+                <Text style={styles.statusSubtle}>
+                  Last fed {data.days_since_last_feeding} days ago
                 </Text>
+              )}
+            </View>
+            {data.feeding_paused_until ? (
+              <View style={styles.statusRight}>
+                <Text style={styles.statusLabel}>UNTIL</Text>
+                <Text style={styles.statusSmallValue}>
+                  {new Date(data.feeding_paused_until).toLocaleDateString()}
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.statusRight}>
+                <Text style={styles.statusSubtle}>Indefinite</Text>
               </View>
             )}
           </View>
         </View>
+      ) : (
+        /* Status Banner — `!= null` covers both null (no accepted feedings yet)
+            and undefined (data still loading). Previous `!== undefined` let
+            null through and rendered "null days ago" on new spiders. */
+        data.days_since_last_feeding != null && (
+          <View style={[styles.statusBanner, statusColorStyle]}>
+            <View style={styles.statusRow}>
+              <View style={styles.statusLeft}>
+                <Text style={styles.statusLabel}>LAST FED</Text>
+                <Text style={styles.statusValue}>
+                  {data.days_since_last_feeding} days ago
+                </Text>
+              </View>
+              {data.next_feeding_prediction && (
+                <View style={styles.statusRight}>
+                  <Text style={styles.statusLabel}>NEXT FEEDING</Text>
+                  <Text style={styles.statusSmallValue}>
+                    {new Date(data.next_feeding_prediction).toLocaleDateString()}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )
       )}
 
       {/* Key Metrics */}
@@ -214,6 +265,15 @@ const styles = StyleSheet.create({
   statusGray: {
     backgroundColor: '#e5e7eb',
     borderColor: '#9ca3af',
+  },
+  statusPaused: {
+    backgroundColor: '#e0e7ff',
+    borderColor: '#c7d2fe',
+  },
+  statusSubtle: {
+    fontSize: 11,
+    color: '#4b5563',
+    marginTop: 4,
   },
   statusRow: {
     flexDirection: 'row',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 const QRSheet = React.lazy(() => import('../../src/components/QRSheet'));
+const PauseFeedingSheet = React.lazy(() => import('../../src/components/PauseFeedingSheet'));
 import {
   View,
   Text,
@@ -42,6 +43,9 @@ interface TarantulaDetail {
   last_molt?: string;
   photo_url?: string;
   notes?: string;
+  // Feeding pause — see migration pst_20260502
+  feeding_paused_reason?: string | null;
+  feeding_paused_until?: string | null;
 }
 
 interface FeedingLog {
@@ -123,6 +127,9 @@ interface FeedingStats {
   longest_gap_days?: number;
   current_streak_accepted: number;
   prey_type_distribution: PreyTypeCount[];
+  is_feeding_paused?: boolean;
+  feeding_paused_reason?: string | null;
+  feeding_paused_until?: string | null;
 }
 
 interface PremoltIndicator {
@@ -175,6 +182,7 @@ export default function TarantulaDetailScreen() {
   const [photoViewerVisible, setPhotoViewerVisible] = useState(false);
   const [showQRSheet, setShowQRSheet] = useState(false);
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0);
+  const [showPauseSheet, setShowPauseSheet] = useState(false);
 
   useEffect(() => {
     fetchTarantula();
@@ -936,6 +944,62 @@ export default function TarantulaDetailScreen() {
         {/* Feeding Stats */}
         {feedingStats && (
           <View style={styles.section}>
+            {/* Pause / resume toggle. Shows above the stats card so the
+                keeper can mute the overdue treatment without scrolling
+                past the red banner first. Wired to pst_20260502 cols. */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                marginBottom: 8,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setShowPauseSheet(true)}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: tarantula?.feeding_paused_reason
+                    ? colors.primary
+                    : colors.border,
+                  backgroundColor: tarantula?.feeding_paused_reason
+                    ? colors.surfaceElevated
+                    : 'transparent',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <MaterialCommunityIcons
+                  name={
+                    tarantula?.feeding_paused_reason
+                      ? 'pause-circle'
+                      : 'pause-circle-outline'
+                  }
+                  size={14}
+                  color={
+                    tarantula?.feeding_paused_reason
+                      ? colors.primary
+                      : colors.textSecondary
+                  }
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '600',
+                    color: tarantula?.feeding_paused_reason
+                      ? colors.primary
+                      : colors.textSecondary,
+                  }}
+                >
+                  {tarantula?.feeding_paused_reason
+                    ? 'Paused — edit'
+                    : 'Pause feedings'}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <FeedingStatsCard data={feedingStats} />
           </View>
         )}
@@ -1069,6 +1133,24 @@ export default function TarantulaDetailScreen() {
             onPhotoAdded={() => {
               setShowQRSheet(false);
               fetchTarantulaData();
+            }}
+          />
+        )}
+      </Suspense>
+
+      {/* Feeding-pause sheet — see migration pst_20260502 */}
+      <Suspense fallback={null}>
+        {showPauseSheet && tarantula && (
+          <PauseFeedingSheet
+            visible={showPauseSheet}
+            onClose={() => setShowPauseSheet(false)}
+            tarantulaId={id as string}
+            tarantulaName={tarantula.name || tarantula.common_name || null}
+            currentReason={tarantula.feeding_paused_reason ?? null}
+            currentUntil={tarantula.feeding_paused_until ?? null}
+            onChange={() => {
+              fetchTarantula();
+              fetchFeedingStats();
             }}
           />
         )}

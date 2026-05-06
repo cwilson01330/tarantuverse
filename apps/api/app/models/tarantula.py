@@ -84,6 +84,13 @@ class Tarantula(Base):
     last_enclosure_cleaning = Column(Date)
     enclosure_notes = Column(Text)  # Modifications, decor, etc.
 
+    # Feeding pause — for premolt, post-rehouse fasting, or any
+    # keeper-known reason to suppress overdue alerts. See pst_20260502.
+    # Canonical reasons used by the picker: premolt | post_rehouse |
+    # recovering | mating_season | other. Free-form strings allowed.
+    feeding_paused_reason = Column(String(40), nullable=True)
+    feeding_paused_until = Column(Date, nullable=True)
+
     # Media
     photo_url = Column(String(500))
 

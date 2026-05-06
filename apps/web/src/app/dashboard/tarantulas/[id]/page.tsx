@@ -11,6 +11,7 @@ import DateInput from '@/components/DateInput'
 import dynamic from 'next/dynamic'
 
 const QRModal = dynamic(() => import('@/components/QRModal'), { ssr: false })
+const PauseFeedingModal = dynamic(() => import('@/components/PauseFeedingModal'), { ssr: false })
 import UpgradeModal from '@/components/UpgradeModal'
 import PricingCard from '@/components/PricingCard'
 import PremoltPredictionSection from '@/components/PremoltPredictionSection'
@@ -45,6 +46,10 @@ interface Tarantula {
   misting_schedule?: string
   last_enclosure_cleaning?: string
   enclosure_notes?: string
+
+  // Feeding pause — pst_20260502
+  feeding_paused_reason?: string | null
+  feeding_paused_until?: string | null
 
   created_at: string
 }
@@ -155,6 +160,9 @@ interface FeedingStats {
   longest_gap_days?: number
   current_streak_accepted: number
   prey_type_distribution: PreyTypeCount[]
+  is_feeding_paused?: boolean
+  feeding_paused_reason?: string | null
+  feeding_paused_until?: string | null
 }
 
 interface Pairing {
@@ -246,6 +254,8 @@ export default function TarantulaDetailPage() {
   })
   const [showShareModal, setShowShareModal] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showPauseModal, setShowPauseModal] = useState(false)
+  const [pauseError, setPauseError] = useState<string | null>(null)
 
   useEffect(() => {
     // Wait for auth to load
@@ -633,6 +643,60 @@ export default function TarantulaDetailPage() {
       console.error('Delete failed:', { error: err, token: token ? 'present' : 'missing', id })
       setDeleteConfirm(false)
       setError(err.message || 'Failed to delete')
+    }
+  }
+
+  /**
+   * Pause feedings for this tarantula. Premolt is the headline use
+   * case — a 7-month-premolt sling shouldn't trigger overdue alerts
+   * every day. The keeper picks a canonical reason + optional until
+   * date; the API stores it on `tarantulas.feeding_paused_*` columns
+   * and the feeding-stats endpoint reads them back to suppress the
+   * red overdue treatment.
+   */
+  const handlePauseFeeding = async (reason: string, until: string | null) => {
+    if (!token) throw new Error('Not authenticated')
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        feeding_paused_reason: reason,
+        feeding_paused_until: until,
+      }),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => null)
+      throw new Error(data?.detail || 'Failed to pause feedings')
+    }
+    // Refetch tarantula + feeding stats so the UI reflects the new
+    // paused state immediately.
+    await Promise.all([fetchTarantula(token), fetchFeedingStats(token)])
+  }
+
+  const handleResumeFeeding = async () => {
+    if (!token) return
+    setPauseError(null)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          feeding_paused_reason: null,
+          feeding_paused_until: null,
+        }),
+      })
+      if (!response.ok) throw new Error('Failed to resume feedings')
+      await Promise.all([fetchTarantula(token), fetchFeedingStats(token)])
+    } catch (err: any) {
+      setPauseError(err.message || 'Failed to resume feedings')
     }
   }
 
@@ -1260,6 +1324,33 @@ export default function TarantulaDetailPage() {
                       )}
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Pause / resume button — toggles the feeding-pause flag on
+                  the tarantula record. When paused, the FeedingStatsCard
+                  swaps the red "X days ago" treatment for a quiet
+                  paused indicator. Wired to pst_20260502 columns. */}
+              <div className="flex justify-end">
+                {tarantula.feeding_paused_reason ? (
+                  <button
+                    onClick={handleResumeFeeding}
+                    className="text-sm font-medium px-3 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
+                  >
+                    Resume feedings
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowPauseModal(true)}
+                    className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                  >
+                    Pause feedings
+                  </button>
+                )}
+              </div>
+              {pauseError && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 p-3 text-sm text-red-800 dark:text-red-200">
+                  {pauseError}
                 </div>
               )}
 
@@ -2179,6 +2270,17 @@ export default function TarantulaDetailPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Pause Feeding Modal */}
+      {tarantula && (
+        <PauseFeedingModal
+          isOpen={showPauseModal}
+          onClose={() => setShowPauseModal(false)}
+          onSubmit={handlePauseFeeding}
+          initialReason={tarantula.feeding_paused_reason || undefined}
+          initialUntil={tarantula.feeding_paused_until || undefined}
+        />
       )}
 
       {/* QR Identity Modal */}
