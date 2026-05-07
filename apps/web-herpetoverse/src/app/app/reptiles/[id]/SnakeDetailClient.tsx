@@ -34,6 +34,7 @@ import {
 } from 'recharts'
 import { ApiError } from '@/lib/apiClient'
 import PhotoGallery from '@/components/PhotoGallery'
+import { PauseFeedingDialog } from '@/components/PauseFeedingDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
 import {
   CreateFeedingPayload,
@@ -296,6 +297,7 @@ export default function SnakeDetailClient({ snakeId }: { snakeId: string }) {
           snake={snake}
           suggestion={preySuggestion}
           onCreated={refetchFeedings}
+          onPauseChanged={refetchAll}
         />
         <FeedingList
           feedings={feedings}
@@ -948,10 +950,14 @@ function LogFeedingForm({
   snake,
   suggestion,
   onCreated,
+  onPauseChanged,
 }: {
   snake: Snake
   suggestion: PreySuggestion | null
   onCreated: () => void
+  /** Called after pausing/resuming so the parent refetches the snake
+   *  (and the FeedingIntelligence/banner reflect the new state). */
+  onPauseChanged: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [date, setDate] = useState(() => todayISO())
@@ -961,6 +967,8 @@ function LogFeedingForm({
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pauseOpen, setPauseOpen] = useState(false)
+  const [pauseHelpOpen, setPauseHelpOpen] = useState(false)
 
   // Live prey:BW hint
   const preyHint = useMemo(() => {
@@ -1031,14 +1039,48 @@ function LogFeedingForm({
     }
   }
 
+  // Friendly label for the current pause reason (shown both in the
+  // collapsed and open form states so the keeper always sees it).
+  const PAUSE_REASON_LABELS: Record<string, string> = {
+    hunger_strike: 'Hunger strike',
+    post_rehouse: 'Post-rehouse',
+    recovering: 'Recovering',
+    breeding_season: 'Breeding season',
+    other: 'Paused',
+  }
+  const pauseLabel = snake.feeding_paused_reason
+    ? PAUSE_REASON_LABELS[snake.feeding_paused_reason] ?? 'Paused'
+    : null
+
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="text-sm text-herp-teal hover:text-herp-lime transition-colors"
-      >
-        ＋ Log a feeding
-      </button>
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={() => setOpen(true)}
+          className="text-sm text-herp-teal hover:text-herp-lime transition-colors"
+        >
+          ＋ Log a feeding
+        </button>
+        {pauseLabel && (
+          <button
+            onClick={() => setPauseOpen(true)}
+            className="text-xs text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+            title="Edit or resume pause"
+          >
+            ⏸ {pauseLabel} — tap to edit
+          </button>
+        )}
+        <PauseFeedingDialog
+          open={pauseOpen}
+          onClose={() => setPauseOpen(false)}
+          taxon="snake"
+          animalId={snake.id}
+          animalName={snakeTitle(snake)}
+          currentReason={snake.feeding_paused_reason}
+          currentUntil={snake.feeding_paused_until}
+          onChange={onPauseChanged}
+        />
+      </div>
     )
   }
 
@@ -1121,6 +1163,60 @@ function LogFeedingForm({
 
       {error && <InlineError message={error} />}
 
+      {/* Pause feedings — surfaces in-context with logging because
+          "she just refused" is the natural moment to mute reminders.
+          Mirrors the mobile pattern. Migration pse_20260502. */}
+      <div className="rounded-md border border-neutral-800 bg-neutral-900/40 p-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
+            {pauseLabel ? 'Feeding paused' : 'Going off feed?'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPauseHelpOpen((v) => !v)}
+            aria-label={pauseHelpOpen ? 'Hide pause help' : 'What is this?'}
+            className="text-neutral-500 hover:text-neutral-300 text-xs leading-none"
+          >
+            ⓘ
+          </button>
+        </div>
+        {pauseHelpOpen && (
+          <p className="text-xs text-neutral-400 leading-relaxed">
+            Snakes and lizards can refuse food for weeks during hunger
+            strikes, brumation prep, post-rehouse settling, or breeding
+            season. Pause to mute &quot;overdue&quot; reminders so they
+            don&apos;t drown out real ones on your other animals. You
+            can resume any time.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => setPauseOpen(true)}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md border text-left transition ${
+            pauseLabel
+              ? 'border-indigo-500/40 bg-indigo-900/20 hover:bg-indigo-900/30'
+              : 'border-neutral-800 hover:bg-neutral-900/60'
+          }`}
+        >
+          <span className="text-base leading-none">
+            {pauseLabel ? '⏸' : '◯'}
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-medium text-white">
+              {pauseLabel ?? 'Pause feeding reminders'}
+            </span>
+            <span className="block text-xs text-neutral-400 mt-0.5">
+              {pauseLabel
+                ? snake.feeding_paused_until
+                  ? `Auto-resumes ${fmtDate(snake.feeding_paused_until) ?? snake.feeding_paused_until} — tap to edit`
+                  : 'Indefinite — tap to edit or resume'
+                : 'Mute overdue alerts during hunger strikes or fasting'}
+            </span>
+          </span>
+          <span className="text-neutral-600">›</span>
+        </button>
+      </div>
+
       <div className="flex items-center gap-2">
         <button
           type="submit"
@@ -1140,6 +1236,17 @@ function LogFeedingForm({
           Cancel
         </button>
       </div>
+
+      <PauseFeedingDialog
+        open={pauseOpen}
+        onClose={() => setPauseOpen(false)}
+        taxon="snake"
+        animalId={snake.id}
+        animalName={snakeTitle(snake)}
+        currentReason={snake.feeding_paused_reason}
+        currentUntil={snake.feeding_paused_until}
+        onChange={onPauseChanged}
+      />
     </form>
   )
 }

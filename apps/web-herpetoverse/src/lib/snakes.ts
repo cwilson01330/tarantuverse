@@ -45,6 +45,13 @@ export interface Snake {
   brumation_active: boolean
   brumation_started_at: string | null
 
+  // Feeding pause — see migration pse_20260502. Distinct from brumation
+  // (which is its own seasonal flag). `reason` is one of
+  //   hunger_strike | post_rehouse | recovering | breeding_season | other
+  // (free-form values pass through verbatim) and `until` is YYYY-MM-DD.
+  feeding_paused_reason: string | null
+  feeding_paused_until: string | null
+
   photo_url: string | null
 
   is_public: boolean
@@ -177,6 +184,10 @@ export interface CreateSnakePayload {
   current_weight_g?: string | number | null
   current_length_in?: string | number | null
   notes?: string | null
+  // Pause fields — accepted by SnakeUpdate. Pass `null` on both to
+  // resume. See migration pse_20260502.
+  feeding_paused_reason?: string | null
+  feeding_paused_until?: string | null
 }
 
 export function createSnake(payload: CreateSnakePayload): Promise<Snake> {

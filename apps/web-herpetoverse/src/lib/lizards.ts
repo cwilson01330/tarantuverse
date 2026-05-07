@@ -54,6 +54,10 @@ export interface Lizard {
   brumation_active: boolean
   brumation_started_at: string | null
 
+  // See snakes.ts — same pause shape, same migration pse_20260502.
+  feeding_paused_reason: string | null
+  feeding_paused_until: string | null
+
   photo_url: string | null
 
   is_public: boolean
@@ -200,6 +204,8 @@ export interface CreateLizardPayload {
   current_weight_g?: string | number | null
   current_length_in?: string | number | null
   notes?: string | null
+  feeding_paused_reason?: string | null
+  feeding_paused_until?: string | null
 }
 
 export function createLizard(payload: CreateLizardPayload): Promise<Lizard> {
