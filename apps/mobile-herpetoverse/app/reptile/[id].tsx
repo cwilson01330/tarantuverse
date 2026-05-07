@@ -197,53 +197,17 @@ function SnakeDetailScreen() {
           fallbackGlyph="🐍"
         />
 
+        {/* When paused, the banner becomes the resume affordance —
+            tappable, with an "Edit" hint. The standalone pause pill
+            was discoverability-weird; the canonical entry point now
+            lives inside Log Feeding (the natural moment to think
+            "she's been refusing for weeks, mute reminders"). */}
         <FeedingStatusBanner
           taxon="snake"
           animalId={snake.id}
           refreshKey={`${feedings.length}-${snake.feeding_paused_reason ?? ''}-${snake.feeding_paused_until ?? ''}`}
+          onPausedPress={() => setPauseOpen(true)}
         />
-
-        <TouchableOpacity
-          onPress={() => setPauseOpen(true)}
-          style={[
-            styles.pauseLink,
-            {
-              borderColor: colors.border,
-              backgroundColor: snake.feeding_paused_reason
-                ? colors.surfaceRaised
-                : 'transparent',
-            },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={
-            snake.feeding_paused_reason
-              ? 'Edit feeding pause'
-              : 'Pause feeding reminders'
-          }
-        >
-          <MaterialCommunityIcons
-            name={snake.feeding_paused_reason ? 'pause-circle' : 'pause-circle-outline'}
-            size={18}
-            color={snake.feeding_paused_reason ? colors.info : colors.textSecondary}
-          />
-          <Text
-            style={{
-              color: snake.feeding_paused_reason ? colors.info : colors.textSecondary,
-              fontSize: 13,
-              fontWeight: '600',
-              flex: 1,
-            }}
-          >
-            {snake.feeding_paused_reason
-              ? 'Feeding reminders paused — tap to edit or resume'
-              : 'Pause feeding reminders'}
-          </Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={16}
-            color={colors.textTertiary}
-          />
-        </TouchableOpacity>
 
         <LogActions
           onLogFeeding={() =>
@@ -386,16 +350,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-  },
-  pauseLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
-    marginTop: -4,
   },
 });
 

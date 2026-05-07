@@ -23,6 +23,7 @@
  * dedicated regurg flag yet. Web does the same; keeping parity matters
  * because keepers split between platforms.
  */
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -31,12 +32,15 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
 import { HeaderBackButton } from '../components/HeaderBackButton';
+import { PauseFeedingSheet } from '../components/PauseFeedingSheet';
 import {
   ChipGroup,
   Field,
@@ -51,9 +55,18 @@ import {
   type CreateFeedingPayload,
   createFeeding as createFeedingSnake,
   getFeeding,
+  getSnake,
   updateFeeding,
 } from '../lib/snakes';
-import { createFeeding as createFeedingLizard } from '../lib/lizards';
+import { createFeeding as createFeedingLizard, getLizard } from '../lib/lizards';
+
+const PAUSE_REASON_LABELS: Record<string, string> = {
+  hunger_strike: 'Hunger strike',
+  post_rehouse: 'Post-rehouse',
+  recovering: 'Recovering',
+  breeding_season: 'Breeding season',
+  other: 'Paused',
+};
 
 type Outcome = 'yes' | 'no' | 'regurg';
 
@@ -92,6 +105,44 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
+  // Feeding-pause state for the animal — surfaced in this screen so
+  // the keeper can pause / edit / resume in the same flow as logging
+  // a refused feeding. The natural moment is "she just refused → I
+  // think she's in [hunger strike / brumation prep / post-rehouse] →
+  // mute reminders". See migration pst_20260502 / pse_20260502.
+  const [animalName, setAnimalName] = useState<string | null>(null);
+  const [pausedReason, setPausedReason] = useState<string | null>(null);
+  const [pausedUntil, setPausedUntil] = useState<string | null>(null);
+  const [showPauseSheet, setShowPauseSheet] = useState(false);
+  const [showPauseHelp, setShowPauseHelp] = useState(false);
+
+  /** Pulls the animal record so we can show current pause state inline.
+   *  Called on mount and again after the PauseFeedingSheet saves. */
+  async function loadAnimalPauseState() {
+    if (!id) return;
+    try {
+      const animal =
+        taxon === 'snake'
+          ? await getSnake(id as string)
+          : await getLizard(id as string);
+      setAnimalName(
+        animal.name ||
+          animal.scientific_name ||
+          (taxon === 'snake' ? 'Snake' : 'Lizard'),
+      );
+      setPausedReason(animal.feeding_paused_reason ?? null);
+      setPausedUntil(animal.feeding_paused_until ?? null);
+    } catch {
+      // Non-fatal — pause section just shows the default copy.
+    }
+  }
+
+  // Load pause state once we have an id (skipped in edit mode where
+  // the screen is purely about correcting an existing log).
+  useEffect(() => {
+    if (id && !isEdit) loadAnimalPauseState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isEdit, taxon]);
 
   // Edit mode — pre-fill from the existing feeding record.
   useEffect(() => {
@@ -241,6 +292,106 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
               />
             </Field>
 
+            {/* Pause feeding row — discoverable in-context with the
+                log-feeding flow. "She just refused — I think she's
+                in a hunger strike" is the moment most keepers reach
+                for a mute. Hidden in edit mode (correcting an old
+                log isn't the right time to manage pause state). */}
+            {!isEdit && id && (
+              <View style={styles.pauseSection}>
+                <View style={styles.pauseHeaderRow}>
+                  <Text style={[styles.pauseLabel, { color: colors.textTertiary }]}>
+                    {pausedReason ? 'FEEDING PAUSED' : 'GOING OFF FEED?'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowPauseHelp((v) => !v)}
+                    hitSlop={8}
+                    accessibilityLabel="What does pausing feedings do?"
+                  >
+                    <MaterialCommunityIcons
+                      name="information-outline"
+                      size={16}
+                      color={colors.textTertiary}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {showPauseHelp && (
+                  <View
+                    style={[
+                      styles.tooltip,
+                      {
+                        backgroundColor: colors.surfaceRaised,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.tooltipText, { color: colors.textSecondary }]}>
+                      Snakes and lizards can refuse food for weeks during
+                      hunger strikes, brumation prep, post-rehouse settling,
+                      or breeding season. Pause to mute "overdue" reminders
+                      so they don't drown out real ones on your other
+                      animals. You can resume any time.
+                    </Text>
+                  </View>
+                )}
+                <TouchableOpacity
+                  onPress={() => setShowPauseSheet(true)}
+                  style={[
+                    styles.pauseRow,
+                    {
+                      backgroundColor: pausedReason
+                        ? colors.surfaceRaised
+                        : 'transparent',
+                      borderColor: pausedReason ? colors.info : colors.border,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    pausedReason
+                      ? 'Edit or resume feeding pause'
+                      : 'Pause feeding reminders'
+                  }
+                >
+                  <MaterialCommunityIcons
+                    name={pausedReason ? 'pause-circle' : 'pause-circle-outline'}
+                    size={22}
+                    color={pausedReason ? colors.info : colors.textSecondary}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: colors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {pausedReason
+                        ? PAUSE_REASON_LABELS[pausedReason] ?? 'Paused'
+                        : 'Pause feeding reminders'}
+                    </Text>
+                    <Text
+                      style={{
+                        color: colors.textSecondary,
+                        fontSize: 12,
+                        marginTop: 2,
+                      }}
+                    >
+                      {pausedReason
+                        ? pausedUntil
+                          ? `Auto-resumes ${new Date(pausedUntil).toLocaleDateString()} — tap to edit`
+                          : 'Indefinite — tap to edit or resume'
+                        : 'Mute overdue alerts during hunger strikes or fasting'}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={18}
+                    color={colors.textTertiary}
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {error && <FormErrorBanner message={error} />}
 
             <SubmitButton
@@ -250,6 +401,21 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
             />
           </ScrollView>
         </KeyboardAvoidingView>
+      )}
+
+      {/* Pause sheet — refetches animal state on save so the row
+          above reflects the new state without leaving this screen. */}
+      {!isEdit && id && (
+        <PauseFeedingSheet
+          visible={showPauseSheet}
+          onClose={() => setShowPauseSheet(false)}
+          taxon={taxon}
+          animalId={id as string}
+          animalName={animalName}
+          currentReason={pausedReason}
+          currentUntil={pausedUntil}
+          onChange={loadAnimalPauseState}
+        />
       )}
     </SafeAreaView>
   );
@@ -263,5 +429,36 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 48,
     gap: 16,
+  },
+  pauseSection: {
+    gap: 8,
+  },
+  pauseHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pauseLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  tooltip: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+  },
+  tooltipText: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  pauseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 12,
   },
 });

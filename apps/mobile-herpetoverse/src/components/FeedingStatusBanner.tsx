@@ -19,7 +19,13 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   type FeedingStatus,
@@ -33,6 +39,11 @@ interface Props {
   animalId: string;
   /** Re-fetch when this changes (e.g. after a feeding is logged). */
   refreshKey?: string | number;
+  /** When the status is `paused`, providing this makes the banner
+   *  tappable (with a small "Tap to edit" hint) so the keeper can
+   *  open the PauseFeedingSheet from the banner itself instead of
+   *  hunting for a separate button. */
+  onPausedPress?: () => void;
 }
 
 interface Visual {
@@ -48,7 +59,7 @@ interface Visual {
   detail?: string;
 }
 
-export function FeedingStatusBanner({ taxon, animalId, refreshKey }: Props) {
+export function FeedingStatusBanner({ taxon, animalId, refreshKey, onPausedPress }: Props) {
   const { colors, layout } = useTheme();
   const [status, setStatus] = useState<FeedingStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -92,6 +103,52 @@ export function FeedingStatusBanner({ taxon, animalId, refreshKey }: Props) {
   }
 
   const visual = describe(status, colors);
+  const tappable = status.status === 'paused' && !!onPausedPress;
+
+  // Static JSX branches — the dynamic component pattern
+  // (`const W: any = condition ? Touchable : View`) crashes Hermes
+  // prod builds. See feedback memory dated 2026-05-01.
+  const inner = (
+    <>
+      <MaterialCommunityIcons name={visual.icon} size={20} color={visual.fg} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.title, { color: visual.fg }]} numberOfLines={1}>
+          {visual.title}
+        </Text>
+        {visual.detail ? (
+          <Text style={[styles.detail, { color: visual.fg }]} numberOfLines={2}>
+            {visual.detail}
+          </Text>
+        ) : null}
+      </View>
+      {tappable && (
+        <View style={styles.editHint}>
+          <Text style={[styles.editHintText, { color: visual.fg }]}>Edit</Text>
+          <MaterialCommunityIcons name="chevron-right" size={16} color={visual.fg} />
+        </View>
+      )}
+    </>
+  );
+
+  if (tappable) {
+    return (
+      <TouchableOpacity
+        onPress={onPausedPress}
+        activeOpacity={0.75}
+        style={[
+          styles.banner,
+          {
+            backgroundColor: visual.bg,
+            borderRadius: layout.radius.md,
+          },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`${visual.title}. Tap to edit pause.`}
+      >
+        {inner}
+      </TouchableOpacity>
+    );
+  }
 
   return (
     <View
@@ -105,17 +162,7 @@ export function FeedingStatusBanner({ taxon, animalId, refreshKey }: Props) {
       accessibilityRole="text"
       accessibilityLabel={`${visual.title}${visual.detail ? `. ${visual.detail}` : ''}`}
     >
-      <MaterialCommunityIcons name={visual.icon} size={20} color={visual.fg} />
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.title, { color: visual.fg }]} numberOfLines={1}>
-          {visual.title}
-        </Text>
-        {visual.detail ? (
-          <Text style={[styles.detail, { color: visual.fg }]} numberOfLines={2}>
-            {visual.detail}
-          </Text>
-        ) : null}
-      </View>
+      {inner}
     </View>
   );
 }
@@ -223,6 +270,18 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 14, fontWeight: '700' },
   detail: { fontSize: 12, marginTop: 2, opacity: 0.85 },
+  editHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    opacity: 0.85,
+  },
+  editHintText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   skeleton: {
     height: 56,
     alignItems: 'center',
