@@ -15,7 +15,7 @@
  * the new animal so back navigation lands on the collection (not on a
  * stale add screen).
  */
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -76,12 +76,32 @@ function AddReptileScreen() {
   const router = useRouter();
   const { colors } = useTheme();
 
-  const [taxon, setTaxon] = useState<'snake' | 'lizard'>('snake');
+  // Query params let the species care sheet (and any future deeplink)
+  // pre-fill this form with a species + taxon. `useLocalSearchParams`
+  // returns whatever's in the route at mount; `useState`'s lazy
+  // initializer reads them once so the user can still edit the values
+  // afterward without us clobbering them on re-render.
+  const params = useLocalSearchParams<{
+    taxon?: string;
+    species_id?: string;
+    scientific_name?: string;
+    common_name?: string;
+  }>();
+
+  const [taxon, setTaxon] = useState<'snake' | 'lizard'>(
+    params.taxon === 'lizard' ? 'lizard' : 'snake',
+  );
   const [name, setName] = useState('');
-  const [scientificName, setScientificName] = useState('');
-  const [speciesId, setSpeciesId] = useState<string | null>(null);
+  const [scientificName, setScientificName] = useState(
+    typeof params.scientific_name === 'string' ? params.scientific_name : '',
+  );
+  const [speciesId, setSpeciesId] = useState<string | null>(
+    typeof params.species_id === 'string' ? params.species_id : null,
+  );
   const [enclosureId, setEnclosureId] = useState<string | null>(null);
-  const [commonName, setCommonName] = useState('');
+  const [commonName, setCommonName] = useState(
+    typeof params.common_name === 'string' ? params.common_name : '',
+  );
   const [sex, setSex] = useState<Sex>('unknown');
   const [hatchDate, setHatchDate] = useState('');
   const [source, setSource] = useState<SourceChoice>('unset');

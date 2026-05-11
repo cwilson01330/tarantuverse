@@ -18,7 +18,7 @@
  * collapse to nothing. The aim is "scrollable but never empty-padded."
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -43,7 +43,46 @@ import {
   getReptileSpecies,
 } from '../../src/lib/reptile-species';
 
+// Seeded reptile families bucketed by clade. Drives the taxon inference
+// for the "Add to my collection" CTA — most keepers shouldn't have to
+// pick "snake or lizard?" when they're standing on a Python regius
+// care sheet. Falls back to undefined → user picks on the add screen.
+const SNAKE_FAMILIES = new Set([
+  'Pythonidae',
+  'Boidae',
+  'Colubridae',
+  'Elapidae',
+  'Viperidae',
+  'Lamprophiidae',
+]);
+const LIZARD_FAMILIES = new Set([
+  'Agamidae',
+  'Anguidae',
+  'Chamaeleonidae',
+  'Cordylidae',
+  'Diplodactylidae',
+  'Eublepharidae',
+  'Gekkonidae',
+  'Helodermatidae',
+  'Iguanidae',
+  'Lacertidae',
+  'Phrynosomatidae',
+  'Rhacodactylidae',
+  'Scincidae',
+  'Sphaerodactylidae',
+  'Teiidae',
+  'Varanidae',
+]);
+
+function taxonFromFamily(family: string | null): 'snake' | 'lizard' | null {
+  if (!family) return null;
+  if (SNAKE_FAMILIES.has(family)) return 'snake';
+  if (LIZARD_FAMILIES.has(family)) return 'lizard';
+  return null;
+}
+
 function SpeciesDetailScreen() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
 
@@ -178,6 +217,26 @@ function SpeciesDetailScreen() {
             )}
           </View>
         </View>
+
+        {/* Add to my collection — primary CTA right under the hero so it
+            never gets buried under the care sections. Taxon is inferred
+            from family when possible; if unknown, the add screen falls
+            back to snake by default and the user can toggle the chip. */}
+        <AddToCollectionCTA
+          onPress={() => {
+            const inferred = taxonFromFamily(species.family);
+            router.push({
+              pathname: '/reptile/add',
+              params: {
+                species_id: species.id,
+                scientific_name: species.scientific_name,
+                common_name: species.common_names[0] ?? '',
+                taxon: inferred ?? 'snake',
+              },
+            } as never);
+          }}
+          taxonHint={taxonFromFamily(species.family)}
+        />
 
         {/* Quick stats */}
         <Section title="At a glance">
@@ -540,6 +599,75 @@ function joinCadence(size: string | null, freq: string | null): string | null {
   if (!size && !freq) return null;
   return [size, freq].filter(Boolean).join(' · ');
 }
+
+// ---------------------------------------------------------------------------
+// Add-to-collection CTA — sits right under the hero, routes to the
+// shared add screen with species pre-filled.
+// ---------------------------------------------------------------------------
+
+function AddToCollectionCTA({
+  onPress,
+  taxonHint,
+}: {
+  onPress: () => void;
+  taxonHint: 'snake' | 'lizard' | null;
+}) {
+  const { colors, layout } = useTheme();
+  const taxonLabel =
+    taxonHint === 'snake'
+      ? 'Add as snake'
+      : taxonHint === 'lizard'
+        ? 'Add as lizard'
+        : 'Add to my collection';
+  const hint =
+    taxonHint === null
+      ? "You'll pick snake or lizard on the next step."
+      : 'Pre-fills species + scientific name. You can change anything before saving.';
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={taxonLabel}
+      style={[
+        ctaStyles.row,
+        {
+          backgroundColor: colors.primary,
+          borderRadius: layout.radius.md,
+        },
+      ]}
+    >
+      <MaterialCommunityIcons name="plus-circle" size={20} color="#0B0B0B" />
+      <View style={{ flex: 1 }}>
+        <Text style={ctaStyles.title}>{taxonLabel}</Text>
+        <Text style={ctaStyles.subtitle}>{hint}</Text>
+      </View>
+      <MaterialCommunityIcons name="chevron-right" size={20} color="#0B0B0B" />
+    </TouchableOpacity>
+  );
+}
+
+const ctaStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  title: {
+    color: '#0B0B0B',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  subtitle: {
+    color: '#0B0B0B',
+    opacity: 0.75,
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Styles
