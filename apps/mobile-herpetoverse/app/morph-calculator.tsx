@@ -19,6 +19,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -36,8 +37,11 @@ import { useTheme } from '../src/contexts/ThemeContext';
 import {
   CALCULATOR_SPECIES,
   type AlleleState,
+  type CitationSourceType,
   type Gene,
   type GeneInput,
+  type WelfareCitation,
+  type WelfareFlag,
   combineOffspring,
   describeOutcome,
   fetchGenesForSpecies,
@@ -55,6 +59,45 @@ interface ParentEntry {
 }
 
 const TOP_N = 12;
+
+// ---------------------------------------------------------------------------
+// Gene-detail labels + colors — mirror the web morph calculator so cross-
+// platform keepers see the same names and warning copy.
+// ---------------------------------------------------------------------------
+
+const WELFARE_FLAG_LABELS: Record<WelfareFlag, string> = {
+  neurological: 'Neurological',
+  structural: 'Structural',
+  viability: 'Viability',
+};
+
+// (fg, bg) pairs. fg works on dark surfaces; bg is a 15-22% tint of fg.
+const WELFARE_FLAG_COLORS: Record<WelfareFlag, { fg: string; bg: string; border: string }> = {
+  neurological: { fg: '#fca5a5', bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.4)' },
+  structural:   { fg: '#fcd34d', bg: 'rgba(245,158,11,0.15)', border: 'rgba(245,158,11,0.4)' },
+  viability:    { fg: '#fda4af', bg: 'rgba(244,63,94,0.15)',  border: 'rgba(244,63,94,0.4)'  },
+};
+
+const SOURCE_TYPE_LABELS: Record<CitationSourceType, string> = {
+  peer_reviewed: 'Peer reviewed',
+  breeder_community: 'Breeder / community',
+};
+
+const SOURCE_TYPE_COLORS: Record<CitationSourceType, { fg: string; bg: string; border: string }> = {
+  peer_reviewed: { fg: '#5eead4', bg: 'rgba(20,184,166,0.15)', border: 'rgba(20,184,166,0.4)' },
+  breeder_community: { fg: '#d4d4d4', bg: 'rgba(64,64,64,0.4)', border: 'rgba(82,82,82,1)' },
+};
+
+function sortCitations(citations: WelfareCitation[]): WelfareCitation[] {
+  const rank = (c: WelfareCitation) => (c.source_type === 'peer_reviewed' ? 0 : 1);
+  return [...citations].sort((a, b) => rank(a) - rank(b));
+}
+
+function extractYear(date?: string | null): string | null {
+  if (!date) return null;
+  const m = /^(\d{4})/.exec(date);
+  return m ? m[1] : null;
+}
 
 function MorphCalculatorScreen() {
   const { colors, layout } = useTheme();
@@ -578,6 +621,12 @@ function PickGeneModal({
                       const inUse = existingForParent.some(
                         (e) => e.gene.id === g.id,
                       );
+                      // Welfare badge gives an early visual warning at the
+                      // search list level — keeper sees "⚠ Neurological"
+                      // before they tap into the gene details.
+                      const welfareColors = g.welfare_flag
+                        ? WELFARE_FLAG_COLORS[g.welfare_flag]
+                        : null;
                       return (
                         <TouchableOpacity
                           key={g.id}
@@ -588,15 +637,37 @@ function PickGeneModal({
                           ]}
                         >
                           <View style={{ flex: 1 }}>
-                            <Text
-                              style={{
-                                color: colors.textPrimary,
-                                fontWeight: '600',
-                                fontSize: 15,
-                              }}
-                            >
-                              {g.common_name}
-                            </Text>
+                            <View style={styles.geneRowTitle}>
+                              <Text
+                                style={{
+                                  color: colors.textPrimary,
+                                  fontWeight: '600',
+                                  fontSize: 15,
+                                }}
+                              >
+                                {g.common_name}
+                              </Text>
+                              {welfareColors && g.welfare_flag && (
+                                <View
+                                  style={[
+                                    styles.welfareBadge,
+                                    {
+                                      backgroundColor: welfareColors.bg,
+                                      borderColor: welfareColors.border,
+                                    },
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.welfareBadgeText,
+                                      { color: welfareColors.fg },
+                                    ]}
+                                  >
+                                    ⚠ {WELFARE_FLAG_LABELS[g.welfare_flag]}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
                             <Text
                               style={{
                                 color: colors.textSecondary,
@@ -621,8 +692,19 @@ function PickGeneModal({
                 </ScrollView>
               </View>
             ) : (
-              <View style={{ paddingTop: 8, paddingBottom: 12, gap: 10 }}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>
+              <ScrollView
+                style={{ maxHeight: 480 }}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingTop: 8, paddingBottom: 12, gap: 12 }}
+              >
+                {/* Gene details — description + welfare notes + citations.
+                    Surfaces here (between gene pick and state pick) so the
+                    keeper sees what they're picking AND has the welfare
+                    context before they commit. Web parity: same content,
+                    same source order, same citation badges. */}
+                <GeneDetails gene={picked} />
+
+                <Text style={[styles.label, { color: colors.textSecondary, marginTop: 4 }]}>
                   How does Parent carry this gene?
                 </Text>
                 {states.map((s) => (
@@ -655,12 +737,228 @@ function PickGeneModal({
                     />
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             )}
           </SafeAreaView>
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GeneDetails — description, welfare notes, citations. Inline disclosure so
+// the keeper can verify every welfare claim without leaving the calculator.
+// Mirrors web's GeneDetails component (apps/web-herpetoverse/.../MorphCalculator.tsx).
+// ---------------------------------------------------------------------------
+
+function GeneDetails({ gene }: { gene: Gene }) {
+  const { colors, layout } = useTheme();
+  const citations = gene.welfare_citations ?? [];
+  const hasCitations = citations.length > 0;
+  const sorted = hasCitations ? sortCitations(citations) : [];
+  const reviewedAt = gene.content_last_reviewed_at;
+  const welfareColors = gene.welfare_flag
+    ? WELFARE_FLAG_COLORS[gene.welfare_flag]
+    : null;
+
+  const hasAnyDetail =
+    !!gene.description ||
+    (!!gene.welfare_flag && !!gene.welfare_notes) ||
+    hasCitations ||
+    !!reviewedAt;
+
+  if (!hasAnyDetail) {
+    return (
+      <View
+        style={[
+          styles.detailsCard,
+          {
+            backgroundColor: colors.surfaceRaised,
+            borderColor: colors.border,
+            borderRadius: layout.radius.md,
+          },
+        ]}
+      >
+        <Text style={[styles.detailsEmpty, { color: colors.textTertiary }]}>
+          No additional notes on file for this gene yet.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.detailsCard,
+        {
+          backgroundColor: colors.surfaceRaised,
+          borderColor: colors.border,
+          borderRadius: layout.radius.md,
+        },
+      ]}
+    >
+      {gene.description && (
+        <View style={{ marginBottom: 10 }}>
+          <Text style={[styles.detailsLabel, { color: colors.textTertiary }]}>
+            What it does
+          </Text>
+          <Text style={[styles.detailsBody, { color: colors.textPrimary }]}>
+            {gene.description}
+          </Text>
+        </View>
+      )}
+
+      {gene.welfare_flag && gene.welfare_notes && welfareColors && (
+        <View style={{ marginBottom: 10 }}>
+          <Text style={[styles.detailsLabel, { color: colors.textTertiary }]}>
+            Welfare notes ({WELFARE_FLAG_LABELS[gene.welfare_flag]})
+          </Text>
+          <View
+            style={{
+              backgroundColor: welfareColors.bg,
+              borderColor: welfareColors.border,
+              borderWidth: 1,
+              borderRadius: 8,
+              padding: 10,
+            }}
+          >
+            <Text style={{ color: welfareColors.fg, fontSize: 12, lineHeight: 17 }}>
+              {gene.welfare_notes}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {hasCitations ? (
+        <View style={{ marginBottom: reviewedAt ? 10 : 0 }}>
+          <Text style={[styles.detailsLabel, { color: colors.textTertiary }]}>
+            References ({sorted.length})
+          </Text>
+          <View style={{ gap: 8 }}>
+            {sorted.map((c, i) => (
+              <CitationItem key={c.ref_key ?? c.url ?? String(i)} citation={c} />
+            ))}
+          </View>
+        </View>
+      ) : gene.welfare_flag ? (
+        <Text
+          style={{
+            color: '#fcd34d',
+            fontSize: 11,
+            fontStyle: 'italic',
+            marginBottom: reviewedAt ? 10 : 0,
+          }}
+        >
+          Welfare flag set but no citations attached yet.
+        </Text>
+      ) : null}
+
+      {reviewedAt && (
+        <Text
+          style={{
+            color: colors.textTertiary,
+            fontSize: 10,
+            paddingTop: 8,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          Content last reviewed{' '}
+          {new Date(reviewedAt).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          })}
+          .
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function CitationItem({ citation }: { citation: WelfareCitation }) {
+  const { colors } = useTheme();
+  const year = extractYear(citation.publication_date);
+  const authorYear = [citation.author, year].filter(Boolean).join(', ');
+  const title = citation.title ?? citation.url ?? 'Reference';
+  const publication = citation.publication;
+  const badgeColors = citation.source_type
+    ? SOURCE_TYPE_COLORS[citation.source_type]
+    : null;
+  const badgeLabel = citation.source_type
+    ? SOURCE_TYPE_LABELS[citation.source_type]
+    : 'Reference';
+
+  const titleNode = citation.url ? (
+    <TouchableOpacity
+      onPress={() => {
+        if (citation.url) Linking.openURL(citation.url);
+      }}
+      accessibilityRole="link"
+      accessibilityLabel={`Open ${title} in browser`}
+    >
+      <Text style={{ color: '#5eead4', fontSize: 12, textDecorationLine: 'underline' }}>
+        {title}
+      </Text>
+    </TouchableOpacity>
+  ) : (
+    <Text style={{ color: colors.textPrimary, fontSize: 12 }}>{title}</Text>
+  );
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+      {badgeColors && (
+        <View
+          style={{
+            backgroundColor: badgeColors.bg,
+            borderColor: badgeColors.border,
+            borderWidth: 1,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            borderRadius: 4,
+            marginTop: 2,
+          }}
+        >
+          <Text
+            style={{
+              color: badgeColors.fg,
+              fontSize: 9,
+              fontWeight: '700',
+              letterSpacing: 0.4,
+              textTransform: 'uppercase',
+            }}
+          >
+            {badgeLabel}
+          </Text>
+        </View>
+      )}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {titleNode}
+        {(authorYear || publication) && (
+          <Text
+            style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}
+          >
+            {authorYear}
+            {authorYear && publication ? ' · ' : ''}
+            {publication ? <Text style={{ fontStyle: 'italic' }}>{publication}</Text> : null}
+          </Text>
+        )}
+        {citation.summary && (
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: 11,
+              fontStyle: 'italic',
+              marginTop: 4,
+              lineHeight: 16,
+            }}
+          >
+            “{citation.summary}”
+          </Text>
+        )}
+      </View>
+    </View>
   );
 }
 
@@ -785,6 +1083,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderWidth: 1,
+  },
+  geneRowTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  welfareBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  welfareBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  detailsCard: {
+    borderWidth: 1,
+    padding: 12,
+  },
+  detailsLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  detailsBody: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  detailsEmpty: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });
 
