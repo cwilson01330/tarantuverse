@@ -3,6 +3,7 @@
  *
  *   Collection   → /(tabs)/index          (snakes + lizards, Bundle 2)
  *   Species      → /(tabs)/species        (care sheets, Bundle 4)
+ *   Breeding     → /(tabs)/breeding       (pairings + clutches, Sprint 5a)
  *   Profile      → /(tabs)/profile        (settings + logout, Bundle 1)
  *
  * Community tabs (messages, forums, followers) are explicitly out of
@@ -57,6 +58,16 @@ export default function TabsLayout() {
           tabBarLabel: 'Species',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="book-open-variant" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="breeding"
+        options={{
+          title: 'Breeding',
+          tabBarLabel: 'Breeding',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="heart-multiple" size={size} color={color} />
           ),
         }}
       />
