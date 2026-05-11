@@ -219,6 +219,19 @@ export async function createShed(
 // Delete endpoints are global (no taxon prefix) so reuse from snakes.ts.
 export { deleteFeeding, deleteShed, deleteWeightLog } from './snakes';
 
+// Prey-suggestion re-export — the backend schema uses `snake_weight_g`
+// for both taxa (semantic naming TBD), so we reuse the snake type
+// verbatim. The lizard endpoint is taxon-aware on the server side.
+import { type PreySuggestion } from './snakes';
+export type { PreySuggestion };
+
+export async function getPreySuggestion(lizardId: string): Promise<PreySuggestion> {
+  const { data } = await apiClient.get<PreySuggestion>(
+    `/lizards/${encodeURIComponent(lizardId)}/prey-suggestion`,
+  );
+  return data;
+}
+
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------

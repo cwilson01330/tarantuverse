@@ -25,7 +25,7 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -53,12 +53,18 @@ import {
 } from '../components/forms/FormPrimitives';
 import {
   type CreateFeedingPayload,
+  type PreySuggestion,
   createFeeding as createFeedingSnake,
   getFeeding,
+  getPreySuggestion as getSnakeSuggestion,
   getSnake,
   updateFeeding,
 } from '../lib/snakes';
-import { createFeeding as createFeedingLizard, getLizard } from '../lib/lizards';
+import {
+  createFeeding as createFeedingLizard,
+  getLizard,
+  getPreySuggestion as getLizardSuggestion,
+} from '../lib/lizards';
 
 const PAUSE_REASON_LABELS: Record<string, string> = {
   hunger_strike: 'Hunger strike',
@@ -115,6 +121,10 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   const [pausedUntil, setPausedUntil] = useState<string | null>(null);
   const [showPauseSheet, setShowPauseSheet] = useState(false);
   const [showPauseHelp, setShowPauseHelp] = useState(false);
+  // Prey-size guidance. Only fetched in create mode (editing an old
+  // log shouldn't surface real-time suggestions for the current state
+  // of the animal — the keeper is correcting historical data).
+  const [suggestion, setSuggestion] = useState<PreySuggestion | null>(null);
 
   /** Pulls the animal record so we can show current pause state inline.
    *  Called on mount and again after the PauseFeedingSheet saves. */
@@ -143,6 +153,79 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
     if (id && !isEdit) loadAnimalPauseState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit, taxon]);
+
+  // Fetch species-aware prey suggestion so the prey-weight field can
+  // show a live "X% of body weight" hint as the keeper types. Skipped
+  // in edit mode — correcting an old log shouldn't show advice based
+  // on the animal's CURRENT weight (which may have drifted since the
+  // log was originally entered).
+  useEffect(() => {
+    if (!id || isEdit) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const s =
+          taxon === 'snake'
+            ? await getSnakeSuggestion(id as string)
+            : await getLizardSuggestion(id as string);
+        if (!cancelled) setSuggestion(s);
+      } catch {
+        // Non-fatal — hint just won't render.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isEdit, taxon]);
+
+  /**
+   * Live prey:body-weight ratio hint. Returns null when there isn't
+   * enough data to compute (empty input, no snake weight, missing
+   * species brackets). The tone drives the color in the field hint:
+   *   - 'ok'      → green, within suggested range
+   *   - 'caution' → amber, outside [min..max] but below power threshold
+   *   - 'warn'    → red, at or above power-feeding threshold
+   *   - 'neutral' → muted, missing animal weight so percent is unknown
+   */
+  const preyHint = useMemo<{
+    tone: 'ok' | 'caution' | 'warn' | 'neutral';
+    text: string;
+  } | null>(() => {
+    if (!suggestion || !suggestion.is_data_available) return null;
+    const preyG = Number(preyWeight);
+    if (!Number.isFinite(preyG) || preyG <= 0) return null;
+    const bwG = Number(suggestion.snake_weight_g);
+    if (!Number.isFinite(bwG) || bwG <= 0) {
+      return {
+        tone: 'neutral',
+        text: 'No animal weight on file — log a weight to see the ratio.',
+      };
+    }
+    const pct = (preyG / bwG) * 100;
+    const pctLabel = pct.toFixed(1).replace(/\.?0+$/, '');
+    const thresholdG = suggestion.power_feeding_threshold_g
+      ? Number(suggestion.power_feeding_threshold_g)
+      : null;
+    const minG = suggestion.suggested_min_g
+      ? Number(suggestion.suggested_min_g)
+      : null;
+    const maxG = suggestion.suggested_max_g
+      ? Number(suggestion.suggested_max_g)
+      : null;
+    if (thresholdG != null && preyG >= thresholdG) {
+      return {
+        tone: 'warn',
+        text: `${pctLabel}% of body weight — above the power-feeding line.`,
+      };
+    }
+    if (minG != null && maxG != null && (preyG < minG || preyG > maxG)) {
+      return {
+        tone: 'caution',
+        text: `${pctLabel}% of body weight — outside the suggested range for this stage.`,
+      };
+    }
+    return { tone: 'ok', text: `${pctLabel}% of body weight.` };
+  }, [suggestion, preyWeight]);
 
   // Edit mode — pre-fill from the existing feeding record.
   useEffect(() => {
@@ -279,6 +362,25 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
                 placeholder="52"
                 keyboardType="decimal-pad"
               />
+              {preyHint && (
+                <Text
+                  style={[
+                    styles.preyHint,
+                    {
+                      color:
+                        preyHint.tone === 'warn'
+                          ? '#fca5a5'
+                          : preyHint.tone === 'caution'
+                            ? '#fcd34d'
+                            : preyHint.tone === 'ok'
+                              ? '#86efac'
+                              : colors.textTertiary,
+                    },
+                  ]}
+                >
+                  {preyHint.text}
+                </Text>
+              )}
             </Field>
 
             <Field label="Notes" hint="Optional">
@@ -460,5 +562,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderRadius: 12,
+  },
+  preyHint: {
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 6,
+    fontWeight: '600',
   },
 });

@@ -258,6 +258,31 @@ export async function deleteWeightLog(id: string): Promise<void> {
   await apiClient.delete(`/weight-logs/${encodeURIComponent(id)}`);
 }
 
+/**
+ * Prey-size + interval guidance for this snake's current life stage.
+ * Mirrors the backend PreySuggestion schema (apps/api/.../schemas/weight_log.py).
+ * Web consumes the same shape for its FeedingIntelligence panel. Lizard
+ * equivalent lives in `lizards.ts`.
+ */
+export interface PreySuggestion {
+  stage: string; // hatchling | juvenile | subadult | adult | unknown
+  snake_weight_g: string | null;
+  suggested_min_g: string | null;
+  suggested_max_g: string | null;
+  interval_days_min: number | null;
+  interval_days_max: number | null;
+  power_feeding_threshold_g: string | null;
+  is_data_available: boolean;
+  warning: string | null;
+}
+
+export async function getPreySuggestion(snakeId: string): Promise<PreySuggestion> {
+  const { data } = await apiClient.get<PreySuggestion>(
+    `/snakes/${encodeURIComponent(snakeId)}/prey-suggestion`,
+  );
+  return data;
+}
+
 export async function getWeightLog(id: string): Promise<WeightLog> {
   const { data } = await apiClient.get<WeightLog>(
     `/weight-logs/${encodeURIComponent(id)}`,

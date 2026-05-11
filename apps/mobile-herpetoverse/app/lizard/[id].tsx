@@ -18,6 +18,7 @@ import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { FeedingIntelligence } from '../../src/components/FeedingIntelligence';
 import { FeedingStatusBanner } from '../../src/components/FeedingStatusBanner';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
@@ -202,6 +203,28 @@ function LizardDetailScreen() {
           refreshKey={`${feedings.length}-${lizard.feeding_paused_reason ?? ''}-${lizard.feeding_paused_until ?? ''}`}
           onPausedPress={() => setPauseOpen(true)}
         />
+
+        {/* Species-aware feeding intelligence — see snake detail for
+            the equivalent reasoning. Lizard endpoint returns the same
+            PreySuggestion shape. */}
+        {(() => {
+          const lastAccepted = feedings
+            .filter((f) => f.accepted)
+            .sort(
+              (a, b) =>
+                new Date(b.fed_at).getTime() - new Date(a.fed_at).getTime(),
+            )[0];
+          return (
+            <FeedingIntelligence
+              taxon="lizard"
+              animalId={lizard.id}
+              lastFedAt={lizard.last_fed_at}
+              lastAcceptedPreyWeightG={lastAccepted?.prey_weight_g ?? null}
+              lastAcceptedFedAt={lastAccepted?.fed_at ?? null}
+              refreshKey={`${feedings.length}-${weights.length}-${lizard.current_weight_g ?? ''}`}
+            />
+          );
+        })()}
 
         <LogActions
           onLogFeeding={() =>

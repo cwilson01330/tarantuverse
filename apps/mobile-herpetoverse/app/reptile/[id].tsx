@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
+import { FeedingIntelligence } from '../../src/components/FeedingIntelligence';
 import { FeedingStatusBanner } from '../../src/components/FeedingStatusBanner';
 import { GenotypeSection } from '../../src/components/GenotypeSection';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
@@ -208,6 +209,31 @@ function SnakeDetailScreen() {
           refreshKey={`${feedings.length}-${snake.feeding_paused_reason ?? ''}-${snake.feeding_paused_until ?? ''}`}
           onPausedPress={() => setPauseOpen(true)}
         />
+
+        {/* Species-aware feeding intelligence — prey range, interval,
+            next feed window, power-feeding flag. Refetches whenever a
+            feeding or weight is logged so suggestions stay in sync.
+            We compute lastAccepted client-side (newest fed_at where
+            accepted=true) rather than trusting server order, since the
+            list-feedings endpoint doesn't guarantee a sort. */}
+        {(() => {
+          const lastAccepted = feedings
+            .filter((f) => f.accepted)
+            .sort(
+              (a, b) =>
+                new Date(b.fed_at).getTime() - new Date(a.fed_at).getTime(),
+            )[0];
+          return (
+            <FeedingIntelligence
+              taxon="snake"
+              animalId={snake.id}
+              lastFedAt={snake.last_fed_at}
+              lastAcceptedPreyWeightG={lastAccepted?.prey_weight_g ?? null}
+              lastAcceptedFedAt={lastAccepted?.fed_at ?? null}
+              refreshKey={`${feedings.length}-${weights.length}-${snake.current_weight_g ?? ''}`}
+            />
+          );
+        })()}
 
         <LogActions
           onLogFeeding={() =>
