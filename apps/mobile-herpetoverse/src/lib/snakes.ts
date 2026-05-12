@@ -119,6 +119,11 @@ export interface ShedLog {
 // Fetchers
 // ---------------------------------------------------------------------------
 
+export async function listSnakes(): Promise<Snake[]> {
+  const { data } = await apiClient.get<Snake[]>('/snakes/');
+  return data;
+}
+
 export async function getSnake(id: string): Promise<Snake> {
   const { data } = await apiClient.get<Snake>(`/snakes/${encodeURIComponent(id)}`);
   return data;

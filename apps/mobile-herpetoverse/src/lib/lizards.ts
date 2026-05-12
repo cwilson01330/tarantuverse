@@ -114,6 +114,11 @@ export interface ShedLog {
 // Fetchers
 // ---------------------------------------------------------------------------
 
+export async function listLizards(): Promise<Lizard[]> {
+  const { data } = await apiClient.get<Lizard[]>('/lizards/');
+  return data;
+}
+
 export async function getLizard(id: string): Promise<Lizard> {
   const { data } = await apiClient.get<Lizard>(`/lizards/${encodeURIComponent(id)}`);
   return data;
