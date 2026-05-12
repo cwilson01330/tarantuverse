@@ -416,13 +416,35 @@ function NewPairingScreen() {
       </KeyboardAvoidingView>
 
       {/* Parent picker modal — same scrollable-list pattern as
-          morph-calculator's PickGeneModal. */}
+          morph-calculator's PickGeneModal.
+
+          We filter out the OTHER slot's current selection so the
+          keeper structurally cannot pick the same animal twice. The
+          submit-time `maleId === femaleId` check stays as a defensive
+          backstop, but in practice this guard makes it unreachable.
+          Bug 2026-05-11 (Cory): bearded dragon Bindi could be picked
+          for both slots and the error only surfaced on save. */}
       <ParentPickerModal
         visible={pickerOpen !== null}
         onClose={() => setPickerOpen(null)}
-        options={pickerOpen === 'male' ? males : females}
+        options={(pickerOpen === 'male' ? males : females).filter((p) =>
+          pickerOpen === 'male' ? p.id !== femaleId : p.id !== maleId,
+        )}
         selectedId={pickerOpen === 'male' ? maleId : femaleId}
         title={pickerOpen === 'male' ? 'Pick the male' : 'Pick the female'}
+        emptyOverride={
+          // Distinct empty-state copy when filtering removed the only
+          // candidate vs no candidates ever existed.
+          pickerOpen === 'male' && femaleId
+            ? males.length > 0 && males.every((p) => p.id === femaleId)
+              ? "The only candidate is already picked as the female. Add another male to pair this one."
+              : null
+            : pickerOpen === 'female' && maleId
+              ? females.length > 0 && females.every((p) => p.id === maleId)
+                ? "The only candidate is already picked as the male. Add another female to pair this one."
+                : null
+              : null
+        }
         onPick={(id) => {
           if (pickerOpen === 'male') setMaleId(id);
           else if (pickerOpen === 'female') setFemaleId(id);
@@ -524,6 +546,7 @@ function ParentPickerModal({
   options,
   selectedId,
   title,
+  emptyOverride,
   onPick,
 }: {
   visible: boolean;
@@ -531,6 +554,9 @@ function ParentPickerModal({
   options: ParentOption[];
   selectedId: string;
   title: string;
+  /** Optional empty-state copy — used when filtering removed the
+   *  only candidate vs no candidates existed at all. */
+  emptyOverride?: string | null;
   onPick: (id: string) => void;
 }) {
   const { colors, layout } = useTheme();
@@ -581,8 +607,8 @@ function ParentPickerModal({
                     { color: colors.textSecondary },
                   ]}
                 >
-                  No candidates available. Add a reptile of the right sex
-                  to your collection first.
+                  {emptyOverride ??
+                    'No candidates available. Add a reptile of the right sex to your collection first.'}
                 </Text>
               ) : (
                 options.map((p) => {
