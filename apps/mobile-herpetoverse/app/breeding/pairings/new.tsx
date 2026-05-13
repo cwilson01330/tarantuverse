@@ -721,16 +721,20 @@ const styles = StyleSheet.create({
   modalCard: {
     paddingHorizontal: 16,
     paddingTop: 12,
+    paddingBottom: 24,
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     maxHeight: '85%',
+    // Floor so short content (single empty-state line) still has
+    // visual presence as a bottom sheet rather than a cramped strip.
+    minHeight: 260,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 8,
+    paddingBottom: 12,
     borderBottomColor: 'transparent',
   },
   modalTitle: {
@@ -739,8 +743,9 @@ const styles = StyleSheet.create({
   },
   modalEmpty: {
     fontSize: 13,
-    lineHeight: 18,
-    padding: 16,
+    lineHeight: 19,
+    paddingHorizontal: 16,
+    paddingVertical: 28,
     textAlign: 'center',
   },
   optionRow: {
