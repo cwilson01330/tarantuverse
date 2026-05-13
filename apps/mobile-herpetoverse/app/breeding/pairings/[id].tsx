@@ -1,40 +1,60 @@
 /**
- * Pairing detail route — Sprint 5a stub.
+ * Pairing detail route — Sprint 5a + 5b incremental.
  *
- * Tapping a row from the breeding tab lands here. Today this screen
- * fetches the pairing record + clutch list and shows a read-only
- * summary; Sprint 5b/5c upgrade it with outcome-editing, clutch
- * creation, and inline offspring rendering.
- *
- * Even as a stub this is genuinely useful — keepers can verify their
- * web-created pairings synced to mobile, and they can browse parent
- * names + status without leaving the app.
+ * Tapping a row from the breeding tab lands here. The screen fetches
+ * the pairing record + clutch list and renders a hero card with parent
+ * names, KV grid, clutch list, and notes. Outcome is now tappable —
+ * 5b add: keepers can update in_progress → successful / unsuccessful /
+ * abandoned without dropping to web. Clutch creation + offspring
+ * still pending Sprint 5c.
  *
  * Hermes-prod safety: static JSX branches only.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { HeaderBackButton } from '../../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
+import { FormErrorBanner } from '../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import {
   PAIRING_OUTCOME_LABEL,
   PAIRING_TYPE_LABEL,
   type Clutch,
   type ReptilePairing,
+  type ReptilePairingOutcome,
   getPairing,
   listClutchesForPairing,
+  updatePairing,
 } from '../../../src/lib/breeding';
+
+const OUTCOME_ORDER: ReptilePairingOutcome[] = [
+  'in_progress',
+  'successful',
+  'unsuccessful',
+  'abandoned',
+  'unknown',
+];
+
+const OUTCOME_HELP: Record<ReptilePairingOutcome, string> = {
+  in_progress: "Still trying or watching for results.",
+  successful: 'Eggs laid or live birth confirmed.',
+  unsuccessful: 'Pair did not produce — moving on.',
+  abandoned: 'Stopped trying before a result.',
+  unknown: "Don't have a clean answer yet.",
+};
 
 function PairingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,31 +63,56 @@ function PairingDetailScreen() {
   const [clutches, setClutches] = useState<Clutch[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Outcome edit modal state
+  const [outcomeOpen, setOutcomeOpen] = useState(false);
+  const [savingOutcome, setSavingOutcome] = useState(false);
+  const [outcomeError, setOutcomeError] = useState<string | null>(null);
+
+  const fetchAll = useCallback(async () => {
     if (!id) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [p, c] = await Promise.all([
-          getPairing(id as string),
-          listClutchesForPairing(id as string).catch(() => [] as Clutch[]),
-        ]);
-        if (cancelled) return;
-        setPairing(p);
-        setClutches(c);
-      } catch (err: any) {
-        if (cancelled) return;
-        setLoadError(
-          err?.response?.data?.detail ||
-            err?.message ||
-            "Couldn't load this pairing.",
-        );
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const [p, c] = await Promise.all([
+        getPairing(id as string),
+        listClutchesForPairing(id as string).catch(() => [] as Clutch[]),
+      ]);
+      setPairing(p);
+      setClutches(c);
+      setLoadError(null);
+    } catch (err: any) {
+      setLoadError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          "Couldn't load this pairing.",
+      );
+    }
   }, [id]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  async function handlePickOutcome(next: ReptilePairingOutcome) {
+    if (!pairing || savingOutcome) return;
+    if (next === pairing.outcome) {
+      setOutcomeOpen(false);
+      return;
+    }
+    setOutcomeError(null);
+    setSavingOutcome(true);
+    try {
+      const updated = await updatePairing(pairing.id, { outcome: next });
+      setPairing(updated);
+      setOutcomeOpen(false);
+    } catch (err: any) {
+      setOutcomeError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          "Couldn't update outcome.",
+      );
+    } finally {
+      setSavingOutcome(false);
+    }
+  }
 
   return (
     <SafeAreaView
@@ -131,9 +176,13 @@ function PairingDetailScreen() {
                   label="Type"
                   value={PAIRING_TYPE_LABEL[pairing.pairing_type]}
                 />
-                <KV
+                <KVPressable
                   label="Outcome"
                   value={PAIRING_OUTCOME_LABEL[pairing.outcome]}
+                  onPress={() => {
+                    setOutcomeError(null);
+                    setOutcomeOpen(true);
+                  }}
                 />
                 <KV
                   label="Visibility"
@@ -247,9 +296,145 @@ function PairingDetailScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Outcome edit modal — bottom sheet with the 5 outcomes. */}
+      {pairing && (
+        <OutcomePickerModal
+          visible={outcomeOpen}
+          current={pairing.outcome}
+          saving={savingOutcome}
+          error={outcomeError}
+          onClose={() => setOutcomeOpen(false)}
+          onPick={handlePickOutcome}
+        />
+      )}
     </SafeAreaView>
   );
 }
+
+// ---------------------------------------------------------------------------
+// OutcomePickerModal — bottom sheet for tap-to-edit outcome.
+// ---------------------------------------------------------------------------
+
+function OutcomePickerModal({
+  visible,
+  current,
+  saving,
+  error,
+  onClose,
+  onPick,
+}: {
+  visible: boolean;
+  current: ReptilePairingOutcome;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onPick: (o: ReptilePairingOutcome) => void;
+}) {
+  const { colors, layout } = useTheme();
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable
+          style={[
+            styles.modalCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderTopLeftRadius: layout.radius.lg,
+              borderTopRightRadius: layout.radius.lg,
+            },
+          ]}
+          onPress={(e) => e.stopPropagation()}
+        >
+          <SafeAreaView edges={['bottom']}>
+            <View style={styles.modalHeader}>
+              <View style={{ width: 24 }} />
+              <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+                Update outcome
+              </Text>
+              <TouchableOpacity onPress={onClose} hitSlop={8} disabled={saving}>
+                <MaterialCommunityIcons
+                  name="close"
+                  size={22}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {OUTCOME_ORDER.map((o) => {
+                const selected = o === current;
+                return (
+                  <TouchableOpacity
+                    key={o}
+                    onPress={() => onPick(o)}
+                    disabled={saving}
+                    style={[
+                      styles.outcomeRow,
+                      {
+                        borderBottomColor: colors.border,
+                        opacity: saving && !selected ? 0.5 : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={selected ? 'radiobox-marked' : 'radiobox-blank'}
+                      size={20}
+                      color={selected ? colors.primary : colors.textSecondary}
+                    />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        style={{
+                          color: colors.textPrimary,
+                          fontWeight: '600',
+                          fontSize: 14,
+                        }}
+                      >
+                        {PAIRING_OUTCOME_LABEL[o]}
+                      </Text>
+                      <Text
+                        style={{
+                          color: colors.textTertiary,
+                          fontSize: 12,
+                          marginTop: 2,
+                          lineHeight: 17,
+                        }}
+                      >
+                        {OUTCOME_HELP[o]}
+                      </Text>
+                    </View>
+                    {saving && selected && (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.primary}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {error && (
+              <View style={{ paddingTop: 8 }}>
+                <FormErrorBanner message={error} />
+              </View>
+            )}
+          </SafeAreaView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// KV cells — read-only and pressable variants.
+// ---------------------------------------------------------------------------
 
 function KV({ label, value }: { label: string; value: string }) {
   const { colors } = useTheme();
@@ -262,6 +447,47 @@ function KV({ label, value }: { label: string; value: string }) {
         {value}
       </Text>
     </View>
+  );
+}
+
+/**
+ * Pressable variant of KV — small chevron hints at edit. Used for the
+ * Outcome row so keepers can tap to update.
+ */
+function KVPressable({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}. Tap to change.`}
+      style={styles.kvCell}
+    >
+      <Text style={[styles.kvLabel, { color: colors.textTertiary }]}>
+        {label.toUpperCase()}
+      </Text>
+      <View style={styles.kvPressableRow}>
+        <Text
+          style={[styles.kvValue, { color: colors.textPrimary }]}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+        <MaterialCommunityIcons
+          name="pencil-outline"
+          size={13}
+          color={colors.primary}
+        />
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -360,6 +586,49 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontStyle: 'italic',
     flex: 1,
+  },
+
+  // KV pressable variant — pencil glyph + value side by side.
+  kvPressableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  // Outcome-edit modal — same bottom-sheet pattern as the parent
+  // picker in /breeding/pairings/new.tsx.
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 24,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    maxHeight: '85%',
+    minHeight: 260,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  outcomeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
   },
 });
 
