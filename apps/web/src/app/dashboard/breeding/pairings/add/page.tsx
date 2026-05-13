@@ -17,8 +17,37 @@ interface Tarantula {
   scientific_name: string
   sex: string | null
   /** Species FK — drives the cross-species pair guard. NULL when the
-   *  keeper hasn't linked a species, in which case we don't enforce. */
+   *  keeper hasn't linked a species, in which case we fall back to
+   *  scientific_name string comparison (see speciesMatches below). */
   species_id: string | null
+}
+
+/**
+ * Cross-species check with graceful fallback.
+ *
+ * Priority order:
+ *   1. species_id match — the canonical comparison when both parents
+ *      were picked from the species autocomplete.
+ *   2. scientific_name match — fallback for keepers who typed names
+ *      as free text before the species autocomplete was wired up.
+ *      Normalized to trim + lowercase so "Avicularia avicularia" and
+ *      "avicularia  Avicularia" still compare equal.
+ *   3. Insufficient data — return true (allow). One or both parents
+ *      have no species or scientific name; we can't enforce.
+ *
+ * Same logic is mirrored on TV mobile in apps/mobile/app/breeding/
+ * pairings/new.tsx — keep them in sync.
+ */
+function speciesMatches(a: Tarantula, b: Tarantula): boolean {
+  if (a.species_id && b.species_id) {
+    return a.species_id === b.species_id
+  }
+  const aName = a.scientific_name?.trim().toLowerCase()
+  const bName = b.scientific_name?.trim().toLowerCase()
+  if (aName && bName) {
+    return aName === bName
+  }
+  return true
 }
 
 export default function AddPairingPage() {
@@ -92,16 +121,13 @@ export default function AddPairingPage() {
       return
     }
     // Cross-species backstop — the pickers also enforce same-species
-    // filter when both parents have species linked, but this catches
-    // the case where the user picked the female first, then changed
-    // the male to a different species.
+    // filter when we have enough info, but this catches the case where
+    // the user picked the female first, then changed the male to a
+    // different species. Uses speciesMatches() so free-typed scientific
+    // names also enforce, not just species_id-linked tarantulas.
     const male = tarantulas.find(t => t.id === formData.male_id)
     const female = tarantulas.find(t => t.id === formData.female_id)
-    if (
-      male?.species_id &&
-      female?.species_id &&
-      male.species_id !== female.species_id
-    ) {
+    if (male && female && !speciesMatches(male, female)) {
       setError(
         `${male.scientific_name || 'This male'} and ${female.scientific_name || 'this female'} are different species — they can't pair. Update one parent's species or pick a matching mate.`,
       )
@@ -153,11 +179,11 @@ export default function AddPairingPage() {
 
   // Cross-filters applied when the OTHER slot is populated:
   //  1. Exclude the same tarantula (no self-pairings).
-  //  2. Exclude cross-species candidates when both parents have a
-  //     species linked. A P. murinus and a G. pulchra can't cross —
-  //     the picker shouldn't tempt the keeper. NULL species on either
-  //     side falls back to no filter (keeper hasn't given us enough
-  //     info to enforce).
+  //  2. Exclude cross-species candidates via speciesMatches() — which
+  //     compares species_id first, falls back to scientific_name when
+  //     species_id is missing, and allows when neither side has enough
+  //     info. A P. murinus and a G. pulchra can't cross — the picker
+  //     shouldn't tempt the keeper.
   const otherFor = (slot: 'male' | 'female') =>
     tarantulas.find(
       t => t.id === (slot === 'male' ? formData.female_id : formData.male_id),
@@ -166,25 +192,13 @@ export default function AddPairingPage() {
   const males = baseMales.filter(t => {
     const other = otherFor('male')
     if (other && t.id === other.id) return false
-    if (
-      other?.species_id &&
-      t.species_id &&
-      t.species_id !== other.species_id
-    ) {
-      return false
-    }
+    if (other && !speciesMatches(t, other)) return false
     return true
   })
   const females = baseFemales.filter(t => {
     const other = otherFor('female')
     if (other && t.id === other.id) return false
-    if (
-      other?.species_id &&
-      t.species_id &&
-      t.species_id !== other.species_id
-    ) {
-      return false
-    }
+    if (other && !speciesMatches(t, other)) return false
     return true
   })
 

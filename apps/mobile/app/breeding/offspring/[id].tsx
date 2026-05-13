@@ -24,11 +24,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -50,6 +53,40 @@ interface Offspring {
   price_sold: number | null;
   notes: string | null;
   created_at: string;
+}
+
+interface EggSac {
+  id: string;
+  pairing_id: string;
+  laid_date: string;
+  hatch_date: string | null;
+}
+
+interface Pairing {
+  id: string;
+  male_id: string;
+  female_id: string;
+}
+
+interface Tarantula {
+  id: string;
+  name?: string | null;
+  common_name?: string | null;
+  scientific_name?: string | null;
+  species_id?: string | null;
+  sex?: string | null;
+}
+
+/**
+ * Lazy-fetched parent prefill for the Add-to-collection modal. Sourced
+ * from the parent pairing's male (with female as fallback). Mirrors
+ * the web ParentPrefill type.
+ */
+interface ParentPrefill {
+  scientific_name: string | null;
+  species_id: string | null;
+  hatch_date: string | null;
+  laid_date: string;
 }
 
 // ─── TV's OffspringStatus enum ────────────────────────────────────────
@@ -126,6 +163,7 @@ function OffspringDetailScreen() {
   );
 
   const [offspring, setOffspring] = useState<Offspring | null>(null);
+  const [linkedTarantula, setLinkedTarantula] = useState<Tarantula | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [statusOpen, setStatusOpen] = useState(false);
@@ -134,12 +172,36 @@ function OffspringDetailScreen() {
 
   const [deleting, setDeleting] = useState(false);
 
+  // Add-to-collection modal state — same shape as the web version.
+  // Parent prefill is fetched on first modal open and cached.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addParent, setAddParent] = useState<ParentPrefill | null>(null);
+  const [addParentLoading, setAddParentLoading] = useState(false);
+  const [addParentError, setAddParentError] = useState<string | null>(null);
+  const [addName, setAddName] = useState('');
+  const [addSex, setAddSex] = useState<'male' | 'female' | 'unknown'>(
+    'unknown',
+  );
+  const [addCreating, setAddCreating] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+
   const fetchOffspring = useCallback(async () => {
     if (!id) return;
     try {
       const res = await apiClient.get<Offspring>(`/offspring/${id}`);
       setOffspring(res.data);
       setLoadError(null);
+      // Best-effort fetch of the linked tarantula so we can display
+      // its name in the linked card. Silent failure — if it 404s
+      // (tarantula was deleted) we just skip the name.
+      if (res.data.tarantula_id) {
+        apiClient
+          .get<Tarantula>(`/tarantulas/${res.data.tarantula_id}`)
+          .then((tRes) => setLinkedTarantula(tRes.data))
+          .catch(() => setLinkedTarantula(null));
+      } else {
+        setLinkedTarantula(null);
+      }
     } catch (err: any) {
       setLoadError(
         err?.response?.data?.detail ||
@@ -152,6 +214,132 @@ function OffspringDetailScreen() {
   useEffect(() => {
     fetchOffspring();
   }, [fetchOffspring]);
+
+  /**
+   * Lazy-fetch parent prefill (species + dates) on first modal open.
+   * Both parents should share a species after the cross-species fix —
+   * we read the male as the canonical source, with female fallback if
+   * the male fetch fails. Failure leaves the modal usable with empty
+   * prefills + a soft inline warning.
+   */
+  async function openAddToCollection() {
+    setAddOpen(true);
+    setAddError(null);
+    if (addParent || addParentLoading || !offspring) return;
+    setAddParentLoading(true);
+    setAddParentError(null);
+    try {
+      const sacRes = await apiClient.get<EggSac>(
+        `/egg-sacs/${offspring.egg_sac_id}`,
+      );
+      const sac = sacRes.data;
+      const pRes = await apiClient.get<Pairing>(`/pairings/${sac.pairing_id}`);
+      const pairing = pRes.data;
+
+      let parent: Tarantula | null = null;
+      try {
+        const maleRes = await apiClient.get<Tarantula>(
+          `/tarantulas/${pairing.male_id}`,
+        );
+        parent = maleRes.data;
+      } catch {
+        try {
+          const femRes = await apiClient.get<Tarantula>(
+            `/tarantulas/${pairing.female_id}`,
+          );
+          parent = femRes.data;
+        } catch {
+          parent = null;
+        }
+      }
+
+      setAddParent({
+        scientific_name: parent?.scientific_name ?? null,
+        species_id: parent?.species_id ?? null,
+        hatch_date: sac.hatch_date,
+        laid_date: sac.laid_date,
+      });
+    } catch (err: any) {
+      setAddParentError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          'Could not load parent species info for prefill.',
+      );
+    } finally {
+      setAddParentLoading(false);
+    }
+  }
+
+  /**
+   * Create a tarantula record from the prefill + form inputs, then
+   * link it back to the offspring via PUT. On success we update local
+   * state so the linked card appears immediately.
+   */
+  async function handleCreateAndLink() {
+    if (!offspring || addCreating) return;
+    if (!addName.trim()) {
+      setAddError('Give your new tarantula a name first.');
+      return;
+    }
+    setAddError(null);
+    setAddCreating(true);
+    try {
+      const dateAcquired =
+        addParent?.hatch_date ||
+        new Date().toISOString().slice(0, 10);
+      const noteLines: string[] = [];
+      if (addParent?.laid_date) {
+        noteLines.push(`Hatched from egg sac laid ${addParent.laid_date}.`);
+      } else {
+        noteLines.push('Bred from offspring record.');
+      }
+      const payload: Record<string, unknown> = {
+        name: addName.trim(),
+        sex: addSex,
+        source: 'bred',
+        date_acquired: dateAcquired,
+        notes: noteLines.join('\n'),
+      };
+      if (addParent?.scientific_name) {
+        payload.scientific_name = addParent.scientific_name;
+      }
+      if (addParent?.species_id) {
+        payload.species_id = addParent.species_id;
+      }
+
+      const tarRes = await apiClient.post<Tarantula>('/tarantulas/', payload);
+      const newTar = tarRes.data;
+
+      // Link the new tarantula to this offspring. If this fails we
+      // leave the tarantula in place — better to orphan the link than
+      // delete a freshly created record. Keeper can fix in the API.
+      try {
+        const linkRes = await apiClient.put<Offspring>(
+          `/offspring/${offspring.id}`,
+          { tarantula_id: newTar.id },
+        );
+        setOffspring(linkRes.data);
+        setLinkedTarantula(newTar);
+        setAddOpen(false);
+        setAddName('');
+        setAddSex('unknown');
+      } catch (err: any) {
+        throw new Error(
+          err?.response?.data?.detail ||
+            err?.message ||
+            "Tarantula created, but couldn't link it to this offspring. You can link it manually later.",
+        );
+      }
+    } catch (err: any) {
+      setAddError(
+        err?.message ||
+          err?.response?.data?.detail ||
+          'Something went wrong creating the record.',
+      );
+    } finally {
+      setAddCreating(false);
+    }
+  }
 
   async function handlePickStatus(next: string) {
     if (!offspring || savingStatus) return;
@@ -333,6 +521,78 @@ function OffspringDetailScreen() {
               )}
             </View>
 
+            {/* Linked tarantula / add-to-collection CTA. Three states:
+                1. Already linked → tap to navigate to the tarantula.
+                2. status === 'kept' but no link → "Add to collection".
+                3. Anything else → render nothing. */}
+            {offspring.tarantula_id ? (
+              <TouchableOpacity
+                onPress={() => {
+                  if (linkedTarantula?.id) {
+                    router.push(`/tarantula/${linkedTarantula.id}` as never);
+                  }
+                }}
+                disabled={!linkedTarantula}
+                accessibilityRole="link"
+                style={[
+                  styles.linkedCard,
+                  {
+                    backgroundColor: 'rgba(59,130,246,0.12)',
+                    borderColor: 'rgba(59,130,246,0.4)',
+                    borderRadius: layout.radius.sm,
+                  },
+                ]}
+              >
+                <Text style={[styles.linkedLabel, { color: '#93c5fd' }]}>
+                  LINKED TO COLLECTION
+                </Text>
+                <Text
+                  style={[styles.linkedValue, { color: '#bfdbfe' }]}
+                  numberOfLines={1}
+                >
+                  {linkedTarantula
+                    ? tarantulaName(linkedTarantula)
+                    : 'Linked tarantula no longer exists.'}
+                </Text>
+              </TouchableOpacity>
+            ) : offspring.status === 'kept' ? (
+              <View
+                style={[
+                  styles.ctaCard,
+                  {
+                    backgroundColor: 'rgba(34,197,94,0.12)',
+                    borderColor: 'rgba(34,197,94,0.4)',
+                    borderRadius: layout.radius.sm,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.ctaTitle, { color: '#86efac' }]}>
+                    Ready to keep this sling?
+                  </Text>
+                  <Text style={[styles.ctaHelp, { color: '#bbf7d0' }]}>
+                    Create a tarantula record and link it back here.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={openAddToCollection}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add to collection"
+                  style={[
+                    styles.ctaButton,
+                    { borderRadius: layout.radius.sm },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="plus"
+                    size={16}
+                    color="#022c22"
+                  />
+                  <Text style={styles.ctaButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             {offspring.notes && (
               <Text style={[styles.notes, { color: colors.textSecondary }]}>
                 {offspring.notes}
@@ -350,6 +610,25 @@ function OffspringDetailScreen() {
           error={statusError}
           onClose={() => setStatusOpen(false)}
           onPick={handlePickStatus}
+        />
+      )}
+
+      {offspring && (
+        <AddToCollectionModal
+          visible={addOpen}
+          parent={addParent}
+          parentLoading={addParentLoading}
+          parentError={addParentError}
+          name={addName}
+          onNameChange={setAddName}
+          sex={addSex}
+          onSexChange={setAddSex}
+          creating={addCreating}
+          error={addError}
+          onClose={() => {
+            if (!addCreating) setAddOpen(false);
+          }}
+          onSubmit={handleCreateAndLink}
         />
       )}
     </SafeAreaView>
@@ -490,6 +769,328 @@ function KV({ label, value }: { label: string; value: string }) {
   );
 }
 
+function tarantulaName(t: Tarantula): string {
+  return (
+    t.name?.trim() ||
+    t.common_name?.trim() ||
+    t.scientific_name?.trim() ||
+    'Unnamed'
+  );
+}
+
+/**
+ * Add-to-collection modal — creates a tarantula record prefilled from
+ * the parent pairing's species and the egg sac's hatch date, then
+ * links the new record back to this offspring entry. Pattern mirrors
+ * StatusPickerModal but uses TextInput for the name field and pill
+ * buttons for sex.
+ */
+function AddToCollectionModal({
+  visible,
+  parent,
+  parentLoading,
+  parentError,
+  name,
+  onNameChange,
+  sex,
+  onSexChange,
+  creating,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  parent: ParentPrefill | null;
+  parentLoading: boolean;
+  parentError: string | null;
+  name: string;
+  onNameChange: (v: string) => void;
+  sex: 'male' | 'female' | 'unknown';
+  onSexChange: (v: 'male' | 'female' | 'unknown') => void;
+  creating: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const { colors, layout } = useTheme();
+  const sexOptions: Array<'male' | 'female' | 'unknown'> = [
+    'male',
+    'female',
+    'unknown',
+  ];
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={onClose}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderTopLeftRadius: layout.radius.lg,
+                borderTopRightRadius: layout.radius.lg,
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <SafeAreaView edges={['bottom']}>
+              <View style={styles.modalHeader}>
+                <View style={{ width: 24 }} />
+                <Text
+                  style={[styles.modalTitle, { color: colors.textPrimary }]}
+                >
+                  Add to collection
+                </Text>
+                <TouchableOpacity
+                  onPress={onClose}
+                  hitSlop={8}
+                  disabled={creating}
+                >
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={22}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                style={{ maxHeight: 480 }}
+              >
+                <Text
+                  style={{
+                    color: colors.textTertiary,
+                    fontSize: 12,
+                    lineHeight: 17,
+                    paddingHorizontal: 4,
+                    paddingBottom: 12,
+                  }}
+                >
+                  Creates a new tarantula record and links it back here.
+                </Text>
+
+                {/* Prefill summary */}
+                <View
+                  style={[
+                    styles.prefillBox,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      borderRadius: layout.radius.sm,
+                    },
+                  ]}
+                >
+                  {parentLoading ? (
+                    <Text
+                      style={{ color: colors.textTertiary, fontSize: 12 }}
+                    >
+                      Loading parent info…
+                    </Text>
+                  ) : parentError ? (
+                    <Text
+                      style={{
+                        color: '#fcd34d',
+                        fontSize: 12,
+                        lineHeight: 17,
+                      }}
+                    >
+                      {parentError} You can still create the record — it
+                      just won&rsquo;t auto-fill the species.
+                    </Text>
+                  ) : (
+                    <>
+                      <PrefillRow
+                        label="Species"
+                        value={
+                          parent?.scientific_name || 'Not set on parents'
+                        }
+                        muted={!parent?.scientific_name}
+                      />
+                      <PrefillRow
+                        label="Date acquired"
+                        value={
+                          parent?.hatch_date
+                            ? fmtDate(parent.hatch_date)
+                            : 'Today'
+                        }
+                      />
+                      <PrefillRow label="Source" value="Bred" />
+                    </>
+                  )}
+                </View>
+
+                {/* Name */}
+                <Text
+                  style={[
+                    styles.formLabel,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  NAME *
+                </Text>
+                <TextInput
+                  value={name}
+                  onChangeText={onNameChange}
+                  placeholder="e.g. Sling #1"
+                  placeholderTextColor={colors.textTertiary}
+                  editable={!creating}
+                  autoFocus
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      color: colors.textPrimary,
+                      borderRadius: layout.radius.sm,
+                    },
+                  ]}
+                />
+
+                {/* Sex */}
+                <Text
+                  style={[
+                    styles.formLabel,
+                    { color: colors.textSecondary, marginTop: 16 },
+                  ]}
+                >
+                  SEX
+                </Text>
+                <View style={styles.sexRow}>
+                  {sexOptions.map((s) => {
+                    const selected = s === sex;
+                    return (
+                      <TouchableOpacity
+                        key={s}
+                        onPress={() => onSexChange(s)}
+                        disabled={creating}
+                        style={[
+                          styles.sexButton,
+                          {
+                            backgroundColor: selected
+                              ? 'rgba(34,197,94,0.18)'
+                              : colors.background,
+                            borderColor: selected
+                              ? 'rgba(34,197,94,0.6)'
+                              : colors.border,
+                            borderRadius: layout.radius.sm,
+                            opacity: creating ? 0.5 : 1,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            color: selected ? '#86efac' : colors.textPrimary,
+                            fontWeight: selected ? '700' : '500',
+                            fontSize: 14,
+                            textTransform: 'capitalize',
+                          }}
+                        >
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {error && (
+                  <Text
+                    style={{
+                      color: '#fca5a5',
+                      fontSize: 12,
+                      lineHeight: 17,
+                      marginTop: 12,
+                    }}
+                  >
+                    {error}
+                  </Text>
+                )}
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  onPress={onClose}
+                  disabled={creating}
+                  style={styles.modalFooterCancel}
+                >
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: 14,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onSubmit}
+                  disabled={creating || !name.trim()}
+                  style={[
+                    styles.modalFooterPrimary,
+                    {
+                      borderRadius: layout.radius.sm,
+                      opacity: creating || !name.trim() ? 0.5 : 1,
+                    },
+                  ]}
+                >
+                  {creating ? (
+                    <ActivityIndicator size="small" color="#022c22" />
+                  ) : (
+                    <Text style={styles.modalFooterPrimaryText}>
+                      Create & link
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function PrefillRow({
+  label,
+  value,
+  muted,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.prefillRow}>
+      <Text style={[styles.prefillLabel, { color: colors.textSecondary }]}>
+        {label}
+      </Text>
+      <Text
+        style={[
+          styles.prefillValue,
+          {
+            color: muted ? colors.textTertiary : colors.textPrimary,
+            fontStyle: muted ? 'italic' : 'normal',
+          },
+        ]}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -588,6 +1189,112 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
+  },
+
+  // Linked-tarantula card (shows when offspring is linked).
+  linkedCard: {
+    borderWidth: 1,
+    padding: 12,
+    gap: 4,
+  },
+  linkedLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
+  linkedValue: { fontSize: 14, fontWeight: '600' },
+
+  // "Add to collection" CTA card (shows when status=kept + no link).
+  ctaCard: {
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ctaTitle: { fontSize: 13, fontWeight: '700' },
+  ctaHelp: { fontSize: 11, lineHeight: 15, marginTop: 2 },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#86efac',
+  },
+  ctaButtonText: {
+    color: '#022c22',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+
+  // Add-to-collection modal styles.
+  prefillBox: {
+    borderWidth: 1,
+    padding: 10,
+    gap: 4,
+    marginBottom: 16,
+  },
+  prefillRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  prefillLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  prefillValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  formLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  textInput: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  sexRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sexButton: {
+    flex: 1,
+    borderWidth: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 12,
+  },
+  modalFooterCancel: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalFooterPrimary: {
+    backgroundColor: '#86efac',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minWidth: 130,
+    alignItems: 'center',
+  },
+  modalFooterPrimaryText: {
+    color: '#022c22',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
 

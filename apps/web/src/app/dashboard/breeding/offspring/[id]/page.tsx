@@ -49,6 +49,13 @@ interface EggSac {
   id: string
   pairing_id: string
   laid_date: string
+  hatch_date: string | null
+}
+
+interface Pairing {
+  id: string
+  male_id: string
+  female_id: string
 }
 
 interface Tarantula {
@@ -56,6 +63,21 @@ interface Tarantula {
   name?: string | null
   common_name?: string | null
   scientific_name?: string | null
+  species_id?: string | null
+  sex?: string | null
+}
+
+/**
+ * Best-guess prefill for "Add to collection" — sourced from the parent
+ * pairing. After the cross-species fix, both parents will share a
+ * species, so reading from the male is sufficient. species_id wins over
+ * scientific_name when both are present (canonical link).
+ */
+interface ParentPrefill {
+  scientific_name: string | null
+  species_id: string | null
+  hatch_date: string | null
+  laid_date: string
 }
 
 const STATUS_OPTIONS: Array<{
@@ -145,6 +167,20 @@ export default function OffspringDetailPage() {
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Add-to-collection modal. Parent prefill is lazy-fetched the first
+  // time the modal opens — most keepers don't keep offspring (they sell
+  // or trade), so we avoid the extra round-trip on every detail load.
+  const [addOpen, setAddOpen] = useState(false)
+  const [addParent, setAddParent] = useState<ParentPrefill | null>(null)
+  const [addParentLoading, setAddParentLoading] = useState(false)
+  const [addParentError, setAddParentError] = useState('')
+  const [addName, setAddName] = useState('')
+  const [addSex, setAddSex] = useState<'male' | 'female' | 'unknown'>(
+    'unknown',
+  )
+  const [addCreating, setAddCreating] = useState(false)
+  const [addError, setAddError] = useState('')
 
   const fetchAll = useCallback(async () => {
     if (!token) return
@@ -254,6 +290,162 @@ export default function OffspringDetailPage() {
       window.alert(err?.message || 'Could not delete the offspring record.')
       setDeleting(false)
       setDeleteConfirm(false)
+    }
+  }
+
+  /**
+   * Opens the Add-to-collection modal and lazy-fetches parent species
+   * info on first open. Cached for the lifetime of the page — if the
+   * keeper closes the modal and reopens it we don't re-fetch.
+   *
+   * Failure case: if the pairing or parent fetch fails (parent deleted,
+   * permissions changed, etc.) we still let the modal open with empty
+   * prefills + a soft inline message. The keeper can type the species
+   * manually.
+   */
+  async function openAddToCollection() {
+    setAddOpen(true)
+    setAddError('')
+    if (addParent || addParentLoading) return
+    if (!token || !offspring) return
+    setAddParentLoading(true)
+    setAddParentError('')
+    try {
+      const headers = { Authorization: `Bearer ${token}` }
+      const sacRes = await fetch(
+        `${API_URL}/api/v1/egg-sacs/${offspring.egg_sac_id}`,
+        { headers },
+      )
+      if (!sacRes.ok) throw new Error('Could not load parent egg sac.')
+      const sac: EggSac = await sacRes.json()
+
+      const pRes = await fetch(
+        `${API_URL}/api/v1/pairings/${sac.pairing_id}`,
+        { headers },
+      )
+      if (!pRes.ok) throw new Error('Could not load parent pairing.')
+      const pairing: Pairing = await pRes.json()
+
+      // Read the male (arbitrary choice — both should match species
+      // after the cross-species fix). Fall back to female if male fetch
+      // fails for any reason.
+      const maleRes = await fetch(
+        `${API_URL}/api/v1/tarantulas/${pairing.male_id}`,
+        { headers },
+      ).catch(() => null)
+      let parent: Tarantula | null = null
+      if (maleRes && maleRes.ok) {
+        parent = await maleRes.json()
+      } else {
+        const femRes = await fetch(
+          `${API_URL}/api/v1/tarantulas/${pairing.female_id}`,
+          { headers },
+        ).catch(() => null)
+        if (femRes && femRes.ok) parent = await femRes.json()
+      }
+
+      setAddParent({
+        scientific_name: parent?.scientific_name ?? null,
+        species_id: parent?.species_id ?? null,
+        hatch_date: sac.hatch_date,
+        laid_date: sac.laid_date,
+      })
+    } catch (err: any) {
+      setAddParentError(
+        err?.message || 'Could not load parent species info for prefill.',
+      )
+    } finally {
+      setAddParentLoading(false)
+    }
+  }
+
+  /**
+   * Create a tarantula record from the offspring + parent prefill,
+   * then link it back to the offspring via PUT. On success we update
+   * local state so the page reflects the linked tarantula immediately
+   * without a refetch.
+   */
+  async function handleCreateAndLink() {
+    if (!offspring || !token || addCreating) return
+    if (!addName.trim()) {
+      setAddError('Give your new tarantula a name first.')
+      return
+    }
+    setAddError('')
+    setAddCreating(true)
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      }
+      const dateAcquired =
+        addParent?.hatch_date ||
+        new Date().toISOString().slice(0, 10) // YYYY-MM-DD local-ish
+
+      // Build the notes field with a back-link to the egg sac so the
+      // tarantula record carries its breeding origin even if the
+      // offspring record is later deleted.
+      const noteLines: string[] = []
+      if (addParent?.laid_date) {
+        noteLines.push(`Hatched from egg sac laid ${addParent.laid_date}.`)
+      } else {
+        noteLines.push(`Bred from offspring record.`)
+      }
+
+      const tarPayload: Record<string, unknown> = {
+        name: addName.trim(),
+        sex: addSex,
+        source: 'bred',
+        date_acquired: dateAcquired,
+        notes: noteLines.join('\n'),
+      }
+      if (addParent?.scientific_name) {
+        tarPayload.scientific_name = addParent.scientific_name
+      }
+      if (addParent?.species_id) {
+        tarPayload.species_id = addParent.species_id
+      }
+
+      const tarRes = await fetch(`${API_URL}/api/v1/tarantulas/`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(tarPayload),
+      })
+      if (!tarRes.ok) {
+        const body = await tarRes.json().catch(() => null)
+        throw new Error(
+          body?.detail || `Could not create tarantula (${tarRes.status}).`,
+        )
+      }
+      const newTar: Tarantula = await tarRes.json()
+
+      // Link the offspring to the new tarantula. If this step fails we
+      // surface the error but leave the new tarantula in place — better
+      // than orphaning the create entirely. Keeper can manually link
+      // later via the API.
+      const linkRes = await fetch(`${API_URL}/api/v1/offspring/${offspring.id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ tarantula_id: newTar.id }),
+      })
+      if (!linkRes.ok) {
+        const body = await linkRes.json().catch(() => null)
+        throw new Error(
+          body?.detail ||
+            `Tarantula created, but couldn't link it to this offspring (${linkRes.status}). You can link it manually later.`,
+        )
+      }
+      const updated: Offspring = await linkRes.json()
+      setOffspring(updated)
+      setLinkedTarantula(newTar)
+      setAddOpen(false)
+      // Reset form for the next sibling
+      setAddName('')
+      setAddSex('unknown')
+    } catch (err: any) {
+      setAddError(err?.message || 'Something went wrong creating the record.')
+    } finally {
+      setAddCreating(false)
     }
   }
 
@@ -409,8 +601,11 @@ export default function OffspringDetailPage() {
           </div>
 
           {/* Linked tarantula — separate card so it stands out from the
-              transactional fields */}
-          {offspring.tarantula_id && (
+              transactional fields. Three states:
+              1. Already linked → show the link.
+              2. Status is "kept" but not linked → show "Add to collection" CTA.
+              3. Neither → render nothing (sold/traded/etc. don't need the link). */}
+          {offspring.tarantula_id ? (
             <div className="mt-6 p-4 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
               <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300 mb-1">
                 Linked to collection
@@ -428,7 +623,26 @@ export default function OffspringDetailPage() {
                 </p>
               )}
             </div>
-          )}
+          ) : offspring.status === 'kept' ? (
+            <div className="mt-6 p-4 rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 flex items-center justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200">
+                  Ready to keep this sling?
+                </p>
+                <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                  Create a tarantula record in your collection — species
+                  and parents prefill from this clutch.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openAddToCollection}
+                className="px-4 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 transition flex-shrink-0"
+              >
+                + Add to collection
+              </button>
+            </div>
+          ) : null}
 
           {offspring.notes && (
             <div className="mt-6">
@@ -571,6 +785,146 @@ export default function OffspringDetailPage() {
                 className="px-4 py-2 text-sm font-semibold rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add-to-collection modal — opens via the green CTA above. The
+          parent species info is fetched lazily on first open and
+          cached on this page; subsequent opens reuse it.
+
+          Fields:
+            - Name (required) — free text, no prefill since slings
+              don't have names yet.
+            - Sex — defaults to unknown.
+            - Read-only prefill summary: species, hatch date, source.
+
+          On save we POST /tarantulas/, then PUT /offspring/{id} with
+          the new tarantula_id. State updates locally so the page
+          reflects the link immediately. */}
+      {addOpen && offspring && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !addCreating && setAddOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-lg bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700"
+          >
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                Add to collection
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Creates a new tarantula record and links it back to this
+                offspring entry.
+              </p>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              {/* Prefill summary */}
+              <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 p-3 text-xs space-y-1">
+                {addParentLoading ? (
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Loading parent info…
+                  </p>
+                ) : addParentError ? (
+                  <p className="text-amber-700 dark:text-amber-300">
+                    {addParentError} You can still create the record — it
+                    just won&rsquo;t auto-fill the species.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Species:</span>{' '}
+                      {addParent?.scientific_name || (
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Not set on parents
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Date acquired:</span>{' '}
+                      {addParent?.hatch_date
+                        ? formatLocalDate(addParent.hatch_date)
+                        : 'Today'}
+                    </p>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      <span className="font-semibold">Source:</span> Bred
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* Name */}
+              <div>
+                <label
+                  htmlFor="add-tar-name"
+                  className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1"
+                >
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="add-tar-name"
+                  type="text"
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                  placeholder="e.g. Sling #1"
+                  disabled={addCreating}
+                  autoFocus
+                  className="w-full px-3 py-2 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                />
+              </div>
+
+              {/* Sex */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+                  Sex
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['male', 'female', 'unknown'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setAddSex(s)}
+                      disabled={addCreating}
+                      className={`px-3 py-2 text-sm rounded-md border capitalize transition ${
+                        addSex === s
+                          ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-semibold'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                      } disabled:opacity-50`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {addError && (
+                <div className="rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+                  {addError}
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+              <button
+                onClick={() => setAddOpen(false)}
+                disabled={addCreating}
+                className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateAndLink}
+                disabled={addCreating || !addName.trim()}
+                className="px-4 py-2 text-sm font-semibold rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {addCreating ? 'Creating…' : 'Create & link'}
               </button>
             </div>
           </div>
