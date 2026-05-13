@@ -73,6 +73,10 @@ interface ParentOption {
   display_name: string;
   sex: Sex | null;
   scientific_name: string | null;
+  /** Reptile species FK. Used to filter cross-species pairings — a
+   *  gargoyle gecko and a bearded dragon shouldn't appear as valid
+   *  pair candidates. NULL when the keeper hasn't linked a species. */
+  reptile_species_id: string | null;
 }
 
 function snakeToOption(s: Snake): ParentOption {
@@ -82,6 +86,7 @@ function snakeToOption(s: Snake): ParentOption {
       s.name || s.common_name || s.scientific_name || 'Unnamed snake',
     sex: s.sex,
     scientific_name: s.scientific_name,
+    reptile_species_id: s.reptile_species_id,
   };
 }
 
@@ -92,6 +97,7 @@ function lizardToOption(l: Lizard): ParentOption {
       l.name || l.common_name || l.scientific_name || 'Unnamed lizard',
     sex: l.sex,
     scientific_name: l.scientific_name,
+    reptile_species_id: l.reptile_species_id,
   };
 }
 
@@ -200,6 +206,21 @@ function NewPairingScreen() {
     }
     if (maleId === femaleId) {
       setSubmitError('Male and female must be different reptiles.');
+      return;
+    }
+    // Defensive cross-species check. Reachable only if the keeper
+    // picked the female first, then changed the male to a different
+    // species afterwards — the picker filter blocks the forward path.
+    if (
+      maleOption?.reptile_species_id &&
+      femaleOption?.reptile_species_id &&
+      maleOption.reptile_species_id !== femaleOption.reptile_species_id
+    ) {
+      const a = maleOption.scientific_name ?? 'this male';
+      const b = femaleOption.scientific_name ?? 'this female';
+      setSubmitError(
+        `${a} and ${b} are different species — they can't pair. Update one parent's species or pick a matching mate.`,
+      );
       return;
     }
 
@@ -418,39 +439,85 @@ function NewPairingScreen() {
       {/* Parent picker modal — same scrollable-list pattern as
           morph-calculator's PickGeneModal.
 
-          We filter out the OTHER slot's current selection so the
-          keeper structurally cannot pick the same animal twice. The
-          submit-time `maleId === femaleId` check stays as a defensive
-          backstop, but in practice this guard makes it unreachable.
-          Bug 2026-05-11 (Cory): bearded dragon Bindi could be picked
-          for both slots and the error only surfaced on save. */}
-      <ParentPickerModal
-        visible={pickerOpen !== null}
-        onClose={() => setPickerOpen(null)}
-        options={(pickerOpen === 'male' ? males : females).filter((p) =>
-          pickerOpen === 'male' ? p.id !== femaleId : p.id !== maleId,
-        )}
-        selectedId={pickerOpen === 'male' ? maleId : femaleId}
-        title={pickerOpen === 'male' ? 'Pick the male' : 'Pick the female'}
-        emptyOverride={
-          // Distinct empty-state copy when filtering removed the only
-          // candidate vs no candidates ever existed.
-          pickerOpen === 'male' && femaleId
-            ? males.length > 0 && males.every((p) => p.id === femaleId)
-              ? "The only candidate is already picked as the female. Add another male to pair this one."
-              : null
-            : pickerOpen === 'female' && maleId
-              ? females.length > 0 && females.every((p) => p.id === maleId)
-                ? "The only candidate is already picked as the male. Add another female to pair this one."
-                : null
-              : null
+          Filters applied (in order):
+            1. Exclude the OTHER slot's current selection so the keeper
+               can't pick the same animal twice. Submit-time
+               `maleId === femaleId` check stays as a defensive backstop
+               but should be unreachable.
+               Bug 2026-05-11 (Cory): Bindi could be picked for both
+               slots and the error only surfaced on save.
+            2. Same-species enforcement — if the other slot has a parent
+               with a non-null reptile_species_id, only show candidates
+               with the matching species. A gargoyle gecko and a
+               bearded dragon are both lizards but biologically can't
+               cross, and the app shouldn't let a keeper accidentally
+               record a cross-species pairing.
+               Edge: if either side has NO species linked, we don't
+               filter (the keeper hasn't given us enough info to enforce
+               — we trust them).
+               Bug 2026-05-13 (Cory): could pair gargoyle gecko ×
+               bearded dragon. */}
+      {(() => {
+        const otherParent =
+          pickerOpen === 'male'
+            ? females.find((p) => p.id === femaleId)
+            : pickerOpen === 'female'
+              ? males.find((p) => p.id === maleId)
+              : null;
+        const targetSpeciesId =
+          otherParent?.reptile_species_id ?? null;
+        const sourceList = pickerOpen === 'male' ? males : females;
+        const otherSlotId = pickerOpen === 'male' ? femaleId : maleId;
+        const filteredOptions = sourceList.filter((p) => {
+          if (p.id === otherSlotId) return false;
+          // Species filter only kicks in when the other slot is
+          // populated AND that animal has a species linked AND this
+          // candidate also has a species linked. If either side is
+          // unlinked, we let it through with the keeper's trust.
+          if (
+            targetSpeciesId &&
+            p.reptile_species_id &&
+            p.reptile_species_id !== targetSpeciesId
+          ) {
+            return false;
+          }
+          return true;
+        });
+
+        // Empty-state copy adapts to the failing-filter reason so the
+        // keeper knows exactly why nothing shows up.
+        let emptyOverride: string | null = null;
+        if (sourceList.length === 0) {
+          // No candidates at all — leave the default copy.
+        } else if (filteredOptions.length === 0 && targetSpeciesId) {
+          const speciesLabel =
+            otherParent?.scientific_name ?? 'the selected species';
+          emptyOverride = `No ${speciesLabel} candidates in your collection match the other parent's species. Add another ${speciesLabel} to pair this one.`;
+        } else if (filteredOptions.length === 0 && otherSlotId) {
+          emptyOverride =
+            pickerOpen === 'male'
+              ? 'The only candidate is already picked as the female. Add another male to pair this one.'
+              : 'The only candidate is already picked as the male. Add another female to pair this one.';
         }
-        onPick={(id) => {
-          if (pickerOpen === 'male') setMaleId(id);
-          else if (pickerOpen === 'female') setFemaleId(id);
-          setPickerOpen(null);
-        }}
-      />
+
+        return (
+          <ParentPickerModal
+            visible={pickerOpen !== null}
+            onClose={() => setPickerOpen(null)}
+            options={filteredOptions}
+            selectedId={pickerOpen === 'male' ? maleId : femaleId}
+            title={
+              pickerOpen === 'male' ? 'Pick the male' : 'Pick the female'
+            }
+            emptyOverride={emptyOverride}
+            onPick={(id) => {
+              if (pickerOpen === 'male') setMaleId(id);
+              else if (pickerOpen === 'female') setFemaleId(id);
+              setPickerOpen(null);
+            }}
+          />
+        );
+      })()}
     </SafeAreaView>
   );
 }

@@ -11,10 +11,11 @@
  * Hermes-prod safety: static JSX branches only.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -35,6 +36,7 @@ import {
   type Clutch,
   type ReptilePairing,
   type ReptilePairingOutcome,
+  deletePairing,
   getPairing,
   listClutchesForPairing,
   updatePairing,
@@ -57,6 +59,7 @@ const OUTCOME_HELP: Record<ReptilePairingOutcome, string> = {
 };
 
 function PairingDetailScreen() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
   const [pairing, setPairing] = useState<ReptilePairing | null>(null);
@@ -67,6 +70,9 @@ function PairingDetailScreen() {
   const [outcomeOpen, setOutcomeOpen] = useState(false);
   const [savingOutcome, setSavingOutcome] = useState(false);
   const [outcomeError, setOutcomeError] = useState<string | null>(null);
+
+  // Delete-pairing state
+  const [deleting, setDeleting] = useState(false);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -90,6 +96,55 @@ function PairingDetailScreen() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  /**
+   * Delete this pairing. Confirmation lives in a native Alert since
+   * destructive actions get one second-chance prompt. On success we
+   * pop back to the breeding tab; if the row was already 404 (e.g.
+   * deleted on another device) we still navigate back since the user's
+   * intent was "remove it from my list."
+   *
+   * Backend CASCADEs to clutches + offspring; that's a one-way action.
+   * The confirmation copy is explicit so keepers don't lose data by
+   * accident.
+   */
+  function handleDelete() {
+    if (!pairing || deleting) return;
+    const clutchSuffix =
+      pairing.clutch_count > 0
+        ? `\n\nThis will also delete ${pairing.clutch_count} clutch${
+            pairing.clutch_count === 1 ? '' : 'es'
+          } and any offspring records under it. This can't be undone.`
+        : "\n\nThis can't be undone.";
+    Alert.alert(
+      'Delete pairing?',
+      `${pairing.male_display_name ?? 'Male'} × ${
+        pairing.female_display_name ?? 'Female'
+      }${clutchSuffix}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deletePairing(pairing.id);
+              router.back();
+            } catch (err: any) {
+              setDeleting(false);
+              Alert.alert(
+                "Couldn't delete",
+                err?.response?.data?.detail ||
+                  err?.message ||
+                  'Try again in a moment.',
+              );
+            }
+          },
+        },
+      ],
+    );
+  }
 
   async function handlePickOutcome(next: ReptilePairingOutcome) {
     if (!pairing || savingOutcome) return;
@@ -119,7 +174,28 @@ function PairingDetailScreen() {
       edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <AppHeader title="Pairing" leftAction={<HeaderBackButton />} />
+      <AppHeader
+        title="Pairing"
+        leftAction={<HeaderBackButton />}
+        rightAction={
+          pairing && !deleting ? (
+            <TouchableOpacity
+              onPress={handleDelete}
+              accessibilityRole="button"
+              accessibilityLabel="Delete pairing"
+              hitSlop={8}
+            >
+              <MaterialCommunityIcons
+                name="trash-can-outline"
+                size={22}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          ) : deleting ? (
+            <ActivityIndicator size="small" color={colors.textTertiary} />
+          ) : null
+        }
+      />
       <ScrollView contentContainerStyle={styles.scroll}>
         {pairing === null && !loadError && (
           <View style={styles.loading}>
