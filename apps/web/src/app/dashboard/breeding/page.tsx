@@ -101,6 +101,53 @@ export default function BreedingPage() {
     }
   }
 
+  /**
+   * Delete a breeding record. Honest cascade-aware confirm so the
+   * keeper knows what they're nuking — pairings → egg sacs → offspring
+   * all CASCADE on the backend. Refetches the lists on success so the
+   * other tabs reflect the cascade too.
+   *
+   * Returns true on success so callers can early-return out of follow-
+   * up state work.
+   */
+  const handleDelete = async (
+    kind: 'pairing' | 'egg-sac' | 'offspring',
+    id: string,
+  ): Promise<boolean> => {
+    if (!token) return false
+    const labels = {
+      pairing:
+        'Delete this pairing? Any egg sacs and offspring records under it will also be deleted. This can’t be undone.',
+      'egg-sac':
+        'Delete this egg sac? Any offspring records under it will also be deleted. This can’t be undone.',
+      offspring: 'Delete this offspring record? This can’t be undone.',
+    } as const
+    if (!window.confirm(labels[kind])) return false
+    const paths = {
+      pairing: 'pairings',
+      'egg-sac': 'egg-sacs',
+      offspring: 'offspring',
+    } as const
+    try {
+      const res = await fetch(`${API_URL}/api/v1/${paths[kind]}/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok && res.status !== 204) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.detail || `Delete failed (${res.status}).`)
+      }
+      // Refetch every list — a pairing delete cascades to egg sacs +
+      // offspring on the server, so stale local state on those two
+      // tabs would lie to the keeper.
+      await fetchBreedingData()
+      return true
+    } catch (err: any) {
+      window.alert(err?.message || 'Could not delete that record.')
+      return false
+    }
+  }
+
   if (isLoading || loading || subLoading) {
     return (
       <DashboardLayout userName="Loading..." userEmail="">
@@ -336,13 +383,22 @@ export default function BreedingPage() {
                 <div className="space-y-4">
                   {pairings.map((pairing) => (
                     <div key={pairing.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                      <div className="flex justify-between items-start">
-                        <div>
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm text-gray-600 dark:text-gray-400">Paired: {formatLocalDate(pairing.paired_date)}</p>
                           <p className="text-sm text-gray-900 dark:text-white">Type: <span className="capitalize">{pairing.pairing_type}</span></p>
-                          <p className="text-sm text-gray-900 dark:text-white">Outcome: <span className="capitalize">{pairing.outcome}</span></p>
+                          <p className="text-sm text-gray-900 dark:text-white">Outcome: <span className="capitalize">{pairing.outcome.replace(/_/g, ' ')}</span></p>
                           {pairing.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{pairing.notes}</p>}
                         </div>
+                        <button
+                          onClick={() => handleDelete('pairing', pairing.id)}
+                          aria-label="Delete pairing"
+                          title="Delete pairing"
+                          className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-1 -m-1 flex-shrink-0"
+                        >
+                          {/* Trash icon */}
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -381,11 +437,23 @@ export default function BreedingPage() {
                 <div className="space-y-4">
                   {eggSacs.map((sac) => (
                     <div key={sac.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Laid: {formatLocalDate(sac.laid_date)}</p>
-                      {sac.spiderling_count && <p className="text-sm text-gray-900 dark:text-white">Count: {sac.spiderling_count} spiderlings</p>}
-                      {sac.viable_count && <p className="text-sm text-gray-900 dark:text-white">Viable: {sac.viable_count}</p>}
-                      {sac.hatch_date && <p className="text-sm text-gray-600 dark:text-gray-400">Hatched: {formatLocalDate(sac.hatch_date)}</p>}
-                      {sac.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{sac.notes}</p>}
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Laid: {formatLocalDate(sac.laid_date)}</p>
+                          {sac.spiderling_count && <p className="text-sm text-gray-900 dark:text-white">Count: {sac.spiderling_count} spiderlings</p>}
+                          {sac.viable_count && <p className="text-sm text-gray-900 dark:text-white">Viable: {sac.viable_count}</p>}
+                          {sac.hatch_date && <p className="text-sm text-gray-600 dark:text-gray-400">Hatched: {formatLocalDate(sac.hatch_date)}</p>}
+                          {sac.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{sac.notes}</p>}
+                        </div>
+                        <button
+                          onClick={() => handleDelete('egg-sac', sac.id)}
+                          aria-label="Delete egg sac"
+                          title="Delete egg sac"
+                          className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-1 -m-1 flex-shrink-0"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -423,11 +491,23 @@ export default function BreedingPage() {
                 <div className="space-y-4">
                   {offspring.map((child) => (
                     <div key={child.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                      <p className="text-sm text-gray-900 dark:text-white">Status: <span className="capitalize">{child.status.replace('_', ' ')}</span></p>
-                      {child.status_date && <p className="text-sm text-gray-600 dark:text-gray-400">{formatLocalDate(child.status_date)}</p>}
-                      {child.price_sold && <p className="text-sm text-gray-900 dark:text-white">Sold for: ${child.price_sold}</p>}
-                      {child.buyer_info && <p className="text-sm text-gray-600 dark:text-gray-400">Buyer: {child.buyer_info}</p>}
-                      {child.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{child.notes}</p>}
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-gray-900 dark:text-white">Status: <span className="capitalize">{child.status.replace('_', ' ')}</span></p>
+                          {child.status_date && <p className="text-sm text-gray-600 dark:text-gray-400">{formatLocalDate(child.status_date)}</p>}
+                          {child.price_sold && <p className="text-sm text-gray-900 dark:text-white">Sold for: ${child.price_sold}</p>}
+                          {child.buyer_info && <p className="text-sm text-gray-600 dark:text-gray-400">Buyer: {child.buyer_info}</p>}
+                          {child.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{child.notes}</p>}
+                        </div>
+                        <button
+                          onClick={() => handleDelete('offspring', child.id)}
+                          aria-label="Delete offspring record"
+                          title="Delete offspring record"
+                          className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-1 -m-1 flex-shrink-0"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

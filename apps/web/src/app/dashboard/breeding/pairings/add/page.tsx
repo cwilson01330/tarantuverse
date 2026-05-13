@@ -15,7 +15,10 @@ interface Tarantula {
   name: string
   common_name: string
   scientific_name: string
-  sex: string
+  sex: string | null
+  /** Species FK — drives the cross-species pair guard. NULL when the
+   *  keeper hasn't linked a species, in which case we don't enforce. */
+  species_id: string | null
 }
 
 export default function AddPairingPage() {
@@ -81,6 +84,29 @@ export default function AddPairingPage() {
       setError('Please select both male and female tarantulas')
       return
     }
+    // Defensive same-tarantula guard. The pickers filter the other
+    // slot out so this should be unreachable, but doubles as a safety
+    // net in case state got crossed.
+    if (formData.male_id === formData.female_id) {
+      setError('Male and female must be different tarantulas.')
+      return
+    }
+    // Cross-species backstop — the pickers also enforce same-species
+    // filter when both parents have species linked, but this catches
+    // the case where the user picked the female first, then changed
+    // the male to a different species.
+    const male = tarantulas.find(t => t.id === formData.male_id)
+    const female = tarantulas.find(t => t.id === formData.female_id)
+    if (
+      male?.species_id &&
+      female?.species_id &&
+      male.species_id !== female.species_id
+    ) {
+      setError(
+        `${male.scientific_name || 'This male'} and ${female.scientific_name || 'this female'} are different species — they can't pair. Update one parent's species or pick a matching mate.`,
+      )
+      return
+    }
 
     try {
       setLoading(true)
@@ -114,8 +140,53 @@ export default function AddPairingPage() {
     }
   }
 
-  const males = tarantulas.filter(t => t.sex === 'male')
-  const females = tarantulas.filter(t => t.sex === 'female')
+  // Sex filter: male slot accepts male + unknown; female slot accepts
+  // female + unknown. Plenty of tarantulas are paired before sex is
+  // confirmed (especially slings + young adults), and the old strict
+  // filter made them invisible.
+  const baseMales = tarantulas.filter(
+    t => t.sex === 'male' || t.sex === 'unknown' || !t.sex,
+  )
+  const baseFemales = tarantulas.filter(
+    t => t.sex === 'female' || t.sex === 'unknown' || !t.sex,
+  )
+
+  // Cross-filters applied when the OTHER slot is populated:
+  //  1. Exclude the same tarantula (no self-pairings).
+  //  2. Exclude cross-species candidates when both parents have a
+  //     species linked. A P. murinus and a G. pulchra can't cross —
+  //     the picker shouldn't tempt the keeper. NULL species on either
+  //     side falls back to no filter (keeper hasn't given us enough
+  //     info to enforce).
+  const otherFor = (slot: 'male' | 'female') =>
+    tarantulas.find(
+      t => t.id === (slot === 'male' ? formData.female_id : formData.male_id),
+    )
+
+  const males = baseMales.filter(t => {
+    const other = otherFor('male')
+    if (other && t.id === other.id) return false
+    if (
+      other?.species_id &&
+      t.species_id &&
+      t.species_id !== other.species_id
+    ) {
+      return false
+    }
+    return true
+  })
+  const females = baseFemales.filter(t => {
+    const other = otherFor('female')
+    if (other && t.id === other.id) return false
+    if (
+      other?.species_id &&
+      t.species_id &&
+      t.species_id !== other.species_id
+    ) {
+      return false
+    }
+    return true
+  })
 
   if (isLoading) {
     return (
@@ -187,6 +258,8 @@ export default function AddPairingPage() {
                 {males.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name || t.common_name || t.scientific_name}
+                    {t.sex === 'unknown' || !t.sex ? ' (sex unknown)' : ''}
+                    {t.scientific_name && (t.name || t.common_name) ? ` — ${t.scientific_name}` : ''}
                   </option>
                 ))}
               </select>
@@ -207,6 +280,8 @@ export default function AddPairingPage() {
                 {females.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name || t.common_name || t.scientific_name}
+                    {t.sex === 'unknown' || !t.sex ? ' (sex unknown)' : ''}
+                    {t.scientific_name && (t.name || t.common_name) ? ` — ${t.scientific_name}` : ''}
                   </option>
                 ))}
               </select>
