@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
@@ -19,7 +19,29 @@ interface Pairing {
   outcome: string
 }
 
+// Next 14 requires useSearchParams() to be inside a <Suspense> boundary
+// or the route bails out of static prerendering at build time. The page
+// default export wraps the form in Suspense; the inner component reads
+// the query params.
 export default function AddEggSacPage() {
+  return (
+    <Suspense fallback={<AddEggSacFallback />}>
+      <AddEggSacInner />
+    </Suspense>
+  )
+}
+
+function AddEggSacFallback() {
+  return (
+    <DashboardLayout userName="Loading..." userEmail="">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <p className="text-gray-900 dark:text-white">Loading...</p>
+      </div>
+    </DashboardLayout>
+  )
+}
+
+function AddEggSacInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   // Prefill from a `?pairing_id=…` query param — set when the user
