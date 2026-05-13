@@ -23,6 +23,16 @@ export default function SpeciesAutocomplete({ onSelect, initialValue = '', place
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  // Track when the next query change was triggered by initialValue (vs.
+  // user typing) so we don't auto-open the dropdown on edit-page load.
+  // Without this, the edit page's async fetch → setFormData → new
+  // initialValue → setQuery would trigger a debounced search that pops
+  // the dropdown open spontaneously, which feels haunted.
+  const isProgrammaticUpdate = useRef(false)
+  // Remember the last initialValue we've reflected so a parent that
+  // re-renders with the same value (after the user has started typing
+  // their own query) doesn't stomp the user's typing.
+  const lastSyncedInitialValue = useRef(initialValue)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -34,6 +44,18 @@ export default function SpeciesAutocomplete({ onSelect, initialValue = '', place
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Reflect parent-driven initialValue changes (e.g. the edit page's
+  // async fetch populating formData.scientific_name after mount). Only
+  // sync when initialValue genuinely changes — otherwise a re-render
+  // with the same prop would overwrite mid-typing input.
+  useEffect(() => {
+    if (initialValue !== lastSyncedInitialValue.current) {
+      isProgrammaticUpdate.current = true
+      lastSyncedInitialValue.current = initialValue
+      setQuery(initialValue)
+    }
+  }, [initialValue])
 
   useEffect(() => {
     const searchSpecies = async () => {
@@ -50,12 +72,18 @@ export default function SpeciesAutocomplete({ onSelect, initialValue = '', place
         if (response.ok) {
           const data = await response.json()
           setResults(data)
-          setIsOpen(true)
+          // Only auto-open when the user actually typed. Programmatic
+          // syncs (initialValue prop changes) populate the input
+          // silently so edit-page loads don't pop a surprise dropdown.
+          if (!isProgrammaticUpdate.current) {
+            setIsOpen(true)
+          }
         }
       } catch (error) {
         console.error('Failed to search species:', error)
       } finally {
         setLoading(false)
+        isProgrammaticUpdate.current = false
       }
     }
 
