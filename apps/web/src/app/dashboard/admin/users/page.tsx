@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -68,6 +68,15 @@ export default function ManageUsersPage() {
         flipUp: boolean;
     } | null>(null);
 
+    // Ref on the menu so the document-level mousedown listener can check
+    // whether the click landed inside the menu before deciding to close
+    // it. The previous approach relied on synthetic-event stopPropagation,
+    // which is fragile across React's event delegation and was eating
+    // button clicks when the menu was flipped above the trigger — the
+    // mousedown closed the menu before the click could land on the
+    // button, so onClick never fired.
+    const menuRef = useRef<HTMLDivElement | null>(null);
+
     // Close the action menu on outside click or Escape, and on scroll
     // (otherwise the menu floats away from its row when the page scrolls,
     // which is more confusing than just closing it).
@@ -76,14 +85,22 @@ export default function ManageUsersPage() {
         function close() {
             setOpenMenu(null);
         }
+        function onDocMouseDown(e: MouseEvent) {
+            // Clicks inside the menu are passthrough so the button's
+            // onClick has a chance to run before we close anything.
+            if (menuRef.current && menuRef.current.contains(e.target as Node)) {
+                return;
+            }
+            close();
+        }
         function onKey(e: KeyboardEvent) {
             if (e.key === 'Escape') close();
         }
-        document.addEventListener('mousedown', close);
+        document.addEventListener('mousedown', onDocMouseDown);
         document.addEventListener('scroll', close, true);
         document.addEventListener('keydown', onKey);
         return () => {
-            document.removeEventListener('mousedown', close);
+            document.removeEventListener('mousedown', onDocMouseDown);
             document.removeEventListener('scroll', close, true);
             document.removeEventListener('keydown', onKey);
         };
@@ -657,8 +674,8 @@ export default function ManageUsersPage() {
                     const close = () => setOpenMenu(null);
                     return (
                         <div
+                            ref={menuRef}
                             role="menu"
-                            onMouseDown={(e) => e.stopPropagation()}
                             style={{
                                 position: 'fixed',
                                 left: openMenu.x,
