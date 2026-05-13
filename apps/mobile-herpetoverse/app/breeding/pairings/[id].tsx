@@ -275,9 +275,30 @@ function PairingDetailScreen() {
             </View>
 
             <View>
-              <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>
-                CLUTCHES
-              </Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>
+                  CLUTCHES
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push(
+                      `/breeding/pairings/${pairing.id}/clutches/new` as never,
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Add clutch"
+                  style={styles.sectionAdd}
+                >
+                  <MaterialCommunityIcons
+                    name="plus-circle"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.sectionAddText, { color: colors.primary }]}>
+                    Add clutch
+                  </Text>
+                </TouchableOpacity>
+              </View>
               {clutches === null ? (
                 <ActivityIndicator color={colors.textTertiary} />
               ) : clutches.length === 0 ? (
@@ -292,17 +313,23 @@ function PairingDetailScreen() {
                   ]}
                 >
                   <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                    No clutches recorded for this pairing yet. Clutch
-                    tracking on mobile arrives in the next sprint — for
-                    now use the web app to record laid dates and
-                    incubation conditions.
+                    No clutches recorded for this pairing yet. Tap{' '}
+                    <Text style={{ fontWeight: '600' }}>Add clutch</Text> when
+                    she lays — the only required field is the laid date,
+                    you can fill in counts and conditions as the clutch
+                    develops.
                   </Text>
                 </View>
               ) : (
                 <View style={{ gap: 8 }}>
                   {clutches.map((c) => (
-                    <View
+                    <TouchableOpacity
                       key={c.id}
+                      onPress={() =>
+                        router.push(`/breeding/clutches/${c.id}` as never)
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open clutch laid ${fmtDate(c.laid_date)}`}
                       style={[
                         styles.clutchRow,
                         {
@@ -341,7 +368,12 @@ function PairingDetailScreen() {
                             : ''}
                         </Text>
                       </View>
-                    </View>
+                      <MaterialCommunityIcons
+                        name="chevron-right"
+                        size={18}
+                        color={colors.textTertiary}
+                      />
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}
@@ -365,8 +397,7 @@ function PairingDetailScreen() {
               <Text
                 style={[styles.comingSoonText, { color: colors.textTertiary }]}
               >
-                Editing outcomes, adding clutches, and recording
-                offspring move to mobile in the next sprint.
+                Recording individual offspring lands in the next sprint.
               </Text>
             </View>
           </>
@@ -631,7 +662,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.6,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  sectionAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+  },
+  sectionAddText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 
   emptyCard: {
