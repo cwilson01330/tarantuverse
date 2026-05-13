@@ -368,8 +368,13 @@ function PairingDetailScreen() {
               ) : (
                 <View style={{ gap: 8 }}>
                   {eggSacs.map((s) => (
-                    <View
+                    <TouchableOpacity
                       key={s.id}
+                      onPress={() =>
+                        router.push(`/breeding/egg-sacs/${s.id}` as never)
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open egg sac laid ${fmtDate(s.laid_date)}`}
                       style={[
                         styles.sacRow,
                         {
@@ -408,7 +413,12 @@ function PairingDetailScreen() {
                             : ''}
                         </Text>
                       </View>
-                    </View>
+                      <MaterialCommunityIcons
+                        name="chevron-right"
+                        size={18}
+                        color={colors.textTertiary}
+                      />
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}

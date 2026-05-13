@@ -362,8 +362,13 @@ function BreedingOverviewScreen() {
               rows={eggSacs.length}
             >
               {eggSacs.map((s) => (
-                <View
+                <TouchableOpacity
                   key={s.id}
+                  onPress={() =>
+                    router.push(`/breeding/egg-sacs/${s.id}` as never)
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Egg sac laid ${fmtDate(s.laid_date)}`}
                   style={[
                     styles.row,
                     {
@@ -415,7 +420,7 @@ function BreedingOverviewScreen() {
                       color={colors.textTertiary}
                     />
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               ))}
             </Section>
 
@@ -426,8 +431,13 @@ function BreedingOverviewScreen() {
               rows={offspring.length}
             >
               {offspring.map((o) => (
-                <View
+                <TouchableOpacity
                   key={o.id}
+                  onPress={() =>
+                    router.push(`/breeding/offspring/${o.id}` as never)
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Offspring — ${fmtOutcome(o.status)}`}
                   style={[
                     styles.row,
                     {
@@ -471,7 +481,7 @@ function BreedingOverviewScreen() {
                       color={colors.textTertiary}
                     />
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               ))}
             </Section>
           </>
