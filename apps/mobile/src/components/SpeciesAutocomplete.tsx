@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,6 +37,23 @@ export default function SpeciesAutocomplete({
   const [results, setResults] = useState<Species[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Same sync pattern as the web SpeciesAutocomplete: reflect
+  // initialValue prop changes that happen after mount (e.g. the edit
+  // screen's async fetch populating formData.scientific_name) without
+  // popping a surprise dropdown.
+  const isProgrammaticUpdate = useRef(false);
+  const lastSyncedInitialValue = useRef(initialValue);
+
+  // Sync query state when the parent updates initialValue post-mount.
+  // Only fires when the value actually changes, so a re-render with
+  // the same prop doesn't overwrite mid-typing input.
+  useEffect(() => {
+    if (initialValue !== lastSyncedInitialValue.current) {
+      isProgrammaticUpdate.current = true;
+      lastSyncedInitialValue.current = initialValue;
+      setQuery(initialValue);
+    }
+  }, [initialValue]);
 
   useEffect(() => {
     if (query.length < 2) {
@@ -52,11 +69,16 @@ export default function SpeciesAutocomplete({
           `/species/search?q=${encodeURIComponent(query)}&limit=10`
         );
         setResults(response.data);
-        setIsOpen(true);
+        // Only auto-open on real typing. Programmatic syncs (edit
+        // screen loading existing species) populate the input silently.
+        if (!isProgrammaticUpdate.current) {
+          setIsOpen(true);
+        }
       } catch (error) {
         console.error('Failed to search species:', error);
       } finally {
         setLoading(false);
+        isProgrammaticUpdate.current = false;
       }
     }, 300);
 

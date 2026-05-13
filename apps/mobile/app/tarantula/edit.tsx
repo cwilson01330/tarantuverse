@@ -12,6 +12,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateInput from '../../src/components/DateInput';
+import SpeciesAutocomplete from '../../src/components/SpeciesAutocomplete';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
@@ -21,6 +22,11 @@ interface TarantulaData {
   name: string;
   common_name: string;
   scientific_name: string;
+  // FK to the species database. Set when the keeper picks from the
+  // autocomplete; null when they free-typed a name. Drives the
+  // cross-species breeding guard, care sheet linkage, and species-aware
+  // feeding cadence — all the reasons we'd rather not lose this on edit.
+  species_id?: string | null;
   sex?: string;
   life_stage?: string;
   date_acquired?: string;
@@ -55,6 +61,7 @@ export default function EditTarantulaScreen() {
     name: '',
     common_name: '',
     scientific_name: '',
+    species_id: null,
     sex: undefined,
     life_stage: undefined,
     date_acquired: undefined,
@@ -87,6 +94,7 @@ export default function EditTarantulaScreen() {
         name: data.name || '',
         common_name: data.common_name || '',
         scientific_name: data.scientific_name || '',
+        species_id: data.species_id ?? null,
         sex: data.sex,
         life_stage: data.life_stage,
         date_acquired: data.date_acquired,
@@ -170,6 +178,30 @@ export default function EditTarantulaScreen() {
         {/* Basic Information */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Basic Information</Text>
+
+          {/* Species link — picking from the autocomplete sets species_id
+              (the FK that the cross-species breeding guard and care
+              sheet lookup rely on) and refreshes scientific + common
+              names. Free-typing into the plain text inputs below still
+              works, but won't establish the FK link. */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Species Lookup</Text>
+            <SpeciesAutocomplete
+              initialValue={formData.scientific_name}
+              onSelect={(species) =>
+                setFormData({
+                  ...formData,
+                  species_id: species.id,
+                  scientific_name: species.scientific_name,
+                  common_name: species.common_names[0] || formData.common_name,
+                })
+              }
+              placeholder="Search species by name..."
+            />
+            <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 6, lineHeight: 15 }}>
+              Pick from the list to link this tarantula to the species database — enables care sheets and the breeding species check.
+            </Text>
+          </View>
 
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Name</Text>
