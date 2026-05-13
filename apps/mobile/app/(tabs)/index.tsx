@@ -952,6 +952,7 @@ function DashboardHubScreen() {
               { icon: 'chart-line', label: 'Analytics', route: '/analytics' },
               { icon: 'book-open-variant', label: 'Species DB', route: '/(tabs)/species' },
               { icon: 'account-group-outline', label: 'Community', route: '/(tabs)/community' },
+              { icon: 'heart-multiple', label: 'Breeding', route: '/breeding' },
             ] as const).map((item) => (
               <TouchableOpacity
                 key={item.label}
