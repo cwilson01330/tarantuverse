@@ -52,12 +52,20 @@ export default function ManageUsersPage() {
     // positioned dropdown next to the button. Tracking the bounding rect
     // (instead of using absolute positioning inside the cell) avoids the
     // table's `overflow-hidden` clipping the menu.
+    //
+    // The menu also flips upward when the trigger is near the bottom of
+    // the viewport — without this, rows in the last screenful of the
+    // table (e.g. the Superadmin row) couldn't reach "Grant Premium" or
+    // "Delete User" because those items rendered below the fold.
     const [openMenu, setOpenMenu] = useState<{
         userId: string;
         // Anchor point so the menu can render right-aligned with the
         // trigger button in fixed coordinates.
         x: number;
         y: number;
+        // Vertical anchor — if true, `y` is the menu's bottom edge
+        // (menu opens upward); otherwise `y` is the top edge.
+        flipUp: boolean;
     } | null>(null);
 
     // Close the action menu on outside click or Escape, and on scroll
@@ -92,9 +100,22 @@ export default function ManageUsersPage() {
         // Menu width is ~14rem (w-56). Right-align with the button.
         const MENU_WIDTH = 224;
         const x = Math.max(8, rect.right - MENU_WIDTH);
-        const y = rect.bottom + 4;
+        // Rough max menu height. The longest variant — unverified user
+        // (manual verify + resend verification + divider + reset pw +
+        // grant premium + divider + delete) — runs about 320px. We use
+        // 340 as a comfortable threshold so the menu flips a little
+        // earlier rather than risking a clipped last item.
+        const MENU_MAX_HEIGHT = 340;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        // Flip upward if there isn't room below AND there is more room
+        // above. Falling back to "below" when neither has room keeps the
+        // menu at least partially visible rather than negative-y.
+        const flipUp =
+            spaceBelow < MENU_MAX_HEIGHT && spaceAbove > spaceBelow;
+        const y = flipUp ? rect.top - 4 : rect.bottom + 4;
         setOpenMenu((prev) =>
-            prev?.userId === userId ? null : { userId, x, y },
+            prev?.userId === userId ? null : { userId, x, y, flipUp },
         );
     }
 
@@ -641,7 +662,21 @@ export default function ManageUsersPage() {
                             style={{
                                 position: 'fixed',
                                 left: openMenu.x,
-                                top: openMenu.y,
+                                // When flipUp is true the menu's bottom
+                                // edge is anchored to openMenu.y (just
+                                // above the trigger), so we use `bottom`
+                                // computed from the viewport height
+                                // instead of `top`. This keeps the menu
+                                // fully visible at the bottom of the
+                                // table without needing to measure
+                                // height after mount.
+                                ...(openMenu.flipUp
+                                    ? {
+                                          bottom:
+                                              window.innerHeight -
+                                              openMenu.y,
+                                      }
+                                    : { top: openMenu.y }),
                                 width: 224,
                                 zIndex: 50,
                             }}
