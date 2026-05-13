@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -26,6 +26,11 @@ interface Tarantula {
 
 export default function AddOffspringPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Prefill from a `?egg_sac_id=…` query param — set when the user
+  // clicks "+ Add offspring" from an egg sac detail page, so they don't
+  // re-pick the parent they just opened.
+  const prefilledEggSacId = searchParams?.get('egg_sac_id') ?? ''
   const { user, token, isAuthenticated, isLoading } = useAuth()
   const [eggSacs, setEggSacs] = useState<EggSac[]>([])
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
@@ -34,7 +39,7 @@ export default function AddOffspringPage() {
 
   // Form state
   const [formData, setFormData] = useState({
-    egg_sac_id: '',
+    egg_sac_id: prefilledEggSacId,
     tarantula_id: '',
     status: 'unknown',
     status_date: '',

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
@@ -21,6 +21,11 @@ interface Pairing {
 
 export default function AddEggSacPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Prefill from a `?pairing_id=…` query param — set when the user
+  // clicks "+ Add egg sac" from a pairing detail page, so they don't
+  // re-pick the parent they just opened.
+  const prefilledPairingId = searchParams?.get('pairing_id') ?? ''
   const { user, token, isAuthenticated, isLoading } = useAuth()
   const [pairings, setPairings] = useState<Pairing[]>([])
   const [loading, setLoading] = useState(false)
@@ -28,7 +33,7 @@ export default function AddEggSacPage() {
 
   // Form state
   const [formData, setFormData] = useState({
-    pairing_id: '',
+    pairing_id: prefilledPairingId,
     laid_date: toISODateLocal(new Date()),
     pulled_date: '',
     hatch_date: '',

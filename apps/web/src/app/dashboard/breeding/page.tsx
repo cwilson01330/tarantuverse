@@ -382,14 +382,23 @@ export default function BreedingPage() {
               ) : (
                 <div className="space-y-4">
                   {pairings.map((pairing) => (
-                    <div key={pairing.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="min-w-0 flex-1">
+                    // Row layout: Link wraps the textual content so the
+                    // bulk of the row navigates to the detail page,
+                    // while the trash button sits as a sibling. Putting
+                    // a <button> inside an <a> is invalid HTML and would
+                    // also steal the click anyway, so we keep them as
+                    // adjacent flex children.
+                    <div key={pairing.id} className="border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm transition">
+                      <div className="flex justify-between items-start gap-3 p-4">
+                        <Link
+                          href={`/dashboard/breeding/pairings/${pairing.id}`}
+                          className="min-w-0 flex-1 cursor-pointer"
+                        >
                           <p className="text-sm text-gray-600 dark:text-gray-400">Paired: {formatLocalDate(pairing.paired_date)}</p>
                           <p className="text-sm text-gray-900 dark:text-white">Type: <span className="capitalize">{pairing.pairing_type}</span></p>
                           <p className="text-sm text-gray-900 dark:text-white">Outcome: <span className="capitalize">{pairing.outcome.replace(/_/g, ' ')}</span></p>
                           {pairing.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{pairing.notes}</p>}
-                        </div>
+                        </Link>
                         <button
                           onClick={() => handleDelete('pairing', pairing.id)}
                           aria-label="Delete pairing"
@@ -436,15 +445,18 @@ export default function BreedingPage() {
               ) : (
                 <div className="space-y-4">
                   {eggSacs.map((sac) => (
-                    <div key={sac.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="min-w-0 flex-1">
+                    <div key={sac.id} className="border border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-300 dark:hover:border-green-700 hover:shadow-sm transition">
+                      <div className="flex justify-between items-start gap-3 p-4">
+                        <Link
+                          href={`/dashboard/breeding/egg-sacs/${sac.id}`}
+                          className="min-w-0 flex-1 cursor-pointer"
+                        >
                           <p className="text-sm text-gray-600 dark:text-gray-400">Laid: {formatLocalDate(sac.laid_date)}</p>
                           {sac.spiderling_count && <p className="text-sm text-gray-900 dark:text-white">Count: {sac.spiderling_count} spiderlings</p>}
                           {sac.viable_count && <p className="text-sm text-gray-900 dark:text-white">Viable: {sac.viable_count}</p>}
                           {sac.hatch_date && <p className="text-sm text-gray-600 dark:text-gray-400">Hatched: {formatLocalDate(sac.hatch_date)}</p>}
                           {sac.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{sac.notes}</p>}
-                        </div>
+                        </Link>
                         <button
                           onClick={() => handleDelete('egg-sac', sac.id)}
                           aria-label="Delete egg sac"
@@ -490,15 +502,18 @@ export default function BreedingPage() {
               ) : (
                 <div className="space-y-4">
                   {offspring.map((child) => (
-                    <div key={child.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                      <div className="flex justify-between items-start gap-3">
-                        <div className="min-w-0 flex-1">
+                    <div key={child.id} className="border border-gray-200 dark:border-gray-700 rounded-lg hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition">
+                      <div className="flex justify-between items-start gap-3 p-4">
+                        <Link
+                          href={`/dashboard/breeding/offspring/${child.id}`}
+                          className="min-w-0 flex-1 cursor-pointer"
+                        >
                           <p className="text-sm text-gray-900 dark:text-white">Status: <span className="capitalize">{child.status.replace('_', ' ')}</span></p>
                           {child.status_date && <p className="text-sm text-gray-600 dark:text-gray-400">{formatLocalDate(child.status_date)}</p>}
                           {child.price_sold && <p className="text-sm text-gray-900 dark:text-white">Sold for: ${child.price_sold}</p>}
                           {child.buyer_info && <p className="text-sm text-gray-600 dark:text-gray-400">Buyer: {child.buyer_info}</p>}
                           {child.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{child.notes}</p>}
-                        </div>
+                        </Link>
                         <button
                           onClick={() => handleDelete('offspring', child.id)}
                           aria-label="Delete offspring record"
