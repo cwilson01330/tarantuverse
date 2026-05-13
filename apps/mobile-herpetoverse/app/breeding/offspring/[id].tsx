@@ -21,11 +21,14 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -40,9 +43,32 @@ import {
   type OffspringStatus,
   type ReptileOffspring,
   deleteOffspring,
+  getClutch,
   getOffspring,
+  getPairing,
   updateOffspring,
 } from '../../../src/lib/breeding';
+import {
+  createSnake,
+  getSnake,
+  type CreateSnakePayload,
+} from '../../../src/lib/snakes';
+import {
+  createLizard,
+  getLizard,
+  type CreateLizardPayload,
+} from '../../../src/lib/lizards';
+
+/**
+ * Lazy-fetched parent species + lifecycle data for the hold-back
+ * modal prefill. Mirrors the HV web equivalent.
+ */
+interface HoldBackPrefill {
+  taxon: 'snake' | 'lizard';
+  scientific_name: string | null;
+  reptile_species_id: string | null;
+  hatch_date: string | null;
+}
 
 const STATUS_ORDER: OffspringStatus[] = [
   'hatched',
@@ -130,6 +156,23 @@ function OffspringDetailScreen() {
 
   const [deleting, setDeleting] = useState(false);
 
+  // Hold-back modal — same pattern as the HV web equivalent. Parent
+  // species prefill is lazy-loaded on first open and cached.
+  const [holdBackOpen, setHoldBackOpen] = useState(false);
+  const [holdBackPrefill, setHoldBackPrefill] =
+    useState<HoldBackPrefill | null>(null);
+  const [holdBackLoading, setHoldBackLoading] = useState(false);
+  const [holdBackPrefillError, setHoldBackPrefillError] = useState<
+    string | null
+  >(null);
+  const [holdBackName, setHoldBackName] = useState('');
+  const [holdBackSex, setHoldBackSex] = useState<'male' | 'female' | 'unknown'>(
+    'unknown',
+  );
+  const [holdBackCreating, setHoldBackCreating] = useState(false);
+  const [holdBackError, setHoldBackError] = useState<string | null>(null);
+  const [linkedRecordName, setLinkedRecordName] = useState<string | null>(null);
+
   const fetchOffspring = useCallback(async () => {
     if (!id) return;
     try {
@@ -201,6 +244,174 @@ function OffspringDetailScreen() {
       ],
     );
   }
+
+  /**
+   * Open hold-back modal and lazy-fetch parent species/taxon prefill.
+   * Cached after first open. Soft-fails on parent fetch — keeper can
+   * still type the species manually.
+   */
+  async function openHoldBack() {
+    setHoldBackOpen(true);
+    setHoldBackError(null);
+    if (holdBackPrefill || holdBackLoading || !offspring) return;
+    setHoldBackLoading(true);
+    setHoldBackPrefillError(null);
+    try {
+      const clutch = await getClutch(offspring.clutch_id);
+      const pairing = await getPairing(clutch.pairing_id);
+      const taxon = pairing.taxon;
+      let scientific_name: string | null = null;
+      let reptile_species_id: string | null = null;
+      try {
+        if (taxon === 'snake' && pairing.male_snake_id) {
+          const m = await getSnake(pairing.male_snake_id);
+          scientific_name = m.scientific_name;
+          reptile_species_id = m.reptile_species_id;
+        } else if (taxon === 'lizard' && pairing.male_lizard_id) {
+          const m = await getLizard(pairing.male_lizard_id);
+          scientific_name = m.scientific_name;
+          reptile_species_id = m.reptile_species_id;
+        }
+      } catch {
+        // fall through to female
+      }
+      if (!scientific_name) {
+        try {
+          if (taxon === 'snake' && pairing.female_snake_id) {
+            const f = await getSnake(pairing.female_snake_id);
+            scientific_name = f.scientific_name;
+            reptile_species_id = f.reptile_species_id;
+          } else if (taxon === 'lizard' && pairing.female_lizard_id) {
+            const f = await getLizard(pairing.female_lizard_id);
+            scientific_name = f.scientific_name;
+            reptile_species_id = f.reptile_species_id;
+          }
+        } catch {
+          // soft-fail; keeper can still proceed.
+        }
+      }
+      setHoldBackPrefill({
+        taxon,
+        scientific_name,
+        reptile_species_id,
+        hatch_date: clutch.hatch_date,
+      });
+    } catch (err: any) {
+      setHoldBackPrefillError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          'Could not load parent species info for prefill.',
+      );
+    } finally {
+      setHoldBackLoading(false);
+    }
+  }
+
+  /**
+   * Create the live snake/lizard record from the offspring + parent
+   * prefill, then link it back via PUT. Flips status to 'kept' if it
+   * wasn't already since the keeper has made the call.
+   */
+  async function handleHoldBackSubmit() {
+    if (!offspring || holdBackCreating) return;
+    if (!holdBackName.trim()) {
+      setHoldBackError('Give your new reptile a name first.');
+      return;
+    }
+    setHoldBackError(null);
+    setHoldBackCreating(true);
+    try {
+      const morphLabelLine = offspring.morph_label
+        ? `Morph: ${offspring.morph_label}.`
+        : null;
+      const hatchedLine = holdBackPrefill?.hatch_date
+        ? `Hatched ${holdBackPrefill.hatch_date}.`
+        : 'Hatched from this clutch.';
+      const noteLines = [hatchedLine, morphLabelLine].filter(
+        (l): l is string => Boolean(l),
+      );
+
+      if (holdBackPrefill?.taxon === 'lizard') {
+        const payload: CreateLizardPayload = {
+          name: holdBackName.trim(),
+          sex: holdBackSex,
+          source: 'bred',
+          hatch_date: holdBackPrefill?.hatch_date ?? null,
+          scientific_name: holdBackPrefill?.scientific_name ?? null,
+          reptile_species_id: holdBackPrefill?.reptile_species_id ?? null,
+          notes: noteLines.join('\n'),
+          current_weight_g: offspring.hatch_weight_g ?? null,
+          current_length_in: offspring.hatch_length_in ?? null,
+        };
+        const created = await createLizard(payload);
+        await updateOffspring(offspring.id, {
+          lizard_id: created.id,
+          status: offspring.status === 'kept' ? undefined : 'kept',
+        });
+      } else {
+        // Defaults to snake — taxon is required on the parent pairing,
+        // so this is a paranoid fallback.
+        const payload: CreateSnakePayload = {
+          name: holdBackName.trim(),
+          sex: holdBackSex,
+          source: 'bred',
+          hatch_date: holdBackPrefill?.hatch_date ?? null,
+          scientific_name: holdBackPrefill?.scientific_name ?? null,
+          reptile_species_id: holdBackPrefill?.reptile_species_id ?? null,
+          notes: noteLines.join('\n'),
+          current_weight_g: offspring.hatch_weight_g ?? null,
+          current_length_in: offspring.hatch_length_in ?? null,
+        };
+        const created = await createSnake(payload);
+        await updateOffspring(offspring.id, {
+          snake_id: created.id,
+          status: offspring.status === 'kept' ? undefined : 'kept',
+        });
+      }
+      const refreshed = await getOffspring(offspring.id);
+      setOffspring(refreshed);
+      setLinkedRecordName(holdBackName.trim());
+      setHoldBackOpen(false);
+      setHoldBackName('');
+      setHoldBackSex('unknown');
+    } catch (err: any) {
+      setHoldBackError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          'Something went wrong creating the record.',
+      );
+    } finally {
+      setHoldBackCreating(false);
+    }
+  }
+
+  // Fetch the linked record's name so the linked card shows what it's
+  // linked to rather than a generic indicator.
+  useEffect(() => {
+    if (!offspring) {
+      setLinkedRecordName(null);
+      return;
+    }
+    if (offspring.snake_id) {
+      getSnake(offspring.snake_id)
+        .then((s) =>
+          setLinkedRecordName(
+            s.name || s.common_name || s.scientific_name || 'Snake record',
+          ),
+        )
+        .catch(() => setLinkedRecordName(null));
+    } else if (offspring.lizard_id) {
+      getLizard(offspring.lizard_id)
+        .then((l) =>
+          setLinkedRecordName(
+            l.name || l.common_name || l.scientific_name || 'Lizard record',
+          ),
+        )
+        .catch(() => setLinkedRecordName(null));
+    } else {
+      setLinkedRecordName(null);
+    }
+  }, [offspring?.snake_id, offspring?.lizard_id]);
 
   const statusColors = offspring ? STATUS_COLORS[offspring.status] : null;
 
@@ -326,12 +537,6 @@ function OffspringDetailScreen() {
                     value={offspring.buyer_info}
                   />
                 )}
-                {(offspring.snake_id || offspring.lizard_id) && (
-                  <KV
-                    label="Live record"
-                    value="Linked to collection"
-                  />
-                )}
               </View>
 
               {offspring.notes && (
@@ -341,30 +546,79 @@ function OffspringDetailScreen() {
               )}
             </View>
 
-            <View
-              style={[
-                styles.comingSoon,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: colors.surfaceRaised,
-                  borderRadius: layout.radius.sm,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="hammer-wrench"
-                size={14}
-                color={colors.textTertiary}
-              />
-              <Text
-                style={[styles.comingSoonText, { color: colors.textTertiary }]}
+            {/* Linked-to-collection card or hold-back CTA. Three states:
+                1. Already linked → tap to open the live record.
+                2. Status allows hold-back → "Add to collection" CTA.
+                3. Otherwise (sold/traded/gifted/deceased) → render
+                   nothing — the offspring is out of the keeper's hands. */}
+            {offspring.snake_id || offspring.lizard_id ? (
+              <TouchableOpacity
+                onPress={() => {
+                  if (offspring.snake_id) {
+                    router.push(`/reptile/${offspring.snake_id}` as never);
+                  } else if (offspring.lizard_id) {
+                    router.push(`/lizard/${offspring.lizard_id}` as never);
+                  }
+                }}
+                accessibilityRole="link"
+                style={[
+                  styles.linkedCard,
+                  {
+                    borderColor: 'rgba(45,212,191,0.4)',
+                    backgroundColor: 'rgba(45,212,191,0.10)',
+                    borderRadius: layout.radius.sm,
+                  },
+                ]}
               >
-                Recording sale price, buyer info, genotype refinement,
-                and linking to a live collection record move to mobile
-                in a future sprint. For now use the web app for those
-                details.
-              </Text>
-            </View>
+                <Text style={[styles.linkedLabel, { color: '#5eead4' }]}>
+                  LINKED TO COLLECTION
+                </Text>
+                <Text
+                  style={[styles.linkedValue, { color: '#99f6e4' }]}
+                  numberOfLines={1}
+                >
+                  {linkedRecordName ??
+                    `Open ${offspring.snake_id ? 'snake' : 'lizard'} record`}
+                </Text>
+                <Text style={[styles.linkedHelp, { color: '#5eead4' }]}>
+                  The live record&rsquo;s own genotype is authoritative.
+                </Text>
+              </TouchableOpacity>
+            ) : showHoldBackCta(offspring.status) ? (
+              <View
+                style={[
+                  styles.ctaCard,
+                  {
+                    borderColor: 'rgba(190,242,100,0.4)',
+                    backgroundColor: 'rgba(190,242,100,0.10)',
+                    borderRadius: layout.radius.sm,
+                  },
+                ]}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.ctaTitle, { color: '#bef264' }]}>
+                    Holding this one back?
+                  </Text>
+                  <Text style={[styles.ctaHelp, { color: '#d9f99d' }]}>
+                    Create a live reptile record — species, hatch date,
+                    and weight prefill from this clutch.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={openHoldBack}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add to collection"
+                  style={[styles.ctaButton, { borderRadius: layout.radius.sm }]}
+                >
+                  <MaterialCommunityIcons
+                    name="plus"
+                    size={16}
+                    color="#022c22"
+                  />
+                  <Text style={styles.ctaButtonText}>Add</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </>
         )}
       </ScrollView>
@@ -380,7 +634,43 @@ function OffspringDetailScreen() {
           onPick={handlePickStatus}
         />
       )}
+
+      {/* Hold-back modal — creates a live snake/lizard record and links
+          it to this offspring. */}
+      {offspring && (
+        <HoldBackModal
+          visible={holdBackOpen}
+          prefill={holdBackPrefill}
+          prefillLoading={holdBackLoading}
+          prefillError={holdBackPrefillError}
+          morphLabel={offspring.morph_label}
+          name={holdBackName}
+          onNameChange={setHoldBackName}
+          sex={holdBackSex}
+          onSexChange={setHoldBackSex}
+          creating={holdBackCreating}
+          error={holdBackError}
+          onClose={() => {
+            if (!holdBackCreating) setHoldBackOpen(false);
+          }}
+          onSubmit={handleHoldBackSubmit}
+        />
+      )}
     </SafeAreaView>
+  );
+}
+
+/**
+ * Visibility predicate for the hold-back CTA. Same logic as the HV web
+ * equivalent — shows on statuses where the keeper hasn't disposed of
+ * the hatchling.
+ */
+function showHoldBackCta(status: OffspringStatus): boolean {
+  return (
+    status === 'hatched' ||
+    status === 'kept' ||
+    status === 'available' ||
+    status === 'unknown'
   );
 }
 
@@ -498,6 +788,328 @@ function StatusPickerModal({
         </Pressable>
       </Pressable>
     </Modal>
+  );
+}
+
+function HoldBackModal({
+  visible,
+  prefill,
+  prefillLoading,
+  prefillError,
+  morphLabel,
+  name,
+  onNameChange,
+  sex,
+  onSexChange,
+  creating,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  prefill: HoldBackPrefill | null;
+  prefillLoading: boolean;
+  prefillError: string | null;
+  morphLabel: string | null;
+  name: string;
+  onNameChange: (v: string) => void;
+  sex: 'male' | 'female' | 'unknown';
+  onSexChange: (v: 'male' | 'female' | 'unknown') => void;
+  creating: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  const { colors, layout } = useTheme();
+  const sexOptions: Array<'male' | 'female' | 'unknown'> = [
+    'male',
+    'female',
+    'unknown',
+  ];
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={onClose}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderTopLeftRadius: layout.radius.lg,
+                borderTopRightRadius: layout.radius.lg,
+              },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <SafeAreaView edges={['bottom']}>
+              <View style={styles.modalHeader}>
+                <View style={{ width: 24 }} />
+                <Text
+                  style={[styles.modalTitle, { color: colors.textPrimary }]}
+                >
+                  Add to collection
+                </Text>
+                <TouchableOpacity
+                  onPress={onClose}
+                  hitSlop={8}
+                  disabled={creating}
+                >
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={22}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                style={{ maxHeight: 480 }}
+              >
+                <Text
+                  style={{
+                    color: colors.textTertiary,
+                    fontSize: 12,
+                    lineHeight: 17,
+                    paddingHorizontal: 4,
+                    paddingBottom: 12,
+                  }}
+                >
+                  Creates a live {prefill?.taxon ?? 'reptile'} record and
+                  links it back to this offspring entry.
+                </Text>
+
+                {/* Prefill summary */}
+                <View
+                  style={[
+                    styles.prefillBox,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      borderRadius: layout.radius.sm,
+                    },
+                  ]}
+                >
+                  {prefillLoading ? (
+                    <Text style={{ color: colors.textTertiary, fontSize: 12 }}>
+                      Loading parent info…
+                    </Text>
+                  ) : prefillError ? (
+                    <Text
+                      style={{
+                        color: '#fcd34d',
+                        fontSize: 12,
+                        lineHeight: 17,
+                      }}
+                    >
+                      {prefillError} You can still create the record — it
+                      just won&rsquo;t auto-fill the species.
+                    </Text>
+                  ) : (
+                    <>
+                      <PrefillRow
+                        label="Taxon"
+                        value={
+                          prefill?.taxon === 'lizard'
+                            ? '🦎 Lizard'
+                            : '🐍 Snake'
+                        }
+                      />
+                      <PrefillRow
+                        label="Species"
+                        value={
+                          prefill?.scientific_name || 'Not set on parents'
+                        }
+                        muted={!prefill?.scientific_name}
+                      />
+                      <PrefillRow
+                        label="Hatch date"
+                        value={prefill?.hatch_date ?? 'Not recorded'}
+                        muted={!prefill?.hatch_date}
+                      />
+                      <PrefillRow label="Source" value="Bred" />
+                    </>
+                  )}
+                </View>
+
+                {/* Name */}
+                <Text
+                  style={[styles.formLabel, { color: colors.textSecondary }]}
+                >
+                  NAME *
+                </Text>
+                <TextInput
+                  value={name}
+                  onChangeText={onNameChange}
+                  placeholder={
+                    morphLabel ? `${morphLabel} hold-back` : 'e.g. Hold-back #1'
+                  }
+                  placeholderTextColor={colors.textTertiary}
+                  editable={!creating}
+                  autoFocus
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      color: colors.textPrimary,
+                      borderRadius: layout.radius.sm,
+                    },
+                  ]}
+                />
+
+                {/* Sex */}
+                <Text
+                  style={[
+                    styles.formLabel,
+                    { color: colors.textSecondary, marginTop: 16 },
+                  ]}
+                >
+                  SEX
+                </Text>
+                <View style={styles.sexRow}>
+                  {sexOptions.map((s) => {
+                    const selected = s === sex;
+                    return (
+                      <TouchableOpacity
+                        key={s}
+                        onPress={() => onSexChange(s)}
+                        disabled={creating}
+                        style={[
+                          styles.sexButton,
+                          {
+                            backgroundColor: selected
+                              ? 'rgba(190,242,100,0.16)'
+                              : colors.background,
+                            borderColor: selected
+                              ? 'rgba(190,242,100,0.5)'
+                              : colors.border,
+                            borderRadius: layout.radius.sm,
+                            opacity: creating ? 0.5 : 1,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            color: selected ? '#bef264' : colors.textPrimary,
+                            fontWeight: selected ? '700' : '500',
+                            fontSize: 14,
+                            textTransform: 'capitalize',
+                          }}
+                        >
+                          {s}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text
+                  style={{
+                    color: colors.textTertiary,
+                    fontSize: 11,
+                    lineHeight: 15,
+                    marginTop: 6,
+                  }}
+                >
+                  Set to unknown if it&rsquo;s too young to sex — you can
+                  update it on the reptile detail page later.
+                </Text>
+
+                {error && (
+                  <Text
+                    style={{
+                      color: '#fca5a5',
+                      fontSize: 12,
+                      lineHeight: 17,
+                      marginTop: 12,
+                    }}
+                  >
+                    {error}
+                  </Text>
+                )}
+              </ScrollView>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  onPress={onClose}
+                  disabled={creating}
+                  style={styles.modalFooterCancel}
+                >
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: 14,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onSubmit}
+                  disabled={creating || !name.trim()}
+                  style={[
+                    styles.modalFooterPrimary,
+                    {
+                      borderRadius: layout.radius.sm,
+                      opacity: creating || !name.trim() ? 0.5 : 1,
+                    },
+                  ]}
+                >
+                  {creating ? (
+                    <ActivityIndicator size="small" color="#022c22" />
+                  ) : (
+                    <Text style={styles.modalFooterPrimaryText}>
+                      Create & link
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function PrefillRow({
+  label,
+  value,
+  muted,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={styles.prefillRow}>
+      <Text style={[styles.prefillLabel, { color: colors.textSecondary }]}>
+        {label}
+      </Text>
+      <Text
+        style={[
+          styles.prefillValue,
+          {
+            color: muted ? colors.textTertiary : colors.textPrimary,
+            fontStyle: muted ? 'italic' : 'normal',
+          },
+        ]}
+        numberOfLines={1}
+      >
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -636,6 +1248,113 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
+  },
+
+  // Linked-to-collection card.
+  linkedCard: {
+    borderWidth: 1,
+    padding: 12,
+    gap: 4,
+  },
+  linkedLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  linkedValue: { fontSize: 14, fontWeight: '700' },
+  linkedHelp: { fontSize: 11, lineHeight: 15, marginTop: 4 },
+
+  // Hold-back CTA card.
+  ctaCard: {
+    borderWidth: 1,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  ctaTitle: { fontSize: 13, fontWeight: '700' },
+  ctaHelp: { fontSize: 11, lineHeight: 15, marginTop: 2 },
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#bef264',
+  },
+  ctaButtonText: {
+    color: '#022c22',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+
+  // Hold-back modal styles.
+  prefillBox: {
+    borderWidth: 1,
+    padding: 10,
+    gap: 4,
+    marginBottom: 16,
+  },
+  prefillRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  prefillLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  prefillValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  formLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  textInput: {
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  sexRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  sexButton: {
+    flex: 1,
+    borderWidth: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 12,
+    paddingTop: 12,
+  },
+  modalFooterCancel: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  modalFooterPrimary: {
+    backgroundColor: '#bef264',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    minWidth: 130,
+    alignItems: 'center',
+  },
+  modalFooterPrimaryText: {
+    color: '#022c22',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
 

@@ -32,6 +32,10 @@ interface ParentOption {
   display_name: string
   sex: 'male' | 'female' | 'unknown' | null
   scientific_name: string | null
+  /** Reptile species FK. Drives the cross-species pair guard; null when
+   *  the keeper hasn't linked a species record, in which case we fall
+   *  back to scientific_name string comparison (see speciesMatches). */
+  reptile_species_id: string | null
 }
 
 function snakeToOption(s: Snake): ParentOption {
@@ -41,6 +45,7 @@ function snakeToOption(s: Snake): ParentOption {
       s.name || s.common_name || s.scientific_name || 'Unnamed snake',
     sex: s.sex,
     scientific_name: s.scientific_name,
+    reptile_species_id: s.reptile_species_id,
   }
 }
 
@@ -51,7 +56,31 @@ function lizardToOption(l: Lizard): ParentOption {
       l.name || l.common_name || l.scientific_name || 'Unnamed lizard',
     sex: l.sex,
     scientific_name: l.scientific_name,
+    reptile_species_id: l.reptile_species_id,
   }
+}
+
+/**
+ * Cross-species check with graceful fallback. Mirrors the helper used
+ * on HV mobile and on TV web/mobile. Keep all four in sync.
+ *
+ *   1. reptile_species_id match — canonical comparison when both
+ *      parents were picked from the species autocomplete.
+ *   2. scientific_name match — fallback for keepers who typed names
+ *      freely. Trim + lowercase normalize so casing differences don't
+ *      false-positive.
+ *   3. Insufficient data — return true (allow). Can't enforce.
+ */
+function speciesMatches(a: ParentOption, b: ParentOption): boolean {
+  if (a.reptile_species_id && b.reptile_species_id) {
+    return a.reptile_species_id === b.reptile_species_id
+  }
+  const aName = a.scientific_name?.trim().toLowerCase()
+  const bName = b.scientific_name?.trim().toLowerCase()
+  if (aName && bName) {
+    return aName === bName
+  }
+  return true
 }
 
 export default function NewPairingPage() {
@@ -107,14 +136,48 @@ export default function NewPairingPage() {
   }, [taxon])
 
   const allOfTaxon = taxon === 'snake' ? snakes : lizards
-  const males = useMemo(
+  const baseMales = useMemo(
     () => allOfTaxon.filter((p) => p.sex === 'male' || p.sex === 'unknown'),
     [allOfTaxon],
   )
-  const females = useMemo(
+  const baseFemales = useMemo(
     () =>
       allOfTaxon.filter((p) => p.sex === 'female' || p.sex === 'unknown'),
     [allOfTaxon],
+  )
+
+  // Cross-filters applied when the OTHER slot is populated:
+  //   1. Exclude the same animal (no self-pairings).
+  //   2. Exclude cross-species candidates via speciesMatches() — which
+  //      compares reptile_species_id first, falls back to
+  //      scientific_name, and allows when neither side has enough info.
+  //      A gargoyle gecko and a bearded dragon shouldn't tempt the
+  //      keeper as valid pair candidates.
+  const femaleOption = useMemo(
+    () => baseFemales.find((p) => p.id === femaleId) ?? null,
+    [baseFemales, femaleId],
+  )
+  const maleOption = useMemo(
+    () => baseMales.find((p) => p.id === maleId) ?? null,
+    [baseMales, maleId],
+  )
+  const males = useMemo(
+    () =>
+      baseMales.filter((p) => {
+        if (femaleOption && p.id === femaleOption.id) return false
+        if (femaleOption && !speciesMatches(p, femaleOption)) return false
+        return true
+      }),
+    [baseMales, femaleOption],
+  )
+  const females = useMemo(
+    () =>
+      baseFemales.filter((p) => {
+        if (maleOption && p.id === maleOption.id) return false
+        if (maleOption && !speciesMatches(p, maleOption)) return false
+        return true
+      }),
+    [baseFemales, maleOption],
   )
 
   async function handleSubmit(e: React.FormEvent) {
@@ -127,6 +190,18 @@ export default function NewPairingPage() {
     }
     if (maleId === femaleId) {
       setSubmitError('Male and female must be different reptiles.')
+      return
+    }
+    // Defensive cross-species check — the picker filters already
+    // exclude cross-species candidates, but a keeper could pick the
+    // female first, then change the male via the dropdown to a stale
+    // option. speciesMatches() also covers free-typed scientific names.
+    if (maleOption && femaleOption && !speciesMatches(maleOption, femaleOption)) {
+      const a = maleOption.scientific_name || 'this male'
+      const b = femaleOption.scientific_name || 'this female'
+      setSubmitError(
+        `${a} and ${b} are different species — they can't pair. Update one parent's species or pick a matching mate.`,
+      )
       return
     }
 

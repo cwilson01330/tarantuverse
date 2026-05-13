@@ -26,9 +26,26 @@ import {
   type UpdateOffspringPayload,
   OFFSPRING_STATUS_LABEL,
   deleteOffspring,
+  getClutch,
   getOffspring,
+  getPairing,
   updateOffspring,
 } from '@/lib/breeding'
+import { createSnake, getSnake, type CreateSnakePayload } from '@/lib/snakes'
+import { createLizard, getLizard, type CreateLizardPayload } from '@/lib/lizards'
+
+/**
+ * Parent species + lifecycle data we pre-fill into the hold-back form.
+ * Lazy-loaded the first time the keeper opens the modal — most offspring
+ * end up sold or traded, so we'd rather not pay the round-trip on every
+ * detail load.
+ */
+interface HoldBackPrefill {
+  taxon: 'snake' | 'lizard'
+  scientific_name: string | null
+  reptile_species_id: string | null
+  hatch_date: string | null
+}
 
 interface Params {
   id: string
@@ -52,6 +69,25 @@ export default function OffspringDetailPage({
   const [buyerDraft, setBuyerDraft] = useState('')
   const [priceDraft, setPriceDraft] = useState('')
   const [genotypeDraft, setGenotypeDraft] = useState('')
+
+  // Hold-back / Add-to-collection modal state. The prefill (parent
+  // species + taxon + hatch date) is lazy-fetched the first time the
+  // keeper opens the modal — most offspring don't end up held back, so
+  // we don't want to pay the round-trip on every detail load.
+  const [holdBackOpen, setHoldBackOpen] = useState(false)
+  const [holdBackPrefill, setHoldBackPrefill] =
+    useState<HoldBackPrefill | null>(null)
+  const [holdBackLoading, setHoldBackLoading] = useState(false)
+  const [holdBackPrefillError, setHoldBackPrefillError] = useState<
+    string | null
+  >(null)
+  const [holdBackName, setHoldBackName] = useState('')
+  const [holdBackSex, setHoldBackSex] = useState<'male' | 'female' | 'unknown'>(
+    'unknown',
+  )
+  const [holdBackCreating, setHoldBackCreating] = useState(false)
+  const [holdBackError, setHoldBackError] = useState<string | null>(null)
+  const [linkedRecordName, setLinkedRecordName] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -108,6 +144,187 @@ export default function OffspringDetailPage({
       )
     }
   }
+
+  /**
+   * Lazy-fetch parent species + taxon for the hold-back modal prefill.
+   * Chains: offspring → clutch → pairing → male animal (snake or
+   * lizard). Falls back to the female if the male fetch fails. Failure
+   * still lets the modal open with empty prefills — the keeper can
+   * type the species manually.
+   */
+  async function openHoldBack() {
+    setHoldBackOpen(true)
+    setHoldBackError(null)
+    if (holdBackPrefill || holdBackLoading || !o) return
+    setHoldBackLoading(true)
+    setHoldBackPrefillError(null)
+    try {
+      const clutch = await getClutch(o.clutch_id)
+      const pairing = await getPairing(clutch.pairing_id)
+      const taxon = pairing.taxon
+      // Pick whichever parent ID matches the pairing's taxon. Falls back
+      // to female if the male fetch fails — both should match species
+      // after the cross-species fix.
+      let scientific_name: string | null = null
+      let reptile_species_id: string | null = null
+      try {
+        if (taxon === 'snake' && pairing.male_snake_id) {
+          const m = await getSnake(pairing.male_snake_id)
+          scientific_name = m.scientific_name
+          reptile_species_id = m.reptile_species_id
+        } else if (taxon === 'lizard' && pairing.male_lizard_id) {
+          const m = await getLizard(pairing.male_lizard_id)
+          scientific_name = m.scientific_name
+          reptile_species_id = m.reptile_species_id
+        }
+      } catch {
+        // fall through to female fetch
+      }
+      if (!scientific_name) {
+        try {
+          if (taxon === 'snake' && pairing.female_snake_id) {
+            const f = await getSnake(pairing.female_snake_id)
+            scientific_name = f.scientific_name
+            reptile_species_id = f.reptile_species_id
+          } else if (taxon === 'lizard' && pairing.female_lizard_id) {
+            const f = await getLizard(pairing.female_lizard_id)
+            scientific_name = f.scientific_name
+            reptile_species_id = f.reptile_species_id
+          }
+        } catch {
+          // Soft-fail; keeper can still proceed without prefill.
+        }
+      }
+      setHoldBackPrefill({
+        taxon,
+        scientific_name,
+        reptile_species_id,
+        hatch_date: clutch.hatch_date,
+      })
+    } catch (err) {
+      setHoldBackPrefillError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not load parent species info for prefill.',
+      )
+    } finally {
+      setHoldBackLoading(false)
+    }
+  }
+
+  /**
+   * Promote this hatchling into the keeper's live collection. Creates a
+   * snake or lizard record (per parent taxon), then links it back to
+   * this offspring via PUT — also flipping status to 'kept' if it
+   * isn't already, since the keeper has made the call.
+   *
+   * If the link step fails after the create succeeded we surface the
+   * error but leave the new record in place — better than deleting a
+   * fresh record. Keeper can manually link via the API or edit form.
+   */
+  async function handleHoldBackSubmit() {
+    if (!o || holdBackCreating) return
+    if (!holdBackName.trim()) {
+      setHoldBackError('Give your new reptile a name first.')
+      return
+    }
+    setHoldBackError(null)
+    setHoldBackCreating(true)
+    try {
+      const morphLabelLine = o.morph_label ? `Morph: ${o.morph_label}.` : null
+      const hatchedLine = holdBackPrefill?.hatch_date
+        ? `Hatched ${holdBackPrefill.hatch_date}.`
+        : 'Hatched from this clutch.'
+      const noteLines = [hatchedLine, morphLabelLine].filter(
+        (l): l is string => Boolean(l),
+      )
+
+      let newId: string
+      if (holdBackPrefill?.taxon === 'lizard') {
+        const payload: CreateLizardPayload = {
+          name: holdBackName.trim(),
+          sex: holdBackSex,
+          source: 'bred',
+          hatch_date: holdBackPrefill?.hatch_date ?? null,
+          scientific_name: holdBackPrefill?.scientific_name ?? null,
+          reptile_species_id: holdBackPrefill?.reptile_species_id ?? null,
+          notes: noteLines.join('\n'),
+          current_weight_g: o.hatch_weight_g ?? null,
+          current_length_in: o.hatch_length_in ?? null,
+        }
+        const created = await createLizard(payload)
+        newId = created.id
+        await updateOffspring(o.id, {
+          lizard_id: newId,
+          status: o.status === 'kept' ? undefined : 'kept',
+        })
+      } else {
+        // Default to snake if taxon prefill failed (taxon is required
+        // by the pairing, so this is a paranoid fallback).
+        const payload: CreateSnakePayload = {
+          name: holdBackName.trim(),
+          sex: holdBackSex,
+          source: 'bred',
+          hatch_date: holdBackPrefill?.hatch_date ?? null,
+          scientific_name: holdBackPrefill?.scientific_name ?? null,
+          reptile_species_id: holdBackPrefill?.reptile_species_id ?? null,
+          notes: noteLines.join('\n'),
+          current_weight_g: o.hatch_weight_g ?? null,
+          current_length_in: o.hatch_length_in ?? null,
+        }
+        const created = await createSnake(payload)
+        newId = created.id
+        await updateOffspring(o.id, {
+          snake_id: newId,
+          status: o.status === 'kept' ? undefined : 'kept',
+        })
+      }
+      // Refetch so the page reflects the new link + status.
+      const refreshed = await getOffspring(o.id)
+      setO(refreshed)
+      setLinkedRecordName(holdBackName.trim())
+      setHoldBackOpen(false)
+      setHoldBackName('')
+      setHoldBackSex('unknown')
+    } catch (err) {
+      setHoldBackError(
+        err instanceof ApiError
+          ? err.message
+          : 'Something went wrong creating the record.',
+      )
+    } finally {
+      setHoldBackCreating(false)
+    }
+  }
+
+  // Fetch the linked record's name when offspring is loaded with a
+  // snake_id or lizard_id, so the "linked to" card can show what it's
+  // linked to rather than a generic indicator.
+  useEffect(() => {
+    if (!o) {
+      setLinkedRecordName(null)
+      return
+    }
+    if (o.snake_id) {
+      getSnake(o.snake_id)
+        .then((s) =>
+          setLinkedRecordName(
+            s.name || s.common_name || s.scientific_name || 'Snake record',
+          ),
+        )
+        .catch(() => setLinkedRecordName(null))
+    } else if (o.lizard_id) {
+      getLizard(o.lizard_id)
+        .then((l) =>
+          setLinkedRecordName(
+            l.name || l.common_name || l.scientific_name || 'Lizard record',
+          ),
+        )
+        .catch(() => setLinkedRecordName(null))
+    } else {
+      setLinkedRecordName(null)
+    }
+  }, [o?.snake_id, o?.lizard_id])
 
   if (!o && error) {
     return (
@@ -202,13 +419,56 @@ export default function OffspringDetailPage({
             />
           </Field>
         </div>
-        {linkedToLive && (
-          <p className="text-[11px] text-herp-teal/80">
-            Linked to a live{' '}
-            {o.snake_id ? 'snake' : 'lizard'} record — its own genotype is
-            authoritative.
-          </p>
-        )}
+        {linkedToLive ? (
+          <div className="rounded-md border border-herp-teal/30 bg-herp-teal/5 p-3">
+            <p className="text-[10px] uppercase tracking-wider text-herp-teal/80 font-medium mb-1">
+              Linked to collection
+            </p>
+            {(() => {
+              const linkedHref = o.snake_id
+                ? `/app/reptiles/${o.snake_id}`
+                : `/app/reptiles/lizards/${o.lizard_id}`
+              const taxonLabel = o.snake_id ? 'snake' : 'lizard'
+              return (
+                <>
+                  <Link
+                    href={linkedHref}
+                    className="text-sm font-medium text-herp-lime hover:underline"
+                  >
+                    {linkedRecordName ?? `Open ${taxonLabel} record`} ›
+                  </Link>
+                  <p className="text-[11px] text-herp-teal/70 mt-1">
+                    The live {taxonLabel}&rsquo;s own genotype is authoritative.
+                  </p>
+                </>
+              )
+            })()}
+          </div>
+        ) : showHoldBackCta(o.status) ? (
+          /* Hold-back / Add-to-collection CTA. Surfaces when the
+             offspring hasn't been disposed of yet — keeper might still
+             want to pull this hatchling into their own collection. The
+             reptile world calls this a "hold back" so we lean on that
+             language in the title. */
+          <div className="rounded-md border border-herp-lime/40 bg-herp-lime/5 p-3 flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-herp-lime">
+                Holding this one back?
+              </p>
+              <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
+                Promote this hatchling to a live reptile record. Species,
+                hatch date, and weight prefill from this clutch.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openHoldBack}
+              className="px-3 py-2 rounded-md herp-gradient-bg text-herp-dark text-xs font-semibold flex-shrink-0"
+            >
+              + Add to collection
+            </button>
+          </div>
+        ) : null}
       </section>
 
       {/* Sale block — only meaningful when status implies it. We render
@@ -313,7 +573,192 @@ export default function OffspringDetailPage({
           {deleting ? 'Deleting…' : 'Delete this offspring record'}
         </button>
       </section>
+
+      {/* Hold-back modal — opens from the CTA above. Parent species
+          info is fetched on first open and cached. Click outside or
+          press Cancel to close.
+
+          On submit: creates a snake or lizard (per parent taxon),
+          links it back to this offspring via tarantula_id/lizard_id,
+          and flips status to 'kept' if it isn't already. */}
+      {holdBackOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !holdBackCreating && setHoldBackOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-lg bg-neutral-950 border border-neutral-800 shadow-2xl"
+          >
+            <div className="px-5 py-4 border-b border-neutral-800">
+              <h3 className="text-base font-semibold text-white">
+                Add hatchling to collection
+              </h3>
+              <p className="text-xs text-neutral-500 mt-1">
+                Creates a live{' '}
+                {holdBackPrefill?.taxon ?? 'reptile'} record and links it
+                back to this offspring entry.
+              </p>
+            </div>
+
+            <div className="px-5 py-4 space-y-4">
+              {/* Prefill summary */}
+              <div className="rounded-md border border-neutral-800 bg-neutral-900/50 p-3 text-xs space-y-1">
+                {holdBackLoading ? (
+                  <p className="text-neutral-500">Loading parent info…</p>
+                ) : holdBackPrefillError ? (
+                  <p className="text-amber-400">
+                    {holdBackPrefillError} You can still create the record
+                    — it just won&rsquo;t auto-fill the species.
+                  </p>
+                ) : (
+                  <>
+                    <PrefillLine
+                      label="Taxon"
+                      value={
+                        holdBackPrefill?.taxon === 'lizard'
+                          ? '🦎 Lizard'
+                          : '🐍 Snake'
+                      }
+                    />
+                    <PrefillLine
+                      label="Species"
+                      value={
+                        holdBackPrefill?.scientific_name ??
+                        'Not set on parents'
+                      }
+                      muted={!holdBackPrefill?.scientific_name}
+                    />
+                    <PrefillLine
+                      label="Hatch date"
+                      value={holdBackPrefill?.hatch_date ?? 'Not recorded'}
+                      muted={!holdBackPrefill?.hatch_date}
+                    />
+                    <PrefillLine label="Source" value="Bred" />
+                  </>
+                )}
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-neutral-500 font-medium mb-1.5">
+                  Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={holdBackName}
+                  onChange={(e) => setHoldBackName(e.target.value)}
+                  placeholder={
+                    o.morph_label
+                      ? `${o.morph_label} hold-back`
+                      : 'e.g. Hold-back #1'
+                  }
+                  disabled={holdBackCreating}
+                  autoFocus
+                  className={INPUT_CLS}
+                />
+              </div>
+
+              {/* Sex */}
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-neutral-500 font-medium mb-1.5">
+                  Sex
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['male', 'female', 'unknown'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setHoldBackSex(s)}
+                      disabled={holdBackCreating}
+                      className={`px-3 py-2 text-xs rounded-md border capitalize transition ${
+                        holdBackSex === s
+                          ? 'border-herp-teal/60 bg-herp-teal/10 text-herp-lime font-semibold'
+                          : 'border-neutral-800 bg-neutral-900/30 text-neutral-400 hover:text-neutral-200'
+                      } disabled:opacity-50`}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-neutral-500 mt-1.5">
+                  Set to <code>unknown</code> if it&rsquo;s too young to
+                  sex — you can update on the reptile detail page later.
+                </p>
+              </div>
+
+              {holdBackError && (
+                <div
+                  role="alert"
+                  className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300"
+                >
+                  {holdBackError}
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-3 border-t border-neutral-800 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setHoldBackOpen(false)}
+                disabled={holdBackCreating}
+                className="px-3 py-2 text-xs text-neutral-400 hover:text-neutral-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleHoldBackSubmit}
+                disabled={holdBackCreating || !holdBackName.trim()}
+                className="px-4 py-2 text-xs font-semibold rounded-md herp-gradient-bg text-herp-dark disabled:opacity-50"
+              >
+                {holdBackCreating ? 'Creating…' : 'Create & link'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
+  )
+}
+
+/**
+ * Visibility predicate for the hold-back CTA. Shows on statuses where
+ * the keeper hasn't disposed of the hatchling — sold/traded/gifted/
+ * deceased mean the offspring is gone and creating a collection
+ * record from it would be confusing.
+ */
+function showHoldBackCta(status: OffspringStatus): boolean {
+  return (
+    status === 'hatched' ||
+    status === 'kept' ||
+    status === 'available' ||
+    status === 'unknown'
+  )
+}
+
+function PrefillLine({
+  label,
+  value,
+  muted,
+}: {
+  label: string
+  value: string
+  muted?: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-neutral-500 font-medium">{label}</span>
+      <span
+        className={`text-right ${
+          muted ? 'text-neutral-500 italic' : 'text-neutral-200'
+        }`}
+      >
+        {value}
+      </span>
+    </div>
   )
 }
 

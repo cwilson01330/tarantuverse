@@ -101,6 +101,31 @@ function lizardToOption(l: Lizard): ParentOption {
   };
 }
 
+/**
+ * Cross-species check with graceful fallback. Mirrors the same helper
+ * shipped on TV (apps/mobile/app/breeding/pairings/new.tsx and the web
+ * equivalent). Keep them in sync.
+ *
+ *   1. reptile_species_id match — canonical comparison when both
+ *      parents were picked from the species autocomplete.
+ *   2. scientific_name match — fallback for keepers who typed names
+ *      freely before linking, or for species not yet in the catalog.
+ *      Trim + lowercase so casing/whitespace differences don't false-
+ *      positive.
+ *   3. Insufficient data — return true (allow). Can't enforce.
+ */
+function speciesMatches(a: ParentOption, b: ParentOption): boolean {
+  if (a.reptile_species_id && b.reptile_species_id) {
+    return a.reptile_species_id === b.reptile_species_id;
+  }
+  const aName = a.scientific_name?.trim().toLowerCase();
+  const bName = b.scientific_name?.trim().toLowerCase();
+  if (aName && bName) {
+    return aName === bName;
+  }
+  return true;
+}
+
 const TAXON_OPTIONS = [
   { value: 'snake' as const, label: '🐍 Snake' },
   { value: 'lizard' as const, label: '🦎 Lizard' },
@@ -211,11 +236,9 @@ function NewPairingScreen() {
     // Defensive cross-species check. Reachable only if the keeper
     // picked the female first, then changed the male to a different
     // species afterwards — the picker filter blocks the forward path.
-    if (
-      maleOption?.reptile_species_id &&
-      femaleOption?.reptile_species_id &&
-      maleOption.reptile_species_id !== femaleOption.reptile_species_id
-    ) {
+    // Uses speciesMatches() so free-typed scientific names enforce too,
+    // not just reptile_species_id-linked records.
+    if (maleOption && femaleOption && !speciesMatches(maleOption, femaleOption)) {
       const a = maleOption.scientific_name ?? 'this male';
       const b = femaleOption.scientific_name ?? 'this female';
       setSubmitError(
@@ -464,34 +487,30 @@ function NewPairingScreen() {
             : pickerOpen === 'female'
               ? males.find((p) => p.id === maleId)
               : null;
-        const targetSpeciesId =
-          otherParent?.reptile_species_id ?? null;
         const sourceList = pickerOpen === 'male' ? males : females;
         const otherSlotId = pickerOpen === 'male' ? femaleId : maleId;
-        const filteredOptions = sourceList.filter((p) => {
-          if (p.id === otherSlotId) return false;
-          // Species filter only kicks in when the other slot is
-          // populated AND that animal has a species linked AND this
-          // candidate also has a species linked. If either side is
-          // unlinked, we let it through with the keeper's trust.
-          if (
-            targetSpeciesId &&
-            p.reptile_species_id &&
-            p.reptile_species_id !== targetSpeciesId
-          ) {
-            return false;
-          }
-          return true;
-        });
+        // Two-step filter so the empty-state copy can distinguish
+        // "species filter excluded everyone" from "only candidate is
+        // the other slot."
+        const afterSameAnimal = sourceList.filter(
+          (p) => p.id !== otherSlotId,
+        );
+        const filteredOptions = afterSameAnimal.filter((p) =>
+          otherParent ? speciesMatches(p, otherParent) : true,
+        );
 
         // Empty-state copy adapts to the failing-filter reason so the
         // keeper knows exactly why nothing shows up.
         let emptyOverride: string | null = null;
         if (sourceList.length === 0) {
           // No candidates at all — leave the default copy.
-        } else if (filteredOptions.length === 0 && targetSpeciesId) {
+        } else if (
+          filteredOptions.length === 0 &&
+          afterSameAnimal.length > 0 &&
+          otherParent
+        ) {
           const speciesLabel =
-            otherParent?.scientific_name ?? 'the selected species';
+            otherParent.scientific_name ?? 'the selected species';
           emptyOverride = `No ${speciesLabel} candidates in your collection match the other parent's species. Add another ${speciesLabel} to pair this one.`;
         } else if (filteredOptions.length === 0 && otherSlotId) {
           emptyOverride =
