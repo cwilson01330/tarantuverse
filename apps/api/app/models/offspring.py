@@ -29,7 +29,16 @@ class Offspring(Base):
     # Optional link to tarantula record if kept in collection
     tarantula_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    status = Column(SQLEnum(OffspringStatus), default=OffspringStatus.UNKNOWN, nullable=False)
+    # The offspringstatus PG enum was created with the lowercase Python
+    # enum *values* ("kept", "sold", "given_away", …). SQLAlchemy defaults
+    # to sending the Python enum *name* ("KEPT", "GIVEN_AWAY") which the
+    # DB rejects. values_callable forces SQLAlchemy to send the values.
+    # See models/pairing.py for the same pattern + reasoning.
+    status = Column(
+        SQLEnum(OffspringStatus, values_callable=lambda x: [e.value for e in x]),
+        default=OffspringStatus.UNKNOWN,
+        nullable=False,
+    )
     status_date = Column(Date, nullable=True)  # Date sold, traded, died, etc.
 
     # Details for sold/traded offspring

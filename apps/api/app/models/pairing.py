@@ -35,8 +35,24 @@ class Pairing(Base):
     paired_date = Column(Date, nullable=False, index=True)
     separated_date = Column(Date, nullable=True)
 
-    pairing_type = Column(SQLEnum(PairingType), default=PairingType.NATURAL, nullable=False)
-    outcome = Column(SQLEnum(PairingOutcome), default=PairingOutcome.IN_PROGRESS, nullable=False)
+    # The pairingtype / pairingoutcome PG enums were created with the
+    # lowercase Python enum *values* ("natural", "in_progress", …), but
+    # SQLAlchemy's default behavior is to send the Python enum *name*
+    # ("NATURAL", "IN_PROGRESS") — which makes inserts fail with
+    # `invalid input value for enum pairingtype: "NATURAL"`. values_callable
+    # tells SQLAlchemy to send the values instead. Don't apply this to
+    # shared UPPERCASE enums (sex/source/carelevel) — those store the
+    # names and would break.
+    pairing_type = Column(
+        SQLEnum(PairingType, values_callable=lambda x: [e.value for e in x]),
+        default=PairingType.NATURAL,
+        nullable=False,
+    )
+    outcome = Column(
+        SQLEnum(PairingOutcome, values_callable=lambda x: [e.value for e in x]),
+        default=PairingOutcome.IN_PROGRESS,
+        nullable=False,
+    )
 
     notes = Column(Text, nullable=True)
     created_at = Column(Date, default=datetime.utcnow, nullable=False)
