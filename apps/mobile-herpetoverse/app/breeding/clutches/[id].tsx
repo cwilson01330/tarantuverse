@@ -356,11 +356,34 @@ function ClutchDetailScreen() {
             </View>
 
             <View>
-              <Text
-                style={[styles.sectionLabel, { color: colors.textTertiary }]}
-              >
-                OFFSPRING
-              </Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text
+                  style={[styles.sectionLabel, { color: colors.textTertiary }]}
+                >
+                  OFFSPRING
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push(
+                      `/breeding/clutches/${clutch.id}/offspring/new` as never,
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Add hatchling"
+                  style={styles.sectionAdd}
+                >
+                  <MaterialCommunityIcons
+                    name="plus-circle"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[styles.sectionAddText, { color: colors.primary }]}
+                  >
+                    Add hatchling
+                  </Text>
+                </TouchableOpacity>
+              </View>
               {offspring === null ? (
                 <ActivityIndicator color={colors.textTertiary} />
               ) : offspring.length === 0 ? (
@@ -377,17 +400,22 @@ function ClutchDetailScreen() {
                   <Text
                     style={[styles.emptyText, { color: colors.textSecondary }]}
                   >
-                    No offspring recorded for this clutch yet. Offspring
-                    tracking on mobile arrives in the next sprint — for
-                    now use the web app to log individual hatchlings,
-                    morphs, and sale status.
+                    No hatchlings recorded for this clutch yet. Tap{' '}
+                    <Text style={{ fontWeight: '600' }}>Add hatchling</Text>{' '}
+                    once eggs start cutting — you can record morph,
+                    weight, and length, then update sale status later.
                   </Text>
                 </View>
               ) : (
                 <View style={{ gap: 8 }}>
                   {offspring.map((o) => (
-                    <View
+                    <TouchableOpacity
                       key={o.id}
+                      onPress={() =>
+                        router.push(`/breeding/offspring/${o.id}` as never)
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${o.morph_label ?? 'hatchling'}`}
                       style={[
                         styles.offspringRow,
                         {
@@ -426,36 +454,15 @@ function ClutchDetailScreen() {
                           {o.price_sold ? ` · $${o.price_sold}` : ''}
                         </Text>
                       </View>
-                    </View>
+                      <MaterialCommunityIcons
+                        name="chevron-right"
+                        size={18}
+                        color={colors.textTertiary}
+                      />
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}
-            </View>
-
-            <View
-              style={[
-                styles.comingSoon,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: colors.surfaceRaised,
-                  borderRadius: layout.radius.sm,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="hammer-wrench"
-                size={14}
-                color={colors.textTertiary}
-              />
-              <Text
-                style={[
-                  styles.comingSoonText,
-                  { color: colors.textTertiary },
-                ]}
-              >
-                Editing counts, adding offspring, and recording sales move
-                to mobile in the next sprint.
-              </Text>
             </View>
           </>
         )}
@@ -570,7 +577,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.6,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  sectionAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+  },
+  sectionAddText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 
   emptyCard: {

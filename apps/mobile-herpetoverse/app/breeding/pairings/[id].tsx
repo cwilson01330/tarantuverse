@@ -379,27 +379,6 @@ function PairingDetailScreen() {
               )}
             </View>
 
-            <View
-              style={[
-                styles.comingSoon,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: colors.surfaceRaised,
-                  borderRadius: layout.radius.sm,
-                },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="hammer-wrench"
-                size={14}
-                color={colors.textTertiary}
-              />
-              <Text
-                style={[styles.comingSoonText, { color: colors.textTertiary }]}
-              >
-                Recording individual offspring lands in the next sprint.
-              </Text>
-            </View>
           </>
         )}
       </ScrollView>
