@@ -13,11 +13,12 @@ class FeedingLog(Base):
     __tablename__ = "feeding_logs"
     __table_args__ = (
         # Polymorphic parent: exactly one of tarantula_id / enclosure_id /
-        # snake_id / lizard_id is set. Enforced by DB CHECK — the three-
-        # parent version was added in flg_20260421_extend_feeding_logs_polymorphic,
-        # extended to four parents in lzp_20260423_extend_polymorphic_tables.
+        # snake_id / lizard_id / frog_id is set. Enforced by DB CHECK —
+        # the three-parent version was added in flg_20260421, extended
+        # to four parents in lzp_20260423, and to five (with frog_id) in
+        # frp_20260513.
         CheckConstraint(
-            'num_nonnulls(tarantula_id, enclosure_id, snake_id, lizard_id) = 1',
+            'num_nonnulls(tarantula_id, enclosure_id, snake_id, lizard_id, frog_id) = 1',
             name='feeding_logs_must_have_exactly_one_parent',
         ),
     )
@@ -34,6 +35,14 @@ class FeedingLog(Base):
     lizard_id = Column(
         UUID(as_uuid=True),
         ForeignKey("lizards.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    # Frog feedings — fruit flies, springtails, pinkies, etc. Same row
+    # shape as lizard feedings. Added by frp_20260513.
+    frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -59,7 +68,14 @@ class FeedingLog(Base):
     enclosure = relationship("Enclosure", back_populates="feeding_logs")
     snake = relationship("Snake", backref="feeding_logs")
     lizard = relationship("Lizard", backref="feeding_logs")
+    frog = relationship("Frog", backref="feeding_logs")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.enclosure_id or self.snake_id or self.lizard_id
+        parent = (
+            self.tarantula_id
+            or self.enclosure_id
+            or self.snake_id
+            or self.lizard_id
+            or self.frog_id
+        )
         return f"<FeedingLog {parent} @ {self.fed_at}>"

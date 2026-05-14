@@ -77,6 +77,12 @@ class ReptileOffspring(Base):
         ForeignKey("lizards.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Frog hold-back link — added by frb_20260513.
+    frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     # Free-text identifier used in two cases:
     #   - hatchling without a recorded genotype yet ("Pied het albino")

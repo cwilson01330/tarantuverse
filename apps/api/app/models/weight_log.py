@@ -50,7 +50,7 @@ class WeightLog(Base):
     __tablename__ = "weight_logs"
     __table_args__ = (
         CheckConstraint(
-            'num_nonnulls(snake_id, lizard_id) = 1',
+            'num_nonnulls(snake_id, lizard_id, frog_id) = 1',
             name='weight_logs_must_have_exactly_one_parent',
         ),
     )
@@ -68,6 +68,13 @@ class WeightLog(Base):
         nullable=True,
         index=True,
     )
+    # Frog weight tracking — same shape. Added by frp_20260513.
+    frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     weighed_at = Column(DateTime(timezone=True), nullable=False, index=True)
     weight_g = Column(Numeric(8, 2), nullable=False)
@@ -82,7 +89,8 @@ class WeightLog(Base):
     # Relationships
     snake = relationship("Snake", backref="weight_logs")
     lizard = relationship("Lizard", backref="weight_logs")
+    frog = relationship("Frog", backref="weight_logs")
 
     def __repr__(self):
-        parent = self.snake_id or self.lizard_id
+        parent = self.snake_id or self.lizard_id or self.frog_id
         return f"<WeightLog parent={parent} {self.weight_g}g @ {self.weighed_at}>"

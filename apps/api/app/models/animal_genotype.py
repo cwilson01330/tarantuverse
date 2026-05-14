@@ -25,7 +25,7 @@ class AnimalGenotype(Base):
     __tablename__ = "animal_genotypes"
     __table_args__ = (
         CheckConstraint(
-            'num_nonnulls(snake_id, lizard_id) = 1',
+            'num_nonnulls(snake_id, lizard_id, frog_id) = 1',
             name='animal_genotypes_must_have_exactly_one_parent',
         ),
     )
@@ -41,6 +41,15 @@ class AnimalGenotype(Base):
     lizard_id = Column(
         UUID(as_uuid=True),
         ForeignKey("lizards.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    # Frog genotypes — dart frog morphs (azureus, leucomelas), Pacman
+    # frog color phases. v1 doesn't surface a frog gene catalog but the
+    # polymorphic slot keeps the table consistent. Added by frp_20260513.
+    frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -67,7 +76,8 @@ class AnimalGenotype(Base):
     # Relationships
     snake = relationship("Snake", backref="genotypes")
     lizard = relationship("Lizard", backref="genotypes")
+    frog = relationship("Frog", backref="genotypes")
 
     def __repr__(self):
-        parent = self.snake_id or self.lizard_id
+        parent = self.snake_id or self.lizard_id or self.frog_id
         return f"<AnimalGenotype parent={parent} gene={self.gene_id} {self.zygosity}>"

@@ -20,7 +20,7 @@ class QRUploadSession(Base):
     __tablename__ = "qr_upload_sessions"
     __table_args__ = (
         CheckConstraint(
-            'num_nonnulls(tarantula_id, snake_id, lizard_id) = 1',
+            'num_nonnulls(tarantula_id, snake_id, lizard_id, frog_id) = 1',
             name='qr_upload_sessions_must_have_exactly_one_parent',
         ),
     )
@@ -45,6 +45,13 @@ class QRUploadSession(Base):
         nullable=True,
         index=True,
     )
+    # Frog photo upload sessions — added by frp_20260513.
+    frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     # Allow multiple uploads per session (e.g. a whole photo shoot)
@@ -58,8 +65,9 @@ class QRUploadSession(Base):
     tarantula = relationship("Tarantula")
     snake = relationship("Snake")
     lizard = relationship("Lizard")
+    frog = relationship("Frog")
     user = relationship("User")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.snake_id or self.lizard_id
+        parent = self.tarantula_id or self.snake_id or self.lizard_id or self.frog_id
         return f"<QRUploadSession {self.token[:8]}... parent={parent}>"

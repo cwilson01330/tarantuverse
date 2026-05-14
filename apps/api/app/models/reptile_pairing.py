@@ -68,6 +68,14 @@ class ReptilePairing(Base):
         ForeignKey("lizards.id", ondelete="CASCADE"),
         nullable=True,
     )
+    # Frog parents — added by frb_20260513. Same XOR semantics: exactly
+    # one of male_snake_id / male_lizard_id / male_frog_id populated,
+    # same for female, and both parents must be the same taxon.
+    male_frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     female_snake_id = Column(
         UUID(as_uuid=True),
         ForeignKey("snakes.id", ondelete="CASCADE"),
@@ -76,6 +84,11 @@ class ReptilePairing(Base):
     female_lizard_id = Column(
         UUID(as_uuid=True),
         ForeignKey("lizards.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    female_frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="CASCADE"),
         nullable=True,
     )
 
@@ -128,13 +141,17 @@ class ReptilePairing(Base):
 
     @property
     def taxon(self) -> str:
-        """Derived discriminator — 'snake' or 'lizard'."""
-        return "snake" if self.male_snake_id is not None else "lizard"
+        """Derived discriminator — 'snake', 'lizard', or 'frog'."""
+        if self.male_snake_id is not None:
+            return "snake"
+        if self.male_lizard_id is not None:
+            return "lizard"
+        return "frog"
 
     @property
     def male_id(self):
-        return self.male_snake_id or self.male_lizard_id
+        return self.male_snake_id or self.male_lizard_id or self.male_frog_id
 
     @property
     def female_id(self):
-        return self.female_snake_id or self.female_lizard_id
+        return self.female_snake_id or self.female_lizard_id or self.female_frog_id

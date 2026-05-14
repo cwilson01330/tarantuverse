@@ -19,7 +19,7 @@ class Photo(Base):
     __tablename__ = "photos"
     __table_args__ = (
         CheckConstraint(
-            'num_nonnulls(tarantula_id, snake_id, lizard_id) = 1',
+            'num_nonnulls(tarantula_id, snake_id, lizard_id, frog_id) = 1',
             name='photos_must_have_exactly_one_parent',
         ),
     )
@@ -42,6 +42,13 @@ class Photo(Base):
         nullable=True,
         index=True,
     )
+    # Frog photos — added by frp_20260513.
+    frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     url = Column(String(500), nullable=False)
     thumbnail_url = Column(String(500))
@@ -54,7 +61,8 @@ class Photo(Base):
     tarantula = relationship("Tarantula", backref="photos")
     snake = relationship("Snake", backref="photos")
     lizard = relationship("Lizard", backref="photos")
+    frog = relationship("Frog", backref="photos")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.snake_id or self.lizard_id
+        parent = self.tarantula_id or self.snake_id or self.lizard_id or self.frog_id
         return f"<Photo {self.id} parent={parent}>"

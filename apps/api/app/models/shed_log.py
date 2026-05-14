@@ -36,7 +36,7 @@ class ShedLog(Base):
     __tablename__ = "shed_logs"
     __table_args__ = (
         CheckConstraint(
-            'num_nonnulls(snake_id, lizard_id) = 1',
+            'num_nonnulls(snake_id, lizard_id, frog_id) = 1',
             name='shed_logs_must_have_exactly_one_parent',
         ),
     )
@@ -51,6 +51,14 @@ class ShedLog(Base):
     lizard_id = Column(
         UUID(as_uuid=True),
         ForeignKey("lizards.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    # Frogs slough their skin and typically eat it — same shed-log
+    # semantics apply. Added by frp_20260513.
+    frog_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("frogs.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -83,7 +91,8 @@ class ShedLog(Base):
     # Relationships
     snake = relationship("Snake", backref="shed_logs")
     lizard = relationship("Lizard", backref="shed_logs")
+    frog = relationship("Frog", backref="shed_logs")
 
     def __repr__(self):
-        parent = self.snake_id or self.lizard_id
+        parent = self.snake_id or self.lizard_id or self.frog_id
         return f"<ShedLog parent={parent} @ {self.shed_at}>"
