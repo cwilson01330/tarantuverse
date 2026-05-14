@@ -25,9 +25,10 @@ export async function initPostHog(): Promise<PostHog | null> {
   posthog = new PostHog(POSTHOG_KEY, {
     host: POSTHOG_HOST,
     // We send $screen events manually on navigation rather than relying
-    // on the SDK's captureLifecycleEvents wiring — navigation events are
-    // finicky with expo-router.
-    captureAppLifecycleEvents: true,
+    // on the SDK's screen-tracking wiring — navigation events are finicky
+    // with expo-router. App open/background lifecycle events are still
+    // worth having, so the native lifecycle capture stays on.
+    captureNativeAppLifecycleEvents: true,
     // No autocapture — only events we explicitly send.
     enableSessionReplay: false,
   });
