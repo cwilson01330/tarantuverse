@@ -207,13 +207,8 @@ function CollectionScreen() {
           <ReptileCard
             row={item}
             onPress={() => {
-              // Lizards live under /lizard/; snakes + frogs use the
-              // root /reptile/ detail route.
-              const path =
-                item.taxon === 'lizard'
-                  ? `/lizard/${item.id}`
-                  : `/reptile/${item.id}`;
-              router.push(path as never);
+              // ADR-003: one taxon-agnostic /reptile/ detail route.
+              router.push(`/reptile/${item.id}` as never);
             }}
           />
         )}

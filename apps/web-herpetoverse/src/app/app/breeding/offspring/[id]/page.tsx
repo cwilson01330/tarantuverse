@@ -401,13 +401,9 @@ export default function OffspringDetailPage({
               Linked to collection
             </p>
             {(() => {
-              // Lizards live under the lizards/ subpath; snakes + frogs
-              // use the root reptile detail route. linkedTaxon may still
-              // be resolving — the root route renders any animal anyway.
-              const linkedHref =
-                linkedTaxon === 'lizard'
-                  ? `/app/reptiles/lizards/${o.animal_id}`
-                  : `/app/reptiles/${o.animal_id}`
+              // ADR-003: one taxon-agnostic detail route. linkedTaxon is
+              // still resolved (below) purely for the "Open … record" label.
+              const linkedHref = `/app/reptiles/${o.animal_id}`
               const taxonLabel = linkedTaxon ?? 'animal'
               return (
                 <>

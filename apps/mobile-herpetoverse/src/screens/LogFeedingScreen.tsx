@@ -3,9 +3,8 @@
  *
  * ADR-003: snakes/lizards/frogs collapsed into one `animals` table, so
  * create posts to `/animals/<id>/feedings` and the screen no longer
- * needs a `taxon` prop. Two route entries still wrap this component
- * (`/reptile/log-feeding/[id]` and `/lizard/log-feeding/[id]`) — they
- * just render it directly now.
+ * needs a `taxon` prop. The canonical route is `/reptile/log-feeding/[id]`;
+ * the legacy `/lizard/log-feeding/[id]` route redirects there.
  *
  * EDIT MODE: when the route includes a `feedingId` query param the screen
  * pre-fills via GET /feedings/{id} and PUTs on save — feeding rows carry

@@ -159,9 +159,8 @@ function AddReptileScreen() {
       // payload instead of routing to per-taxon endpoints.
       const created = await createAnimal(payload);
       // Replace so back goes to collection, not back to this form.
-      const detailPath =
-        taxon === 'snake' ? `/reptile/${created.id}` : `/lizard/${created.id}`;
-      router.replace(detailPath as never);
+      // ADR-003: one detail route for every taxon.
+      router.replace(`/reptile/${created.id}` as never);
     } catch (err) {
       setError(extractErrorMessage(err, 'Could not save this reptile.'));
       setSubmitting(false);

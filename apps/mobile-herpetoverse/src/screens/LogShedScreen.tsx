@@ -1,5 +1,5 @@
 /**
- * Log shed — shared screen for snake and lizard, also handles edit.
+ * Log shed — shared screen for every taxon, also handles edit.
  *
  * Lighter than weight + feeding because shed entries are simpler: a
  * date, whether the shed came off cleanly, whether anything retained,

@@ -35,12 +35,9 @@ import { useTheme } from '../contexts/ThemeContext';
 const WEB_BASE =
   process.env.EXPO_PUBLIC_WEB_URL || 'https://herpetoverse.com';
 
-export type ShareTaxon = 'snake' | 'lizard';
-
 interface Props {
   visible: boolean;
   onClose: () => void;
-  taxon: ShareTaxon;
   animalId: string;
   animalName?: string | null;
   /**
@@ -54,7 +51,6 @@ interface Props {
 export function ReptileShareSheet({
   visible,
   onClose,
-  taxon,
   animalId,
   animalName,
   collectionVisibility,
@@ -86,12 +82,9 @@ export function ReptileShareSheet({
 
   const handleOpenWebLabels = () => {
     // Open the OWNER detail page on web, where the label-printing UI
-    // lives (ReptileQRModal). Requires login on web.
-    const ownerPath =
-      taxon === 'snake'
-        ? `/app/reptiles/${animalId}`
-        : `/app/reptiles/lizards/${animalId}`;
-    Linking.openURL(`${WEB_BASE}${ownerPath}`);
+    // lives (ReptileQRModal). Requires login on web. ADR-003 collapsed
+    // the per-taxon route trees — one /app/reptiles/{id} path for all.
+    Linking.openURL(`${WEB_BASE}/app/reptiles/${animalId}`);
   };
 
   const isPrivate = collectionVisibility === 'private';

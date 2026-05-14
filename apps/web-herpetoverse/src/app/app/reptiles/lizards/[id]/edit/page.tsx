@@ -1,17 +1,18 @@
-import EditLizardClient from './EditLizardClient'
+/**
+ * Legacy lizard edit route.
+ *
+ * ADR-003 follow-through: the edit clients collapsed into one
+ * taxon-agnostic screen at /app/reptiles/[id]/edit. This file is kept
+ * only so any straggler link still resolves — it permanently redirects
+ * to the unified route.
+ */
+import { redirect } from 'next/navigation'
 
 interface PageProps {
-  // Next.js 15 — dynamic params are a Promise.
   params: Promise<{ id: string }>
 }
 
-export const metadata = {
-  title: 'Edit reptile · Herpetoverse',
-}
-
-export default async function EditLizardPage({ params }: PageProps) {
+export default async function LegacyLizardEditPage({ params }: PageProps) {
   const { id } = await params
-  // Auth gate lives in /app/reptiles/layout.tsx; the fetch must run client-side
-  // because the bearer token is in localStorage.
-  return <EditLizardClient lizardId={id} />
+  redirect(`/app/reptiles/${id}/edit`)
 }

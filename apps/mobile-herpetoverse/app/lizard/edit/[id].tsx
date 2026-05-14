@@ -1,9 +1,10 @@
-/** Lizard edit route — wraps the shared (taxon-agnostic) screen. */
-import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
-import { EditReptileScreen } from '../../../src/screens/EditReptileScreen';
+/**
+ * Legacy lizard edit route — redirects to the unified
+ * `/reptile/edit/[id]`. ADR-003 route collapse.
+ */
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-function Page() {
-  return <EditReptileScreen />;
+export default function Page() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <Redirect href={`/reptile/edit/${id}` as never} />;
 }
-
-export default withErrorBoundary(Page, 'edit-reptile-lizard');

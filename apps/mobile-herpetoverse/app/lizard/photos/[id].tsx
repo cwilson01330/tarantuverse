@@ -1,9 +1,10 @@
-/** Lizard photo gallery route — wraps the shared screen with `taxon="lizard"`. */
-import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
-import { ReptilePhotoGalleryScreen } from '../../../src/screens/ReptilePhotoGalleryScreen';
+/**
+ * Legacy lizard photo gallery route — redirects to
+ * `/reptile/photos/[id]`. ADR-003 route collapse.
+ */
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-function Page() {
-  return <ReptilePhotoGalleryScreen taxon="lizard" />;
+export default function Page() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <Redirect href={`/reptile/photos/${id}` as never} />;
 }
-
-export default withErrorBoundary(Page, 'reptile-photos-lizard');

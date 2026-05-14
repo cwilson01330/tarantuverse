@@ -1,9 +1,10 @@
-/** Lizard QR upload session route. */
-import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
-import { QRUploadSessionScreen } from '../../../src/screens/QRUploadSessionScreen';
+/**
+ * Legacy lizard QR upload session route — redirects to
+ * `/reptile/qr/[id]`. ADR-003 route collapse.
+ */
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-function Page() {
-  return <QRUploadSessionScreen />;
+export default function Page() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  return <Redirect href={`/reptile/qr/${id}` as never} />;
 }
-
-export default withErrorBoundary(Page, 'qr-upload-lizard');

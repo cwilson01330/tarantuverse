@@ -524,13 +524,8 @@ function OffspringDetailScreen() {
               <TouchableOpacity
                 onPress={() => {
                   if (!offspring.animal_id) return;
-                  // Lizards live under /lizard/; snakes + frogs use the
-                  // root /reptile/ detail route.
-                  const path =
-                    linkedTaxon === 'lizard'
-                      ? `/lizard/${offspring.animal_id}`
-                      : `/reptile/${offspring.animal_id}`;
-                  router.push(path as never);
+                  // ADR-003: one detail route for every taxon.
+                  router.push(`/reptile/${offspring.animal_id}` as never);
                 }}
                 accessibilityRole="link"
                 style={[

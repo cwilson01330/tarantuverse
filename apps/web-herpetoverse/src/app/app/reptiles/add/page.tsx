@@ -22,9 +22,9 @@
  *  - Starting weight is offered inline so the weight trend chart has a
  *    data point day one.
  *
- * On success: router.push to the appropriate detail page
- * (/app/reptiles/{id} for snakes, /app/reptiles/lizards/{id} for
- * lizards) so the keeper immediately sees the record they just created.
+ * On success: router.push to the unified detail page
+ * (/app/reptiles/{id} — ADR-003 collapsed the per-taxon route trees) so
+ * the keeper immediately sees the record they just created.
  */
 
 import Link from 'next/link'
@@ -154,13 +154,8 @@ export default function AddReptilePage() {
     setSubmitting(true)
     try {
       const animal = await createAnimal(payload)
-      // Lizards live under the lizards/ subpath; snakes use the root
-      // reptile detail route.
-      router.push(
-        form.taxon === 'lizard'
-          ? `/app/reptiles/lizards/${animal.id}`
-          : `/app/reptiles/${animal.id}`,
-      )
+      // ADR-003: one taxon-agnostic detail route for every taxon.
+      router.push(`/app/reptiles/${animal.id}`)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || 'Could not save. Please try again.')

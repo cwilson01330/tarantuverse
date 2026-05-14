@@ -142,12 +142,8 @@ export default function ReptilePublicProfile({ animalId }: Props) {
   // Quick-action destinations for the owner. Tarantuverse uses query
   // params (?log=feeding); we keep the same shape so the dashboard pages
   // can read the param and pre-open the relevant log form.
-  // Lizards live under a `lizards/` subpath; snakes + frogs use the
-  // root reptile detail route.
-  const detailHref =
-    p.taxon === 'lizard'
-      ? `/app/reptiles/lizards/${p.id}`
-      : `/app/reptiles/${p.id}`
+  // ADR-003: one taxon-agnostic detail route for every taxon.
+  const detailHref = `/app/reptiles/${p.id}`
   const logFeedingHref = `${detailHref}?log=feeding`
   const logShedHref = `${detailHref}?log=shed`
 

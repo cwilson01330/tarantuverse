@@ -1,4 +1,4 @@
-import EditReptileClient from './EditReptileClient'
+import EditAnimalClient from './EditAnimalClient'
 
 interface PageProps {
   // Next.js 15 — dynamic params are a Promise.
@@ -13,5 +13,8 @@ export default async function EditReptilePage({ params }: PageProps) {
   const { id } = await params
   // Auth gate lives in /app/reptiles/layout.tsx; the fetch must run client-side
   // because the bearer token is in localStorage.
-  return <EditReptileClient snakeId={id} />
+  //
+  // ADR-003: one taxon-agnostic edit screen. The lizard-specific edit route
+  // redirects here.
+  return <EditAnimalClient animalId={id} />
 }

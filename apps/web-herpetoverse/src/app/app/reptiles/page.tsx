@@ -6,11 +6,10 @@
  * First authenticated page in Herpetoverse. Uses the shared Tarantuverse
  * API via apiClient — see lib/auth.ts + lib/apiClient.ts.
  *
- * Displays every reptile the keeper owns regardless of taxon (snakes +
- * lizards). Taxon is kept as part of each row so the card can route to
- * the right detail page (/app/reptiles/{id} for snakes vs.
- * /app/reptiles/lizards/{id} for lizards) and render a subtle taxon
- * indicator. Sorting is newest-first by created_at.
+ * Displays every reptile the keeper owns regardless of taxon. ADR-003
+ * collapsed the per-taxon route trees, so every card routes to the one
+ * /app/reptiles/[id] detail page; taxon is kept on each row only to
+ * render a subtle taxon indicator. Sorting is newest-first by created_at.
  *
  * Error handling is permissive: if one taxon fetch fails we still show
  * whatever loaded; a banner surfaces the partial failure.
@@ -54,12 +53,10 @@ function animalRow(a: Animal): ReptileRow {
   }
 }
 
-/** Detail page URL — lizards go under a `lizards/` subpath; snakes and
- *  frogs use the root-level reptile detail route. */
+/** Detail page URL — ADR-003 collapsed the per-taxon route trees, so
+ *  every taxon resolves through the one /app/reptiles/[id] route. */
 function detailHref(row: ReptileRow): string {
-  return row.taxon === 'lizard'
-    ? `/app/reptiles/lizards/${row.id}`
-    : `/app/reptiles/${row.id}`
+  return `/app/reptiles/${row.id}`
 }
 
 export default function ReptilesPage() {

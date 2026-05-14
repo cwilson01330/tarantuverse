@@ -1,9 +1,16 @@
-/** Lizard log-shed route — wraps the shared (taxon-agnostic) screen. */
-import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
-import { LogShedScreen } from '../../../src/screens/LogShedScreen';
+/**
+ * Legacy lizard log-shed route — redirects to `/reptile/log-shed/[id]`,
+ * forwarding the optional `shedId` edit param. ADR-003 route collapse.
+ */
+import { Redirect, useLocalSearchParams } from 'expo-router';
 
-function Page() {
-  return <LogShedScreen />;
+export default function Page() {
+  const { id, shedId } = useLocalSearchParams<{
+    id: string;
+    shedId?: string;
+  }>();
+  const href = shedId
+    ? `/reptile/log-shed/${id}?shedId=${shedId}`
+    : `/reptile/log-shed/${id}`;
+  return <Redirect href={href as never} />;
 }
-
-export default withErrorBoundary(Page, 'log-shed-lizard');

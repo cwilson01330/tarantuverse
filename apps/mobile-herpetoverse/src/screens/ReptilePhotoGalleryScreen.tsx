@@ -1,5 +1,5 @@
 /**
- * Reptile photo gallery — shared between snake + lizard.
+ * Reptile photo gallery — taxon-agnostic (snake, lizard, frog).
  *
  * Three responsibilities:
  *   1. List the animal's photos in a thumb grid.
@@ -53,11 +53,10 @@ import {
   updatePhotoCaption,
   uploadPhoto,
 } from '../lib/photos';
-import type { AnimalTaxon } from '../lib/animals';
 
-// ADR-003: photo data is taxon-agnostic now; `taxon` survives only to
-// pick the right per-taxon in-app route for the QR shortcut.
-export function ReptilePhotoGalleryScreen({ taxon }: { taxon: AnimalTaxon }) {
+// ADR-003: photo data and routing are both taxon-agnostic now — the
+// QR shortcut and every other nav target resolve through `/reptile/...`.
+export function ReptilePhotoGalleryScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
@@ -320,11 +319,7 @@ export function ReptilePhotoGalleryScreen({ taxon }: { taxon: AnimalTaxon }) {
               <TouchableOpacity
                 onPress={() => {
                   if (!id) return;
-                  const path =
-                    taxon === 'lizard'
-                      ? `/lizard/qr/${id}`
-                      : `/reptile/qr/${id}`;
-                  router.push(path as never);
+                  router.push(`/reptile/qr/${id}` as never);
                 }}
                 style={styles.qrShortcut}
                 accessibilityRole="button"

@@ -1,4 +1,4 @@
-import SnakeDetailClient from './SnakeDetailClient'
+import AnimalDetailClient from './AnimalDetailClient'
 
 interface PageProps {
   // Next.js 15: dynamic params are a Promise.
@@ -14,5 +14,8 @@ export default async function ReptileDetailPage({ params }: PageProps) {
   // The detail page is authenticated — the auth gate lives in
   // /app/reptiles/layout.tsx, and the data fetch lives in the client
   // component because the token is in localStorage.
-  return <SnakeDetailClient snakeId={id} />
+  //
+  // ADR-003: one taxon-agnostic detail screen. The lizard-specific route
+  // (/app/reptiles/lizards/[id]) redirects here.
+  return <AnimalDetailClient animalId={id} />
 }

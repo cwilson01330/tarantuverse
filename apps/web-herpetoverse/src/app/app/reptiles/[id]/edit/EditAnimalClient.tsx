@@ -1,24 +1,26 @@
 'use client'
 
 /**
- * Edit Reptile form + Danger Zone.
+ * Edit Animal form + Danger Zone — taxon-agnostic.
+ *
+ * ADR-003 follow-through: the snake- and lizard-shaped edit clients were
+ * identical (the edit form has no taxon-conditional fields), so they're
+ * one component now. Frog edit rides this for free.
  *
  * Mirrors /app/reptiles/add almost field-for-field — same sections, same
  * INPUT_CLS, same nullableStr/nullableNum helpers. Differences:
  *
- *  - We fetch the snake first and seed the form with its current values.
+ *  - We fetch the animal first and seed the form with its current values.
  *    Decimal fields arrive as strings; we keep them as strings in form state
  *    so the user can see what's there and re-type without precision loss.
- *  - On submit we PUT to /api/v1/snakes/{id}. SnakeUpdate on the backend has
- *    the same optional-field surface as SnakeCreate plus two denormalized
- *    timestamps (last_fed_at/last_shed_at) that only admin/bulk-import flows
- *    should touch — we never write those from this form.
+ *  - On submit we PUT to /api/v1/animals/{id}. AnimalUpdate on the backend
+ *    is all-optional and excludes `taxon` (immutable) plus the denormalized
+ *    last_fed_at/last_shed_at timestamps — we never write those here.
  *  - Danger Zone: typed-confirm delete. CASCADE wipes all weight logs,
  *    feedings, sheds, and photos — the extra friction is load-bearing.
  *
- * Success routes to /app/reptiles/{id} so the keeper lands on the record
- * they just edited. Delete success routes to /app/reptiles so they don't
- * hit a 404 on the old detail URL.
+ * Success routes to /app/reptiles/{id}; delete success routes to
+ * /app/reptiles so the keeper doesn't hit a 404 on the old detail URL.
  */
 
 import Link from 'next/link'
@@ -27,18 +29,15 @@ import { useEffect, useState } from 'react'
 import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
-// ADR-003: snake/lizard libs collapsed into lib/animals. This is still
-// the snake-shaped edit screen, so the unified helpers are aliased back
-// to their snake-era names — the form body is taxon-agnostic.
 import {
-  type UpdateAnimalPayload as CreateSnakePayload,
-  deleteAnimal as deleteSnake,
-  getAnimal as getSnake,
+  type Animal,
   type Sex,
-  type Animal as Snake,
-  animalTitle as snakeTitle,
   type Source,
-  updateAnimal as updateSnake,
+  type UpdateAnimalPayload,
+  animalTitle,
+  deleteAnimal,
+  getAnimal,
+  updateAnimal,
 } from '@/lib/animals'
 
 // Form state mirrors /add — all strings so input round-tripping stays
@@ -86,46 +85,46 @@ const LABEL_CLS =
 const SECTION_HDR_CLS =
   'text-[11px] uppercase tracking-[0.18em] text-herp-lime/80 font-medium mb-4'
 
-/** Snake → FormState. Strings stay strings; nulls become ''. */
-function snakeToForm(s: Snake): FormState {
+/** Animal → FormState. Strings stay strings; nulls become ''. */
+function animalToForm(a: Animal): FormState {
   return {
-    name: s.name ?? '',
-    commonName: s.common_name ?? '',
-    scientificName: s.scientific_name ?? '',
-    speciesId: s.herp_species_id,
-    enclosureId: s.enclosure_id,
-    sex: (s.sex as Sex | null) ?? 'unknown',
-    hatchDate: s.hatch_date ?? '',
-    dateAcquired: s.date_acquired ?? '',
-    source: (s.source as Source | null) ?? '',
-    sourceBreeder: s.source_breeder ?? '',
-    pricePaid: s.price_paid ?? '',
-    currentWeightG: s.current_weight_g ?? '',
-    currentLengthIn: s.current_length_in ?? '',
-    notes: s.notes ?? '',
+    name: a.name ?? '',
+    commonName: a.common_name ?? '',
+    scientificName: a.scientific_name ?? '',
+    speciesId: a.herp_species_id,
+    enclosureId: a.enclosure_id,
+    sex: (a.sex as Sex | null) ?? 'unknown',
+    hatchDate: a.hatch_date ?? '',
+    dateAcquired: a.date_acquired ?? '',
+    source: (a.source as Source | null) ?? '',
+    sourceBreeder: a.source_breeder ?? '',
+    pricePaid: a.price_paid ?? '',
+    currentWeightG: a.current_weight_g ?? '',
+    currentLengthIn: a.current_length_in ?? '',
+    notes: a.notes ?? '',
   }
 }
 
-export default function EditReptileClient({ snakeId }: { snakeId: string }) {
+export default function EditAnimalClient({ animalId }: { animalId: string }) {
   const router = useRouter()
-  const [snake, setSnake] = useState<Snake | null>(null)
+  const [animal, setAnimal] = useState<Animal | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load the snake once on mount. The auth layout above has already gated
+  // Load the animal once on mount. The auth layout above has already gated
   // on sign-in, so 401s here mean the token went stale — the apiClient
   // handles that with a session clear and re-login redirect.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    getSnake(snakeId)
-      .then((s) => {
+    getAnimal(animalId)
+      .then((a) => {
         if (cancelled) return
-        setSnake(s)
-        setForm(snakeToForm(s))
+        setAnimal(a)
+        setForm(animalToForm(a))
         setLoadError(null)
       })
       .catch((err) => {
@@ -144,7 +143,7 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
     return () => {
       cancelled = true
     }
-  }, [snakeId])
+  }, [animalId])
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -181,7 +180,7 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
       }
     }
 
-    const payload: CreateSnakePayload = {
+    const payload: UpdateAnimalPayload = {
       name: nullableStr(form.name),
       common_name: nullableStr(form.commonName),
       scientific_name: nullableStr(form.scientificName),
@@ -200,8 +199,8 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
 
     setSubmitting(true)
     try {
-      await updateSnake(snakeId, payload)
-      router.push(`/app/reptiles/${snakeId}`)
+      await updateAnimal(animalId, payload)
+      router.push(`/app/reptiles/${animalId}`)
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || 'Could not save changes.')
@@ -213,10 +212,10 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
   }
 
   if (loading) return <LoadingShell />
-  if (loadError || !snake) {
+  if (loadError || !animal) {
     return (
       <div className="max-w-3xl mx-auto">
-        <BackLink snakeId={snakeId} />
+        <BackLink animalId={animalId} />
         <div
           role="alert"
           className="mt-6 p-4 rounded-md border border-red-500/40 bg-red-500/10 text-sm text-red-300"
@@ -229,13 +228,13 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <BackLink snakeId={snakeId} />
+      <BackLink animalId={animalId} />
       <header className="mt-6 mb-8">
         <p className="text-xs tracking-[0.2em] uppercase text-herp-lime mb-3 font-medium">
           Edit reptile
         </p>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-wide text-white mb-2">
-          Edit {snakeTitle(snake)}
+          Edit {animalTitle(animal)}
         </h1>
         <p className="text-neutral-400 text-sm">
           Changes save to the detail page. Deleting is permanent.
@@ -466,7 +465,7 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
 
         <div className="flex items-center justify-between gap-4 pt-2">
           <Link
-            href={`/app/reptiles/${snakeId}`}
+            href={`/app/reptiles/${animalId}`}
             className="text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
           >
             ← Cancel
@@ -485,7 +484,7 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
       {/* Danger Zone — separated from the form on purpose so it can't be */}
       {/* activated by an Enter keypress inside an input.                 */}
       {/* ------------------------------------------------------------- */}
-      <DangerZone snake={snake} />
+      <DangerZone animal={animal} />
     </div>
   )
 }
@@ -494,7 +493,7 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
 // Danger Zone — typed-confirm delete
 // ---------------------------------------------------------------------------
 
-function DangerZone({ snake }: { snake: Snake }) {
+function DangerZone({ animal }: { animal: Animal }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
 
@@ -521,7 +520,7 @@ function DangerZone({ snake }: { snake: Snake }) {
 
       {open && (
         <DeleteConfirmModal
-          snake={snake}
+          animal={animal}
           onCancel={() => setOpen(false)}
           onDeleted={() => {
             // After deletion the detail URL 404s, so punt back to the list.
@@ -534,15 +533,15 @@ function DangerZone({ snake }: { snake: Snake }) {
 }
 
 function DeleteConfirmModal({
-  snake,
+  animal,
   onCancel,
   onDeleted,
 }: {
-  snake: Snake
+  animal: Animal
   onCancel: () => void
   onDeleted: () => void
 }) {
-  const title = snakeTitle(snake)
+  const title = animalTitle(animal)
   const [typed, setTyped] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -554,7 +553,7 @@ function DeleteConfirmModal({
     setError(null)
     setSubmitting(true)
     try {
-      await deleteSnake(snake.id)
+      await deleteAnimal(animal.id)
       onDeleted()
     } catch (err) {
       if (err instanceof ApiError) {
@@ -662,10 +661,10 @@ function Field({
   )
 }
 
-function BackLink({ snakeId }: { snakeId: string }) {
+function BackLink({ animalId }: { animalId: string }) {
   return (
     <Link
-      href={`/app/reptiles/${snakeId}`}
+      href={`/app/reptiles/${animalId}`}
       className="inline-flex items-center gap-1.5 text-sm text-herp-teal hover:text-herp-lime transition-colors"
     >
       <span aria-hidden="true">←</span> Back to detail

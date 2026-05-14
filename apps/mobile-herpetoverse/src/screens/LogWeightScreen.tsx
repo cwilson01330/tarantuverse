@@ -1,5 +1,5 @@
 /**
- * Log weight — shared screen for snake and lizard, also handles edit.
+ * Log weight — shared screen for every taxon, also handles edit.
  *
  * Mirrors the web LogWeightForm minus the chart preview. Backend
  * denormalizes `current_weight_g` on the parent record when the new log

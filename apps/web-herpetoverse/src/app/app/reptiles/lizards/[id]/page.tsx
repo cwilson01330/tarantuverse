@@ -1,21 +1,18 @@
-import LizardDetailClient from './LizardDetailClient'
+/**
+ * Legacy lizard detail route.
+ *
+ * ADR-003 follow-through: the snake- and lizard-shaped detail clients
+ * collapsed into one taxon-agnostic screen at /app/reptiles/[id]. This
+ * file is kept only so any straggler link to the old `lizards/` subpath
+ * still resolves — it permanently redirects to the unified route.
+ */
+import { redirect } from 'next/navigation'
 
 interface PageProps {
-  // Next.js 15: dynamic params are a Promise.
   params: Promise<{ id: string }>
 }
 
-export const metadata = {
-  title: 'Reptile detail · Herpetoverse',
-}
-
-export default async function LizardDetailPage({ params }: PageProps) {
+export default async function LegacyLizardDetailPage({ params }: PageProps) {
   const { id } = await params
-  // Auth gate lives in /app/reptiles/layout.tsx. The data fetch runs in the
-  // client component because the bearer token is in localStorage.
-  //
-  // Lizards live under a `lizards/` subpath so existing snake bookmarks
-  // (/app/reptiles/{id}) keep resolving to the snake detail page. See
-  // /app/reptiles/page.tsx's detailHref for the routing contract.
-  return <LizardDetailClient lizardId={id} />
+  redirect(`/app/reptiles/${id}`)
 }
