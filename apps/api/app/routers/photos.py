@@ -9,8 +9,7 @@ from datetime import datetime
 from app.database import get_db
 from app.models.photo import Photo
 from app.models.tarantula import Tarantula
-from app.models.snake import Snake
-from app.models.lizard import Lizard
+from app.models.animal import Animal
 from app.routers.auth import get_current_user
 from app.models.user import User
 from app.services.storage import storage_service
@@ -104,7 +103,7 @@ async def upload_photo(
             filename=file.filename or "upload.jpg",
             content_type=detected_mime,  # use verified MIME, not client-supplied
         )
-        
+
         # Create photo record in database
         photo = Photo(
             id=str(uuid.uuid4()),
@@ -115,16 +114,16 @@ async def upload_photo(
             taken_at=datetime.utcnow(),
             created_at=datetime.utcnow()
         )
-        
+
         db.add(photo)
-        
+
         # If this is the first photo, set it as the tarantula's main photo
         if not tarantula.photo_url:
             tarantula.photo_url = photo_url
-        
+
         db.commit()
         db.refresh(photo)
-        
+
         return {
             "id": photo.id,
             "url": photo.url,
@@ -133,7 +132,7 @@ async def upload_photo(
             "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
             "created_at": photo.created_at.isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception:
@@ -154,14 +153,14 @@ async def get_photos(
         Tarantula.id == tarantula_id,
         Tarantula.user_id == current_user.id
     ).first()
-    
+
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
-    
+
     photos = db.query(Photo).filter(
         Photo.tarantula_id == tarantula_id
     ).order_by(Photo.created_at.desc()).all()
-    
+
     return [
         {
             "id": photo.id,
@@ -178,49 +177,44 @@ async def get_photos(
 def _photo_owner_parent(photo: Photo, db: Session, user: User):
     """Return the owned parent row for a photo, or None if user isn't owner.
 
-    Photos are polymorphic (tarantula_id OR snake_id OR lizard_id).
-    Centralizing this ownership check keeps DELETE / set-main /
-    caption-edit free of taxon branching.
+    ADR-003: photos are polymorphic between a TV tarantula and an HV
+    animal (tarantula_id XOR animal_id). Centralizing this ownership
+    check keeps DELETE / set-main / caption-edit free of taxon branching.
     """
     if photo.tarantula_id:
         return db.query(Tarantula).filter(
             Tarantula.id == photo.tarantula_id,
             Tarantula.user_id == user.id,
         ).first()
-    if photo.snake_id:
-        return db.query(Snake).filter(
-            Snake.id == photo.snake_id,
-            Snake.user_id == user.id,
-        ).first()
-    if photo.lizard_id:
-        return db.query(Lizard).filter(
-            Lizard.id == photo.lizard_id,
-            Lizard.user_id == user.id,
+    if photo.animal_id:
+        return db.query(Animal).filter(
+            Animal.id == photo.animal_id,
+            Animal.user_id == user.id,
         ).first()
     return None
 
 
-@router.post("/snakes/{snake_id}/photos")
-async def upload_snake_photo(
-    snake_id: str,
+@router.post("/animals/{animal_id}/photos")
+async def upload_animal_photo(
+    animal_id: str,
     file: UploadFile = File(...),
     caption: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Upload a photo for a snake.
+    """Upload a photo for an HV animal (any taxon).
 
-    Herpetoverse v1 is free-tier beta — no photo-count gate yet. When
-    subscription limits extend to snakes (v1.x), mirror the tarantula
-    gate here and key it off `Photo.snake_id == snake_id`.
+    Herpetoverse is free-tier beta — no photo-count gate yet. When
+    subscription limits extend to animals (v1.x), mirror the tarantula
+    gate here keyed off `Photo.animal_id == animal_id`.
     """
-    snake = db.query(Snake).filter(
-        Snake.id == snake_id,
-        Snake.user_id == current_user.id,
+    animal = db.query(Animal).filter(
+        Animal.id == animal_id,
+        Animal.user_id == current_user.id,
     ).first()
 
-    if not snake:
-        raise HTTPException(status_code=404, detail="Snake not found")
+    if not animal:
+        raise HTTPException(status_code=404, detail="Animal not found")
 
     try:
         file_data = await file.read()
@@ -242,7 +236,7 @@ async def upload_snake_photo(
 
         photo = Photo(
             id=str(uuid.uuid4()),
-            snake_id=snake_id,
+            animal_id=animal_id,
             url=photo_url,
             thumbnail_url=thumbnail_url,
             caption=caption,
@@ -252,9 +246,9 @@ async def upload_snake_photo(
 
         db.add(photo)
 
-        # First photo becomes the snake's main photo (mirrors tarantula path).
-        if not snake.photo_url:
-            snake.photo_url = photo_url
+        # First photo becomes the animal's main photo (mirrors tarantula path).
+        if not animal.photo_url:
+            animal.photo_url = photo_url
 
         db.commit()
         db.refresh(photo)
@@ -272,138 +266,28 @@ async def upload_snake_photo(
         raise
     except Exception:
         db.rollback()
-        logger.exception("Photo upload failed for snake %s", snake_id)
+        logger.exception("Photo upload failed for animal %s", animal_id)
         raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
 
 
-@router.get("/snakes/{snake_id}/photos")
-async def get_snake_photos(
-    snake_id: str,
+@router.get("/animals/{animal_id}/photos")
+async def get_animal_photos(
+    animal_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List photos for a snake, most recent first."""
-    snake = db.query(Snake).filter(
-        Snake.id == snake_id,
-        Snake.user_id == current_user.id,
+    """List photos for an HV animal, most recent first."""
+    animal = db.query(Animal).filter(
+        Animal.id == animal_id,
+        Animal.user_id == current_user.id,
     ).first()
 
-    if not snake:
-        raise HTTPException(status_code=404, detail="Snake not found")
+    if not animal:
+        raise HTTPException(status_code=404, detail="Animal not found")
 
     photos = (
         db.query(Photo)
-        .filter(Photo.snake_id == snake_id)
-        .order_by(Photo.created_at.desc())
-        .all()
-    )
-
-    return [
-        {
-            "id": photo.id,
-            "url": photo.url,
-            "thumbnail_url": photo.thumbnail_url,
-            "caption": photo.caption,
-            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
-            "created_at": photo.created_at.isoformat(),
-        }
-        for photo in photos
-    ]
-
-
-@router.post("/lizards/{lizard_id}/photos")
-async def upload_lizard_photo(
-    lizard_id: str,
-    file: UploadFile = File(...),
-    caption: Optional[str] = Form(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Upload a photo for a lizard.
-
-    Herpetoverse v1 is free-tier beta — no photo-count gate yet. Mirrors
-    the snake path; same 15MB size ceiling and magic-byte validation.
-    """
-    lizard = db.query(Lizard).filter(
-        Lizard.id == lizard_id,
-        Lizard.user_id == current_user.id,
-    ).first()
-
-    if not lizard:
-        raise HTTPException(status_code=404, detail="Lizard not found")
-
-    try:
-        file_data = await file.read()
-
-        try:
-            detected_mime = validate_image_bytes(file_data)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-
-        max_size = 15 * 1024 * 1024
-        if len(file_data) > max_size:
-            raise HTTPException(status_code=400, detail="File size exceeds 15 MB limit")
-
-        photo_url, thumbnail_url = await storage_service.upload_photo(
-            file_data=file_data,
-            filename=file.filename or "upload.jpg",
-            content_type=detected_mime,
-        )
-
-        photo = Photo(
-            id=str(uuid.uuid4()),
-            lizard_id=lizard_id,
-            url=photo_url,
-            thumbnail_url=thumbnail_url,
-            caption=caption,
-            taken_at=datetime.utcnow(),
-            created_at=datetime.utcnow(),
-        )
-
-        db.add(photo)
-
-        # First photo becomes the lizard's main photo (mirrors tarantula/snake path).
-        if not lizard.photo_url:
-            lizard.photo_url = photo_url
-
-        db.commit()
-        db.refresh(photo)
-
-        return {
-            "id": photo.id,
-            "url": photo.url,
-            "thumbnail_url": photo.thumbnail_url,
-            "caption": photo.caption,
-            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
-            "created_at": photo.created_at.isoformat(),
-        }
-
-    except HTTPException:
-        raise
-    except Exception:
-        db.rollback()
-        logger.exception("Photo upload failed for lizard %s", lizard_id)
-        raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
-
-
-@router.get("/lizards/{lizard_id}/photos")
-async def get_lizard_photos(
-    lizard_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """List photos for a lizard, most recent first."""
-    lizard = db.query(Lizard).filter(
-        Lizard.id == lizard_id,
-        Lizard.user_id == current_user.id,
-    ).first()
-
-    if not lizard:
-        raise HTTPException(status_code=404, detail="Lizard not found")
-
-    photos = (
-        db.query(Photo)
-        .filter(Photo.lizard_id == lizard_id)
+        .filter(Photo.animal_id == animal_id)
         .order_by(Photo.created_at.desc())
         .all()
     )
@@ -427,7 +311,7 @@ async def delete_photo(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete a photo (polymorphic — tarantula, snake, or lizard parent)."""
+    """Delete a photo (polymorphic — tarantula or animal parent)."""
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
 
     if not photo:
@@ -436,17 +320,17 @@ async def delete_photo(
     parent = _photo_owner_parent(photo, db, current_user)
     if parent is None:
         raise HTTPException(status_code=403, detail="Not authorized to delete this photo")
-    
+
     try:
         # Delete files from storage service (R2 or local)
         await storage_service.delete_photo(photo.url, photo.thumbnail_url)
-        
+
         # Delete from database
         db.delete(photo)
         db.commit()
-        
+
         return {"message": "Photo deleted successfully"}
-        
+
     except Exception:
         db.rollback()
         logger.exception("Photo delete failed for photo %s", photo_id)
@@ -462,9 +346,8 @@ async def update_photo(
 ):
     """Update a photo's editable metadata (currently: caption only).
 
-    Polymorphic — same endpoint handles tarantula, snake, and lizard
-    photos. Ownership is resolved through the parent animal via
-    `_photo_owner_parent`.
+    Polymorphic — same endpoint handles tarantula and animal photos.
+    Ownership is resolved through the parent via `_photo_owner_parent`.
     """
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
 
@@ -515,7 +398,7 @@ async def set_main_photo(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Set a photo as the main photo for its owning animal (tarantula, snake, or lizard)."""
+    """Set a photo as the main photo for its owning parent (tarantula or animal)."""
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
 
     if not photo:
@@ -526,7 +409,7 @@ async def set_main_photo(
         raise HTTPException(status_code=403, detail="Not authorized to modify this photo")
 
     try:
-        # Works for Tarantula, Snake, and Lizard — all three expose `photo_url`.
+        # Works for Tarantula and Animal — both expose `photo_url`.
         parent.photo_url = photo.url
         db.commit()
 
@@ -534,7 +417,7 @@ async def set_main_photo(
             "message": "Main photo updated successfully",
             "photo_url": photo.url
         }
-        
+
     except Exception:
         db.rollback()
         logger.exception("Set main photo failed for photo %s", photo_id)

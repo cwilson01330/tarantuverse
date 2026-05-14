@@ -1,21 +1,22 @@
 /**
- * Public snake profile route — destination of label QR codes.
+ * Legacy public snake profile route.
  *
- * The page itself is a client component; this file is the route entry
- * that resolves the dynamic `[id]` param and forwards to the shared
- * ReptilePublicProfile renderer.
+ * ADR-003 collapsed the per-taxon `/s/[id]` + `/l/[id]` routes into the
+ * taxon-agnostic `/a/[id]`. This file is kept only so QR labels printed
+ * before the consolidation still resolve — it permanently redirects to
+ * the new route.
  */
-import ReptilePublicProfile from '@/components/ReptilePublicProfile'
+import { redirect } from 'next/navigation'
 
 interface Params {
   id: string
 }
 
-export default async function PublicSnakePage({
+export default async function LegacyPublicSnakePage({
   params,
 }: {
   params: Promise<Params>
 }) {
   const { id } = await params
-  return <ReptilePublicProfile taxon="snake" animalId={id} />
+  redirect(`/a/${id}`)
 }

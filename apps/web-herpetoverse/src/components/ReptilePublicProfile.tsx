@@ -28,7 +28,7 @@ import {
 } from '@/lib/qr'
 
 interface Props {
-  taxon: 'snake' | 'lizard'
+  /** ADR-003: one taxon-agnostic id — the profile payload carries `taxon`. */
   animalId: string
 }
 
@@ -39,14 +39,14 @@ type LoadState =
   | { kind: 'not_found' }
   | { kind: 'error'; message: string }
 
-export default function ReptilePublicProfile({ taxon, animalId }: Props) {
+export default function ReptilePublicProfile({ animalId }: Props) {
   const router = useRouter()
   const [state, setState] = useState<LoadState>({ kind: 'loading' })
 
   useEffect(() => {
     let cancelled = false
     setState({ kind: 'loading' })
-    getPublicProfile(taxon, animalId)
+    getPublicProfile(animalId)
       .then((profile) => {
         if (cancelled) return
         setState({ kind: 'ready', profile })
@@ -73,7 +73,7 @@ export default function ReptilePublicProfile({ taxon, animalId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [taxon, animalId])
+  }, [animalId])
 
   // ---------------------------------------------------------------------------
   // States that can short-circuit
@@ -136,15 +136,18 @@ export default function ReptilePublicProfile({ taxon, animalId }: Props) {
   // Profile loaded
   // ---------------------------------------------------------------------------
   const p = state.profile
-  const taxonGlyph = p.taxon === 'snake' ? '🐍' : '🦎'
+  const taxonGlyph =
+    p.taxon === 'snake' ? '🐍' : p.taxon === 'frog' ? '🐸' : '🦎'
 
   // Quick-action destinations for the owner. Tarantuverse uses query
   // params (?log=feeding); we keep the same shape so the dashboard pages
   // can read the param and pre-open the relevant log form.
+  // Lizards live under a `lizards/` subpath; snakes + frogs use the
+  // root reptile detail route.
   const detailHref =
-    p.taxon === 'snake'
-      ? `/app/reptiles/${p.id}`
-      : `/app/reptiles/lizards/${p.id}`
+    p.taxon === 'lizard'
+      ? `/app/reptiles/lizards/${p.id}`
+      : `/app/reptiles/${p.id}`
   const logFeedingHref = `${detailHref}?log=feeding`
   const logShedHref = `${detailHref}?log=shed`
 

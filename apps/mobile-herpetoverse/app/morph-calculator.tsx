@@ -46,7 +46,7 @@ import {
   describeOutcome,
   fetchGenesForSpecies,
   formatProbability,
-  listSnakeGenotype,
+  listAnimalGenotype,
   stateLabel,
   stateToCount,
   validStatesForGene,
@@ -129,13 +129,15 @@ function MorphCalculatorScreen() {
     };
   }, [species.scientific_name]);
 
-  // Pre-fill parent A from a snake's genotype when arriving with ?snakeId=...
+  // Pre-fill parent A from an animal's genotype when arriving with ?snakeId=...
+  // (the query param keeps its snake-era name; the genotype store is
+  // taxon-agnostic post-ADR-003.)
   useEffect(() => {
     if (!snakeId || !genes) return;
     let cancelled = false;
     (async () => {
       try {
-        const rows = await listSnakeGenotype(snakeId as string);
+        const rows = await listAnimalGenotype(snakeId as string);
         if (cancelled) return;
         const entries: ParentEntry[] = rows
           .map((row) => {

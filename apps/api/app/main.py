@@ -50,9 +50,7 @@ import app.routers.qr as qr
 import app.routers.feeder_species as feeder_species
 import app.routers.feeder_colonies as feeder_colonies
 import app.routers.waitlist as waitlist
-import app.routers.snakes as snakes  # Herpetoverse v1
-import app.routers.lizards as lizards  # Herpetoverse v1
-import app.routers.frogs as frogs  # Herpetoverse v1
+import app.routers.animals as animals  # Herpetoverse — unified taxon table (ADR-003)
 import app.routers.sheds as sheds  # Herpetoverse v1
 import app.routers.genes as genes  # Herpetoverse v1 — morph catalog
 import app.routers.reptile_species as reptile_species  # Herpetoverse v1
@@ -269,14 +267,8 @@ app.include_router(feeder_colonies.router, prefix="/api/v1/feeder-colonies", tag
 print("[STARTUP] Registering waitlist router...")
 app.include_router(waitlist.router, prefix="/api/v1", tags=["waitlist", "public"])
 
-print("[STARTUP] Registering snakes router (Herpetoverse v1)...")
-app.include_router(snakes.router, prefix="/api/v1/snakes", tags=["snakes", "herpetoverse"])
-
-print("[STARTUP] Registering lizards router (Herpetoverse v1)...")
-app.include_router(lizards.router, prefix="/api/v1/lizards", tags=["lizards", "herpetoverse"])
-
-print("[STARTUP] Registering frogs router (Herpetoverse v1)...")
-app.include_router(frogs.router, prefix="/api/v1/frogs", tags=["frogs", "herpetoverse"])
+print("[STARTUP] Registering animals router (Herpetoverse — ADR-003)...")
+app.include_router(animals.router, prefix="/api/v1/animals", tags=["animals", "herpetoverse"])
 
 print("[STARTUP] Registering sheds router (Herpetoverse v1)...")
 app.include_router(sheds.router, prefix="/api/v1", tags=["sheds", "herpetoverse"])

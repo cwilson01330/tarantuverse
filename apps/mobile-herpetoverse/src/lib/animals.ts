@@ -1,21 +1,36 @@
 /**
- * Snake API client — mirrors web-herpetoverse/src/lib/snakes.ts.
+ * Unified animal API client (ADR-003) — supersedes lib/snakes.ts +
+ * lib/lizards.ts.
  *
- * Bundle 4 adds the create/delete surface for the log-entry screens.
+ * The per-taxon snakes/lizards/frogs tables collapsed into one `animals`
+ * table discriminated by `taxon`. One set of CRUD helpers; pass a
+ * `taxon` to `listAnimals` when a screen needs a single-taxon view.
+ *
+ * Mirrors apps/web-herpetoverse/src/lib/animals.ts. apiClient baseURL
+ * already includes `/api/v1` (see the `feedback_mobile_apiclient_baseurl_
+ * double_prefix` memory), so paths here start at the resource.
+ *
  * Endpoint paths must match the FastAPI router exactly (`/weight-logs`,
- * not `/weights`); a wrong slug returns 404 silently because the route
- * just isn't registered. Bundle 3 had `/weights` — fixed here.
+ * not `/weights`); a wrong slug 404s silently because the route just
+ * isn't registered.
  */
 import { apiClient } from '../services/api';
 
 // ---------------------------------------------------------------------------
-// Shared enum-ish types — keep in sync with web. Backend stores these as
-// Postgres enums; values are lowercase to match the API responses.
+// Shared enum-ish types — backend stores these as Postgres enums; values
+// are lowercase to match API responses.
 // ---------------------------------------------------------------------------
 
 export type Sex = 'male' | 'female' | 'unknown';
 export type Source = 'bred' | 'bought' | 'wild_caught';
 export type Visibility = 'private' | 'public';
+export type AnimalTaxon = 'snake' | 'lizard' | 'frog';
+
+export const TAXON_LABELS: Record<AnimalTaxon, string> = {
+  snake: 'Snake',
+  lizard: 'Lizard',
+  frog: 'Frog',
+};
 
 export type WeightContext =
   | 'routine'
@@ -35,14 +50,17 @@ export const WEIGHT_CONTEXT_LABELS: Record<WeightContext, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Schemas (a subset of what the web client tracks — only fields the mobile
-// detail screen reads. Add more here as Bundle 5 lands.)
+// Schemas — mirror apps/api/app/schemas/animal.py (subset the mobile
+// screens read; add fields here as screens need them).
 // ---------------------------------------------------------------------------
 
-export interface Snake {
+export interface Animal {
   id: string;
   user_id: string;
-  reptile_species_id: string | null;
+  taxon: AnimalTaxon;
+  // Renamed from reptile_species_id in anh_20260514 — the catalog table
+  // is herp_species now (it holds amphibians too).
+  herp_species_id: string | null;
   enclosure_id: string | null;
 
   name: string | null;
@@ -77,7 +95,7 @@ export interface Snake {
 
 export interface WeightLog {
   id: string;
-  snake_id: string;
+  animal_id: string;
   weighed_at: string;
   weight_g: string;
   context: WeightContext;
@@ -87,7 +105,7 @@ export interface WeightLog {
 
 export interface FeedingLog {
   id: string;
-  snake_id: string | null;
+  animal_id: string | null;
   fed_at: string;
   food_type: string | null;
   food_size: string | null;
@@ -100,7 +118,7 @@ export interface FeedingLog {
 
 export interface ShedLog {
   id: string;
-  snake_id: string;
+  animal_id: string;
   shed_at: string;
   in_blue_started_at: string | null;
   weight_before_g: string | null;
@@ -115,159 +133,11 @@ export interface ShedLog {
   created_at: string;
 }
 
-// ---------------------------------------------------------------------------
-// Fetchers
-// ---------------------------------------------------------------------------
-
-export async function listSnakes(): Promise<Snake[]> {
-  const { data } = await apiClient.get<Snake[]>('/snakes/');
-  return data;
-}
-
-export async function getSnake(id: string): Promise<Snake> {
-  const { data } = await apiClient.get<Snake>(`/snakes/${encodeURIComponent(id)}`);
-  return data;
-}
-
-export async function listWeightLogs(snakeId: string): Promise<WeightLog[]> {
-  const { data } = await apiClient.get<WeightLog[]>(
-    `/snakes/${encodeURIComponent(snakeId)}/weight-logs`,
-  );
-  return data;
-}
-
-export async function listFeedings(snakeId: string): Promise<FeedingLog[]> {
-  const { data } = await apiClient.get<FeedingLog[]>(
-    `/snakes/${encodeURIComponent(snakeId)}/feedings`,
-  );
-  return data;
-}
-
-export async function listSheds(snakeId: string): Promise<ShedLog[]> {
-  const { data } = await apiClient.get<ShedLog[]>(
-    `/snakes/${encodeURIComponent(snakeId)}/sheds`,
-  );
-  return data;
-}
-
-// ---------------------------------------------------------------------------
-// Mutations — Bundle 4
-// ---------------------------------------------------------------------------
-
-export interface CreateSnakePayload {
-  name?: string | null;
-  common_name?: string | null;
-  scientific_name?: string | null;
-  reptile_species_id?: string | null;
-  enclosure_id?: string | null;
-  sex?: Sex | null;
-  hatch_date?: string | null;
-  date_acquired?: string | null;
-  source?: Source | null;
-  current_weight_g?: string | number | null;
-  notes?: string | null;
-}
-
-export async function createSnake(payload: CreateSnakePayload): Promise<Snake> {
-  const { data } = await apiClient.post<Snake>('/snakes/', payload);
-  return data;
-}
-
 /**
- * Update a snake. Reuses CreateSnakePayload because the form surface is
- * the same — backend SnakeUpdate inherits SnakeBase (all fields optional).
- */
-export async function updateSnake(
-  id: string,
-  payload: CreateSnakePayload,
-): Promise<Snake> {
-  const { data } = await apiClient.put<Snake>(
-    `/snakes/${encodeURIComponent(id)}`,
-    payload,
-  );
-  return data;
-}
-
-export async function deleteSnake(id: string): Promise<void> {
-  await apiClient.delete(`/snakes/${encodeURIComponent(id)}`);
-}
-
-/**
- * Pause feeding reminders for an animal. The backend's
- * `_compute_feeding_status` will return `status='paused'` while this
- * is active. Reason values from the canonical list (hunger_strike,
- * post_rehouse, recovering, breeding_season, other) get translated
- * to friendly prose; other strings pass through verbatim.
- *
- * `until` is an ISO date (YYYY-MM-DD). Pass `null` for indefinite —
- * keeper resumes manually. Pass a future date for a self-clearing
- * pause.
- *
- * Same payload shape works for snakes and lizards since the columns
- * are identical; we expose a unified helper that picks the route.
- */
-export async function pauseFeeding(
-  taxon: 'snake' | 'lizard',
-  animalId: string,
-  reason: string,
-  until: string | null,
-): Promise<Snake | LizardLike> {
-  const path =
-    taxon === 'snake'
-      ? `/snakes/${encodeURIComponent(animalId)}`
-      : `/lizards/${encodeURIComponent(animalId)}`;
-  const { data } = await apiClient.put(path, {
-    feeding_paused_reason: reason,
-    feeding_paused_until: until,
-  });
-  return data;
-}
-
-export async function resumeFeeding(
-  taxon: 'snake' | 'lizard',
-  animalId: string,
-): Promise<Snake | LizardLike> {
-  const path =
-    taxon === 'snake'
-      ? `/snakes/${encodeURIComponent(animalId)}`
-      : `/lizards/${encodeURIComponent(animalId)}`;
-  const { data } = await apiClient.put(path, {
-    feeding_paused_reason: null,
-    feeding_paused_until: null,
-  });
-  return data;
-}
-
-/** Loose shape — we don't import lizard types from here to avoid a cycle. */
-type LizardLike = Snake;
-
-export interface CreateWeightLogPayload {
-  weighed_at: string;
-  weight_g: string | number;
-  context?: WeightContext;
-  notes?: string | null;
-}
-
-export async function createWeightLog(
-  snakeId: string,
-  payload: CreateWeightLogPayload,
-): Promise<WeightLog> {
-  const { data } = await apiClient.post<WeightLog>(
-    `/snakes/${encodeURIComponent(snakeId)}/weight-logs`,
-    payload,
-  );
-  return data;
-}
-
-export async function deleteWeightLog(id: string): Promise<void> {
-  await apiClient.delete(`/weight-logs/${encodeURIComponent(id)}`);
-}
-
-/**
- * Prey-size + interval guidance for this snake's current life stage.
- * Mirrors the backend PreySuggestion schema (apps/api/.../schemas/weight_log.py).
- * Web consumes the same shape for its FeedingIntelligence panel. Lizard
- * equivalent lives in `lizards.ts`.
+ * Prey-size + interval guidance for an animal's current life stage.
+ * Mirrors the backend PreySuggestion schema. The wire field name is
+ * `snake_weight_g` for backward-compat — for any taxon the value is
+ * still that animal's weight.
  */
 export interface PreySuggestion {
   stage: string; // hatchling | juvenile | subadult | adult | unknown
@@ -281,9 +151,160 @@ export interface PreySuggestion {
   warning: string | null;
 }
 
-export async function getPreySuggestion(snakeId: string): Promise<PreySuggestion> {
+// ---------------------------------------------------------------------------
+// Fetchers
+// ---------------------------------------------------------------------------
+
+/**
+ * List the keeper's animals. Pass a `taxon` to scope to one taxon — the
+ * single-taxon collection views pass it; a unified view omits it.
+ */
+export async function listAnimals(taxon?: AnimalTaxon): Promise<Animal[]> {
+  const qs = taxon ? `?taxon=${encodeURIComponent(taxon)}` : '';
+  const { data } = await apiClient.get<Animal[]>(`/animals/${qs}`);
+  return data;
+}
+
+export async function getAnimal(id: string): Promise<Animal> {
+  const { data } = await apiClient.get<Animal>(
+    `/animals/${encodeURIComponent(id)}`,
+  );
+  return data;
+}
+
+export async function listWeightLogs(animalId: string): Promise<WeightLog[]> {
+  const { data } = await apiClient.get<WeightLog[]>(
+    `/animals/${encodeURIComponent(animalId)}/weight-logs`,
+  );
+  return data;
+}
+
+export async function listFeedings(animalId: string): Promise<FeedingLog[]> {
+  const { data } = await apiClient.get<FeedingLog[]>(
+    `/animals/${encodeURIComponent(animalId)}/feedings`,
+  );
+  return data;
+}
+
+export async function listSheds(animalId: string): Promise<ShedLog[]> {
+  const { data } = await apiClient.get<ShedLog[]>(
+    `/animals/${encodeURIComponent(animalId)}/sheds`,
+  );
+  return data;
+}
+
+export async function getPreySuggestion(
+  animalId: string,
+): Promise<PreySuggestion> {
   const { data } = await apiClient.get<PreySuggestion>(
-    `/snakes/${encodeURIComponent(snakeId)}/prey-suggestion`,
+    `/animals/${encodeURIComponent(animalId)}/prey-suggestion`,
+  );
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Animal mutations
+// ---------------------------------------------------------------------------
+
+/**
+ * Payload for creating an animal. Mirrors AnimalCreate on the backend.
+ * `taxon` is required and immutable once set; every other field is
+ * optional so the form can progressively disclose sections.
+ */
+export interface CreateAnimalPayload {
+  taxon: AnimalTaxon;
+  name?: string | null;
+  common_name?: string | null;
+  scientific_name?: string | null;
+  herp_species_id?: string | null;
+  enclosure_id?: string | null;
+  sex?: Sex | null;
+  hatch_date?: string | null;
+  date_acquired?: string | null;
+  source?: Source | null;
+  current_weight_g?: string | number | null;
+  current_length_in?: string | number | null;
+  notes?: string | null;
+}
+
+export async function createAnimal(
+  payload: CreateAnimalPayload,
+): Promise<Animal> {
+  const { data } = await apiClient.post<Animal>('/animals/', payload);
+  return data;
+}
+
+/**
+ * AnimalUpdate on the backend is all-optional and does NOT accept
+ * `taxon` (immutable). We reuse a Partial of the create payload minus
+ * taxon — the add screen and edit screen fill the same bag otherwise.
+ */
+export type UpdateAnimalPayload = Partial<Omit<CreateAnimalPayload, 'taxon'>>;
+
+export async function updateAnimal(
+  id: string,
+  payload: UpdateAnimalPayload,
+): Promise<Animal> {
+  const { data } = await apiClient.put<Animal>(
+    `/animals/${encodeURIComponent(id)}`,
+    payload,
+  );
+  return data;
+}
+
+export async function deleteAnimal(id: string): Promise<void> {
+  await apiClient.delete(`/animals/${encodeURIComponent(id)}`);
+}
+
+/**
+ * Pause feeding reminders for an animal. The backend's
+ * `_compute_feeding_status` returns `status='paused'` while this is
+ * active. Reason values from the canonical list (hunger_strike,
+ * post_rehouse, recovering, breeding_season, other) get translated to
+ * friendly prose; other strings pass through verbatim.
+ *
+ * `until` is an ISO date (YYYY-MM-DD). Pass `null` for indefinite —
+ * keeper resumes manually. ADR-003: one route for every taxon, no
+ * taxon arg.
+ */
+export async function pauseFeeding(
+  animalId: string,
+  reason: string,
+  until: string | null,
+): Promise<Animal> {
+  const { data } = await apiClient.put<Animal>(
+    `/animals/${encodeURIComponent(animalId)}`,
+    { feeding_paused_reason: reason, feeding_paused_until: until },
+  );
+  return data;
+}
+
+export async function resumeFeeding(animalId: string): Promise<Animal> {
+  const { data } = await apiClient.put<Animal>(
+    `/animals/${encodeURIComponent(animalId)}`,
+    { feeding_paused_reason: null, feeding_paused_until: null },
+  );
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Weight logs
+// ---------------------------------------------------------------------------
+
+export interface CreateWeightLogPayload {
+  weighed_at: string;
+  weight_g: string | number;
+  context?: WeightContext;
+  notes?: string | null;
+}
+
+export async function createWeightLog(
+  animalId: string,
+  payload: CreateWeightLogPayload,
+): Promise<WeightLog> {
+  const { data } = await apiClient.post<WeightLog>(
+    `/animals/${encodeURIComponent(animalId)}/weight-logs`,
+    payload,
   );
   return data;
 }
@@ -306,6 +327,14 @@ export async function updateWeightLog(
   return data;
 }
 
+export async function deleteWeightLog(id: string): Promise<void> {
+  await apiClient.delete(`/weight-logs/${encodeURIComponent(id)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Feedings
+// ---------------------------------------------------------------------------
+
 export interface CreateFeedingPayload {
   fed_at: string;
   food_type?: string | null;
@@ -317,18 +346,14 @@ export interface CreateFeedingPayload {
 }
 
 export async function createFeeding(
-  snakeId: string,
+  animalId: string,
   payload: CreateFeedingPayload,
 ): Promise<FeedingLog> {
   const { data } = await apiClient.post<FeedingLog>(
-    `/snakes/${encodeURIComponent(snakeId)}/feedings`,
+    `/animals/${encodeURIComponent(animalId)}/feedings`,
     payload,
   );
   return data;
-}
-
-export async function deleteFeeding(id: string): Promise<void> {
-  await apiClient.delete(`/feedings/${encodeURIComponent(id)}`);
 }
 
 export async function getFeeding(id: string): Promise<FeedingLog> {
@@ -349,6 +374,14 @@ export async function updateFeeding(
   return data;
 }
 
+export async function deleteFeeding(id: string): Promise<void> {
+  await apiClient.delete(`/feedings/${encodeURIComponent(id)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Sheds
+// ---------------------------------------------------------------------------
+
 export interface CreateShedPayload {
   shed_at: string;
   in_blue_started_at?: string | null;
@@ -359,18 +392,14 @@ export interface CreateShedPayload {
 }
 
 export async function createShed(
-  snakeId: string,
+  animalId: string,
   payload: CreateShedPayload,
 ): Promise<ShedLog> {
   const { data } = await apiClient.post<ShedLog>(
-    `/snakes/${encodeURIComponent(snakeId)}/sheds`,
+    `/animals/${encodeURIComponent(animalId)}/sheds`,
     payload,
   );
   return data;
-}
-
-export async function deleteShed(id: string): Promise<void> {
-  await apiClient.delete(`/sheds/${encodeURIComponent(id)}`);
 }
 
 export async function getShed(id: string): Promise<ShedLog> {
@@ -391,10 +420,16 @@ export async function updateShed(
   return data;
 }
 
+export async function deleteShed(id: string): Promise<void> {
+  await apiClient.delete(`/sheds/${encodeURIComponent(id)}`);
+}
+
 // ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
 
-export function snakeTitle(s: Pick<Snake, 'name' | 'common_name' | 'scientific_name'>): string {
-  return s.name || s.common_name || s.scientific_name || 'Unnamed';
+export function animalTitle(
+  a: Pick<Animal, 'name' | 'common_name' | 'scientific_name'>,
+): string {
+  return a.name || a.common_name || a.scientific_name || 'Unnamed';
 }

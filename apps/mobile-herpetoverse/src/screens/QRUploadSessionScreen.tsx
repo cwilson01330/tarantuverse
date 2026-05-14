@@ -7,18 +7,16 @@
  * keeper's auth.
  *
  * UX:
- *   - On mount: POST to /<taxon>/<id>/upload-session
+ *   - On mount: POST to /animals/<id>/upload-session (ADR-003 collapsed
+ *     the per-taxon endpoints — taxon comes back in the response)
  *   - Render QR (using react-native-qrcode-svg) + URL
  *   - Copy-to-clipboard, system Share, "Generate new" actions
  *   - Live countdown to expiry — when it hits 0 the QR is greyed out
  *     and a "Generate new" CTA appears
  *
- * Web upload page caveat: the URL the API returns currently points to
- * `tarantuverse.com/upload/<token>`, where the existing upload page
- * only renders tarantula sessions. Microcopy notes this and offers a
- * direct copy of the URL anyway (so a beta tester can verify the
- * session shape via browser network tools while we ship the cross-
- * taxon upload page in Sprint 9).
+ * Web upload page: the URL the API returns points to
+ * `tarantuverse.com/upload/<token>`; that page reads the session's
+ * `taxon` field and renders animal sessions under Herpetoverse branding.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -42,12 +40,11 @@ import {
   extractErrorMessage,
 } from '../components/forms/FormPrimitives';
 import {
-  type QRTaxon,
   type UploadSessionResponse,
   createUploadSession,
 } from '../lib/qr';
 
-export function QRUploadSessionScreen({ taxon }: { taxon: QRTaxon }) {
+export function QRUploadSessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
 
@@ -77,14 +74,14 @@ export function QRUploadSessionScreen({ taxon }: { taxon: QRTaxon }) {
     setError(null);
     setCopied(false);
     try {
-      const data = await createUploadSession(taxon, id);
+      const data = await createUploadSession(id);
       setSession(data);
     } catch (err) {
       setError(extractErrorMessage(err, "Couldn't create an upload session."));
     } finally {
       setGenerating(false);
     }
-  }, [id, taxon]);
+  }, [id]);
 
   useEffect(() => {
     generate();
@@ -110,8 +107,7 @@ export function QRUploadSessionScreen({ taxon }: { taxon: QRTaxon }) {
     }
   }
 
-  const animalName =
-    session?.snake_name ?? session?.lizard_name ?? null;
+  const animalName = session?.animal_name ?? null;
 
   return (
     <SafeAreaView

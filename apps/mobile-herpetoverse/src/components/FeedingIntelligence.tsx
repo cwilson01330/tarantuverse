@@ -25,11 +25,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
-import { type PreySuggestion, getPreySuggestion as getSnakeSuggestion } from '../lib/snakes';
-import { getPreySuggestion as getLizardSuggestion } from '../lib/lizards';
+import { type PreySuggestion, getPreySuggestion } from '../lib/animals';
 
 interface Props {
-  taxon: 'snake' | 'lizard';
   animalId: string;
   /** Most-recent ACCEPTED feeding date — drives the next-feed window. */
   lastFedAt: string | null;
@@ -49,7 +47,6 @@ const STAGE_LABEL: Record<string, string> = {
 };
 
 export function FeedingIntelligence({
-  taxon,
   animalId,
   lastFedAt,
   lastAcceptedPreyWeightG,
@@ -66,10 +63,7 @@ export function FeedingIntelligence({
     setLoadError(null);
     (async () => {
       try {
-        const s =
-          taxon === 'snake'
-            ? await getSnakeSuggestion(animalId)
-            : await getLizardSuggestion(animalId);
+        const s = await getPreySuggestion(animalId);
         if (!cancelled) setSuggestion(s);
       } catch {
         if (!cancelled) setLoadError("Couldn't load feeding guidance.");
@@ -78,7 +72,7 @@ export function FeedingIntelligence({
     return () => {
       cancelled = true;
     };
-  }, [taxon, animalId, refreshKey]);
+  }, [animalId, refreshKey]);
 
   // Next-feed window — last_fed + interval_min .. last_fed + interval_max.
   // We compute on the client because last_fed_at can change without

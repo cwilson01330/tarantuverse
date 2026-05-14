@@ -1,21 +1,22 @@
 /**
- * Public lizard profile route — destination of label QR codes.
+ * Legacy public lizard profile route.
  *
- * Mirror of /s/[id] — both routes funnel into the shared
- * ReptilePublicProfile component which dispatches the right
- * /s/{id} or /l/{id} backend call based on the taxon prop.
+ * ADR-003 collapsed the per-taxon `/s/[id]` + `/l/[id]` routes into the
+ * taxon-agnostic `/a/[id]`. This file is kept only so QR labels printed
+ * before the consolidation still resolve — it permanently redirects to
+ * the new route.
  */
-import ReptilePublicProfile from '@/components/ReptilePublicProfile'
+import { redirect } from 'next/navigation'
 
 interface Params {
   id: string
 }
 
-export default async function PublicLizardPage({
+export default async function LegacyPublicLizardPage({
   params,
 }: {
   params: Promise<Params>
 }) {
   const { id } = await params
-  return <ReptilePublicProfile taxon="lizard" animalId={id} />
+  redirect(`/a/${id}`)
 }

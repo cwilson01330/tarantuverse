@@ -13,7 +13,7 @@
  * Design notes:
  *  - Sane defaults: sex=unknown, no required fields except a common name.
  *  - Species picker is encouraged (not forced) — without a
- *    reptile_species_id the prey-suggestion endpoint can't compute
+ *    herp_species_id the prey-suggestion endpoint can't compute
  *    stage/interval/ranges, so we nudge in UI rather than block submit.
  *    The species library is shared across taxa; today nothing prevents
  *    a keeper from picking a snake species for a lizard record. That's
@@ -34,16 +34,14 @@ import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
 import {
-  createSnake,
-  type CreateSnakePayload,
+  createAnimal,
+  type CreateAnimalPayload,
   type Sex,
   type Source,
-} from '@/lib/snakes'
-import {
-  createLizard,
-  type CreateLizardPayload,
-} from '@/lib/lizards'
+} from '@/lib/animals'
 
+// The form only offers snake + lizard for now — frog creation UI lands
+// with the dedicated frog work (ADR-003 made the backend taxon-ready).
 type Taxon = 'snake' | 'lizard'
 
 interface FormState {
@@ -133,15 +131,14 @@ export default function AddReptilePage() {
       }
     }
 
-    // Snake and lizard create payloads are structurally identical —
-    // both extend the same `SnakeBase`-shaped surface on the backend.
-    // The only reason they're typed separately is the two call sites
-    // route through different endpoints.
-    const payload: CreateSnakePayload & CreateLizardPayload = {
+    // ADR-003: one unified animals endpoint — the taxon discriminator
+    // rides in the payload instead of routing to per-taxon endpoints.
+    const payload: CreateAnimalPayload = {
+      taxon: form.taxon,
       name: nullableStr(form.name),
       common_name: nullableStr(form.commonName),
       scientific_name: nullableStr(form.scientificName),
-      reptile_species_id: form.speciesId,
+      herp_species_id: form.speciesId,
       enclosure_id: form.enclosureId,
       sex: form.sex,
       hatch_date: nullableStr(form.hatchDate),
@@ -156,13 +153,14 @@ export default function AddReptilePage() {
 
     setSubmitting(true)
     try {
-      if (form.taxon === 'snake') {
-        const snake = await createSnake(payload)
-        router.push(`/app/reptiles/${snake.id}`)
-      } else {
-        const lizard = await createLizard(payload)
-        router.push(`/app/reptiles/lizards/${lizard.id}`)
-      }
+      const animal = await createAnimal(payload)
+      // Lizards live under the lizards/ subpath; snakes use the root
+      // reptile detail route.
+      router.push(
+        form.taxon === 'lizard'
+          ? `/app/reptiles/lizards/${animal.id}`
+          : `/app/reptiles/${animal.id}`,
+      )
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message || 'Could not save. Please try again.')

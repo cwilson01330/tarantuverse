@@ -44,8 +44,8 @@ interface ApiFetchOptions extends RequestInit {
  * Fetch + auth + JSON parsing in one call.
  *
  * Usage:
- *   const snakes = await apiFetch<Snake[]>('/api/v1/snakes/')
- *   const created = await apiFetch<Snake>('/api/v1/snakes/', { method: 'POST', json: payload })
+ *   const animals = await apiFetch<Animal[]>('/api/v1/animals/')
+ *   const created = await apiFetch<Animal>('/api/v1/animals/', { method: 'POST', json: payload })
  */
 export async function apiFetch<T = unknown>(
   path: string,

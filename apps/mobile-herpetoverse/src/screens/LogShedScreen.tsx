@@ -9,9 +9,8 @@
  * desk anyway.
  *
  * EDIT MODE: when the route includes a `shedId` query param, pre-fill
- * via GET /sheds/{id} and PUT on save. Edit dispatches taxon-agnostically
- * since /sheds/{id} resolves polymorphism via the row's snake_id /
- * lizard_id.
+ * via GET /sheds/{id} and PUT on save. ADR-003: shed rows carry a single
+ * `animal_id` and both create + edit hit taxon-agnostic routes.
  */
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -39,11 +38,10 @@ import {
 } from '../components/forms/FormPrimitives';
 import {
   type CreateShedPayload,
-  createShed as createShedSnake,
+  createShed,
   getShed,
   updateShed,
-} from '../lib/snakes';
-import { createShed as createShedLizard } from '../lib/lizards';
+} from '../lib/animals';
 
 const COMPLETE_OPTIONS = [
   { value: 'yes' as const, label: 'One piece' },
@@ -65,7 +63,7 @@ function isoToYMD(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
-export function LogShedScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
+export function LogShedScreen() {
   const router = useRouter();
   const { id, shedId } = useLocalSearchParams<{
     id?: string;
@@ -133,10 +131,8 @@ export function LogShedScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
     try {
       if (isEdit && shedId) {
         await updateShed(shedId as string, payload);
-      } else if (taxon === 'snake') {
-        await createShedSnake(id as string, payload);
       } else {
-        await createShedLizard(id as string, payload);
+        await createShed(id as string, payload);
       }
       router.back();
     } catch (err) {

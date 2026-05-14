@@ -1,9 +1,9 @@
-/** Snake edit route — wraps the shared screen with `taxon="snake"`. */
+/** Snake edit route — wraps the shared (taxon-agnostic) screen. */
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
 import { EditReptileScreen } from '../../../src/screens/EditReptileScreen';
 
 function Page() {
-  return <EditReptileScreen taxon="snake" />;
+  return <EditReptileScreen />;
 }
 
 export default withErrorBoundary(Page, 'edit-reptile-snake');

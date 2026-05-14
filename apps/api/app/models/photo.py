@@ -18,8 +18,11 @@ from app.database import Base
 class Photo(Base):
     __tablename__ = "photos"
     __table_args__ = (
+        # snake/lizard/frog collapsed into animal_id in anm_20260514
+        # (ADR-003). Still polymorphic between TV tarantulas and HV
+        # animals — exactly one of the two parents is set.
         CheckConstraint(
-            'num_nonnulls(tarantula_id, snake_id, lizard_id, frog_id) = 1',
+            'num_nonnulls(tarantula_id, animal_id) = 1',
             name='photos_must_have_exactly_one_parent',
         ),
     )
@@ -30,22 +33,9 @@ class Photo(Base):
         ForeignKey("tarantulas.id", ondelete="CASCADE"),
         nullable=True,
     )
-    snake_id = Column(
+    animal_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("snakes.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    lizard_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("lizards.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    # Frog photos — added by frp_20260513.
-    frog_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("frogs.id", ondelete="CASCADE"),
+        ForeignKey("animals.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -59,10 +49,8 @@ class Photo(Base):
 
     # Relationships
     tarantula = relationship("Tarantula", backref="photos")
-    snake = relationship("Snake", backref="photos")
-    lizard = relationship("Lizard", backref="photos")
-    frog = relationship("Frog", backref="photos")
+    animal = relationship("Animal", backref="photos")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.snake_id or self.lizard_id or self.frog_id
+        parent = self.tarantula_id or self.animal_id
         return f"<Photo {self.id} parent={parent}>"

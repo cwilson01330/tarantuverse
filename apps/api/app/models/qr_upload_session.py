@@ -19,8 +19,11 @@ from app.database import Base
 class QRUploadSession(Base):
     __tablename__ = "qr_upload_sessions"
     __table_args__ = (
+        # snake/lizard/frog collapsed into animal_id in anm_20260514
+        # (ADR-003). Still polymorphic between TV tarantulas and HV
+        # animals — exactly one parent set.
         CheckConstraint(
-            'num_nonnulls(tarantula_id, snake_id, lizard_id, frog_id) = 1',
+            'num_nonnulls(tarantula_id, animal_id) = 1',
             name='qr_upload_sessions_must_have_exactly_one_parent',
         ),
     )
@@ -33,22 +36,9 @@ class QRUploadSession(Base):
         ForeignKey("tarantulas.id", ondelete="CASCADE"),
         nullable=True,
     )
-    snake_id = Column(
+    animal_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("snakes.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    lizard_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("lizards.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    # Frog photo upload sessions — added by frp_20260513.
-    frog_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("frogs.id", ondelete="CASCADE"),
+        ForeignKey("animals.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -63,11 +53,9 @@ class QRUploadSession(Base):
 
     # Relationships
     tarantula = relationship("Tarantula")
-    snake = relationship("Snake")
-    lizard = relationship("Lizard")
-    frog = relationship("Frog")
+    animal = relationship("Animal")
     user = relationship("User")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.snake_id or self.lizard_id or self.frog_id
+        parent = self.tarantula_id or self.animal_id
         return f"<QRUploadSession {self.token[:8]}... parent={parent}>"

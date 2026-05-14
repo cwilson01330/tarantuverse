@@ -4,10 +4,10 @@
  * Reptile species autocomplete. Debounced 300ms against /reptile-species/search.
  *
  * Two pieces of state leave this component:
- *   - `speciesId`  → reptile_species_id on the snake record (links care sheet
+ *   - `speciesId`  → herp_species_id on the animal record (links care sheet
  *                     + feeding intelligence — without this the prey-suggestion
  *                     endpoint can't compute stage/prey ranges).
- *   - `scientificName` → cached on the snake record too, so list/detail views
+ *   - `scientificName` → cached on the animal record too, so list/detail views
  *                         don't need a species round-trip.
  *
  * Keyboard: ArrowUp/Down move focus, Enter selects, Escape closes. Mouse: click

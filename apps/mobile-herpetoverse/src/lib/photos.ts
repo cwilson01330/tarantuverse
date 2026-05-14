@@ -1,11 +1,11 @@
 /**
- * Photo API client — taxon-aware list/upload, taxon-agnostic mutations.
+ * Photo API client.
  *
- * Backend has separate POST/GET endpoints per taxon (`/snakes/<id>/photos`,
- * `/lizards/<id>/photos`) but a single shared mutation surface for delete,
- * caption edit, and set-main (`/photos/<id>...`). Photos belong to one
- * animal at a time — the join column is either `snake_id` or `lizard_id`,
- * and the backend resolves ownership through whichever is set.
+ * ADR-003: the per-taxon snakes/lizards tables collapsed into `animals`,
+ * so list + upload route through `/animals/<id>/photos` regardless of
+ * taxon. The shared mutation surface (delete, caption edit, set-main)
+ * stays at `/photos/<id>...`. The photos table join column is now
+ * `animal_id` (or `tarantula_id` on the Tarantuverse side).
  *
  * Multipart uploads: React Native FormData accepts the `{ uri, name, type }`
  * triple — see `uploadPhoto` below. Don't set `Content-Type` manually;
@@ -23,19 +23,13 @@ export interface Photo {
   created_at: string;
 }
 
-export type PhotoTaxon = 'snake' | 'lizard';
-
 // ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
 
-export async function listPhotos(
-  taxon: PhotoTaxon,
-  animalId: string,
-): Promise<Photo[]> {
-  const root = taxon === 'snake' ? 'snakes' : 'lizards';
+export async function listPhotos(animalId: string): Promise<Photo[]> {
   const { data } = await apiClient.get<Photo[]>(
-    `/${root}/${encodeURIComponent(animalId)}/photos`,
+    `/animals/${encodeURIComponent(animalId)}/photos`,
   );
   return data;
 }
@@ -45,7 +39,6 @@ export async function listPhotos(
 // ---------------------------------------------------------------------------
 
 export interface UploadPhotoArgs {
-  taxon: PhotoTaxon;
   animalId: string;
   /** Local file URI from expo-image-picker (file://, content://, etc.). */
   imageUri: string;
@@ -53,12 +46,10 @@ export interface UploadPhotoArgs {
 }
 
 export async function uploadPhoto({
-  taxon,
   animalId,
   imageUri,
   caption,
 }: UploadPhotoArgs): Promise<Photo> {
-  const root = taxon === 'snake' ? 'snakes' : 'lizards';
   const formData = new FormData();
 
   // Derive a sensible filename + mime from the URI extension. RN's
@@ -80,7 +71,7 @@ export async function uploadPhoto({
   }
 
   const { data } = await apiClient.post<Photo>(
-    `/${root}/${encodeURIComponent(animalId)}/photos`,
+    `/animals/${encodeURIComponent(animalId)}/photos`,
     formData,
     {
       headers: {

@@ -28,15 +28,14 @@ import {
 } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { relativeDays } from '../../utils/relative-days';
-import type { Sex, WeightContext } from '../../lib/snakes';
+import type { Sex, WeightContext } from '../../lib/animals';
 import type { Photo } from '../../lib/photos';
 
-// Minimal structural types — shared between snake (snakes.ts has
-// `snake_id: string`) and lizard (lizards.ts has both snake_id and
-// lizard_id as `string | null` since the row table is polymorphic).
-// Importing either taxon's full schema here would fail to typecheck
-// for the other; defining the slim view used by these components keeps
-// both screens happy.
+// Minimal structural slim-views of the log shapes. ADR-003 collapsed the
+// per-taxon tables into `animals` (log rows now carry a single
+// `animal_id`), but these components only need a handful of display
+// fields — keeping the slim view means callers can pass either the full
+// Animal-era log rows or anything structurally compatible.
 export interface WeightLogView {
   id: string;
   weighed_at: string;

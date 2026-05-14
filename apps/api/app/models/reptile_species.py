@@ -36,7 +36,12 @@ class ReptileCareLevel(str, enum.Enum):
 
 
 class ReptileSpecies(Base):
-    __tablename__ = "reptile_species"
+    # Table renamed reptile_species -> herp_species in anh_20260514
+    # (ADR-003) — the catalog holds amphibians (frogs) too. The Python
+    # class name is kept as ReptileSpecies to avoid a large mechanical
+    # rename across routers/schemas/seeds; only the DB-facing name
+    # needed fixing per the user's request.
+    __tablename__ = "herp_species"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 

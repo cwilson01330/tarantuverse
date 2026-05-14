@@ -7,10 +7,11 @@
  * same INPUT_CLS, same nullableStr/nullableNum helpers, same typed-confirm
  * delete modal. Differences:
  *
- *  - Data layer is `@/lib/lizards` instead of `@/lib/snakes` (different
- *    endpoints: /api/v1/lizards/...).
- *  - Naming: `lizardId`, `lizard`, `Lizard`, `CreateLizardPayload`,
- *    `lizardTitle`.
+ *  - ADR-003: both screens hit the unified `@/lib/animals` data layer
+ *    (`/api/v1/animals/...`). The helpers are aliased back to their
+ *    lizard-era names here so the form body stays taxon-agnostic.
+ *  - Naming: `lizardId`, `lizard`, `Lizard` (aliased `Animal`),
+ *    `CreateLizardPayload` (aliased `UpdateAnimalPayload`), `lizardTitle`.
  *  - BackLink + success redirect route into the `lizards/` subpath so we
  *    don't 404 on the old snake detail URL.
  *  - Genetics section is intentionally omitted — the genes catalog is
@@ -27,16 +28,19 @@ import { useEffect, useState } from 'react'
 import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
+// ADR-003: snake/lizard libs collapsed into lib/animals. This is still
+// the lizard-shaped edit screen, so the unified helpers are aliased back
+// to their lizard-era names — the form body is taxon-agnostic.
 import {
-  type CreateLizardPayload,
-  deleteLizard,
-  getLizard,
-  type Lizard,
-  lizardTitle,
+  type UpdateAnimalPayload as CreateLizardPayload,
+  deleteAnimal as deleteLizard,
+  getAnimal as getLizard,
+  type Animal as Lizard,
+  animalTitle as lizardTitle,
   type Sex,
   type Source,
-  updateLizard,
-} from '@/lib/lizards'
+  updateAnimal as updateLizard,
+} from '@/lib/animals'
 
 // Form state mirrors the add flow — all strings so input round-tripping stays
 // predictable. `null`s from the wire get normalized to '' here; we reverse
@@ -90,7 +94,7 @@ function lizardToForm(l: Lizard): FormState {
     name: l.name ?? '',
     commonName: l.common_name ?? '',
     scientificName: l.scientific_name ?? '',
-    speciesId: l.reptile_species_id,
+    speciesId: l.herp_species_id,
     enclosureId: l.enclosure_id,
     sex: (l.sex as Sex | null) ?? 'unknown',
     hatchDate: l.hatch_date ?? '',
@@ -183,7 +187,7 @@ export default function EditLizardClient({ lizardId }: { lizardId: string }) {
       name: nullableStr(form.name),
       common_name: nullableStr(form.commonName),
       scientific_name: nullableStr(form.scientificName),
-      reptile_species_id: form.speciesId,
+      herp_species_id: form.speciesId,
       enclosure_id: form.enclosureId,
       sex: form.sex,
       hatch_date: nullableStr(form.hatchDate),

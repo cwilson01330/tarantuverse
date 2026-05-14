@@ -2,7 +2,7 @@
  * Reptile species autocomplete — mobile.
  *
  * Two-piece state out (matches web component):
- *   - speciesId  → reptile_species_id on the animal record (links care
+ *   - speciesId  → herp_species_id on the animal record (links care
  *                  sheet + prey suggestion)
  *   - scientificName → cached on the animal record so list/detail views
  *                       don't need a species round-trip
@@ -14,7 +14,7 @@
  *
  * Falls back to free text gracefully — if the keeper's species isn't
  * in our library yet, they can still type anything and save. The form
- * will record `scientific_name` without a `reptile_species_id`, and
+ * will record `scientific_name` without a `herp_species_id`, and
  * prey-suggestion + care-sheet links will show "no species linked"
  * states until they pick one later.
  */

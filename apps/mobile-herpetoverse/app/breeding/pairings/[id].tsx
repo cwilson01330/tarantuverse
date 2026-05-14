@@ -238,7 +238,11 @@ function PairingDetailScreen() {
                 {pairing.female_display_name ?? 'Female'}
               </Text>
               <Text style={[styles.heroMeta, { color: colors.textSecondary }]}>
-                {pairing.taxon === 'snake' ? '🐍 Snake pairing' : '🦎 Lizard pairing'}
+                {pairing.taxon === 'snake'
+                  ? '🐍 Snake pairing'
+                  : pairing.taxon === 'frog'
+                  ? '🐸 Frog pairing'
+                  : '🦎 Lizard pairing'}
               </Text>
               <View style={styles.kvGrid}>
                 <KV label="Paired" value={fmtDate(pairing.paired_date)} />

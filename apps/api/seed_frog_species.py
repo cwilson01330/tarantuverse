@@ -2,10 +2,11 @@
 
 Per PRD-herpetoverse-v1 §5.3 and docs/design/RUBRIC-care-sheet-content.md.
 
-Naming note: the catalog table is `reptile_species` for legacy reasons.
-Frogs are amphibians, not reptiles — but the table represents
-"non-tarantula animal" semantically (see frg_20260513 migration
-docstring) and the user-facing app just calls it "Species."
+Naming note: the catalog table is `herp_species` (renamed from
+reptile_species in anh_20260514 / ADR-003). The Python model class is
+still `ReptileSpecies` — only the DB-facing name was changed. Frogs are
+amphibians, not reptiles, but "herp" covers both and the user-facing
+app just calls it "Species."
 
 Scope: 5 well-documented commonly-kept species.
 
@@ -198,7 +199,10 @@ SPECIES_DATA = [
         "family": "Ceratophryidae",
         "order_name": "Anura",
         "care_level": "beginner",
-        "handleability": "minimal_handling",
+        # No "minimal handling" tier in the schema — frogs map onto the
+        # reptile handleability scale. hands_off covers "permeable skin,
+        # will bite, don't pick up casually."
+        "handleability": "hands_off",
         "activity_period": "nocturnal",
         "native_region": "Subtropical South America — Argentina, Uruguay, southern Brazil",
         "adult_length_min_in": Decimal("4"),
@@ -218,8 +222,8 @@ SPECIES_DATA = [
         "humidity_shed_boost_min": 70,
         "humidity_shed_boost_max": 90,
         "uvb_required": False,
-        "uvb_type": "low_optional",
-        "uvb_replacement_months": 12,
+        "uvb_type": "not_required",
+        "uvb_replacement_months": None,
         "enclosure_type": "terrestrial",
         "enclosure_min_hatchling": "Small deli cup / shoebox bin (1-2 gal)",
         "enclosure_min_juvenile": "5 gallon / 16\"L x 8\"W x 10\"H",
@@ -295,7 +299,7 @@ SPECIES_DATA = [
         "family": "Dendrobatidae",
         "order_name": "Anura",
         "care_level": "intermediate",
-        "handleability": "no_handling",
+        "handleability": "hands_off",
         "activity_period": "diurnal",
         "native_region": "Central America — Nicaragua to northwestern Colombia; introduced to Hawaii",
         "adult_length_min_in": Decimal("1.0"),
@@ -317,8 +321,8 @@ SPECIES_DATA = [
         "humidity_shed_boost_min": 90,
         "humidity_shed_boost_max": 100,
         "uvb_required": False,
-        "uvb_type": "low_optional",
-        "uvb_replacement_months": 12,
+        "uvb_type": "not_required",
+        "uvb_replacement_months": None,
         "enclosure_type": "arboreal",
         "enclosure_min_hatchling": "Plastic deli cup with moss + leaf litter",
         "enclosure_min_juvenile": "10 gallon vertical / 12\"L x 12\"W x 18\"H",
@@ -394,7 +398,7 @@ SPECIES_DATA = [
         "family": "Hylidae",
         "order_name": "Anura",
         "care_level": "intermediate",
-        "handleability": "minimal_handling",
+        "handleability": "hands_off",
         "activity_period": "nocturnal",
         "native_region": "Amazon basin — Brazil, Peru, Colombia, Venezuela",
         "adult_length_min_in": Decimal("2.5"),
@@ -414,7 +418,7 @@ SPECIES_DATA = [
         "humidity_shed_boost_min": 80,
         "humidity_shed_boost_max": 100,
         "uvb_required": True,
-        "uvb_type": "low_5_uvb",
+        "uvb_type": "T8",
         "uvb_replacement_months": 12,
         "enclosure_type": "arboreal",
         "enclosure_min_hatchling": "Plastic deli cup, vertical orientation",
@@ -487,7 +491,9 @@ SPECIES_DATA = [
         "family": "Hylidae",
         "order_name": "Anura",
         "care_level": "beginner",
-        "handleability": "minimal_handling",
+        # White's are the one frog in this set that genuinely tolerates
+        # brief, occasional handling — that's their hobby reputation.
+        "handleability": "docile",
         "activity_period": "nocturnal",
         "native_region": "Northern and eastern Australia; New Guinea",
         "adult_length_min_in": Decimal("3"),
@@ -507,7 +513,7 @@ SPECIES_DATA = [
         "humidity_shed_boost_min": 70,
         "humidity_shed_boost_max": 80,
         "uvb_required": True,
-        "uvb_type": "low_5_uvb",
+        "uvb_type": "T8",
         "uvb_replacement_months": 12,
         "enclosure_type": "arboreal",
         "enclosure_min_hatchling": "5 gallon vertical / plastic deli cup",
@@ -545,7 +551,7 @@ SPECIES_DATA = [
         "cites_appendix": None,
         "iucn_status": "LC",
         "has_morph_market": True,
-        "morph_complexity": "low",
+        "morph_complexity": "simple",
         "care_guide": (
             "**White's Tree Frog (Litoria caerulea)** — Arguably the most "
             "beginner-friendly tree frog in the hobby. Hardy, forgiving "
@@ -571,7 +577,9 @@ SPECIES_DATA = [
         "family": "Pyxicephalidae",
         "order_name": "Anura",
         "care_level": "intermediate",
-        "handleability": "minimal_handling",
+        # Pixies bite hard, gape, and bellow — defensive is the honest
+        # mapping onto the reptile handleability scale.
+        "handleability": "defensive",
         "activity_period": "nocturnal",
         "native_region": "Sub-Saharan Africa — savanna grasslands",
         # Males much larger than females — note the wide range.
@@ -592,8 +600,8 @@ SPECIES_DATA = [
         "humidity_shed_boost_min": 70,
         "humidity_shed_boost_max": 85,
         "uvb_required": False,
-        "uvb_type": "low_optional",
-        "uvb_replacement_months": 12,
+        "uvb_type": "not_required",
+        "uvb_replacement_months": None,
         "enclosure_type": "terrestrial",
         "enclosure_min_hatchling": "Small plastic bin or 5 gallon",
         "enclosure_min_juvenile": "10 gallon / 20\"L x 10\"W x 12\"H",
@@ -641,7 +649,7 @@ SPECIES_DATA = [
         "cites_appendix": None,
         "iucn_status": "LC",
         "has_morph_market": False,
-        "morph_complexity": "low",
+        "morph_complexity": "simple",
         "care_guide": (
             "**African Bullfrog (Pyxicephalus adspersus)** — The largest "
             "frog in mainland Africa and the keeper's introduction to "

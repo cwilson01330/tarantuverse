@@ -17,13 +17,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.animal import Animal
 from app.models.animal_genotype import AnimalGenotype
 from app.models.clutch import Clutch
 from app.models.gene import Gene
-from app.models.lizard import Lizard
 from app.models.reptile_offspring import ReptileOffspring
 from app.models.reptile_pairing import ReptilePairing
-from app.models.snake import Snake
 from app.models.user import User
 from app.schemas.reptile_breeding import (
     ClutchCreate,
@@ -219,28 +218,18 @@ async def get_clutch_parent_genotypes(
     c = _own_clutch_or_404(clutch_id, current_user.id, db)
     pairing = _own_pairing_or_404(c.pairing_id, current_user.id, db)
 
-    if pairing.taxon == "snake":
-        male = db.query(Snake).filter(Snake.id == pairing.male_snake_id).first()
-        female = db.query(Snake).filter(Snake.id == pairing.female_snake_id).first()
-        male_genotypes = _genotypes_for_snake(pairing.male_snake_id, db)
-        female_genotypes = _genotypes_for_snake(pairing.female_snake_id, db)
-        male_name = (
-            male.name or male.common_name or male.scientific_name or "Male"
-        ) if male else "Male"
-        female_name = (
-            female.name or female.common_name or female.scientific_name or "Female"
-        ) if female else "Female"
-    else:
-        male = db.query(Lizard).filter(Lizard.id == pairing.male_lizard_id).first()
-        female = db.query(Lizard).filter(Lizard.id == pairing.female_lizard_id).first()
-        male_genotypes = _genotypes_for_lizard(pairing.male_lizard_id, db)
-        female_genotypes = _genotypes_for_lizard(pairing.female_lizard_id, db)
-        male_name = (
-            male.name or male.common_name or male.scientific_name or "Male"
-        ) if male else "Male"
-        female_name = (
-            female.name or female.common_name or female.scientific_name or "Female"
-        ) if female else "Female"
+    # ADR-003: both parents are rows in the unified animals table — no
+    # more per-taxon branching here.
+    male = db.query(Animal).filter(Animal.id == pairing.male_animal_id).first()
+    female = db.query(Animal).filter(Animal.id == pairing.female_animal_id).first()
+    male_genotypes = _genotypes_for_animal(pairing.male_animal_id, db)
+    female_genotypes = _genotypes_for_animal(pairing.female_animal_id, db)
+    male_name = (
+        male.name or male.common_name or male.scientific_name or "Male"
+    ) if male else "Male"
+    female_name = (
+        female.name or female.common_name or female.scientific_name or "Female"
+    ) if female else "Female"
 
     male_keys = {g.gene_key for g in male_genotypes}
     female_keys = {g.gene_key for g in female_genotypes}
@@ -264,25 +253,23 @@ async def get_clutch_parent_genotypes(
             "predictions need at least one shared gene."
         )
 
+    taxon_str = (
+        pairing.taxon.value
+        if hasattr(pairing.taxon, "value")
+        else pairing.taxon
+    )
+
     return ClutchParentGenotypesResponse(
         pairing_id=pairing.id,
         clutch_id=c.id,
-        taxon=pairing.taxon,
+        taxon=taxon_str,
         male=ParentGenotypeBundle(
-            animal_id=(
-                pairing.male_snake_id
-                if pairing.taxon == "snake"
-                else pairing.male_lizard_id
-            ),
+            animal_id=pairing.male_animal_id,
             display_name=male_name,
             genotypes=male_genotypes,
         ),
         female=ParentGenotypeBundle(
-            animal_id=(
-                pairing.female_snake_id
-                if pairing.taxon == "snake"
-                else pairing.female_lizard_id
-            ),
+            animal_id=pairing.female_animal_id,
             display_name=female_name,
             genotypes=female_genotypes,
         ),
@@ -291,24 +278,15 @@ async def get_clutch_parent_genotypes(
     )
 
 
-def _genotypes_for_snake(snake_id, db: Session) -> List[GenotypeEntry]:
-    if not snake_id:
+def _genotypes_for_animal(animal_id, db: Session) -> List[GenotypeEntry]:
+    """Recorded zygosities for one parent. ADR-003 collapsed the
+    per-taxon FK on animal_genotypes to a single animal_id."""
+    if not animal_id:
         return []
     return _genotype_rows_to_entries(
         db.query(AnimalGenotype, Gene)
         .join(Gene, Gene.id == AnimalGenotype.gene_id)
-        .filter(AnimalGenotype.snake_id == snake_id)
-        .all()
-    )
-
-
-def _genotypes_for_lizard(lizard_id, db: Session) -> List[GenotypeEntry]:
-    if not lizard_id:
-        return []
-    return _genotype_rows_to_entries(
-        db.query(AnimalGenotype, Gene)
-        .join(Gene, Gene.id == AnimalGenotype.gene_id)
-        .filter(AnimalGenotype.lizard_id == lizard_id)
+        .filter(AnimalGenotype.animal_id == animal_id)
         .all()
     )
 

@@ -8,9 +8,10 @@
  *               for handing capture off to a guest's device.
  *   Label tab:  renders a printable enclosure label. The label QR
  *               points at the reptile's permanent public profile
- *               (`/s/<id>` or `/l/<id>`) — when the owner scans it
- *               they jump to quick-action buttons (Log feeding / shed),
- *               when a visitor scans it they see a read-only profile.
+ *               (`/a/<id>` — ADR-003 collapsed the per-taxon `/s/` and
+ *               `/l/` routes) — when the owner scans it they jump to
+ *               quick-action buttons (Log feeding / shed), when a
+ *               visitor scans it they see a read-only profile.
  *
  * The upload session uses `position: fixed` polling at 5s — fine for a
  * 20-min session lifetime. The label flow is fully client-side: the
@@ -336,16 +337,16 @@ function savePrefs(prefs: StoredPrefs): void {
 }
 
 import { ApiError } from '@/lib/apiClient'
-import { listPhotos as listSnakePhotos } from '@/lib/snakes'
-import { listPhotos as listLizardPhotos } from '@/lib/lizards'
+// ADR-003: photos route through the unified animals API — no per-taxon
+// dispatch. TAXON_LABELS supplies the display fallback when no name is set.
+import { type AnimalTaxon, TAXON_LABELS, listPhotos } from '@/lib/animals'
 import {
-  type QRTaxon,
   type UploadSessionResponse,
   createUploadSession,
 } from '@/lib/qr'
 
 interface Props {
-  taxon: QRTaxon
+  taxon: AnimalTaxon
   animalId: string
   /** For copy in the modal header. Falls back to a generic if absent. */
   animalName: string | null
@@ -490,7 +491,7 @@ export default function ReptileQRModal({
 
     let session: UploadSessionResponse
     try {
-      session = await createUploadSession(taxon, animalId)
+      session = await createUploadSession(animalId)
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -508,10 +509,7 @@ export default function ReptileQRModal({
     // we can detect *new* uploads rather than counting pre-existing ones.
     const seedKnownCount = async () => {
       try {
-        const photos =
-          taxon === 'snake'
-            ? await listSnakePhotos(animalId)
-            : await listLizardPhotos(animalId)
+        const photos = await listPhotos(animalId)
         knownPhotoCount = photos.length
       } catch {
         // If the seed fails we just count any future state as new — minor
@@ -541,10 +539,7 @@ export default function ReptileQRModal({
     // Poll for new photos every 5s.
     pollRef.current = setInterval(async () => {
       try {
-        const photos =
-          taxon === 'snake'
-            ? await listSnakePhotos(animalId)
-            : await listLizardPhotos(animalId)
+        const photos = await listPhotos(animalId)
         if (knownPhotoCount == null) {
           knownPhotoCount = photos.length
           return
@@ -570,7 +565,7 @@ export default function ReptileQRModal({
       timeLeft: '20:00',
       receivedCount: 0,
     })
-  }, [taxon, animalId, onPhotoAdded, stopAllTimers])
+  }, [animalId, onPhotoAdded, stopAllTimers])
 
   // Auto-generate on mount.
   useEffect(() => {
@@ -609,8 +604,8 @@ export default function ReptileQRModal({
   // ---------------------------------------------------------------------------
   // Label tab — print-ready enclosure label
   // ---------------------------------------------------------------------------
-  const publicProfilePath =
-    taxon === 'snake' ? `/s/${animalId}` : `/l/${animalId}`
+  // ADR-003: one taxon-agnostic public-profile route.
+  const publicProfilePath = `/a/${animalId}`
   const publicProfileUrl =
     typeof window === 'undefined'
       ? ''
@@ -625,7 +620,7 @@ export default function ReptileQRModal({
       labelPreviewRef.current?.querySelector('svg')?.outerHTML ?? ''
 
     const labelHtml = renderLabelHTML({
-      animalName: animalName ?? (taxon === 'snake' ? 'Snake' : 'Lizard'),
+      animalName: animalName ?? TAXON_LABELS[taxon],
       scientificName: scientificName ?? null,
       commonName: commonName ?? null,
       sex: sex ?? null,
@@ -1060,8 +1055,7 @@ export default function ReptileQRModal({
                         lineHeight: 1.2,
                       }}
                     >
-                      {animalName ||
-                        (taxon === 'snake' ? 'Snake' : 'Lizard')}
+                      {animalName || TAXON_LABELS[taxon]}
                     </div>
 
                     {showSex && sexInfo && (

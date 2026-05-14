@@ -1,15 +1,15 @@
 /**
- * Log feeding — shared screen for snake and lizard, also handles edit.
+ * Log feeding — shared screen for every taxon, also handles edit.
  *
- * Two route entries (`/reptile/log-feeding/[id]` and
- * `/lizard/log-feeding/[id]`) wrap this component, passing `taxon`. The
- * screen routes its createFeeding call to the right lib so the request
- * lands on `/snakes/<id>/feedings` or `/lizards/<id>/feedings`.
+ * ADR-003: snakes/lizards/frogs collapsed into one `animals` table, so
+ * create posts to `/animals/<id>/feedings` and the screen no longer
+ * needs a `taxon` prop. Two route entries still wrap this component
+ * (`/reptile/log-feeding/[id]` and `/lizard/log-feeding/[id]`) — they
+ * just render it directly now.
  *
  * EDIT MODE: when the route includes a `feedingId` query param the screen
- * pre-fills via GET /feedings/{id} and PUTs on save. The taxon-specific
- * snake/lizard libs aren't needed for edit since /feedings/{id} is
- * polymorphic (resolved server-side via the row's snake_id / lizard_id).
+ * pre-fills via GET /feedings/{id} and PUTs on save — feeding rows carry
+ * a single `animal_id` and the route is taxon-agnostic.
  *
  * Form contract matches the web equivalent's CreateFeedingPayload:
  *   - fed_at (ISO datetime, required)
@@ -54,17 +54,12 @@ import {
 import {
   type CreateFeedingPayload,
   type PreySuggestion,
-  createFeeding as createFeedingSnake,
+  createFeeding,
+  getAnimal,
   getFeeding,
-  getPreySuggestion as getSnakeSuggestion,
-  getSnake,
+  getPreySuggestion,
   updateFeeding,
-} from '../lib/snakes';
-import {
-  createFeeding as createFeedingLizard,
-  getLizard,
-  getPreySuggestion as getLizardSuggestion,
-} from '../lib/lizards';
+} from '../lib/animals';
 
 const PAUSE_REASON_LABELS: Record<string, string> = {
   hunger_strike: 'Hunger strike',
@@ -94,7 +89,7 @@ function isoToYMD(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
-export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
+export function LogFeedingScreen() {
   const router = useRouter();
   const { id, feedingId } = useLocalSearchParams<{
     id?: string;
@@ -131,14 +126,9 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   async function loadAnimalPauseState() {
     if (!id) return;
     try {
-      const animal =
-        taxon === 'snake'
-          ? await getSnake(id as string)
-          : await getLizard(id as string);
+      const animal = await getAnimal(id as string);
       setAnimalName(
-        animal.name ||
-          animal.scientific_name ||
-          (taxon === 'snake' ? 'Snake' : 'Lizard'),
+        animal.name || animal.scientific_name || 'This animal',
       );
       setPausedReason(animal.feeding_paused_reason ?? null);
       setPausedUntil(animal.feeding_paused_until ?? null);
@@ -152,7 +142,7 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
   useEffect(() => {
     if (id && !isEdit) loadAnimalPauseState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, isEdit, taxon]);
+  }, [id, isEdit]);
 
   // Fetch species-aware prey suggestion so the prey-weight field can
   // show a live "X% of body weight" hint as the keeper types. Skipped
@@ -164,10 +154,7 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
     let cancelled = false;
     (async () => {
       try {
-        const s =
-          taxon === 'snake'
-            ? await getSnakeSuggestion(id as string)
-            : await getLizardSuggestion(id as string);
+        const s = await getPreySuggestion(id as string);
         if (!cancelled) setSuggestion(s);
       } catch {
         // Non-fatal — hint just won't render.
@@ -176,7 +163,7 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
     return () => {
       cancelled = true;
     };
-  }, [id, isEdit, taxon]);
+  }, [id, isEdit]);
 
   /**
    * Live prey:body-weight ratio hint. Returns null when there isn't
@@ -296,10 +283,8 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
     try {
       if (isEdit && feedingId) {
         await updateFeeding(feedingId as string, payload);
-      } else if (taxon === 'snake') {
-        await createFeedingSnake(id as string, payload);
       } else {
-        await createFeedingLizard(id as string, payload);
+        await createFeeding(id as string, payload);
       }
       router.back();
     } catch (err) {
@@ -511,7 +496,6 @@ export function LogFeedingScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
         <PauseFeedingSheet
           visible={showPauseSheet}
           onClose={() => setShowPauseSheet(false)}
-          taxon={taxon}
           animalId={id as string}
           animalName={animalName}
           currentReason={pausedReason}

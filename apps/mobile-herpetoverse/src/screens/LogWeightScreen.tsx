@@ -40,12 +40,11 @@ import {
 import {
   type CreateWeightLogPayload,
   type WeightContext,
-  createWeightLog as createWeightLogSnake,
+  createWeightLog,
   getWeightLog,
   updateWeightLog,
   WEIGHT_CONTEXT_LABELS,
-} from '../lib/snakes';
-import { createWeightLog as createWeightLogLizard } from '../lib/lizards';
+} from '../lib/animals';
 
 const CONTEXT_OPTIONS = (
   Object.keys(WEIGHT_CONTEXT_LABELS) as WeightContext[]
@@ -61,7 +60,7 @@ function isoToYMD(iso: string): string {
   return `${y}-${m}-${day}`;
 }
 
-export function LogWeightScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
+export function LogWeightScreen() {
   const router = useRouter();
   const { id, weightId } = useLocalSearchParams<{
     id?: string;
@@ -130,10 +129,8 @@ export function LogWeightScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
     try {
       if (isEdit && weightId) {
         await updateWeightLog(weightId as string, payload);
-      } else if (taxon === 'snake') {
-        await createWeightLogSnake(id as string, payload);
       } else {
-        await createWeightLogLizard(id as string, payload);
+        await createWeightLog(id as string, payload);
       }
       router.back();
     } catch (err) {

@@ -1,12 +1,13 @@
 /**
- * ReptileShareSheet — bottom sheet with the snake/lizard's permanent
- * public profile QR + URL.
+ * ReptileShareSheet — bottom sheet with the animal's permanent public
+ * profile QR + URL.
  *
- * The QR encodes `https://herpetoverse.com/{s|l}/{id}` — a public
- * profile that 403s for non-owners if the keeper's collection is set
+ * ADR-003: the QR encodes `https://herpetoverse.com/a/{id}` — the
+ * taxon-agnostic public profile (collapsed from the old `/s/` + `/l/`
+ * routes). It 403s for non-owners if the keeper's collection is set
  * private (controlled by `users.collection_visibility` on the API).
  * The QR works for enclosure labels, business cards, and "scan to see
- * the snake" scenarios.
+ * the animal" scenarios.
  *
  * Mobile printing isn't supported in v1 — keepers who want printed
  * enclosure labels open the snake on web (where ReptileQRModal has the
@@ -61,8 +62,8 @@ export function ReptileShareSheet({
   const { colors, layout } = useTheme();
   const [copied, setCopied] = useState(false);
 
-  const path = taxon === 'snake' ? 's' : 'l';
-  const profileUrl = `${WEB_BASE}/${path}/${animalId}`;
+  // ADR-003: one taxon-agnostic public-profile route.
+  const profileUrl = `${WEB_BASE}/a/${animalId}`;
 
   const handleCopy = async () => {
     await Clipboard.setStringAsync(profileUrl);
@@ -120,7 +121,7 @@ export function ReptileShareSheet({
             <View style={styles.header}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.title, { color: colors.textPrimary }]}>
-                  Share {animalName ?? (taxon === 'snake' ? 'this snake' : 'this lizard')}
+                  Share {animalName ?? 'this animal'}
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
                   Permanent public profile link.

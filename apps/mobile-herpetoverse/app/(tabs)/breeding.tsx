@@ -256,7 +256,11 @@ function PairingRow({
             ? ` · separated ${fmtDate(pairing.separated_date)}`
             : ''}
           {' · '}
-          {pairing.taxon === 'snake' ? '🐍 Snake' : '🦎 Lizard'}
+          {pairing.taxon === 'snake'
+            ? '🐍 Snake'
+            : pairing.taxon === 'frog'
+            ? '🐸 Frog'
+            : '🦎 Lizard'}
         </Text>
       </View>
       <View style={styles.rowChips}>

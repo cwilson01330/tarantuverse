@@ -27,16 +27,19 @@ import { useEffect, useState } from 'react'
 import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
+// ADR-003: snake/lizard libs collapsed into lib/animals. This is still
+// the snake-shaped edit screen, so the unified helpers are aliased back
+// to their snake-era names — the form body is taxon-agnostic.
 import {
-  type CreateSnakePayload,
-  deleteSnake,
-  getSnake,
+  type UpdateAnimalPayload as CreateSnakePayload,
+  deleteAnimal as deleteSnake,
+  getAnimal as getSnake,
   type Sex,
-  type Snake,
-  snakeTitle,
+  type Animal as Snake,
+  animalTitle as snakeTitle,
   type Source,
-  updateSnake,
-} from '@/lib/snakes'
+  updateAnimal as updateSnake,
+} from '@/lib/animals'
 
 // Form state mirrors /add — all strings so input round-tripping stays
 // predictable. `null`s from the wire get normalized to '' here; we reverse
@@ -89,7 +92,7 @@ function snakeToForm(s: Snake): FormState {
     name: s.name ?? '',
     commonName: s.common_name ?? '',
     scientificName: s.scientific_name ?? '',
-    speciesId: s.reptile_species_id,
+    speciesId: s.herp_species_id,
     enclosureId: s.enclosure_id,
     sex: (s.sex as Sex | null) ?? 'unknown',
     hatchDate: s.hatch_date ?? '',
@@ -182,7 +185,7 @@ export default function EditReptileClient({ snakeId }: { snakeId: string }) {
       name: nullableStr(form.name),
       common_name: nullableStr(form.commonName),
       scientific_name: nullableStr(form.scientificName),
-      reptile_species_id: form.speciesId,
+      herp_species_id: form.speciesId,
       enclosure_id: form.enclosureId,
       sex: form.sex,
       hatch_date: nullableStr(form.hatchDate),

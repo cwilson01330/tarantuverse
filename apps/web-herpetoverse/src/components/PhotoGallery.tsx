@@ -12,14 +12,12 @@
  *   - Minimal inline lightbox — no library, no dependencies.
  *
  * Taxon awareness:
- *   The photos table is polymorphic on the backend — a row has exactly one
- *   of tarantula_id / snake_id / lizard_id / enclosure_id set. The list +
- *   upload routes are nested under the parent (`/snakes/{id}/photos`,
- *   `/lizards/{id}/photos`), so this component dispatches based on `taxon`
- *   to the matching data-layer module. The standalone per-photo operations
- *   (delete, set-main, update-caption) are taxon-neutral on the server, so
- *   we can safely import those from either module — we use the snake module
- *   to avoid duplication.
+ *   ADR-003 collapsed the per-taxon snake/lizard tables into `animals`,
+ *   so the photos table is polymorphic on `tarantula_id` / `animal_id` /
+ *   `enclosure_id` and the list + upload routes are nested under the
+ *   animal (`/animals/{id}/photos`) regardless of taxon. No per-taxon
+ *   dispatch — one set of data-layer helpers. The `taxon` prop survives
+ *   only to pick the right empty-state glyph.
  *
  * Notes on identifying "main":
  *   The parent record carries `photo_url` as a denormalized copy of the main
@@ -36,26 +34,21 @@
  */
 
 import Image from 'next/image'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError } from '@/lib/apiClient'
-// Shared per-photo operations (polymorphic on the server).
+// ADR-003: photos route through the unified animals API regardless of
+// taxon — one set of helpers, no per-taxon dispatch.
 import {
-  Photo,
+  type Photo,
+  type AnimalTaxon,
   deletePhoto,
+  listPhotos,
   setMainPhoto,
   updatePhotoCaption,
-} from '@/lib/snakes'
-// Taxon-specific collection endpoints.
-import {
-  listPhotos as listSnakePhotos,
-  uploadPhoto as uploadSnakePhoto,
-} from '@/lib/snakes'
-import {
-  listPhotos as listLizardPhotos,
-  uploadPhoto as uploadLizardPhoto,
-} from '@/lib/lizards'
+  uploadPhoto,
+} from '@/lib/animals'
 
-export type PhotoGalleryTaxon = 'snake' | 'lizard'
+export type PhotoGalleryTaxon = AnimalTaxon
 
 // ---------------------------------------------------------------------------
 // Upload queue types
@@ -95,23 +88,14 @@ export default function PhotoGallery({
   mainPhotoUrl,
   onMainChanged,
 }: {
-  /** Snake or lizard id — used for the taxon-scoped list/upload endpoints. */
+  /** Animal id — used for the animal-scoped list/upload endpoints. */
   animalId: string
+  /** Drives the empty-state glyph only; data routing is taxon-agnostic. */
   taxon: PhotoGalleryTaxon
   /** Current denormalized main-photo URL on the parent record. */
   mainPhotoUrl: string | null
   onMainChanged?: () => void
 }) {
-  // Bind taxon → data-layer calls once. `useMemo` keeps the identity stable
-  // across renders so the refetch + upload effects don't re-fire on every
-  // parent render.
-  const { listPhotos, uploadPhoto } = useMemo(
-    () =>
-      taxon === 'lizard'
-        ? { listPhotos: listLizardPhotos, uploadPhoto: uploadLizardPhoto }
-        : { listPhotos: listSnakePhotos, uploadPhoto: uploadSnakePhoto },
-    [taxon],
-  )
   const [photos, setPhotos] = useState<Photo[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -653,7 +637,8 @@ function EmptyState({
   taxon: PhotoGalleryTaxon
   onPick: () => void
 }) {
-  const glyph = taxon === 'lizard' ? '🦎' : '🐍'
+  const glyph =
+    taxon === 'lizard' ? '🦎' : taxon === 'frog' ? '🐸' : '🐍'
   return (
     <button
       type="button"

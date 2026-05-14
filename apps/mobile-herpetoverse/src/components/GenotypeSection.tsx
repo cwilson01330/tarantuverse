@@ -39,10 +39,10 @@ import {
   type CreateGenotypePayload,
   type Gene,
   type Zygosity,
-  addSnakeGenotype,
-  deleteSnakeGenotype,
+  addAnimalGenotype,
+  deleteAnimalGenotype,
   fetchGenesForSpecies,
-  listSnakeGenotype,
+  listAnimalGenotype,
   zygosityLabel,
 } from '../lib/genes';
 
@@ -70,7 +70,7 @@ export function GenotypeSection({ snakeId, scientificName }: Props) {
     (async () => {
       try {
         const [g, c] = await Promise.all([
-          listSnakeGenotype(snakeId),
+          listAnimalGenotype(snakeId),
           fetchGenesForSpecies(species),
         ]);
         if (cancelled) return;
@@ -97,14 +97,14 @@ export function GenotypeSection({ snakeId, scientificName }: Props) {
   const handleDelete = (row: AnimalGenotype) => {
     const gene = geneById[row.gene_id];
     const name = gene?.common_name ?? 'this gene';
-    Alert.alert('Remove gene', `Remove ${name} from this snake?`, [
+    Alert.alert('Remove gene', `Remove ${name} from this animal?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteSnakeGenotype(snakeId, row.id);
+            await deleteAnimalGenotype(snakeId, row.id);
             setRows((prev) => (prev ?? []).filter((r) => r.id !== row.id));
           } catch {
             Alert.alert('Error', "Couldn't remove that gene.");
@@ -336,7 +336,7 @@ function AddGeneModal({
     setError(null);
     setSubmitting(true);
     try {
-      const created = await addSnakeGenotype(snakeId, payload);
+      const created = await addAnimalGenotype(snakeId, payload);
       onAdded(created);
     } catch (err: any) {
       setError(
@@ -468,7 +468,7 @@ function AddGeneModal({
                             >
                               {g.gene_type.replace('_', ' ')}
                               {g.lethal_homozygous ? ' · lethal homozygous' : ''}
-                              {alreadyHave ? ' · already on this snake' : ''}
+                              {alreadyHave ? ' · already added' : ''}
                             </Text>
                           </View>
                           <MaterialCommunityIcons

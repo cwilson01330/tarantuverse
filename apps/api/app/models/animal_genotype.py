@@ -23,34 +23,15 @@ from app.database import Base
 
 class AnimalGenotype(Base):
     __tablename__ = "animal_genotypes"
-    __table_args__ = (
-        CheckConstraint(
-            'num_nonnulls(snake_id, lizard_id, frog_id) = 1',
-            name='animal_genotypes_must_have_exactly_one_parent',
-        ),
-    )
+    # Polymorphic snake/lizard/frog FKs collapsed into animal_id in
+    # anm_20260514 (ADR-003). animal_id is NOT NULL — no CHECK needed.
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    snake_id = Column(
+    animal_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("snakes.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    lizard_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("lizards.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    # Frog genotypes — dart frog morphs (azureus, leucomelas), Pacman
-    # frog color phases. v1 doesn't surface a frog gene catalog but the
-    # polymorphic slot keeps the table consistent. Added by frp_20260513.
-    frog_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("frogs.id", ondelete="CASCADE"),
-        nullable=True,
+        ForeignKey("animals.id", ondelete="CASCADE"),
+        nullable=False,
         index=True,
     )
 
@@ -74,10 +55,7 @@ class AnimalGenotype(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    snake = relationship("Snake", backref="genotypes")
-    lizard = relationship("Lizard", backref="genotypes")
-    frog = relationship("Frog", backref="genotypes")
+    animal = relationship("Animal", backref="genotypes")
 
     def __repr__(self):
-        parent = self.snake_id or self.lizard_id or self.frog_id
-        return f"<AnimalGenotype parent={parent} gene={self.gene_id} {self.zygosity}>"
+        return f"<AnimalGenotype animal={self.animal_id} gene={self.gene_id} {self.zygosity}>"

@@ -37,17 +37,20 @@ import {
   ShedsList,
   WeighInsList,
 } from '../../src/components/reptile-detail/ReptileDetailShared';
+// ADR-003: snake/lizard libs collapsed into lib/animals. This is still
+// the snake-shaped detail route, so the unified helpers are aliased back
+// to their snake-era names — the screen body stays taxon-agnostic.
 import {
+  type Animal as Snake,
   type FeedingLog,
   type ShedLog,
-  type Snake,
   type WeightLog,
-  getSnake,
+  animalTitle as snakeTitle,
+  getAnimal as getSnake,
   listFeedings,
   listSheds,
   listWeightLogs,
-  snakeTitle,
-} from '../../src/lib/snakes';
+} from '../../src/lib/animals';
 import { type Photo, listPhotos } from '../../src/lib/photos';
 
 function SnakeDetailScreen() {
@@ -74,7 +77,7 @@ function SnakeDetailScreen() {
         listWeightLogs(id),
         listFeedings(id),
         listSheds(id),
-        listPhotos('snake', id),
+        listPhotos(id),
       ]);
 
     if (snakeR.status === 'fulfilled') {
@@ -204,7 +207,6 @@ function SnakeDetailScreen() {
             lives inside Log Feeding (the natural moment to think
             "she's been refusing for weeks, mute reminders"). */}
         <FeedingStatusBanner
-          taxon="snake"
           animalId={snake.id}
           refreshKey={`${feedings.length}-${snake.feeding_paused_reason ?? ''}-${snake.feeding_paused_until ?? ''}`}
           onPausedPress={() => setPauseOpen(true)}
@@ -225,7 +227,6 @@ function SnakeDetailScreen() {
             )[0];
           return (
             <FeedingIntelligence
-              taxon="snake"
               animalId={snake.id}
               lastFedAt={snake.last_fed_at}
               lastAcceptedPreyWeightG={lastAccepted?.prey_weight_g ?? null}
@@ -345,7 +346,6 @@ function SnakeDetailScreen() {
       <PauseFeedingSheet
         visible={pauseOpen}
         onClose={() => setPauseOpen(false)}
-        taxon="snake"
         animalId={snake.id}
         animalName={snakeTitle(snake)}
         currentReason={snake.feeding_paused_reason}

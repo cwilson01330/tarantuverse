@@ -25,19 +25,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { apiClient } from '../../src/services/api';
+import { type AnimalTaxon, listAnimals } from '../../src/lib/animals';
 import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { daysSince, relativeDays } from '../../src/utils/relative-days';
 
 // ---------------------------------------------------------------------------
-// Types — minimum subset of the Snake/Lizard schemas needed for the card.
-// Full shapes live in the future detail screens; here we keep the surface
+// Types — minimum subset of the Animal schema needed for the card.
+// Full shapes live in the detail screens; here we keep the surface
 // small so the API contract is obvious.
 // ---------------------------------------------------------------------------
 
 type Sex = 'male' | 'female' | 'unknown' | null;
-type Taxon = 'snake' | 'lizard';
+// ADR-003: every taxon flows through the unified animals endpoint.
+type Taxon = AnimalTaxon;
 
 interface ReptileBase {
   id: string;
@@ -76,43 +77,35 @@ function CollectionScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchAll = useCallback(async () => {
-    // Fetch both taxa in parallel. allSettled so one failure doesn't
-    // zero out the other — same pattern as the web list.
-    const [snakesRes, lizardsRes] = await Promise.allSettled([
-      apiClient.get<ReptileBase[]>('/snakes/'),
-      apiClient.get<ReptileBase[]>('/lizards/'),
-    ]);
-
-    const merged: ReptileRow[] = [];
-    const failures: string[] = [];
-
-    if (snakesRes.status === 'fulfilled') {
-      for (const s of snakesRes.value.data) {
-        merged.push({ ...s, taxon: 'snake' });
-      }
-    } else {
-      failures.push('snakes');
+    // ADR-003: one unified animals endpoint — every taxon in a single
+    // call. The `taxon` discriminator rides on each row.
+    try {
+      const animals = await listAnimals();
+      const merged: ReptileRow[] = animals.map((a) => ({
+        id: a.id,
+        name: a.name,
+        common_name: a.common_name,
+        scientific_name: a.scientific_name,
+        sex: a.sex,
+        photo_url: a.photo_url,
+        last_fed_at: a.last_fed_at,
+        created_at: a.created_at,
+        taxon: a.taxon,
+      }));
+      // Newest first.
+      merged.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      setRows(merged);
+      setPartialError(null);
+    } catch {
+      // Keep whatever's already on screen rather than blanking it.
+      setRows((prev) => prev ?? []);
+      setPartialError(
+        "Couldn't load your collection. Pull down to retry.",
+      );
     }
-    if (lizardsRes.status === 'fulfilled') {
-      for (const l of lizardsRes.value.data) {
-        merged.push({ ...l, taxon: 'lizard' });
-      }
-    } else {
-      failures.push('lizards');
-    }
-
-    // Newest first.
-    merged.sort(
-      (a, b) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
-
-    setRows(merged);
-    setPartialError(
-      failures.length > 0
-        ? `Couldn't load ${failures.join(' or ')}. Pull down to retry.`
-        : null,
-    );
   }, []);
 
   // useFocusEffect re-fetches when the keeper returns from another screen
@@ -214,10 +207,12 @@ function CollectionScreen() {
           <ReptileCard
             row={item}
             onPress={() => {
+              // Lizards live under /lizard/; snakes + frogs use the
+              // root /reptile/ detail route.
               const path =
-                item.taxon === 'snake'
-                  ? `/reptile/${item.id}`
-                  : `/lizard/${item.id}`;
+                item.taxon === 'lizard'
+                  ? `/lizard/${item.id}`
+                  : `/reptile/${item.id}`;
               router.push(path as never);
             }}
           />

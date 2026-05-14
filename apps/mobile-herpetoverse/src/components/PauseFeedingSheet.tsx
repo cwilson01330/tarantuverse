@@ -1,7 +1,7 @@
 /**
  * PauseFeedingSheet — bottom-sheet modal for setting/clearing the
- * `feeding_paused_reason` + `feeding_paused_until` flags on a snake or
- * lizard.
+ * `feeding_paused_reason` + `feeding_paused_until` flags on any HV
+ * animal.
  *
  * Why this exists: ball pythons go on multi-month hunger strikes as
  * normal behavior. Without a way to tell the app "I know, leave me
@@ -12,10 +12,11 @@
  *   - 5 reason chips: Hunger strike / Post-rehouse / Recovering /
  *     Breeding season / Other
  *   - Optional "until" date (YYYY-MM-DD). Blank = indefinite.
- *   - Save → PUT /snakes/{id} (or /lizards/{id}) with the two fields
+ *   - Save → PUT /animals/{id} with the two fields
  *   - "Resume now" button (only when already paused) → PUT with both
  *     fields cleared to null
  *
+ * ADR-003: taxon-agnostic — one updateAnimal call, no branching.
  * Brumation is a separate concept handled by `brumation_active`. This
  * sheet doesn't touch that — keepers managing brumation use the
  * existing flow on the detail screen / edit form.
@@ -35,7 +36,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import { pauseFeeding, resumeFeeding } from '../lib/snakes';
+import { pauseFeeding, resumeFeeding } from '../lib/animals';
 
 const REASON_OPTIONS: Array<{ value: string; label: string; helper: string }> = [
   {
@@ -68,7 +69,6 @@ const REASON_OPTIONS: Array<{ value: string; label: string; helper: string }> = 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  taxon: 'snake' | 'lizard';
   animalId: string;
   animalName?: string | null;
   /** Current reason, if any — passed in so resume makes sense. */
@@ -81,7 +81,6 @@ interface Props {
 export function PauseFeedingSheet({
   visible,
   onClose,
-  taxon,
   animalId,
   animalName,
   currentReason,
@@ -131,7 +130,7 @@ export function PauseFeedingSheet({
     setError(null);
     setSubmitting(true);
     try {
-      await pauseFeeding(taxon, animalId, reason, until.trim() || null);
+      await pauseFeeding(animalId, reason, until.trim() || null);
       onChange();
       onClose();
     } catch (err: any) {
@@ -148,7 +147,7 @@ export function PauseFeedingSheet({
     setError(null);
     setSubmitting(true);
     try {
-      await resumeFeeding(taxon, animalId);
+      await resumeFeeding(animalId);
       onChange();
       onClose();
     } catch (err: any) {

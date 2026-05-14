@@ -36,18 +36,22 @@ import { ApiError } from '@/lib/apiClient'
 import PhotoGallery from '@/components/PhotoGallery'
 import { PauseFeedingDialog } from '@/components/PauseFeedingDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
+// ADR-003: the per-taxon snake/lizard libs collapsed into lib/animals.
+// This screen still renders the snake-shaped detail view, so we alias the
+// unified helpers back to their snake-era names — the component body is
+// taxon-agnostic already and doesn't need to change.
 import {
-  CreateFeedingPayload,
-  CreateShedPayload,
-  CreateWeightLogPayload,
-  FeedingLog,
-  PreySuggestion,
-  ShedLog,
-  Snake,
+  type CreateFeedingPayload,
+  type CreateShedPayload,
+  type CreateWeightLogPayload,
+  type FeedingLog,
+  type PreySuggestion,
+  type ShedLog,
+  type Animal as Snake,
   WEIGHT_CONTEXT_LABELS,
-  WeightContext,
-  WeightLog,
-  WeightTrendResponse,
+  type WeightContext,
+  type WeightLog,
+  type WeightTrendResponse,
   createFeeding,
   createShed,
   createWeightLog,
@@ -58,14 +62,14 @@ import {
   fmtDecimal,
   fmtGrams,
   getPreySuggestion,
-  getSnake,
+  getAnimal as getSnake,
   getWeightTrend,
   listFeedings,
   listSheds,
   listWeightLogs,
   relativeDays,
-  snakeTitle,
-} from '@/lib/snakes'
+  animalTitle as snakeTitle,
+} from '@/lib/animals'
 
 // ---------------------------------------------------------------------------
 // Page
@@ -353,9 +357,9 @@ function SnakeHeader({
           </h1>
           {snake.scientific_name && (
             <p className="text-sm italic text-neutral-400">
-              {snake.reptile_species_id ? (
+              {snake.herp_species_id ? (
                 <Link
-                  href={`/app/species/${snake.reptile_species_id}`}
+                  href={`/app/species/${snake.herp_species_id}`}
                   className="text-herp-teal hover:text-herp-lime transition-colors"
                 >
                   {snake.scientific_name}
@@ -1073,7 +1077,6 @@ function LogFeedingForm({
         <PauseFeedingDialog
           open={pauseOpen}
           onClose={() => setPauseOpen(false)}
-          taxon="snake"
           animalId={snake.id}
           animalName={snakeTitle(snake)}
           currentReason={snake.feeding_paused_reason}
@@ -1240,7 +1243,6 @@ function LogFeedingForm({
       <PauseFeedingDialog
         open={pauseOpen}
         onClose={() => setPauseOpen(false)}
-        taxon="snake"
         animalId={snake.id}
         animalName={snakeTitle(snake)}
         currentReason={snake.feeding_paused_reason}

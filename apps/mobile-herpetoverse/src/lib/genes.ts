@@ -75,7 +75,8 @@ export type Zygosity = 'het' | 'visual' | 'poss_het' | 'super';
 
 export interface AnimalGenotype {
   id: string;
-  snake_id: string;
+  // ADR-003: genotype rows attach to the unified animals table.
+  animal_id: string;
   gene_id: string;
   zygosity: Zygosity;
   poss_het_percentage: number | null;
@@ -135,48 +136,50 @@ export async function fetchGenesForSpecies(
 }
 
 // ---------------------------------------------------------------------------
-// Per-snake genotype CRUD. Lizards are not supported yet — gene catalog
-// is ball-python only.
+// Per-animal genotype CRUD. ADR-003: snakes/lizards/frogs collapsed into
+// `animals`, so the route is `/animals/{id}/genotype`. The gene catalog
+// is ball-python only for now, but the genotype store itself is taxon-
+// agnostic.
 // ---------------------------------------------------------------------------
 
-export async function listSnakeGenotype(
-  snakeId: string,
+export async function listAnimalGenotype(
+  animalId: string,
 ): Promise<AnimalGenotype[]> {
   const { data } = await apiClient.get<AnimalGenotype[]>(
-    `/snakes/${encodeURIComponent(snakeId)}/genotype`,
+    `/animals/${encodeURIComponent(animalId)}/genotype`,
   );
   return data;
 }
 
-export async function addSnakeGenotype(
-  snakeId: string,
+export async function addAnimalGenotype(
+  animalId: string,
   payload: CreateGenotypePayload,
 ): Promise<AnimalGenotype> {
   const { data } = await apiClient.post<AnimalGenotype>(
-    `/snakes/${encodeURIComponent(snakeId)}/genotype`,
+    `/animals/${encodeURIComponent(animalId)}/genotype`,
     payload,
   );
   return data;
 }
 
-export async function updateSnakeGenotype(
-  snakeId: string,
+export async function updateAnimalGenotype(
+  animalId: string,
   genotypeId: string,
   payload: Partial<CreateGenotypePayload>,
 ): Promise<AnimalGenotype> {
   const { data } = await apiClient.put<AnimalGenotype>(
-    `/snakes/${encodeURIComponent(snakeId)}/genotype/${encodeURIComponent(genotypeId)}`,
+    `/animals/${encodeURIComponent(animalId)}/genotype/${encodeURIComponent(genotypeId)}`,
     payload,
   );
   return data;
 }
 
-export async function deleteSnakeGenotype(
-  snakeId: string,
+export async function deleteAnimalGenotype(
+  animalId: string,
   genotypeId: string,
 ): Promise<void> {
   await apiClient.delete(
-    `/snakes/${encodeURIComponent(snakeId)}/genotype/${encodeURIComponent(genotypeId)}`,
+    `/animals/${encodeURIComponent(animalId)}/genotype/${encodeURIComponent(genotypeId)}`,
   );
 }
 

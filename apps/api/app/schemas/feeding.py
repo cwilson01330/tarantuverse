@@ -41,15 +41,15 @@ class FeedingLogUpdate(BaseModel):
 class FeedingLogResponse(FeedingLogBase):
     """Schema for feeding log response.
 
-    Polymorphic parent — exactly one of tarantula_id / snake_id /
-    lizard_id / enclosure_id is populated. All Optional so Pydantic
-    serializes any variant without a 500.
+    Polymorphic parent — exactly one of tarantula_id / enclosure_id /
+    animal_id is populated. ADR-003 collapsed the per-taxon
+    snake/lizard/frog FKs into a single animal_id. All Optional so
+    Pydantic serializes any variant without a 500.
     """
     id: uuid.UUID
-    tarantula_id: Optional[uuid.UUID] = None  # Now optional - can be enclosure-level
-    enclosure_id: Optional[uuid.UUID] = None  # For enclosure-level feedings
-    snake_id: Optional[uuid.UUID] = None  # Herpetoverse v1
-    lizard_id: Optional[uuid.UUID] = None  # Herpetoverse v1 — lizard parity
+    tarantula_id: Optional[uuid.UUID] = None  # TV tarantula parent
+    enclosure_id: Optional[uuid.UUID] = None  # enclosure-level (feeders)
+    animal_id: Optional[uuid.UUID] = None  # HV animal parent (any taxon)
     created_at: datetime
 
     class Config:

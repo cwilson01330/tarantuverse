@@ -1,39 +1,52 @@
 /**
- * Data layer for the Herpetoverse lizard subsystem.
+ * Data layer for the unified Herpetoverse animals API (ADR-003).
  *
- * Mirrors lib/snakes.ts 1:1 — same types, same helpers, same wire shapes.
- * Endpoints swap `/snakes/` → `/lizards/` on the nested collection routes;
- * the standalone log-operation routes (`/weight-logs/{id}`, `/feedings/{id}`,
- * `/sheds/{id}`, `/photos/{id}`) are polymorphic on the server and unchanged.
+ * Supersedes lib/snakes.ts + lib/lizards.ts — the per-taxon snake/lizard/
+ * frog tables collapsed into one `animals` table discriminated by
+ * `taxon`. One set of CRUD helpers, filtered by taxon where the UI
+ * needs a single-taxon view.
+ *
+ * Wraps /api/v1/animals/* plus the polymorphic feedings/sheds/weight-log
+ * routes (now `/api/v1/animals/{id}/...`) and the standalone
+ * log-operation routes (`/weight-logs/{id}`, `/feedings/{id}`,
+ * `/sheds/{id}`, `/photos/{id}`).
  *
  * Decimal fields come through as strings (Pydantic default). The UI
  * formats them but we keep the wire shape verbatim so round-tripping
  * (read → edit → write) stays safe.
  *
- * Feeding-intelligence caveat: `life_stage_feeding` was designed around
- * the snake whole-prey-bolus model (prey-weight : body-weight ratio).
- * For insectivorous lizards (leopard gecko, fat-tail, bearded dragon
- * nymphs) the ratio numbers are crude proxies — the authoritative
- * feeding protocol lives in the species sheet's `supplementation_notes`
- * and `feeding_frequency_*` fields. The prey-suggestion endpoint still
- * returns plausible bounds; just don't treat them as prescriptive.
+ * Feeding-intelligence caveat carried over from lib/lizards.ts:
+ * `life_stage_feeding` was designed around the snake whole-prey-bolus
+ * model. For insectivorous taxa the ratio numbers are crude proxies —
+ * the authoritative feeding protocol lives in the species sheet's
+ * `supplementation_notes` + `feeding_frequency_*`.
  */
 'use client'
 
 import { apiFetch } from './apiClient'
 
 // ---------------------------------------------------------------------------
-// Types — mirror apps/api/app/schemas/lizard.py
+// Types — mirror apps/api/app/schemas/animal.py
 // ---------------------------------------------------------------------------
 
 export type Sex = 'male' | 'female' | 'unknown'
 export type Source = 'bred' | 'bought' | 'wild_caught'
 export type Visibility = 'private' | 'public'
+export type AnimalTaxon = 'snake' | 'lizard' | 'frog'
 
-export interface Lizard {
+export const TAXON_LABELS: Record<AnimalTaxon, string> = {
+  snake: 'Snake',
+  lizard: 'Lizard',
+  frog: 'Frog',
+}
+
+export interface Animal {
   id: string
   user_id: string
-  reptile_species_id: string | null
+  taxon: AnimalTaxon
+  // Renamed from reptile_species_id in anh_20260514 — the catalog table
+  // is herp_species now (it holds amphibians too).
+  herp_species_id: string | null
   enclosure_id: string | null
 
   name: string | null
@@ -54,7 +67,10 @@ export interface Lizard {
   brumation_active: boolean
   brumation_started_at: string | null
 
-  // See snakes.ts — same pause shape, same migration pse_20260502.
+  // Feeding pause — see migration pse_20260502. Distinct from brumation
+  // (its own seasonal flag). `reason` is one of
+  //   hunger_strike | post_rehouse | recovering | breeding_season | other
+  // (free-form values pass through verbatim) and `until` is YYYY-MM-DD.
   feeding_paused_reason: string | null
   feeding_paused_until: string | null
 
@@ -88,16 +104,9 @@ export const WEIGHT_CONTEXT_LABELS: Record<WeightContext, string> = {
   other: 'Other',
 }
 
-/**
- * Polymorphic weight log — the same DB row can belong to a snake OR a
- * lizard (exactly one of snake_id / lizard_id is set). The server
- * schema makes both Optional; UIs should read the one relevant to
- * their context.
- */
 export interface WeightLog {
   id: string
-  snake_id: string | null
-  lizard_id: string | null
+  animal_id: string
   weighed_at: string
   weight_g: string
   context: WeightContext
@@ -118,13 +127,9 @@ export interface WeightTrendResponse {
   alert_threshold_pct: string | null
 }
 
-/**
- * Prey-weight suggestion for the animal's current life stage. The
- * schema field name is `snake_weight_g` for backward-compat — for a
- * lizard prey-suggestion call the value is still the lizard's weight.
- */
 export interface PreySuggestion {
   stage: 'hatchling' | 'juvenile' | 'subadult' | 'adult' | 'unknown'
+  // Wire field name is snake-legacy; value is whatever taxon's weight.
   snake_weight_g: string | null
   suggested_min_g: string | null
   suggested_max_g: string | null
@@ -139,8 +144,7 @@ export interface FeedingLog {
   id: string
   tarantula_id: string | null
   enclosure_id: string | null
-  snake_id: string | null
-  lizard_id: string | null
+  animal_id: string | null
   fed_at: string
   food_type: string | null
   food_size: string | null
@@ -153,8 +157,7 @@ export interface FeedingLog {
 
 export interface ShedLog {
   id: string
-  snake_id: string | null
-  lizard_id: string | null
+  animal_id: string
   shed_at: string
   in_blue_started_at: string | null
   weight_before_g: string | null
@@ -173,27 +176,35 @@ export interface ShedLog {
 // Fetchers
 // ---------------------------------------------------------------------------
 
-export function listLizards(): Promise<Lizard[]> {
-  // Trailing slash required — FastAPI router mounts with slash, and redirect
-  // drops the auth header.
-  return apiFetch<Lizard[]>('/api/v1/lizards/')
+/**
+ * List the keeper's animals. Pass a `taxon` to scope to one taxon —
+ * the per-taxon collection screens (which used to hit /snakes,
+ * /lizards) pass it; the unified collection view omits it.
+ *
+ * Trailing slash required — FastAPI mounts the router with a slash and
+ * the redirect drops the auth header.
+ */
+export function listAnimals(taxon?: AnimalTaxon): Promise<Animal[]> {
+  const qs = taxon ? `?taxon=${encodeURIComponent(taxon)}` : ''
+  return apiFetch<Animal[]>(`/api/v1/animals/${qs}`)
 }
 
-export function getLizard(id: string): Promise<Lizard> {
-  return apiFetch<Lizard>(`/api/v1/lizards/${encodeURIComponent(id)}`)
+export function getAnimal(id: string): Promise<Animal> {
+  return apiFetch<Animal>(`/api/v1/animals/${encodeURIComponent(id)}`)
 }
 
 /**
- * Payload for creating a lizard. Mirrors LizardCreate on the backend; every
- * field is optional so the form can progressively disclose sections. Numeric
- * fields accept either strings (straight from an <input>) or numbers —
- * backend Pydantic coerces Decimal either way.
+ * Payload for creating an animal. Mirrors AnimalCreate on the backend.
+ * `taxon` is required and immutable once set; every other field is
+ * optional so the form can progressively disclose sections. Numeric
+ * fields accept strings or numbers — Pydantic coerces Decimal either way.
  */
-export interface CreateLizardPayload {
+export interface CreateAnimalPayload {
+  taxon: AnimalTaxon
   name?: string | null
   common_name?: string | null
   scientific_name?: string | null
-  reptile_species_id?: string | null
+  herp_species_id?: string | null
   enclosure_id?: string | null
   sex?: Sex | null
   hatch_date?: string | null
@@ -204,27 +215,31 @@ export interface CreateLizardPayload {
   current_weight_g?: string | number | null
   current_length_in?: string | number | null
   notes?: string | null
+  // Pause fields — accepted by AnimalUpdate. Pass `null` on both to
+  // resume. See migration pse_20260502.
   feeding_paused_reason?: string | null
   feeding_paused_until?: string | null
 }
 
-export function createLizard(payload: CreateLizardPayload): Promise<Lizard> {
-  return apiFetch<Lizard>('/api/v1/lizards/', {
+export function createAnimal(payload: CreateAnimalPayload): Promise<Animal> {
+  return apiFetch<Animal>('/api/v1/animals/', {
     method: 'POST',
     json: payload,
   })
 }
 
 /**
- * LizardUpdate on the backend inherits LizardBase (all fields optional) plus
- * species/enclosure FKs. We reuse CreateLizardPayload here because the form
- * surface is the same — the add page and edit page fill the same bag.
+ * AnimalUpdate on the backend is all-optional and does NOT accept
+ * `taxon` (immutable). We reuse a Partial of the create payload minus
+ * taxon — the add page and edit page fill the same bag otherwise.
  */
-export function updateLizard(
+export type UpdateAnimalPayload = Partial<Omit<CreateAnimalPayload, 'taxon'>>
+
+export function updateAnimal(
   id: string,
-  payload: CreateLizardPayload,
-): Promise<Lizard> {
-  return apiFetch<Lizard>(`/api/v1/lizards/${encodeURIComponent(id)}`, {
+  payload: UpdateAnimalPayload,
+): Promise<Animal> {
+  return apiFetch<Animal>(`/api/v1/animals/${encodeURIComponent(id)}`, {
     method: 'PUT',
     json: payload,
   })
@@ -234,31 +249,31 @@ export function updateLizard(
  * Hard delete — CASCADEs to weight logs, feedings, sheds, and photos.
  * Callers should surface that clearly before calling.
  */
-export function deleteLizard(id: string): Promise<void> {
-  return apiFetch<void>(`/api/v1/lizards/${encodeURIComponent(id)}`, {
+export function deleteAnimal(id: string): Promise<void> {
+  return apiFetch<void>(`/api/v1/animals/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
 }
 
-export function listWeightLogs(lizardId: string): Promise<WeightLog[]> {
+export function listWeightLogs(animalId: string): Promise<WeightLog[]> {
   return apiFetch<WeightLog[]>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/weight-logs`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/weight-logs`,
   )
 }
 
 export function getWeightTrend(
-  lizardId: string,
+  animalId: string,
 ): Promise<WeightTrendResponse> {
   return apiFetch<WeightTrendResponse>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/weight-logs/trend`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/weight-logs/trend`,
   )
 }
 
 export function getPreySuggestion(
-  lizardId: string,
+  animalId: string,
 ): Promise<PreySuggestion> {
   return apiFetch<PreySuggestion>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/prey-suggestion`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/prey-suggestion`,
   )
 }
 
@@ -270,25 +285,24 @@ export interface CreateWeightLogPayload {
 }
 
 export function createWeightLog(
-  lizardId: string,
+  animalId: string,
   payload: CreateWeightLogPayload,
 ): Promise<WeightLog> {
   return apiFetch<WeightLog>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/weight-logs`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/weight-logs`,
     { method: 'POST', json: payload },
   )
 }
 
 export function deleteWeightLog(id: string): Promise<void> {
-  // Standalone log endpoint — taxon-neutral on the server.
   return apiFetch<void>(`/api/v1/weight-logs/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
 }
 
-export function listFeedings(lizardId: string): Promise<FeedingLog[]> {
+export function listFeedings(animalId: string): Promise<FeedingLog[]> {
   return apiFetch<FeedingLog[]>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/feedings`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/feedings`,
   )
 }
 
@@ -303,25 +317,24 @@ export interface CreateFeedingPayload {
 }
 
 export function createFeeding(
-  lizardId: string,
+  animalId: string,
   payload: CreateFeedingPayload,
 ): Promise<FeedingLog> {
   return apiFetch<FeedingLog>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/feedings`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/feedings`,
     { method: 'POST', json: payload },
   )
 }
 
 export function deleteFeeding(id: string): Promise<void> {
-  // Standalone log endpoint — taxon-neutral on the server.
   return apiFetch<void>(`/api/v1/feedings/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
 }
 
-export function listSheds(lizardId: string): Promise<ShedLog[]> {
+export function listSheds(animalId: string): Promise<ShedLog[]> {
   return apiFetch<ShedLog[]>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/sheds`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/sheds`,
   )
 }
 
@@ -335,28 +348,27 @@ export interface CreateShedPayload {
 }
 
 export function createShed(
-  lizardId: string,
+  animalId: string,
   payload: CreateShedPayload,
 ): Promise<ShedLog> {
   return apiFetch<ShedLog>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/sheds`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/sheds`,
     { method: 'POST', json: payload },
   )
 }
 
 export function deleteShed(id: string): Promise<void> {
-  // Standalone log endpoint — taxon-neutral on the server.
   return apiFetch<void>(`/api/v1/sheds/${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
 }
 
 // ---------------------------------------------------------------------------
-// Photos — polymorphic. Backend accepts tarantula_id / snake_id / lizard_id
-// on the photos table; these helpers all route through the lizard-scoped
-// endpoints. Upload is multipart; the browser sets Content-Type + boundary
-// when we pass FormData to fetch (apiClient leaves Content-Type unset unless
-// `json` is provided).
+// Photos — polymorphic (tarantula_id XOR animal_id on the photos table).
+// These helpers route through the animal-scoped endpoints. Upload is
+// multipart; the browser sets Content-Type + boundary when we pass
+// FormData to fetch (apiClient leaves Content-Type unset unless `json`
+// is provided).
 // ---------------------------------------------------------------------------
 
 export interface Photo {
@@ -368,9 +380,9 @@ export interface Photo {
   created_at: string
 }
 
-export function listPhotos(lizardId: string): Promise<Photo[]> {
+export function listPhotos(animalId: string): Promise<Photo[]> {
   return apiFetch<Photo[]>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/photos`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/photos`,
   )
 }
 
@@ -379,7 +391,7 @@ export interface UploadPhotoOptions {
 }
 
 export function uploadPhoto(
-  lizardId: string,
+  animalId: string,
   file: File,
   { caption }: UploadPhotoOptions = {},
 ): Promise<Photo> {
@@ -387,7 +399,7 @@ export function uploadPhoto(
   form.append('file', file)
   if (caption && caption.trim()) form.append('caption', caption.trim())
   return apiFetch<Photo>(
-    `/api/v1/lizards/${encodeURIComponent(lizardId)}/photos`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/photos`,
     { method: 'POST', body: form },
   )
 }
@@ -399,9 +411,8 @@ export function deletePhoto(photoId: string): Promise<void> {
 }
 
 /**
- * Update a photo's editable metadata. Only caption is mutable server-side
- * right now; this helper wraps that single field and returns the refreshed
- * Photo. Passing null or an empty string clears the caption.
+ * Update a photo's editable metadata. Only caption is mutable
+ * server-side right now; passing null or "" clears the caption.
  */
 export function updatePhotoCaption(
   photoId: string,
@@ -415,7 +426,7 @@ export function updatePhotoCaption(
 
 /**
  * Promote a photo to be the animal's main photo. Server responds with
- * {message, photo_url}; we don't surface that — callers refetch the lizard.
+ * {message, photo_url}; we don't surface that — callers refetch.
  */
 export function setMainPhoto(photoId: string): Promise<void> {
   return apiFetch<void>(
@@ -428,12 +439,12 @@ export function setMainPhoto(photoId: string): Promise<void> {
 // Display helpers
 // ---------------------------------------------------------------------------
 
-export function lizardTitle(lizard: Lizard): string {
+export function animalTitle(animal: Animal): string {
   return (
-    lizard.name ||
-    lizard.common_name ||
-    lizard.scientific_name ||
-    'Unnamed reptile'
+    animal.name ||
+    animal.common_name ||
+    animal.scientific_name ||
+    'Unnamed animal'
   )
 }
 
@@ -468,8 +479,10 @@ export function fmtDate(iso: string | null | undefined): string | null {
 /**
  * "2 days ago" / "Today" / "Yesterday".
  *
- * Calendar-day diff in the user's local timezone — see snakes.ts for
- * the full reasoning (Brooke-on-EST bug class, 2026-04-24).
+ * Calendar-day diff in the user's local timezone — NOT a UTC time-delta
+ * floor. The naïve `Math.floor((now - then) / 86_400_000)` flips at UTC
+ * midnight, not local midnight. Same Brooke-on-EST bug class fixed on
+ * Tarantuverse.
  */
 export function relativeDays(iso: string | null | undefined): string | null {
   if (!iso) return null
@@ -479,7 +492,9 @@ export function relativeDays(iso: string | null | undefined): string | null {
   const now = new Date()
   const thenLocal = new Date(then.getFullYear(), then.getMonth(), then.getDate())
   const nowLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const diffDays = Math.round((nowLocal.getTime() - thenLocal.getTime()) / 86_400_000)
+  const diffDays = Math.round(
+    (nowLocal.getTime() - thenLocal.getTime()) / 86_400_000,
+  )
 
   if (diffDays <= 0) return 'Today'
   if (diffDays === 1) return 'Yesterday'

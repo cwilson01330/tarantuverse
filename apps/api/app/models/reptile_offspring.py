@@ -64,23 +64,14 @@ class ReptileOffspring(Base):
         index=True,
     )
 
-    # Optional links to live reptile records — SET NULL on delete so
-    # offspring history survives the keeper later removing the spawned
-    # animal (rehoming, loss, etc.).
-    snake_id = Column(
+    # Optional hold-back link to a live animal record — SET NULL on
+    # delete so offspring history survives the keeper later removing
+    # the spawned animal (rehoming, loss, etc.). The per-taxon
+    # snake/lizard/frog FKs were collapsed into animal_id in
+    # anm_20260514 (ADR-003).
+    animal_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("snakes.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    lizard_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("lizards.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    # Frog hold-back link — added by frb_20260513.
-    frog_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("frogs.id", ondelete="SET NULL"),
+        ForeignKey("animals.id", ondelete="SET NULL"),
         nullable=True,
     )
 

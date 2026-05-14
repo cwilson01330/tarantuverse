@@ -40,15 +40,11 @@ import {
 import { EnclosurePicker } from '../../src/components/forms/EnclosurePicker';
 import { ReptileSpeciesAutocomplete } from '../../src/components/forms/ReptileSpeciesAutocomplete';
 import {
-  type CreateSnakePayload,
+  type CreateAnimalPayload,
   type Sex,
   type Source,
-  createSnake,
-} from '../../src/lib/snakes';
-import {
-  type CreateLizardPayload,
-  createLizard,
-} from '../../src/lib/lizards';
+  createAnimal,
+} from '../../src/lib/animals';
 
 const TAXON_OPTIONS = [
   { value: 'snake' as const, label: 'Snake' },
@@ -143,11 +139,12 @@ function AddReptileScreen() {
       return;
     }
 
-    const payload: CreateSnakePayload | CreateLizardPayload = {
+    const payload: CreateAnimalPayload = {
+      taxon,
       name: trimmedName || null,
       scientific_name: trimmedSci || null,
       common_name: trimmedCommon || null,
-      reptile_species_id: speciesId,
+      herp_species_id: speciesId,
       enclosure_id: enclosureId,
       sex,
       hatch_date: hatchIso,
@@ -158,10 +155,9 @@ function AddReptileScreen() {
 
     setSubmitting(true);
     try {
-      const created =
-        taxon === 'snake'
-          ? await createSnake(payload as CreateSnakePayload)
-          : await createLizard(payload as CreateLizardPayload);
+      // ADR-003: one create call — the taxon discriminator rides in the
+      // payload instead of routing to per-taxon endpoints.
+      const created = await createAnimal(payload);
       // Replace so back goes to collection, not back to this form.
       const detailPath =
         taxon === 'snake' ? `/reptile/${created.id}` : `/lizard/${created.id}`;

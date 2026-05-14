@@ -194,7 +194,11 @@ function PairingRow({ pairing: p }: { pairing: ReptilePairing }) {
               ? ` · separated ${formatDate(p.separated_date)}`
               : ''}
             {' · '}
-            {p.taxon === 'snake' ? '🐍 Snake' : '🦎 Lizard'}
+            {p.taxon === 'snake'
+              ? '🐍 Snake'
+              : p.taxon === 'frog'
+              ? '🐸 Frog'
+              : '🦎 Lizard'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

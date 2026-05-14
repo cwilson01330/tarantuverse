@@ -1,9 +1,12 @@
 /**
  * Reptile breeding API client — pairings, clutches, offspring.
  *
- * Mobile port of apps/web-herpetoverse/src/lib/breeding.ts. Backend is
- * fully taxon-polymorphic (snake + lizard parents via separate FK
- * columns enforced by CHECK constraints — see ReptilePairing model).
+ * Mobile port of apps/web-herpetoverse/src/lib/breeding.ts.
+ *
+ * ADR-003: snakes/lizards/frogs collapsed into one `animals` table, so
+ * both pairing parents are `male_animal_id` / `female_animal_id` (plus
+ * a denormalized `taxon`), and offspring link to a live record via a
+ * single `animal_id`.
  *
  * Per-pairing visibility (`is_private` defaults TRUE) and a parent-
  * genotypes endpoint that packages each parent's recorded zygosities so
@@ -17,7 +20,8 @@ import { apiClient } from '../services/api';
 
 // ─── Pairings ──────────────────────────────────────────────────────────
 
-export type Taxon = 'snake' | 'lizard';
+// ADR-003: frogs joined snakes + lizards under the unified animals table.
+export type Taxon = 'snake' | 'lizard' | 'frog';
 export type ReptilePairingType =
   | 'natural'
   | 'cohabitation'
@@ -34,12 +38,9 @@ export interface ReptilePairing {
   id: string;
   user_id: string;
   taxon: Taxon;
-  male_id: string;
-  female_id: string;
-  male_snake_id: string | null;
-  male_lizard_id: string | null;
-  female_snake_id: string | null;
-  female_lizard_id: string | null;
+  // ADR-003: both parents are rows in the unified animals table.
+  male_animal_id: string;
+  female_animal_id: string;
   paired_date: string;
   separated_date: string | null;
   pairing_type: ReptilePairingType;
@@ -244,8 +245,8 @@ export interface ReptileOffspring {
   id: string;
   clutch_id: string;
   user_id: string;
-  snake_id: string | null;
-  lizard_id: string | null;
+  // ADR-003: optional hold-back link to a live animal record.
+  animal_id: string | null;
   morph_label: string | null;
   recorded_genotype: GenotypeEntry[] | null;
   status: OffspringStatus;
@@ -262,8 +263,7 @@ export interface ReptileOffspring {
 
 export interface CreateOffspringPayload {
   clutch_id: string;
-  snake_id?: string | null;
-  lizard_id?: string | null;
+  animal_id?: string | null;
   morph_label?: string | null;
   recorded_genotype?: GenotypeEntry[] | null;
   status?: OffspringStatus;
@@ -277,8 +277,7 @@ export interface CreateOffspringPayload {
 }
 
 export interface UpdateOffspringPayload {
-  snake_id?: string | null;
-  lizard_id?: string | null;
+  animal_id?: string | null;
   morph_label?: string | null;
   recorded_genotype?: GenotypeEntry[] | null;
   status?: OffspringStatus;

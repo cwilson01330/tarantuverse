@@ -33,12 +33,12 @@ from app.models.feeder_species import FeederSpecies
 from app.models.feeder_colony import FeederColony
 from app.models.feeder_care_log import FeederCareLog
 from app.models.waitlist import WaitlistSignup
-# Herpetoverse v1 (ADR-002 parallel taxon tables) — reptile_species MUST be
-# imported before snake so SQLAlchemy sees the target of the FK.
+# Herpetoverse — ADR-003 consolidated the per-taxon snake/lizard/frog
+# tables into one `animals` table. ReptileSpecies (DB table renamed to
+# herp_species) MUST be imported before Animal so SQLAlchemy sees the
+# FK target.
 from app.models.reptile_species import ReptileSpecies
-from app.models.snake import Snake
-from app.models.lizard import Lizard
-from app.models.frog import Frog
+from app.models.animal import Animal, AnimalTaxon
 from app.models.shed_log import ShedLog
 from app.models.weight_log import WeightLog
 from app.models.gene import Gene
@@ -95,9 +95,8 @@ __all__ = [
     "FeederCareLog",
     "WaitlistSignup",
     "ReptileSpecies",
-    "Snake",
-    "Lizard",
-    "Frog",
+    "Animal",
+    "AnimalTaxon",
     "ShedLog",
     "WeightLog",
     "Gene",

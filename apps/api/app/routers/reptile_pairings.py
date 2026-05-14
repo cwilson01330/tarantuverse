@@ -8,25 +8,26 @@ Visibility model:
   • is_private defaults TRUE, so a fresh pairing is invisible to
     everyone but the owner until they explicitly publish.
 
-Per the design discussion: `is_private` is per-pairing. Some keepers
-want their morph projects hidden until offspring are listed for sale.
+Per ADR-003 the per-taxon parent FKs were collapsed: both parents are
+now rows in the unified `animals` table (`male_animal_id` /
+`female_animal_id`), with the shared `taxon` denormalized onto the
+pairing. Same-taxon match is enforced here in `_resolve_parents` (the
+DB-level CHECK is gone — a cross-row constraint would need a trigger).
 """
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.animal import Animal, AnimalTaxon
 from app.models.clutch import Clutch
-from app.models.lizard import Lizard
 from app.models.reptile_pairing import (
     ReptilePairing,
     ReptilePairingOutcome,
     ReptilePairingType,
 )
-from app.models.snake import Snake
 from app.models.user import User
 from app.schemas.reptile_breeding import (
     ReptilePairingCreate,
@@ -41,39 +42,38 @@ router = APIRouter()
 # ─── Helpers ───────────────────────────────────────────────────────────
 
 
+def _animal_display(a: Animal) -> str:
+    return a.name or a.common_name or a.scientific_name or f"Unnamed {a.taxon.value}"
+
+
 def _enrich_response(
     pairing: ReptilePairing,
     db: Session,
 ) -> ReptilePairingResponse:
     """Build a response with display names + clutch count without
     forcing the caller to round-trip back to the parent records."""
-    male_name: Optional[str] = None
-    female_name: Optional[str] = None
-    if pairing.taxon == "snake":
-        m = db.query(Snake).filter(Snake.id == pairing.male_snake_id).first()
-        f = db.query(Snake).filter(Snake.id == pairing.female_snake_id).first()
-        male_name = _snake_display(m) if m else None
-        female_name = _snake_display(f) if f else None
-    else:
-        m = db.query(Lizard).filter(Lizard.id == pairing.male_lizard_id).first()
-        f = db.query(Lizard).filter(Lizard.id == pairing.female_lizard_id).first()
-        male_name = _lizard_display(m) if m else None
-        female_name = _lizard_display(f) if f else None
+    m = db.query(Animal).filter(Animal.id == pairing.male_animal_id).first()
+    f = db.query(Animal).filter(Animal.id == pairing.female_animal_id).first()
+    male_name = _animal_display(m) if m else None
+    female_name = _animal_display(f) if f else None
 
     clutch_count = (
         db.query(Clutch).filter(Clutch.pairing_id == pairing.id).count()
     )
 
+    # `taxon` is a real column now (an AnimalTaxon enum) — emit its value.
+    taxon_str = (
+        pairing.taxon.value
+        if hasattr(pairing.taxon, "value")
+        else pairing.taxon
+    )
+
     return ReptilePairingResponse(
         id=pairing.id,
         user_id=pairing.user_id,
-        taxon=pairing.taxon,
-        male_id=pairing.male_id,
-        female_id=pairing.female_id,
-        male_snake_id=pairing.male_snake_id,
-        male_lizard_id=pairing.male_lizard_id,
-        female_snake_id=pairing.female_snake_id,
-        female_lizard_id=pairing.female_lizard_id,
+        taxon=taxon_str,
+        male_animal_id=pairing.male_animal_id,
+        female_animal_id=pairing.female_animal_id,
         paired_date=pairing.paired_date,
         separated_date=pairing.separated_date,
         pairing_type=pairing.pairing_type.value,
@@ -88,81 +88,51 @@ def _enrich_response(
     )
 
 
-def _snake_display(s: Snake) -> str:
-    return s.name or s.common_name or s.scientific_name or "Unnamed snake"
-
-
-def _lizard_display(l: Lizard) -> str:
-    return l.name or l.common_name or l.scientific_name or "Unnamed lizard"
-
-
 def _resolve_parents(
     payload: ReptilePairingCreate,
     user_id: UUID,
     db: Session,
 ) -> dict:
-    """Validate the parent IDs match the declared taxon and that the
-    keeper owns both. Returns the FK column kwargs for the new row."""
-    if payload.taxon == "snake":
-        male = db.query(Snake).filter(
-            Snake.id == payload.male_id,
-            Snake.user_id == user_id,
-        ).first()
-        female = db.query(Snake).filter(
-            Snake.id == payload.female_id,
-            Snake.user_id == user_id,
-        ).first()
-        if not male or not female:
-            raise HTTPException(
-                status_code=404,
-                detail="One or both snakes not found in your collection.",
-            )
-        if male.sex and male.sex.value not in ("male", "unknown"):
-            raise HTTPException(
-                status_code=400,
-                detail="Male slot must be a male (or unknown-sex) snake.",
-            )
-        if female.sex and female.sex.value not in ("female", "unknown"):
-            raise HTTPException(
-                status_code=400,
-                detail="Female slot must be a female (or unknown-sex) snake.",
-            )
-        return {
-            "male_snake_id": male.id,
-            "female_snake_id": female.id,
-            "male_lizard_id": None,
-            "female_lizard_id": None,
-        }
+    """Validate the parent IDs, that the keeper owns both, that both
+    are the declared taxon, and that the sex slots line up. Returns the
+    column kwargs for the new pairing row."""
+    taxon = AnimalTaxon(payload.taxon)
 
-    # lizard branch
-    male = db.query(Lizard).filter(
-        Lizard.id == payload.male_id,
-        Lizard.user_id == user_id,
+    male = db.query(Animal).filter(
+        Animal.id == payload.male_id,
+        Animal.user_id == user_id,
     ).first()
-    female = db.query(Lizard).filter(
-        Lizard.id == payload.female_id,
-        Lizard.user_id == user_id,
+    female = db.query(Animal).filter(
+        Animal.id == payload.female_id,
+        Animal.user_id == user_id,
     ).first()
     if not male or not female:
         raise HTTPException(
             status_code=404,
-            detail="One or both lizards not found in your collection.",
+            detail="One or both animals not found in your collection.",
+        )
+    # Both parents must be the declared taxon — cross-taxon pairings
+    # aren't biologically meaningful and the DB CHECK no longer guards
+    # this (ADR-003), so the API is the enforcement point.
+    if male.taxon != taxon or female.taxon != taxon:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Both parents must be {payload.taxon}s.",
         )
     if male.sex and male.sex.value not in ("male", "unknown"):
         raise HTTPException(
             status_code=400,
-            detail="Male slot must be a male (or unknown-sex) lizard.",
+            detail=f"Male slot must be a male (or unknown-sex) {payload.taxon}.",
         )
     if female.sex and female.sex.value not in ("female", "unknown"):
         raise HTTPException(
             status_code=400,
-            detail="Female slot must be a female (or unknown-sex) lizard.",
+            detail=f"Female slot must be a female (or unknown-sex) {payload.taxon}.",
         )
     return {
-        "male_lizard_id": male.id,
-        "female_lizard_id": female.id,
-        "male_snake_id": None,
-        "female_snake_id": None,
+        "male_animal_id": male.id,
+        "female_animal_id": female.id,
+        "taxon": taxon,
     }
 
 
@@ -195,13 +165,13 @@ async def create_pairing(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new pairing. Parents must be in the keeper's collection
-    and match the declared taxon; sex is checked against male/female slots
-    (unknown-sex is allowed for both, since not every reptile is sexed
-    before pairing decisions are made)."""
+    and match the declared taxon; sex is checked against male/female
+    slots (unknown-sex is allowed for both, since not every animal is
+    sexed before pairing decisions are made)."""
     if payload.male_id == payload.female_id:
         raise HTTPException(
             status_code=400,
-            detail="Male and female must be different reptiles.",
+            detail="Male and female must be different animals.",
         )
 
     parent_kwargs = _resolve_parents(payload, current_user.id, db)

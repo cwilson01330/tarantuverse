@@ -4,11 +4,11 @@ Two access patterns mirror the clutch surface:
   • List under a clutch: GET /clutches/{id}/offspring
   • Direct read/update/delete: GET/PUT/DELETE /reptile-offspring/{id}
 
-If the keeper has registered the hatchling as a real reptile (`snake_id`
-or `lizard_id` set), the parent reptile's own genotype rows are the
-source of truth. Otherwise `recorded_genotype` JSONB holds whatever was
-observed at hatch — useful for sale paperwork even if the hatchling
-moves on before getting a full record.
+If the keeper has registered the hatchling as a live animal record
+(`animal_id` set — the hold-back link), that record's own genotype
+rows are the source of truth. Otherwise `recorded_genotype` JSONB
+holds whatever was observed at hatch — useful for sale paperwork even
+if the hatchling moves on before getting a full record.
 """
 from typing import List
 from uuid import UUID
@@ -17,13 +17,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.animal import Animal
 from app.models.clutch import Clutch
-from app.models.lizard import Lizard
 from app.models.reptile_offspring import (
     ReptileOffspring,
     ReptileOffspringStatus,
 )
-from app.models.snake import Snake
 from app.models.user import User
 from app.schemas.reptile_breeding import (
     ReptileOffspringCreate,
@@ -67,32 +66,19 @@ def _own_offspring_or_404(
 def _resolve_link(
     payload, user_id: UUID, db: Session
 ) -> None:
-    """If the payload links to a snake/lizard, validate ownership."""
-    if getattr(payload, "snake_id", None):
-        s = db.query(Snake).filter(
-            Snake.id == payload.snake_id,
-            Snake.user_id == user_id,
+    """If the payload sets a hold-back link (animal_id), validate the
+    keeper owns that animal. ADR-003 collapsed snake_id/lizard_id into
+    a single animal_id."""
+    if getattr(payload, "animal_id", None):
+        a = db.query(Animal).filter(
+            Animal.id == payload.animal_id,
+            Animal.user_id == user_id,
         ).first()
-        if not s:
+        if not a:
             raise HTTPException(
                 status_code=404,
-                detail="Linked snake not found in your collection.",
+                detail="Linked animal not found in your collection.",
             )
-    if getattr(payload, "lizard_id", None):
-        l = db.query(Lizard).filter(
-            Lizard.id == payload.lizard_id,
-            Lizard.user_id == user_id,
-        ).first()
-        if not l:
-            raise HTTPException(
-                status_code=404,
-                detail="Linked lizard not found in your collection.",
-            )
-    if getattr(payload, "snake_id", None) and getattr(payload, "lizard_id", None):
-        raise HTTPException(
-            status_code=400,
-            detail="Offspring can be linked to a snake OR a lizard, not both.",
-        )
 
 
 # ─── Routes — clutch-scoped list + create ──────────────────────────────

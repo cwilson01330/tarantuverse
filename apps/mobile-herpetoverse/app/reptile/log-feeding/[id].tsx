@@ -1,9 +1,9 @@
-/** Snake log-feeding route — wraps the shared screen with `taxon="snake"`. */
+/** Snake log-feeding route — wraps the shared (taxon-agnostic) screen. */
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
 import { LogFeedingScreen } from '../../../src/screens/LogFeedingScreen';
 
 function Page() {
-  return <LogFeedingScreen taxon="snake" />;
+  return <LogFeedingScreen />;
 }
 
 export default withErrorBoundary(Page, 'log-feeding-snake');

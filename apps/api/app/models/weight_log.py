@@ -48,31 +48,14 @@ WEIGHT_LOG_CONTEXTS = (
 
 class WeightLog(Base):
     __tablename__ = "weight_logs"
-    __table_args__ = (
-        CheckConstraint(
-            'num_nonnulls(snake_id, lizard_id, frog_id) = 1',
-            name='weight_logs_must_have_exactly_one_parent',
-        ),
-    )
+    # Polymorphic snake/lizard/frog FKs collapsed into animal_id in
+    # anm_20260514 (ADR-003). animal_id is NOT NULL — no CHECK needed.
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    snake_id = Column(
+    animal_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("snakes.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    lizard_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("lizards.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    # Frog weight tracking — same shape. Added by frp_20260513.
-    frog_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("frogs.id", ondelete="CASCADE"),
-        nullable=True,
+        ForeignKey("animals.id", ondelete="CASCADE"),
+        nullable=False,
         index=True,
     )
 
@@ -87,10 +70,7 @@ class WeightLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    snake = relationship("Snake", backref="weight_logs")
-    lizard = relationship("Lizard", backref="weight_logs")
-    frog = relationship("Frog", backref="weight_logs")
+    animal = relationship("Animal", backref="weight_logs")
 
     def __repr__(self):
-        parent = self.snake_id or self.lizard_id or self.frog_id
-        return f"<WeightLog parent={parent} {self.weight_g}g @ {self.weighed_at}>"
+        return f"<WeightLog animal={self.animal_id} {self.weight_g}g @ {self.weighed_at}>"

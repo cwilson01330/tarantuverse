@@ -1,10 +1,14 @@
 """Reptile pairing model — male × female mating record.
 
-Cross-taxon: a pairing is between two snakes OR two lizards. The
-DB CHECK constraints enforce that exactly one of `male_snake_id` /
-`male_lizard_id` is set (ditto female), and both parents share the
-same taxon. The Python convenience property `taxon` derives the
-discriminator from whichever FKs are populated.
+Both parents are rows in the unified `animals` table (ADR-003). The
+`taxon` column is denormalized onto the pairing — same-taxon match is
+enforced by the application (the pairing form's species check) since a
+cross-row CHECK would need a trigger.
+
+The table keeps the `reptile_pairings` name even though it now also
+covers amphibians — renaming it is a bigger refactor than the misnomer
+is worth (same call as keeping `reptile_species` → `herp_species` as
+the only rename).
 """
 import enum
 import uuid
@@ -23,6 +27,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+from app.models.animal import AnimalTaxon
 
 
 class ReptilePairingType(str, enum.Enum):
@@ -58,38 +63,31 @@ class ReptilePairing(Base):
     # Cross-taxon parents — exactly one of *_snake_id / *_lizard_id is
     # populated per side. CHECK constraints in the migration enforce
     # this + same-taxon for the pair.
-    male_snake_id = Column(
+    # Both parents are rows in the unified animals table (ADR-003).
+    # The per-taxon *_snake_id / *_lizard_id / *_frog_id columns were
+    # collapsed in anm_20260514.
+    male_animal_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("snakes.id", ondelete="CASCADE"),
-        nullable=True,
+        ForeignKey("animals.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
-    male_lizard_id = Column(
+    female_animal_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("lizards.id", ondelete="CASCADE"),
-        nullable=True,
+        ForeignKey("animals.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
-    # Frog parents — added by frb_20260513. Same XOR semantics: exactly
-    # one of male_snake_id / male_lizard_id / male_frog_id populated,
-    # same for female, and both parents must be the same taxon.
-    male_frog_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("frogs.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    female_snake_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("snakes.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    female_lizard_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("lizards.id", ondelete="CASCADE"),
-        nullable=True,
-    )
-    female_frog_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("frogs.id", ondelete="CASCADE"),
-        nullable=True,
+    # Denormalized taxon — both parents share it (app-enforced). Lets
+    # the breeding overview filter/group without joining to animals.
+    taxon = Column(
+        SQLEnum(
+            AnimalTaxon,
+            name="animal_taxon",
+            create_type=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
     )
 
     paired_date = Column(Date, nullable=False, index=True)
@@ -138,20 +136,16 @@ class ReptilePairing(Base):
         back_populates="pairing",
         cascade="all, delete-orphan",
     )
+    male = relationship("Animal", foreign_keys=[male_animal_id])
+    female = relationship("Animal", foreign_keys=[female_animal_id])
 
-    @property
-    def taxon(self) -> str:
-        """Derived discriminator — 'snake', 'lizard', or 'frog'."""
-        if self.male_snake_id is not None:
-            return "snake"
-        if self.male_lizard_id is not None:
-            return "lizard"
-        return "frog"
-
+    # Back-compat aliases — `taxon` is now a real column. Some callers
+    # still read `.male_id` / `.female_id`; keep them pointing at the
+    # consolidated FKs so the router rewrite can migrate incrementally.
     @property
     def male_id(self):
-        return self.male_snake_id or self.male_lizard_id or self.male_frog_id
+        return self.male_animal_id
 
     @property
     def female_id(self):
-        return self.female_snake_id or self.female_lizard_id or self.female_frog_id
+        return self.female_animal_id

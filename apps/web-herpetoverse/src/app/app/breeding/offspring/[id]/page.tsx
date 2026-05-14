@@ -9,10 +9,14 @@
  * save on change. No submit button.
  *
  * Genotype editor: free-text via JSON-shaped recorded_genotype on
- * offspring without a live snake/lizard FK. v1 doesn't try to
- * surface the species' gene catalog as a dropdown here — that's a
- * v1.x polish. For now keepers can type "pied/het", "albino/hom"
- * style entries and we save them as { gene_key, zygosity }.
+ * offspring without a live animal FK. v1 doesn't try to surface the
+ * species' gene catalog as a dropdown here — that's a v1.x polish.
+ * For now keepers can type "pied/het", "albino/hom" style entries and
+ * we save them as { gene_key, zygosity }.
+ *
+ * ADR-003: snakes/lizards/frogs collapsed into one `animals` table, so
+ * the hold-back flow creates a single Animal (taxon from the pairing)
+ * and links it back via offspring.animal_id.
  */
 
 import Link from 'next/link'
@@ -31,8 +35,14 @@ import {
   getPairing,
   updateOffspring,
 } from '@/lib/breeding'
-import { createSnake, getSnake, type CreateSnakePayload } from '@/lib/snakes'
-import { createLizard, getLizard, type CreateLizardPayload } from '@/lib/lizards'
+// ADR-003: snake/lizard libs collapsed into lib/animals — one create
+// call + one getter, taxon rides in the payload / on the record.
+import {
+  type AnimalTaxon,
+  type CreateAnimalPayload,
+  createAnimal,
+  getAnimal,
+} from '@/lib/animals'
 
 /**
  * Parent species + lifecycle data we pre-fill into the hold-back form.
@@ -41,9 +51,9 @@ import { createLizard, getLizard, type CreateLizardPayload } from '@/lib/lizards
  * detail load.
  */
 interface HoldBackPrefill {
-  taxon: 'snake' | 'lizard'
+  taxon: AnimalTaxon
   scientific_name: string | null
-  reptile_species_id: string | null
+  herp_species_id: string | null
   hatch_date: string | null
 }
 
@@ -88,6 +98,9 @@ export default function OffspringDetailPage({
   const [holdBackCreating, setHoldBackCreating] = useState(false)
   const [holdBackError, setHoldBackError] = useState<string | null>(null)
   const [linkedRecordName, setLinkedRecordName] = useState<string | null>(null)
+  // Offspring no longer carries a taxon — it's on the linked animal
+  // record. We resolve it for the "linked to collection" card's href.
+  const [linkedTaxon, setLinkedTaxon] = useState<AnimalTaxon | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -147,10 +160,13 @@ export default function OffspringDetailPage({
 
   /**
    * Lazy-fetch parent species + taxon for the hold-back modal prefill.
-   * Chains: offspring → clutch → pairing → male animal (snake or
-   * lizard). Falls back to the female if the male fetch fails. Failure
-   * still lets the modal open with empty prefills — the keeper can
-   * type the species manually.
+   * Chains: offspring → clutch → pairing → male animal. Falls back to
+   * the female if the male fetch fails. Failure still lets the modal
+   * open with empty prefills — the keeper can type the species manually.
+   *
+   * ADR-003: the pairing carries both parents as `male_animal_id` /
+   * `female_animal_id` plus a denormalized `taxon`, and getAnimal is
+   * one call for any taxon — no per-taxon branching here anymore.
    */
   async function openHoldBack() {
     setHoldBackOpen(true)
@@ -162,35 +178,22 @@ export default function OffspringDetailPage({
       const clutch = await getClutch(o.clutch_id)
       const pairing = await getPairing(clutch.pairing_id)
       const taxon = pairing.taxon
-      // Pick whichever parent ID matches the pairing's taxon. Falls back
-      // to female if the male fetch fails — both should match species
-      // after the cross-species fix.
+      // Try the male first, fall back to the female — both should match
+      // species after the cross-species fix.
       let scientific_name: string | null = null
-      let reptile_species_id: string | null = null
+      let herp_species_id: string | null = null
       try {
-        if (taxon === 'snake' && pairing.male_snake_id) {
-          const m = await getSnake(pairing.male_snake_id)
-          scientific_name = m.scientific_name
-          reptile_species_id = m.reptile_species_id
-        } else if (taxon === 'lizard' && pairing.male_lizard_id) {
-          const m = await getLizard(pairing.male_lizard_id)
-          scientific_name = m.scientific_name
-          reptile_species_id = m.reptile_species_id
-        }
+        const m = await getAnimal(pairing.male_animal_id)
+        scientific_name = m.scientific_name
+        herp_species_id = m.herp_species_id
       } catch {
         // fall through to female fetch
       }
       if (!scientific_name) {
         try {
-          if (taxon === 'snake' && pairing.female_snake_id) {
-            const f = await getSnake(pairing.female_snake_id)
-            scientific_name = f.scientific_name
-            reptile_species_id = f.reptile_species_id
-          } else if (taxon === 'lizard' && pairing.female_lizard_id) {
-            const f = await getLizard(pairing.female_lizard_id)
-            scientific_name = f.scientific_name
-            reptile_species_id = f.reptile_species_id
-          }
+          const f = await getAnimal(pairing.female_animal_id)
+          scientific_name = f.scientific_name
+          herp_species_id = f.herp_species_id
         } catch {
           // Soft-fail; keeper can still proceed without prefill.
         }
@@ -198,7 +201,7 @@ export default function OffspringDetailPage({
       setHoldBackPrefill({
         taxon,
         scientific_name,
-        reptile_species_id,
+        herp_species_id,
         hatch_date: clutch.hatch_date,
       })
     } catch (err) {
@@ -213,10 +216,10 @@ export default function OffspringDetailPage({
   }
 
   /**
-   * Promote this hatchling into the keeper's live collection. Creates a
-   * snake or lizard record (per parent taxon), then links it back to
-   * this offspring via PUT — also flipping status to 'kept' if it
-   * isn't already, since the keeper has made the call.
+   * Promote this hatchling into the keeper's live collection. Creates an
+   * Animal record (taxon from the parent pairing), then links it back to
+   * this offspring via PUT — also flipping status to 'kept' if it isn't
+   * already, since the keeper has made the call.
    *
    * If the link step fails after the create succeeded we surface the
    * error but leave the new record in place — better than deleting a
@@ -239,46 +242,26 @@ export default function OffspringDetailPage({
         (l): l is string => Boolean(l),
       )
 
-      let newId: string
-      if (holdBackPrefill?.taxon === 'lizard') {
-        const payload: CreateLizardPayload = {
-          name: holdBackName.trim(),
-          sex: holdBackSex,
-          source: 'bred',
-          hatch_date: holdBackPrefill?.hatch_date ?? null,
-          scientific_name: holdBackPrefill?.scientific_name ?? null,
-          reptile_species_id: holdBackPrefill?.reptile_species_id ?? null,
-          notes: noteLines.join('\n'),
-          current_weight_g: o.hatch_weight_g ?? null,
-          current_length_in: o.hatch_length_in ?? null,
-        }
-        const created = await createLizard(payload)
-        newId = created.id
-        await updateOffspring(o.id, {
-          lizard_id: newId,
-          status: o.status === 'kept' ? undefined : 'kept',
-        })
-      } else {
-        // Default to snake if taxon prefill failed (taxon is required
-        // by the pairing, so this is a paranoid fallback).
-        const payload: CreateSnakePayload = {
-          name: holdBackName.trim(),
-          sex: holdBackSex,
-          source: 'bred',
-          hatch_date: holdBackPrefill?.hatch_date ?? null,
-          scientific_name: holdBackPrefill?.scientific_name ?? null,
-          reptile_species_id: holdBackPrefill?.reptile_species_id ?? null,
-          notes: noteLines.join('\n'),
-          current_weight_g: o.hatch_weight_g ?? null,
-          current_length_in: o.hatch_length_in ?? null,
-        }
-        const created = await createSnake(payload)
-        newId = created.id
-        await updateOffspring(o.id, {
-          snake_id: newId,
-          status: o.status === 'kept' ? undefined : 'kept',
-        })
+      // ADR-003: one create call — taxon rides in the payload. The
+      // pairing is taxon-locked so holdBackPrefill.taxon is reliable;
+      // default to snake only if the prefill fetch failed entirely.
+      const payload: CreateAnimalPayload = {
+        taxon: holdBackPrefill?.taxon ?? 'snake',
+        name: holdBackName.trim(),
+        sex: holdBackSex,
+        source: 'bred',
+        hatch_date: holdBackPrefill?.hatch_date ?? null,
+        scientific_name: holdBackPrefill?.scientific_name ?? null,
+        herp_species_id: holdBackPrefill?.herp_species_id ?? null,
+        notes: noteLines.join('\n'),
+        current_weight_g: o.hatch_weight_g ?? null,
+        current_length_in: o.hatch_length_in ?? null,
       }
+      const created = await createAnimal(payload)
+      await updateOffspring(o.id, {
+        animal_id: created.id,
+        status: o.status === 'kept' ? undefined : 'kept',
+      })
       // Refetch so the page reflects the new link + status.
       const refreshed = await getOffspring(o.id)
       setO(refreshed)
@@ -297,34 +280,27 @@ export default function OffspringDetailPage({
     }
   }
 
-  // Fetch the linked record's name when offspring is loaded with a
-  // snake_id or lizard_id, so the "linked to" card can show what it's
-  // linked to rather than a generic indicator.
+  // Fetch the linked record's name + taxon when offspring is loaded with
+  // an animal_id, so the "linked to" card can show what it's linked to
+  // (and route to the right detail page) rather than a generic indicator.
   useEffect(() => {
-    if (!o) {
+    if (!o || !o.animal_id) {
       setLinkedRecordName(null)
+      setLinkedTaxon(null)
       return
     }
-    if (o.snake_id) {
-      getSnake(o.snake_id)
-        .then((s) =>
-          setLinkedRecordName(
-            s.name || s.common_name || s.scientific_name || 'Snake record',
-          ),
+    getAnimal(o.animal_id)
+      .then((a) => {
+        setLinkedRecordName(
+          a.name || a.common_name || a.scientific_name || 'Animal record',
         )
-        .catch(() => setLinkedRecordName(null))
-    } else if (o.lizard_id) {
-      getLizard(o.lizard_id)
-        .then((l) =>
-          setLinkedRecordName(
-            l.name || l.common_name || l.scientific_name || 'Lizard record',
-          ),
-        )
-        .catch(() => setLinkedRecordName(null))
-    } else {
-      setLinkedRecordName(null)
-    }
-  }, [o?.snake_id, o?.lizard_id])
+        setLinkedTaxon(a.taxon)
+      })
+      .catch(() => {
+        setLinkedRecordName(null)
+        setLinkedTaxon(null)
+      })
+  }, [o?.animal_id])
 
   if (!o && error) {
     return (
@@ -346,7 +322,7 @@ export default function OffspringDetailPage({
   }
   if (!o) return <SkeletonDetail />
 
-  const linkedToLive = !!(o.snake_id || o.lizard_id)
+  const linkedToLive = !!o.animal_id
 
   return (
     <article className="max-w-2xl mx-auto space-y-6">
@@ -425,10 +401,14 @@ export default function OffspringDetailPage({
               Linked to collection
             </p>
             {(() => {
-              const linkedHref = o.snake_id
-                ? `/app/reptiles/${o.snake_id}`
-                : `/app/reptiles/lizards/${o.lizard_id}`
-              const taxonLabel = o.snake_id ? 'snake' : 'lizard'
+              // Lizards live under the lizards/ subpath; snakes + frogs
+              // use the root reptile detail route. linkedTaxon may still
+              // be resolving — the root route renders any animal anyway.
+              const linkedHref =
+                linkedTaxon === 'lizard'
+                  ? `/app/reptiles/lizards/${o.animal_id}`
+                  : `/app/reptiles/${o.animal_id}`
+              const taxonLabel = linkedTaxon ?? 'animal'
               return (
                 <>
                   <Link
@@ -578,9 +558,9 @@ export default function OffspringDetailPage({
           info is fetched on first open and cached. Click outside or
           press Cancel to close.
 
-          On submit: creates a snake or lizard (per parent taxon),
-          links it back to this offspring via tarantula_id/lizard_id,
-          and flips status to 'kept' if it isn't already. */}
+          On submit: creates an Animal (taxon from the parent pairing),
+          links it back to this offspring via offspring.animal_id, and
+          flips status to 'kept' if it isn't already. */}
       {holdBackOpen && (
         <div
           role="dialog"

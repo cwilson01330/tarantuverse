@@ -48,25 +48,23 @@ import {
   getPairing,
   updateOffspring,
 } from '../../../src/lib/breeding';
+// ADR-003: snake/lizard libs collapsed into lib/animals — one create
+// call + one getter, taxon rides in the payload / on the record.
 import {
-  createSnake,
-  getSnake,
-  type CreateSnakePayload,
-} from '../../../src/lib/snakes';
-import {
-  createLizard,
-  getLizard,
-  type CreateLizardPayload,
-} from '../../../src/lib/lizards';
+  type AnimalTaxon,
+  type CreateAnimalPayload,
+  createAnimal,
+  getAnimal,
+} from '../../../src/lib/animals';
 
 /**
  * Lazy-fetched parent species + lifecycle data for the hold-back
  * modal prefill. Mirrors the HV web equivalent.
  */
 interface HoldBackPrefill {
-  taxon: 'snake' | 'lizard';
+  taxon: AnimalTaxon;
   scientific_name: string | null;
-  reptile_species_id: string | null;
+  herp_species_id: string | null;
   hatch_date: string | null;
 }
 
@@ -172,6 +170,9 @@ function OffspringDetailScreen() {
   const [holdBackCreating, setHoldBackCreating] = useState(false);
   const [holdBackError, setHoldBackError] = useState<string | null>(null);
   const [linkedRecordName, setLinkedRecordName] = useState<string | null>(null);
+  // Offspring no longer carries a taxon — it's on the linked animal
+  // record. We resolve it for the "linked to collection" card's route.
+  const [linkedTaxon, setLinkedTaxon] = useState<AnimalTaxon | null>(null);
 
   const fetchOffspring = useCallback(async () => {
     if (!id) return;
@@ -260,32 +261,23 @@ function OffspringDetailScreen() {
       const clutch = await getClutch(offspring.clutch_id);
       const pairing = await getPairing(clutch.pairing_id);
       const taxon = pairing.taxon;
+      // ADR-003: both parents are rows in the unified animals table —
+      // getAnimal is one call for any taxon. Try the male first, fall
+      // back to the female.
       let scientific_name: string | null = null;
-      let reptile_species_id: string | null = null;
+      let herp_species_id: string | null = null;
       try {
-        if (taxon === 'snake' && pairing.male_snake_id) {
-          const m = await getSnake(pairing.male_snake_id);
-          scientific_name = m.scientific_name;
-          reptile_species_id = m.reptile_species_id;
-        } else if (taxon === 'lizard' && pairing.male_lizard_id) {
-          const m = await getLizard(pairing.male_lizard_id);
-          scientific_name = m.scientific_name;
-          reptile_species_id = m.reptile_species_id;
-        }
+        const m = await getAnimal(pairing.male_animal_id);
+        scientific_name = m.scientific_name;
+        herp_species_id = m.herp_species_id;
       } catch {
         // fall through to female
       }
       if (!scientific_name) {
         try {
-          if (taxon === 'snake' && pairing.female_snake_id) {
-            const f = await getSnake(pairing.female_snake_id);
-            scientific_name = f.scientific_name;
-            reptile_species_id = f.reptile_species_id;
-          } else if (taxon === 'lizard' && pairing.female_lizard_id) {
-            const f = await getLizard(pairing.female_lizard_id);
-            scientific_name = f.scientific_name;
-            reptile_species_id = f.reptile_species_id;
-          }
+          const f = await getAnimal(pairing.female_animal_id);
+          scientific_name = f.scientific_name;
+          herp_species_id = f.herp_species_id;
         } catch {
           // soft-fail; keeper can still proceed.
         }
@@ -293,7 +285,7 @@ function OffspringDetailScreen() {
       setHoldBackPrefill({
         taxon,
         scientific_name,
-        reptile_species_id,
+        herp_species_id,
         hatch_date: clutch.hatch_date,
       });
     } catch (err: any) {
@@ -331,43 +323,26 @@ function OffspringDetailScreen() {
         (l): l is string => Boolean(l),
       );
 
-      if (holdBackPrefill?.taxon === 'lizard') {
-        const payload: CreateLizardPayload = {
-          name: holdBackName.trim(),
-          sex: holdBackSex,
-          source: 'bred',
-          hatch_date: holdBackPrefill?.hatch_date ?? null,
-          scientific_name: holdBackPrefill?.scientific_name ?? null,
-          reptile_species_id: holdBackPrefill?.reptile_species_id ?? null,
-          notes: noteLines.join('\n'),
-          current_weight_g: offspring.hatch_weight_g ?? null,
-          current_length_in: offspring.hatch_length_in ?? null,
-        };
-        const created = await createLizard(payload);
-        await updateOffspring(offspring.id, {
-          lizard_id: created.id,
-          status: offspring.status === 'kept' ? undefined : 'kept',
-        });
-      } else {
-        // Defaults to snake — taxon is required on the parent pairing,
-        // so this is a paranoid fallback.
-        const payload: CreateSnakePayload = {
-          name: holdBackName.trim(),
-          sex: holdBackSex,
-          source: 'bred',
-          hatch_date: holdBackPrefill?.hatch_date ?? null,
-          scientific_name: holdBackPrefill?.scientific_name ?? null,
-          reptile_species_id: holdBackPrefill?.reptile_species_id ?? null,
-          notes: noteLines.join('\n'),
-          current_weight_g: offspring.hatch_weight_g ?? null,
-          current_length_in: offspring.hatch_length_in ?? null,
-        };
-        const created = await createSnake(payload);
-        await updateOffspring(offspring.id, {
-          snake_id: created.id,
-          status: offspring.status === 'kept' ? undefined : 'kept',
-        });
-      }
+      // ADR-003: one create call — taxon rides in the payload. The
+      // pairing is taxon-locked so holdBackPrefill.taxon is reliable;
+      // default to snake only if the prefill fetch failed entirely.
+      const payload: CreateAnimalPayload = {
+        taxon: holdBackPrefill?.taxon ?? 'snake',
+        name: holdBackName.trim(),
+        sex: holdBackSex,
+        source: 'bred',
+        hatch_date: holdBackPrefill?.hatch_date ?? null,
+        scientific_name: holdBackPrefill?.scientific_name ?? null,
+        herp_species_id: holdBackPrefill?.herp_species_id ?? null,
+        notes: noteLines.join('\n'),
+        current_weight_g: offspring.hatch_weight_g ?? null,
+        current_length_in: offspring.hatch_length_in ?? null,
+      };
+      const created = await createAnimal(payload);
+      await updateOffspring(offspring.id, {
+        animal_id: created.id,
+        status: offspring.status === 'kept' ? undefined : 'kept',
+      });
       const refreshed = await getOffspring(offspring.id);
       setOffspring(refreshed);
       setLinkedRecordName(holdBackName.trim());
@@ -385,33 +360,27 @@ function OffspringDetailScreen() {
     }
   }
 
-  // Fetch the linked record's name so the linked card shows what it's
-  // linked to rather than a generic indicator.
+  // Fetch the linked record's name + taxon so the linked card shows
+  // what it's linked to (and routes correctly) rather than a generic
+  // indicator.
   useEffect(() => {
-    if (!offspring) {
+    if (!offspring || !offspring.animal_id) {
       setLinkedRecordName(null);
+      setLinkedTaxon(null);
       return;
     }
-    if (offspring.snake_id) {
-      getSnake(offspring.snake_id)
-        .then((s) =>
-          setLinkedRecordName(
-            s.name || s.common_name || s.scientific_name || 'Snake record',
-          ),
-        )
-        .catch(() => setLinkedRecordName(null));
-    } else if (offspring.lizard_id) {
-      getLizard(offspring.lizard_id)
-        .then((l) =>
-          setLinkedRecordName(
-            l.name || l.common_name || l.scientific_name || 'Lizard record',
-          ),
-        )
-        .catch(() => setLinkedRecordName(null));
-    } else {
-      setLinkedRecordName(null);
-    }
-  }, [offspring?.snake_id, offspring?.lizard_id]);
+    getAnimal(offspring.animal_id)
+      .then((a) => {
+        setLinkedRecordName(
+          a.name || a.common_name || a.scientific_name || 'Animal record',
+        );
+        setLinkedTaxon(a.taxon);
+      })
+      .catch(() => {
+        setLinkedRecordName(null);
+        setLinkedTaxon(null);
+      });
+  }, [offspring?.animal_id]);
 
   const statusColors = offspring ? STATUS_COLORS[offspring.status] : null;
 
@@ -551,14 +520,17 @@ function OffspringDetailScreen() {
                 2. Status allows hold-back → "Add to collection" CTA.
                 3. Otherwise (sold/traded/gifted/deceased) → render
                    nothing — the offspring is out of the keeper's hands. */}
-            {offspring.snake_id || offspring.lizard_id ? (
+            {offspring.animal_id ? (
               <TouchableOpacity
                 onPress={() => {
-                  if (offspring.snake_id) {
-                    router.push(`/reptile/${offspring.snake_id}` as never);
-                  } else if (offspring.lizard_id) {
-                    router.push(`/lizard/${offspring.lizard_id}` as never);
-                  }
+                  if (!offspring.animal_id) return;
+                  // Lizards live under /lizard/; snakes + frogs use the
+                  // root /reptile/ detail route.
+                  const path =
+                    linkedTaxon === 'lizard'
+                      ? `/lizard/${offspring.animal_id}`
+                      : `/reptile/${offspring.animal_id}`;
+                  router.push(path as never);
                 }}
                 accessibilityRole="link"
                 style={[
@@ -578,7 +550,7 @@ function OffspringDetailScreen() {
                   numberOfLines={1}
                 >
                   {linkedRecordName ??
-                    `Open ${offspring.snake_id ? 'snake' : 'lizard'} record`}
+                    `Open ${linkedTaxon ?? 'animal'} record`}
                 </Text>
                 <Text style={[styles.linkedHelp, { color: '#5eead4' }]}>
                   The live record&rsquo;s own genotype is authoritative.

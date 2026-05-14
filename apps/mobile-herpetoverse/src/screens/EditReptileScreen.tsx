@@ -3,8 +3,9 @@
  *
  * Mirror of /reptile/add but pre-filled and PUTs instead of POSTs.
  * Includes a destructive Delete button that confirms then cascades
- * (DELETE on /snakes/<id> or /lizards/<id> CASCADEs to weight logs,
- * feedings, sheds, and photos via FK constraints).
+ * (DELETE on /animals/<id> CASCADEs to weight logs, feedings, sheds,
+ * and photos via FK constraints). ADR-003: taxon-agnostic — one
+ * getAnimal / updateAnimal / deleteAnimal surface, no branching.
  *
  * Why a separate file from AddReptileScreen instead of a shared form
  * component: the add form was finalized in Bundle 4; refactoring it now
@@ -44,23 +45,15 @@ import {
 import { EnclosurePicker } from '../components/forms/EnclosurePicker';
 import { ReptileSpeciesAutocomplete } from '../components/forms/ReptileSpeciesAutocomplete';
 import {
-  type CreateSnakePayload,
+  type Animal,
   type Sex,
-  type Snake,
   type Source,
-  deleteSnake,
-  getSnake,
-  snakeTitle,
-  updateSnake,
-} from '../lib/snakes';
-import {
-  type CreateLizardPayload,
-  type Lizard,
-  deleteLizard,
-  getLizard,
-  lizardTitle,
-  updateLizard,
-} from '../lib/lizards';
+  type UpdateAnimalPayload,
+  animalTitle,
+  deleteAnimal,
+  getAnimal,
+  updateAnimal,
+} from '../lib/animals';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'female', label: 'Female' },
@@ -76,14 +69,12 @@ const SOURCE_OPTIONS: { value: SourceChoice; label: string }[] = [
   { value: 'wild_caught', label: 'Wild-caught' },
 ];
 
-type AnimalRow = Snake | Lizard;
-
-export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
+export function EditReptileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
 
-  const [animal, setAnimal] = useState<AnimalRow | null>(null);
+  const [animal, setAnimal] = useState<Animal | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -114,14 +105,13 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
       setLoading(true);
       setLoadError(null);
 
-      const fetcher = taxon === 'snake' ? getSnake : getLizard;
-      fetcher(id)
+      getAnimal(id)
         .then((data) => {
           if (cancelled) return;
           setAnimal(data);
           setName(data.name ?? '');
           setScientificName(data.scientific_name ?? '');
-          setSpeciesId(data.reptile_species_id);
+          setSpeciesId(data.herp_species_id);
           setEnclosureId(data.enclosure_id);
           setCommonName(data.common_name ?? '');
           setSex(data.sex ?? 'unknown');
@@ -141,7 +131,7 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
       return () => {
         cancelled = true;
       };
-    }, [id, taxon, animal]),
+    }, [id, animal]),
   );
 
   async function handleSave() {
@@ -172,11 +162,11 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
       return;
     }
 
-    const payload: CreateSnakePayload | CreateLizardPayload = {
+    const payload: UpdateAnimalPayload = {
       name: trimmedName || null,
       scientific_name: trimmedSci || null,
       common_name: trimmedCommon || null,
-      reptile_species_id: speciesId,
+      herp_species_id: speciesId,
       enclosure_id: enclosureId,
       sex,
       hatch_date: hatchIso,
@@ -187,11 +177,7 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
 
     setSubmitting(true);
     try {
-      if (taxon === 'snake') {
-        await updateSnake(id, payload as CreateSnakePayload);
-      } else {
-        await updateLizard(id, payload as CreateLizardPayload);
-      }
+      await updateAnimal(id, payload);
       router.back();
     } catch (err) {
       setError(extractErrorMessage(err, "Couldn't save changes."));
@@ -201,11 +187,8 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
 
   function handleDelete() {
     if (!id || deleting) return;
-    const title =
-      animal && (taxon === 'snake'
-        ? snakeTitle(animal as Snake)
-        : lizardTitle(animal as Lizard));
-    const label = title || (taxon === 'snake' ? 'this snake' : 'this lizard');
+    const title = animal ? animalTitle(animal) : null;
+    const label = title || 'this reptile';
     Alert.alert(
       `Delete ${label}?`,
       "This permanently removes the reptile and all weigh-ins, feedings, sheds, and photos attached to it. There is no undo.",
@@ -218,11 +201,7 @@ export function EditReptileScreen({ taxon }: { taxon: 'snake' | 'lizard' }) {
             setDeleting(true);
             setError(null);
             try {
-              if (taxon === 'snake') {
-                await deleteSnake(id);
-              } else {
-                await deleteLizard(id);
-              }
+              await deleteAnimal(id);
               // Pop back to root collection — the detail screen we
               // came from no longer exists.
               router.replace('/' as never);

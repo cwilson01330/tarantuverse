@@ -6,10 +6,11 @@
  * Flow:
  *   1. Taxon picker (snake / lizard) — flips which collection feeds the
  *      parent slots and resets the parent selections.
- *   2. Male + Female parent — modal picker pulled from listSnakes /
- *      listLizards. Male slot accepts male+unknown sex; female slot
- *      accepts female+unknown. We allow unknown in both because plenty
- *      of slings/hatchlings get paired before sex is confirmed.
+ *   2. Male + Female parent — modal picker pulled from the unified
+ *      animals endpoint, scoped to the chosen taxon. Male slot accepts
+ *      male+unknown sex; female slot accepts female+unknown. We allow
+ *      unknown in both because plenty of slings/hatchlings get paired
+ *      before sex is confirmed.
  *   3. Paired date (required) + Separated date (optional). Both
  *      YYYY-MM-DD; we validate before submit.
  *   4. Pairing type chip group (natural / cohabitation / assisted / ai).
@@ -65,39 +66,29 @@ import {
   type Taxon,
   createPairing,
 } from '../../../src/lib/breeding';
-import { type Lizard, listLizards } from '../../../src/lib/lizards';
-import { type Sex, type Snake, listSnakes } from '../../../src/lib/snakes';
+// ADR-003: snake/lizard libs collapsed into lib/animals. The taxon picker
+// still scopes the dropdowns, so we fetch each taxon explicitly.
+import { type Animal, type Sex, listAnimals } from '../../../src/lib/animals';
 
 interface ParentOption {
   id: string;
   display_name: string;
   sex: Sex | null;
   scientific_name: string | null;
-  /** Reptile species FK. Used to filter cross-species pairings — a
+  /** Herp species FK. Used to filter cross-species pairings — a
    *  gargoyle gecko and a bearded dragon shouldn't appear as valid
    *  pair candidates. NULL when the keeper hasn't linked a species. */
-  reptile_species_id: string | null;
+  herp_species_id: string | null;
 }
 
-function snakeToOption(s: Snake): ParentOption {
+function animalToOption(a: Animal): ParentOption {
   return {
-    id: s.id,
+    id: a.id,
     display_name:
-      s.name || s.common_name || s.scientific_name || 'Unnamed snake',
-    sex: s.sex,
-    scientific_name: s.scientific_name,
-    reptile_species_id: s.reptile_species_id,
-  };
-}
-
-function lizardToOption(l: Lizard): ParentOption {
-  return {
-    id: l.id,
-    display_name:
-      l.name || l.common_name || l.scientific_name || 'Unnamed lizard',
-    sex: l.sex,
-    scientific_name: l.scientific_name,
-    reptile_species_id: l.reptile_species_id,
+      a.name || a.common_name || a.scientific_name || 'Unnamed reptile',
+    sex: a.sex,
+    scientific_name: a.scientific_name,
+    herp_species_id: a.herp_species_id,
   };
 }
 
@@ -106,7 +97,7 @@ function lizardToOption(l: Lizard): ParentOption {
  * shipped on TV (apps/mobile/app/breeding/pairings/new.tsx and the web
  * equivalent). Keep them in sync.
  *
- *   1. reptile_species_id match — canonical comparison when both
+ *   1. herp_species_id match — canonical comparison when both
  *      parents were picked from the species autocomplete.
  *   2. scientific_name match — fallback for keepers who typed names
  *      freely before linking, or for species not yet in the catalog.
@@ -115,8 +106,8 @@ function lizardToOption(l: Lizard): ParentOption {
  *   3. Insufficient data — return true (allow). Can't enforce.
  */
 function speciesMatches(a: ParentOption, b: ParentOption): boolean {
-  if (a.reptile_species_id && b.reptile_species_id) {
-    return a.reptile_species_id === b.reptile_species_id;
+  if (a.herp_species_id && b.herp_species_id) {
+    return a.herp_species_id === b.herp_species_id;
   }
   const aName = a.scientific_name?.trim().toLowerCase();
   const bName = b.scientific_name?.trim().toLowerCase();
@@ -170,10 +161,13 @@ function NewPairingScreen() {
       let cancelled = false;
       (async () => {
         try {
-          const [s, l] = await Promise.all([listSnakes(), listLizards()]);
+          const [s, l] = await Promise.all([
+            listAnimals('snake'),
+            listAnimals('lizard'),
+          ]);
           if (cancelled) return;
-          setSnakes(s.map(snakeToOption));
-          setLizards(l.map(lizardToOption));
+          setSnakes(s.map(animalToOption));
+          setLizards(l.map(animalToOption));
           setLoadError(null);
         } catch (err) {
           if (cancelled) return;
@@ -237,7 +231,7 @@ function NewPairingScreen() {
     // picked the female first, then changed the male to a different
     // species afterwards — the picker filter blocks the forward path.
     // Uses speciesMatches() so free-typed scientific names enforce too,
-    // not just reptile_species_id-linked records.
+    // not just herp_species_id-linked records.
     if (maleOption && femaleOption && !speciesMatches(maleOption, femaleOption)) {
       const a = maleOption.scientific_name ?? 'this male';
       const b = femaleOption.scientific_name ?? 'this female';
@@ -470,7 +464,7 @@ function NewPairingScreen() {
                Bug 2026-05-11 (Cory): Bindi could be picked for both
                slots and the error only surfaced on save.
             2. Same-species enforcement — if the other slot has a parent
-               with a non-null reptile_species_id, only show candidates
+               with a non-null herp_species_id, only show candidates
                with the matching species. A gargoyle gecko and a
                bearded dragon are both lizards but biologically can't
                cross, and the app shouldn't let a keeper accidentally

@@ -1,40 +1,47 @@
 /**
  * QR upload-session client.
  *
- * Backend creates a 20-minute token tied to a snake or lizard. The
- * phone browser at the returned `upload_url` posts photos via the
+ * Backend creates a 20-minute token tied to an HV animal (any taxon).
+ * The phone browser at the returned `upload_url` posts photos via the
  * unauthenticated `/upload-sessions/{token}/photo` route — useful for
  * handing off photo capture to a guest, partner, or another device
  * without sharing login credentials.
  *
+ * ADR-003: the per-taxon snake/lizard tables collapsed into `animals`,
+ * so the snake/lizard upload-session endpoints collapsed into
+ * `/api/v1/animals/{id}/upload-session` and the `/s/{id}` + `/l/{id}`
+ * public-profile routes collapsed into `/api/v1/a/{id}`.
+ *
  * NOTE on web-side rendering: the upload page lives at
  * `apps/web/src/app/upload/[token]/page.tsx` (Tarantuverse domain).
- * It's been extended to read the session's `taxon` field and render
- * snake/lizard sessions under Herpetoverse branding, so even though
- * the URL says tarantuverse.com the page reads on-brand once loaded.
+ * It reads the session's `taxon` field and renders animal sessions
+ * under Herpetoverse branding, so even though the URL says
+ * tarantuverse.com the page reads on-brand once loaded.
  */
 import { apiFetch } from './apiClient'
+import type { AnimalTaxon } from './animals'
 
-export type QRTaxon = 'snake' | 'lizard'
+export type { AnimalTaxon } from './animals'
 
 export interface UploadSessionResponse {
   token: string
   upload_url: string
   expires_at: string
   expires_in_minutes: number
-  taxon: QRTaxon
-  /** Snake responses include `snake_name`, lizard responses `lizard_name`. */
-  snake_name?: string
-  lizard_name?: string
+  taxon: AnimalTaxon
+  /** Display name of the animal the session is bound to. */
+  animal_name?: string
 }
 
+/**
+ * Create a 20-minute upload session for an animal. ADR-003 collapsed the
+ * per-taxon endpoints — one route now, taxon comes back in the response.
+ */
 export async function createUploadSession(
-  taxon: QRTaxon,
   animalId: string,
 ): Promise<UploadSessionResponse> {
-  const root = taxon === 'snake' ? 'snakes' : 'lizards'
   return apiFetch<UploadSessionResponse>(
-    `/api/v1/${root}/${encodeURIComponent(animalId)}/upload-session`,
+    `/api/v1/animals/${encodeURIComponent(animalId)}/upload-session`,
     { method: 'POST' },
   )
 }
@@ -50,7 +57,7 @@ export async function createUploadSession(
 
 export interface PublicReptileProfile {
   id: string
-  taxon: 'snake' | 'lizard'
+  taxon: AnimalTaxon
   name: string | null
   common_name: string | null
   scientific_name: string | null
@@ -107,14 +114,17 @@ export interface PublicReptileProfile {
   notes?: string | null
 }
 
+/**
+ * Fetch the permanent public profile for an animal. ADR-003 collapsed
+ * `/s/{id}` + `/l/{id}` into `/a/{id}` — taxon comes back in the payload.
+ *
+ * Sends auth if available (so the owner check works) but doesn't require
+ * it — apiFetch always attaches a token when present.
+ */
 export async function getPublicProfile(
-  taxon: 'snake' | 'lizard',
   animalId: string,
 ): Promise<PublicReptileProfile> {
-  const path = taxon === 'snake' ? 's' : 'l'
-  // Send auth if available (so the owner check works) but don't require
-  // it — the apiClient's apiFetch always attaches a token when present.
   return apiFetch<PublicReptileProfile>(
-    `/api/v1/${path}/${encodeURIComponent(animalId)}`,
+    `/api/v1/a/${encodeURIComponent(animalId)}`,
   )
 }

@@ -5,11 +5,11 @@
  * src/components/reptile-detail/ReptileDetailShared so a UX tweak for
  * snakes lands here automatically.
  *
- * Note on polymorphic logs: the lizard endpoints
- * (/lizards/{id}/weights, /feedings, /sheds) return rows that have BOTH
- * `snake_id` and `lizard_id` columns; exactly one is non-null. The
- * server filters to lizard rows for these routes so the response is
- * shape-clean for UI use — see src/lib/lizards.ts for the type defs.
+ * ADR-003: snakes/lizards/frogs collapsed into one `animals` table, so
+ * the data layer (lib/animals) is taxon-agnostic — log rows carry a
+ * single `animal_id` and there's one set of fetchers. This screen still
+ * exists as the lizard-shaped route; the unified helpers are aliased
+ * back to their lizard-era names so the body doesn't change.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -36,16 +36,16 @@ import {
   WeighInsList,
 } from '../../src/components/reptile-detail/ReptileDetailShared';
 import {
+  type Animal as Lizard,
   type FeedingLog,
-  type Lizard,
   type ShedLog,
   type WeightLog,
-  getLizard,
+  animalTitle as lizardTitle,
+  getAnimal as getLizard,
   listFeedings,
   listSheds,
   listWeightLogs,
-  lizardTitle,
-} from '../../src/lib/lizards';
+} from '../../src/lib/animals';
 import { type Photo, listPhotos } from '../../src/lib/photos';
 
 function LizardDetailScreen() {
@@ -72,7 +72,7 @@ function LizardDetailScreen() {
         listWeightLogs(id),
         listFeedings(id),
         listSheds(id),
-        listPhotos('lizard', id),
+        listPhotos(id),
       ]);
 
     if (lizardR.status === 'fulfilled') {
@@ -198,7 +198,6 @@ function LizardDetailScreen() {
         {/* See snake detail — pause entry now lives in Log Feeding,
             and the banner itself is the resume affordance when paused. */}
         <FeedingStatusBanner
-          taxon="lizard"
           animalId={lizard.id}
           refreshKey={`${feedings.length}-${lizard.feeding_paused_reason ?? ''}-${lizard.feeding_paused_until ?? ''}`}
           onPausedPress={() => setPauseOpen(true)}
@@ -216,7 +215,6 @@ function LizardDetailScreen() {
             )[0];
           return (
             <FeedingIntelligence
-              taxon="lizard"
               animalId={lizard.id}
               lastFedAt={lizard.last_fed_at}
               lastAcceptedPreyWeightG={lastAccepted?.prey_weight_g ?? null}
@@ -292,7 +290,6 @@ function LizardDetailScreen() {
       <PauseFeedingSheet
         visible={pauseOpen}
         onClose={() => setPauseOpen(false)}
-        taxon="lizard"
         animalId={lizard.id}
         animalName={lizardTitle(lizard)}
         currentReason={lizard.feeding_paused_reason}

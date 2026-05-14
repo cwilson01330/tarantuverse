@@ -47,15 +47,17 @@ import {
 } from '../components/forms/FormPrimitives';
 import {
   type Photo,
-  type PhotoTaxon,
   deletePhoto,
   listPhotos,
   setMainPhoto,
   updatePhotoCaption,
   uploadPhoto,
 } from '../lib/photos';
+import type { AnimalTaxon } from '../lib/animals';
 
-export function ReptilePhotoGalleryScreen({ taxon }: { taxon: PhotoTaxon }) {
+// ADR-003: photo data is taxon-agnostic now; `taxon` survives only to
+// pick the right per-taxon in-app route for the QR shortcut.
+export function ReptilePhotoGalleryScreen({ taxon }: { taxon: AnimalTaxon }) {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
@@ -80,14 +82,14 @@ export function ReptilePhotoGalleryScreen({ taxon }: { taxon: PhotoTaxon }) {
   const fetchPhotos = useCallback(async () => {
     if (!id) return;
     try {
-      const data = await listPhotos(taxon, id);
+      const data = await listPhotos(id);
       setPhotos(data);
       setLoadError(null);
     } catch (err) {
       setLoadError(extractErrorMessage(err, "Couldn't load photos."));
       setPhotos((prev) => prev ?? []); // keep showing empty rather than null
     }
-  }, [id, taxon]);
+  }, [id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -155,7 +157,6 @@ export function ReptilePhotoGalleryScreen({ taxon }: { taxon: PhotoTaxon }) {
     setUploadError(null);
     try {
       await uploadPhoto({
-        taxon,
         animalId: id,
         imageUri: pickedUri,
         caption: newCaption,
@@ -320,9 +321,9 @@ export function ReptilePhotoGalleryScreen({ taxon }: { taxon: PhotoTaxon }) {
                 onPress={() => {
                   if (!id) return;
                   const path =
-                    taxon === 'snake'
-                      ? `/reptile/qr/${id}`
-                      : `/lizard/qr/${id}`;
+                    taxon === 'lizard'
+                      ? `/lizard/qr/${id}`
+                      : `/reptile/qr/${id}`;
                   router.push(path as never);
                 }}
                 style={styles.qrShortcut}

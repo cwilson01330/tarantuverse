@@ -20,63 +20,46 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { ApiError } from '@/lib/apiClient'
 import {
+  type Animal,
+  type AnimalTaxon,
+  animalTitle,
   fmtGrams,
-  listSnakes,
+  listAnimals,
   relativeDays,
-  Snake,
-  snakeTitle,
-} from '@/lib/snakes'
-import {
-  listLizards,
-  Lizard,
-  lizardTitle,
-} from '@/lib/lizards'
+} from '@/lib/animals'
 
-type Taxon = 'snake' | 'lizard'
+type Taxon = AnimalTaxon
 
 interface ReptileRow {
   taxon: Taxon
   id: string
   title: string
   scientific_name: string | null
-  sex: Snake['sex']
+  sex: Animal['sex']
   current_weight_g: string | null
   last_fed_at: string | null
   created_at: string
 }
 
-function snakeRow(s: Snake): ReptileRow {
+function animalRow(a: Animal): ReptileRow {
   return {
-    taxon: 'snake',
-    id: s.id,
-    title: snakeTitle(s),
-    scientific_name: s.scientific_name,
-    sex: s.sex,
-    current_weight_g: s.current_weight_g,
-    last_fed_at: s.last_fed_at,
-    created_at: s.created_at,
+    taxon: a.taxon,
+    id: a.id,
+    title: animalTitle(a),
+    scientific_name: a.scientific_name,
+    sex: a.sex,
+    current_weight_g: a.current_weight_g,
+    last_fed_at: a.last_fed_at,
+    created_at: a.created_at,
   }
 }
 
-function lizardRow(l: Lizard): ReptileRow {
-  return {
-    taxon: 'lizard',
-    id: l.id,
-    title: lizardTitle(l),
-    scientific_name: l.scientific_name,
-    sex: l.sex,
-    current_weight_g: l.current_weight_g,
-    last_fed_at: l.last_fed_at,
-    created_at: l.created_at,
-  }
-}
-
-/** Detail page URL — snakes use legacy root-level route; lizards go under
- *  a `lizards/` subpath so existing snake bookmarks don't break. */
+/** Detail page URL — lizards go under a `lizards/` subpath; snakes and
+ *  frogs use the root-level reptile detail route. */
 function detailHref(row: ReptileRow): string {
-  return row.taxon === 'snake'
-    ? `/app/reptiles/${row.id}`
-    : `/app/reptiles/lizards/${row.id}`
+  return row.taxon === 'lizard'
+    ? `/app/reptiles/lizards/${row.id}`
+    : `/app/reptiles/${row.id}`
 }
 
 export default function ReptilesPage() {
@@ -86,47 +69,32 @@ export default function ReptilesPage() {
   useEffect(() => {
     let cancelled = false
 
-    // Fetch both taxa in parallel. allSettled so one failure doesn't
-    // zero out the other.
-    Promise.allSettled([listSnakes(), listLizards()]).then((results) => {
-      if (cancelled) return
-
-      const collected: ReptileRow[] = []
-      const failures: string[] = []
-
-      const [snakeResult, lizardResult] = results
-
-      if (snakeResult.status === 'fulfilled') {
-        collected.push(...snakeResult.value.map(snakeRow))
-      } else {
-        const err = snakeResult.reason
-        // 401 is handled by apiClient (redirects to login); ignore here.
-        if (err instanceof ApiError && err.status !== 401) {
-          failures.push(`Snakes: ${err.message}`)
-        } else if (!(err instanceof ApiError)) {
-          failures.push('Could not load your snakes.')
+    // ADR-003: one unified animals endpoint — every taxon in a single call.
+    listAnimals()
+      .then((animals) => {
+        if (cancelled) return
+        const collected = animals.map(animalRow)
+        // Newest first — keeps just-added animals at the top of the grid.
+        collected.sort((a, b) =>
+          b.created_at.localeCompare(a.created_at),
+        )
+        setRows(collected)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        // 401 is handled by apiClient (redirects to login); show an empty
+        // grid rather than a scary banner while the redirect fires.
+        if (err instanceof ApiError && err.status === 401) {
+          setRows([])
+          return
         }
-      }
-
-      if (lizardResult.status === 'fulfilled') {
-        collected.push(...lizardResult.value.map(lizardRow))
-      } else {
-        const err = lizardResult.reason
-        if (err instanceof ApiError && err.status !== 401) {
-          failures.push(`Lizards: ${err.message}`)
-        } else if (!(err instanceof ApiError)) {
-          failures.push('Could not load your lizards.')
-        }
-      }
-
-      // Newest first — keeps just-added animals at the top of the grid.
-      collected.sort((a, b) =>
-        b.created_at.localeCompare(a.created_at),
-      )
-
-      setRows(collected)
-      if (failures.length) setError(failures.join(' '))
-    })
+        setRows([])
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : 'Could not load your reptiles.',
+        )
+      })
 
     return () => {
       cancelled = true
@@ -182,8 +150,14 @@ export default function ReptilesPage() {
 function ReptileCard({ row }: { row: ReptileRow }) {
   const weight = fmtGrams(row.current_weight_g)
   const lastFed = relativeDays(row.last_fed_at)
-  const taxonLabel = row.taxon === 'snake' ? 'Snake' : 'Lizard'
-  const taxonGlyph = row.taxon === 'snake' ? '🐍' : '🦎'
+  const taxonLabel =
+    row.taxon === 'snake'
+      ? 'Snake'
+      : row.taxon === 'frog'
+      ? 'Frog'
+      : 'Lizard'
+  const taxonGlyph =
+    row.taxon === 'snake' ? '🐍' : row.taxon === 'frog' ? '🐸' : '🦎'
 
   return (
     <Link

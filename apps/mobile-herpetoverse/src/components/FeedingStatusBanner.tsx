@@ -15,7 +15,8 @@
  * status indicator, not a CTA. The "Feed" action button below is the
  * affordance.
  *
- * Backend route: GET /<taxon>/<id>/feeding-status (added 2026-05-01).
+ * Backend route: GET /animals/<id>/feeding-status (ADR-003 collapsed the
+ * per-taxon snake/lizard endpoints).
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -30,12 +31,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import {
   type FeedingStatus,
   type FeedingStatusKind,
-  type Taxon,
   fetchFeedingStatus,
 } from '../lib/feeding-status';
 
 interface Props {
-  taxon: Taxon;
   animalId: string;
   /** Re-fetch when this changes (e.g. after a feeding is logged). */
   refreshKey?: string | number;
@@ -59,7 +58,7 @@ interface Visual {
   detail?: string;
 }
 
-export function FeedingStatusBanner({ taxon, animalId, refreshKey, onPausedPress }: Props) {
+export function FeedingStatusBanner({ animalId, refreshKey, onPausedPress }: Props) {
   const { colors, layout } = useTheme();
   const [status, setStatus] = useState<FeedingStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -70,7 +69,7 @@ export function FeedingStatusBanner({ taxon, animalId, refreshKey, onPausedPress
     setLoadError(null);
     (async () => {
       try {
-        const s = await fetchFeedingStatus(taxon, animalId);
+        const s = await fetchFeedingStatus(animalId);
         if (!cancelled) setStatus(s);
       } catch {
         if (!cancelled) setLoadError("Couldn't load feeding status.");
@@ -79,7 +78,7 @@ export function FeedingStatusBanner({ taxon, animalId, refreshKey, onPausedPress
     return () => {
       cancelled = true;
     };
-  }, [taxon, animalId, refreshKey]);
+  }, [animalId, refreshKey]);
 
   // Hide entirely on transient load failure — the section "Recent
   // feedings" still surfaces what the keeper needs.

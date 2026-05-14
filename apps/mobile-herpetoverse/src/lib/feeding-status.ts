@@ -1,8 +1,8 @@
 /**
  * Feeding-status data layer.
  *
- * Wraps the GET /snakes/{id}/feeding-status and /lizards/{id}/feeding-status
- * endpoints (added 2026-05-01). The server combines:
+ * Wraps GET /animals/{id}/feeding-status (ADR-003 collapsed the per-taxon
+ * snake/lizard endpoints). The server combines:
  *   - the species' interval_days_min/max from life_stage_feeding,
  *   - the most recent ACCEPTED feeding (refusals do not reset the clock),
  *   - and a brumation override
@@ -37,16 +37,11 @@ export interface FeedingStatus {
   note: string | null;
 }
 
-export type Taxon = 'snake' | 'lizard';
-
 export async function fetchFeedingStatus(
-  taxon: Taxon,
   animalId: string,
 ): Promise<FeedingStatus> {
-  const path =
-    taxon === 'snake'
-      ? `/snakes/${encodeURIComponent(animalId)}/feeding-status`
-      : `/lizards/${encodeURIComponent(animalId)}/feeding-status`;
-  const { data } = await apiClient.get<FeedingStatus>(path);
+  const { data } = await apiClient.get<FeedingStatus>(
+    `/animals/${encodeURIComponent(animalId)}/feeding-status`,
+  );
   return data;
 }

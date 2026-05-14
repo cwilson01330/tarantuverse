@@ -2,7 +2,7 @@
 
 /**
  * PauseFeedingDialog — set or clear the `feeding_paused_reason` /
- * `feeding_paused_until` flags on a snake or lizard.
+ * `feeding_paused_until` flags on any HV animal.
  *
  * Why this exists: snakes (especially ball pythons) routinely refuse food
  * for months during hunger strikes, brumation prep, post-rehouse settling,
@@ -15,22 +15,19 @@
  *   - 5 reason chips: hunger_strike / post_rehouse / recovering /
  *     breeding_season / other
  *   - Optional `until` date (YYYY-MM-DD). Blank = indefinite.
- *   - Save → updateSnake/updateLizard with the two fields
- *   - Resume → updateSnake/updateLizard with both cleared to null
+ *   - Save → updateAnimal with the two fields
+ *   - Resume → updateAnimal with both cleared to null
  *
+ * ADR-003: taxon-agnostic now — one updateAnimal call, no branching.
  * Brumation is a separate flag (`brumation_active`) handled elsewhere.
  */
 
 import { useEffect, useState } from 'react'
-import { updateSnake } from '@/lib/snakes'
-import { updateLizard } from '@/lib/lizards'
-
-type Taxon = 'snake' | 'lizard'
+import { updateAnimal } from '@/lib/animals'
 
 interface Props {
   open: boolean
   onClose: () => void
-  taxon: Taxon
   animalId: string
   animalName?: string | null
   /** Current pause reason on the animal, if any. Drives the resume button. */
@@ -71,7 +68,6 @@ const REASON_OPTIONS: Array<{ value: string; label: string; helper: string }> = 
 export function PauseFeedingDialog({
   open,
   onClose,
-  taxon,
   animalId,
   animalName,
   currentReason,
@@ -122,11 +118,7 @@ export function PauseFeedingDialog({
         feeding_paused_reason: reason,
         feeding_paused_until: until.trim() || null,
       }
-      if (taxon === 'snake') {
-        await updateSnake(animalId, payload)
-      } else {
-        await updateLizard(animalId, payload)
-      }
+      await updateAnimal(animalId, payload)
       onChange()
       onClose()
     } catch (err: unknown) {
@@ -144,11 +136,7 @@ export function PauseFeedingDialog({
         feeding_paused_reason: null,
         feeding_paused_until: null,
       }
-      if (taxon === 'snake') {
-        await updateSnake(animalId, payload)
-      } else {
-        await updateLizard(animalId, payload)
-      }
+      await updateAnimal(animalId, payload)
       onChange()
       onClose()
     } catch (err: unknown) {

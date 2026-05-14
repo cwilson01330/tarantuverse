@@ -30,8 +30,8 @@ class ShedLogBase(BaseModel):
 
 
 class ShedLogCreate(ShedLogBase):
-    """Schema for creating a shed log. `snake_id` is taken from the route,
-    not the payload."""
+    """Schema for creating a shed log. `animal_id` is taken from the
+    route, not the payload."""
     pass
 
 
@@ -53,13 +53,11 @@ class ShedLogUpdate(BaseModel):
 class ShedLogResponse(ShedLogBase):
     """Response schema includes server-managed fields.
 
-    Polymorphic parent: exactly one of `snake_id` / `lizard_id` is set.
-    The DB CHECK constraint guarantees this invariant; both are Optional
-    here so Pydantic can serialize lizard-parented sheds without a 500.
+    ADR-003 collapsed the per-taxon parent FKs into a single
+    `animal_id` (NOT NULL).
     """
     id: uuid.UUID
-    snake_id: Optional[uuid.UUID] = None
-    lizard_id: Optional[uuid.UUID] = None
+    animal_id: uuid.UUID
     created_at: datetime
 
     class Config:

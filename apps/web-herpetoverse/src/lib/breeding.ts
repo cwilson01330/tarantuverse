@@ -11,7 +11,8 @@ import { apiFetch } from './apiClient'
 
 // ─── Pairings ──────────────────────────────────────────────────────────
 
-export type Taxon = 'snake' | 'lizard'
+// ADR-003: frogs joined snakes + lizards under the unified animals table.
+export type Taxon = 'snake' | 'lizard' | 'frog'
 export type ReptilePairingType =
   | 'natural'
   | 'cohabitation'
@@ -28,12 +29,10 @@ export interface ReptilePairing {
   id: string
   user_id: string
   taxon: Taxon
-  male_id: string
-  female_id: string
-  male_snake_id: string | null
-  male_lizard_id: string | null
-  female_snake_id: string | null
-  female_lizard_id: string | null
+  // ADR-003: both parents are rows in the unified animals table; the
+  // per-taxon *_snake_id / *_lizard_id columns were collapsed.
+  male_animal_id: string
+  female_animal_id: string
   paired_date: string
   separated_date: string | null
   pairing_type: ReptilePairingType
@@ -236,8 +235,8 @@ export interface ReptileOffspring {
   id: string
   clutch_id: string
   user_id: string
-  snake_id: string | null
-  lizard_id: string | null
+  // ADR-003: optional hold-back link to a live animal record.
+  animal_id: string | null
   morph_label: string | null
   recorded_genotype: GenotypeEntry[] | null
   status: OffspringStatus
@@ -254,8 +253,7 @@ export interface ReptileOffspring {
 
 export interface CreateOffspringPayload {
   clutch_id: string
-  snake_id?: string | null
-  lizard_id?: string | null
+  animal_id?: string | null
   morph_label?: string | null
   recorded_genotype?: GenotypeEntry[] | null
   status?: OffspringStatus
@@ -269,8 +267,7 @@ export interface CreateOffspringPayload {
 }
 
 export interface UpdateOffspringPayload {
-  snake_id?: string | null
-  lizard_id?: string | null
+  animal_id?: string | null
   morph_label?: string | null
   recorded_genotype?: GenotypeEntry[] | null
   status?: OffspringStatus

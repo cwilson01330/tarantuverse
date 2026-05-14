@@ -27,16 +27,16 @@ PairingOutcomeStr = Literal[
     "abandoned",
     "unknown",
 ]
-TaxonStr = Literal["snake", "lizard"]
+TaxonStr = Literal["snake", "lizard", "frog"]
 
 
 class ReptilePairingCreate(BaseModel):
     """Create a new pairing.
 
-    Caller supplies `taxon` + the two parent IDs; the server fills the
-    appropriate FK columns. Mixing taxa in a single pairing is rejected
-    by the DB CHECK constraint, but we also short-circuit at the API
-    layer for a friendlier error.
+    Caller supplies `taxon` + the two parent animal IDs; the server
+    validates both parents are that taxon and writes male_animal_id /
+    female_animal_id / taxon. (Per ADR-003 the per-taxon parent FKs
+    were collapsed into a single animal FK pair.)
     """
     taxon: TaxonStr
     male_id: UUID
@@ -69,12 +69,9 @@ class ReptilePairingResponse(BaseModel):
     id: UUID
     user_id: UUID
     taxon: TaxonStr
-    male_id: UUID  # derived: whichever of male_snake_id / male_lizard_id is set
-    female_id: UUID
-    male_snake_id: Optional[UUID] = None
-    male_lizard_id: Optional[UUID] = None
-    female_snake_id: Optional[UUID] = None
-    female_lizard_id: Optional[UUID] = None
+    # ADR-003: both parents are rows in the unified animals table.
+    male_animal_id: UUID
+    female_animal_id: UUID
     paired_date: date
     separated_date: Optional[date] = None
     pairing_type: PairingTypeStr
@@ -199,8 +196,8 @@ class GenotypeEntry(BaseModel):
 
 class ReptileOffspringCreate(BaseModel):
     clutch_id: UUID
-    snake_id: Optional[UUID] = None
-    lizard_id: Optional[UUID] = None
+    # ADR-003: optional hold-back link to a live animal record.
+    animal_id: Optional[UUID] = None
     morph_label: Optional[str] = Field(None, max_length=200)
     recorded_genotype: Optional[List[GenotypeEntry]] = None
     status: OffspringStatusStr = "hatched"
@@ -214,8 +211,7 @@ class ReptileOffspringCreate(BaseModel):
 
 
 class ReptileOffspringUpdate(BaseModel):
-    snake_id: Optional[UUID] = None
-    lizard_id: Optional[UUID] = None
+    animal_id: Optional[UUID] = None
     morph_label: Optional[str] = Field(None, max_length=200)
     recorded_genotype: Optional[List[GenotypeEntry]] = None
     status: Optional[OffspringStatusStr] = None
@@ -234,8 +230,7 @@ class ReptileOffspringResponse(BaseModel):
     id: UUID
     clutch_id: UUID
     user_id: UUID
-    snake_id: Optional[UUID] = None
-    lizard_id: Optional[UUID] = None
+    animal_id: Optional[UUID] = None
     morph_label: Optional[str] = None
     recorded_genotype: Optional[List[Any]] = None
     status: OffspringStatusStr

@@ -40,18 +40,22 @@ import { ApiError } from '@/lib/apiClient'
 import PhotoGallery from '@/components/PhotoGallery'
 import { PauseFeedingDialog } from '@/components/PauseFeedingDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
+// ADR-003: the per-taxon snake/lizard libs collapsed into lib/animals.
+// This screen still renders the lizard-shaped detail view, so we alias the
+// unified helpers back to their lizard-era names — the component body is
+// taxon-agnostic already and doesn't need to change.
 import {
-  CreateFeedingPayload,
-  CreateShedPayload,
-  CreateWeightLogPayload,
-  FeedingLog,
-  Lizard,
-  PreySuggestion,
-  ShedLog,
+  type CreateFeedingPayload,
+  type CreateShedPayload,
+  type CreateWeightLogPayload,
+  type FeedingLog,
+  type Animal as Lizard,
+  type PreySuggestion,
+  type ShedLog,
   WEIGHT_CONTEXT_LABELS,
-  WeightContext,
-  WeightLog,
-  WeightTrendResponse,
+  type WeightContext,
+  type WeightLog,
+  type WeightTrendResponse,
   createFeeding,
   createShed,
   createWeightLog,
@@ -61,15 +65,15 @@ import {
   fmtDate,
   fmtDecimal,
   fmtGrams,
-  getLizard,
+  getAnimal as getLizard,
   getPreySuggestion,
   getWeightTrend,
   listFeedings,
   listSheds,
   listWeightLogs,
-  lizardTitle,
+  animalTitle as lizardTitle,
   relativeDays,
-} from '@/lib/lizards'
+} from '@/lib/animals'
 
 // ---------------------------------------------------------------------------
 // Page
@@ -356,9 +360,9 @@ function LizardHeader({
           </h1>
           {lizard.scientific_name && (
             <p className="text-sm italic text-neutral-400">
-              {lizard.reptile_species_id ? (
+              {lizard.herp_species_id ? (
                 <Link
-                  href={`/app/species/${lizard.reptile_species_id}`}
+                  href={`/app/species/${lizard.herp_species_id}`}
                   className="text-herp-teal hover:text-herp-lime transition-colors"
                 >
                   {lizard.scientific_name}
@@ -1085,7 +1089,6 @@ function LogFeedingForm({
         <PauseFeedingDialog
           open={pauseOpen}
           onClose={() => setPauseOpen(false)}
-          taxon="lizard"
           animalId={lizard.id}
           animalName={lizard.name || lizard.scientific_name || 'this lizard'}
           currentReason={lizard.feeding_paused_reason}
@@ -1250,7 +1253,6 @@ function LogFeedingForm({
       <PauseFeedingDialog
         open={pauseOpen}
         onClose={() => setPauseOpen(false)}
-        taxon="lizard"
         animalId={lizard.id}
         animalName={lizard.name || lizard.scientific_name || 'this lizard'}
         currentReason={lizard.feeding_paused_reason}

@@ -25,7 +25,7 @@ class AnimalGenotypeBase(BaseModel):
 
 
 class AnimalGenotypeCreate(AnimalGenotypeBase):
-    """snake_id comes from the route, not the payload."""
+    """animal_id comes from the route, not the payload."""
     pass
 
 
@@ -40,7 +40,7 @@ class AnimalGenotypeUpdate(BaseModel):
 
 class AnimalGenotypeResponse(AnimalGenotypeBase):
     id: uuid.UUID
-    snake_id: uuid.UUID
+    animal_id: uuid.UUID  # ADR-003: collapsed from snake_id/lizard_id
     created_at: datetime
 
     class Config:

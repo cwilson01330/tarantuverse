@@ -40,8 +40,8 @@ import {
   fetchGenesForSpecies,
   formatProbability,
 } from '@/lib/genes'
-import { getLizard } from '@/lib/lizards'
-import { getSnake } from '@/lib/snakes'
+// ADR-003: snake/lizard libs collapsed into lib/animals — one getter.
+import { getAnimal } from '@/lib/animals'
 
 interface Params {
   id: string
@@ -307,11 +307,9 @@ function PredictedOutcomes({ clutchId }: { clutchId: string }) {
         // Need a scientific_name to fetch the gene catalog. Pull it from
         // whichever parent has one — both should be the same species
         // since pairings are taxon-locked, and species linkage is on
-        // the snake/lizard record itself.
+        // the animal record itself.
         const parentId = b.male.animal_id
-        const parent = b.taxon === 'snake'
-          ? await getSnake(parentId)
-          : await getLizard(parentId)
+        const parent = await getAnimal(parentId)
         if (cancelled) return
 
         if (!parent.scientific_name) {

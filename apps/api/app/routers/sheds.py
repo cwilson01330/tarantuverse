@@ -1,24 +1,21 @@
-"""Shed log routes — Herpetoverse v1
+"""Shed log routes — Herpetoverse
 
-Parallel to the molt_logs router — reptiles shed, tarantulas molt. The
-biology is different enough that we keep two separate routers (see
-PRD-herpetoverse-v1.md §5.3), but the CRUD shape is the same:
+Parallel to the molt_logs router — reptiles + amphibians shed,
+tarantulas molt. ADR-003 collapsed the per-taxon parent tables, so the
+route surface is now taxon-agnostic:
 
-  GET  /snakes/{snake_id}/sheds
-  POST /snakes/{snake_id}/sheds
-  GET  /lizards/{lizard_id}/sheds
-  POST /lizards/{lizard_id}/sheds
-  PUT  /sheds/{shed_id}
+  GET    /animals/{animal_id}/sheds
+  POST   /animals/{animal_id}/sheds
+  GET    /sheds/{shed_id}
+  PUT    /sheds/{shed_id}
   DELETE /sheds/{shed_id}
 
-Ownership is enforced by walking `shed.snake.user_id == current_user.id`
-(or the lizard equivalent) on every write. Reads do the same via a join
-filter.
+Ownership is enforced by walking `shed.animal.user_id == current_user.id`
+on every write; reads do the same via the owning animal.
 
-Side-effects on POST:
-  - Denormalize `snakes.last_shed_at` / `lizards.last_shed_at` to the new
-    shed date so dashboards don't need to scan the full shed history for
-    the "last shed X days ago" badge.
+Side-effect on POST: denormalize `animals.last_shed_at` to the new
+shed date so dashboards don't scan the full shed history for the
+"last shed X days ago" badge.
 """
 from typing import List
 import uuid
@@ -28,8 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
-from app.models.snake import Snake
-from app.models.lizard import Lizard
+from app.models.animal import Animal
 from app.models.shed_log import ShedLog
 from app.schemas.shed_log import ShedLogCreate, ShedLogUpdate, ShedLogResponse
 from app.utils.dependencies import get_current_user
@@ -37,57 +33,33 @@ from app.utils.dependencies import get_current_user
 router = APIRouter()
 
 
-def _get_owned_snake(db: Session, snake_id: uuid.UUID, user: User) -> Snake:
-    snake = (
-        db.query(Snake)
-        .filter(Snake.id == snake_id, Snake.user_id == user.id)
+def _get_owned_animal(db: Session, animal_id: uuid.UUID, user: User) -> Animal:
+    animal = (
+        db.query(Animal)
+        .filter(Animal.id == animal_id, Animal.user_id == user.id)
         .first()
     )
-    if not snake:
+    if not animal:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Snake not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Animal not found"
         )
-    return snake
-
-
-def _get_owned_lizard(db: Session, lizard_id: uuid.UUID, user: User) -> Lizard:
-    lizard = (
-        db.query(Lizard)
-        .filter(Lizard.id == lizard_id, Lizard.user_id == user.id)
-        .first()
-    )
-    if not lizard:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Lizard not found"
-        )
-    return lizard
+    return animal
 
 
 def _get_owned_shed(db: Session, shed_id: uuid.UUID, user: User) -> ShedLog:
-    """Fetch a shed log and verify the owning animal belongs to the caller.
-
-    Raises 404 for missing shed, 403 for not-your-shed (matches molts router).
-    Works for both snake-parented and lizard-parented shed logs.
-    """
+    """Fetch a shed log and verify the owning animal belongs to the
+    caller. Raises 404 for missing shed, 403 for not-your-shed."""
     shed = db.query(ShedLog).filter(ShedLog.id == shed_id).first()
     if not shed:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Shed log not found"
         )
 
-    if shed.snake_id:
-        owner = (
-            db.query(Snake)
-            .filter(Snake.id == shed.snake_id, Snake.user_id == user.id)
-            .first()
-        )
-    else:
-        owner = (
-            db.query(Lizard)
-            .filter(Lizard.id == shed.lizard_id, Lizard.user_id == user.id)
-            .first()
-        )
-
+    owner = (
+        db.query(Animal)
+        .filter(Animal.id == shed.animal_id, Animal.user_id == user.id)
+        .first()
+    )
     if not owner:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
@@ -95,53 +67,50 @@ def _get_owned_shed(db: Session, shed_id: uuid.UUID, user: User) -> ShedLog:
     return shed
 
 
-@router.get("/snakes/{snake_id}/sheds", response_model=List[ShedLogResponse])
+@router.get("/animals/{animal_id}/sheds", response_model=List[ShedLogResponse])
 async def list_sheds(
-    snake_id: uuid.UUID,
+    animal_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List shed logs for a snake, most recent first."""
-    _get_owned_snake(db, snake_id, current_user)
+    """List shed logs for an animal, most recent first."""
+    _get_owned_animal(db, animal_id, current_user)
     return (
         db.query(ShedLog)
-        .filter(ShedLog.snake_id == snake_id)
+        .filter(ShedLog.animal_id == animal_id)
         .order_by(ShedLog.shed_at.desc())
         .all()
     )
 
 
 @router.post(
-    "/snakes/{snake_id}/sheds",
+    "/animals/{animal_id}/sheds",
     response_model=ShedLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_shed(
-    snake_id: uuid.UUID,
+    animal_id: uuid.UUID,
     shed_data: ShedLogCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Log a shed for a snake.
+    """Log a shed. Denormalizes `animals.last_shed_at` so the dashboard
+    "X days since shed" badge doesn't re-scan the shed history."""
+    animal = _get_owned_animal(db, animal_id, current_user)
 
-    Denormalizes `snakes.last_shed_at` so the dashboard "X days since shed"
-    badge doesn't need to re-scan the shed history.
-    """
-    snake = _get_owned_snake(db, snake_id, current_user)
-
-    new_shed = ShedLog(snake_id=snake_id, **shed_data.model_dump())
+    new_shed = ShedLog(animal_id=animal_id, **shed_data.model_dump())
     db.add(new_shed)
 
     # Denormalize last_shed_at — only move it forward, never backward
     # (so backfilling an old shed doesn't regress the dashboard badge).
     shed_date = new_shed.shed_at.date() if new_shed.shed_at else None
-    if shed_date and (snake.last_shed_at is None or shed_date > snake.last_shed_at):
-        snake.last_shed_at = shed_date
+    if shed_date and (
+        animal.last_shed_at is None or shed_date > animal.last_shed_at
+    ):
+        animal.last_shed_at = shed_date
 
     db.commit()
     db.refresh(new_shed)
-
-    # TODO(sprint-5): emit activity feed "new_shed" once reptile actions ship
     return new_shed
 
 
@@ -151,9 +120,8 @@ async def get_shed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Fetch a single shed log by id. Used by the mobile + web edit forms
-    to pre-fill fields. Ownership checked via owning snake or lizard.
-    """
+    """Fetch a single shed log by id — used by the edit forms to
+    pre-fill fields."""
     return _get_owned_shed(db, shed_id, current_user)
 
 
@@ -164,7 +132,7 @@ async def update_shed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Partial update of a shed log. Ownership checked via owning snake."""
+    """Partial update of a shed log."""
     shed = _get_owned_shed(db, shed_id, current_user)
 
     update_data = shed_data.model_dump(exclude_unset=True)
@@ -182,59 +150,10 @@ async def delete_shed(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Delete a shed log. Does NOT recompute last_shed_at — that would need
-    a full history scan; acceptable since last_shed_at is a hint, not
-    authoritative. Future analytics can recompute if needed.
-    """
+    """Delete a shed log. Does NOT recompute last_shed_at — that would
+    need a full history scan; acceptable since last_shed_at is a hint,
+    not authoritative."""
     shed = _get_owned_shed(db, shed_id, current_user)
     db.delete(shed)
     db.commit()
     return None
-
-
-# ─────────────────────────── Lizard parents ───────────────────────────
-
-@router.get("/lizards/{lizard_id}/sheds", response_model=List[ShedLogResponse])
-async def list_lizard_sheds(
-    lizard_id: uuid.UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """List shed logs for a lizard, most recent first."""
-    _get_owned_lizard(db, lizard_id, current_user)
-    return (
-        db.query(ShedLog)
-        .filter(ShedLog.lizard_id == lizard_id)
-        .order_by(ShedLog.shed_at.desc())
-        .all()
-    )
-
-
-@router.post(
-    "/lizards/{lizard_id}/sheds",
-    response_model=ShedLogResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def create_lizard_shed(
-    lizard_id: uuid.UUID,
-    shed_data: ShedLogCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Log a shed for a lizard.
-
-    Denormalizes `lizards.last_shed_at` so the dashboard "X days since
-    shed" badge doesn't need to re-scan the shed history.
-    """
-    lizard = _get_owned_lizard(db, lizard_id, current_user)
-
-    new_shed = ShedLog(lizard_id=lizard_id, **shed_data.model_dump())
-    db.add(new_shed)
-
-    shed_date = new_shed.shed_at.date() if new_shed.shed_at else None
-    if shed_date and (lizard.last_shed_at is None or shed_date > lizard.last_shed_at):
-        lizard.last_shed_at = shed_date
-
-    db.commit()
-    db.refresh(new_shed)
-    return new_shed
