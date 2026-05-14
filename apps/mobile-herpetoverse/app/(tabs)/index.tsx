@@ -1,10 +1,10 @@
 /**
  * Reptile collection.
  *
- * Displays every snake + lizard the keeper owns, merged into a single
- * scrollable list (matches the web /app/reptiles UX). Taxon stays on
- * each row so we can route to the right detail screen when a card is
- * tapped.
+ * Displays every snake, lizard, and frog the keeper owns, merged into a
+ * single scrollable list (matches the web /app/reptiles UX). Taxon
+ * stays on each row to drive the per-taxon glyph; ADR-003 collapsed the
+ * detail routes so every card opens the one /reptile/[id] screen.
  *
  * Error handling is permissive: if one taxon fetch fails we still show
  * whatever loaded; the partial-failure state is surfaced via a banner
@@ -159,8 +159,8 @@ function CollectionScreen() {
             No reptiles yet
           </Text>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Add your first snake or lizard to start tracking weights,
-            feedings, and sheds.
+            Add your first snake, lizard, or frog to start tracking
+            weights, feedings, and sheds.
           </Text>
           <TouchableOpacity
             onPress={() => router.push('/reptile/add' as never)}
@@ -254,7 +254,8 @@ function ReptileCard({
   const { colors, layout } = useTheme();
   const lastFed = relativeDays(row.last_fed_at);
   const days = daysSince(row.last_fed_at);
-  const taxonGlyph = row.taxon === 'snake' ? '🐍' : '🦎';
+  const taxonGlyph =
+    row.taxon === 'snake' ? '🐍' : row.taxon === 'frog' ? '🐸' : '🦎';
 
   // Color-coded last-fed indicator. Calibrated for snake/lizard cadence
   // (much longer than tarantulas) — green up to a week, yellow to two

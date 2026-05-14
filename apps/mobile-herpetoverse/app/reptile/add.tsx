@@ -2,9 +2,9 @@
  * Add reptile — Sprint 8 Bundle 4.
  *
  * Slim version of web-herpetoverse `/app/reptiles/add`. Lets a keeper
- * pick taxon (snake/lizard), then captures the minimum a row needs to
- * be useful: name, sex, scientific name, hatch date, source, optional
- * starting weight + notes.
+ * pick taxon (snake, lizard, or frog), then captures the minimum a row
+ * needs to be useful: name, sex, scientific name, hatch date, source,
+ * optional starting weight + notes.
  *
  * Species autocomplete + enclosure picker are deferred to Bundle 5 —
  * Bundle 4 ships the create flow so keepers can stop hopping to web
@@ -40,6 +40,7 @@ import {
 import { EnclosurePicker } from '../../src/components/forms/EnclosurePicker';
 import { ReptileSpeciesAutocomplete } from '../../src/components/forms/ReptileSpeciesAutocomplete';
 import {
+  type AnimalTaxon,
   type CreateAnimalPayload,
   type Sex,
   type Source,
@@ -49,7 +50,19 @@ import {
 const TAXON_OPTIONS = [
   { value: 'snake' as const, label: 'Snake' },
   { value: 'lizard' as const, label: 'Lizard' },
+  { value: 'frog' as const, label: 'Frog' },
 ];
+
+// Per-taxon example values for input placeholders, so the form speaks
+// the keeper's animal instead of always sounding snake-first.
+const TAXON_EXAMPLES: Record<
+  AnimalTaxon,
+  { name: string; common: string; weight: string }
+> = {
+  snake: { name: 'Hex', common: 'Ball python', weight: '650' },
+  lizard: { name: 'Kiwi', common: 'Leopard gecko', weight: '60' },
+  frog: { name: 'Bean', common: 'Pacman frog', weight: '90' },
+};
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'female', label: 'Female' },
@@ -84,8 +97,10 @@ function AddReptileScreen() {
     common_name?: string;
   }>();
 
-  const [taxon, setTaxon] = useState<'snake' | 'lizard'>(
-    params.taxon === 'lizard' ? 'lizard' : 'snake',
+  const [taxon, setTaxon] = useState<AnimalTaxon>(
+    params.taxon === 'lizard' || params.taxon === 'frog'
+      ? params.taxon
+      : 'snake',
   );
   const [name, setName] = useState('');
   const [scientificName, setScientificName] = useState(
@@ -105,6 +120,9 @@ function AddReptileScreen() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Placeholder examples for the currently-selected taxon.
+  const ex = TAXON_EXAMPLES[taxon];
 
   async function handleSubmit() {
     if (submitting) return;
@@ -190,7 +208,7 @@ function AddReptileScreen() {
             <ThemedInput
               value={name}
               onChangeText={setName}
-              placeholder="Hex"
+              placeholder={ex.name}
               autoCapitalize="words"
             />
           </Field>
@@ -218,11 +236,11 @@ function AddReptileScreen() {
             />
           </Field>
 
-          <Field label="Common name" hint="e.g. Ball python">
+          <Field label="Common name" hint={`e.g. ${ex.common}`}>
             <ThemedInput
               value={commonName}
               onChangeText={setCommonName}
-              placeholder="Ball python"
+              placeholder={ex.common}
               autoCapitalize="words"
             />
           </Field>
@@ -264,7 +282,7 @@ function AddReptileScreen() {
             <ThemedInput
               value={currentWeight}
               onChangeText={setCurrentWeight}
-              placeholder="650"
+              placeholder={ex.weight}
               keyboardType="decimal-pad"
             />
           </Field>

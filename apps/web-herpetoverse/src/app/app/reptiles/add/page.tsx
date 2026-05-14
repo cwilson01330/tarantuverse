@@ -3,12 +3,12 @@
 /**
  * Add Reptile form.
  *
- * Entry point for every keeper-created reptile in Herpetoverse — there
- * is no mobile-side create flow yet, so everything comes through here.
+ * The web entry point for keeper-created reptiles in Herpetoverse (the
+ * mobile app has its own create flow at app/reptile/add.tsx).
  * The form is taxon-aware: a segmented toggle at the top switches
- * between snake and lizard creation. All other fields are identical
- * because the LizardBase schema is a literal field-for-field mirror of
- * SnakeBase.
+ * between snake, lizard, and frog creation. All other fields are
+ * identical across taxa — ADR-003 collapsed them onto one AnimalBase
+ * schema, so the form shape never branches.
  *
  * Design notes:
  *  - Sane defaults: sex=unknown, no required fields except a common name.
@@ -40,9 +40,42 @@ import {
   type Source,
 } from '@/lib/animals'
 
-// The form only offers snake + lizard for now — frog creation UI lands
-// with the dedicated frog work (ADR-003 made the backend taxon-ready).
-type Taxon = 'snake' | 'lizard'
+type Taxon = 'snake' | 'lizard' | 'frog'
+
+// Per-taxon example values for input placeholders, so the form speaks
+// the keeper's animal instead of always sounding snake-first.
+const TAXON_EXAMPLES: Record<
+  Taxon,
+  {
+    nickname: string
+    scientific: string
+    common: string
+    weight: string
+    length: string
+  }
+> = {
+  snake: {
+    nickname: 'Samson',
+    scientific: 'Python regius',
+    common: 'Ball python',
+    weight: '145',
+    length: '24',
+  },
+  lizard: {
+    nickname: 'Kiwi',
+    scientific: 'Eublepharis macularius',
+    common: 'Leopard gecko',
+    weight: '60',
+    length: '8',
+  },
+  frog: {
+    nickname: 'Bean',
+    scientific: 'Ceratophrys ornata',
+    common: 'Pacman frog',
+    weight: '90',
+    length: '4',
+  },
+}
 
 interface FormState {
   taxon: Taxon
@@ -166,6 +199,9 @@ export default function AddReptilePage() {
     }
   }
 
+  // Placeholder examples for the currently-selected taxon.
+  const ex = TAXON_EXAMPLES[form.taxon]
+
   return (
     <div className="max-w-3xl mx-auto">
       <header className="mb-8">
@@ -183,7 +219,8 @@ export default function AddReptilePage() {
 
       <form onSubmit={handleSubmit} className="space-y-8" noValidate>
         {/* ------------------------------------------------------------- */}
-        {/* Taxon picker — drives endpoint routing and the post-save URL. */}
+        {/* Taxon picker — sets the `taxon` discriminator on the record   */}
+        {/* and drives the taxon-aware placeholder examples below.        */}
         {/* ------------------------------------------------------------- */}
         <TaxonToggle
           value={form.taxon}
@@ -202,7 +239,7 @@ export default function AddReptilePage() {
                 type="text"
                 value={form.name}
                 onChange={(e) => update('name', e.target.value)}
-                placeholder={form.taxon === 'snake' ? 'Samson' : 'Kiwi'}
+                placeholder={ex.nickname}
                 maxLength={100}
                 className={INPUT_CLS}
                 autoFocus
@@ -250,11 +287,7 @@ export default function AddReptilePage() {
                           : prev.commonName,
                     }))
                   }}
-                  placeholder={
-                    form.taxon === 'snake'
-                      ? 'Python regius'
-                      : 'Eublepharis macularius'
-                  }
+                  placeholder={ex.scientific}
                 />
               </Field>
             </div>
@@ -264,9 +297,7 @@ export default function AddReptilePage() {
                 type="text"
                 value={form.commonName}
                 onChange={(e) => update('commonName', e.target.value)}
-                placeholder={
-                  form.taxon === 'snake' ? 'Ball python' : 'Leopard gecko'
-                }
+                placeholder={ex.common}
                 maxLength={100}
                 className={INPUT_CLS}
               />
@@ -315,7 +346,7 @@ export default function AddReptilePage() {
                 min="0"
                 value={form.currentWeightG}
                 onChange={(e) => update('currentWeightG', e.target.value)}
-                placeholder={form.taxon === 'snake' ? '145' : '60'}
+                placeholder={ex.weight}
                 className={INPUT_CLS}
               />
             </Field>
@@ -328,7 +359,7 @@ export default function AddReptilePage() {
                 min="0"
                 value={form.currentLengthIn}
                 onChange={(e) => update('currentLengthIn', e.target.value)}
-                placeholder={form.taxon === 'snake' ? '24' : '8'}
+                placeholder={ex.length}
                 className={INPUT_CLS}
               />
             </Field>
@@ -429,9 +460,7 @@ export default function AddReptilePage() {
             disabled={submitting}
             className="herp-gradient-bg text-herp-dark font-bold px-6 py-2.5 rounded-md tracking-wide disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
-            {submitting
-              ? 'Saving…'
-              : `Save ${form.taxon === 'snake' ? 'snake' : 'lizard'}`}
+            {submitting ? 'Saving…' : `Save ${form.taxon}`}
           </button>
         </div>
       </form>
@@ -462,9 +491,9 @@ function Field({
 }
 
 /**
- * Segmented two-option toggle. Rendered as radio buttons under the hood
- * (group labeled "Taxon") so keyboard + screen reader users get a
- * proper grouped-control experience, not two disconnected buttons.
+ * Segmented taxon toggle. Rendered as radio buttons under the hood
+ * (group labeled "Animal type") so keyboard + screen reader users get a
+ * proper grouped-control experience, not three disconnected buttons.
  */
 function TaxonToggle({
   value,
@@ -476,6 +505,7 @@ function TaxonToggle({
   const options: Array<{ value: Taxon; label: string; glyph: string }> = [
     { value: 'snake', label: 'Snake', glyph: '🐍' },
     { value: 'lizard', label: 'Lizard', glyph: '🦎' },
+    { value: 'frog', label: 'Frog', glyph: '🐸' },
   ]
 
   return (
@@ -484,7 +514,7 @@ function TaxonToggle({
       <div
         role="radiogroup"
         aria-label="Animal type"
-        className="grid grid-cols-2 gap-3"
+        className="grid grid-cols-3 gap-3"
       >
         {options.map((opt) => {
           const active = opt.value === value
@@ -517,8 +547,8 @@ function TaxonToggle({
       </div>
       <p className="mt-3 text-[11px] text-neutral-500 px-1">
         Don&apos;t worry — you can still log feedings, weights, sheds, and
-        photos for either one. This just routes your new record to the right
-        collection.
+        photos for any of them. This just sets what kind of animal the
+        record is.
       </p>
     </fieldset>
   )

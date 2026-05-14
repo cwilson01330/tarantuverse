@@ -237,7 +237,7 @@ function EmptyState() {
         No reptiles yet
       </h2>
       <p className="text-sm text-neutral-400 max-w-md mx-auto mb-6">
-        Add your first snake or lizard to start tracking weights,
+        Add your first snake, lizard, or frog to start tracking weights,
         feedings, and sheds. Link it to a species to unlock prey
         suggestions.
       </p>
