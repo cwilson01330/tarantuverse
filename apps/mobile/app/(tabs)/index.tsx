@@ -19,6 +19,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
+import { useBreakpoint } from '../../src/hooks/useBreakpoint';
 import { getImageUrl } from '../../src/utils/image-url';
 
 const WalkthroughableView = walkthroughable(View);
@@ -107,6 +108,18 @@ function DashboardHubScreen() {
   const { user } = useAuth();
   const { colors } = useTheme();
   const { start: startTour } = useCopilot();
+  const { breakpoint } = useBreakpoint();
+
+  // Quick Actions grid column width. sm (every iPhone and folded phone)
+  // keeps the existing layout — no override, the base style's '31.5%'
+  // wins. Wider Android forms get explicit widths so the grid fills the
+  // extra real estate (4 cols on a large phone or folded foldable, 5 on
+  // unfolded foldable, 6 on a tablet).
+  const quickActionWidth =
+    breakpoint === 'xl' ? '15.5%' :
+    breakpoint === 'lg' ? '18.5%' :
+    breakpoint === 'md' ? '23.5%' :
+    undefined;
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
@@ -956,7 +969,10 @@ function DashboardHubScreen() {
             ] as const).map((item) => (
               <TouchableOpacity
                 key={item.label}
-                style={styles.actionButton}
+                style={[
+                  styles.actionButton,
+                  quickActionWidth ? { width: quickActionWidth } : null,
+                ]}
                 onPress={() => router.push(item.route as any)}
                 activeOpacity={0.7}
                 accessibilityRole="button"
