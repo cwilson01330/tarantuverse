@@ -356,14 +356,37 @@ function EggSacDetailScreen() {
             </View>
 
             <View>
-              <Text
-                style={[styles.sectionLabel, { color: colors.textTertiary }]}
-              >
-                OFFSPRING{' '}
-                <Text style={{ fontWeight: '400' }}>
-                  ({offspring?.length ?? 0})
+              <View style={styles.sectionHeaderRow}>
+                <Text
+                  style={[styles.sectionLabel, { color: colors.textTertiary }]}
+                >
+                  OFFSPRING{' '}
+                  <Text style={{ fontWeight: '400' }}>
+                    ({offspring?.length ?? 0})
+                  </Text>
                 </Text>
-              </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push(
+                      `/breeding/egg-sacs/${sac.id}/offspring/new` as never,
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Add offspring"
+                  style={styles.sectionAdd}
+                >
+                  <MaterialCommunityIcons
+                    name="plus-circle"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[styles.sectionAddText, { color: colors.primary }]}
+                  >
+                    Add offspring
+                  </Text>
+                </TouchableOpacity>
+              </View>
               {offspring === null ? (
                 <ActivityIndicator color={colors.textTertiary} />
               ) : offspring.length === 0 ? (
@@ -380,9 +403,10 @@ function EggSacDetailScreen() {
                   <Text
                     style={[styles.emptyText, { color: colors.textSecondary }]}
                   >
-                    No offspring recorded for this sac yet. Add hatchlings
-                    on the web app to log status, sale info, and buyer
-                    notes per spiderling.
+                    No offspring recorded for this sac yet. Tap{' '}
+                    <Text style={{ fontWeight: '600' }}>Add offspring</Text>{' '}
+                    to log a spiderling — status, sale info, and buyer
+                    notes per individual.
                   </Text>
                 </View>
               ) : (
@@ -539,7 +563,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.6,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  sectionAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+  },
+  sectionAddText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 
   emptyCard: { borderWidth: 1, padding: 14 },

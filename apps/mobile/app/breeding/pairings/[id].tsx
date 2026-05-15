@@ -338,12 +338,35 @@ function PairingDetailScreen() {
             </View>
 
             <View>
-              <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>
-                EGG SACS{' '}
-                <Text style={{ fontWeight: '400' }}>
-                  ({eggSacs?.length ?? 0})
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>
+                  EGG SACS{' '}
+                  <Text style={{ fontWeight: '400' }}>
+                    ({eggSacs?.length ?? 0})
+                  </Text>
                 </Text>
-              </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push(
+                      `/breeding/pairings/${pairing.id}/egg-sacs/new` as never,
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel="Add egg sac"
+                  style={styles.sectionAdd}
+                >
+                  <MaterialCommunityIcons
+                    name="plus-circle"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[styles.sectionAddText, { color: colors.primary }]}
+                  >
+                    Add egg sac
+                  </Text>
+                </TouchableOpacity>
+              </View>
               {eggSacs === null ? (
                 <ActivityIndicator color={colors.textTertiary} />
               ) : eggSacs.length === 0 ? (
@@ -360,9 +383,10 @@ function PairingDetailScreen() {
                   <Text
                     style={[styles.emptyText, { color: colors.textSecondary }]}
                   >
-                    No egg sacs recorded for this pairing yet. Log a sac on
-                    the web app once she drops to start tracking laid
-                    date, spiderling count, and hatch outcome.
+                    No egg sacs recorded for this pairing yet. Tap{' '}
+                    <Text style={{ fontWeight: '600' }}>Add egg sac</Text>{' '}
+                    once she drops to start tracking laid date,
+                    spiderling count, and hatch outcome.
                   </Text>
                 </View>
               ) : (
@@ -682,7 +706,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.6,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  sectionAdd: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+  },
+  sectionAddText: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 
   emptyCard: {

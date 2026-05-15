@@ -241,7 +241,24 @@ function BreedingOverviewScreen() {
       edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <AppHeader title="Breeding" leftAction={backButton} />
+      <AppHeader
+        title="Breeding"
+        leftAction={backButton}
+        rightAction={
+          <TouchableOpacity
+            onPress={() => router.push('/breeding/pairings/new' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="New pairing"
+            hitSlop={8}
+          >
+            <MaterialCommunityIcons
+              name="plus"
+              size={24}
+              color={iconColor}
+            />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -254,9 +271,9 @@ function BreedingOverviewScreen() {
         }
       >
         <Text style={[styles.intro, { color: colors.textSecondary }]}>
-          Track pairings, egg sacs, and offspring. Creating new records
-          lives on the web app for now — mobile create flows ship in a
-          future update. Tap a pairing to see its egg sacs.
+          Track pairings, egg sacs, and offspring across the season. Tap
+          + to record a new pairing, or tap an existing row to view + add
+          egg sacs and offspring.
         </Text>
 
         {loadError && (
@@ -285,7 +302,7 @@ function BreedingOverviewScreen() {
             <Section
               title="PAIRINGS"
               emptyEmoji="💑"
-              emptyText="No pairings yet. Record your first on the web app to see it here."
+              emptyText="No pairings yet. Tap + at the top right to record your first."
               rows={pairings.length}
             >
               {pairings.map((p) => {
@@ -358,7 +375,7 @@ function BreedingOverviewScreen() {
             <Section
               title="EGG SACS"
               emptyEmoji="🥚"
-              emptyText="No egg sacs recorded. Log a sac on the web app to track laid dates, spiderling counts, and hatch outcomes."
+              emptyText="No egg sacs recorded. Open a pairing to log when she drops one."
               rows={eggSacs.length}
             >
               {eggSacs.map((s) => (
@@ -427,7 +444,7 @@ function BreedingOverviewScreen() {
             <Section
               title="OFFSPRING"
               emptyEmoji="🕷️"
-              emptyText="No offspring recorded. Add hatchlings on the web app — status (available, sold, kept), sale prices, and buyer notes."
+              emptyText="No offspring recorded. Open an egg sac to add individual spiderlings — status, sale price, buyer notes."
               rows={offspring.length}
             >
               {offspring.map((o) => (
