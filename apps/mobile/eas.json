@@ -35,6 +35,13 @@
     "production": {
       "extends": "base",
       "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://tarantuverse-api.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "628209648097-i35nlkrksvoqj1o7cfk30p56947khm2p.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "628209648097-qt596g5efb603ar3ml254qp1n0d3he1b.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "628209648097-sv5s79os54b9kplju6l2k394kaio91f5.apps.googleusercontent.com",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_DdGjrRbHBa3BHYSnZTVSHVkbcLWtY56kAL7nRLeBU5mr"
+      },
       "ios": {
         "buildConfiguration": "Release",
         "autoIncrement": true
