@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider } from '../src/contexts/ThemeContext';
@@ -9,6 +9,10 @@ import {
   initPostHog,
   resetPostHog,
 } from '../src/services/posthog';
+import {
+  cleanupQuickActions,
+  setupQuickActions,
+} from '../src/services/quick-actions';
 
 /**
  * Bridges auth state into PostHog. Initializes the SDK once, then
@@ -51,6 +55,29 @@ function PostHogBridge() {
   return null;
 }
 
+/**
+ * Registers launcher app shortcuts (long-press the icon → Add Tarantula
+ * / My Collection / Feeders) and routes taps via `router.push`. The
+ * service is resilient — if a build doesn't have the native module
+ * linked, setup is a no-op rather than a crash.
+ */
+function QuickActionsBridge() {
+  const router = useRouter();
+
+  useEffect(() => {
+    setupQuickActions((href) => {
+      try {
+        router.push(href as never);
+      } catch (error) {
+        console.warn('[QuickActions] push failed for', href, error);
+      }
+    });
+    return cleanupQuickActions;
+  }, [router]);
+
+  return null;
+}
+
 function RootLayoutContent() {
   const { user, isLoading } = useAuth();
   const [onboardingComplete, setOnboardingComplete] = useState(false);
@@ -82,6 +109,7 @@ function RootLayoutContent() {
   return (
     <>
       <PostHogBridge />
+      <QuickActionsBridge />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />

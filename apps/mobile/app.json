@@ -55,7 +55,8 @@
           }
         }
       ],
-      "expo-iap"
+      "expo-iap",
+      "expo-quick-actions"
     ],
     "extra": {
       "router": {
