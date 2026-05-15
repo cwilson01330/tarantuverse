@@ -21,6 +21,10 @@
  *    stays simple. Taxon-filtered search is a follow-up.
  *  - Starting weight is offered inline so the weight trend chart has a
  *    data point day one.
+ *  - Query-param pre-fill: arriving from a species care sheet's
+ *    "add to collection" CTA seeds taxon + species + names. useSearchParams
+ *    needs a Suspense boundary, so the default export is a Suspense shell
+ *    around the AddReptileForm body.
  *
  * On success: router.push to the unified detail page
  * (/app/reptiles/{id} — ADR-003 collapsed the per-taxon route trees) so
@@ -28,8 +32,8 @@
  */
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
 import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
@@ -121,9 +125,25 @@ const LABEL_CLS =
 const SECTION_HDR_CLS =
   'text-[11px] uppercase tracking-[0.18em] text-herp-lime/80 font-medium mb-4'
 
-export default function AddReptilePage() {
+function AddReptileForm() {
   const router = useRouter()
-  const [form, setForm] = useState<FormState>(INITIAL)
+  const searchParams = useSearchParams()
+  // Seed from query params when the keeper arrives via "Add to collection"
+  // on a species care sheet — they land with species + taxon pre-filled.
+  // Lazy initializer so the params are read once; the keeper can still
+  // edit every field afterward without us clobbering their edits.
+  const [form, setForm] = useState<FormState>(() => {
+    const taxonParam = searchParams.get('taxon')
+    const taxon: Taxon =
+      taxonParam === 'lizard' || taxonParam === 'frog' ? taxonParam : 'snake'
+    return {
+      ...INITIAL,
+      taxon,
+      speciesId: searchParams.get('species_id'),
+      scientificName: searchParams.get('scientific_name') ?? '',
+      commonName: searchParams.get('common_name') ?? '',
+    }
+  })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -465,6 +485,19 @@ export default function AddReptilePage() {
         </div>
       </form>
     </div>
+  )
+}
+
+/**
+ * Suspense shell. `AddReptileForm` calls `useSearchParams`, which Next
+ * requires to sit inside a Suspense boundary — without it the Vercel
+ * build fails the static prerender pass for this route.
+ */
+export default function AddReptilePage() {
+  return (
+    <Suspense fallback={null}>
+      <AddReptileForm />
+    </Suspense>
   )
 }
 

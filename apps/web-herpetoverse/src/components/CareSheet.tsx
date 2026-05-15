@@ -8,7 +8,9 @@
  * Each host owns its own chrome (back-link target, breadcrumbs, JSON-LD).
  * This component only renders the article body (hero + content sections +
  * content footer). Nothing here references routes or flags, so it stays
- * drop-in-reusable.
+ * drop-in-reusable. The optional `afterHero` slot lets a host inject its
+ * own chrome right below the hero — the keeper page uses it for the
+ * "add to collection" CTA; the public page leaves it empty.
  *
  * Extracted from the original monolith at `/app/species/[id]/page.tsx` in
  * Sprint 6b (2026-04-23). If you change a section, change it once here —
@@ -36,10 +38,18 @@ import {
   IucnBadge,
 } from '@/components/SpeciesBadges'
 
-export default function CareSheet({ species }: { species: ReptileSpecies }) {
+export default function CareSheet({
+  species,
+  afterHero,
+}: {
+  species: ReptileSpecies
+  afterHero?: React.ReactNode
+}) {
   return (
     <>
       <Hero species={species} />
+
+      {afterHero}
 
       {species.care_guide && (
         <Section title="Overview" category="Care guide">

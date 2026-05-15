@@ -43,10 +43,10 @@ import {
   getReptileSpecies,
 } from '../../src/lib/reptile-species';
 
-// Seeded reptile families bucketed by clade. Drives the taxon inference
+// Seeded herp families bucketed by clade. Drives the taxon inference
 // for the "Add to my collection" CTA — most keepers shouldn't have to
-// pick "snake or lizard?" when they're standing on a Python regius
-// care sheet. Falls back to undefined → user picks on the add screen.
+// pick the type when they're standing on a Python regius care sheet.
+// Falls back to null → user picks on the add screen.
 const SNAKE_FAMILIES = new Set([
   'Pythonidae',
   'Boidae',
@@ -74,10 +74,23 @@ const LIZARD_FAMILIES = new Set([
   'Varanidae',
 ]);
 
-function taxonFromFamily(family: string | null): 'snake' | 'lizard' | null {
+// Anuran families covered by the seeded frog care sheets. Litoria is
+// filed under Hylidae to match the seed data (some taxonomies split it
+// into Pelodryadidae) — inference keys on the stored string.
+const FROG_FAMILIES = new Set([
+  'Ceratophryidae',
+  'Dendrobatidae',
+  'Hylidae',
+  'Pyxicephalidae',
+]);
+
+function taxonFromFamily(
+  family: string | null,
+): 'snake' | 'lizard' | 'frog' | null {
   if (!family) return null;
   if (SNAKE_FAMILIES.has(family)) return 'snake';
   if (LIZARD_FAMILIES.has(family)) return 'lizard';
+  if (FROG_FAMILIES.has(family)) return 'frog';
   return null;
 }
 
@@ -610,7 +623,7 @@ function AddToCollectionCTA({
   taxonHint,
 }: {
   onPress: () => void;
-  taxonHint: 'snake' | 'lizard' | null;
+  taxonHint: 'snake' | 'lizard' | 'frog' | null;
 }) {
   const { colors, layout } = useTheme();
   const taxonLabel =
@@ -618,10 +631,12 @@ function AddToCollectionCTA({
       ? 'Add as snake'
       : taxonHint === 'lizard'
         ? 'Add as lizard'
-        : 'Add to my collection';
+        : taxonHint === 'frog'
+          ? 'Add as frog'
+          : 'Add to my collection';
   const hint =
     taxonHint === null
-      ? "You'll pick snake or lizard on the next step."
+      ? "You'll pick the type on the next step."
       : 'Pre-fills species + scientific name. You can change anything before saving.';
 
   return (
