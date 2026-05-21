@@ -15,18 +15,22 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { type AnimalTaxon, listAnimals } from '../../src/lib/animals';
+import { type AnimalTaxon, createFeeding, listAnimals } from '../../src/lib/animals';
 import { AppHeader } from '../../src/components/AppHeader';
+import { AnimalActionSheet } from '../../src/components/AnimalActionSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { daysSince, relativeDays } from '../../src/utils/relative-days';
 
@@ -75,6 +79,11 @@ function CollectionScreen() {
   const [rows, setRows] = useState<ReptileRow[] | null>(null);
   const [partialError, setPartialError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Long-press quick-actions sheet. `actionTarget` holds the animal
+  // whose sheet is open (null = closed); `actionBusy` gates the rows
+  // while the mark-fed POST is in flight.
+  const [actionTarget, setActionTarget] = useState<ReptileRow | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const fetchAll = useCallback(async () => {
     // ADR-003: one unified animals endpoint — every taxon in a single
@@ -124,6 +133,54 @@ function CollectionScreen() {
       setRefreshing(false);
     }
   }, [fetchAll]);
+
+  // "Mark fed today" — posts an accepted feeding dated now. food_type
+  // is left null on purpose: this is the one-tap path, and the keeper
+  // can open the full Log Feeding form later to add detail. A full
+  // refetch picks up the animal's refreshed last_fed_at so the card's
+  // feeding pill updates.
+  const handleMarkFed = async () => {
+    if (!actionTarget) return;
+    const target = actionTarget;
+    setActionBusy(true);
+    try {
+      await createFeeding(target.id, {
+        fed_at: new Date().toISOString(),
+        accepted: true,
+      });
+      await fetchAll();
+      setActionTarget(null);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          `Logged a feeding for ${reptileTitle(target)}`,
+          ToastAndroid.SHORT,
+        );
+      }
+    } catch {
+      Alert.alert(
+        'Could not log feeding',
+        `Something went wrong logging a feeding for ${reptileTitle(
+          target,
+        )}. Please try again.`,
+      );
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleLogShed = () => {
+    if (!actionTarget) return;
+    const animalId = actionTarget.id;
+    setActionTarget(null);
+    router.push(`/reptile/log-shed/${animalId}` as never);
+  };
+
+  const handleEditFromSheet = () => {
+    if (!actionTarget) return;
+    const animalId = actionTarget.id;
+    setActionTarget(null);
+    router.push(`/reptile/edit/${animalId}` as never);
+  };
 
   // ---------- Loading skeleton ----------
   if (rows === null) {
@@ -210,6 +267,7 @@ function CollectionScreen() {
               // ADR-003: one taxon-agnostic /reptile/ detail route.
               router.push(`/reptile/${item.id}` as never);
             }}
+            onLongPress={() => setActionTarget(item)}
           />
         )}
         refreshControl={
@@ -236,6 +294,23 @@ function CollectionScreen() {
       >
         <MaterialCommunityIcons name="plus" size={28} color="#0B0B0B" />
       </TouchableOpacity>
+
+      {/* Long-press quick actions. The Modal inside stays hidden until
+          a card long-press sets actionTarget. */}
+      <AnimalActionSheet
+        target={
+          actionTarget
+            ? { id: actionTarget.id, name: reptileTitle(actionTarget) }
+            : null
+        }
+        busy={actionBusy}
+        onClose={() => {
+          if (!actionBusy) setActionTarget(null);
+        }}
+        onMarkFed={handleMarkFed}
+        onLogShed={handleLogShed}
+        onEdit={handleEditFromSheet}
+      />
     </SafeAreaView>
   );
 }
@@ -247,9 +322,11 @@ function CollectionScreen() {
 function ReptileCard({
   row,
   onPress,
+  onLongPress,
 }: {
   row: ReptileRow;
   onPress: () => void;
+  onLongPress: () => void;
 }) {
   const { colors, layout } = useTheme();
   const lastFed = relativeDays(row.last_fed_at);
@@ -271,6 +348,7 @@ function ReptileCard({
   return (
     <TouchableOpacity
       onPress={onPress}
+      onLongPress={onLongPress}
       style={[
         styles.card,
         {
@@ -283,6 +361,7 @@ function ReptileCard({
       accessibilityLabel={`${reptileTitle(row)}, ${row.taxon}, ${
         lastFed ? 'fed ' + lastFed.toLowerCase() : 'never fed'
       }`}
+      accessibilityHint="Opens the detail screen. Long press for quick actions."
     >
       {/* Photo or placeholder */}
       <View style={styles.cardImageWrap}>
