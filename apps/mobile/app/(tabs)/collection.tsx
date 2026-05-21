@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  Platform,
+  ToastAndroid,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
@@ -22,6 +24,7 @@ import TarantulaCardSkeleton from '../../src/components/TarantulaCardSkeleton';
 import PremoltAlertCard from '../../src/components/PremoltAlertCard';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
+import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 
 interface Tarantula {
   id: string;
@@ -74,6 +77,11 @@ function CollectionScreen() {
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'lastFed' | 'acquired'>('name');
+  // Long-press quick-actions sheet. `actionTarget` holds the tarantula
+  // whose sheet is open (null = closed); `actionBusy` gates the rows
+  // while the mark-fed POST is in flight.
+  const [actionTarget, setActionTarget] = useState<Tarantula | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   // Load view preference from AsyncStorage
   useEffect(() => {
@@ -306,6 +314,89 @@ function CollectionScreen() {
     setRefreshing(false);
   }, []);
 
+  // Re-fetch one tarantula's feeding stats and patch it into the map,
+  // so a quick "mark fed" flips that card's badge without a full
+  // collection reload. Falls back to an optimistic "fed today" if the
+  // stats call itself fails.
+  const refreshFeedingStatus = async (tarantulaId: string) => {
+    const tzOffset = new Date().getTimezoneOffset();
+    try {
+      const response = await apiClient.get(
+        `/tarantulas/${tarantulaId}/feeding-stats`,
+        { params: { tz_offset_minutes: tzOffset } },
+      );
+      setFeedingStatuses((prev) => {
+        const next = new Map(prev);
+        next.set(tarantulaId, {
+          tarantula_id: tarantulaId,
+          days_since_last_feeding: response.data.days_since_last_feeding,
+          acceptance_rate: response.data.acceptance_rate,
+          is_feeding_paused: response.data.is_feeding_paused,
+        });
+        return next;
+      });
+    } catch (error) {
+      setFeedingStatuses((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(tarantulaId);
+        next.set(tarantulaId, {
+          tarantula_id: tarantulaId,
+          days_since_last_feeding: 0,
+          acceptance_rate: existing?.acceptance_rate ?? 0,
+          is_feeding_paused: existing?.is_feeding_paused,
+        });
+        return next;
+      });
+    }
+  };
+
+  // "Mark fed today" — posts an accepted feeding dated now. food_type
+  // is left null on purpose: this is the one-tap path, and the detail
+  // screen renders a null type as "Unknown food" the keeper can edit
+  // later. Endpoint has no trailing slash (named sub-resource).
+  const handleMarkFed = async () => {
+    if (!actionTarget) return;
+    const target = actionTarget;
+    setActionBusy(true);
+    try {
+      await apiClient.post(`/tarantulas/${target.id}/feedings`, {
+        fed_at: new Date().toISOString(),
+        accepted: true,
+      });
+      await refreshFeedingStatus(target.id);
+      setActionTarget(null);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          `Logged a feeding for ${getDisplayName(target)}`,
+          ToastAndroid.SHORT,
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        'Could not log feeding',
+        `Something went wrong logging a feeding for ${getDisplayName(
+          target,
+        )}. Please try again.`,
+      );
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleLogMolt = () => {
+    if (!actionTarget) return;
+    const tarantulaId = actionTarget.id;
+    setActionTarget(null);
+    router.push(`/tarantula/add-molt?id=${tarantulaId}`);
+  };
+
+  const handleEditFromSheet = () => {
+    if (!actionTarget) return;
+    const tarantulaId = actionTarget.id;
+    setActionTarget(null);
+    router.push(`/tarantula/edit?id=${tarantulaId}`);
+  };
+
   const renderTarantula = ({ item }: { item: Tarantula }) => {
     const displayName = item.name || item.common_name || 'Unknown';
     const sexLabel = item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
@@ -313,9 +404,10 @@ function CollectionScreen() {
       <TouchableOpacity
         style={styles.card}
         onPress={() => router.push(`/tarantula/${item.id}`)}
+        onLongPress={() => setActionTarget(item)}
         accessibilityRole="button"
         accessibilityLabel={`${displayName}, ${item.scientific_name}, ${sexLabel}`}
-        accessibilityHint="Opens this tarantula's detail page"
+        accessibilityHint="Opens this tarantula's detail page. Long press for quick actions."
       >
         <View style={styles.imageContainer}>
           {item.photo_url ? (
@@ -396,9 +488,10 @@ function CollectionScreen() {
       <TouchableOpacity
         style={styles.listItem}
         onPress={() => router.push(`/tarantula/${item.id}`)}
+        onLongPress={() => setActionTarget(item)}
         accessibilityRole="button"
         accessibilityLabel={`${displayName}, ${item.scientific_name}, ${sexLabel}`}
-        accessibilityHint="Opens this tarantula's detail page"
+        accessibilityHint="Opens this tarantula's detail page. Long press for quick actions."
       >
         <View style={styles.listImageContainer}>
           {item.photo_url ? (
@@ -1203,6 +1296,23 @@ function CollectionScreen() {
           </PrimaryButton>
         </>
       )}
+
+      {/* Long-press quick actions. Always mounted — the Modal inside
+          stays hidden until a card/row long-press sets actionTarget. */}
+      <TarantulaActionSheet
+        target={
+          actionTarget
+            ? { id: actionTarget.id, name: getDisplayName(actionTarget) }
+            : null
+        }
+        busy={actionBusy}
+        onClose={() => {
+          if (!actionBusy) setActionTarget(null);
+        }}
+        onMarkFed={handleMarkFed}
+        onLogMolt={handleLogMolt}
+        onEdit={handleEditFromSheet}
+      />
     </View>
   );
 }
