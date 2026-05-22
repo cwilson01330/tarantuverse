@@ -130,6 +130,13 @@ function SettingsScreen() {
           ]}
         >
           <ActionRow
+            icon="account-edit-outline"
+            label="Edit profile"
+            onPress={() => router.push('/edit-profile' as never)}
+            colors={colors}
+          />
+          <Divider color={colors.border} />
+          <ActionRow
             icon="logout"
             label="Sign out"
             onPress={handleSignOut}
