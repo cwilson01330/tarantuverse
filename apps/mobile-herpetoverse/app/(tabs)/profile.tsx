@@ -1,11 +1,11 @@
 /**
- * Profile tab — v1 just shows who you are and a Sign Out button.
- * Settings and account-management screens get built out in later bundles.
+ * Profile tab — shows who you are, links to the morph calculator, and
+ * opens the Settings screen. Sign out and account deletion live in
+ * Settings.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,29 +15,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { captureEvent } from '../../src/services/posthog';
 import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 
 function ProfileScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { colors, layout } = useTheme();
-
-  function handleSignOut() {
-    Alert.alert('Sign out', 'You can sign back in any time.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out',
-        style: 'destructive',
-        onPress: async () => {
-          captureEvent('logout');
-          await logout();
-          router.replace('/login');
-        },
-      },
-    ]);
-  }
 
   return (
     <SafeAreaView
@@ -124,19 +108,38 @@ function ProfileScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={handleSignOut}
+          onPress={() => router.push('/settings' as never)}
           style={[
-            styles.signOutButton,
+            styles.toolButton,
             {
-              borderColor: colors.danger,
+              borderColor: colors.border,
               borderRadius: layout.radius.md,
+              backgroundColor: colors.surface,
             },
           ]}
           accessibilityRole="button"
-          accessibilityLabel="Sign out"
+          accessibilityLabel="Open settings"
         >
-          <MaterialCommunityIcons name="logout" size={18} color={colors.danger} />
-          <Text style={[styles.signOutText, { color: colors.danger }]}>Sign out</Text>
+          <MaterialCommunityIcons
+            name="cog-outline"
+            size={20}
+            color={colors.primary}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.toolButtonTitle, { color: colors.textPrimary }]}>
+              Settings
+            </Text>
+            <Text
+              style={[styles.toolButtonSubtitle, { color: colors.textSecondary }]}
+            >
+              Account, support, and legal.
+            </Text>
+          </View>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={20}
+            color={colors.textTertiary}
+          />
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -205,17 +208,6 @@ const styles = StyleSheet.create({
   },
   toolButtonTitle: { fontSize: 15, fontWeight: '600' },
   toolButtonSubtitle: { fontSize: 12, marginTop: 2 },
-  signOutButton: {
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  signOutText: { fontSize: 15, fontWeight: '600' },
 });
 
 export default withErrorBoundary(ProfileScreen, 'profile');
