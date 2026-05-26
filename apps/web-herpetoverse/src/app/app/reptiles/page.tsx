@@ -26,6 +26,7 @@ import {
   listAnimals,
   relativeDays,
 } from '@/lib/animals'
+import { lastFedTextClass } from '@/lib/cgd'
 
 type Taxon = AnimalTaxon
 
@@ -37,6 +38,8 @@ interface ReptileRow {
   sex: Animal['sex']
   current_weight_g: string | null
   last_fed_at: string | null
+  /** Drives the CGD-aware Last fed coloring on the card. */
+  feeds_on_cgd: boolean
   created_at: string
 }
 
@@ -49,6 +52,7 @@ function animalRow(a: Animal): ReptileRow {
     sex: a.sex,
     current_weight_g: a.current_weight_g,
     last_fed_at: a.last_fed_at,
+    feeds_on_cgd: a.feeds_on_cgd,
     created_at: a.created_at,
   }
 }
@@ -147,6 +151,7 @@ export default function ReptilesPage() {
 function ReptileCard({ row }: { row: ReptileRow }) {
   const weight = fmtGrams(row.current_weight_g)
   const lastFed = relativeDays(row.last_fed_at)
+  const lastFedClass = lastFedTextClass(row.last_fed_at, row.feeds_on_cgd)
   const taxonLabel =
     row.taxon === 'snake'
       ? 'Snake'
@@ -199,7 +204,7 @@ function ReptileCard({ row }: { row: ReptileRow }) {
           <dt className="text-neutral-500 uppercase tracking-wider text-[10px] mb-0.5">
             Last fed
           </dt>
-          <dd className="text-neutral-200">{lastFed || '—'}</dd>
+          <dd className={lastFedClass}>{lastFed || '—'}</dd>
         </div>
       </dl>
     </Link>

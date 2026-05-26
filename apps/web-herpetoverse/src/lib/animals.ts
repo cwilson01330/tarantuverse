@@ -224,6 +224,8 @@ export interface CreateAnimalPayload {
   // resume. See migration pse_20260502.
   feeding_paused_reason?: string | null
   feeding_paused_until?: string | null
+  /** Per-animal CGD override. null inherits the species default. */
+  feeds_on_cgd_override?: boolean | null
 }
 
 export function createAnimal(payload: CreateAnimalPayload): Promise<Animal> {

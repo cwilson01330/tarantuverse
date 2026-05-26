@@ -229,6 +229,8 @@ export interface CreateAnimalPayload {
   source?: Source | null;
   current_weight_g?: string | number | null;
   current_length_in?: string | number | null;
+  /** Per-animal CGD override. null inherits the species default. */
+  feeds_on_cgd_override?: boolean | null;
   notes?: string | null;
 }
 

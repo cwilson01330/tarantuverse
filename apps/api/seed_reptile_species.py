@@ -327,6 +327,74 @@ CITES = {
             "from a major substrate and vivarium industry supplier."
         ),
     },
+    # Leachianus gecko (Rhacodactylus leachianus)
+    "pangea_leachianus": {
+        "source_type": "breeder_community",
+        "title": "Leachianus Gecko Care Sheet",
+        "author": "Pangea Reptile",
+        "url": "https://pangeareptile.com/pages/leachianus-gecko-care-sheet",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Breeder reference from a major rhacodactylid producer and the "
+            "originator of the most widely-used commercial CGD blends."
+        ),
+    },
+    "reptifiles_leachianus": {
+        "source_type": "breeder_community",
+        "title": "Leachianus Gecko Care Guide",
+        "author": "ReptiFiles",
+        "url": "https://reptifiles.com/leachianus-gecko-care/",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Keeper reference for Rhacodactylus leachianus with locality "
+            "notes and adult-housing guidance."
+        ),
+    },
+    "biodude_leachianus": {
+        "source_type": "breeder_community",
+        "title": "Leachianus Gecko Care and Bioactive Setup",
+        "author": "The Bio Dude",
+        "url": "https://www.thebiodude.com/blogs/gecko-caresheets/leachianus-gecko-care-sheet",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Bioactive-focused husbandry reference for Rhacodactylus "
+            "leachianus from a major substrate and vivarium supplier."
+        ),
+    },
+    # Chahoua / Mossy prehensile-tailed gecko (Mniarogekko chahoua)
+    "pangea_chahoua": {
+        "source_type": "breeder_community",
+        "title": "Chahoua Gecko Care Sheet",
+        "author": "Pangea Reptile",
+        "url": "https://pangeareptile.com/pages/chahoua-gecko-care-sheet",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Breeder reference covering both the Mainland (Grande Terre) "
+            "and Pine Island locality types of Mniarogekko chahoua."
+        ),
+    },
+    "reptifiles_chahoua": {
+        "source_type": "breeder_community",
+        "title": "Mossy Prehensile-Tailed Gecko Care Guide",
+        "author": "ReptiFiles",
+        "url": "https://reptifiles.com/mossy-prehensile-tailed-gecko-care/",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Keeper reference for Mniarogekko chahoua with locality notes "
+            "and feeding cadence guidance."
+        ),
+    },
+    "northern_gecko_chahoua": {
+        "source_type": "breeder_community",
+        "title": "Chahoua Gecko Care",
+        "author": "Northern Gecko",
+        "url": "https://northerngecko.ca/pages/chahoua-care-sheet",
+        "publication_date": "2023-01-01",
+        "summary": (
+            "Specialist breeder reference for Mniarogekko chahoua from a "
+            "well-known Canadian producer of New Caledonian geckos."
+        ),
+    },
     # Bearded dragon
     "reptifiles_bearded_dragon": {
         "source_type": "breeder_community",
@@ -1351,6 +1419,241 @@ SPECIES_DATA = [
             "reptifiles_gargoyle_gecko",
             "reptiles_magazine_gargoyle_gecko",
             "biodude_gargoyle_gecko",
+        ),
+    },
+    # -- Leachianus gecko ----------------------------------------------------
+    {
+        "scientific_name": "Rhacodactylus leachianus",
+        "common_names": ["Leachianus Gecko", "Leachie", "New Caledonian Giant Gecko"],
+        "feeds_on_cgd": True,
+        "genus": "Rhacodactylus",
+        "family": "Diplodactylidae",
+        "order_name": "Squamata",
+        "care_level": "intermediate",
+        "handleability": "defensive",
+        "activity_period": "nocturnal",
+        "native_region": "Southern New Caledonia — Grande Terre and offshore islands (Pine Island, Nuu Ami, Brosse, etc.). Locality types are tracked in the hobby.",
+        "adult_length_min_in": Decimal("12"),
+        "adult_length_max_in": Decimal("17"),
+        "adult_weight_min_g": Decimal("250"),
+        "adult_weight_max_g": Decimal("600"),
+        # Room-temperature husbandry mirrors crested and gargoyle —
+        # temperatures sustained above 82°F are stressful and harmful.
+        "temp_cool_min": Decimal("68"),
+        "temp_cool_max": Decimal("74"),
+        "temp_warm_min": Decimal("72"),
+        "temp_warm_max": Decimal("80"),
+        "temp_basking_min": Decimal("78"),
+        "temp_basking_max": Decimal("82"),
+        "temp_night_min": Decimal("65"),
+        "temp_night_max": Decimal("72"),
+        "humidity_min": 60,
+        "humidity_max": 80,
+        "humidity_shed_boost_min": 70,
+        "humidity_shed_boost_max": 90,
+        "uvb_required": False,
+        "uvb_type": "not_required",
+        "uvb_distance_min_in": None,
+        "uvb_distance_max_in": None,
+        "uvb_replacement_months": None,
+        "enclosure_type": "arboreal",
+        "enclosure_min_hatchling": "12\"L x 12\"W x 18\"H (overly large enclosures stress neonates)",
+        "enclosure_min_juvenile": "18\"L x 18\"W x 24\"H",
+        "enclosure_min_adult": "36\"L x 18\"W x 36\"H minimum; larger preferred for adult giants",
+        "bioactive_suitable": True,
+        "substrate_safe_list": [
+            "coco fiber / topsoil blend",
+            "bioactive mix with sphagnum and leaf litter",
+            "paper towel (quarantine)",
+        ],
+        "substrate_avoid_list": ["calcium sand", "walnut shell", "cedar", "pine"],
+        "substrate_depth_min_in": Decimal("2"),
+        "substrate_depth_max_in": Decimal("4"),
+        "diet_type": "omnivore",
+        "prey_size_hatchling": "1/4\" crickets, small dubia (occasional treat)",
+        "prey_size_juvenile": "Medium crickets, small dubia (1× per week)",
+        "prey_size_adult": "Large crickets, dubia, hornworms; adults will take fuzzy mice (sparingly)",
+        "feeding_frequency_hatchling": "MRP (Pangea, Repashy, Black Panther Zoological) nightly; insects 1× per week once feeding well",
+        "feeding_frequency_juvenile": "MRP 3–5× per week; live insects 1× per week",
+        "feeding_frequency_adult": "MRP 2–3× per week; live insects every 1–2 weeks; an occasional fuzzy or pinky for mature giants",
+        "hatchling_weight_min_g": Decimal("8"),
+        "hatchling_weight_max_g": Decimal("15"),
+        "power_feeding_threshold_pct": Decimal("8.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 30, "ratio_pct_min": 3, "ratio_pct_max": 6, "interval_days_min": 1, "interval_days_max": 2},
+            {"stage": "juvenile", "weight_g_max": 100, "ratio_pct_min": 3, "ratio_pct_max": 5, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "subadult", "weight_g_max": 250, "ratio_pct_min": 2, "ratio_pct_max": 4, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 2, "ratio_pct_max": 3, "interval_days_min": 2, "interval_days_max": 4},
+        ],
+        "supplementation_notes": (
+            "Primary diet is a complete powdered gecko meal-replacement "
+            "(MRP). Adults take larger prey than other rhacodactylids — "
+            "the occasional fuzzy mouse is well documented but should not "
+            "replace insects + MRP as the staple. Dust insects with "
+            "calcium (no D3 if MRP is the primary diet)."
+        ),
+        "water_bowl_description": (
+            "Sturdy bowl plus nightly misting — leachies drink from "
+            "droplets on leaves and glass. Adults can knock light bowls "
+            "around, so ceramic or heavy resin is preferred."
+        ),
+        "brumation_required": False,
+        "defensive_displays": [
+            "open-mouth threat (impressive in this species — the gape is wide)",
+            "biting (can deliver a hard bite that breaks skin; respect the warning)",
+            "vocalizing (loud growls, barks, and 'devil dog' calls)",
+            "tail drop is rare; tail does NOT fully regenerate",
+            "cannibalism toward smaller conspecifics — adults will eat hatchlings and juveniles",
+        ],
+        "lifespan_captivity_min_yrs": 15,
+        "lifespan_captivity_max_yrs": 25,
+        "cites_appendix": None,
+        "iucn_status": "VU",  # Vulnerable per IUCN due to restricted New Caledonia range
+        "wild_population_notes": (
+            "Endemic to southern New Caledonia with multiple locality "
+            "types tracked in the hobby (Pine Island, Nuu Ami, Mt. Koghis, "
+            "and others). IUCN Vulnerable due to habitat fragmentation. "
+            "Captive population is well-established; all animals in the "
+            "pet trade should be captive-bred and provenance-documented."
+        ),
+        "has_morph_market": True,
+        "morph_complexity": "moderate",
+        "care_guide": (
+            "**Leachianus Gecko (Rhacodactylus leachianus)** — The "
+            "largest gecko in the world by mass. Room-temperature "
+            "husbandry like its smaller rhacodactylid cousins, an MRP-"
+            "based diet supplemented with insects and the occasional "
+            "fuzzy mouse, and a tall arboreal enclosure for the adult. "
+            "**Two things set leachies apart from cresties or "
+            "gargoyles:** they are **defensive and territorial** — adults "
+            "can deliver a bite that breaks skin and should be handled "
+            "minimally — and they **do not regrow a dropped tail**. "
+            "Locality matters in the hobby: Pine Island and Mt. Koghis "
+            "animals look distinct, and ethical keepers track and pair "
+            "by provenance. Cannibalistic toward smaller geckos; house "
+            "alone except for controlled breeding."
+        ),
+        "sources": cite(
+            "pangea_leachianus",
+            "reptifiles_leachianus",
+            "biodude_leachianus",
+        ),
+    },
+    # -- Chahoua gecko (Mossy prehensile-tailed) -----------------------------
+    {
+        "scientific_name": "Mniarogekko chahoua",
+        "common_names": [
+            "Chahoua Gecko",
+            "Mossy Prehensile-Tailed Gecko",
+            "Bavay's Giant Gecko",
+        ],
+        "feeds_on_cgd": True,
+        "genus": "Mniarogekko",
+        "family": "Diplodactylidae",
+        "order_name": "Squamata",
+        "care_level": "intermediate",
+        "handleability": "docile",
+        "activity_period": "nocturnal",
+        "native_region": "New Caledonia — Grande Terre (Mainland) and Pine Island (Île des Pins). The two populations are tracked separately in the hobby.",
+        "adult_length_min_in": Decimal("8"),
+        "adult_length_max_in": Decimal("11"),
+        "adult_weight_min_g": Decimal("60"),
+        "adult_weight_max_g": Decimal("110"),
+        # Same room-temperature husbandry as the other rhacodactylids.
+        "temp_cool_min": Decimal("68"),
+        "temp_cool_max": Decimal("74"),
+        "temp_warm_min": Decimal("72"),
+        "temp_warm_max": Decimal("78"),
+        "temp_basking_min": Decimal("76"),
+        "temp_basking_max": Decimal("80"),
+        "temp_night_min": Decimal("65"),
+        "temp_night_max": Decimal("72"),
+        "humidity_min": 60,
+        "humidity_max": 75,
+        "humidity_shed_boost_min": 70,
+        "humidity_shed_boost_max": 90,
+        "uvb_required": False,
+        "uvb_type": "not_required",
+        "uvb_distance_min_in": None,
+        "uvb_distance_max_in": None,
+        "uvb_replacement_months": None,
+        "enclosure_type": "arboreal",
+        "enclosure_min_hatchling": "Kritter Keeper or 5-gallon equivalent (chahoua hatchlings stress in oversized enclosures)",
+        "enclosure_min_juvenile": "12\"L x 12\"W x 18\"H minimum",
+        "enclosure_min_adult": "18\"L x 18\"W x 24\"H (24\"H+ preferred for adults)",
+        "bioactive_suitable": True,
+        "substrate_safe_list": [
+            "coco fiber / topsoil blend",
+            "bioactive mix with sphagnum topper",
+            "paper towel (quarantine)",
+        ],
+        "substrate_avoid_list": ["calcium sand", "walnut shell", "cedar", "pine"],
+        "substrate_depth_min_in": Decimal("2"),
+        "substrate_depth_max_in": Decimal("4"),
+        "diet_type": "omnivore",
+        "prey_size_hatchling": "Pinhead crickets (rare treat)",
+        "prey_size_juvenile": "1/4\" crickets, small dubia (1× per week)",
+        "prey_size_adult": "Medium crickets, dubia, hornworms (1–2× per week)",
+        "feeding_frequency_hatchling": "MRP (Pangea, Repashy, Black Panther Zoological) nightly; insects 1× per week once feeding well",
+        "feeding_frequency_juvenile": "MRP 3–5× per week; live insects 1× per week",
+        "feeding_frequency_adult": "MRP 2–3× per week; live insects 1–2× per week",
+        "hatchling_weight_min_g": Decimal("3"),
+        "hatchling_weight_max_g": Decimal("5"),
+        "power_feeding_threshold_pct": Decimal("8.0"),
+        "weight_loss_concern_pct_30d": Decimal("10.0"),
+        "life_stage_feeding": [
+            {"stage": "hatchling", "weight_g_max": 10, "ratio_pct_min": 3, "ratio_pct_max": 6, "interval_days_min": 1, "interval_days_max": 2},
+            {"stage": "juvenile", "weight_g_max": 30, "ratio_pct_min": 3, "ratio_pct_max": 5, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "subadult", "weight_g_max": 60, "ratio_pct_min": 2, "ratio_pct_max": 5, "interval_days_min": 2, "interval_days_max": 3},
+            {"stage": "adult", "weight_g_max": None, "ratio_pct_min": 2, "ratio_pct_max": 4, "interval_days_min": 2, "interval_days_max": 3},
+        ],
+        "supplementation_notes": (
+            "Primary diet is a complete powdered gecko meal-replacement "
+            "(MRP). Chahoua are more insect-driven than crested geckos — "
+            "plan on at least one insect meal per week. Dust insects "
+            "with calcium (no D3 if MRP is the primary diet)."
+        ),
+        "water_bowl_description": (
+            "Small bowl plus nightly misting. Chahoua drink from droplets "
+            "on leaves and glass; the enclosure should dry through the day."
+        ),
+        "brumation_required": False,
+        "defensive_displays": [
+            "tail drop (tail *does* regenerate, unlike crested geckos)",
+            "biting (rare; chahoua are typically calm)",
+            "vocalizing (quieter than gargoyles or leachies)",
+        ],
+        "lifespan_captivity_min_yrs": 15,
+        "lifespan_captivity_max_yrs": 25,
+        "cites_appendix": None,
+        "iucn_status": "VU",  # Vulnerable per IUCN
+        "wild_population_notes": (
+            "Endemic to New Caledonia with two distinct populations — "
+            "Mainland (Grande Terre) and Pine Island (Île des Pins). "
+            "IUCN Vulnerable. Captive population is well-established for "
+            "both locality types; all animals in the pet trade should be "
+            "captive-bred and provenance-documented."
+        ),
+        "has_morph_market": True,
+        "morph_complexity": "moderate",
+        "care_guide": (
+            "**Chahoua Gecko (Mniarogekko chahoua)** — Also called the "
+            "Mossy Prehensile-Tailed Gecko. Same room-temperature "
+            "husbandry as the other rhacodactylids, MRP-based diet with "
+            "1+ insect meals per week, and a tall arboreal enclosure. "
+            "Two distinct locality types are tracked in the hobby — "
+            "Mainland (Grande Terre) and Pine Island (Île des Pins) — "
+            "and ethical keepers don't cross them. **Unlike crested "
+            "geckos, chahoua regrow their tail**, and their prehensile "
+            "tail is genuinely grippy in a way crested or gargoyle tails "
+            "are not. Generally calmer than gargoyles and quieter than "
+            "leachies; a good intermediate-keeper rhac."
+        ),
+        "sources": cite(
+            "pangea_chahoua",
+            "reptifiles_chahoua",
+            "northern_gecko_chahoua",
         ),
     },
     # -- Bearded dragon -----------------------------------------------------

@@ -81,6 +81,14 @@ const SOURCE_OPTIONS: { value: SourceChoice; label: string }[] = [
   { value: 'wild_caught', label: 'Wild-caught' },
 ];
 
+// CGD override picker. 'auto' inherits the species default, yes/no
+// explicitly overrides for this animal.
+const CGD_OVERRIDE_OPTIONS: { value: 'auto' | 'yes' | 'no'; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+];
+
 function AddReptileScreen() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -117,6 +125,11 @@ function AddReptileScreen() {
   const [hatchDate, setHatchDate] = useState('');
   const [source, setSource] = useState<SourceChoice>('unset');
   const [currentWeight, setCurrentWeight] = useState('');
+  // CGD override — 'auto' inherits the species default, yes/no
+  // explicitly overrides. Most keepers leave it on auto.
+  const [cgdOverride, setCgdOverride] = useState<'auto' | 'yes' | 'no'>(
+    'auto',
+  );
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,6 +181,8 @@ function AddReptileScreen() {
       hatch_date: hatchIso,
       source: source === 'unset' ? null : source,
       current_weight_g: weightN ? Number(weightN) : null,
+      feeds_on_cgd_override:
+        cgdOverride === 'yes' ? true : cgdOverride === 'no' ? false : null,
       notes: notes.trim() || null,
     };
 
@@ -284,6 +299,17 @@ function AddReptileScreen() {
               onChangeText={setCurrentWeight}
               placeholder={ex.weight}
               keyboardType="decimal-pad"
+            />
+          </Field>
+
+          <Field
+            label="Feeds on CGD"
+            hint="Auto follows the species default. Override only if this individual is fed differently."
+          >
+            <ChipGroup
+              options={CGD_OVERRIDE_OPTIONS}
+              value={cgdOverride}
+              onChange={setCgdOverride}
             />
           </Field>
 

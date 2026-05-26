@@ -69,6 +69,12 @@ const SOURCE_OPTIONS: { value: SourceChoice; label: string }[] = [
   { value: 'wild_caught', label: 'Wild-caught' },
 ];
 
+const CGD_OVERRIDE_OPTIONS: { value: 'auto' | 'yes' | 'no'; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'yes', label: 'Yes' },
+  { value: 'no', label: 'No' },
+];
+
 export function EditReptileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -88,6 +94,11 @@ export function EditReptileScreen() {
   const [hatchDate, setHatchDate] = useState('');
   const [source, setSource] = useState<SourceChoice>('unset');
   const [currentWeight, setCurrentWeight] = useState('');
+  // CGD override — 'auto' inherits the species default, yes/no
+  // explicitly overrides for this animal.
+  const [cgdOverride, setCgdOverride] = useState<'auto' | 'yes' | 'no'>(
+    'auto',
+  );
   const [notes, setNotes] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
@@ -118,6 +129,13 @@ export function EditReptileScreen() {
           setHatchDate(data.hatch_date ?? '');
           setSource(data.source ?? 'unset');
           setCurrentWeight(data.current_weight_g ?? '');
+          setCgdOverride(
+            data.feeds_on_cgd_override === true
+              ? 'yes'
+              : data.feeds_on_cgd_override === false
+                ? 'no'
+                : 'auto',
+          );
           setNotes(data.notes ?? '');
         })
         .catch((err) => {
@@ -172,6 +190,8 @@ export function EditReptileScreen() {
       hatch_date: hatchIso,
       source: source === 'unset' ? null : source,
       current_weight_g: weightN ? Number(weightN) : null,
+      feeds_on_cgd_override:
+        cgdOverride === 'yes' ? true : cgdOverride === 'no' ? false : null,
       notes: notes.trim() || null,
     };
 
@@ -334,6 +354,17 @@ export function EditReptileScreen() {
               onChangeText={setCurrentWeight}
               placeholder="650"
               keyboardType="decimal-pad"
+            />
+          </Field>
+
+          <Field
+            label="Feeds on CGD"
+            hint="Auto follows the species default. Override only if this individual is fed differently."
+          >
+            <ChipGroup
+              options={CGD_OVERRIDE_OPTIONS}
+              value={cgdOverride}
+              onChange={setCgdOverride}
             />
           </Field>
 

@@ -57,6 +57,8 @@ interface FormState {
   pricePaid: string
   currentWeightG: string
   currentLengthIn: string
+  /** 'auto' inherits the species CGD default; yes/no overrides it. */
+  cgdOverride: 'auto' | 'yes' | 'no'
   notes: string
 }
 
@@ -74,6 +76,7 @@ const EMPTY: FormState = {
   pricePaid: '',
   currentWeightG: '',
   currentLengthIn: '',
+  cgdOverride: 'auto',
   notes: '',
 }
 
@@ -101,6 +104,12 @@ function animalToForm(a: Animal): FormState {
     pricePaid: a.price_paid ?? '',
     currentWeightG: a.current_weight_g ?? '',
     currentLengthIn: a.current_length_in ?? '',
+    cgdOverride:
+      a.feeds_on_cgd_override === true
+        ? 'yes'
+        : a.feeds_on_cgd_override === false
+          ? 'no'
+          : 'auto',
     notes: a.notes ?? '',
   }
 }
@@ -194,6 +203,12 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
       price_paid: nullableNum(form.pricePaid),
       current_weight_g: nullableNum(form.currentWeightG),
       current_length_in: nullableNum(form.currentLengthIn),
+      feeds_on_cgd_override:
+        form.cgdOverride === 'yes'
+          ? true
+          : form.cgdOverride === 'no'
+            ? false
+            : null,
       notes: nullableStr(form.notes),
     }
 
@@ -436,6 +451,39 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
               />
             </Field>
           </div>
+        </section>
+
+        {/* ------------------------------------------------------------- */}
+        {/* Diet override — most keepers leave this on Auto. */}
+        {/* ------------------------------------------------------------- */}
+        <section className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
+          <h2 className={SECTION_HDR_CLS}>Diet</h2>
+          <Field label="Feeds on CGD">
+            <div className="flex gap-2 mb-2">
+              {(['auto', 'yes', 'no'] as const).map((opt) => {
+                const selected = form.cgdOverride === opt
+                const label = opt === 'auto' ? 'Auto' : opt === 'yes' ? 'Yes' : 'No'
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => update('cgdOverride', opt)}
+                    className={`px-4 py-2 rounded-md border text-sm transition-colors ${
+                      selected
+                        ? 'border-herp-teal bg-herp-teal/10 text-herp-teal'
+                        : 'border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-neutral-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-xs text-neutral-500">
+              Auto follows the species default. Override only if this
+              individual is fed a different diet than its species.
+            </p>
+          </Field>
         </section>
 
         {/* ------------------------------------------------------------- */}
