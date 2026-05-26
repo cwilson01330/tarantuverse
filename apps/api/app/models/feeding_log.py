@@ -13,10 +13,11 @@ class FeedingLog(Base):
     __tablename__ = "feeding_logs"
     __table_args__ = (
         # Polymorphic parent: exactly one of tarantula_id / enclosure_id
-        # / animal_id is set. The snake/lizard/frog FKs were collapsed
-        # into a single animal_id in anm_20260514 (ADR-003).
+        # / animal_id / scorpion_id is set. snake/lizard/frog were
+        # collapsed into animal_id in anm_20260514 (ADR-003); scorpion_id
+        # was added in scp_20260522 (scorpion expansion v1).
         CheckConstraint(
-            'num_nonnulls(tarantula_id, enclosure_id, animal_id) = 1',
+            'num_nonnulls(tarantula_id, enclosure_id, animal_id, scorpion_id) = 1',
             name='feeding_logs_must_have_exactly_one_parent',
         ),
     )
@@ -27,6 +28,12 @@ class FeedingLog(Base):
     animal_id = Column(
         UUID(as_uuid=True),
         ForeignKey("animals.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    scorpion_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("scorpions.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
@@ -51,7 +58,11 @@ class FeedingLog(Base):
     tarantula = relationship("Tarantula", backref="feeding_logs")
     enclosure = relationship("Enclosure", back_populates="feeding_logs")
     animal = relationship("Animal", backref="feeding_logs")
+    scorpion = relationship("Scorpion", backref="feeding_logs")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.enclosure_id or self.animal_id
+        parent = (
+            self.tarantula_id or self.enclosure_id or self.animal_id
+            or self.scorpion_id
+        )
         return f"<FeedingLog {parent} @ {self.fed_at}>"

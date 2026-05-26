@@ -59,6 +59,10 @@ import app.routers.weight_logs as weight_logs  # Herpetoverse v1 — Sprint 5
 import app.routers.reptile_pairings as reptile_pairings  # Herpetoverse breeding
 import app.routers.clutches as clutches  # Herpetoverse breeding
 import app.routers.reptile_offspring as reptile_offspring  # Herpetoverse breeding
+# Scorpion expansion v1 (scp_20260522) — TV gets a sibling taxon.
+import app.routers.scorpions as scorpions
+import app.routers.scorpion_species as scorpion_species
+import app.routers.scorpion_colonies as scorpion_colonies
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -292,6 +296,13 @@ print("[STARTUP] Registering reptile breeding routers (pairings/clutches/offspri
 app.include_router(reptile_pairings.router, prefix="/api/v1/reptile-pairings", tags=["reptile_breeding", "herpetoverse"])
 app.include_router(clutches.router, prefix="/api/v1", tags=["reptile_breeding", "herpetoverse"])
 app.include_router(reptile_offspring.router, prefix="/api/v1", tags=["reptile_breeding", "herpetoverse"])
+
+# Scorpion expansion v1 — per-animal CRUD, public catalog, and colony
+# grouping layer for communal setups. Breeding (broods) ships in Phase 5.
+print("[STARTUP] Registering scorpion routers (scorpions/species/colonies)...")
+app.include_router(scorpions.router, prefix="/api/v1/scorpions", tags=["scorpions"])
+app.include_router(scorpion_species.router, prefix="/api/v1/scorpion-species", tags=["scorpion_species"])
+app.include_router(scorpion_colonies.router, prefix="/api/v1/scorpion-colonies", tags=["scorpion_colonies"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

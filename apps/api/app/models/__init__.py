@@ -55,6 +55,13 @@ from app.models.reptile_offspring import (
     ReptileOffspring,
     ReptileOffspringStatus,
 )
+# Scorpion expansion v1 (scp_20260522). ScorpionSpecies + ScorpionColony
+# must be imported before Scorpion so the FK targets resolve at
+# registration time; Brood must come after Scorpion for the same reason.
+from app.models.scorpion_species import ScorpionSpecies
+from app.models.scorpion_colony import ScorpionColony
+from app.models.scorpion import Scorpion
+from app.models.brood import Brood
 
 __all__ = [
     "User",
@@ -107,4 +114,8 @@ __all__ = [
     "Clutch",
     "ReptileOffspring",
     "ReptileOffspringStatus",
+    "ScorpionSpecies",
+    "ScorpionColony",
+    "Scorpion",
+    "Brood",
 ]

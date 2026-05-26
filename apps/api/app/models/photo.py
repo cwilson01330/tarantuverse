@@ -18,11 +18,11 @@ from app.database import Base
 class Photo(Base):
     __tablename__ = "photos"
     __table_args__ = (
-        # snake/lizard/frog collapsed into animal_id in anm_20260514
-        # (ADR-003). Still polymorphic between TV tarantulas and HV
-        # animals — exactly one of the two parents is set.
+        # Polymorphic across TV tarantulas, HV animals, and TV
+        # scorpions — exactly one parent is set. scorpion_id added in
+        # scp_20260522.
         CheckConstraint(
-            'num_nonnulls(tarantula_id, animal_id) = 1',
+            'num_nonnulls(tarantula_id, animal_id, scorpion_id) = 1',
             name='photos_must_have_exactly_one_parent',
         ),
     )
@@ -39,6 +39,12 @@ class Photo(Base):
         nullable=True,
         index=True,
     )
+    scorpion_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("scorpions.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     url = Column(String(500), nullable=False)
     thumbnail_url = Column(String(500))
@@ -50,7 +56,8 @@ class Photo(Base):
     # Relationships
     tarantula = relationship("Tarantula", backref="photos")
     animal = relationship("Animal", backref="photos")
+    scorpion = relationship("Scorpion", backref="photos")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.animal_id
+        parent = self.tarantula_id or self.animal_id or self.scorpion_id
         return f"<Photo {self.id} parent={parent}>"
