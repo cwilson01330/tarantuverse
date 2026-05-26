@@ -32,6 +32,7 @@ from app.database import get_db
 from app.models.qr_upload_session import QRUploadSession
 from app.models.tarantula import Tarantula
 from app.models.animal import Animal
+from app.models.scorpion import Scorpion
 from app.models.photo import Photo
 from app.models.user import User
 from app.models.feeding_log import FeedingLog
@@ -76,30 +77,61 @@ def _animal_display_name(a: Animal) -> str:
     return " ".join(parts) or "Unknown"
 
 
+def _scorpion_display_name(s: Scorpion) -> str:
+    """Display-name helper for scorpions — same shape as tarantula /
+    animal so the upload page renders identically across taxa."""
+    parts = []
+    if s.name:
+        parts.append(s.name)
+    label = s.common_name or s.scientific_name
+    if label:
+        parts.append(f"({label})" if s.name else label)
+    return " ".join(parts) or "Unknown"
+
+
 def _session_parent(session: QRUploadSession) -> tuple[str, object | None]:
     """Return (kind, parent_row) for a session.
 
-    `kind` is 'tarantula' or 'animal'. `row` may be None only if the
-    parent was hard-deleted after session creation (shouldn't happen —
-    FKs are CASCADE — but defensive).
+    `kind` is 'tarantula', 'animal', or 'scorpion'. `row` may be None
+    only if the parent was hard-deleted after session creation
+    (shouldn't happen — FKs are CASCADE — but defensive).
     """
     if session.tarantula_id:
         return ("tarantula", session.tarantula)
     if session.animal_id:
         return ("animal", session.animal)
+    if session.scorpion_id:
+        return ("scorpion", session.scorpion)
     return ("unknown", None)
 
 
 def _session_taxon_str(kind: str, parent) -> str:
     """The `taxon` value the upload page renders context from.
 
-    For a tarantula parent it's 'tarantula'; for an animal parent it's
-    the animal's own taxon ('snake' / 'lizard' / 'frog')."""
+    For tarantula / scorpion parents it's the literal kind; for an
+    animal parent it's the animal's own taxon
+    ('snake' / 'lizard' / 'frog')."""
     if kind == "tarantula":
         return "tarantula"
+    if kind == "scorpion":
+        return "scorpion"
     if kind == "animal" and parent is not None:
         return parent.taxon.value if hasattr(parent.taxon, "value") else str(parent.taxon)
     return "unknown"
+
+
+def _display_name_for(kind: str, parent) -> str:
+    """One-stop dispatcher so the photo-upload flow doesn't have to
+    branch on `kind` repeatedly. Returns 'Unknown' if parent is None."""
+    if parent is None:
+        return "Unknown"
+    if kind == "tarantula":
+        return _tarantula_display_name(parent)
+    if kind == "scorpion":
+        return _scorpion_display_name(parent)
+    if kind == "animal":
+        return _animal_display_name(parent)
+    return "Unknown"
 
 
 def _optional_user(
@@ -224,6 +256,57 @@ async def create_animal_upload_session(
     }
 
 
+@router.post("/scorpions/{scorpion_id}/upload-session")
+async def create_scorpion_upload_session(
+    scorpion_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a short-lived QR upload session for a scorpion.
+
+    Phone browser uses the returned token to upload photos without
+    being logged in — mirrors the tarantula + animal sibling routes."""
+    scorpion = db.query(Scorpion).filter(
+        Scorpion.id == scorpion_id,
+        Scorpion.user_id == current_user.id,
+    ).first()
+    if not scorpion:
+        raise HTTPException(status_code=404, detail="Scorpion not found")
+
+    # Deactivate any existing active session for this scorpion so a
+    # newly-generated QR supersedes the old one — same UX as tarantulas.
+    db.query(QRUploadSession).filter(
+        QRUploadSession.scorpion_id == scorpion_id,
+        QRUploadSession.user_id == current_user.id,
+        QRUploadSession.is_active == True,
+    ).update({"is_active": False})
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=SESSION_TTL_MINUTES)
+
+    session = QRUploadSession(
+        token=token,
+        scorpion_id=scorpion_id,
+        user_id=current_user.id,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    web_base = getattr(settings, "FRONTEND_URL", "https://tarantuverse.com")
+    upload_url = f"{web_base}/upload/{token}"
+
+    return {
+        "token": token,
+        "upload_url": upload_url,
+        "expires_at": expires_at.isoformat(),
+        "expires_in_minutes": SESSION_TTL_MINUTES,
+        "taxon": "scorpion",
+        "scorpion_name": _scorpion_display_name(scorpion),
+    }
+
+
 @router.get("/upload-sessions/{token}")
 async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
     """
@@ -249,10 +332,7 @@ async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
         # CASCADE delete should have killed the session too; defensive branch.
         raise HTTPException(status_code=404, detail="Upload session parent no longer exists")
 
-    if kind == "tarantula":
-        display_name = _tarantula_display_name(parent)
-    else:
-        display_name = _animal_display_name(parent)
+    display_name = _display_name_for(kind, parent)
 
     payload = {
         "valid": True,
@@ -267,6 +347,8 @@ async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
     # Back-compat for existing clients that read `tarantula_name`.
     if kind == "tarantula":
         payload["tarantula_name"] = display_name
+    elif kind == "scorpion":
+        payload["scorpion_name"] = display_name
     return payload
 
 
@@ -331,7 +413,8 @@ async def upload_photo_via_token(
         )
 
         # Photo has a CHECK constraint enforcing exactly-one-parent
-        # (tarantula_id XOR animal_id), so pick the right FK column.
+        # (tarantula_id, animal_id, or scorpion_id — see scp_20260522).
+        # Pick the right FK column based on session kind.
         kind, parent = _session_parent(session)
         if parent is None:
             raise HTTPException(status_code=410, detail="Upload session parent no longer exists")
@@ -346,20 +429,20 @@ async def upload_photo_via_token(
         }
         if kind == "tarantula":
             photo_kwargs["tarantula_id"] = str(session.tarantula_id)
+        elif kind == "scorpion":
+            photo_kwargs["scorpion_id"] = str(session.scorpion_id)
         else:
             photo_kwargs["animal_id"] = str(session.animal_id)
 
         photo = Photo(**photo_kwargs)
         db.add(photo)
 
-        # Set as main photo if none exists (Tarantula + Animal both expose photo_url).
+        # Set as main photo if none exists. Tarantula, Animal, and
+        # Scorpion all expose `photo_url`.
         if not parent.photo_url:
             parent.photo_url = photo_url
 
-        if kind == "tarantula":
-            display_name = _tarantula_display_name(parent)
-        else:
-            display_name = _animal_display_name(parent)
+        display_name = _display_name_for(kind, parent)
 
         session.used_count = (session.used_count or 0) + 1
         # Auto-deactivate on the last allowed upload so the token becomes dead.
@@ -378,9 +461,11 @@ async def upload_photo_via_token(
             "uploads_this_session": session.used_count,
             "uploads_remaining": max(0, MAX_UPLOADS_PER_SESSION - session.used_count),
         }
-        # Back-compat field for existing clients.
+        # Back-compat fields for existing clients keyed by parent kind.
         if kind == "tarantula":
             resp["tarantula_name"] = display_name
+        elif kind == "scorpion":
+            resp["scorpion_name"] = display_name
         return resp
 
     except HTTPException:

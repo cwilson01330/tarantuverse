@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.animal import Animal
+from app.models.scorpion import Scorpion
 from app.models.feeding_log import FeedingLog
 from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate, FeedingLogResponse
 from app.schemas.feeding_reminder import FeedingReminderSummary
@@ -27,9 +28,9 @@ def _feeding_owner_taxon(feeding: FeedingLog, db: Session, user: User):
     this feeding log. Returns (None, None) if not authorized.
 
     Polymorphic parent lookup — ADR-003 collapsed snake/lizard/frog into
-    a single animal_id, so feeding_logs are now parented by tarantula,
-    animal, or enclosure. Centralized so update/delete don't duplicate
-    the branching logic.
+    a single animal_id, and scp_20260522 added scorpion_id. Feeding logs
+    are now parented by tarantula, animal, scorpion, or enclosure.
+    Centralized so update/delete don't duplicate the branching logic.
     """
     if feeding.tarantula_id:
         row = db.query(Tarantula).filter(
@@ -43,6 +44,12 @@ def _feeding_owner_taxon(feeding: FeedingLog, db: Session, user: User):
             Animal.user_id == user.id,
         ).first()
         return (Animal, row) if row else (None, None)
+    if feeding.scorpion_id:
+        row = db.query(Scorpion).filter(
+            Scorpion.id == feeding.scorpion_id,
+            Scorpion.user_id == user.id,
+        ).first()
+        return (Scorpion, row) if row else (None, None)
     # enclosure-parented feedings aren't ownership-checked here (feeders);
     # they're handled by their own router.
     return (None, None)
@@ -187,6 +194,64 @@ async def create_animal_feeding_log(
     if fed_at and (animal.last_fed_at is None or fed_at > animal.last_fed_at):
         animal.last_fed_at = fed_at
 
+    db.commit()
+    db.refresh(new_feeding)
+    return new_feeding
+
+
+@router.get("/scorpions/{scorpion_id}/feedings", response_model=List[FeedingLogResponse])
+async def get_scorpion_feeding_logs(
+    scorpion_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List feeding logs for a scorpion, most recent first."""
+    scorpion = db.query(Scorpion).filter(
+        Scorpion.id == scorpion_id,
+        Scorpion.user_id == current_user.id,
+    ).first()
+
+    if not scorpion:
+        raise HTTPException(status_code=404, detail="Scorpion not found")
+
+    return (
+        db.query(FeedingLog)
+        .filter(FeedingLog.scorpion_id == scorpion_id)
+        .order_by(FeedingLog.fed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/scorpions/{scorpion_id}/feedings",
+    response_model=FeedingLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_scorpion_feeding_log(
+    scorpion_id: uuid.UUID,
+    feeding_data: FeedingLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a feeding for a scorpion.
+
+    Mirrors the tarantula path — single CASCADE parent, no enclosure
+    fanout (colonies still log per-scorpion). Activity feed emission
+    is deferred until scorpion activity icons land alongside the
+    Phase 3 mobile work.
+    """
+    scorpion = db.query(Scorpion).filter(
+        Scorpion.id == scorpion_id,
+        Scorpion.user_id == current_user.id,
+    ).first()
+
+    if not scorpion:
+        raise HTTPException(status_code=404, detail="Scorpion not found")
+
+    new_feeding = FeedingLog(
+        scorpion_id=scorpion_id, **feeding_data.model_dump(),
+    )
+    db.add(new_feeding)
     db.commit()
     db.refresh(new_feeding)
     return new_feeding

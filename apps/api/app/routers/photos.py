@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.photo import Photo
 from app.models.tarantula import Tarantula
 from app.models.animal import Animal
+from app.models.scorpion import Scorpion
 from app.routers.auth import get_current_user
 from app.models.user import User
 from app.services.storage import storage_service
@@ -177,9 +178,10 @@ async def get_photos(
 def _photo_owner_parent(photo: Photo, db: Session, user: User):
     """Return the owned parent row for a photo, or None if user isn't owner.
 
-    ADR-003: photos are polymorphic between a TV tarantula and an HV
-    animal (tarantula_id XOR animal_id). Centralizing this ownership
-    check keeps DELETE / set-main / caption-edit free of taxon branching.
+    Polymorphic between a TV tarantula, an HV animal (ADR-003), and a
+    TV scorpion (scp_20260522) — exactly one of (tarantula_id,
+    animal_id, scorpion_id) is set. Centralizing this ownership check
+    keeps DELETE / set-main / caption-edit free of taxon branching.
     """
     if photo.tarantula_id:
         return db.query(Tarantula).filter(
@@ -190,6 +192,11 @@ def _photo_owner_parent(photo: Photo, db: Session, user: User):
         return db.query(Animal).filter(
             Animal.id == photo.animal_id,
             Animal.user_id == user.id,
+        ).first()
+    if photo.scorpion_id:
+        return db.query(Scorpion).filter(
+            Scorpion.id == photo.scorpion_id,
+            Scorpion.user_id == user.id,
         ).first()
     return None
 
@@ -288,6 +295,120 @@ async def get_animal_photos(
     photos = (
         db.query(Photo)
         .filter(Photo.animal_id == animal_id)
+        .order_by(Photo.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": photo.id,
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
+            "created_at": photo.created_at.isoformat(),
+        }
+        for photo in photos
+    ]
+
+
+@router.post("/scorpions/{scorpion_id}/photos")
+async def upload_scorpion_photo(
+    scorpion_id: str,
+    file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a photo for a scorpion.
+
+    Mirrors the tarantula path: magic-byte validation, 15 MB cap, R2
+    upload, thumbnail generation. The tarantula subscription gate is
+    intentionally NOT applied to scorpions in v1 — scorpions launch
+    without per-taxon limits, matching how Herpetoverse animals do it.
+    Add a gate here when subscriptions extend to scorpions.
+    """
+    scorpion = db.query(Scorpion).filter(
+        Scorpion.id == scorpion_id,
+        Scorpion.user_id == current_user.id,
+    ).first()
+
+    if not scorpion:
+        raise HTTPException(status_code=404, detail="Scorpion not found")
+
+    try:
+        file_data = await file.read()
+
+        try:
+            detected_mime = validate_image_bytes(file_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        max_size = 15 * 1024 * 1024
+        if len(file_data) > max_size:
+            raise HTTPException(status_code=400, detail="File size exceeds 15 MB limit")
+
+        photo_url, thumbnail_url = await storage_service.upload_photo(
+            file_data=file_data,
+            filename=file.filename or "upload.jpg",
+            content_type=detected_mime,
+        )
+
+        photo = Photo(
+            id=str(uuid.uuid4()),
+            scorpion_id=scorpion_id,
+            url=photo_url,
+            thumbnail_url=thumbnail_url,
+            caption=caption,
+            taken_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+        )
+
+        db.add(photo)
+
+        # First photo becomes the scorpion's main photo (mirrors
+        # tarantula path).
+        if not scorpion.photo_url:
+            scorpion.photo_url = photo_url
+
+        db.commit()
+        db.refresh(photo)
+
+        return {
+            "id": photo.id,
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
+            "created_at": photo.created_at.isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Photo upload failed for scorpion %s", scorpion_id)
+        raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
+
+
+@router.get("/scorpions/{scorpion_id}/photos")
+async def get_scorpion_photos(
+    scorpion_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List photos for a scorpion, most recent first."""
+    scorpion = db.query(Scorpion).filter(
+        Scorpion.id == scorpion_id,
+        Scorpion.user_id == current_user.id,
+    ).first()
+
+    if not scorpion:
+        raise HTTPException(status_code=404, detail="Scorpion not found")
+
+    photos = (
+        db.query(Photo)
+        .filter(Photo.scorpion_id == scorpion_id)
         .order_by(Photo.created_at.desc())
         .all()
     )
