@@ -24,8 +24,14 @@ try {
 try {
   if (!isExpoGo) {
     Notifications.setNotificationHandler({
+      // expo-notifications 0.32 split the old `shouldShowAlert` flag
+      // into `shouldShowBanner` (heads-up) and `shouldShowList`
+      // (notification center). Keeping shouldShowAlert too for
+      // back-compat with older runtime versions.
       handleNotification: async () => ({
         shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
       }),

@@ -1036,7 +1036,7 @@ export default function KeeperProfileScreen() {
                 )}
                 {profile.social_links.website && (
                   <TouchableOpacity
-                    style={[styles.socialIconButton, { backgroundColor: colors.surfaceRaised || '#374151' }]}
+                    style={[styles.socialIconButton, { backgroundColor: colors.surface || '#374151' }]}
                     onPress={() => Linking.openURL(socialUrl('website', profile.social_links!.website)!)}
                     accessibilityLabel="Website"
                   >

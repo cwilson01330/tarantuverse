@@ -57,6 +57,11 @@ export const signInWithGoogle = async (): Promise<{
     username: string;
     display_name: string;
     avatar_url?: string;
+    // Server always returns collection_visibility on auth responses;
+    // typed here so the AuthContext User shape lines up without a cast.
+    collection_visibility: string;
+    is_superuser?: boolean;
+    is_admin?: boolean;
   };
 }> => {
   // Check if Google Sign-In is available
@@ -154,6 +159,11 @@ export const signInWithApple = async (): Promise<{
     username: string;
     display_name: string;
     avatar_url?: string;
+    // Server always returns collection_visibility on auth responses;
+    // typed here so the AuthContext User shape lines up without a cast.
+    collection_visibility: string;
+    is_superuser?: boolean;
+    is_admin?: boolean;
   };
 }> => {
   try {

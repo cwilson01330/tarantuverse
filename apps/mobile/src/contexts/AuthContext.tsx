@@ -12,7 +12,25 @@ interface User {
   username: string;
   display_name: string;
   avatar_url?: string;
+  // Keeper-profile fields — read by app/settings.tsx and the public
+  // profile screens. `collection_visibility` is required everywhere
+  // else (the API always sends it); the profile_* fields and
+  // social_links are optional because older payloads may omit them.
   collection_visibility: string;
+  profile_bio?: string | null;
+  profile_location?: string | null;
+  profile_experience_level?: string | null;
+  profile_years_keeping?: number | null;
+  profile_specialties?: string[] | null;
+  social_links?: {
+    instagram?: string | null;
+    youtube?: string | null;
+    website?: string | null;
+    tiktok?: string | null;
+    facebook?: string | null;
+    morphmarket?: string | null;
+    arachnoboards?: string | null;
+  } | null;
   is_superuser?: boolean;
   is_admin?: boolean;
 }

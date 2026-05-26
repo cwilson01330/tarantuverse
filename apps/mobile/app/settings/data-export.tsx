@@ -38,7 +38,11 @@ const DATA_CATEGORIES = [
 export default function DataExportScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { colors, layout } = useTheme();
+  const { colors, layout, theme } = useTheme();
+  // `theme` is the 'light' | 'dark' string from the context — used for
+  // dark-mode-conditional badge colors below. `isDark` was
+  // removed in the preset refactor; replicate it locally.
+  const isDark = theme === 'dark';
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const backButton = (
     <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
@@ -153,7 +157,7 @@ export default function DataExportScreen() {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      backgroundColor: colors.backgroundElevated,
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 10,
       padding: 10,
       width: '48%',
@@ -218,12 +222,12 @@ export default function DataExportScreen() {
       fontSize: 14,
     },
     infoCard: {
-      backgroundColor: colors.isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
+      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
       borderRadius: 16,
       padding: 16,
       marginTop: 8,
       borderWidth: 1,
-      borderColor: colors.isDark ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe',
+      borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe',
     },
     infoTitle: {
       fontSize: 14,
@@ -288,8 +292,8 @@ export default function DataExportScreen() {
           <View style={styles.exportHeader}>
             <MaterialCommunityIcons name="code-json" size={22} color={colors.primary} />
             <Text style={styles.exportTitle}>JSON Export</Text>
-            <View style={[styles.badge, { backgroundColor: colors.isDark ? 'rgba(59, 130, 246, 0.2)' : '#dbeafe' }]}>
-              <Text style={[styles.badgeText, { color: colors.isDark ? '#93c5fd' : '#1d4ed8' }]}>Re-import</Text>
+            <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : '#dbeafe' }]}>
+              <Text style={[styles.badgeText, { color: isDark ? '#93c5fd' : '#1d4ed8' }]}>Re-import</Text>
             </View>
           </View>
           <Text style={styles.exportDescription}>
@@ -313,8 +317,8 @@ export default function DataExportScreen() {
           <View style={styles.exportHeader}>
             <MaterialCommunityIcons name="file-delimited" size={22} color="#10b981" />
             <Text style={styles.exportTitle}>CSV Spreadsheets</Text>
-            <View style={[styles.badge, { backgroundColor: colors.isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5' }]}>
-              <Text style={[styles.badgeText, { color: colors.isDark ? '#6ee7b7' : '#065f46' }]}>Excel / Sheets</Text>
+            <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5' }]}>
+              <Text style={[styles.badgeText, { color: isDark ? '#6ee7b7' : '#065f46' }]}>Excel / Sheets</Text>
             </View>
           </View>
           <Text style={styles.exportDescription}>
@@ -338,8 +342,8 @@ export default function DataExportScreen() {
           <View style={styles.exportHeader}>
             <MaterialCommunityIcons name="folder-zip" size={22} color="#a855f7" />
             <Text style={styles.exportTitle}>Complete Backup</Text>
-            <View style={[styles.badge, { backgroundColor: colors.isDark ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff' }]}>
-              <Text style={[styles.badgeText, { color: colors.isDark ? '#c084fc' : '#6b21a8' }]}>+ Photos</Text>
+            <View style={[styles.badge, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.2)' : '#f3e8ff' }]}>
+              <Text style={[styles.badgeText, { color: isDark ? '#c084fc' : '#6b21a8' }]}>+ Photos</Text>
             </View>
           </View>
           <Text style={styles.exportDescription}>

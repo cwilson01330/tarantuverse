@@ -526,6 +526,12 @@ export default function TarantulaDetailScreen() {
     );
   }
 
+  // Defensive guard for TS — by this point loading + error returns above
+  // have already exited; the only way `tarantula` can still be null is if
+  // a hot-reload landed us here mid-fetch. Returning null lets the next
+  // render cycle pick up the resolved state.
+  if (!tarantula) return null;
+
   const detailRightActions = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
       <TouchableOpacity style={{ padding: 6 }} onPress={handleShareTarantula} accessibilityLabel="Share">
@@ -1082,7 +1088,11 @@ export default function TarantulaDetailScreen() {
             scientificName={tarantula.scientific_name}
             onPhotoAdded={() => {
               setShowQRSheet(false);
-              fetchTarantulaData();
+              // Refetch the main record + photos so the just-uploaded QR
+              // photo shows up. The function name is `fetchTarantula`
+              // (not `fetchTarantulaData`) — a stale rename ghost.
+              fetchTarantula();
+              fetchPhotos();
             }}
           />
         )}

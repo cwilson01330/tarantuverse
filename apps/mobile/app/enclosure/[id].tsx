@@ -347,7 +347,9 @@ export default function EnclosureDetailScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Update',
-          onPress: async (value) => {
+          // Alert.prompt's onPress receives the user-entered string;
+          // typing it explicitly silences the implicit-any error.
+          onPress: async (value?: string) => {
             const count = parseInt(value || '');
             if (isNaN(count) || count < 0) {
               Alert.alert('Invalid', 'Please enter a valid number');

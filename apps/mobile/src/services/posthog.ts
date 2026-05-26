@@ -25,7 +25,8 @@ export async function initPostHog(): Promise<PostHog | null> {
 
   posthog = new PostHog(POSTHOG_KEY, {
     host: POSTHOG_HOST,
-    captureAppLifecycleEvents: true,
+    // posthog-react-native renamed this option in a recent release.
+    captureNativeAppLifecycleEvents: true,
     enableSessionReplay: false,
   });
   await posthog.ready;

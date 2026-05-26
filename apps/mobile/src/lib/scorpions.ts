@@ -115,6 +115,19 @@ export interface ScorpionCreate {
   enclosure_size?: string | null;
   substrate_type?: string | null;
   substrate_depth?: string | null;
+  last_substrate_change?: string | null;
+  target_temp_min?: string | number | null;
+  target_temp_max?: string | number | null;
+  target_humidity_min?: string | number | null;
+  target_humidity_max?: string | number | null;
+  water_dish?: boolean | null;
+  misting_schedule?: string | null;
+  last_enclosure_cleaning?: string | null;
+  enclosure_notes?: string | null;
+  feeding_paused_reason?: string | null;
+  feeding_paused_until?: string | null;
+  photo_url?: string | null;
+  is_public?: boolean;
   notes?: string | null;
   visibility?: Visibility | null;
 }

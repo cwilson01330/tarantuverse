@@ -573,7 +573,10 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   menuOverlayBackground: {
-    position: 'fixed',
+    // React Native StyleSheet only accepts 'absolute' | 'relative' |
+    // 'static'. 'fixed' is a web-only CSS value. Use 'absolute' inside
+    // a Modal/overlay container — same visual result on RN.
+    position: 'absolute',
     top: 0,
     left: 0,
     right: 0,

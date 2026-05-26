@@ -60,7 +60,10 @@ const CATEGORY_ORDER = ['collection', 'feeding', 'molts', 'breeding', 'community
 
 export default function AchievementsScreen() {
   const { user } = useAuth()
-  const { colors, isDark } = useTheme()
+  // ThemeContext no longer exposes `isDark` directly — derive from
+  // the `theme` string instead.
+  const { colors, theme } = useTheme()
+  const isDark = theme === 'dark'
   const [achievements, setAchievements] = useState<AchievementsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)

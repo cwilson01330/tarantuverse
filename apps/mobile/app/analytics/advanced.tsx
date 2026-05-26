@@ -340,7 +340,8 @@ export default function AdvancedAnalyticsScreen() {
         <AppHeader title="Advanced Analytics" leftAction={backButton} />
         <ScrollView style={styles.container}>
           <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="sparkles" size={64} color={colors.textTertiary} />
+            {/* MCI ships `star-four-points`, not `sparkles`. */}
+            <MaterialCommunityIcons name="star-four-points" size={64} color={colors.textTertiary} />
             <Text style={styles.emptyTitle}>More Data Needed</Text>
             <Text style={styles.emptyText}>
               Keep tracking your tarantulas to unlock advanced insights!

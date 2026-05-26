@@ -5,7 +5,11 @@ import { useTheme } from '../src/contexts/ThemeContext';
 
 export default function PricingScreen() {
   const router = useRouter();
-  const { theme } = useTheme();
+  // useTheme exposes `colors` (the token map) and `theme` (a string —
+  // 'light' | 'dark'). Old code path here treated `theme` as the
+  // token map; reaching it via `colors` is the current convention.
+  const { colors, theme } = useTheme();
+  const isDark = theme === 'dark';
 
   const handleChoosePlan = () => {
     router.push('/subscription');
@@ -86,14 +90,14 @@ export default function PricingScreen() {
   ];
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={[styles.backButtonText, { color: theme.text }]}>← Back</Text>
+          <Text style={[styles.backButtonText, { color: colors.textPrimary }]}>← Back</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: theme.text }]}>Simple, Transparent Pricing</Text>
-        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Simple, Transparent Pricing</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Start free with generous limits. Upgrade for unlimited tracking and breeding features.
         </Text>
       </View>
@@ -105,7 +109,7 @@ export default function PricingScreen() {
             key={plan.name}
             style={[
               styles.planCard,
-              { backgroundColor: theme.surface, borderColor: plan.popular ? '#a855f7' : theme.border },
+              { backgroundColor: colors.surface, borderColor: plan.popular ? '#a855f7' : colors.border },
               plan.popular && styles.planCardPopular,
             ]}
           >
@@ -115,15 +119,15 @@ export default function PricingScreen() {
               </View>
             )}
 
-            <Text style={[styles.planName, { color: theme.text }]}>{plan.name}</Text>
+            <Text style={[styles.planName, { color: colors.textPrimary }]}>{plan.name}</Text>
             <View style={styles.priceRow}>
-              <Text style={[styles.price, { color: theme.text }]}>{plan.price}</Text>
-              <Text style={[styles.period, { color: theme.textSecondary }]}>{plan.period}</Text>
+              <Text style={[styles.price, { color: colors.textPrimary }]}>{plan.price}</Text>
+              <Text style={[styles.period, { color: colors.textSecondary }]}>{plan.period}</Text>
             </View>
             {plan.savings && (
               <Text style={styles.savings}>{plan.savings}</Text>
             )}
-            <Text style={[styles.planDescription, { color: theme.textSecondary }]}>
+            <Text style={[styles.planDescription, { color: colors.textSecondary }]}>
               {plan.description}
             </Text>
 
@@ -131,7 +135,7 @@ export default function PricingScreen() {
               {plan.features.map((feature, i) => (
                 <View key={i} style={styles.featureRow}>
                   <Text style={styles.checkIcon}>✓</Text>
-                  <Text style={[styles.featureText, { color: theme.textSecondary }]}>
+                  <Text style={[styles.featureText, { color: colors.textSecondary }]}>
                     {feature}
                   </Text>
                 </View>
@@ -143,14 +147,14 @@ export default function PricingScreen() {
                 styles.ctaButton,
                 plan.popular
                   ? styles.ctaButtonPopular
-                  : { backgroundColor: theme.isDark ? theme.backgroundElevated : '#f3f4f6', borderColor: theme.border },
+                  : { backgroundColor: isDark ? colors.surfaceElevated : '#f3f4f6', borderColor: colors.border },
               ]}
               onPress={plan.name === 'Free' ? () => router.push('/register') : handleChoosePlan}
             >
               <Text
                 style={[
                   styles.ctaButtonText,
-                  { color: plan.popular ? '#fff' : theme.text },
+                  { color: plan.popular ? '#fff' : colors.textPrimary },
                 ]}
               >
                 {plan.cta}
@@ -185,12 +189,12 @@ export default function PricingScreen() {
       </View>
 
       {/* Feature Comparison Table */}
-      <View style={[styles.comparisonSection, { backgroundColor: theme.surface }]}>
-        <Text style={[styles.comparisonTitle, { color: theme.text }]}>Feature Comparison</Text>
+      <View style={[styles.comparisonSection, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.comparisonTitle, { color: colors.textPrimary }]}>Feature Comparison</Text>
         <View style={styles.comparisonTable}>
-          <View style={[styles.comparisonHeader, { borderBottomColor: theme.border }]}>
-            <Text style={[styles.comparisonHeaderText, { color: theme.text }]}>Feature</Text>
-            <Text style={[styles.comparisonHeaderText, { color: theme.text }]}>Free</Text>
+          <View style={[styles.comparisonHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.comparisonHeaderText, { color: colors.textPrimary }]}>Feature</Text>
+            <Text style={[styles.comparisonHeaderText, { color: colors.textPrimary }]}>Free</Text>
             <Text style={[styles.comparisonHeaderText, { color: '#a855f7' }]}>Premium</Text>
           </View>
           {comparisonFeatures.map((feature, i) => (
@@ -198,13 +202,13 @@ export default function PricingScreen() {
               key={i}
               style={[
                 styles.comparisonRow,
-                { backgroundColor: i % 2 === 0 ? theme.backgroundElevated : 'transparent', borderBottomColor: theme.border },
+                { backgroundColor: i % 2 === 0 ? colors.surfaceElevated : 'transparent', borderBottomColor: colors.border },
               ]}
             >
-              <Text style={[styles.comparisonFeatureName, { color: theme.text }]}>
+              <Text style={[styles.comparisonFeatureName, { color: colors.textPrimary }]}>
                 {feature.name}
               </Text>
-              <Text style={[styles.comparisonValue, { color: theme.textSecondary }]}>
+              <Text style={[styles.comparisonValue, { color: colors.textSecondary }]}>
                 {feature.free}
               </Text>
               <Text style={[styles.comparisonValuePremium, { color: '#a855f7' }]}>
@@ -216,41 +220,41 @@ export default function PricingScreen() {
       </View>
 
       {/* FAQ */}
-      <View style={[styles.faqSection, { backgroundColor: theme.surface }]}>
-        <Text style={[styles.faqTitle, { color: theme.text }]}>Frequently Asked Questions</Text>
+      <View style={[styles.faqSection, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.faqTitle, { color: colors.textPrimary }]}>Frequently Asked Questions</Text>
 
         <View style={styles.faqItem}>
-          <Text style={[styles.faqQuestion, { color: theme.text }]}>
+          <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>
             Can I change plans later?
           </Text>
-          <Text style={[styles.faqAnswer, { color: theme.textSecondary }]}>
+          <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
             Yes! You can upgrade at any time. If you have a promo code, you can redeem it in your settings.
           </Text>
         </View>
 
         <View style={styles.faqItem}>
-          <Text style={[styles.faqQuestion, { color: theme.text }]}>
+          <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>
             What happens if I exceed my plan limits?
           </Text>
-          <Text style={[styles.faqAnswer, { color: theme.textSecondary }]}>
+          <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
             We'll show you a friendly upgrade prompt when you hit your limit. Your data is never deleted, and you can upgrade anytime.
           </Text>
         </View>
 
         <View style={styles.faqItem}>
-          <Text style={[styles.faqQuestion, { color: theme.text }]}>
+          <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>
             Do you offer promo codes?
           </Text>
-          <Text style={[styles.faqAnswer, { color: theme.textSecondary }]}>
+          <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
             Yes! Early adopters may receive promo codes for free premium access. If you have a code, you can redeem it in your account settings.
           </Text>
         </View>
 
         <View style={styles.faqItem}>
-          <Text style={[styles.faqQuestion, { color: theme.text }]}>
+          <Text style={[styles.faqQuestion, { color: colors.textPrimary }]}>
             Can I cancel my monthly subscription?
           </Text>
-          <Text style={[styles.faqAnswer, { color: theme.textSecondary }]}>
+          <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
             Absolutely! Monthly plans can be canceled anytime from your account settings. No long-term contracts.
           </Text>
         </View>

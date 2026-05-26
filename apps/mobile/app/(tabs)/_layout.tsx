@@ -80,25 +80,39 @@ export default function TabLayout() {
       <Tabs.Screen
         name="collection"
         options={{
-          title: 'My Tarantulas',
-          tabBarLabel: 'Tarantulas',
+          // Single Collection tab spans every taxon (tarantulas +
+          // scorpions today, more invert taxa later). Mirrors HV's
+          // ADR-003 pattern: one bottom-bar entry, taxon disambiguates
+          // inside the add flow. Header icon opens the unified species
+          // browser — keepers can browse both catalogs from one place.
+          title: 'My Collection',
+          tabBarLabel: 'Collection',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="spider" size={size} color={color} />
+            <MaterialCommunityIcons name="paw" size={size} color={color} />
+          ),
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/species' as any)}
+              style={styles.headerButton}
+              accessibilityLabel="Browse species catalog"
+            >
+              <MaterialCommunityIcons
+                name="book-open-variant"
+                size={24}
+                color={tintColor}
+              />
+            </TouchableOpacity>
           ),
         }}
       />
       <Tabs.Screen
         name="scorpions"
         options={{
-          title: 'My Scorpions',
-          tabBarLabel: 'Scorpions',
-          // MaterialCommunityIcons doesn't ship a scorpion glyph;
-          // 'zodiac-scorpio' is the constellation/zodiac symbol, which
-          // reads as a scorpion silhouette and is the closest visual
-          // match in the set.
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="zodiac-scorpio" size={size} color={color} />
-          ),
+          // Hidden from the tab bar — the Collection tab now surfaces
+          // both tarantulas and scorpions. Kept as a route so any
+          // existing deep-links continue to resolve; the screen itself
+          // could be deprecated to a redirect in a follow-up.
+          href: null,
         }}
       />
       <Tabs.Screen

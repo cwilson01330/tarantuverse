@@ -146,7 +146,10 @@ export default function FeedersListScreen() {
             style={[
               styles.lowBanner,
               {
-                backgroundColor: colors.warningBg ?? 'rgba(245, 158, 11, 0.15)',
+                // warningBg was removed from ThemeColors — use a fixed
+                // translucent amber. The border still picks up the
+                // theme's `warning` token.
+                backgroundColor: 'rgba(245, 158, 11, 0.15)',
                 borderColor: colors.warning ?? '#f59e0b',
               },
             ]}

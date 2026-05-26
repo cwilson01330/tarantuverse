@@ -422,7 +422,7 @@ export default function AnalyticsScreen() {
             onPress={() => router.push('/analytics/advanced')}
             style={styles.advancedButton}
           >
-            <MaterialCommunityIcons name="sparkles" size={16} color={iconColor} />
+            <MaterialCommunityIcons name="star-four-points" size={16} color={iconColor} />
           </TouchableOpacity>
         }
       />

@@ -28,7 +28,8 @@ export default function AchievementBadge({
   earnedAt,
   size = 'large',
 }: AchievementBadgeProps) {
-  const { colors, isDark } = useTheme()
+  const { colors, theme } = useTheme()
+  const isDark = theme === 'dark'
   const tierColor = TIER_COLORS[tier]
 
   const iconSize = size === 'small' ? 26 : 48

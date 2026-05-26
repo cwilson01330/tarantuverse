@@ -25,6 +25,11 @@ import PremoltAlertCard from '../../src/components/PremoltAlertCard';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
+import {
+  listScorpions,
+  scorpionDisplayName,
+  type Scorpion,
+} from '../../src/lib/scorpions';
 
 interface Tarantula {
   id: string;
@@ -64,11 +69,22 @@ interface CollectionStats {
   };
 }
 
+// Taxon discriminator drives the FlatList row dispatcher: tarantulas
+// keep their full-featured card (feeding badge + premolt + action
+// sheet), scorpions render via a simpler card until those features
+// ship for the scorpion surface. New taxa land here when added.
+type TaxonFilter = 'all' | 'tarantulas' | 'scorpions';
+
+type Row =
+  | { kind: 'tarantula'; data: Tarantula }
+  | { kind: 'scorpion'; data: Scorpion };
+
 function CollectionScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
+  const [scorpions, setScorpions] = useState<Scorpion[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
@@ -77,6 +93,9 @@ function CollectionScreen() {
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'lastFed' | 'acquired'>('name');
+  // Taxon filter — sits above search/sort. When 'tarantulas' or
+  // 'scorpions', the other taxon is filtered out entirely.
+  const [taxonFilter, setTaxonFilter] = useState<TaxonFilter>('all');
   // Long-press quick-actions sheet. `actionTarget` holds the tarantula
   // whose sheet is open (null = closed); `actionBusy` gates the rows
   // while the mark-fed POST is in flight.
@@ -113,6 +132,7 @@ function CollectionScreen() {
 
   useEffect(() => {
     fetchTarantulas();
+    fetchScorpions();
     fetchCollectionStats();
   }, []);
 
@@ -122,6 +142,17 @@ function CollectionScreen() {
       setCollectionStats(response.data);
     } catch (error) {
       // Silently fail - stats are optional
+    }
+  };
+
+  const fetchScorpions = async () => {
+    // Failure here is non-fatal — scorpions are an additive surface;
+    // a load error shouldn't blank the whole collection. Keep silent.
+    try {
+      const rows = await listScorpions();
+      setScorpions(rows);
+    } catch {
+      setScorpions([]);
     }
   };
 
@@ -273,44 +304,76 @@ function CollectionScreen() {
   // Helper: get best display name for a tarantula
   const getDisplayName = (t: Tarantula) => t.name || t.common_name || 'Unknown';
 
-  // Filter and sort tarantulas
-  const getFilteredAndSortedTarantulas = () => {
-    let filtered = tarantulas.filter(t => {
-      const query = searchQuery.toLowerCase();
-      return (
-        (t.name || '').toLowerCase().includes(query) ||
-        (t.common_name || '').toLowerCase().includes(query) ||
-        (t.scientific_name || '').toLowerCase().includes(query)
-      );
-    });
+  // Unified row name lookup — drives the search and the name sort
+  // across taxa. Scorpion display name reuses scorpionDisplayName from
+  // the lib for consistency with the Phase 3b screens.
+  const getRowName = (row: Row): string =>
+    row.kind === 'tarantula'
+      ? getDisplayName(row.data)
+      : scorpionDisplayName(row.data);
 
-    // Sort based on selected option
+  // Filter and sort rows (tarantulas + scorpions, gated by taxonFilter).
+  const getFilteredRows = (): Row[] => {
+    const query = searchQuery.toLowerCase();
+
+    const tarantulaRows: Row[] =
+      taxonFilter === 'scorpions'
+        ? []
+        : tarantulas.map((t) => ({ kind: 'tarantula' as const, data: t }));
+    const scorpionRows: Row[] =
+      taxonFilter === 'tarantulas'
+        ? []
+        : scorpions.map((s) => ({ kind: 'scorpion' as const, data: s }));
+
+    let rows: Row[] = [...tarantulaRows, ...scorpionRows];
+
+    // Search across name, common_name, and scientific_name regardless
+    // of taxon. Empty query short-circuits.
+    if (query) {
+      rows = rows.filter((row) => {
+        const d = row.data;
+        return (
+          (d.name || '').toLowerCase().includes(query)
+          || (d.common_name || '').toLowerCase().includes(query)
+          || (d.scientific_name || '').toLowerCase().includes(query)
+        );
+      });
+    }
+
     switch (sortBy) {
       case 'lastFed': {
-        filtered.sort((a, b) => {
-          const daysA = feedingStatuses.get(a.id)?.days_since_last_feeding ?? Infinity;
-          const daysB = feedingStatuses.get(b.id)?.days_since_last_feeding ?? Infinity;
-          return daysB - daysA; // Most recently fed first
+        // Only tarantulas have feeding statuses today — scorpions sort
+        // to the bottom by default. When scorpion feeding analytics
+        // ship, generalize this to a per-row "lastFed" accessor.
+        rows.sort((a, b) => {
+          if (a.kind !== 'tarantula' && b.kind !== 'tarantula') return 0;
+          if (a.kind !== 'tarantula') return 1;
+          if (b.kind !== 'tarantula') return -1;
+          const daysA =
+            feedingStatuses.get(a.data.id)?.days_since_last_feeding ?? Infinity;
+          const daysB =
+            feedingStatuses.get(b.data.id)?.days_since_last_feeding ?? Infinity;
+          return daysB - daysA;
         });
         break;
       }
-      case 'acquired': {
-        filtered.sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b)));
-        break;
-      }
+      case 'acquired':
       case 'name':
       default: {
-        filtered.sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b)));
+        rows.sort((a, b) => getRowName(a).localeCompare(getRowName(b)));
       }
     }
 
-    return filtered;
+    return rows;
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchTarantulas();
-    await fetchCollectionStats();
+    await Promise.all([
+      fetchTarantulas(),
+      fetchScorpions(),
+      fetchCollectionStats(),
+    ]);
     setRefreshing(false);
   }, []);
 
@@ -462,6 +525,82 @@ function CollectionScreen() {
         <View style={styles.cardContent}>
           <Text style={styles.name}>{displayName}</Text>
           <Text style={styles.scientificName}>{item.scientific_name}</Text>
+          {item.common_name && (
+            <Text style={styles.commonName}>{item.common_name}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Scorpion card — same visual frame as renderTarantula so the
+  // unified grid reads as one collection. No feeding-status pill or
+  // premolt badge (those features don't exist for scorpions yet); no
+  // long-press action sheet either. Add taxon-specific affordances
+  // here as the scorpion surface grows.
+  const renderScorpion = ({ item }: { item: Scorpion }) => {
+    const displayName =
+      item.name || item.common_name || item.scientific_name || 'Unnamed';
+    const sexLabel =
+      item.sex === 'female'
+        ? 'female'
+        : item.sex === 'male'
+          ? 'male'
+          : 'unknown sex';
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/scorpion/${item.id}` as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, scorpion`}
+        accessibilityHint="Opens this scorpion's detail page."
+      >
+        <View style={styles.imageContainer}>
+          {item.photo_url ? (
+            <Image
+              source={{ uri: getImageUrl(item.photo_url) }}
+              style={styles.image}
+              accessibilityLabel={`Photo of ${displayName}`}
+            />
+          ) : (
+            <View
+              style={styles.placeholderImage}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              <MaterialCommunityIcons
+                name="zodiac-scorpio"
+                size={40}
+                color={colors.textTertiary}
+              />
+            </View>
+          )}
+          {item.sex && item.sex !== 'unknown' && (
+            <View
+              style={[
+                styles.sexBadge,
+                item.sex === 'female' ? styles.femaleBadge : styles.maleBadge,
+              ]}
+              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
+            >
+              <MaterialCommunityIcons
+                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
+                size={16}
+                color="#fff"
+              />
+            </View>
+          )}
+          {/* Small taxon glyph in the bottom-left so scorpions are
+              visually distinguishable from tarantulas at a glance. */}
+          <View style={styles.taxonGlyph}>
+            <Text style={{ fontSize: 14 }}>🦂</Text>
+          </View>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.name}>{displayName}</Text>
+          {item.scientific_name && (
+            <Text style={styles.scientificName}>{item.scientific_name}</Text>
+          )}
           {item.common_name && (
             <Text style={styles.commonName}>{item.common_name}</Text>
           )}
@@ -812,6 +951,21 @@ function CollectionScreen() {
     unknownBadge: {
       backgroundColor: '#9ca3af',
     },
+    // Small taxon glyph in the card's bottom-left corner. Sits where
+    // the feeding badge would land on a tarantula card, but the slot
+    // is taxon-specific so they don't collide (scorpions have no
+    // feeding badge yet).
+    taxonGlyph: {
+      position: 'absolute',
+      bottom: 8,
+      left: 8,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     feedingBadge: {
       position: 'absolute',
       top: 8,
@@ -1153,20 +1307,97 @@ function CollectionScreen() {
     );
   }
 
-  // Empty state card component for when collection is empty
+  // Add-flow disambiguator. Mirrors HV's ADR-003 pattern: one entry
+  // point on the bottom bar, taxon picked inside the add flow. Alert
+  // is the lightest-weight bottom-sheet substitute that respects
+  // platform conventions on both iOS and Android.
+  const openAddPicker = () => {
+    Alert.alert(
+      'Add to collection',
+      'What are you adding?',
+      [
+        {
+          text: '🕷  Tarantula',
+          onPress: () => router.push('/tarantula/add'),
+        },
+        {
+          text: '🦂  Scorpion',
+          onPress: () => router.push('/scorpion/add' as any),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  // Renders the cross-taxon row using the discriminated union — the
+  // FlatList itself stays homogeneous; renderItem dispatches.
+  const renderRow = ({ item }: { item: Row }) => {
+    if (item.kind === 'scorpion') {
+      return renderScorpion({ item: item.data });
+    }
+    return viewMode === 'card'
+      ? renderTarantula({ item: item.data })
+      : renderListItem({ item: item.data });
+  };
+
+  // Inline three-chip taxon filter — sits at the top of the list
+  // header so the keeper can switch focus without leaving the screen.
+  const TaxonFilterChips = () => (
+    <View style={styles.sortContainer}>
+      {(
+        [
+          { value: 'all' as const, label: 'All' },
+          { value: 'tarantulas' as const, label: '🕷 Tarantulas' },
+          { value: 'scorpions' as const, label: '🦂 Scorpions' },
+        ]
+      ).map((opt) => {
+        const active = taxonFilter === opt.value;
+        return (
+          <TouchableOpacity
+            key={opt.value}
+            style={[
+              styles.sortChip,
+              active && styles.sortChipActive,
+              { borderColor: colors.border },
+            ]}
+            onPress={() => setTaxonFilter(opt.value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+          >
+            <Text
+              style={[
+                styles.sortChipText,
+                active && styles.sortChipTextActive,
+                { color: active ? '#fff' : colors.textSecondary },
+              ]}
+            >
+              {opt.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
+  // Empty state card component for when collection is empty.
+  // NB: currently unused since the empty-state branch below renders
+  // the full welcome flow directly; kept around as a smaller inline
+  // nudge variant if a future iteration wants it back. Routes through
+  // openAddPicker so the taxon disambiguator stays the single entry.
   const GetStartedCard = () => (
     <View style={[styles.getStartedCard, { borderColor: colors.primary }]}>
       <View style={styles.getStartedContent}>
         <Text style={styles.getStartedEmoji}>🎯</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.getStartedTitle}>Add Your First Tarantula</Text>
+          <Text style={styles.getStartedTitle}>Add your first animal</Text>
           <Text style={styles.getStartedText}>
-            Start building your collection by adding your first tarantula to get started!
+            Start building your collection — tarantulas or scorpions both supported.
           </Text>
         </View>
       </View>
       <PrimaryButton
-        onPress={() => router.push('/tarantula/add')}
+        onPress={openAddPicker}
         style={styles.getStartedButton}
       >
         <MaterialCommunityIcons name="plus" size={18} color="#fff" />
@@ -1175,21 +1406,26 @@ function CollectionScreen() {
     </View>
   );
 
+  // Collection is empty across BOTH taxa — show the welcome flow that
+  // offers either path.
+  const collectionEmpty = tarantulas.length === 0 && scorpions.length === 0;
+
   return (
     <View style={styles.container}>
-      {tarantulas.length === 0 ? (
+      {collectionEmpty ? (
         <View style={styles.empty}>
-          <MaterialCommunityIcons name="spider" size={64} color={colors.textTertiary} />
-          <Text style={styles.emptyTitle}>No Tarantulas Yet</Text>
+          <MaterialCommunityIcons name="paw" size={64} color={colors.textTertiary} />
+          <Text style={styles.emptyTitle}>No animals yet</Text>
           <Text style={styles.emptyText}>
-            Start building your collection by adding your first tarantula. Not sure which species to pick? Browse our care sheets first.
+            Start building your collection — add a tarantula or a
+            scorpion. Not sure which species? Browse the care sheets first.
           </Text>
           <PrimaryButton
-            onPress={() => router.push('/tarantula/add')}
+            onPress={openAddPicker}
             style={styles.addButton}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.addButtonText}>Add Tarantula</Text>
+            <Text style={styles.addButtonText}>Add to collection</Text>
           </PrimaryButton>
           <TouchableOpacity
             onPress={() => router.push('/(tabs)/species')}
@@ -1215,9 +1451,9 @@ function CollectionScreen() {
         <>
           <FlatList
             key={viewMode} // Force re-render when viewMode changes (needed for numColumns)
-            data={getFilteredAndSortedTarantulas()}
-            renderItem={viewMode === 'card' ? renderTarantula : renderListItem}
-            keyExtractor={(item) => item.id}
+            data={getFilteredRows()}
+            renderItem={renderRow}
+            keyExtractor={(item) => `${item.kind}-${item.data.id}`}
             numColumns={viewMode === 'card' ? 2 : 1}
             contentContainerStyle={styles.list}
             ListHeaderComponent={
@@ -1227,6 +1463,11 @@ function CollectionScreen() {
 
                 {/* Search Bar */}
                 <SearchBar />
+
+                {/* Taxon filter — sits above the sort chips so it
+                    reads as the primary axis (taxon first, then sort
+                    inside that taxon). */}
+                <TaxonFilterChips />
 
                 {/* Sort Chips */}
                 <SortChips />
@@ -1289,7 +1530,7 @@ function CollectionScreen() {
           <PrimaryButton
             fab
             size={56}
-            onPress={() => router.push('/tarantula/add')}
+            onPress={openAddPicker}
             outerStyle={styles.fab}
           >
             <MaterialCommunityIcons name="plus" size={28} color="#fff" />
