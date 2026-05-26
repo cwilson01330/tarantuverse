@@ -71,6 +71,7 @@ import {
   listWeightLogs,
   relativeDays,
 } from '@/lib/animals'
+import { CGD_BRANDS, DEFAULT_CGD_FOOD_TYPE } from '@/lib/cgd'
 
 // ---------------------------------------------------------------------------
 // Page
@@ -974,6 +975,10 @@ function LogFeedingForm({
   const [error, setError] = useState<string | null>(null)
   const [pauseOpen, setPauseOpen] = useState(false)
   const [pauseHelpOpen, setPauseHelpOpen] = useState(false)
+  // One-tap "Refresh CGD" — separate busy/error state so the button
+  // can show progress without forcing the full form open.
+  const [cgdBusy, setCgdBusy] = useState(false)
+  const [cgdError, setCgdError] = useState<string | null>(null)
 
   // Live prey:BW hint
   const preyHint = useMemo(() => {
@@ -1044,6 +1049,30 @@ function LogFeedingForm({
     }
   }
 
+  // One-tap CGD refresh — posts a feeding with the default brand and
+  // tells the parent to refetch. Skips the open form entirely; a
+  // keeper who wants to set brand/weight/notes uses "+ Log a feeding"
+  // instead.
+  async function handleRefreshCgd() {
+    if (cgdBusy) return
+    setCgdError(null)
+    setCgdBusy(true)
+    try {
+      await createFeeding(animal.id, {
+        fed_at: new Date().toISOString(),
+        food_type: DEFAULT_CGD_FOOD_TYPE,
+        accepted: true,
+        prey_weight_g: null,
+        notes: null,
+      })
+      onCreated()
+    } catch (err) {
+      setCgdError(errMsg(err, 'Could not log CGD refresh.'))
+    } finally {
+      setCgdBusy(false)
+    }
+  }
+
   // Friendly label for the current pause reason (shown both in the
   // collapsed and open form states so the keeper always sees it).
   const PAUSE_REASON_LABELS: Record<string, string> = {
@@ -1066,6 +1095,26 @@ function LogFeedingForm({
         >
           ＋ Log a feeding
         </button>
+        {animal.feeds_on_cgd && (
+          <>
+            <button
+              onClick={handleRefreshCgd}
+              disabled={cgdBusy}
+              className="text-sm text-herp-lime hover:text-herp-teal transition-colors disabled:opacity-50"
+              title="Logs a CGD refresh with the default brand"
+            >
+              {cgdBusy ? 'Logging…' : '🍃 Refreshed CGD'}
+            </button>
+            {cgdError && (
+              <span
+                role="alert"
+                className="text-xs text-rose-400"
+              >
+                {cgdError}
+              </span>
+            )}
+          </>
+        )}
         {pauseLabel && (
           <button
             onClick={() => setPauseOpen(true)}
@@ -1103,15 +1152,17 @@ function LogFeedingForm({
             className={INPUT_CLS}
           />
         </Field>
-        <Field label="Prey type">
-          <input
-            type="text"
-            value={foodType}
-            onChange={(e) => setFoodType(e.target.value)}
-            placeholder="e.g. frozen-thawed rat, dubia roaches"
-            className={INPUT_CLS}
-          />
-        </Field>
+        {!animal.feeds_on_cgd && (
+          <Field label="Prey type">
+            <input
+              type="text"
+              value={foodType}
+              onChange={(e) => setFoodType(e.target.value)}
+              placeholder="e.g. frozen-thawed rat, dubia roaches"
+              className={INPUT_CLS}
+            />
+          </Field>
+        )}
         <Field label="Outcome">
           <select
             value={accepted}
@@ -1126,6 +1177,41 @@ function LogFeedingForm({
           </select>
         </Field>
       </div>
+
+      {/* CGD brand picker — only for rhacodactylids. Spans the full
+          form width so all 8 chips fit on one or two rows. Clicking a
+          chip sets food_type to that brand; the text input below
+          remains the "Or type a custom brand" escape hatch. */}
+      {animal.feeds_on_cgd && (
+        <Field label="Food type">
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {CGD_BRANDS.map((brand) => {
+              const selected = foodType === brand
+              return (
+                <button
+                  key={brand}
+                  type="button"
+                  onClick={() => setFoodType(brand)}
+                  className={`px-2.5 py-1 rounded-full border text-xs transition-colors ${
+                    selected
+                      ? 'border-herp-teal bg-herp-teal/10 text-herp-teal'
+                      : 'border-neutral-800 bg-neutral-950 text-neutral-300 hover:border-neutral-700'
+                  }`}
+                >
+                  {brand}
+                </button>
+              )
+            })}
+          </div>
+          <input
+            type="text"
+            value={foodType}
+            onChange={(e) => setFoodType(e.target.value)}
+            placeholder="Or type a custom brand or food"
+            className={INPUT_CLS}
+          />
+        </Field>
+      )}
 
       <Field label="Prey weight (g, optional)">
         <input

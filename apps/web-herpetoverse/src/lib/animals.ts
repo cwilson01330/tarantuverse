@@ -74,6 +74,11 @@ export interface Animal {
   feeding_paused_reason: string | null
   feeding_paused_until: string | null
 
+  /** Per-animal CGD override. NULL inherits the species default. */
+  feeds_on_cgd_override: boolean | null
+  /** Resolved CGD flag (override ?? species default). Server-computed. */
+  feeds_on_cgd: boolean
+
   photo_url: string | null
 
   is_public: boolean
