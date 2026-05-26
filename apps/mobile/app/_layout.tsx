@@ -114,11 +114,11 @@ function RootLayoutContent() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
-        {/* Show onboarding if user is authenticated but hasn't completed it */}
+        {/* Show onboarding if user is authenticated but hasn't completed it.
+            NB: expo-router 6 dropped the legacy `animationEnabled` flag in
+            favor of the v7 navigation `animation` enum — `'none'` is the
+            equivalent of the old `false`. */}
         {user && !onboardingComplete && (
-          {/* expo-router 6 dropped the legacy `animationEnabled` flag
-              in favor of the v7 navigation `animation` enum. `'none'`
-              is the equivalent of the old `false`. */}
           <Stack.Screen name="onboarding" options={{ animation: 'none' }} />
         )}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
