@@ -17,12 +17,16 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
+  Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
@@ -41,6 +45,7 @@ import {
   type CreateWeightLogPayload,
   type WeightContext,
   createWeightLog,
+  deleteWeightLog,
   getWeightLog,
   updateWeightLog,
   WEIGHT_CONTEXT_LABELS,
@@ -67,13 +72,14 @@ export function LogWeightScreen() {
     weightId?: string;
   }>();
   const isEdit = Boolean(weightId);
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
 
   const [date, setDate] = useState(() => todayISO());
   const [grams, setGrams] = useState('');
   const [context, setContext] = useState<WeightContext>('routine');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,6 +143,38 @@ export function LogWeightScreen() {
       setError(extractErrorMessage(err, 'Could not save weight.'));
       setSubmitting(false);
     }
+  }
+
+  // Delete this weight log. Only reachable in edit mode. Note the
+  // backend does NOT recompute the parent animal's current_weight_g
+  // hint when a historical log is removed — that's intentional and
+  // rare enough not to matter.
+  function handleDelete() {
+    if (!isEdit || !weightId || deleting) return;
+    Alert.alert(
+      'Delete this weigh-in?',
+      'This permanently removes the weight log. It cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            setError(null);
+            try {
+              await deleteWeightLog(weightId as string);
+              router.back();
+            } catch (err) {
+              setError(
+                extractErrorMessage(err, 'Could not delete this weight.'),
+              );
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -204,6 +242,40 @@ export function LogWeightScreen() {
               busy={submitting}
               onPress={handleSubmit}
             />
+
+            {isEdit && (
+              <TouchableOpacity
+                onPress={handleDelete}
+                disabled={deleting || submitting}
+                style={[
+                  styles.deleteButton,
+                  {
+                    borderColor: colors.danger,
+                    borderRadius: layout.radius.md,
+                    opacity: deleting || submitting ? 0.5 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Delete this weigh-in"
+              >
+                {deleting ? (
+                  <ActivityIndicator color={colors.danger} />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons
+                      name="trash-can-outline"
+                      size={18}
+                      color={colors.danger}
+                    />
+                    <Text
+                      style={[styles.deleteButtonText, { color: colors.danger }]}
+                    >
+                      Delete weigh-in
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       )}
@@ -219,5 +291,19 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 48,
     gap: 16,
+  },
+  deleteButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

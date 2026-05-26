@@ -16,12 +16,16 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
+  Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
@@ -39,6 +43,7 @@ import {
 import {
   type CreateShedPayload,
   createShed,
+  deleteShed,
   getShed,
   updateShed,
 } from '../lib/animals';
@@ -70,7 +75,7 @@ export function LogShedScreen() {
     shedId?: string;
   }>();
   const isEdit = Boolean(shedId);
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
 
   const [date, setDate] = useState(() => todayISO());
   const [complete, setComplete] = useState<'yes' | 'no'>('yes');
@@ -78,6 +83,7 @@ export function LogShedScreen() {
   const [retainedNotes, setRetainedNotes] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,6 +145,36 @@ export function LogShedScreen() {
       setError(extractErrorMessage(err, 'Could not save shed.'));
       setSubmitting(false);
     }
+  }
+
+  // Delete this shed log. Only reachable in edit mode; the typed
+  // Alert confirm is the only guard but the blast radius is one row.
+  function handleDelete() {
+    if (!isEdit || !shedId || deleting) return;
+    Alert.alert(
+      'Delete this shed?',
+      'This permanently removes the shed log. It cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            setError(null);
+            try {
+              await deleteShed(shedId as string);
+              router.back();
+            } catch (err) {
+              setError(
+                extractErrorMessage(err, 'Could not delete this shed.'),
+              );
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   }
 
   return (
@@ -219,6 +255,40 @@ export function LogShedScreen() {
             busy={submitting}
             onPress={handleSubmit}
           />
+
+          {isEdit && (
+            <TouchableOpacity
+              onPress={handleDelete}
+              disabled={deleting || submitting}
+              style={[
+                styles.deleteButton,
+                {
+                  borderColor: colors.danger,
+                  borderRadius: layout.radius.md,
+                  opacity: deleting || submitting ? 0.5 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Delete this shed"
+            >
+              {deleting ? (
+                <ActivityIndicator color={colors.danger} />
+              ) : (
+                <>
+                  <MaterialCommunityIcons
+                    name="trash-can-outline"
+                    size={18}
+                    color={colors.danger}
+                  />
+                  <Text
+                    style={[styles.deleteButtonText, { color: colors.danger }]}
+                  >
+                    Delete shed
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
           </ScrollView>
         </KeyboardAvoidingView>
       )}
@@ -229,6 +299,20 @@ export function LogShedScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   flex: { flex: 1 },
+  deleteButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scroll: {
     padding: 16,
