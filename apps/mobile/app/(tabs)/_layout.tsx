@@ -88,6 +88,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="scorpions"
+        options={{
+          title: 'My Scorpions',
+          tabBarLabel: 'Scorpions',
+          // MaterialCommunityIcons doesn't ship a scorpion glyph;
+          // 'zodiac-scorpio' is the constellation/zodiac symbol, which
+          // reads as a scorpion silhouette and is the closest visual
+          // match in the set.
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="zodiac-scorpio" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="enclosures"
         options={{
           href: null, // Hidden from tab bar, still accessible via navigation
@@ -126,11 +140,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Search',
-          tabBarLabel: 'Search',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="magnify" size={size} color={color} />
-          ),
+          // Hidden from the bottom bar to make room for the Scorpions
+          // tab (iOS guideline is 5 tabs max; we'd have hit 6). Search
+          // is still reachable via direct navigation from headers and
+          // from screens that include a search affordance.
+          href: null,
         }}
       />
       <Tabs.Screen
