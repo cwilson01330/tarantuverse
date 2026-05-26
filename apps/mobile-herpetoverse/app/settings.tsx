@@ -152,6 +152,25 @@ function SettingsScreen() {
           />
         </View>
 
+        <SectionLabel text="Reminders" colors={colors} />
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: layout.radius.lg,
+            },
+          ]}
+        >
+          <ActionRow
+            icon="bell-outline"
+            label="Notifications"
+            onPress={() => router.push('/notification-preferences' as never)}
+            colors={colors}
+          />
+        </View>
+
         <SectionLabel text="Support & legal" colors={colors} />
         <View
           style={[

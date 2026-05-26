@@ -59,6 +59,17 @@ import {
   getPreySuggestion,
   updateFeeding,
 } from '../lib/animals';
+import { apiClient } from '../services/api';
+import { scheduleFeedingReminder } from '../services/notifications';
+
+/** Subset of /notification-preferences/ the feeding flow needs. */
+interface NotificationPrefsSubset {
+  feeding_reminders_enabled: boolean;
+  feeding_reminder_hours: number;
+  quiet_hours_enabled: boolean;
+  quiet_hours_start: string;
+  quiet_hours_end: string;
+}
 
 const PAUSE_REASON_LABELS: Record<string, string> = {
   hunger_strike: 'Hunger strike',
@@ -142,6 +153,32 @@ export function LogFeedingScreen() {
     if (id && !isEdit) loadAnimalPauseState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
+
+  // Notification preferences — used after save to schedule a feeding
+  // reminder. Non-fatal if it fails (the keeper just won't get a
+  // reminder for this log).
+  const [notifPrefs, setNotifPrefs] =
+    useState<NotificationPrefsSubset | null>(null);
+
+  useEffect(() => {
+    // Skip in edit mode — editing a historical row shouldn't kick off
+    // a new reminder.
+    if (isEdit) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await apiClient.get<NotificationPrefsSubset>(
+          '/notification-preferences/',
+        );
+        if (!cancelled) setNotifPrefs(data);
+      } catch {
+        // ignore — feature degrades gracefully
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit]);
 
   // Fetch species-aware prey suggestion so the prey-weight field can
   // show a live "X% of body weight" hint as the keeper types. Skipped
@@ -284,6 +321,28 @@ export function LogFeedingScreen() {
         await updateFeeding(feedingId as string, payload);
       } else {
         await createFeeding(id as string, payload);
+        // Schedule a feeding reminder if the keeper opted in. Skip on
+        // refusal / regurg — those aren't "fed today" events, so
+        // resetting the cadence would be misleading. The notifications
+        // module handles permission + quiet-hours adjustment internally
+        // and silently no-ops if anything goes wrong.
+        if (
+          outcome === 'yes' &&
+          id &&
+          animalName &&
+          notifPrefs?.feeding_reminders_enabled
+        ) {
+          await scheduleFeedingReminder(
+            id as string,
+            animalName,
+            notifPrefs.feeding_reminder_hours || 24,
+            {
+              enabled: notifPrefs.quiet_hours_enabled,
+              start: notifPrefs.quiet_hours_start,
+              end: notifPrefs.quiet_hours_end,
+            },
+          );
+        }
       }
       router.back();
     } catch (err) {
