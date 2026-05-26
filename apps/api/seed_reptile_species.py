@@ -1113,6 +1113,7 @@ SPECIES_DATA = [
     {
         "scientific_name": "Correlophus ciliatus",
         "common_names": ["Crested Gecko", "Eyelash Gecko"],
+        "feeds_on_cgd": True,
         "genus": "Correlophus",
         "family": "Diplodactylidae",
         "order_name": "Squamata",
@@ -1228,6 +1229,7 @@ SPECIES_DATA = [
     {
         "scientific_name": "Rhacodactylus auriculatus",
         "common_names": ["Gargoyle Gecko", "Knob-headed Giant Gecko", "New Caledonian Bumpy Gecko"],
+        "feeds_on_cgd": True,
         "genus": "Rhacodactylus",
         "family": "Diplodactylidae",
         "order_name": "Squamata",

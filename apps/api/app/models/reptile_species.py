@@ -147,6 +147,13 @@ class ReptileSpecies(Base):
     # Validated at the schema layer — no DB-level shape enforcement.
     life_stage_feeding = Column(JSONB)
 
+    # Diet — true for rhacodactylid geckos and others fed a complete
+    # gecko diet (Pangea / Repashy / etc.) on a refresh cadence rather
+    # than discrete prey events. Drives CGD-aware feeding-status
+    # thresholds in the clients ("overdue" at day 4 instead of day 7).
+    # Per-animal override lives on animals.feeds_on_cgd_override.
+    feeds_on_cgd = Column(Boolean, nullable=False, server_default="false")
+
     # Water & behavior
     water_bowl_description = Column(String(200))
     soaking_behavior = Column(Text)

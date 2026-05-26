@@ -157,6 +157,11 @@ class ReptileSpeciesBase(BaseModel):
     def _check_life_stage_feeding(cls, v: Any) -> Any:
         return _validate_life_stage_feeding(v)
 
+    # Diet — true for rhacodactylids and others fed a complete gecko
+    # diet (Pangea / Repashy / etc.). Drives CGD-aware feeding-status
+    # thresholds in the clients.
+    feeds_on_cgd: bool = False
+
     # Water & behavior
     water_bowl_description: Optional[str] = Field(None, max_length=200)
     soaking_behavior: Optional[str] = None

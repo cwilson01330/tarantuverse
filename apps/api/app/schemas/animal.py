@@ -41,6 +41,11 @@ class AnimalBase(BaseModel):
     feeding_paused_reason: Optional[str] = Field(None, max_length=40)
     feeding_paused_until: Optional[date] = None
 
+    # CGD override — NULL inherits the herp_species.feeds_on_cgd default;
+    # true/false explicitly overrides for this animal. Clients resolve
+    # the effective value as `override ?? species.feeds_on_cgd`.
+    feeds_on_cgd_override: Optional[bool] = None
+
     # Media
     photo_url: Optional[str] = Field(None, max_length=500)
 

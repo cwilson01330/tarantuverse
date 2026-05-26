@@ -123,6 +123,12 @@ class Animal(Base):
     feeding_paused_reason = Column(String(40), nullable=True)
     feeding_paused_until = Column(Date, nullable=True)
 
+    # CGD override — NULL inherits from herp_species.feeds_on_cgd,
+    # true/false explicitly overrides for this animal. Drives CGD-aware
+    # feeding-status thresholds in the clients (overdue at day 4 instead
+    # of day 7). See cgd_20260522 migration.
+    feeds_on_cgd_override = Column(Boolean, nullable=True)
+
     # Media
     photo_url = Column(String(500))
 
