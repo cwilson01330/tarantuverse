@@ -27,6 +27,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -54,6 +55,7 @@ import {
   type CreateFeedingPayload,
   type PreySuggestion,
   createFeeding,
+  deleteFeeding,
   getAnimal,
   getFeeding,
   getPreySuggestion,
@@ -107,7 +109,7 @@ export function LogFeedingScreen() {
     feedingId?: string;
   }>();
   const isEdit = Boolean(feedingId);
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
 
   const [date, setDate] = useState(() => todayISO());
   const [foodType, setFoodType] = useState('');
@@ -115,6 +117,7 @@ export function LogFeedingScreen() {
   const [outcome, setOutcome] = useState<Outcome>('yes');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [error, setError] = useState<string | null>(null);
   // Feeding-pause state for the animal — surfaced in this screen so
@@ -354,6 +357,37 @@ export function LogFeedingScreen() {
     }
   }
 
+  // Delete this feeding log. Only reachable in edit mode — the
+  // Alert.alert confirm is the only guard, but the destructive
+  // outcome is bounded (one feeding row, not the animal).
+  function handleDelete() {
+    if (!isEdit || !feedingId || deleting) return;
+    Alert.alert(
+      'Delete this feeding?',
+      'This permanently removes the feeding log. It cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            setError(null);
+            try {
+              await deleteFeeding(feedingId as string);
+              router.back();
+            } catch (err) {
+              setError(
+                extractErrorMessage(err, 'Could not delete this feeding.'),
+              );
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView
       edges={['left', 'right', 'bottom']}
@@ -569,6 +603,40 @@ export function LogFeedingScreen() {
               busy={submitting}
               onPress={handleSubmit}
             />
+
+            {isEdit && (
+              <TouchableOpacity
+                onPress={handleDelete}
+                disabled={deleting || submitting}
+                style={[
+                  styles.deleteButton,
+                  {
+                    borderColor: colors.danger,
+                    borderRadius: layout.radius.md,
+                    opacity: deleting || submitting ? 0.5 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Delete this feeding"
+              >
+                {deleting ? (
+                  <ActivityIndicator color={colors.danger} />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons
+                      name="trash-can-outline"
+                      size={18}
+                      color={colors.danger}
+                    />
+                    <Text
+                      style={[styles.deleteButtonText, { color: colors.danger }]}
+                    >
+                      Delete feeding
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       )}
@@ -594,6 +662,20 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   flex: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  deleteButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  deleteButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   scroll: {
     padding: 16,
     paddingBottom: 48,
