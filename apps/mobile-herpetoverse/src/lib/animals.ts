@@ -83,6 +83,11 @@ export interface Animal {
   /** ISO date (YYYY-MM-DD) — pause auto-resumes after this date. Null = indefinite. */
   feeding_paused_until: string | null;
 
+  /** Per-animal CGD override. NULL inherits the species default. */
+  feeds_on_cgd_override: boolean | null;
+  /** Resolved CGD flag (override ?? species default). Server-computed. */
+  feeds_on_cgd: boolean;
+
   photo_url: string | null;
 
   notes: string | null;

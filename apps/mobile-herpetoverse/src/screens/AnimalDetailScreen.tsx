@@ -20,7 +20,16 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
@@ -47,12 +56,14 @@ import {
   type ShedLog,
   type WeightLog,
   animalTitle,
+  createFeeding,
   getAnimal,
   listFeedings,
   listSheds,
   listWeightLogs,
 } from '../lib/animals';
 import { type Photo, listPhotos } from '../lib/photos';
+import { DEFAULT_CGD_FOOD_TYPE } from '../lib/cgd';
 
 /** Empty-state glyph for the hero card when there's no photo. */
 function taxonGlyph(taxon: Animal['taxon']): string {
@@ -238,6 +249,14 @@ export function AnimalDetailScreen() {
           );
         })()}
 
+        {/* CGD refresh — one-tap log of a fresh Pangea dish, only for
+            animals whose species (or per-animal override) feeds on a
+            complete gecko diet. Logging via the full feeding form is
+            still available via the Feeding action below. */}
+        {animal.feeds_on_cgd && (
+          <CgdRefreshSection animal={animal} onRefreshed={onRefresh} />
+        )}
+
         <LogActions
           onLogFeeding={() =>
             router.push(`/reptile/log-feeding/${animal.id}` as never)
@@ -362,6 +381,86 @@ export function AnimalDetailScreen() {
   );
 }
 
+/**
+ * Inline card that lets the keeper log a CGD refresh in one tap.
+ * Posts a feeding with the default brand and bumps the parent's
+ * onRefreshed so the FeedingStatusBanner / FeedingIntelligence /
+ * collection card pill update.
+ */
+function CgdRefreshSection({
+  animal,
+  onRefreshed,
+}: {
+  animal: Animal;
+  onRefreshed: () => Promise<void> | void;
+}) {
+  const { colors, layout } = useTheme();
+  const [busy, setBusy] = useState(false);
+
+  async function handleRefresh() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await createFeeding(animal.id, {
+        fed_at: new Date().toISOString(),
+        food_type: DEFAULT_CGD_FOOD_TYPE,
+        accepted: true,
+      });
+      await onRefreshed();
+    } catch {
+      Alert.alert(
+        'Could not log refresh',
+        'Something went wrong. Please try again in a moment.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <TouchableOpacity
+      onPress={handleRefresh}
+      disabled={busy}
+      style={[
+        styles.cgdCard,
+        {
+          backgroundColor: colors.surfaceRaised,
+          borderColor: colors.border,
+          borderRadius: layout.radius.lg,
+          opacity: busy ? 0.7 : 1,
+        },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel="Log a CGD refresh"
+    >
+      <View style={[styles.cgdIcon, { backgroundColor: colors.surface }]}>
+        <MaterialCommunityIcons name="leaf" size={22} color={colors.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.cgdTitle, { color: colors.textPrimary }]}>
+          Refreshed CGD
+        </Text>
+        <Text
+          style={[styles.cgdSubtitle, { color: colors.textSecondary }]}
+          numberOfLines={2}
+        >
+          Logs a fresh dish with the default brand. Adjust later in the full
+          feeding form.
+        </Text>
+      </View>
+      {busy ? (
+        <ActivityIndicator color={colors.primary} />
+      ) : (
+        <MaterialCommunityIcons
+          name="plus-circle"
+          size={22}
+          color={colors.primary}
+        />
+      )}
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollContent: {
@@ -382,6 +481,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
+  },
+  cgdCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: 1,
+  },
+  cgdIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cgdTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  cgdSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
   },
 });
 

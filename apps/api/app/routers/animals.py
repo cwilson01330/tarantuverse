@@ -17,7 +17,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models.user import User
@@ -74,7 +74,14 @@ async def get_animals(
     Optional `?taxon=` filter lets the per-taxon collection screens
     (which used to hit /snakes, /lizards, /frogs) scope their query.
     """
-    query = db.query(Animal).filter(Animal.user_id == current_user.id)
+    # Eager-load herp_species so the AnimalResponse.feeds_on_cgd
+    # resolution (override ?? species default) doesn't fire one extra
+    # SELECT per row in this list.
+    query = (
+        db.query(Animal)
+        .options(selectinload(Animal.herp_species))
+        .filter(Animal.user_id == current_user.id)
+    )
     if taxon:
         query = query.filter(Animal.taxon == AnimalTaxon(taxon))
     return query.order_by(Animal.created_at.desc()).all()
@@ -110,6 +117,7 @@ async def get_animal(
     """Fetch one animal by id. Owner-only."""
     animal = (
         db.query(Animal)
+        .options(selectinload(Animal.herp_species))
         .filter(Animal.id == animal_id, Animal.user_id == current_user.id)
         .first()
     )
@@ -131,6 +139,7 @@ async def update_animal(
     immutable — it's not in the update schema."""
     animal = (
         db.query(Animal)
+        .options(selectinload(Animal.herp_species))
         .filter(Animal.id == animal_id, Animal.user_id == current_user.id)
         .first()
     )
@@ -163,6 +172,7 @@ async def delete_animal(
     """
     animal = (
         db.query(Animal)
+        .options(selectinload(Animal.herp_species))
         .filter(Animal.id == animal_id, Animal.user_id == current_user.id)
         .first()
     )

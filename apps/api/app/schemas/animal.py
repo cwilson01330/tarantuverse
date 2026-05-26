@@ -85,6 +85,11 @@ class AnimalResponse(AnimalBase):
     enclosure_id: Optional[uuid.UUID] = None
     last_fed_at: Optional[datetime] = None
     last_shed_at: Optional[date] = None
+    # Resolved CGD flag (override ?? species default ?? false). Populated
+    # from the @property on the Animal model. Clients use this to switch
+    # the collection card to CGD-aware cadence thresholds and to surface
+    # CGD-specific actions ("Refreshed CGD" quick log). Read-only.
+    feeds_on_cgd: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
 

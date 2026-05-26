@@ -148,5 +148,18 @@ class Animal(Base):
     herp_species = relationship("ReptileSpecies", backref="animals")
     enclosure = relationship("Enclosure", backref="animal_inhabitants")
 
+    @property
+    def feeds_on_cgd(self) -> bool:
+        """Resolved CGD flag — per-animal override wins, then species
+        default, then False. Read by AnimalResponse.feeds_on_cgd via
+        Pydantic from_attributes. For list endpoints, the animals
+        router eager-loads herp_species to avoid an N+1.
+        """
+        if self.feeds_on_cgd_override is not None:
+            return bool(self.feeds_on_cgd_override)
+        if self.herp_species is not None:
+            return bool(self.herp_species.feeds_on_cgd)
+        return False
+
     def __repr__(self):
         return f"<Animal {self.taxon} {self.name or self.scientific_name}>"

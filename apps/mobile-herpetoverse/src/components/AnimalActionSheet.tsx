@@ -27,21 +27,29 @@ import { useTheme } from '../contexts/ThemeContext';
 export interface AnimalActionTarget {
   id: string;
   name: string;
+  /** Drives the optional "Refreshed CGD" row at the top of the sheet. */
+  feedsOnCgd?: boolean;
 }
+
+type ActionKey = 'fed' | 'cgd' | 'shed' | 'edit';
 
 interface AnimalActionSheetProps {
   /** The animal the sheet acts on. `null` keeps the sheet closed. */
   target: AnimalActionTarget | null;
-  /** True while the mark-fed POST is in flight — disables every row. */
+  /** True while a write action is in flight — disables every row. */
   busy?: boolean;
+  /** Which row should show the spinner while busy is true. */
+  busyKey?: ActionKey | null;
   onClose: () => void;
   onMarkFed: () => void;
   onLogShed: () => void;
   onEdit: () => void;
+  /** One-tap CGD refresh. Only used when target.feedsOnCgd is true. */
+  onRefreshCgd?: () => void;
 }
 
 type Row = {
-  key: 'fed' | 'shed' | 'edit';
+  key: ActionKey;
   label: string;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   onPress: () => void;
@@ -50,15 +58,32 @@ type Row = {
 export function AnimalActionSheet({
   target,
   busy = false,
+  busyKey = null,
   onClose,
   onMarkFed,
   onLogShed,
   onEdit,
+  onRefreshCgd,
 }: AnimalActionSheetProps) {
   const { colors, layout } = useTheme();
   const visible = target !== null;
 
+  // CGD-fed animals get a one-tap "Refreshed CGD" row at the top —
+  // logs a feeding with the default Pangea brand. Skipped when the
+  // species (and per-animal override) say this animal isn't on CGD.
+  const showCgd = Boolean(target?.feedsOnCgd && onRefreshCgd);
+
   const rows: Row[] = [
+    ...(showCgd
+      ? [
+          {
+            key: 'cgd' as const,
+            label: 'Refreshed CGD',
+            icon: 'leaf' as const,
+            onPress: onRefreshCgd!,
+          },
+        ]
+      : []),
     {
       key: 'fed',
       label: 'Mark fed today',
@@ -138,7 +163,7 @@ export function AnimalActionSheet({
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
                 {row.label}
               </Text>
-              {busy && row.key === 'fed' ? (
+              {busy && row.key === busyKey ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <MaterialCommunityIcons

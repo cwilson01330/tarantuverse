@@ -61,6 +61,7 @@ import {
 } from '../lib/animals';
 import { apiClient } from '../services/api';
 import { scheduleFeedingReminder } from '../services/notifications';
+import { CGD_BRAND_OPTIONS } from '../lib/cgd';
 
 /** Subset of /notification-preferences/ the feeding flow needs. */
 interface NotificationPrefsSubset {
@@ -122,6 +123,7 @@ export function LogFeedingScreen() {
   // think she's in [hunger strike / brumation prep / post-rehouse] →
   // mute reminders". See migration pst_20260502 / pse_20260502.
   const [animalName, setAnimalName] = useState<string | null>(null);
+  const [feedsOnCgd, setFeedsOnCgd] = useState(false);
   const [pausedReason, setPausedReason] = useState<string | null>(null);
   const [pausedUntil, setPausedUntil] = useState<string | null>(null);
   const [showPauseSheet, setShowPauseSheet] = useState(false);
@@ -140,6 +142,7 @@ export function LogFeedingScreen() {
       setAnimalName(
         animal.name || animal.scientific_name || 'This animal',
       );
+      setFeedsOnCgd(Boolean(animal.feeds_on_cgd));
       setPausedReason(animal.feeding_paused_reason ?? null);
       setPausedUntil(animal.feeding_paused_until ?? null);
     } catch {
@@ -389,11 +392,33 @@ export function LogFeedingScreen() {
               />
             </Field>
 
-            <Field label="Prey type" hint="e.g. frozen-thawed rat, dubia, mealworm">
+            {feedsOnCgd && (
+              <Field
+                label="CGD brand"
+                hint="Pick a brand or type one below."
+              >
+                <ChipGroup
+                  options={CGD_BRAND_OPTIONS}
+                  value={foodType}
+                  onChange={setFoodType}
+                />
+              </Field>
+            )}
+
+            <Field
+              label={feedsOnCgd ? 'Food type' : 'Prey type'}
+              hint={
+                feedsOnCgd
+                  ? 'Or type a custom brand or food.'
+                  : 'e.g. frozen-thawed rat, dubia, mealworm'
+              }
+            >
               <ThemedInput
                 value={foodType}
                 onChangeText={setFoodType}
-                placeholder="Frozen-thawed rat"
+                placeholder={
+                  feedsOnCgd ? 'Custom brand or food' : 'Frozen-thawed rat'
+                }
                 autoCapitalize="sentences"
               />
             </Field>

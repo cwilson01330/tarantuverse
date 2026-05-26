@@ -33,6 +33,7 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { AnimalActionSheet } from '../../src/components/AnimalActionSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { daysSince, relativeDays } from '../../src/utils/relative-days';
+import { DEFAULT_CGD_FOOD_TYPE, feedingPillColor } from '../../src/lib/cgd';
 
 // ---------------------------------------------------------------------------
 // Types — minimum subset of the Animal schema needed for the card.
@@ -52,6 +53,8 @@ interface ReptileBase {
   sex: Sex;
   photo_url: string | null;
   last_fed_at: string | null;
+  /** Resolved CGD flag — drives the tighter feeding-status ramp. */
+  feeds_on_cgd: boolean;
   created_at: string;
 }
 
@@ -81,9 +84,13 @@ function CollectionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // Long-press quick-actions sheet. `actionTarget` holds the animal
   // whose sheet is open (null = closed); `actionBusy` gates the rows
-  // while the mark-fed POST is in flight.
+  // while a write is in flight, and `actionBusyKey` says which row
+  // should show the spinner.
   const [actionTarget, setActionTarget] = useState<ReptileRow | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [actionBusyKey, setActionBusyKey] = useState<'fed' | 'cgd' | null>(
+    null,
+  );
 
   const fetchAll = useCallback(async () => {
     // ADR-003: one unified animals endpoint — every taxon in a single
@@ -98,6 +105,7 @@ function CollectionScreen() {
         sex: a.sex,
         photo_url: a.photo_url,
         last_fed_at: a.last_fed_at,
+        feeds_on_cgd: a.feeds_on_cgd,
         created_at: a.created_at,
         taxon: a.taxon,
       }));
@@ -143,6 +151,7 @@ function CollectionScreen() {
     if (!actionTarget) return;
     const target = actionTarget;
     setActionBusy(true);
+    setActionBusyKey('fed');
     try {
       await createFeeding(target.id, {
         fed_at: new Date().toISOString(),
@@ -165,6 +174,44 @@ function CollectionScreen() {
       );
     } finally {
       setActionBusy(false);
+      setActionBusyKey(null);
+    }
+  };
+
+  // "Refreshed CGD" — one-tap log of a CGD refresh with the default
+  // Pangea brand. Only surfaced when the animal feeds on CGD. The
+  // keeper can change the brand later via the full log-feeding form;
+  // we just want the cadence pill to update with one tap when they
+  // swap the dish.
+  const handleRefreshCgd = async () => {
+    if (!actionTarget) return;
+    const target = actionTarget;
+    setActionBusy(true);
+    setActionBusyKey('cgd');
+    try {
+      await createFeeding(target.id, {
+        fed_at: new Date().toISOString(),
+        food_type: DEFAULT_CGD_FOOD_TYPE,
+        accepted: true,
+      });
+      await fetchAll();
+      setActionTarget(null);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(
+          `Refreshed CGD for ${reptileTitle(target)}`,
+          ToastAndroid.SHORT,
+        );
+      }
+    } catch {
+      Alert.alert(
+        'Could not log refresh',
+        `Something went wrong logging a CGD refresh for ${reptileTitle(
+          target,
+        )}. Please try again.`,
+      );
+    } finally {
+      setActionBusy(false);
+      setActionBusyKey(null);
     }
   };
 
@@ -300,16 +347,22 @@ function CollectionScreen() {
       <AnimalActionSheet
         target={
           actionTarget
-            ? { id: actionTarget.id, name: reptileTitle(actionTarget) }
+            ? {
+                id: actionTarget.id,
+                name: reptileTitle(actionTarget),
+                feedsOnCgd: actionTarget.feeds_on_cgd,
+              }
             : null
         }
         busy={actionBusy}
+        busyKey={actionBusyKey}
         onClose={() => {
           if (!actionBusy) setActionTarget(null);
         }}
         onMarkFed={handleMarkFed}
         onLogShed={handleLogShed}
         onEdit={handleEditFromSheet}
+        onRefreshCgd={handleRefreshCgd}
       />
     </SafeAreaView>
   );
@@ -334,16 +387,16 @@ function ReptileCard({
   const taxonGlyph =
     row.taxon === 'snake' ? '🐍' : row.taxon === 'frog' ? '🐸' : '🦎';
 
-  // Color-coded last-fed indicator. Calibrated for snake/lizard cadence
-  // (much longer than tarantulas) — green up to a week, yellow to two
-  // weeks, orange to a month, red beyond. Tune per species in a future
-  // pass when species-aware reminders land.
-  let pillBg: string = colors.success;
-  if (days != null) {
-    if (days >= 30) pillBg = '#ef4444';
-    else if (days >= 14) pillBg = '#f97316';
-    else if (days >= 7) pillBg = '#eab308';
-  }
+  // Color-coded last-fed indicator. Snake/lizard cadence is the
+  // default; CGD-fed rhacodactylids get a tighter ramp (overdue at
+  // day 4 instead of day 7) so a healthy crestie reads as green at
+  // day 2, not yellow. See lib/cgd.ts.
+  const pillBg = feedingPillColor(days, row.feeds_on_cgd, {
+    green: colors.success,
+    yellow: '#eab308',
+    orange: '#f97316',
+    red: '#ef4444',
+  });
 
   return (
     <TouchableOpacity
