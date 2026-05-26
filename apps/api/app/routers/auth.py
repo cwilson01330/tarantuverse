@@ -1157,7 +1157,24 @@ async def forgot_password(
         user.reset_token_expires_at = expires
         db.commit()
 
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        # Allowlist of trusted frontend origins for the reset link so
+        # Herpetoverse can route users back to herpetoverse.com instead
+        # of the default tarantuverse.com FRONTEND_URL. Anything outside
+        # the list falls back to the default — never raises, so a stale
+        # client can't cause a 4xx on a sensitive flow.
+        allowed_reset_origins = {
+            "https://tarantuverse.com",
+            "https://www.tarantuverse.com",
+            "https://herpetoverse.com",
+            "https://www.herpetoverse.com",
+        }
+        requested = (forgot_data.frontend_url or "").rstrip("/")
+        base_url = (
+            requested
+            if requested in allowed_reset_origins
+            else settings.FRONTEND_URL.rstrip("/")
+        )
+        reset_link = f"{base_url}/reset-password?token={token}"
         await EmailService.send_password_reset_email(user.email, reset_link)
 
     return {"message": "If an account exists for that email, a password reset link has been sent."}

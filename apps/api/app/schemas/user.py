@@ -83,6 +83,12 @@ class ResetPasswordRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+    # Optional caller-specified base URL for the reset link in the email.
+    # Lets Herpetoverse send users back to herpetoverse.com instead of
+    # tarantuverse.com (the default FRONTEND_URL). Validated against an
+    # allowlist of trusted hosts in the router; an unknown value falls
+    # back to the default rather than erroring.
+    frontend_url: Optional[str] = None
 
 
 class UserResponse(BaseModel):

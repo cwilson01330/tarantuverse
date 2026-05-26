@@ -122,6 +122,16 @@ export default function LoginScreen() {
               editable={!submitting}
             />
 
+            <View style={{ alignItems: 'flex-end', marginTop: 8 }}>
+              <Link href="/forgot-password" asChild>
+                <TouchableOpacity disabled={submitting} accessibilityRole="link">
+                  <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '500' }}>
+                    Forgot password?
+                  </Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+
             {error && (
               <View
                 style={[
