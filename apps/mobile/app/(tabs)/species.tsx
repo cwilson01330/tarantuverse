@@ -30,6 +30,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { apiClient } from '../../src/services/api';
 import {
   listScorpionSpecies,
   type ScorpionSpecies,
@@ -106,11 +107,18 @@ export default function UnifiedSpeciesScreen() {
     setLoading(true);
     try {
       if (which === 'tarantulas') {
-        const response = await fetch(
-          `${process.env.EXPO_PUBLIC_API_URL}/api/v1/species?limit=200`,
-        );
-        const data = await response.json();
-        const items = (data.items || data) as any[];
+        // Use apiClient (not raw fetch) for parity with the scorpion
+        // path. apiClient's baseURL already includes /api/v1 and has a
+        // fallback to the prod host, so the request works even when
+        // EXPO_PUBLIC_API_URL isn't injected at runtime. The previous
+        // raw-fetch implementation silently returned [] in that case,
+        // which presented as "no tarantulas in the database."
+        const { data } = await apiClient.get<any>('/species', {
+          params: { limit: 200 },
+        });
+        // API has historically returned either a bare array or a
+        // {items, total} envelope — handle both defensively.
+        const items: any[] = Array.isArray(data) ? data : data?.items ?? [];
         setRows(
           items.map((s) => ({
             taxon: 'tarantulas' as const,
@@ -144,7 +152,11 @@ export default function UnifiedSpeciesScreen() {
           })),
         );
       }
-    } catch {
+    } catch (err) {
+      // Surface the failure so it's visible in `eas update:view` logs
+      // and Expo dev tools rather than silently rendering an empty
+      // grid the keeper can't diagnose.
+      console.warn('[species] Failed to load', which, err);
       setRows([]);
     } finally {
       setLoading(false);
