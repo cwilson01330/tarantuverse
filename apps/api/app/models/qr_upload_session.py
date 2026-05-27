@@ -48,6 +48,13 @@ class QRUploadSession(Base):
         nullable=True,
         index=True,
     )
+    # Inverts consolidation companion column — see ADR-005.
+    invert_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("inverts.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     # Allow multiple uploads per session (e.g. a whole photo shoot)
@@ -61,6 +68,7 @@ class QRUploadSession(Base):
     tarantula = relationship("Tarantula")
     animal = relationship("Animal")
     scorpion = relationship("Scorpion")
+    invert = relationship("Invert")
     user = relationship("User")
 
     def __repr__(self):

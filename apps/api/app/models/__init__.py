@@ -62,6 +62,11 @@ from app.models.scorpion_species import ScorpionSpecies
 from app.models.scorpion_colony import ScorpionColony
 from app.models.scorpion import Scorpion
 from app.models.brood import Brood
+# Inverts consolidation v1 (ADR-005, inv_20260527). Unified Invert +
+# InvertSpecies models. Coexist with the legacy per-taxon models
+# during Phases A-C; legacy models retire in Phase D.
+from app.models.invert_species import InvertSpecies
+from app.models.invert import Invert
 
 __all__ = [
     "User",
@@ -118,4 +123,6 @@ __all__ = [
     "ScorpionColony",
     "Scorpion",
     "Brood",
+    "InvertSpecies",
+    "Invert",
 ]

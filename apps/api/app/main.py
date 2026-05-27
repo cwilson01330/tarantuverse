@@ -63,6 +63,11 @@ import app.routers.reptile_offspring as reptile_offspring  # Herpetoverse breedi
 import app.routers.scorpions as scorpions
 import app.routers.scorpion_species as scorpion_species
 import app.routers.scorpion_colonies as scorpion_colonies
+# Inverts consolidation v1 (inv_20260527, ADR-005) — unified per-animal
+# surface. New tables are empty until backfill (Phase B). Old per-taxon
+# routes keep working unchanged until the read cutover (Phase C1).
+import app.routers.inverts as inverts
+import app.routers.invert_species as invert_species
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -303,6 +308,13 @@ print("[STARTUP] Registering scorpion routers (scorpions/species/colonies)...")
 app.include_router(scorpions.router, prefix="/api/v1/scorpions", tags=["scorpions"])
 app.include_router(scorpion_species.router, prefix="/api/v1/scorpion-species", tags=["scorpion_species"])
 app.include_router(scorpion_colonies.router, prefix="/api/v1/scorpion-colonies", tags=["scorpion_colonies"])
+
+# Inverts consolidation (ADR-005). Additive in Phase A1 — these routes
+# serve the new tables, the legacy /tarantulas/ and /scorpions/ routes
+# keep serving the old tables. Read cutover at Phase C1.
+print("[STARTUP] Registering inverts routers (consolidation Phase A1)...")
+app.include_router(inverts.router, prefix="/api/v1/inverts", tags=["inverts"])
+app.include_router(invert_species.router, prefix="/api/v1/invert-species", tags=["invert_species"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

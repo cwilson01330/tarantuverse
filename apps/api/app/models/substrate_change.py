@@ -30,6 +30,13 @@ class SubstrateChange(Base):
         nullable=True,
         index=True,
     )
+    # Inverts consolidation companion column — see ADR-005.
+    invert_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("inverts.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     changed_at = Column(Date, nullable=False)
     substrate_type = Column(String(100))  # Type of substrate used
@@ -43,6 +50,7 @@ class SubstrateChange(Base):
     tarantula = relationship("Tarantula", backref="substrate_changes")
     enclosure = relationship("Enclosure", back_populates="substrate_changes")
     scorpion = relationship("Scorpion", backref="substrate_changes")
+    invert = relationship("Invert", backref="substrate_changes")
 
     def __repr__(self):
         parent = self.tarantula_id or self.enclosure_id or self.scorpion_id

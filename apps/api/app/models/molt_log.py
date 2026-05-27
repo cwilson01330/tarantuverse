@@ -30,6 +30,14 @@ class MoltLog(Base):
         nullable=True,
         index=True,
     )
+    # Inverts consolidation companion column. See feeding_log.py for
+    # the full ADR-005 explanation; same pattern.
+    invert_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("inverts.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     molted_at = Column(DateTime(timezone=True), nullable=False)
     premolt_started_at = Column(DateTime(timezone=True))
@@ -50,6 +58,7 @@ class MoltLog(Base):
     tarantula = relationship("Tarantula", backref="molt_logs")
     enclosure = relationship("Enclosure", back_populates="molt_logs")
     scorpion = relationship("Scorpion", backref="molt_logs")
+    invert = relationship("Invert", backref="molt_logs")
 
     def __repr__(self):
         parent = self.tarantula_id or self.enclosure_id or self.scorpion_id

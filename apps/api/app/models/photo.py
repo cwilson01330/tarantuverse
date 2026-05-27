@@ -45,6 +45,13 @@ class Photo(Base):
         nullable=True,
         index=True,
     )
+    # Inverts consolidation companion column — see ADR-005.
+    invert_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("inverts.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     url = Column(String(500), nullable=False)
     thumbnail_url = Column(String(500))
@@ -57,6 +64,7 @@ class Photo(Base):
     tarantula = relationship("Tarantula", backref="photos")
     animal = relationship("Animal", backref="photos")
     scorpion = relationship("Scorpion", backref="photos")
+    invert = relationship("Invert", backref="photos")
 
     def __repr__(self):
         parent = self.tarantula_id or self.animal_id or self.scorpion_id

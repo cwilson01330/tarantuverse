@@ -1,0 +1,97 @@
+"""
+Invert schemas — unified per-animal API contract (Phase A1 of ADR-005).
+
+Wide schema covering tarantula + scorpion + centipede fields. The
+client decides which subset to present based on `taxon`.
+"""
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Optional
+import uuid
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+TAXON_PATTERN = "^(tarantula|scorpion|centipede)$"
+LIFE_STAGE_PATTERN = "^(sling|juvenile|adult)$"
+ENCLOSURE_TYPE_PATTERN = "^(terrestrial|arboreal|fossorial)$"
+
+
+class InvertBase(BaseModel):
+    """Common editable fields. Mirrors the existing tarantula + scorpion
+    schemas; taxon-specific fields are nullable."""
+    name: Optional[str] = Field(None, max_length=100)
+    common_name: Optional[str] = Field(None, max_length=100)
+    scientific_name: Optional[str] = Field(None, max_length=255)
+    sex: Optional[str] = Field(None, pattern="^(male|female|unknown)$")
+
+    date_acquired: Optional[date] = None
+    source: Optional[str] = Field(None, pattern="^(bred|bought|wild_caught)$")
+    price_paid: Optional[Decimal] = None
+
+    # Tarantula-only — nullable. Server-side validation could reject
+    # non-tarantula taxa setting this, but staying lenient for now.
+    life_stage: Optional[str] = Field(None, pattern=LIFE_STAGE_PATTERN)
+
+    # Scorpion + centipede growth tracking
+    current_instar: Optional[int] = Field(None, ge=1, le=15)
+    current_length_mm: Optional[Decimal] = None
+
+    # Centipede-only growth tracking
+    current_segment_count: Optional[int] = Field(None, ge=1)
+    current_leg_pair_count: Optional[int] = Field(None, ge=1)
+
+    # Husbandry
+    enclosure_type: Optional[str] = Field(None, pattern=ENCLOSURE_TYPE_PATTERN)
+    enclosure_size: Optional[str] = Field(None, max_length=50)
+    substrate_type: Optional[str] = Field(None, max_length=100)
+    substrate_depth: Optional[str] = Field(None, max_length=50)
+    last_substrate_change: Optional[date] = None
+    target_temp_min: Optional[Decimal] = None
+    target_temp_max: Optional[Decimal] = None
+    target_humidity_min: Optional[Decimal] = None
+    target_humidity_max: Optional[Decimal] = None
+    water_dish: Optional[bool] = True
+    misting_schedule: Optional[str] = Field(None, max_length=100)
+    last_enclosure_cleaning: Optional[date] = None
+    enclosure_notes: Optional[str] = None
+
+    # Feeding pause
+    feeding_paused_reason: Optional[str] = Field(None, max_length=40)
+    feeding_paused_until: Optional[date] = None
+
+    # Media / privacy / notes
+    photo_url: Optional[str] = Field(None, max_length=500)
+    is_public: bool = False
+    visibility: Optional[str] = Field(None, pattern="^(public|private)$")
+    notes: Optional[str] = None
+
+
+class InvertCreate(InvertBase):
+    """Create — taxon is required and immutable thereafter."""
+    taxon: str = Field(..., pattern=TAXON_PATTERN)
+    species_id: Optional[uuid.UUID] = None
+    enclosure_id: Optional[uuid.UUID] = None
+    colony_id: Optional[uuid.UUID] = None
+
+
+class InvertUpdate(InvertBase):
+    """Partial update. `taxon` is INTENTIONALLY OMITTED — an animal
+    cannot change taxon once created (would invalidate logs / photos /
+    care sheet linkage)."""
+    species_id: Optional[uuid.UUID] = None
+    enclosure_id: Optional[uuid.UUID] = None
+    colony_id: Optional[uuid.UUID] = None
+
+
+class InvertResponse(InvertBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    taxon: str
+    species_id: Optional[uuid.UUID] = None
+    enclosure_id: Optional[uuid.UUID] = None
+    colony_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

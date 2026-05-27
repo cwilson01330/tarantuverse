@@ -37,6 +37,17 @@ class FeedingLog(Base):
         nullable=True,
         index=True,
     )
+    # Companion column for the inverts consolidation (ADR-005 Phase A1).
+    # Nullable + not in any CHECK constraint — it shadows whichever
+    # legacy parent column is set, populated by dual-write in Phase A2
+    # and by the backfill script in Phase B. Becomes the canonical
+    # parent once Phase D drops the legacy columns.
+    invert_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("inverts.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     fed_at = Column(DateTime(timezone=True), nullable=False)
     food_type = Column(String(100))  # e.g., "cricket", "roach", "mealworm"
@@ -59,6 +70,7 @@ class FeedingLog(Base):
     enclosure = relationship("Enclosure", back_populates="feeding_logs")
     animal = relationship("Animal", backref="feeding_logs")
     scorpion = relationship("Scorpion", backref="feeding_logs")
+    invert = relationship("Invert", backref="feeding_logs")
 
     def __repr__(self):
         parent = (
