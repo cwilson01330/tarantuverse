@@ -31,6 +31,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { apiClient } from '../../src/services/api';
+import { getImageUrl } from '../../src/utils/image-url';
 import {
   listScorpionSpecies,
   type ScorpionSpecies,
@@ -251,7 +252,15 @@ export default function UnifiedSpeciesScreen() {
       >
         <View style={styles.imageContainer}>
           {item.image_url ? (
-            <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" />
+            // getImageUrl handles both absolute R2 URLs and legacy
+            // server-relative paths (`/uploads/photos/...`). Without
+            // it, relative paths render as broken images. See
+            // src/utils/image-url.ts.
+            <Image
+              source={{ uri: getImageUrl(item.image_url) }}
+              style={styles.image}
+              resizeMode="cover"
+            />
           ) : (
             <View style={[styles.placeholderImage, { backgroundColor: colors.surfaceElevated }]}>
               <Text style={styles.placeholderEmoji}>{typeIcon}</Text>
