@@ -754,34 +754,15 @@ function CollectionScreen() {
     </View>
   );
 
-  const SearchBar = () => (
-    <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <MaterialCommunityIcons
-        name="magnify"
-        size={20}
-        color={colors.textSecondary}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      />
-      <TextInput
-        style={[styles.searchInput, { color: colors.textPrimary }]}
-        placeholder="Search by name, species..."
-        placeholderTextColor={colors.textTertiary}
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        accessibilityLabel="Search tarantulas by name or species"
-      />
-      {searchQuery.length > 0 && (
-        <TouchableOpacity
-          onPress={() => setSearchQuery('')}
-          accessibilityRole="button"
-          accessibilityLabel="Clear search"
-        >
-          <MaterialCommunityIcons name="close-circle" size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  // Search bar was previously a `const SearchBar = () => (...)`
+  // component defined inside CollectionScreen, which caused React to
+  // see a NEW component type on every parent render — so the inner
+  // TextInput got unmounted after every keystroke and the keyboard
+  // lost focus. Now inlined directly into the FlatList header below.
+  // The other inline header components (SortChips, ViewToggle,
+  // TaxonFilterChips) still follow the old pattern but have no input
+  // state that suffers from unmount/remount; clean those up when
+  // there's a reason to touch them again.
 
   const SortChips = () => (
     <View style={styles.sortContainer} accessibilityRole="radiogroup">
@@ -1461,8 +1442,40 @@ function CollectionScreen() {
                 {/* Premolt Alert Card */}
                 <PremoltAlertCard />
 
-                {/* Search Bar */}
-                <SearchBar />
+                {/* Search Bar — inlined (not a sub-component) so the
+                    TextInput keeps its identity across re-renders.
+                    Defining it as `const SearchBar = () => (...)` made
+                    React see a new component type every keystroke,
+                    which unmounted the input and dropped keyboard
+                    focus after one character. */}
+                <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <MaterialCommunityIcons
+                    name="magnify"
+                    size={20}
+                    color={colors.textSecondary}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no"
+                  />
+                  <TextInput
+                    style={[styles.searchInput, { color: colors.textPrimary }]}
+                    placeholder="Search by name, species..."
+                    placeholderTextColor={colors.textTertiary}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    accessibilityLabel="Search tarantulas by name or species"
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity
+                      onPress={() => setSearchQuery('')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Clear search"
+                    >
+                      <MaterialCommunityIcons name="close-circle" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
 
                 {/* Taxon filter — sits above the sort chips so it
                     reads as the primary axis (taxon first, then sort
