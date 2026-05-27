@@ -110,11 +110,14 @@ export default function UnifiedSpeciesScreen() {
         // Use apiClient (not raw fetch) for parity with the scorpion
         // path. apiClient's baseURL already includes /api/v1 and has a
         // fallback to the prod host, so the request works even when
-        // EXPO_PUBLIC_API_URL isn't injected at runtime. The previous
-        // raw-fetch implementation silently returned [] in that case,
-        // which presented as "no tarantulas in the database."
+        // EXPO_PUBLIC_API_URL isn't injected at runtime.
+        //
+        // NB: the species router caps limit at 100 (`le=100`). Asking
+        // for more returns 422 and a silently-empty grid. Keep this
+        // value at 100 until the backend cap is raised. The scorpion
+        // catalog uses `le=200` so its fetch is unaffected.
         const { data } = await apiClient.get<any>('/species', {
-          params: { limit: 200 },
+          params: { limit: 100 },
         });
         // API has historically returned either a bare array or a
         // {items, total} envelope — handle both defensively.
