@@ -68,6 +68,11 @@ import app.routers.scorpion_colonies as scorpion_colonies
 # routes keep working unchanged until the read cutover (Phase C1).
 import app.routers.inverts as inverts
 import app.routers.invert_species as invert_species
+# Centipedes launch on the consolidated surface (ADR-005 Phase C2).
+# No legacy centipedes table — these routers read/write Invert with
+# taxon='centipede' directly.
+import app.routers.centipedes as centipedes
+import app.routers.centipede_species as centipede_species
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -315,6 +320,13 @@ app.include_router(scorpion_colonies.router, prefix="/api/v1/scorpion-colonies",
 print("[STARTUP] Registering inverts routers (consolidation Phase A1)...")
 app.include_router(inverts.router, prefix="/api/v1/inverts", tags=["inverts"])
 app.include_router(invert_species.router, prefix="/api/v1/invert-species", tags=["invert_species"])
+
+# Centipedes (ADR-005 Phase C2) — per-taxon facade over inverts WHERE
+# taxon='centipede'. No legacy table; this is the first taxon launched
+# directly on the consolidated surface.
+print("[STARTUP] Registering centipede routers (Phase C2)...")
+app.include_router(centipedes.router, prefix="/api/v1/centipedes", tags=["centipedes"])
+app.include_router(centipede_species.router, prefix="/api/v1/centipede-species", tags=["centipede_species"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

@@ -33,6 +33,7 @@ from app.models.qr_upload_session import QRUploadSession
 from app.models.tarantula import Tarantula
 from app.models.animal import Animal
 from app.models.scorpion import Scorpion
+from app.models.invert import Invert
 from app.models.photo import Photo
 from app.models.user import User
 from app.models.feeding_log import FeedingLog
@@ -90,12 +91,28 @@ def _scorpion_display_name(s: Scorpion) -> str:
     return " ".join(parts) or "Unknown"
 
 
+def _invert_display_name(i: Invert) -> str:
+    """Display-name helper for inverts (currently used for centipedes
+    — they have no legacy table and the QR session resolves to the
+    Invert row directly)."""
+    parts = []
+    if i.name:
+        parts.append(i.name)
+    label = i.common_name or i.scientific_name
+    if label:
+        parts.append(f"({label})" if i.name else label)
+    return " ".join(parts) or "Unknown"
+
+
 def _session_parent(session: QRUploadSession) -> tuple[str, object | None]:
     """Return (kind, parent_row) for a session.
 
-    `kind` is 'tarantula', 'animal', or 'scorpion'. `row` may be None
-    only if the parent was hard-deleted after session creation
-    (shouldn't happen — FKs are CASCADE — but defensive).
+    `kind` is 'tarantula', 'animal', 'scorpion', or 'invert'. `row`
+    may be None only if the parent was hard-deleted after session
+    creation (shouldn't happen — FKs are CASCADE — but defensive).
+
+    For centipede sessions, only `invert_id` is set — the relationship
+    on QRUploadSession exposes that row as `session.invert`.
     """
     if session.tarantula_id:
         return ("tarantula", session.tarantula)
@@ -103,6 +120,10 @@ def _session_parent(session: QRUploadSession) -> tuple[str, object | None]:
         return ("animal", session.animal)
     if session.scorpion_id:
         return ("scorpion", session.scorpion)
+    if session.invert_id:
+        # Centipede sessions land here. Other taxa that launch on the
+        # consolidated surface in the future will share this branch.
+        return ("invert", session.invert)
     return ("unknown", None)
 
 
@@ -111,13 +132,16 @@ def _session_taxon_str(kind: str, parent) -> str:
 
     For tarantula / scorpion parents it's the literal kind; for an
     animal parent it's the animal's own taxon
-    ('snake' / 'lizard' / 'frog')."""
+    ('snake' / 'lizard' / 'frog'); for an invert parent it's
+    `parent.taxon` (currently 'centipede')."""
     if kind == "tarantula":
         return "tarantula"
     if kind == "scorpion":
         return "scorpion"
     if kind == "animal" and parent is not None:
         return parent.taxon.value if hasattr(parent.taxon, "value") else str(parent.taxon)
+    if kind == "invert" and parent is not None:
+        return parent.taxon if isinstance(parent.taxon, str) else str(parent.taxon)
     return "unknown"
 
 
@@ -132,6 +156,8 @@ def _display_name_for(kind: str, parent) -> str:
         return _scorpion_display_name(parent)
     if kind == "animal":
         return _animal_display_name(parent)
+    if kind == "invert":
+        return _invert_display_name(parent)
     return "Unknown"
 
 
@@ -310,6 +336,63 @@ async def create_scorpion_upload_session(
     }
 
 
+@router.post("/centipedes/{centipede_id}/upload-session")
+async def create_centipede_upload_session(
+    centipede_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a short-lived QR upload session for a centipede.
+
+    Centipedes have no legacy per-taxon table — the QR session
+    references them only through `invert_id`. The upload page then
+    receives `taxon: 'centipede'` from the session-info endpoint and
+    renders the centipede-specific context (segment count, leg pairs,
+    venom callout).
+    """
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    # Deactivate any existing active session for this centipede so a
+    # newly-generated QR supersedes the old one — same UX as the other
+    # taxa.
+    db.query(QRUploadSession).filter(
+        QRUploadSession.invert_id == centipede_id,
+        QRUploadSession.user_id == current_user.id,
+        QRUploadSession.is_active == True,
+    ).update({"is_active": False})
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=SESSION_TTL_MINUTES)
+
+    session = QRUploadSession(
+        token=token,
+        invert_id=centipede_id,
+        user_id=current_user.id,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    web_base = getattr(settings, "FRONTEND_URL", "https://tarantuverse.com")
+    upload_url = f"{web_base}/upload/{token}"
+
+    return {
+        "token": token,
+        "upload_url": upload_url,
+        "expires_at": expires_at.isoformat(),
+        "expires_in_minutes": SESSION_TTL_MINUTES,
+        "taxon": "centipede",
+        "centipede_name": _invert_display_name(centipede),
+    }
+
+
 @router.get("/upload-sessions/{token}")
 async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
     """
@@ -352,6 +435,12 @@ async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
         payload["tarantula_name"] = display_name
     elif kind == "scorpion":
         payload["scorpion_name"] = display_name
+    elif kind == "invert" and parent is not None:
+        # Centipede sessions land here. Use the parent's actual taxon
+        # to key the back-compat name field (future-proofs against
+        # additional taxa launched on the consolidated surface).
+        taxon_key = parent.taxon if isinstance(parent.taxon, str) else str(parent.taxon)
+        payload[f"{taxon_key}_name"] = display_name
     return payload
 
 
@@ -432,12 +521,16 @@ async def upload_photo_via_token(
         }
         # ADR-005 A2 — also populate invert_id for tarantula/scorpion
         # parents so the new unified photos view sees this row.
+        # Centipede sessions land on the `invert` branch — only
+        # invert_id is set (CHECK widened in cip_20260527).
         if kind == "tarantula":
             photo_kwargs["tarantula_id"] = str(session.tarantula_id)
             photo_kwargs["invert_id"] = invert_id_if_exists(db, session.tarantula_id)
         elif kind == "scorpion":
             photo_kwargs["scorpion_id"] = str(session.scorpion_id)
             photo_kwargs["invert_id"] = invert_id_if_exists(db, session.scorpion_id)
+        elif kind == "invert":
+            photo_kwargs["invert_id"] = str(session.invert_id)
         else:
             photo_kwargs["animal_id"] = str(session.animal_id)
 
@@ -473,6 +566,9 @@ async def upload_photo_via_token(
             resp["tarantula_name"] = display_name
         elif kind == "scorpion":
             resp["scorpion_name"] = display_name
+        elif kind == "invert" and parent is not None:
+            taxon_key = parent.taxon if isinstance(parent.taxon, str) else str(parent.taxon)
+            resp[f"{taxon_key}_name"] = display_name
         return resp
 
     except HTTPException:

@@ -13,6 +13,7 @@ from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.animal import Animal
 from app.models.scorpion import Scorpion
+from app.models.invert import Invert
 from app.models.feeding_log import FeedingLog
 from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate, FeedingLogResponse
 from app.schemas.feeding_reminder import FeedingReminderSummary
@@ -52,6 +53,15 @@ def _feeding_owner_taxon(feeding: FeedingLog, db: Session, user: User):
             Scorpion.user_id == user.id,
         ).first()
         return (Scorpion, row) if row else (None, None)
+    # Centipedes (and any taxon that launches on the consolidated
+    # surface) have NO per-taxon FK column — only invert_id is set on
+    # the log row. ADR-005 C2.
+    if feeding.invert_id:
+        row = db.query(Invert).filter(
+            Invert.id == feeding.invert_id,
+            Invert.user_id == user.id,
+        ).first()
+        return (Invert, row) if row else (None, None)
     # enclosure-parented feedings aren't ownership-checked here (feeders);
     # they're handled by their own router.
     return (None, None)
@@ -258,6 +268,70 @@ async def create_scorpion_feeding_log(
     new_feeding = FeedingLog(
         scorpion_id=scorpion_id,
         invert_id=invert_id_if_exists(db, scorpion_id),
+        **feeding_data.model_dump(),
+    )
+    db.add(new_feeding)
+    db.commit()
+    db.refresh(new_feeding)
+    return new_feeding
+
+
+@router.get("/centipedes/{centipede_id}/feedings", response_model=List[FeedingLogResponse])
+async def get_centipede_feeding_logs(
+    centipede_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List feeding logs for a centipede, most recent first.
+
+    Centipede logs are parented ONLY by `invert_id` — there is no
+    `centipede_id` column on `feeding_logs`. The widened CHECK
+    constraint in cip_20260527 allows this shape.
+    """
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    return (
+        db.query(FeedingLog)
+        .filter(FeedingLog.invert_id == centipede_id)
+        .order_by(FeedingLog.fed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/centipedes/{centipede_id}/feedings",
+    response_model=FeedingLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_centipede_feeding_log(
+    centipede_id: uuid.UUID,
+    feeding_data: FeedingLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a feeding for a centipede.
+
+    Sets ONLY `invert_id` on the FeedingLog row. The CHECK constraint
+    permits this via the "invert-only" branch widened in cip_20260527.
+    Activity feed emission is deferred until centipede activity icons
+    land alongside the next mobile bundle.
+    """
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    new_feeding = FeedingLog(
+        invert_id=centipede_id,
         **feeding_data.model_dump(),
     )
     db.add(new_feeding)

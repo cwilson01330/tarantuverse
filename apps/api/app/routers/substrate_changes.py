@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.scorpion import Scorpion
+from app.models.invert import Invert
 from app.models.substrate_change import SubstrateChange
 from app.schemas.substrate_change import SubstrateChangeCreate, SubstrateChangeUpdate, SubstrateChangeResponse
 from app.utils.dependencies import get_current_user
@@ -34,6 +35,12 @@ def _substrate_owner_parent(change: SubstrateChange, db: Session, user: User):
         return db.query(Scorpion).filter(
             Scorpion.id == change.scorpion_id,
             Scorpion.user_id == user.id,
+        ).first()
+    # Centipede substrate changes — invert-only parent (ADR-005 C2).
+    if change.invert_id:
+        return db.query(Invert).filter(
+            Invert.id == change.invert_id,
+            Invert.user_id == user.id,
         ).first()
     return None
 
@@ -164,6 +171,80 @@ async def create_scorpion_substrate_change(
             scorpion.substrate_type = change_data.substrate_type
         if change_data.substrate_depth:
             scorpion.substrate_depth = change_data.substrate_depth
+
+    db.commit()
+    db.refresh(new_change)
+    return new_change
+
+
+@router.get(
+    "/centipedes/{centipede_id}/substrate-changes",
+    response_model=List[SubstrateChangeResponse],
+)
+async def get_centipede_substrate_changes(
+    centipede_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List substrate-change logs for a centipede, most recent first.
+
+    Centipedes need deep, humid substrate — many species burrow >6"
+    and rehouses are stressful, so this log surface helps keepers
+    pace cleanings appropriately."""
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    return (
+        db.query(SubstrateChange)
+        .filter(SubstrateChange.invert_id == centipede_id)
+        .order_by(SubstrateChange.changed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/centipedes/{centipede_id}/substrate-changes",
+    response_model=SubstrateChangeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_centipede_substrate_change(
+    centipede_id: uuid.UUID,
+    change_data: SubstrateChangeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a substrate change for a centipede. Forward-only denorm of
+    the date + type + depth onto the parent Invert so the detail card
+    can show 'last refreshed: X days ago' without a join."""
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    new_change = SubstrateChange(
+        invert_id=centipede_id,
+        **change_data.model_dump(),
+    )
+    db.add(new_change)
+
+    # Forward-only denormalization onto the Invert row.
+    if (
+        centipede.last_substrate_change is None
+        or change_data.changed_at > centipede.last_substrate_change
+    ):
+        centipede.last_substrate_change = change_data.changed_at
+        if change_data.substrate_type:
+            centipede.substrate_type = change_data.substrate_type
+        if change_data.substrate_depth:
+            centipede.substrate_depth = change_data.substrate_depth
 
     db.commit()
     db.refresh(new_change)

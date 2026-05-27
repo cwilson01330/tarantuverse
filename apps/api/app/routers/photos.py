@@ -11,6 +11,7 @@ from app.models.photo import Photo
 from app.models.tarantula import Tarantula
 from app.models.animal import Animal
 from app.models.scorpion import Scorpion
+from app.models.invert import Invert
 from app.routers.auth import get_current_user
 from app.models.user import User
 from app.services.storage import storage_service
@@ -199,6 +200,13 @@ def _photo_owner_parent(photo: Photo, db: Session, user: User):
         return db.query(Scorpion).filter(
             Scorpion.id == photo.scorpion_id,
             Scorpion.user_id == user.id,
+        ).first()
+    # Centipede photos — invert-only parent (ADR-005 C2). The widened
+    # CHECK in cip_20260527 allows this shape.
+    if photo.invert_id:
+        return db.query(Invert).filter(
+            Invert.id == photo.invert_id,
+            Invert.user_id == user.id,
         ).first()
     return None
 
@@ -412,6 +420,116 @@ async def get_scorpion_photos(
     photos = (
         db.query(Photo)
         .filter(Photo.scorpion_id == scorpion_id)
+        .order_by(Photo.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": photo.id,
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
+            "created_at": photo.created_at.isoformat(),
+        }
+        for photo in photos
+    ]
+
+
+@router.post("/centipedes/{centipede_id}/photos")
+async def upload_centipede_photo(
+    centipede_id: str,
+    file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a photo for a centipede.
+
+    Mirrors the scorpion path: magic-byte validation, 15 MB cap, R2
+    upload, thumbnail generation. The Photo row sets ONLY `invert_id`
+    — no `tarantula_id`, `scorpion_id`, or `animal_id` — and relies on
+    the CHECK widened in cip_20260527.
+    """
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    try:
+        file_data = await file.read()
+
+        try:
+            detected_mime = validate_image_bytes(file_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        max_size = 15 * 1024 * 1024
+        if len(file_data) > max_size:
+            raise HTTPException(status_code=400, detail="File size exceeds 15 MB limit")
+
+        photo_url, thumbnail_url = await storage_service.upload_photo(
+            file_data=file_data,
+            filename=file.filename or "upload.jpg",
+            content_type=detected_mime,
+        )
+
+        photo = Photo(
+            id=str(uuid.uuid4()),
+            invert_id=centipede_id,
+            url=photo_url,
+            thumbnail_url=thumbnail_url,
+            caption=caption,
+            taken_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+        )
+        db.add(photo)
+
+        if not centipede.photo_url:
+            centipede.photo_url = photo_url
+
+        db.commit()
+        db.refresh(photo)
+
+        return {
+            "id": photo.id,
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
+            "created_at": photo.created_at.isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Photo upload failed for centipede %s", centipede_id)
+        raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
+
+
+@router.get("/centipedes/{centipede_id}/photos")
+async def get_centipede_photos(
+    centipede_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List photos for a centipede, most recent first."""
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    photos = (
+        db.query(Photo)
+        .filter(Photo.invert_id == centipede_id)
         .order_by(Photo.created_at.desc())
         .all()
     )

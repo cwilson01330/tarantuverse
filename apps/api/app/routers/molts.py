@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.models.scorpion import Scorpion
+from app.models.invert import Invert
 from app.models.molt_log import MoltLog
 from app.schemas.molt import MoltLogCreate, MoltLogUpdate, MoltLogResponse
 from app.utils.dependencies import get_current_user
@@ -38,6 +39,13 @@ def _molt_owner_parent(molt: MoltLog, db: Session, user: User):
         return db.query(Scorpion).filter(
             Scorpion.id == molt.scorpion_id,
             Scorpion.user_id == user.id,
+        ).first()
+    # Centipede molts live solely on `invert_id` — no per-taxon FK.
+    # ADR-005 C2; CHECK widened in cip_20260527.
+    if molt.invert_id:
+        return db.query(Invert).filter(
+            Invert.id == molt.invert_id,
+            Invert.user_id == user.id,
         ).first()
     return None
 
@@ -161,6 +169,66 @@ async def create_scorpion_molt_log(
     new_molt = MoltLog(
         scorpion_id=scorpion_id,
         invert_id=invert_id_if_exists(db, scorpion_id),  # ADR-005 A2
+        **molt_data.model_dump(),
+    )
+    db.add(new_molt)
+    db.commit()
+    db.refresh(new_molt)
+    return new_molt
+
+
+@router.get("/centipedes/{centipede_id}/molts", response_model=List[MoltLogResponse])
+async def get_centipede_molt_logs(
+    centipede_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List molt logs for a centipede, most recent first.
+
+    Centipedes molt — anamorphic species (e.g. Geophilomorpha) add
+    segments on each molt; epimorphic species (e.g. most Scolopendra)
+    keep their adult segment count from birth. The keeper may want to
+    track instar progression alongside; that lives on the Invert row,
+    not here.
+    """
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    return (
+        db.query(MoltLog)
+        .filter(MoltLog.invert_id == centipede_id)
+        .order_by(MoltLog.molted_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/centipedes/{centipede_id}/molts",
+    response_model=MoltLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_centipede_molt_log(
+    centipede_id: uuid.UUID,
+    molt_data: MoltLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a molt for a centipede. Sets only `invert_id`."""
+    centipede = db.query(Invert).filter(
+        Invert.id == centipede_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "centipede",
+    ).first()
+    if not centipede:
+        raise HTTPException(status_code=404, detail="Centipede not found")
+
+    new_molt = MoltLog(
+        invert_id=centipede_id,
         **molt_data.model_dump(),
     )
     db.add(new_molt)
