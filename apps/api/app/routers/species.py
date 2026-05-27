@@ -18,6 +18,12 @@ from app.schemas.species import (
     SpeciesSearchResult,
 )
 from app.utils.dependencies import get_current_user
+# ADR-005 Phase A2 dual-write into `invert_species`.
+from app.services.inverts_dualwrite import (
+    mirror_species_create,
+    mirror_species_delete,
+    mirror_species_update,
+)
 
 router = APIRouter()
 
@@ -154,6 +160,10 @@ async def create_species(
     )
 
     db.add(new_species)
+    # ADR-005 A2 mirror — write the matching invert_species row before
+    # commit so the two tables stay consistent atomically.
+    db.flush()
+    mirror_species_create(db, new_species)
     db.commit()
     db.refresh(new_species)
 
@@ -298,6 +308,8 @@ async def update_species(
     for field, value in update_data.items():
         setattr(species, field, value)
 
+    # ADR-005 A2 mirror — keep invert_species in sync.
+    mirror_species_update(db, species)
     db.commit()
     db.refresh(species)
 
@@ -320,6 +332,8 @@ async def delete_species(
         raise HTTPException(status_code=404, detail="Species not found")
 
     db.delete(species)
+    # ADR-005 A2 mirror — drop the matching invert_species row.
+    mirror_species_delete(db, species_id)
     db.commit()
 
     return None

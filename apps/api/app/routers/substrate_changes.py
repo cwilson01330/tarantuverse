@@ -13,6 +13,7 @@ from app.models.scorpion import Scorpion
 from app.models.substrate_change import SubstrateChange
 from app.schemas.substrate_change import SubstrateChangeCreate, SubstrateChangeUpdate, SubstrateChangeResponse
 from app.utils.dependencies import get_current_user
+from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 
 router = APIRouter()
 
@@ -79,6 +80,7 @@ async def create_substrate_change(
 
     new_change = SubstrateChange(
         tarantula_id=tarantula_id,
+        invert_id=invert_id_if_exists(db, tarantula_id),  # ADR-005 A2
         **change_data.model_dump()
     )
 
@@ -145,7 +147,9 @@ async def create_scorpion_substrate_change(
         raise HTTPException(status_code=404, detail="Scorpion not found")
 
     new_change = SubstrateChange(
-        scorpion_id=scorpion_id, **change_data.model_dump(),
+        scorpion_id=scorpion_id,
+        invert_id=invert_id_if_exists(db, scorpion_id),  # ADR-005 A2
+        **change_data.model_dump(),
     )
     db.add(new_change)
 

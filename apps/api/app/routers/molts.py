@@ -14,6 +14,7 @@ from app.models.molt_log import MoltLog
 from app.schemas.molt import MoltLogCreate, MoltLogUpdate, MoltLogResponse
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
+from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 
 router = APIRouter()
 
@@ -83,6 +84,7 @@ async def create_molt_log(
 
     new_molt = MoltLog(
         tarantula_id=tarantula_id,
+        invert_id=invert_id_if_exists(db, tarantula_id),  # ADR-005 A2
         **molt_data.model_dump()
     )
 
@@ -156,7 +158,11 @@ async def create_scorpion_molt_log(
     if not scorpion:
         raise HTTPException(status_code=404, detail="Scorpion not found")
 
-    new_molt = MoltLog(scorpion_id=scorpion_id, **molt_data.model_dump())
+    new_molt = MoltLog(
+        scorpion_id=scorpion_id,
+        invert_id=invert_id_if_exists(db, scorpion_id),  # ADR-005 A2
+        **molt_data.model_dump(),
+    )
     db.add(new_molt)
     db.commit()
     db.refresh(new_molt)

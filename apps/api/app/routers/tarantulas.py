@@ -32,6 +32,13 @@ from app.schemas.tarantula import (
 )
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
+# ADR-005 Phase A2 — mirror writes to the unified `inverts` table.
+# Same SQLAlchemy session = atomic commit with the legacy write.
+from app.services.inverts_dualwrite import (
+    mirror_tarantula_create,
+    mirror_tarantula_delete,
+    mirror_tarantula_update,
+)
 
 router = APIRouter()
 
@@ -116,6 +123,10 @@ async def create_tarantula(
     )
 
     db.add(new_tarantula)
+    # Flush so new_tarantula.id is populated before we build the
+    # mirrored Invert row — both inserts then commit atomically.
+    db.flush()
+    mirror_tarantula_create(db, new_tarantula)
     db.commit()
     db.refresh(new_tarantula)
 
@@ -207,6 +218,8 @@ async def update_tarantula(
     for field, value in update_data.items():
         setattr(tarantula, field, value)
 
+    # Mirror the same edit to the unified `inverts` row (ADR-005 A2).
+    mirror_tarantula_update(db, tarantula)
     db.commit()
     db.refresh(tarantula)
 
@@ -253,6 +266,10 @@ async def delete_tarantula(
     ).delete(synchronize_session='fetch')
 
     db.delete(tarantula)
+    # Mirror the delete to the unified `inverts` table. Each CASCADE
+    # fires on its own FK independently, so the order of these two
+    # deletes doesn't matter for log/photo cleanup.
+    mirror_tarantula_delete(db, tarantula_id)
     db.commit()
 
     return None

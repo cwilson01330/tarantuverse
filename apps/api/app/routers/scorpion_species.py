@@ -26,6 +26,12 @@ from app.schemas.scorpion_species import (
     ScorpionSpeciesCreate, ScorpionSpeciesResponse, ScorpionSpeciesUpdate,
 )
 from app.utils.dependencies import get_current_user
+# ADR-005 Phase A2 dual-write into `invert_species`.
+from app.services.inverts_dualwrite import (
+    mirror_scorpion_species_create,
+    mirror_scorpion_species_delete,
+    mirror_scorpion_species_update,
+)
 
 router = APIRouter()
 
@@ -155,6 +161,9 @@ async def create_scorpion_species(
         is_verified=False,
     )
     db.add(new_species)
+    # ADR-005 A2 mirror — invert_species row written atomically.
+    db.flush()
+    mirror_scorpion_species_create(db, new_species)
     db.commit()
     db.refresh(new_species)
     return new_species
@@ -197,6 +206,8 @@ async def update_scorpion_species(
     for field, value in update_data.items():
         setattr(species, field, value)
 
+    # ADR-005 A2 mirror.
+    mirror_scorpion_species_update(db, species)
     db.commit()
     db.refresh(species)
     return species
@@ -226,5 +237,7 @@ async def delete_scorpion_species(
             detail="Scorpion species not found",
         )
     db.delete(species)
+    # ADR-005 A2 mirror.
+    mirror_scorpion_species_delete(db, species_id)
     db.commit()
     return None

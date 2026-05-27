@@ -25,6 +25,12 @@ from app.schemas.scorpion import (
     ScorpionCreate, ScorpionResponse, ScorpionUpdate,
 )
 from app.utils.dependencies import get_current_user
+# ADR-005 Phase A2 dual-write into `inverts`.
+from app.services.inverts_dualwrite import (
+    mirror_scorpion_create,
+    mirror_scorpion_delete,
+    mirror_scorpion_update,
+)
 
 router = APIRouter()
 
@@ -120,6 +126,10 @@ async def create_scorpion(
 
     new_scorpion = Scorpion(user_id=current_user.id, **payload)
     db.add(new_scorpion)
+    # ADR-005 A2 mirror — flush so the new id is materialized, then
+    # insert the matching `inverts` row in the same transaction.
+    db.flush()
+    mirror_scorpion_create(db, new_scorpion)
     db.commit()
     db.refresh(new_scorpion)
 
@@ -183,6 +193,8 @@ async def update_scorpion(
     for field, value in update_data.items():
         setattr(scorpion, field, value)
 
+    # ADR-005 A2 mirror — keep the unified `inverts` row in sync.
+    mirror_scorpion_update(db, scorpion)
     db.commit()
     db.refresh(scorpion)
     return scorpion
@@ -208,5 +220,7 @@ async def delete_scorpion(
             detail="Scorpion not found",
         )
     db.delete(scorpion)
+    # ADR-005 A2 mirror — drop the unified row too.
+    mirror_scorpion_delete(db, scorpion_id)
     db.commit()
     return None

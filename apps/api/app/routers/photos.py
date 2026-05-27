@@ -16,6 +16,7 @@ from app.models.user import User
 from app.services.storage import storage_service
 from app.config import settings
 from app.utils.file_validation import validate_image_bytes
+from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 
 
 class PhotoUpdate(BaseModel):
@@ -109,6 +110,7 @@ async def upload_photo(
         photo = Photo(
             id=str(uuid.uuid4()),
             tarantula_id=tarantula_id,
+            invert_id=invert_id_if_exists(db, tarantula_id),  # ADR-005 A2
             url=photo_url,
             thumbnail_url=thumbnail_url,
             caption=caption,
@@ -357,6 +359,7 @@ async def upload_scorpion_photo(
         photo = Photo(
             id=str(uuid.uuid4()),
             scorpion_id=scorpion_id,
+            invert_id=invert_id_if_exists(db, scorpion_id),  # ADR-005 A2
             url=photo_url,
             thumbnail_url=thumbnail_url,
             caption=caption,

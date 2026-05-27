@@ -42,6 +42,7 @@ from app.models.species import Species
 from app.utils.dependencies import get_current_user
 from app.utils.file_validation import validate_image_bytes
 from app.services.storage import storage_service
+from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -185,6 +186,7 @@ async def create_upload_session(
     session = QRUploadSession(
         token=token,
         tarantula_id=tarantula_id,
+        invert_id=invert_id_if_exists(db, tarantula_id),  # ADR-005 A2
         user_id=current_user.id,
         expires_at=expires_at,
     )
@@ -287,6 +289,7 @@ async def create_scorpion_upload_session(
     session = QRUploadSession(
         token=token,
         scorpion_id=scorpion_id,
+        invert_id=invert_id_if_exists(db, scorpion_id),  # ADR-005 A2
         user_id=current_user.id,
         expires_at=expires_at,
     )
@@ -427,10 +430,14 @@ async def upload_photo_via_token(
             "taken_at": datetime.utcnow(),
             "created_at": datetime.utcnow(),
         }
+        # ADR-005 A2 — also populate invert_id for tarantula/scorpion
+        # parents so the new unified photos view sees this row.
         if kind == "tarantula":
             photo_kwargs["tarantula_id"] = str(session.tarantula_id)
+            photo_kwargs["invert_id"] = invert_id_if_exists(db, session.tarantula_id)
         elif kind == "scorpion":
             photo_kwargs["scorpion_id"] = str(session.scorpion_id)
+            photo_kwargs["invert_id"] = invert_id_if_exists(db, session.scorpion_id)
         else:
             photo_kwargs["animal_id"] = str(session.animal_id)
 

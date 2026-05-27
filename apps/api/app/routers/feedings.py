@@ -19,6 +19,8 @@ from app.schemas.feeding_reminder import FeedingReminderSummary
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
 from app.services.feeding_reminder_service import get_user_feeding_reminders
+# ADR-005 Phase A2 — opportunistically populate invert_id on new logs.
+from app.services.inverts_dualwrite import invert_id_if_exists
 
 router = APIRouter()
 
@@ -96,9 +98,13 @@ async def create_feeding_log(
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
 
-    # Create feeding log
+    # Create feeding log. invert_id is set if the corresponding Invert
+    # row exists (which it does for any tarantula created post-A2 or
+    # once backfill in Phase B runs); kept NULL otherwise so the FK
+    # constraint doesn't fail on pre-A2 parents.
     new_feeding = FeedingLog(
         tarantula_id=tarantula_id,
+        invert_id=invert_id_if_exists(db, tarantula_id),
         **feeding_data.model_dump()
     )
 
@@ -248,8 +254,11 @@ async def create_scorpion_feeding_log(
     if not scorpion:
         raise HTTPException(status_code=404, detail="Scorpion not found")
 
+    # ADR-005 A2 — also set invert_id when the corresponding row exists.
     new_feeding = FeedingLog(
-        scorpion_id=scorpion_id, **feeding_data.model_dump(),
+        scorpion_id=scorpion_id,
+        invert_id=invert_id_if_exists(db, scorpion_id),
+        **feeding_data.model_dump(),
     )
     db.add(new_feeding)
     db.commit()
