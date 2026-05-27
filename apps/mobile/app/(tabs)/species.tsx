@@ -326,6 +326,12 @@ export default function UnifiedSpeciesScreen() {
     );
   };
 
+  // NB: do not define these as React components inside the parent
+  // (`const Foo = () => ...`). React treats each render's function as
+  // a NEW component type, which unmounts/remounts on every state change.
+  // For the FlatList header that's why the search TextInput kept losing
+  // focus after one keystroke. Inlining the JSX directly keeps the
+  // same element identity across renders.
   const TaxonSegment = () => (
     <View style={[styles.segmentWrap, { backgroundColor: colors.surfaceElevated }]}>
       {(['tarantulas', 'scorpions'] as Taxon[]).map((t) => {
@@ -380,8 +386,13 @@ export default function UnifiedSpeciesScreen() {
     </TouchableOpacity>
   );
 
-  const ListHeader = () => (
-    <View>
+  // Header content rendered inline below — NOT as a FlatList
+  // ListHeaderComponent function, because that path causes the
+  // TextInput inside to unmount on every keystroke. As a side
+  // benefit, hoisting it outside means the search + filters stay
+  // visible while scrolling the result grid.
+  const HeaderContent = (
+    <>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>Species Database</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -405,6 +416,8 @@ export default function UnifiedSpeciesScreen() {
           placeholderTextColor={colors.textTertiary}
           value={searchTerm}
           onChangeText={setSearchTerm}
+          autoCapitalize="none"
+          autoCorrect={false}
         />
         {searchTerm.length > 0 && (
           <TouchableOpacity onPress={() => setSearchTerm('')}>
@@ -442,14 +455,14 @@ export default function UnifiedSpeciesScreen() {
       <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
         {filtered.length} species found
       </Text>
-    </View>
+    </>
   );
 
   if (loading && rows.length === 0) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <Stack.Screen options={{ headerShown: false }} />
-        <ListHeader />
+        {HeaderContent}
         <View style={styles.loadingContainer}>
           <Text style={{ fontSize: 60, marginBottom: 16 }}>
             {taxon === 'tarantulas' ? '🕷️' : '🦂'}
@@ -465,27 +478,25 @@ export default function UnifiedSpeciesScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
+      {HeaderContent}
       {filtered.length === 0 ? (
-        <>
-          <ListHeader />
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyEmoji}>🔍</Text>
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-              No species found
-            </Text>
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Try adjusting your search or filters
-            </Text>
-          </View>
-        </>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyEmoji}>🔍</Text>
+          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+            No species found
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            Try adjusting your search or filters
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={filtered}
           renderItem={renderCard}
           keyExtractor={(item) => `${item.taxon}-${item.id}`}
-          ListHeaderComponent={ListHeader}
           numColumns={2}
           contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
