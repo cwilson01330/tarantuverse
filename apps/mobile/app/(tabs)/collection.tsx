@@ -26,6 +26,10 @@ import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 import {
+  AddPickerSheet,
+  type AddPickerTaxon,
+} from '../../src/components/AddPickerSheet';
+import {
   listScorpions,
   scorpionDisplayName,
   type Scorpion,
@@ -109,6 +113,9 @@ function CollectionScreen() {
   // while the mark-fed POST is in flight.
   const [actionTarget, setActionTarget] = useState<Tarantula | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  // Add-to-collection taxon picker — replaces the native Alert.alert
+  // dialog so the options render left-aligned with their glyphs.
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
 
   // Load view preference from AsyncStorage
   useEffect(() => {
@@ -1392,30 +1399,26 @@ function CollectionScreen() {
   }
 
   // Add-flow disambiguator. Mirrors HV's ADR-003 pattern: one entry
-  // point on the bottom bar, taxon picked inside the add flow. Alert
-  // is the lightest-weight bottom-sheet substitute that respects
-  // platform conventions on both iOS and Android.
+  // point on the bottom bar, taxon picked inside the add flow.
+  //
+  // Originally this used `Alert.alert` for cross-platform consistency,
+  // but Android's Material AlertDialog right-justifies its options —
+  // with three taxa + a leading emoji glyph, that read awkwardly. The
+  // dedicated AddPickerSheet renders rows left-aligned matching the
+  // existing TarantulaActionSheet shape.
   const openAddPicker = () => {
-    Alert.alert(
-      'Add to collection',
-      'What are you adding?',
-      [
-        {
-          text: '🕷  Tarantula',
-          onPress: () => router.push('/tarantula/add'),
-        },
-        {
-          text: '🦂  Scorpion',
-          onPress: () => router.push('/scorpion/add' as any),
-        },
-        {
-          text: '🐛  Centipede',
-          onPress: () => router.push('/centipede/add' as any),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ],
-      { cancelable: true },
-    );
+    setAddPickerOpen(true);
+  };
+
+  const handleAddPick = (taxon: AddPickerTaxon) => {
+    setAddPickerOpen(false);
+    if (taxon === 'tarantula') {
+      router.push('/tarantula/add');
+    } else if (taxon === 'scorpion') {
+      router.push('/scorpion/add' as any);
+    } else {
+      router.push('/centipede/add' as any);
+    }
   };
 
   // Renders the cross-taxon row using the discriminated union — the
@@ -1677,6 +1680,13 @@ function CollectionScreen() {
         onMarkFed={handleMarkFed}
         onLogMolt={handleLogMolt}
         onEdit={handleEditFromSheet}
+      />
+
+      {/* Add-to-collection taxon picker. Same always-mounted pattern. */}
+      <AddPickerSheet
+        visible={addPickerOpen}
+        onClose={() => setAddPickerOpen(false)}
+        onPick={handleAddPick}
       />
     </View>
   );
