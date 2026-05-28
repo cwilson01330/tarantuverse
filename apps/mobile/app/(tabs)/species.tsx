@@ -37,6 +37,10 @@ import {
   type ScorpionSpecies,
   venomSeverityColor,
 } from '../../src/lib/scorpions';
+import {
+  listCentipedeSpecies,
+  type CentipedeSpecies,
+} from '../../src/lib/centipedes';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -46,7 +50,7 @@ const CARD_WIDTH = (width - 48) / 2;
 // the renderer can dispatch on `taxon` to show taxon-appropriate badges.
 // ---------------------------------------------------------------------------
 
-type Taxon = 'tarantulas' | 'scorpions';
+type Taxon = 'tarantulas' | 'scorpions' | 'centipedes';
 
 interface TarantulaRow {
   taxon: 'tarantulas';
@@ -76,7 +80,24 @@ interface ScorpionRow {
   communal_suitable: boolean;
 }
 
-type Row = TarantulaRow | ScorpionRow;
+interface CentipedeRow {
+  taxon: 'centipedes';
+  id: string;
+  scientific_name: string;
+  common_names: string[];
+  type: string | null;
+  care_level: string | null;
+  adult_size: string | null;
+  is_verified: boolean;
+  image_url: string | null;
+  /** Centipedes share the scorpion venom tier shape — used to render
+   * the same "Hot" pill on the card. */
+  venom_severity: CentipedeSpecies['venom_severity'];
+  /** Drives the small "anamorphic"/"epimorphic" hint on the card. */
+  developmental_class: CentipedeSpecies['developmental_class'];
+}
+
+type Row = TarantulaRow | ScorpionRow | CentipedeRow;
 
 export default function UnifiedSpeciesScreen() {
   const { colors } = useTheme();
@@ -84,7 +105,11 @@ export default function UnifiedSpeciesScreen() {
   // each collection tab preselect the right segment.
   const { taxon: taxonParam } = useLocalSearchParams<{ taxon?: string }>();
   const initialTaxon: Taxon =
-    taxonParam === 'scorpions' ? 'scorpions' : 'tarantulas';
+    taxonParam === 'scorpions'
+      ? 'scorpions'
+      : taxonParam === 'centipedes'
+        ? 'centipedes'
+        : 'tarantulas';
 
   const [taxon, setTaxon] = useState<Taxon>(initialTaxon);
   const [rows, setRows] = useState<Row[]>([]);
@@ -138,7 +163,7 @@ export default function UnifiedSpeciesScreen() {
             medically_significant_venom: s.medically_significant_venom,
           })),
         );
-      } else {
+      } else if (which === 'scorpions') {
         const items = await listScorpionSpecies({ limit: 200 });
         setRows(
           items.map((s) => ({
@@ -153,6 +178,24 @@ export default function UnifiedSpeciesScreen() {
             image_url: s.image_url,
             venom_severity: s.venom_severity,
             communal_suitable: s.communal_suitable,
+          })),
+        );
+      } else {
+        // centipedes
+        const items = await listCentipedeSpecies({ limit: 200 });
+        setRows(
+          items.map((c) => ({
+            taxon: 'centipedes' as const,
+            id: c.id,
+            scientific_name: c.scientific_name,
+            common_names: c.common_names ?? [],
+            type: c.type,
+            care_level: c.care_level,
+            adult_size: c.adult_size,
+            is_verified: c.is_verified,
+            image_url: c.image_url,
+            venom_severity: c.venom_severity,
+            developmental_class: c.developmental_class,
           })),
         );
       }
@@ -212,6 +255,16 @@ export default function UnifiedSpeciesScreen() {
         default: return '🦂';
       }
     }
+    if (which === 'centipedes') {
+      // Centipede `type` reuses the tarantula vocabulary
+      // (terrestrial / fossorial). Most pet trade species are
+      // fossorial, so that branch gets the mountain glyph.
+      switch (type) {
+        case 'terrestrial': return '🏜️';
+        case 'fossorial': return '⛰️';
+        default: return '🐛';
+      }
+    }
     switch (type) {
       case 'terrestrial': return '🏜️';
       case 'arboreal': return '🌳';
@@ -224,15 +277,20 @@ export default function UnifiedSpeciesScreen() {
     const path =
       row.taxon === 'tarantulas'
         ? `/species/${row.id}`
-        : `/scorpion-species/${row.id}`;
+        : row.taxon === 'scorpions'
+          ? `/scorpion-species/${row.id}`
+          : `/centipede-species/${row.id}`;
     router.push(path as any);
   };
 
   const renderCard = ({ item, index }: { item: Row; index: number }) => {
     const careLevel = getCareLevel(item.care_level);
     const typeIcon = getTypeIcon(item.taxon, item.type);
+    // Scorpions + centipedes share the same venom-tier shape; render
+    // the same pill so a keeper scans the whole catalog for hot
+    // species the same way.
     const venom =
-      item.taxon === 'scorpions'
+      item.taxon === 'scorpions' || item.taxon === 'centipedes'
         ? venomSeverityColor(item.venom_severity)
         : null;
     const isHot =
@@ -334,8 +392,14 @@ export default function UnifiedSpeciesScreen() {
   // same element identity across renders.
   const TaxonSegment = () => (
     <View style={[styles.segmentWrap, { backgroundColor: colors.surfaceElevated }]}>
-      {(['tarantulas', 'scorpions'] as Taxon[]).map((t) => {
+      {(['tarantulas', 'scorpions', 'centipedes'] as Taxon[]).map((t) => {
         const active = t === taxon;
+        const label =
+          t === 'tarantulas'
+            ? '🕷  Tarantulas'
+            : t === 'scorpions'
+              ? '🦂  Scorpions'
+              : '🐛  Centipedes';
         return (
           <TouchableOpacity
             key={t}
@@ -351,8 +415,9 @@ export default function UnifiedSpeciesScreen() {
                 styles.segmentText,
                 { color: active ? '#fff' : colors.textPrimary },
               ]}
+              numberOfLines={1}
             >
-              {t === 'tarantulas' ? '🕷  Tarantulas' : '🦂  Scorpions'}
+              {label}
             </Text>
           </TouchableOpacity>
         );
@@ -396,7 +461,13 @@ export default function UnifiedSpeciesScreen() {
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>Species Database</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {rows.length} {taxon === 'tarantulas' ? 'tarantula' : 'scorpion'} species
+          {rows.length}{' '}
+          {taxon === 'tarantulas'
+            ? 'tarantula'
+            : taxon === 'scorpions'
+              ? 'scorpion'
+              : 'centipede'}{' '}
+          species
         </Text>
       </View>
 
@@ -411,7 +482,9 @@ export default function UnifiedSpeciesScreen() {
           placeholder={
             taxon === 'tarantulas'
               ? 'Search tarantula species…'
-              : 'Search scorpion species…'
+              : taxon === 'scorpions'
+                ? 'Search scorpion species…'
+                : 'Search centipede species…'
           }
           placeholderTextColor={colors.textTertiary}
           value={searchTerm}
@@ -465,7 +538,11 @@ export default function UnifiedSpeciesScreen() {
         {HeaderContent}
         <View style={styles.loadingContainer}>
           <Text style={{ fontSize: 60, marginBottom: 16 }}>
-            {taxon === 'tarantulas' ? '🕷️' : '🦂'}
+            {taxon === 'tarantulas'
+              ? '🕷️'
+              : taxon === 'scorpions'
+                ? '🦂'
+                : '🐛'}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Loading species…

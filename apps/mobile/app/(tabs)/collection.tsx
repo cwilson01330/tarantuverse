@@ -30,6 +30,11 @@ import {
   scorpionDisplayName,
   type Scorpion,
 } from '../../src/lib/scorpions';
+import {
+  listCentipedes,
+  centipedeDisplayName,
+  type Centipede,
+} from '../../src/lib/centipedes';
 
 interface Tarantula {
   id: string;
@@ -71,13 +76,15 @@ interface CollectionStats {
 
 // Taxon discriminator drives the FlatList row dispatcher: tarantulas
 // keep their full-featured card (feeding badge + premolt + action
-// sheet), scorpions render via a simpler card until those features
-// ship for the scorpion surface. New taxa land here when added.
-type TaxonFilter = 'all' | 'tarantulas' | 'scorpions';
+// sheet), scorpions + centipedes render via a simpler card until
+// those features ship for the additional surfaces. New taxa land
+// here when added.
+type TaxonFilter = 'all' | 'tarantulas' | 'scorpions' | 'centipedes';
 
 type Row =
   | { kind: 'tarantula'; data: Tarantula }
-  | { kind: 'scorpion'; data: Scorpion };
+  | { kind: 'scorpion'; data: Scorpion }
+  | { kind: 'centipede'; data: Centipede };
 
 function CollectionScreen() {
   const router = useRouter();
@@ -85,6 +92,7 @@ function CollectionScreen() {
   const { colors } = useTheme();
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [scorpions, setScorpions] = useState<Scorpion[]>([]);
+  const [centipedes, setCentipedes] = useState<Centipede[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
@@ -133,6 +141,7 @@ function CollectionScreen() {
   useEffect(() => {
     fetchTarantulas();
     fetchScorpions();
+    fetchCentipedes();
     fetchCollectionStats();
   }, []);
 
@@ -153,6 +162,19 @@ function CollectionScreen() {
       setScorpions(rows);
     } catch {
       setScorpions([]);
+    }
+  };
+
+  const fetchCentipedes = async () => {
+    // Same non-fatal pattern as scorpions — centipedes are the third
+    // additive taxon (ADR-005 C2). Older mobile builds running pre-C2
+    // never hit this endpoint; this build silently handles a 404 if
+    // someone's API instance lags behind.
+    try {
+      const rows = await listCentipedes();
+      setCentipedes(rows);
+    } catch {
+      setCentipedes([]);
     }
   };
 
@@ -305,27 +327,34 @@ function CollectionScreen() {
   const getDisplayName = (t: Tarantula) => t.name || t.common_name || 'Unknown';
 
   // Unified row name lookup — drives the search and the name sort
-  // across taxa. Scorpion display name reuses scorpionDisplayName from
-  // the lib for consistency with the Phase 3b screens.
-  const getRowName = (row: Row): string =>
-    row.kind === 'tarantula'
-      ? getDisplayName(row.data)
-      : scorpionDisplayName(row.data);
+  // across taxa. Scorpion + centipede display names reuse their lib
+  // helpers for consistency with the per-taxon detail screens.
+  const getRowName = (row: Row): string => {
+    if (row.kind === 'tarantula') return getDisplayName(row.data);
+    if (row.kind === 'scorpion') return scorpionDisplayName(row.data);
+    return centipedeDisplayName(row.data);
+  };
 
-  // Filter and sort rows (tarantulas + scorpions, gated by taxonFilter).
+  // Filter and sort rows (tarantulas + scorpions + centipedes, gated
+  // by taxonFilter). When a specific taxon is selected the other two
+  // collapse out entirely so the keeper can focus.
   const getFilteredRows = (): Row[] => {
     const query = searchQuery.toLowerCase();
 
     const tarantulaRows: Row[] =
-      taxonFilter === 'scorpions'
-        ? []
-        : tarantulas.map((t) => ({ kind: 'tarantula' as const, data: t }));
+      taxonFilter === 'all' || taxonFilter === 'tarantulas'
+        ? tarantulas.map((t) => ({ kind: 'tarantula' as const, data: t }))
+        : [];
     const scorpionRows: Row[] =
-      taxonFilter === 'tarantulas'
-        ? []
-        : scorpions.map((s) => ({ kind: 'scorpion' as const, data: s }));
+      taxonFilter === 'all' || taxonFilter === 'scorpions'
+        ? scorpions.map((s) => ({ kind: 'scorpion' as const, data: s }))
+        : [];
+    const centipedeRows: Row[] =
+      taxonFilter === 'all' || taxonFilter === 'centipedes'
+        ? centipedes.map((c) => ({ kind: 'centipede' as const, data: c }))
+        : [];
 
-    let rows: Row[] = [...tarantulaRows, ...scorpionRows];
+    let rows: Row[] = [...tarantulaRows, ...scorpionRows, ...centipedeRows];
 
     // Search across name, common_name, and scientific_name regardless
     // of taxon. Empty query short-circuits.
@@ -372,6 +401,7 @@ function CollectionScreen() {
     await Promise.all([
       fetchTarantulas(),
       fetchScorpions(),
+      fetchCentipedes(),
       fetchCollectionStats(),
     ]);
     setRefreshing(false);
@@ -594,6 +624,79 @@ function CollectionScreen() {
               visually distinguishable from tarantulas at a glance. */}
           <View style={styles.taxonGlyph}>
             <Text style={{ fontSize: 14 }}>🦂</Text>
+          </View>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.name}>{displayName}</Text>
+          {item.scientific_name && (
+            <Text style={styles.scientificName}>{item.scientific_name}</Text>
+          )}
+          {item.common_name && (
+            <Text style={styles.commonName}>{item.common_name}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Centipede card mirrors the scorpion card. Same simple shape until
+  // feeding-status + premolt indicators ship for the consolidated
+  // taxa. Icon is `bug-outline` (closest MCI glyph to a centipede) +
+  // a 🐛 taxon stamp in the bottom-left.
+  const renderCentipede = ({ item }: { item: Centipede }) => {
+    const displayName =
+      item.name || item.common_name || item.scientific_name || 'Unnamed';
+    const sexLabel =
+      item.sex === 'female'
+        ? 'female'
+        : item.sex === 'male'
+          ? 'male'
+          : 'unknown sex';
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/centipede/${item.id}` as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, centipede`}
+        accessibilityHint="Opens this centipede's detail page."
+      >
+        <View style={styles.imageContainer}>
+          {item.photo_url ? (
+            <Image
+              source={{ uri: getImageUrl(item.photo_url) }}
+              style={styles.image}
+              accessibilityLabel={`Photo of ${displayName}`}
+            />
+          ) : (
+            <View
+              style={styles.placeholderImage}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              <MaterialCommunityIcons
+                name="bug-outline"
+                size={40}
+                color={colors.textTertiary}
+              />
+            </View>
+          )}
+          {item.sex && item.sex !== 'unknown' && (
+            <View
+              style={[
+                styles.sexBadge,
+                item.sex === 'female' ? styles.femaleBadge : styles.maleBadge,
+              ]}
+              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
+            >
+              <MaterialCommunityIcons
+                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
+                size={16}
+                color="#fff"
+              />
+            </View>
+          )}
+          <View style={styles.taxonGlyph}>
+            <Text style={{ fontSize: 14 }}>🐛</Text>
           </View>
         </View>
         <View style={styles.cardContent}>
@@ -1305,6 +1408,10 @@ function CollectionScreen() {
           text: '🦂  Scorpion',
           onPress: () => router.push('/scorpion/add' as any),
         },
+        {
+          text: '🐛  Centipede',
+          onPress: () => router.push('/centipede/add' as any),
+        },
         { text: 'Cancel', style: 'cancel' },
       ],
       { cancelable: true },
@@ -1316,6 +1423,9 @@ function CollectionScreen() {
   const renderRow = ({ item }: { item: Row }) => {
     if (item.kind === 'scorpion') {
       return renderScorpion({ item: item.data });
+    }
+    if (item.kind === 'centipede') {
+      return renderCentipede({ item: item.data });
     }
     return viewMode === 'card'
       ? renderTarantula({ item: item.data })
@@ -1331,6 +1441,7 @@ function CollectionScreen() {
           { value: 'all' as const, label: 'All' },
           { value: 'tarantulas' as const, label: '🕷 Tarantulas' },
           { value: 'scorpions' as const, label: '🦂 Scorpions' },
+          { value: 'centipedes' as const, label: '🐛 Centipedes' },
         ]
       ).map((opt) => {
         const active = taxonFilter === opt.value;
