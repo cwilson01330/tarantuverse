@@ -260,10 +260,49 @@ export default function ActivityFeedItem({ activity }: ActivityFeedItemProps) {
     }
   };
 
+  // Tarantula thumbnail — only the husbandry activities (add/molt/feed)
+  // carry a subject animal. The backend writes tarantula_name +
+  // thumbnail_url into activity_metadata for these. photo_url may be an
+  // absolute R2 URL or a relative /uploads path, so resolve the same way
+  // mobile does.
+  const metadata = activity.activity_metadata || {};
+  const isTarantulaActivity =
+    activity.action_type === "new_tarantula" ||
+    activity.action_type === "molt" ||
+    activity.action_type === "feeding";
+  const tarantulaName: string | undefined =
+    metadata.tarantula_name || metadata.name;
+  const rawThumbnail = metadata.thumbnail_url as string | undefined;
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const thumbnailUrl = rawThumbnail
+    ? rawThumbnail.startsWith("http")
+      ? rawThumbnail
+      : `${API_URL}${rawThumbnail}`
+    : null;
+
   return (
     <div className="flex items-start gap-3 p-4 bg-dark-50 rounded-lg shadow-lg border border-electric-blue-500/20 hover:shadow-electric-blue-500/30 hover:border-electric-blue-500/30 transition-all">
       {/* Icon */}
       <div className="flex-shrink-0 mt-1">{getActionIcon()}</div>
+
+      {/* Tarantula thumbnail (husbandry activities only) */}
+      {isTarantulaActivity &&
+        (thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbnailUrl}
+            alt={tarantulaName ? `Photo of ${tarantulaName}` : "Tarantula photo"}
+            className="flex-shrink-0 w-11 h-11 rounded-lg object-cover"
+          />
+        ) : tarantulaName ? (
+          <div
+            className="flex-shrink-0 w-11 h-11 rounded-lg bg-dark-100 flex items-center justify-center text-xl"
+            aria-hidden="true"
+          >
+            🕷️
+          </div>
+        ) : null)}
 
       {/* Content */}
       <div className="flex-1 min-w-0">

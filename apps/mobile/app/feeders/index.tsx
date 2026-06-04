@@ -348,7 +348,7 @@ export default function FeedersListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1 },
-  contentInner: { padding: 16 },
+  contentInner: { padding: 16, paddingBottom: 100 }, // FAB clearance: bottom 28 + 56 height + 16 gap
   loadingWrap: { paddingVertical: 48, alignItems: 'center' },
   lowBanner: {
     flexDirection: 'row',

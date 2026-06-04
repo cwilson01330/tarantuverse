@@ -808,9 +808,9 @@ function CollectionScreen() {
           {days !== undefined && (
             <View
               style={[styles.listBadge, { backgroundColor: feedingColor }]}
-              accessibilityLabel={`Last fed ${days} days ago`}
+              accessibilityLabel={days === 0 ? 'Fed today' : `Last fed ${days} days ago`}
             >
-              <Text style={styles.listBadgeText}>{days}d</Text>
+              <Text style={styles.listBadgeText}>{days === 0 ? 'Today' : `${days}d`}</Text>
             </View>
           )}
           {premoltPrediction && premoltPrediction.confidence_level !== 'low' && (

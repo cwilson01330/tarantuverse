@@ -354,6 +354,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 12,
+    paddingBottom: 92, // FAB clearance: bottom 20 + 56 height + 16 gap
   },
   centerContent: {
     flex: 1,

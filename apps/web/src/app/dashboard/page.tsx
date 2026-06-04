@@ -398,10 +398,11 @@ export default function DashboardHub() {
           {/* Total Collection */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
+            aria-label={`My collection: ${tarantulas.length} tarantulas. View all.`}
             className="bg-surface rounded-2xl shadow-lg border border-theme p-6 hover:shadow-xl transition-all text-left group"
           >
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center text-2xl shadow-lg">
+              <div aria-hidden="true" className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center text-2xl shadow-lg">
                 🕷️
               </div>
               <div>
@@ -417,6 +418,7 @@ export default function DashboardHub() {
           {/* Needs Feeding */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
+            aria-label={`Needs feeding: ${overdueFeedings.length} ${overdueFeedings.length > 0 ? 'overdue 7 or more days' : 'all on schedule'}.`}
             className={`rounded-2xl shadow-lg border p-6 hover:shadow-xl transition-all text-left ${
               overdueFeedings.length > 0
                 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
@@ -424,7 +426,7 @@ export default function DashboardHub() {
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-lg ${
+              <div aria-hidden="true" className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-lg ${
                 overdueFeedings.length > 0
                   ? 'bg-red-500'
                   : 'bg-gradient-brand'
@@ -445,9 +447,12 @@ export default function DashboardHub() {
               across the user's collection. Falls back to '—' before stats
               load (vs '0' which would imply "you've logged none" and look
               wrong on first paint). */}
-          <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
+          <div
+            className="bg-surface rounded-2xl shadow-lg border border-theme p-6"
+            aria-label={`Total molts logged across collection: ${collectionStats ? collectionStats.total_molts : 'loading'}.`}
+          >
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center text-2xl shadow-lg">
+              <div aria-hidden="true" className="w-12 h-12 rounded-xl bg-gradient-brand flex items-center justify-center text-2xl shadow-lg">
                 🦋
               </div>
               <div>
@@ -463,6 +468,7 @@ export default function DashboardHub() {
           {/* Premolt Alerts */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
+            aria-label={`Premolt alerts: ${premoltAlerts.length} ${premoltAlerts.length > 0 ? 'at medium or higher confidence' : 'no alerts'}.`}
             className={`rounded-2xl shadow-lg border p-6 hover:shadow-xl transition-all text-left ${
               premoltAlerts.length > 0
                 ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
@@ -470,7 +476,7 @@ export default function DashboardHub() {
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-lg ${
+              <div aria-hidden="true" className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-lg ${
                 premoltAlerts.length > 0
                   ? 'bg-purple-500'
                   : 'bg-gradient-brand'
