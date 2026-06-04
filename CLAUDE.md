@@ -1719,26 +1719,18 @@ const data = await response.json()
 
 ## 🔍 Database Migration Status
 
-### Complete Migration Chain (19 migrations):
-1. `9588b399ad54_initial_migration.py` - Initial schema
-2. `a1b2c3d4e5f6_add_photo_url_to_tarantulas.py` - Photo URL field
-3. `b2c3d4e5f6g7_expand_species_model.py` - Expanded species fields
-4. `c3d4e5f6g7h8_add_husbandry_and_substrate_changes.py` - Husbandry + substrate changes
-5. `d1e2f3g4h5i6_add_community_features.py` - Community base
-6. `e2f3g4h5i6j7_add_messages_table.py` - Message board
-7. `f3g4h5i6j7k8_add_message_interactions.py` - Likes/reactions
-8. `g4h5i6j7k8l9_add_follow_and_direct_messaging_models.py` - Follow + DM
-9. `h5i6j7k8l9m0_add_forums_and_activity_feed.py` - Forums + activity
-10. `i6j7k8l9m0n1_change_activity_target_id_to_string.py` - Activity target fix
-11. `j1k2l3m4n5o6_add_subscription_tables.py` - Subscriptions
-12. `add_oauth_fields.py` (oauth_fields_001) - OAuth authentication
-13. `add_safety_fields_to_species.py` - Safety information
-14. `k2l3m4n5o6p7_add_breeding_module.py` - Breeding module
-15. `l3m4n5o6p7q8_add_notification_preferences.py` - Notification system
-16. `w4x5y6z7a8b9_add_system_settings.py` - System settings & feature flags
-17. `x5y6z7a8b9c0_add_achievements.py` - Achievement definitions & user tracking
-18. `y6z7a8b9c0d1_add_qr_identity_system.py` - QR upload sessions
-19. `z7a8b9c0d1e2_add_token_blocklist.py` - JWT token revocation
+### Migration Chain (recent additions through 2026-06-04):
+Earlier migrations 1-19 (initial schema → token blocklist) listed in CHANGELOG_OLDER.md when extracted. Recent additions:
+
+20. `cgd_20260522_add_feeds_on_cgd.py` — Crested Gecko Diet feeding flag (HV)
+21. `scp_20260522_add_scorpions.py` — Scorpion expansion: `scorpions`, `scorpion_species`, `scorpion_colonies`, `broods`, polymorphic FK extensions to feeding_logs / molt_logs / substrate_changes / photos / qr_upload_sessions
+22. `inv_20260527_inverts_consolidation_v1.py` — ADR-005 Phase A1: unified `inverts` + `invert_species` tables (taxon discriminator: tarantula | scorpion | centipede), nullable `invert_id` companion column on the five polymorphic-log tables
+23. `cip_20260527_widen_log_checks_for_inverts.py` — ADR-005 Phase C2: widens at-least-one-parent and exactly-one-parent CHECK constraints on the five log tables so centipede rows (invert_id only, no per-taxon FK) are accepted
+
+**Data migrations not in Alembic:**
+- `backfill_inverts.py` (one-shot) — Phase B backfill. Run via Render shell after the inv_20260527 migration. Idempotent. 2026-05-27 prod run: 1440 tarantulas + 102 species + 25 scorpion species mirrored, 154 species_id links resolved, 1527 log rows linked (1234 feedings + 103 molts + 14 substrate changes + 173 photos + 3 QR sessions). All 16 verification checks clean.
+- `seed_scorpion_species.py` — 25-species catalog seed (Phase 1 scorpion expansion)
+- `seed_centipede_species.py` — 9-species catalog seed (Phase C2 centipede launch)
 
 **All migrations applied to production database**
 
@@ -1907,7 +1899,7 @@ This includes:
 
 ### Current Limitations:
 - No offline mode (requires internet connection)
-- No environmental sensor integration (IoT)
+- No environmental sensor integration yet (scoped — see Future Enhancements)
 - Payment integration not complete (Stripe/PayPal)
 - No WebSocket for real-time messaging
 
@@ -1917,10 +1909,13 @@ This includes:
 3. Complete OAuth provider setup (Google, Apple, GitHub)
 4. Add WebSocket for real-time updates (DMs, notifications)
 5. Health tracking module (medical logs, treatments, vet visits)
+6. ADR-005 Phase C1 — read cutover on legacy `/tarantulas/` + `/scorpions/` routes (after soak)
+7. ADR-005 Phase D — drop dual-write + legacy tables (gated, 2+ weeks after C1)
+8. Add-flow streamline — single form with taxon segment control + dual-mode species input (parked design, prototype on `centipede/add.tsx` first)
 
 ### Future Enhancements:
 - Offline mode with local storage and sync
-- Temperature/humidity sensor integration (IoT)
+- **Temperature/humidity sensor integration** — scoped 2026-06-04. v1 plan: `enclosure_readings` table (id, enclosure_id, source, recorded_at, temp_f, humidity_pct, battery_pct, raw_payload) + `sensor_connections` table per user/provider. Tier 1 integration: SwitchBot (cleanest API, hub-based, broad keeper appeal). Tier 2: generic webhook ingest endpoint with per-enclosure token (DIY ESP32 + SHT30 / BME280). Iterate to Govee (H5101/H5179) and Shelly H&T after launch. Polling cadence ~10 min — "live" with 5-15 min latency is honest for husbandry use. Out-of-range alerts pulled from species `temperature_min/max` + `humidity_min/max` already on `invert_species`. Surface battery status prominently — a dead sensor silently lies.
 - Multi-user collections (shared access)
 - Marketplace/classifieds integration
 - NFC tag support for enclosures
@@ -1929,14 +1924,25 @@ This includes:
 - Tarantula "personality profiles"
 - Breeder network and marketplace
 - Community challenges and leaderboards
+- QRSheet generalization — currently tarantula-only, extend to scorpions + centipedes so any taxon can spawn an offline upload QR code
 
 ---
 
-**Last Updated**: 2026-04-09
-**Version**: 1.0.0 (Platform Hardening Complete)
+**Last Updated**: 2026-06-04
+**Version**: 1.2.0 (Multi-taxon platform — tarantulas + scorpions + centipedes on unified `inverts`)
 **Status**: Active Development
 
-**Recent Changes** (2026-04-03 → 2026-04-09):
+**Recent Changes** (2026-04-14 → 2026-06-04):
+- 🦂 **SCORPION EXPANSION**: Full new taxon — 25-species catalog (`scorpion_species`), per-animal `scorpions` table, `scorpion_colonies` for communal setups, polymorphic FK extensions to feeding/molt/substrate/photo/QR (scp_20260522 migration), CRUD routers, mobile lib + screens + species browser. Venom severity tier ('mild' / 'moderate' / 'medically_significant') is the headline safety field. Breeding (`broods`) deferred to a later phase.
+- 🐛 **CENTIPEDE LAUNCH** (ADR-005 Phase C2 + C3): Third taxon shipped directly on the unified `inverts` surface — no legacy table. 9-species seed (Scolopendromorpha) covering beginner mild venom (E. trigonopodus, Rhysida longipes, S. polymorpha) through medically-significant (S. gigantea, S. subspinipes). `/centipedes/` + `/centipede-species/` per-taxon facade routers, centipede-parented log endpoints with widened CHECK constraints (cip_20260527), full mobile UI (lib, detail/add/edit/log/photo screens, care sheet with biology callout, species browser segment).
+- 🔄 **ADR-005 INVERTS CONSOLIDATION** (Phases A1, A2, B): Unified `inverts` + `invert_species` tables collapsing the tarantula + scorpion silos into one taxon-discriminated surface. A1 created the schema additively (inv_20260527). A2 wired dual-write on every legacy CRUD path so writes hit both surfaces atomically (`inverts_dualwrite.py` service, 13 mirror functions). B backfilled production cleanly — 1440 tarantulas + 102 species + 25 scorpion species mirrored, 154 species_id links resolved, 1527 log rows linked, all 16 verification checks at 0. Read cutover (C1) and legacy table drop (D) remain gated.
+- 📱 **MOBILE COLLECTION CONSOLIDATION**: Replaced separate Tarantulas + Scorpions bottom tabs with a single Collection tab that filters by taxon. Added the third-taxon centipede chip + add-picker option. Replaced the native `Alert.alert` taxon picker with `AddPickerSheet` — left-aligned bottom-sheet modal matching the existing `TarantulaActionSheet` visual language (3 rows with leading emoji glyphs, cancel pill, backdrop tap dismiss).
+- 🎨 **THEME PRESET SYSTEM** (April 14): Multi-axis `AestheticPreset` (Keeper / Hobbyist) wired through mobile `ThemeContext` + web CSS custom properties. Cross-device sync via `user_theme_preferences.aesthetic_preset` column. `AppHeader`, `PrimaryButton`, and ~13 gradient surfaces migrated to preset-aware components.
+- ⏸️ **FEEDING PAUSE UX** (Path C, April): `feeding_paused_reason` + `feeding_paused_until` columns + UI surface ("Paused" pill replacing the red overdue treatment) on collection grid + detail screens, both web and mobile, both Tarantuverse and Herpetoverse.
+- 🏆 **TIER 1 DASHBOARD CARDS + ACHIEVEMENTS POLISH**: Slimmed achievement gallery, surface quick-win cards on dashboard.
+- 🪲 **BUG FIX BUNDLE**: Enum casing alignment (snake / reptile species / breeding enums, both UPPERCASE shared and lowercase per-taxon), percent-units double-scaling (refusal rate display), refusals filtered out of cadence math (next-feeding prediction), calendar-day diffs via tz_offset_minutes (not UTC midnight floors), expo-notifications trigger type explicit (SDK 53+), Hermes prod crash from dynamic component patterns, useSearchParams Suspense wrapping (Next 14), Alembic PG enum double-create workarounds.
+
+**Previous Changelog** (2026-04-03 → 2026-04-09):
 - 🔐 **SECURITY HARDENING**: Rate limiting (SlowAPI), JWT token revocation with blocklist, CORS explicit headers, magic byte file validation, password complexity, dev secret detection, OAuth auto-link fix
 - 📧 **PASSWORD RECOVERY & EMAIL**: Resend API integration, forgot/reset password flow (web + mobile), optional email verification feature flag
 - 📱 **QR IDENTITY SYSTEM**: Upload sessions (20-min TTL), enclosure labels with font/color/field customization, public tarantula profiles (`/t/{id}`), web upload page

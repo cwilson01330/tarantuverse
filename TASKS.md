@@ -2,6 +2,52 @@
 
 ## Active
 
+### 🔄 ADR-005 Inverts Consolidation · A1+A2+B+C2+C3 shipped 2026-05-27, soak window open
+
+Plan: `docs/design/PLAN-inverts-consolidation-v1.md` · Decision: `docs/design/ADR-005-inverts-consolidation.md`
+
+**Shipped:**
+- [x] ~~Phase A1 — additive schema migration: `inverts` + `invert_species` tables + `invert_id` companion columns on the 5 polymorphic log tables (inv_20260527)~~
+- [x] ~~Phase A2 — dual-write service (`inverts_dualwrite.py`) wired into every legacy CRUD route (4 entity routers, 5 log routers, 24 mirror call sites)~~
+- [x] ~~Phase B — backfill script (`backfill_inverts.py`) verified clean on prod: 1440 tarantulas + 127 species mirrored, 1527 log rows linked, all checks at 0~~
+- [x] ~~Phase C2 — centipede launch on unified surface: CHECK widening migration (cip_20260527), `/centipedes/` + `/centipede-species/` routers, centipede-parented log endpoints, 9-species seed~~
+- [x] ~~Phase C3 — mobile centipede UI: lib, detail/add/edit/log/photo screens, collection tab integration, species browser segment, care sheet with biology callout~~
+- [x] ~~`AddPickerSheet` — left-aligned bottom sheet replacing native Alert.alert for the add-to-collection taxon picker~~
+
+**Remaining (gated):**
+- [ ] **Phase C1 — read cutover on legacy routes**: switch `/tarantulas/` + `/scorpions/` handlers to read from `inverts WHERE taxon=…` while keeping response shapes identical for older mobile clients. Medium risk, reversible. Start after soak window confirms backend stable.
+- [ ] **Phase D — drop dual-write + legacy tables**: gated for 2+ weeks after C1 ships. Snapshot DB before running. Irreversible without snapshot restore.
+
+---
+
+### 🌡️ Sensor Integration · scoped 2026-06-04
+
+Discussed direction: tiered approach. v1 covers SwitchBot (cleanest API) + generic webhook ingest endpoint for DIY tier. Iterate to Govee + Shelly after launch.
+
+- [ ] **Data model** — `enclosure_readings` table (id, enclosure_id, source enum, recorded_at, temp_f, humidity_pct, battery_pct, raw_payload jsonb) + `sensor_connections` table (per-user provider auth + enclosure mapping)
+- [ ] **SwitchBot integration** — Open API v1.1, cloud poll every 10 min via background job, OAuth-style API key entry
+- [ ] **Generic webhook ingest** — `POST /enclosures/{id}/readings` with per-enclosure secret token (DIY ESP32 path)
+- [ ] **Environment tab on enclosure detail** — current reading + 24h/7d/30d sparkline + battery status pill
+- [ ] **Out-of-range alerts** — pull thresholds from `invert_species.temperature_min/max` + `humidity_min/max`
+- [ ] **Rate limiting + per-user opt-in** — guard against scale (1000 keepers × 10min polls)
+
+Stretch (after launch):
+- [ ] Govee integration (H5101 / H5179, requires WiFi gateway)
+- [ ] Shelly H&T Plus integration (local LAN HTTP API + cloud API)
+- [ ] Sensorpush integration (premium tier, rate-limited API)
+
+---
+
+### 🎯 Add-Flow Streamline · parked 2026-06-04
+
+Replace the bottom-sheet picker + separate add screens with a single form that has a taxon segment control at the top. Species autocomplete scoped to the active taxon. "I don't see my species" affordance routes to freehand scientific_name entry.
+
+- [ ] **Prototype on `centipede/add.tsx`** — net-new screen with cleanest field set; least risk
+- [ ] **Visual sign-off** — share the prototype before extending to tarantula + scorpion add screens
+- [ ] **Roll out to scorpion + tarantula add screens** — same shape, taxon-specific field blocks toggle based on segment selection
+
+---
+
 ### 🎨 Theme Preset System — Sprint 1 (Mobile Architecture) · ✅ SHIPPED 2026-04-14
 
 - [x] ~~Extend ThemeContext with `AestheticPreset` axis + `LayoutTokens` (useGradient, radius, density, elevation)~~
@@ -92,11 +138,36 @@
 - [ ] **Unread badges on bottom tabs** — Community (forum replies) + Profile (DMs)
 - [ ] **Stripe/PayPal payment integration** — complete subscription monetization
 - [ ] **Icon system consolidation** — migrate all emoji-as-UI to Phosphor or Lucide
+- [ ] **QRSheet generalization** — currently tarantula-only; extend to scorpions + centipedes so any taxon can spawn an offline upload QR
+- [ ] **Sensor integration v1.1** — Govee API (H5101 / H5179) after SwitchBot launches
+- [ ] **Sensor integration v1.2** — Shelly H&T Plus (local LAN + cloud)
+- [ ] **Sensor integration premium tier** — Sensorpush (rate-limited API, premium accuracy)
+- [ ] **Centipede care sheet images** — sourcing pipeline for the 9 v1 species (currently image_url=null)
 
 ---
 
 ## Done
 
+- [x] ~~AddPickerSheet bottom sheet — left-aligned taxon picker replacing Alert.alert~~ (2026-06-04)
+- [x] ~~ADR-005 Phase C3: Centipede mobile UI (lib, 7 screens, collection integration, species browser segment, care sheet with biology callout)~~ (2026-05-27)
+- [x] ~~ADR-005 Phase C2: Centipede backend launch (CHECK widening migration, `/centipedes/` + `/centipede-species/` routers, centipede log endpoints, 9-species seed)~~ (2026-05-27)
+- [x] ~~ADR-005 Phase B: Backfill script — 1440 tarantulas + 127 species mirrored, 1527 log rows linked, all checks at 0~~ (2026-05-27)
+- [x] ~~ADR-005 Phase A2: Dual-write service wired into 4 entity routers + 5 log routers (24 mirror call sites)~~ (2026-05-27)
+- [x] ~~ADR-005 Phase A1: Additive `inverts` + `invert_species` schema, `invert_id` companion columns~~ (2026-05-27)
+- [x] ~~Mobile Collection consolidation — single Collection tab with taxon filter + add-picker, hide separate Scorpions tab~~ (2026-05-22)
+- [x] ~~Unified species browser — taxon switcher segment between tarantula + scorpion catalogs~~ (2026-05-22)
+- [x] ~~Scorpion Phase 3b: Mobile detail/add/edit/log screens + photo upload + QR + species browser + care sheet~~ (2026-05-22)
+- [x] ~~Scorpion Phase 3a: Mobile lib, types, collection screen, tab nav consolidation~~ (2026-05-22)
+- [x] ~~Scorpion Phase 2: 25-species seed script~~ (2026-05-22)
+- [x] ~~Scorpion Phase 1b: Polymorphic FK extensions (feeding/molt/substrate/photo/QR) for scorpion_id~~ (2026-05-22)
+- [x] ~~Scorpion Phase 1a: Migration + models + schemas + 4 new routers (scorpions, scorpion_species, scorpion_colonies, broods)~~ (2026-05-22)
+- [x] ~~CGD (Crested Gecko Diet) feeding flag — herp_species.feeds_on_cgd + animals.feeds_on_cgd_override + UI + brand picker~~ (2026-05-22)
+- [x] ~~HV mobile notifications service + native install + preferences screen~~ (2026-05-22)
+- [x] ~~HV mobile + web settings parity~~ (2026-05-22)
+- [x] ~~Password recovery per-app frontend_url + web /reset-password + mobile forgot-password~~ (2026-05-22)
+- [x] ~~ADR-003: Single animals table (HV) — snake/lizard/frog consolidated~~ (2026-05-14)
+- [x] ~~TV Path C: Feeding pause UX — backend column, web detail, mobile detail, collection grid overdue suppression~~ (2026-05-01)
+- [x] ~~HV reptile breeding parity — backend + web + mobile (TV 6a-6i)~~ (2026-04 → 2026-05)
 - [x] ~~Fix silent 401 failures: align session maxAge, add expired token redirect on web and mobile~~ (2026-04-13)
 - [x] ~~Fix label print: use outerHTML to preserve theme styles, strip preview zoom~~ (2026-04-13)
 - [x] ~~Platform design audit (9 screens + accessibility + design system)~~ (2026-04-13)
@@ -104,3 +175,4 @@
 - [x] ~~PRD: Theme preset system~~ (2026-04-13)
 - [x] ~~Sprint plan: Theme preset system~~ (2026-04-13)
 - [x] ~~Sprint 1 mobile: ThemeContext preset axis, AppHeader, PrimaryButton, full gradient migration~~ (2026-04-14)
+- [x] ~~Update CLAUDE.md with multi-taxon platform changes + recent changelog~~ (2026-06-04)
