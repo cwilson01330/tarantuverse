@@ -114,7 +114,7 @@ export default function PricingPage() {
                 <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-gray-700 dark:text-gray-300">Up to 15 tarantulas</span>
+                <span className="text-gray-700 dark:text-gray-300">Up to 20 animals</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -174,7 +174,7 @@ export default function PricingPage() {
                 <svg className="w-5 h-5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-gray-700 dark:text-gray-300">Unlimited tarantulas</span>
+                <span className="text-gray-700 dark:text-gray-300">Unlimited animals</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

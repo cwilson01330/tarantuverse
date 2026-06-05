@@ -43,7 +43,7 @@ export default function UpgradeModal({ isOpen, onClose, feature, description }: 
           <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
             <li className="flex items-start gap-2">
               <span className="text-green-500 mt-0.5">✓</span>
-              <span>Unlimited tarantulas</span>
+              <span>Unlimited animals</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-green-500 mt-0.5">✓</span>

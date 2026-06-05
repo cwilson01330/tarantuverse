@@ -140,6 +140,7 @@ class User(Base):
             # Return free tier defaults
             return {
                 "max_tarantulas": 15,
+                "max_animals": 20,
                 "can_use_breeding": False,
                 "max_photos_per_tarantula": 5,
                 "has_priority_support": False,
@@ -157,6 +158,7 @@ class User(Base):
             # Return free tier defaults
             return {
                 "max_tarantulas": 15,
+                "max_animals": 20,
                 "can_use_breeding": False,
                 "max_photos_per_tarantula": 5,
                 "has_priority_support": False,
@@ -172,6 +174,7 @@ class User(Base):
             # Fallback to free tier
             return {
                 "max_tarantulas": 15,
+                "max_animals": 20,
                 "can_use_breeding": False,
                 "max_photos_per_tarantula": 5,
                 "has_priority_support": False,
@@ -180,6 +183,9 @@ class User(Base):
 
         return {
             "max_tarantulas": plan.max_tarantulas,
+            # Older plan rows (pre-sub_20260605) may not have max_animals
+            # populated; fall back to the free default rather than None.
+            "max_animals": plan.max_animals if plan.max_animals is not None else 20,
             "can_use_breeding": plan.can_use_breeding,
             "max_photos_per_tarantula": plan.max_photos_per_tarantula,
             "has_priority_support": plan.has_priority_support,

@@ -56,7 +56,7 @@ export default function UpgradeModal({
   ];
 
   const premiumFeatures = [
-    'Unlimited tarantulas',
+    'Unlimited animals',
     'Unlimited photo uploads',
     'Full breeding module (pairings, egg sacs, offspring)',
     'Advanced analytics & insights',

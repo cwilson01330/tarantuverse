@@ -36,6 +36,7 @@ from app.schemas.centipede import (
     CentipedeCreate, CentipedeResponse, CentipedeUpdate,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.limits import enforce_collection_limit
 
 router = APIRouter()
 
@@ -125,6 +126,8 @@ async def create_centipede(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new centipede. Taxon is force-set to 'centipede'."""
+    # Cross-taxon collection cap (counts inverts: tarantulas + scorpions + centipedes).
+    enforce_collection_limit(db, current_user)
     _validate_species(db, payload.species_id)
 
     data = _coerce_enums(payload.model_dump())

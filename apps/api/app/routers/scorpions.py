@@ -25,6 +25,7 @@ from app.schemas.scorpion import (
     ScorpionCreate, ScorpionResponse, ScorpionUpdate,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.limits import enforce_collection_limit
 # ADR-005 Phase A2 dual-write into `inverts`.
 from app.services.inverts_dualwrite import (
     mirror_scorpion_create,
@@ -111,6 +112,8 @@ async def create_scorpion(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new scorpion for the authenticated user."""
+    # Cross-taxon collection cap (counts inverts: tarantulas + scorpions + centipedes).
+    enforce_collection_limit(db, current_user)
     _validate_species(db, scorpion_data.species_id)
     _validate_colony(db, current_user, scorpion_data.colony_id)
 

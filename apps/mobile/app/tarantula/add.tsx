@@ -656,8 +656,8 @@ export default function AddTarantulaScreen() {
           visible={showUpgradeModal}
           onClose={() => setShowUpgradeModal(false)}
           title="Collection Limit Reached"
-          message="You've reached the free tier limit of 15 tarantulas."
-          feature="Unlimited Tarantulas"
+          message="You've reached the free tier limit of 20 animals."
+          feature="Unlimited Animals"
         />
       </Suspense>
     </View>

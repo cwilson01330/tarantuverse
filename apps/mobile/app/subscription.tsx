@@ -146,7 +146,7 @@ export default function SubscriptionScreen() {
 
       Alert.alert(
         'Success!',
-        'Your subscription is now active! Enjoy unlimited tarantulas, photos, and breeding features.',
+        'Your subscription is now active! Enjoy unlimited animals, photos, and breeding features.',
         [{ text: 'OK' }]
       );
     } catch (error: any) {
@@ -655,7 +655,7 @@ export default function SubscriptionScreen() {
               <View style={styles.featuresList}>
                 <View style={styles.featureItem}>
                   <MaterialCommunityIcons name="check-circle" size={18} color="white" />
-                  <Text style={styles.featureText}>Unlimited tarantulas</Text>
+                  <Text style={styles.featureText}>Unlimited animals</Text>
                 </View>
                 <View style={styles.featureItem}>
                   <MaterialCommunityIcons name="check-circle" size={18} color="white" />

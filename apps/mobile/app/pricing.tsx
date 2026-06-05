@@ -22,8 +22,8 @@ export default function PricingScreen() {
       period: '/forever',
       description: 'Perfect for casual keepers with small collections',
       features: [
-        'Up to 15 tarantulas',
-        '5 photos per tarantula',
+        'Up to 20 animals',
+        '5 photos per animal',
         'Feeding & molt tracking',
         'Basic analytics',
         'Community access',
@@ -39,7 +39,7 @@ export default function PricingScreen() {
       description: 'Perfect for trying premium features',
       features: [
         'Everything in Free, plus:',
-        'Unlimited tarantulas',
+        'Unlimited animals',
         'Unlimited photos',
         'Full breeding module',
         'Advanced analytics',

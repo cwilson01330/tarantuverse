@@ -29,6 +29,7 @@ from app.models.scorpion_colony import ScorpionColony
 from app.models.tarantula import Sex, Source  # shared DB enums (UPPERCASE)
 from app.schemas.invert import InvertCreate, InvertResponse, InvertUpdate
 from app.utils.dependencies import get_current_user
+from app.utils.limits import enforce_collection_limit
 
 router = APIRouter()
 
@@ -118,6 +119,8 @@ async def create_invert(
     current_user: User = Depends(get_current_user),
 ):
     """Create a new invert. `taxon` is required and immutable."""
+    # Cross-taxon collection cap (counts inverts: tarantulas + scorpions + centipedes).
+    enforce_collection_limit(db, current_user)
     _validate_species(db, payload.species_id, payload.taxon)
     _validate_colony(db, current_user, payload.colony_id)
 

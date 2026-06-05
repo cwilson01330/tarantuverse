@@ -64,7 +64,7 @@ function CheckoutSuccessContent() {
                 You now have access to:
               </h3>
               <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                <li>Unlimited tarantulas</li>
+                <li>Unlimited animals</li>
                 <li>Unlimited photos</li>
                 <li>Full breeding module</li>
                 <li>Advanced analytics</li>

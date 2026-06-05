@@ -31,6 +31,7 @@ from app.schemas.tarantula import (
     PremoltIndicator
 )
 from app.utils.dependencies import get_current_user
+from app.utils.limits import enforce_collection_limit
 from app.services.activity_service import create_activity
 # ADR-005 Phase A2 — mirror writes to the unified `inverts` table.
 # Same SQLAlchemy session = atomic commit with the legacy write.
@@ -76,21 +77,10 @@ async def create_tarantula(
     - **date_acquired**: When you got this tarantula
     - All other fields are optional
     """
-    # Check tarantula count limit
-    limits = current_user.get_subscription_limits()
-    current_count = db.query(Tarantula).filter(Tarantula.user_id == current_user.id).count()
-
-    # -1 means unlimited (premium)
-    if limits["max_tarantulas"] != -1 and current_count >= limits["max_tarantulas"]:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail={
-                "message": f"You've reached the limit of {limits['max_tarantulas']} tarantulas on the free plan. Upgrade to premium for unlimited tracking!",
-                "current_count": current_count,
-                "limit": limits["max_tarantulas"],
-                "is_premium": limits["is_premium"]
-            }
-        )
+    # Enforce the cross-taxon collection cap (counted against `inverts`,
+    # which covers tarantulas + scorpions + centipedes). Replaces the
+    # former tarantula-only check.
+    enforce_collection_limit(db, current_user)
 
     tarantula_dict = tarantula_data.model_dump()
     # sex/source DB enums were created with uppercase names (MALE, FEMALE, BRED, etc.)

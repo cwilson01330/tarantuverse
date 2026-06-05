@@ -32,7 +32,8 @@ class SubscriptionPlan(Base):
 
     # Features
     features = Column(JSONB, default={})
-    max_tarantulas = Column(Integer, default=15)  # -1 for unlimited
+    max_tarantulas = Column(Integer, default=15)  # -1 for unlimited (legacy; retained for back-compat)
+    max_animals = Column(Integer, default=20)  # -1 for unlimited; cross-taxon cap counted against `inverts`
     can_edit_species = Column(Boolean, default=False)
     can_submit_species = Column(Boolean, default=False)
     has_advanced_filters = Column(Boolean, default=False)
