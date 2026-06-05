@@ -91,8 +91,8 @@ export default function Home() {
 
             <p className="text-xl text-gray-300 mb-8 leading-relaxed">
               Track feedings, predict molts, manage breeding projects, and connect with
-              the keeper community — all in one place. Built by keepers who got tired of
-              juggling spreadsheets.
+              the keeper community — for your tarantulas, scorpions, and centipedes, all
+              in one place. Built by keepers who got tired of juggling spreadsheets.
             </p>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
@@ -132,9 +132,9 @@ export default function Home() {
               <div className="bg-dark border border-neon-pink-500/30 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-neon-pink-500 to-electric-blue-500 rounded-lg flex items-center justify-center text-xl">🕷️</div>
+                    <div className="w-10 h-10 bg-gradient-to-br from-neon-pink-500 to-electric-blue-500 rounded-lg flex items-center justify-center text-xl">🦂</div>
                     <div>
-                      <div className="font-semibold text-gray-100 text-sm">Brachypelma hamorii</div>
+                      <div className="font-semibold text-gray-100 text-sm">Pandinus imperator</div>
                       <div className="text-xs text-orange-400">⚠ Due for feeding</div>
                     </div>
                   </div>
@@ -147,11 +147,11 @@ export default function Home() {
                   </div>
                   <div className="bg-electric-blue-500/10 border border-electric-blue-500/20 rounded-lg p-2 text-center">
                     <div className="text-xs text-gray-400">Molts</div>
-                    <div className="font-bold text-electric-blue-400 text-sm">12</div>
+                    <div className="font-bold text-electric-blue-400 text-sm">6</div>
                   </div>
                   <div className="bg-neon-pink-500/10 border border-neon-pink-500/20 rounded-lg p-2 text-center">
                     <div className="text-xs text-gray-400">Size</div>
-                    <div className="font-bold text-neon-pink-400 text-sm">5.2″</div>
+                    <div className="font-bold text-neon-pink-400 text-sm">5.9″</div>
                   </div>
                 </div>
               </div>
@@ -177,7 +177,7 @@ export default function Home() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-xs text-gray-300">
                     <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0"></span>
-                    <span><strong>SpiderKeeper_TX</strong> posted a molt photo</span>
+                    <span><strong>CentipedeCarl</strong> logged a molt for S. dehaani</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-300">
                     <span className="w-2 h-2 rounded-full bg-neon-pink-400 flex-shrink-0"></span>
@@ -203,7 +203,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div>
-              <div className="text-2xl md:text-3xl font-bold text-electric-blue-400">100+</div>
+              <div className="text-2xl md:text-3xl font-bold text-electric-blue-400">130+</div>
               <div className="text-xs md:text-sm text-gray-400 mt-1">Species Care Sheets</div>
             </div>
             <div>
@@ -218,6 +218,71 @@ export default function Home() {
               <div className="text-2xl md:text-3xl font-bold text-amber-400">11</div>
               <div className="text-xs md:text-sm text-gray-400 mt-1">Feeder Colony Species</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Three Taxa ──────────────────────────────────────────── */}
+      <section id="taxa" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            <span className="text-gray-100">Three taxa, </span>
+            <span className="bg-gradient-primary bg-clip-text text-transparent">one platform</span>
+          </h2>
+          <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+            Tarantuverse started with tarantulas — and now tracks scorpions and centipedes
+            on the same husbandry tools. Feeding, molt, substrate, and photo logs work the
+            same across every animal in your collection.
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {/* Tarantulas */}
+          <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/10 transition">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl">🕷️</span>
+              <div>
+                <h3 className="text-lg font-bold text-gray-100">Tarantulas</h3>
+                <div className="text-xs text-electric-blue-400 font-semibold">100+ species care sheets</div>
+              </div>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              The full toolkit — feeding stats, growth analytics, premolt prediction, and the
+              complete breeding module (pairings, egg sacs, offspring). Safety warnings flag
+              Old World species and urticating hairs.
+            </p>
+          </div>
+
+          {/* Scorpions */}
+          <div className="bg-dark-50 border border-neon-pink-500/20 rounded-2xl p-6 hover:border-neon-pink-500/40 hover:shadow-lg hover:shadow-neon-pink-500/10 transition">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl">🦂</span>
+              <div>
+                <h3 className="text-lg font-bold text-gray-100">Scorpions</h3>
+                <div className="text-xs text-neon-pink-400 font-semibold">25 species care sheets</div>
+              </div>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Track individuals or communal colonies, with feeding, molt, and substrate logs.
+              Care sheets lead with a venom severity tier — mild, moderate, or medically
+              significant — so you always know what you're working with.
+            </p>
+          </div>
+
+          {/* Centipedes */}
+          <div className="bg-dark-50 border border-green-500/20 rounded-2xl p-6 hover:border-green-500/40 hover:shadow-lg hover:shadow-green-500/10 transition">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-3xl">🐛</span>
+              <div>
+                <h3 className="text-lg font-bold text-gray-100">Centipedes</h3>
+                <div className="text-xs text-green-400 font-semibold">9 species care sheets</div>
+              </div>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              The newest addition, from beginner-friendly mild-venom species to medically
+              significant Scolopendra. Full feeding, molt, and substrate tracking, with care
+              sheets that include a biology callout for these fast, fascinating predators.
+            </p>
           </div>
         </div>
       </section>
@@ -304,11 +369,11 @@ export default function Home() {
 
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/10 transition">
             <div className="text-3xl mb-3">📚</div>
-            <h3 className="text-lg font-bold mb-2 text-gray-100">100+ Species Care Sheets</h3>
+            <h3 className="text-lg font-bold mb-2 text-gray-100">130+ Species Care Sheets</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Link any tarantula to our species database and get instant care requirements —
-              temperature, humidity, enclosure size, feeding frequency, and safety warnings
-              for OW species.
+              Link any tarantula, scorpion, or centipede to our species database and get instant
+              care requirements — temperature, humidity, enclosure size, feeding frequency, and
+              safety warnings for Old World species and medically significant venom.
             </p>
           </div>
 
@@ -990,7 +1055,7 @@ export default function Home() {
                 <TarantuverseLogoTransparent className="w-8 h-8" />
                 <span className="font-bold text-gray-100">Tarantuverse</span>
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed">Built by keepers, for keepers. The only app built specifically for tarantula enthusiasts.</p>
+              <p className="text-sm text-gray-400 leading-relaxed">Built by keepers, for keepers. Made specifically for tarantula, scorpion, and centipede enthusiasts.</p>
             </div>
             <div>
               <h4 className="font-semibold text-gray-100 mb-3">Product</h4>
@@ -1020,7 +1085,7 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-electric-blue-500/10 pt-8 text-center text-sm text-gray-500">
-            © {new Date().getFullYear()} Tarantuverse. Built by keepers, for keepers. 🕷️
+            © {new Date().getFullYear()} Tarantuverse. Built by keepers, for keepers. 🕷️🦂🐛
           </div>
         </div>
       </footer>
