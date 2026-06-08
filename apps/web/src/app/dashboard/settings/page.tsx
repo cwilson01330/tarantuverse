@@ -548,9 +548,9 @@ export default function SettingsPage() {
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-theme-secondary">Tarantulas</p>
+                  <p className="text-theme-secondary">Animals</p>
                   <p className="font-semibold text-theme-primary">
-                    {subscriptionLimits?.max_tarantulas === -1 ? 'Unlimited' : `${subscriptionLimits?.max_tarantulas ?? 15} max`}
+                    {subscriptionLimits?.max_animals === -1 ? 'Unlimited' : `${subscriptionLimits?.max_animals ?? 20} max`}
                   </p>
                 </div>
                 <div>

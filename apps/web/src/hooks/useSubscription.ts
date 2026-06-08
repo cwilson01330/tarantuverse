@@ -3,7 +3,8 @@ import { useAuth } from './useAuth'
 
 interface SubscriptionLimits {
   is_premium: boolean
-  max_tarantulas: number
+  max_tarantulas: number // legacy; retained for back-compat
+  max_animals: number // cross-taxon collection cap (-1 = unlimited)
   can_use_breeding: boolean
   max_photos_per_tarantula: number
   has_priority_support: boolean
@@ -37,6 +38,7 @@ export function useSubscription() {
         setLimits({
           is_premium: false,
           max_tarantulas: 15,
+          max_animals: 20,
           can_use_breeding: false,
           max_photos_per_tarantula: 5,
           has_priority_support: false,
@@ -62,10 +64,15 @@ export function useSubscription() {
     fetchLimits()
   }, [fetchLimits])
 
+  // Collection cap is now cross-taxon (animals), counted server-side
+  // against `inverts`. Fall back to the legacy tarantula field if an
+  // older API response omits max_animals.
+  const animalLimit = (): number => limits?.max_animals ?? limits?.max_tarantulas ?? 20
+
   const canAddTarantula = (currentCount: number): boolean => {
     if (!limits) return false
     if (limits.is_premium) return true
-    return currentCount < limits.max_tarantulas
+    return currentCount < animalLimit()
   }
 
   const canUseBreeding = (): boolean => {
@@ -81,7 +88,7 @@ export function useSubscription() {
 
   const getRemainingTarantulas = (currentCount: number): number => {
     if (!limits || limits.is_premium) return Infinity
-    return Math.max(0, limits.max_tarantulas - currentCount)
+    return Math.max(0, animalLimit() - currentCount)
   }
 
   const getRemainingPhotos = (currentPhotoCount: number): number => {

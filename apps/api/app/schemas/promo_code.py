@@ -77,7 +77,8 @@ class PromoCodeBulkCreate(BaseModel):
 
 class SubscriptionLimitsResponse(BaseModel):
     """Schema for user subscription limits"""
-    max_tarantulas: int
+    max_tarantulas: int  # legacy; retained for back-compat
+    max_animals: int  # cross-taxon collection cap (-1 = unlimited)
     can_use_breeding: bool
     max_photos_per_tarantula: int
     has_priority_support: bool

@@ -340,8 +340,8 @@ export default function DashboardHub() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Free Tier Warning Banner */}
         {!subscriptionLimits?.is_premium &&
-         tarantulas.length >= 10 &&
-         tarantulas.length < 15 &&
+         tarantulas.length >= (subscriptionLimits?.max_animals ?? 20) - 5 &&
+         tarantulas.length < (subscriptionLimits?.max_animals ?? 20) &&
          showWarning && (
           <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 shadow-lg">
             <div className="flex items-start justify-between">
@@ -350,7 +350,7 @@ export default function DashboardHub() {
                 <div className="flex-1">
                   <h3 className="font-bold text-theme-primary mb-1">Approaching Free Tier Limit</h3>
                   <p className="text-sm text-theme-secondary mb-3">
-                    You have <strong>{tarantulas.length} of 15</strong> tarantulas on the free plan.
+                    You have <strong>{tarantulas.length} of {subscriptionLimits?.max_animals ?? 20}</strong> animals on the free plan.
                     Upgrade to Premium for unlimited tracking!
                   </p>
                   <div className="flex flex-wrap gap-2">
