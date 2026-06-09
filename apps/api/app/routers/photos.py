@@ -121,9 +121,15 @@ async def upload_photo(
 
         db.add(photo)
 
-        # If this is the first photo, set it as the tarantula's main photo
+        # If this is the first photo, set it as the tarantula's main photo.
+        # Also seed the unified Invert mirror's hero so the consolidated
+        # collection grid (which reads Invert.photo_url) shows it. ADR-008.
         if not tarantula.photo_url:
             tarantula.photo_url = photo_url
+        if photo.invert_id:
+            invert_mirror = db.query(Invert).filter(Invert.id == photo.invert_id).first()
+            if invert_mirror and not invert_mirror.photo_url:
+                invert_mirror.photo_url = photo_url
 
         db.commit()
         db.refresh(photo)
@@ -773,11 +779,48 @@ async def delete_photo(
         raise HTTPException(status_code=403, detail="Not authorized to delete this photo")
 
     try:
+        # If we're deleting the current hero, promote the next most-recent
+        # remaining photo (or clear the hero if none remain). ADR-008 — the
+        # generic invert detail/collection read photo_url, so a dangling hero
+        # URL pointing at a deleted image would otherwise show a broken image.
+        # Captured before the row is removed.
+        was_hero = getattr(parent, "photo_url", None) == photo.url
+        sibling_filter = (
+            Photo.tarantula_id == photo.tarantula_id if photo.tarantula_id
+            else Photo.animal_id == photo.animal_id if photo.animal_id
+            else Photo.scorpion_id == photo.scorpion_id if photo.scorpion_id
+            else Photo.invert_id == photo.invert_id if photo.invert_id
+            else None
+        )
+
         # Delete files from storage service (R2 or local)
         await storage_service.delete_photo(photo.url, photo.thumbnail_url)
 
         # Delete from database
         db.delete(photo)
+
+        if was_hero:
+            next_photo = None
+            if sibling_filter is not None:
+                next_photo = (
+                    db.query(Photo)
+                    .filter(sibling_filter, Photo.id != photo_id)
+                    .order_by(Photo.created_at.desc())
+                    .first()
+                )
+            new_url = next_photo.url if next_photo else None
+            parent.photo_url = new_url
+            # Keep the unified Invert mirror in lockstep (shared PK), covering
+            # tarantula + scorpion whose legacy FK is resolved first. No-op for
+            # HV animals (no Invert mirror) and when parent already IS an Invert.
+            if not isinstance(parent, Invert):
+                invert = db.query(Invert).filter(
+                    Invert.id == parent.id,
+                    Invert.user_id == current_user.id,
+                ).first()
+                if invert:
+                    invert.photo_url = new_url
+
         db.commit()
 
         return {"message": "Photo deleted successfully"}
