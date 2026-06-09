@@ -829,12 +829,6 @@ const styles = StyleSheet.create({
   commonName: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
   scientificName: { fontSize: 12, fontStyle: 'italic', marginBottom: 8 },
   quickInfo: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  infoChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  infoChipText: { fontSize: 11, fontWeight: '600' },
 
   emptyContainer: { padding: 48, alignItems: 'center' },
   emptyEmoji: { fontSize: 64, marginBottom: 16 },
