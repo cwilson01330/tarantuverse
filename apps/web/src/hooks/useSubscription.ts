@@ -50,6 +50,7 @@ export function useSubscription() {
       setLimits({
         is_premium: false,
         max_tarantulas: 15,
+        max_animals: 20,
         can_use_breeding: false,
         max_photos_per_tarantula: 5,
         has_priority_support: false,
