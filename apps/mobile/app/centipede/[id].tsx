@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -43,6 +44,8 @@ function CentipedeDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
+  // Push floating hero actions below the status bar (full-bleed hero).
+  const insets = useSafeAreaInsets();
 
   const [centipede, setCentipede] = useState<Centipede | null>(null);
   const [feedings, setFeedings] = useState<CentipedeFeedingLog[]>([]);
@@ -162,7 +165,7 @@ function CentipedeDetailScreen() {
             />
           </View>
         )}
-        <View style={styles.heroActions}>
+        <View style={[styles.heroActions, { top: insets.top + 12 }]}>
           <TouchableOpacity
             style={styles.heroButton}
             onPress={handleEdit}
