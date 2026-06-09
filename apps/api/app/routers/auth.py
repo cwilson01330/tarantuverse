@@ -32,6 +32,31 @@ from app.utils.file_validation import validate_image_bytes
 router = APIRouter()
 
 
+def _cascade_collection_to_public(db: Session, user_id) -> None:
+    """Flip a keeper's currently-private animals to public when their
+    profile goes public.
+
+    Writes across BOTH the unified `inverts` surface and the legacy
+    per-taxon tables so the dual-write invariant holds — otherwise the
+    `inverts` mirror drifts stale (the bug this replaced: a bulk
+    Tarantula update that never touched `inverts`).
+
+    Coverage: `inverts` catches every taxon including centipedes (which
+    have no legacy table); `tarantulas` + `scorpions` keep their legacy
+    rows in sync. Only private→public is cascaded — going public→private
+    preserves individual per-animal hide choices.
+    """
+    from app.models.invert import Invert
+    from app.models.tarantula import Tarantula
+    from app.models.scorpion import Scorpion
+
+    for model in (Invert, Tarantula, Scorpion):
+        db.query(model).filter(
+            model.user_id == user_id,
+            model.visibility == 'private',
+        ).update({model.visibility: 'public'}, synchronize_session=False)
+
+
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 @limiter.limit("5/minute")
 async def register(request: Request, user_data: UserCreate, db: Session = Depends(get_db)):
@@ -289,11 +314,7 @@ async def update_profile(
     # Going public→private does NOT cascade — we preserve individual
     # hides so they survive a future re-opening.
     if flipping_to_public:
-        from app.models.tarantula import Tarantula
-        db.query(Tarantula).filter(
-            Tarantula.user_id == current_user.id,
-            Tarantula.visibility == 'private',
-        ).update({Tarantula.visibility: 'public'}, synchronize_session=False)
+        _cascade_collection_to_public(db, current_user.id)
 
     db.commit()
     db.refresh(current_user)
@@ -327,11 +348,7 @@ async def update_visibility(
     current_user.collection_visibility = new_visibility
 
     if flipping_to_public:
-        from app.models.tarantula import Tarantula
-        db.query(Tarantula).filter(
-            Tarantula.user_id == current_user.id,
-            Tarantula.visibility == 'private',
-        ).update({Tarantula.visibility: 'public'}, synchronize_session=False)
+        _cascade_collection_to_public(db, current_user.id)
 
     db.commit()
     db.refresh(current_user)
