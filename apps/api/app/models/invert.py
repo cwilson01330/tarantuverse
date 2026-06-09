@@ -35,7 +35,9 @@ class Invert(Base):
     __tablename__ = "inverts"
     __table_args__ = (
         CheckConstraint(
-            "taxon IN ('tarantula', 'scorpion', 'centipede')",
+            "taxon IN ('tarantula', 'scorpion', 'centipede', "
+            "'whip_spider', 'vinegaroon', 'true_spider', "
+            "'millipede', 'mantis', 'other')",
             name='inverts_taxon_check',
         ),
         CheckConstraint(

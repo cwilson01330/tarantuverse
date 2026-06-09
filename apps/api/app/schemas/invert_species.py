@@ -48,6 +48,7 @@ class InvertSpeciesBase(BaseModel):
     substrate_depth: Optional[str] = Field(None, max_length=100)
     substrate_type: Optional[str] = Field(None, max_length=200)
 
+    feeding_mode: Optional[str] = Field('predator', pattern="^(predator|detritivore|omnivore)$")
     prey_size: Optional[str] = Field(None, max_length=200)
     feeding_frequency_sling: Optional[str] = Field(None, max_length=100)
     feeding_frequency_juvenile: Optional[str] = Field(None, max_length=100)
@@ -111,6 +112,7 @@ class InvertSpeciesUpdate(BaseModel):
     enclosure_size_adult: Optional[str] = Field(None, max_length=100)
     substrate_depth: Optional[str] = Field(None, max_length=100)
     substrate_type: Optional[str] = Field(None, max_length=200)
+    feeding_mode: Optional[str] = Field('predator', pattern="^(predator|detritivore|omnivore)$")
     prey_size: Optional[str] = Field(None, max_length=200)
     feeding_frequency_sling: Optional[str] = Field(None, max_length=100)
     feeding_frequency_juvenile: Optional[str] = Field(None, max_length=100)

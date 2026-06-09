@@ -73,6 +73,10 @@ import app.routers.invert_species as invert_species
 # taxon='centipede' directly.
 import app.routers.centipedes as centipedes
 import app.routers.centipede_species as centipede_species
+# Whip spiders (ADR-006 taxon #1) — also launch directly on `inverts`
+# with taxon='whip_spider'. No legacy table, no dual-write.
+import app.routers.whip_spiders as whip_spiders
+import app.routers.whip_spider_species as whip_spider_species
 
 app = FastAPI(
     title="Tarantuverse API",
@@ -327,6 +331,12 @@ app.include_router(invert_species.router, prefix="/api/v1/invert-species", tags=
 print("[STARTUP] Registering centipede routers (Phase C2)...")
 app.include_router(centipedes.router, prefix="/api/v1/centipedes", tags=["centipedes"])
 app.include_router(centipede_species.router, prefix="/api/v1/centipede-species", tags=["centipede_species"])
+
+# Whip spiders (ADR-006 taxon #1) — per-taxon facade over inverts WHERE
+# taxon='whip_spider'. No legacy table; same shape as centipedes.
+print("[STARTUP] Registering whip spider routers (ADR-006 taxon #1)...")
+app.include_router(whip_spiders.router, prefix="/api/v1/whip-spiders", tags=["whip_spiders"])
+app.include_router(whip_spider_species.router, prefix="/api/v1/whip-spider-species", tags=["whip_spider_species"])
 
 # Mount static files for uploaded photos
 uploads_dir = "uploads"

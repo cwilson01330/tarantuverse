@@ -25,19 +25,34 @@ from app.database import Base
 # Tuple kept in sync with the migration's TAXON_CHECK. When a new taxon
 # is added, update this list AND alter the CHECK constraint in a
 # follow-up migration.
-INVERT_TAXON_VALUES = ('tarantula', 'scorpion', 'centipede')
+INVERT_TAXON_VALUES = (
+    'tarantula', 'scorpion', 'centipede',
+    'whip_spider', 'vinegaroon', 'true_spider',
+    'millipede', 'mantis', 'other',
+)
+
+# Species-level feeding mode (ADR-006). Drives husbandry copy and the
+# feeding-reminder / refusal logic. Detritivores must NOT get live-prey
+# cadence nudges.
+INVERT_FEEDING_MODES = ('predator', 'detritivore', 'omnivore')
 
 
 class InvertSpecies(Base):
     __tablename__ = "invert_species"
     __table_args__ = (
         CheckConstraint(
-            "taxon IN ('tarantula', 'scorpion', 'centipede')",
+            "taxon IN ('tarantula', 'scorpion', 'centipede', "
+            "'whip_spider', 'vinegaroon', 'true_spider', "
+            "'millipede', 'mantis', 'other')",
             name='invert_species_taxon_check',
         ),
         CheckConstraint(
             "care_level IN ('beginner', 'intermediate', 'advanced')",
             name='invert_species_care_level_check',
+        ),
+        CheckConstraint(
+            "feeding_mode IN ('predator', 'detritivore', 'omnivore')",
+            name='invert_species_feeding_mode_check',
         ),
         CheckConstraint(
             "venom_severity IS NULL OR "
@@ -92,6 +107,10 @@ class InvertSpecies(Base):
     substrate_type = Column(String(200))
 
     # Feeding
+    # feeding_mode drives husbandry copy + the reminder/refusal logic
+    # (ADR-006). 'predator' = live prey (default), 'detritivore' =
+    # decaying plant matter (millipedes), 'omnivore' = both.
+    feeding_mode = Column(String(20), nullable=False, server_default='predator')
     prey_size = Column(String(200))
     feeding_frequency_sling = Column(String(100))
     feeding_frequency_juvenile = Column(String(100))
