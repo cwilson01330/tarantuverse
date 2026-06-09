@@ -73,8 +73,11 @@ export default function SpeciesPage() {
       params.append('limit', '100');
       if (filters.verifiedOnly) params.append('verified_only', 'true');
 
+      // New-taxon endpoints already carry a ?taxon= query, so join with
+      // '&' in that case; established taxa have no query and use '?'.
+      const sep = activeTaxon.endpoint.includes('?') ? '&' : '?';
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}${activeTaxon.endpoint}?${params}`,
+        `${process.env.NEXT_PUBLIC_API_URL}${activeTaxon.endpoint}${sep}${params}`,
       );
       const data = await response.json();
       // Tarantula /species returns {items}|array; per-taxon endpoints
