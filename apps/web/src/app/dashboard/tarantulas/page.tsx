@@ -38,11 +38,52 @@ interface PremoltPrediction {
   status_text: string
 }
 
+// --- Multi-taxon (ADR-006) -------------------------------------------------
+// The collection list shows every taxon. Tarantulas keep their rich badges
+// (feeding status + premolt); the other taxa render lean cards. Non-tarantula
+// detail/add pages are built in later web batches — until then those routes
+// 404 (collection list parity is this batch's scope).
+type TaxonKey = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider'
+
+interface Animal {
+  id: string
+  taxon: TaxonKey
+  common_name: string
+  scientific_name: string
+  sex?: string
+  date_acquired?: string
+  photo_url?: string
+}
+
+const TAXA: {
+  key: TaxonKey
+  label: string
+  glyph: string
+  listEndpoint: string
+  addPath: string
+  detailPath: (id: string) => string
+}[] = [
+  { key: 'tarantula', label: 'Tarantulas', glyph: '🕷', listEndpoint: '/api/v1/tarantulas/', addPath: '/dashboard/tarantulas/add', detailPath: (id) => `/dashboard/tarantulas/${id}` },
+  { key: 'scorpion', label: 'Scorpions', glyph: '🦂', listEndpoint: '/api/v1/scorpions/', addPath: '/dashboard/inverts/add?taxon=scorpion', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'centipede', label: 'Centipedes', glyph: '🐛', listEndpoint: '/api/v1/centipedes/', addPath: '/dashboard/inverts/add?taxon=centipede', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'whip_spider', label: 'Whip spiders', glyph: '🕸️', listEndpoint: '/api/v1/whip-spiders/', addPath: '/dashboard/inverts/add?taxon=whip_spider', detailPath: (id) => `/dashboard/inverts/${id}` },
+]
+
+const TAXON_CONFIG: Record<TaxonKey, (typeof TAXA)[number]> = TAXA.reduce(
+  (acc, t) => ({ ...acc, [t.key]: t }),
+  {} as Record<TaxonKey, (typeof TAXA)[number]>,
+)
+
 export default function TarantulasPage() {
   const router = useRouter()
   const { user, token, isAuthenticated, isLoading } = useAuth()
   const { canAddTarantula, isPremium } = useSubscription()
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
+  // Non-tarantula animals (scorpions + centipedes + whip spiders), each tagged
+  // with its taxon. Merged with tarantulas for the unified collection list.
+  const [otherAnimals, setOtherAnimals] = useState<Animal[]>([])
+  const [taxonFilter, setTaxonFilter] = useState<'all' | TaxonKey>('all')
+  const [showAddMenu, setShowAddMenu] = useState(false)
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
   const [searchQuery, setSearchQuery] = useState('')
@@ -66,7 +107,9 @@ export default function TarantulasPage() {
   }
 
   const handleAddTarantula = () => {
-    if (!canAddTarantula(tarantulas.length)) {
+    // Gate on the whole collection (cross-taxon) since the cap counts all
+    // animals, not just tarantulas.
+    if (!canAddTarantula(tarantulas.length + otherAnimals.length)) {
       setShowUpgradeModal(true)
     } else {
       router.push('/dashboard/tarantulas/add')
@@ -112,6 +155,34 @@ export default function TarantulasPage() {
         fetchAllFeedingStatuses(token, data)
         fetchAllPremoltPredictions(token, data)
       }
+
+      // Fetch the non-tarantula taxa in parallel and tag each with its
+      // taxon. Each is non-fatal — an API that lags behind one taxon just
+      // shows fewer animals rather than blanking the whole list.
+      const otherTaxa = TAXA.filter((t) => t.key !== 'tarantula')
+      const otherResults = await Promise.all(
+        otherTaxa.map(async (t) => {
+          try {
+            const res = await fetch(`${API_URL}${t.listEndpoint}`, {
+              headers: { 'Authorization': `Bearer ${token}` },
+            })
+            if (!res.ok) return [] as Animal[]
+            const rows = await res.json()
+            return (Array.isArray(rows) ? rows : []).map((r: any) => ({
+              id: r.id,
+              taxon: t.key,
+              common_name: r.common_name || r.name || '',
+              scientific_name: r.scientific_name || '',
+              sex: r.sex,
+              date_acquired: r.date_acquired,
+              photo_url: r.photo_url,
+            })) as Animal[]
+          } catch {
+            return [] as Animal[]
+          }
+        }),
+      )
+      setOtherAnimals(otherResults.flat())
 
       // Fetch subscription limits
       const limitsResponse = await fetch(`${API_URL}/api/v1/promo-codes/me/limits`, {
@@ -281,12 +352,43 @@ export default function TarantulasPage() {
     )
   }
 
-  const filteredTarantulas = searchQuery
-    ? tarantulas.filter(t =>
-      t.common_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.scientific_name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    : tarantulas
+  // Unified collection across all taxa. Tarantulas are tagged on the fly;
+  // the other taxa are already tagged in otherAnimals.
+  const allAnimals: Animal[] = [
+    ...tarantulas.map((t) => ({
+      id: t.id,
+      taxon: 'tarantula' as const,
+      common_name: t.common_name,
+      scientific_name: t.scientific_name,
+      sex: t.sex,
+      date_acquired: t.date_acquired,
+      photo_url: t.photo_url,
+    })),
+    ...otherAnimals,
+  ]
+
+  const filteredAnimals = allAnimals.filter((a) => {
+    if (taxonFilter !== 'all' && a.taxon !== taxonFilter) return false
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      return (
+        (a.common_name || '').toLowerCase().includes(q) ||
+        (a.scientific_name || '').toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+
+  // Route the "Add Animal" choice to the right add flow.
+  const handleAddPick = (taxon: TaxonKey) => {
+    setShowAddMenu(false)
+    if (taxon === 'tarantula') {
+      // Preserve the free-tier gate for the existing tarantula add flow.
+      handleAddTarantula()
+    } else {
+      router.push(TAXON_CONFIG[taxon].addPath)
+    }
+  }
 
   return (
     <DashboardLayout
@@ -297,8 +399,8 @@ export default function TarantulasPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tarantula Count Warning */}
         {!subscriptionLimits?.is_premium &&
-         tarantulas.length >= 10 &&
-         tarantulas.length < 15 &&
+         allAnimals.length >= (subscriptionLimits?.max_animals ?? 20) - 5 &&
+         allAnimals.length < (subscriptionLimits?.max_animals ?? 20) &&
          showWarning && (
           <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 shadow-lg">
             <div className="flex items-start justify-between">
@@ -309,7 +411,7 @@ export default function TarantulasPage() {
                     Approaching Free Tier Limit
                   </h3>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    You have <strong>{tarantulas.length} of 15</strong> tarantulas on the free plan.
+                    You have <strong>{allAnimals.length} of {subscriptionLimits?.max_animals ?? 20}</strong> animals on the free plan.
                     Upgrade to Premium for unlimited tracking!
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -341,7 +443,7 @@ export default function TarantulasPage() {
             <div className="mt-3 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(tarantulas.length / 15) * 100}%` }}
+                style={{ width: `${(allAnimals.length / (subscriptionLimits?.max_animals ?? 20)) * 100}%` }}
               />
             </div>
           </div>
@@ -350,8 +452,8 @@ export default function TarantulasPage() {
         {/* Page Header */}
         <div className="flex flex-wrap justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-theme-primary">My Tarantulas</h1>
-            <p className="text-theme-secondary mt-1">{tarantulas.length} in your collection</p>
+            <h1 className="text-3xl font-bold text-theme-primary">My Collection</h1>
+            <p className="text-theme-secondary mt-1">{allAnimals.length} in your collection</p>
           </div>
         </div>
 
@@ -360,7 +462,7 @@ export default function TarantulasPage() {
           {/* Main content - Collection */}
           <div className="lg:col-span-2">
             {/* Search Bar */}
-            {tarantulas.length > 0 && (
+            {allAnimals.length > 0 && (
               <div className="mb-6">
                 <div className="relative">
                   <input
@@ -377,19 +479,46 @@ export default function TarantulasPage() {
               </div>
             )}
 
+            {/* Taxon filter */}
+            {allAnimals.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                {([{ key: 'all' as const, label: 'All', glyph: '' }, ...TAXA]).map((t) => {
+                  const active = taxonFilter === t.key
+                  const count =
+                    t.key === 'all'
+                      ? allAnimals.length
+                      : allAnimals.filter((a) => a.taxon === t.key).length
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => setTaxonFilter(t.key as 'all' | TaxonKey)}
+                      className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                        active
+                          ? 'bg-gradient-brand text-white shadow-md'
+                          : 'bg-surface border border-theme text-theme-secondary hover:text-theme-primary'
+                      }`}
+                      aria-pressed={active}
+                    >
+                      {'glyph' in t && t.glyph ? `${t.glyph} ` : ''}{t.label} ({count})
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {/* Collection Grid */}
-            {tarantulas.length === 0 ? (
+            {allAnimals.length === 0 ? (
               <div className="bg-surface rounded-2xl shadow-lg border border-theme p-12 text-center">
                 <div className="text-6xl mb-4">🕷️</div>
                 <h2 className="text-2xl font-bold mb-3 text-theme-primary">Your Collection is Empty</h2>
                 <p className="text-theme-secondary mb-8 max-w-md mx-auto">
-                  Start tracking your tarantulas by adding your first one! Keep detailed records of feedings, molts, and husbandry.
+                  Start tracking your collection by adding your first animal! Keep detailed records of feedings, molts, and husbandry.
                 </p>
                 <button
-                  onClick={handleAddTarantula}
+                  onClick={() => setShowAddMenu(true)}
                   className="px-8 py-4 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
                 >
-                  ➕ Add First Tarantula
+                  ➕ Add Animal
                 </button>
                 <button
                   onClick={() => router.push('/dashboard/tarantulas/import')}
@@ -402,7 +531,7 @@ export default function TarantulasPage() {
               <div>
                 <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
                   <h2 className="text-2xl font-bold text-theme-primary">
-                    {searchQuery ? `Search Results (${filteredTarantulas.length})` : 'Collection'}
+                    {searchQuery ? `Search Results (${filteredAnimals.length})` : 'Collection'}
                   </h2>
                   <div className="flex items-center gap-3">
                     {/* View Toggle */}
@@ -435,10 +564,10 @@ export default function TarantulasPage() {
                       </button>
                     </div>
                     <button
-                      onClick={handleAddTarantula}
+                      onClick={() => setShowAddMenu(true)}
                       className="px-6 py-3 bg-gradient-brand text-white rounded-xl hover:brightness-90 transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
                     >
-                      ➕ Add Tarantula
+                      ➕ Add Animal
                     </button>
                     <button
                       onClick={() => router.push('/dashboard/tarantulas/import')}
@@ -449,10 +578,10 @@ export default function TarantulasPage() {
                   </div>
                 </div>
 
-                {filteredTarantulas.length === 0 ? (
+                {filteredAnimals.length === 0 ? (
                   <div className="bg-surface rounded-2xl shadow-lg border border-theme p-12 text-center">
                     <div className="text-4xl mb-3">🔍</div>
-                    <p className="text-theme-secondary">No tarantulas match your search.</p>
+                    <p className="text-theme-secondary">No animals match your search.</p>
                   </div>
                 ) : viewMode === 'list' ? (
                   /* List View */
@@ -469,46 +598,53 @@ export default function TarantulasPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {filteredTarantulas.map((tarantula) => {
-                          const feedingStatus = feedingStatuses.get(tarantula.id)
-                          const premoltPrediction = premoltPredictions.get(tarantula.id)
+                        {filteredAnimals.map((animal) => {
+                          const isT = animal.taxon === 'tarantula'
+                          const feedingStatus = isT ? feedingStatuses.get(animal.id) : undefined
+                          const premoltPrediction = isT ? premoltPredictions.get(animal.id) : undefined
+                          const cfg = TAXON_CONFIG[animal.taxon]
                           return (
                             <tr
-                              key={tarantula.id}
-                              onClick={() => router.push(`/dashboard/tarantulas/${tarantula.id}`)}
+                              key={animal.id}
+                              onClick={() => router.push(cfg.detailPath(animal.id))}
                               className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
                             >
                               <td className="px-4 py-3">
                                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30 flex-shrink-0">
-                                  {tarantula.photo_url ? (
+                                  {animal.photo_url ? (
                                     <img
-                                      src={getImageUrl(tarantula.photo_url)}
-                                      alt={tarantula.common_name}
+                                      src={getImageUrl(animal.photo_url)}
+                                      alt={animal.common_name}
                                       className="w-full h-full object-cover"
                                     />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-2xl">🕷️</div>
+                                    <div className="w-full h-full flex items-center justify-center text-2xl">{cfg.glyph}</div>
                                   )}
                                 </div>
                               </td>
                               <td className="px-4 py-3">
-                                <div className="font-semibold text-theme-primary">{tarantula.common_name}</div>
-                                <div className="text-sm text-theme-secondary italic sm:hidden">{tarantula.scientific_name}</div>
+                                <div className="font-semibold text-theme-primary">
+                                  {!isT && <span className="mr-1">{cfg.glyph}</span>}
+                                  {animal.common_name || animal.scientific_name}
+                                </div>
+                                <div className="text-sm text-theme-secondary italic sm:hidden">{animal.scientific_name}</div>
                               </td>
                               <td className="px-4 py-3 hidden sm:table-cell">
-                                <span className="text-sm italic text-theme-secondary">{tarantula.scientific_name}</span>
+                                <span className="text-sm italic text-theme-secondary">{animal.scientific_name}</span>
                               </td>
                               <td className="px-4 py-3 hidden md:table-cell align-middle">
-                                {tarantula.sex ? (
+                                {animal.sex ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
-                                    {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '?'} {tarantula.sex}
+                                    {animal.sex === 'male' ? '♂️' : animal.sex === 'female' ? '♀️' : '?'} {animal.sex}
                                   </span>
                                 ) : (
                                   <span className="text-theme-tertiary text-sm">—</span>
                                 )}
                               </td>
                               <td className="px-4 py-3 align-middle">
-                                {feedingStatus?.is_feeding_paused ? (
+                                {!isT ? (
+                                  <span className="text-theme-tertiary text-sm">—</span>
+                                ) : feedingStatus?.is_feeding_paused ? (
                                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
                                     ⏸ Paused
                                   </span>
@@ -526,7 +662,7 @@ export default function TarantulasPage() {
                                 )}
                               </td>
                               <td className="px-4 py-3 hidden lg:table-cell align-middle">
-                                {premoltPrediction && premoltPrediction.confidence_level !== 'low' ? (
+                                {isT && premoltPrediction && premoltPrediction.confidence_level !== 'low' ? (
                                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                                     premoltPrediction.confidence_level === 'very_high' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
                                     premoltPrediction.confidence_level === 'high' ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
@@ -547,42 +683,49 @@ export default function TarantulasPage() {
                 ) : (
                   /* Card View */
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredTarantulas.map((tarantula) => (
+                    {filteredAnimals.map((animal) => (
                       <div
-                        key={tarantula.id}
-                        onClick={() => router.push(`/dashboard/tarantulas/${tarantula.id}`)}
+                        key={animal.id}
+                        onClick={() => router.push(TAXON_CONFIG[animal.taxon].detailPath(animal.id))}
                         className="group relative overflow-hidden rounded-2xl bg-surface shadow-lg hover:shadow-lg transition-all duration-300 cursor-pointer border border-theme hover:border-electric-blue-500/40"
                       >
                         {/* Image with gradient overlay */}
                         <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
-                          {tarantula.photo_url ? (
+                          {animal.photo_url ? (
                             <>
                               <img
-                                src={getImageUrl(tarantula.photo_url)}
-                                alt={tarantula.common_name}
+                                src={getImageUrl(animal.photo_url)}
+                                alt={animal.common_name}
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                             </>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
-                              🕷️
+                              {TAXON_CONFIG[animal.taxon].glyph}
                             </div>
                           )}
 
                           {/* Status badges */}
                           <div className="absolute top-3 left-3 right-3 flex flex-col gap-2">
                             <div className="flex justify-between items-start">
-                              {/* Premolt badge (left) */}
+                              {/* Premolt badge (left) — tarantula only */}
                               <div>
-                                {getPremoltBadge(tarantula.id)}
+                                {animal.taxon === 'tarantula' ? getPremoltBadge(animal.id) : null}
                               </div>
 
-                              {/* Feeding status badge (right) */}
+                              {/* Right badge: feeding status for tarantulas,
+                                  taxon label for the other taxa. */}
                               <div>
-                                {getFeedingStatusBadge(tarantula.id) || (
+                                {animal.taxon === 'tarantula' ? (
+                                  getFeedingStatusBadge(animal.id) || (
+                                    <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
+                                      No data
+                                    </span>
+                                  )
+                                ) : (
                                   <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
-                                    No data
+                                    {TAXON_CONFIG[animal.taxon].glyph} {TAXON_CONFIG[animal.taxon].label.replace(/s$/, '')}
                                   </span>
                                 )}
                               </div>
@@ -593,22 +736,22 @@ export default function TarantulasPage() {
                         {/* Content */}
                         <div className="p-5">
                           <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
-                            {tarantula.common_name}
+                            {animal.common_name || animal.scientific_name}
                           </h3>
                           <p className="text-sm italic text-theme-secondary mb-3 line-clamp-1">
-                            {tarantula.scientific_name}
+                            {animal.scientific_name}
                           </p>
 
                           {/* Quick stats */}
                           <div className="flex flex-wrap gap-2">
-                            {tarantula.sex && (
+                            {animal.sex && (
                               <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
-                                {tarantula.sex === 'male' ? '♂️' : tarantula.sex === 'female' ? '♀️' : '?'} {tarantula.sex}
+                                {animal.sex === 'male' ? '♂️' : animal.sex === 'female' ? '♀️' : '?'} {animal.sex}
                               </span>
                             )}
-                            {tarantula.date_acquired && (
+                            {animal.date_acquired && (
                               <span className="px-3 py-1 rounded-lg bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-xs font-semibold border border-pink-200 dark:border-pink-500/30">
-                                📅 {formatLocalDate(tarantula.date_acquired, { year: 'numeric', month: 'short' })}
+                                📅 {formatLocalDate(animal.date_acquired, { year: 'numeric', month: 'short' })}
                               </span>
                             )}
                           </div>
@@ -635,14 +778,47 @@ export default function TarantulasPage() {
       </div>
 
       {/* Floating Action Button (Mobile-friendly) */}
-      {tarantulas.length > 0 && (
+      {allAnimals.length > 0 && (
         <button
-          onClick={handleAddTarantula}
+          onClick={() => setShowAddMenu(true)}
           className="fixed bottom-6 right-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-brand text-white shadow-2xl shadow-gradient-brand hover:scale-110 hover:shadow-2xl transition-all duration-200 flex items-center justify-center text-2xl sm:text-3xl z-50"
-          aria-label="Add tarantula"
+          aria-label="Add animal"
         >
           ➕
         </button>
+      )}
+
+      {/* Add Animal picker — choose a taxon, route to its add flow. */}
+      {showAddMenu && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+          onClick={() => setShowAddMenu(false)}
+        >
+          <div
+            className="bg-surface w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl border border-theme shadow-2xl p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-theme-primary mb-1">Add to collection</h3>
+            <p className="text-sm text-theme-secondary mb-3">What are you adding?</p>
+            {TAXA.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => handleAddPick(t.key)}
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-surface-elevated transition text-left"
+              >
+                <span className="text-2xl w-8 text-center">{t.glyph}</span>
+                <span className="flex-1 font-semibold text-theme-primary">{t.label.replace(/s$/, '')}</span>
+                <span className="text-theme-tertiary">›</span>
+              </button>
+            ))}
+            <button
+              onClick={() => setShowAddMenu(false)}
+              className="w-full mt-2 py-3 rounded-xl bg-surface-elevated text-theme-secondary font-semibold"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Upgrade Modal */}
