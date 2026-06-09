@@ -378,9 +378,15 @@ async def upload_scorpion_photo(
         db.add(photo)
 
         # First photo becomes the scorpion's main photo (mirrors
-        # tarantula path).
+        # tarantula path). Also seed the unified Invert mirror's hero so the
+        # generic invert detail/collection (which read Invert.photo_url) show
+        # it rather than the generic glyph. ADR-008.
         if not scorpion.photo_url:
             scorpion.photo_url = photo_url
+        if photo.invert_id:
+            invert_mirror = db.query(Invert).filter(Invert.id == photo.invert_id).first()
+            if invert_mirror and not invert_mirror.photo_url:
+                invert_mirror.photo_url = photo_url
 
         db.commit()
         db.refresh(photo)
@@ -856,6 +862,25 @@ async def set_main_photo(
     try:
         # Works for Tarantula and Animal — both expose `photo_url`.
         parent.photo_url = photo.url
+        # Mirror onto the unified Invert row too. _photo_owner_parent resolves
+        # the legacy parent (tarantula / scorpion) first, so without this the
+        # legacy row's hero updates but the Invert mirror's doesn't — and the
+        # generic invert detail/collection read Invert.photo_url, leaving the
+        # hero as the generic glyph. ADR-008.
+        #
+        # Key the mirror on parent.id (the Invert shares the legacy row's PK
+        # under dual-write) rather than photo.invert_id, so photos uploaded
+        # before the A2/backfill — which have a null invert_id — are covered
+        # too. Animals (HV) have no Invert mirror, so the lookup returns None
+        # and this safely no-ops. Also a no-op when the parent already IS the
+        # Invert (centipedes / new taxa).
+        if not isinstance(parent, Invert):
+            invert = db.query(Invert).filter(
+                Invert.id == parent.id,
+                Invert.user_id == current_user.id,
+            ).first()
+            if invert:
+                invert.photo_url = photo.url
         db.commit()
 
         return {
