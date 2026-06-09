@@ -696,9 +696,9 @@ function DashboardHubScreen() {
   const handleAddPick = (taxon: AddPickerTaxon) => {
     setAddPickerOpen(false);
     if (taxon === 'tarantula') router.push('/tarantula/add');
-    else if (taxon === 'scorpion') router.push('/scorpion/add' as any);
-    else if (taxon === 'centipede') router.push('/centipede/add' as any);
-    else router.push('/whip-spider/add' as any);
+    // All non-tarantula taxa go through the generic invert add screen
+    // (ADR-007) — matches the collection tab's picker.
+    else router.push(`/invert/add?taxon=${taxon}` as any);
   };
 
   // Empty state — gated on the whole collection, not just tarantulas, so
