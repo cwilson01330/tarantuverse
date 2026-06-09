@@ -38,8 +38,15 @@ interface TarantulaDetail {
   sex?: string;
   age_years?: number;
   acquisition_date?: string;
+  enclosure_type?: string;
   enclosure_size?: string;
   substrate_type?: string;
+  substrate_depth?: string;
+  target_temp_min?: number | string;
+  target_temp_max?: number | string;
+  target_humidity_min?: number | string;
+  target_humidity_max?: number | string;
+  water_dish?: boolean;
   last_fed?: string;
   last_molt?: string;
   photo_url?: string;
@@ -520,11 +527,17 @@ export default function TarantulaDetailScreen() {
   const headerTitle =
     tarantula.name || tarantula.common_name || tarantula.scientific_name || 'Unnamed Tarantula';
 
-  // Husbandry via the shared InfoGrid (ADR-008 convergence) — same fields,
-  // same look, now sourced from the shared component used by every taxon.
+  // Husbandry via the shared InfoGrid (ADR-008 convergence). Field set now
+  // matches the invert grid — including Type / Temperature / Humidity / Water
+  // dish, which the tarantula screen previously omitted — plus the
+  // tarantula-specific Last Fed / Last Molt.
   const husbandryItems: InfoGridItem[] = [];
+  if (tarantula.enclosure_type) husbandryItems.push({ icon: 'shape-outline', label: 'Type', value: tarantula.enclosure_type });
   if (tarantula.enclosure_size) husbandryItems.push({ icon: 'cube-outline', label: 'Enclosure', value: tarantula.enclosure_size });
-  if (tarantula.substrate_type) husbandryItems.push({ icon: 'layers', label: 'Substrate', value: tarantula.substrate_type });
+  if (tarantula.substrate_type) husbandryItems.push({ icon: 'layers', label: 'Substrate', value: tarantula.substrate_depth ? `${tarantula.substrate_type} (${tarantula.substrate_depth})` : tarantula.substrate_type });
+  if (tarantula.target_temp_min || tarantula.target_temp_max) husbandryItems.push({ icon: 'thermometer', label: 'Temperature', value: `${tarantula.target_temp_min ?? '?'}–${tarantula.target_temp_max ?? '?'} °F` });
+  if (tarantula.target_humidity_min || tarantula.target_humidity_max) husbandryItems.push({ icon: 'water-percent', label: 'Humidity', value: `${tarantula.target_humidity_min ?? '?'}–${tarantula.target_humidity_max ?? '?'}%` });
+  husbandryItems.push({ icon: 'cup-water', label: 'Water dish', value: tarantula.water_dish ? 'Yes' : 'No' });
   if (tarantula.last_fed) husbandryItems.push({ icon: 'food', label: 'Last Fed', value: formatLocalDate(tarantula.last_fed) });
   if (tarantula.last_molt) husbandryItems.push({ icon: 'refresh', label: 'Last Molt', value: formatLocalDate(tarantula.last_molt) });
 
