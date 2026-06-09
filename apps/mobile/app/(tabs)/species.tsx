@@ -18,6 +18,7 @@ import {
   FlatList,
   Image,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -44,6 +45,11 @@ import {
 import {
   listWhipSpiderSpecies,
 } from '../../src/lib/whip-spiders';
+import {
+  listInvertSpecies,
+  INVERT_TAXA,
+  type InvertTaxon,
+} from '../../src/lib/inverts';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -53,7 +59,36 @@ const CARD_WIDTH = (width - 48) / 2;
 // the renderer can dispatch on `taxon` to show taxon-appropriate badges.
 // ---------------------------------------------------------------------------
 
-type Taxon = 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders';
+// The four "established" taxa keep their plural keys + dedicated libs.
+// The ADR-006 expansion taxa use their singular `InvertTaxon` keys and
+// all flow through the generic `/invert-species/?taxon=` endpoint, so
+// adding another is a one-line edit to GENERIC_TAXA + the seed.
+type GenericTaxon = 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'other';
+type Taxon = 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | GenericTaxon;
+
+const GENERIC_TAXA: GenericTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'other'];
+const isGenericTaxon = (t: Taxon): t is GenericTaxon =>
+  (GENERIC_TAXA as string[]).includes(t);
+
+// Per-taxon display metadata. `tab` is the segment label (glyph + name),
+// `noun` is the singular used in "{n} {noun} species" + search hints,
+// `glyph` is the large loading/empty emoji. Established taxa keep their
+// curated labels; the five expansion taxa pull glyph from the registry.
+const TAXON_ORDER: Taxon[] = [
+  'tarantulas', 'scorpions', 'centipedes', 'whip_spiders',
+  'vinegaroon', 'true_spider', 'millipede', 'mantis', 'other',
+];
+const TAXON_META: Record<Taxon, { tab: string; noun: string; glyph: string }> = {
+  tarantulas: { tab: '🕷  Tarantulas', noun: 'tarantula', glyph: '🕷️' },
+  scorpions: { tab: '🦂  Scorpions', noun: 'scorpion', glyph: '🦂' },
+  centipedes: { tab: '🐛  Centipedes', noun: 'centipede', glyph: '🐛' },
+  whip_spiders: { tab: '🕸️  Whip spiders', noun: 'whip spider', glyph: '🕸️' },
+  vinegaroon: { tab: `${INVERT_TAXA.vinegaroon.glyph}  Vinegaroons`, noun: 'vinegaroon', glyph: INVERT_TAXA.vinegaroon.glyph },
+  true_spider: { tab: `${INVERT_TAXA.true_spider.glyph}  True spiders`, noun: 'true spider', glyph: INVERT_TAXA.true_spider.glyph },
+  millipede: { tab: `${INVERT_TAXA.millipede.glyph}  Millipedes`, noun: 'millipede', glyph: INVERT_TAXA.millipede.glyph },
+  mantis: { tab: `${INVERT_TAXA.mantis.glyph}  Mantises`, noun: 'mantis', glyph: INVERT_TAXA.mantis.glyph },
+  other: { tab: `${INVERT_TAXA.other.glyph}  Other`, noun: 'other invertebrate', glyph: INVERT_TAXA.other.glyph },
+};
 
 interface TarantulaRow {
   taxon: 'tarantulas';
@@ -115,7 +150,25 @@ interface WhipSpiderRow {
   communal_suitable: boolean;
 }
 
-type Row = TarantulaRow | ScorpionRow | CentipedeRow | WhipSpiderRow;
+interface GenericInvertRow {
+  taxon: GenericTaxon;
+  id: string;
+  scientific_name: string;
+  common_names: string[];
+  type: string | null;
+  care_level: string | null;
+  adult_size: string | null;
+  is_verified: boolean;
+  image_url: string | null;
+  /** Generic venom tier string ('mild'|'moderate'|'medically_significant'|null).
+   * Most expansion taxa are harmless (null). */
+  venom_severity: string | null;
+  communal_suitable: boolean;
+  /** Drives a leaf glyph for detritivores (millipedes) on the card. */
+  feeding_mode: string | null;
+}
+
+type Row = TarantulaRow | ScorpionRow | CentipedeRow | WhipSpiderRow | GenericInvertRow;
 
 export default function UnifiedSpeciesScreen() {
   const { colors } = useTheme();
@@ -129,7 +182,9 @@ export default function UnifiedSpeciesScreen() {
         ? 'centipedes'
         : taxonParam === 'whip_spiders'
           ? 'whip_spiders'
-          : 'tarantulas';
+          : taxonParam && (GENERIC_TAXA as string[]).includes(taxonParam)
+            ? (taxonParam as GenericTaxon)
+            : 'tarantulas';
 
   const [taxon, setTaxon] = useState<Taxon>(initialTaxon);
   const [rows, setRows] = useState<Row[]>([]);
@@ -217,8 +272,7 @@ export default function UnifiedSpeciesScreen() {
             developmental_class: c.developmental_class,
           })),
         );
-      } else {
-        // whip spiders
+      } else if (which === 'whip_spiders') {
         const items = await listWhipSpiderSpecies({ limit: 200 });
         setRows(
           items.map((w) => ({
@@ -232,6 +286,26 @@ export default function UnifiedSpeciesScreen() {
             is_verified: w.is_verified,
             image_url: w.image_url,
             communal_suitable: w.communal_suitable,
+          })),
+        );
+      } else {
+        // ADR-006 expansion taxa — all go through the generic species
+        // endpoint. `which` IS the InvertTaxon key here.
+        const items = await listInvertSpecies(which as InvertTaxon, 200);
+        setRows(
+          items.map((s) => ({
+            taxon: which as GenericTaxon,
+            id: s.id,
+            scientific_name: s.scientific_name,
+            common_names: s.common_names ?? [],
+            type: s.type,
+            care_level: s.care_level,
+            adult_size: s.adult_size,
+            is_verified: s.is_verified,
+            image_url: s.image_url,
+            venom_severity: s.venom_severity,
+            communal_suitable: s.communal_suitable,
+            feeding_mode: s.feeding_mode,
           })),
         );
       }
@@ -282,6 +356,16 @@ export default function UnifiedSpeciesScreen() {
   // Type-icon dispatcher — emoji glyphs that visually distinguish
   // body plan + biome at a glance on the card.
   const getTypeIcon = (which: Taxon, type: string | null) => {
+    if (isGenericTaxon(which)) {
+      // Body-plan biome glyphs where meaningful, else the taxon's
+      // registry glyph (🦂/🕷/🪱/🦗/🐾).
+      switch (type) {
+        case 'arboreal': return '🌳';
+        case 'terrestrial': return '🏜️';
+        case 'fossorial': return '⛰️';
+        default: return INVERT_TAXA[which].glyph;
+      }
+    }
     if (which === 'scorpions') {
       switch (type) {
         case 'terrestrial': return '🏜️';
@@ -327,6 +411,11 @@ export default function UnifiedSpeciesScreen() {
     router.push(path as any);
   };
 
+  // Row-level guard (narrows `item` to GenericInvertRow, unlike
+  // isGenericTaxon which only narrows the taxon string).
+  const isGenericRow = (r: Row): r is GenericInvertRow =>
+    (GENERIC_TAXA as string[]).includes(r.taxon);
+
   const renderCard = ({ item, index }: { item: Row; index: number }) => {
     const careLevel = getCareLevel(item.care_level);
     const typeIcon = getTypeIcon(item.taxon, item.type);
@@ -336,13 +425,17 @@ export default function UnifiedSpeciesScreen() {
     const venom =
       item.taxon === 'scorpions' || item.taxon === 'centipedes'
         ? venomSeverityColor(item.venom_severity)
-        : null;
+        : isGenericRow(item) && item.venom_severity
+          ? venomSeverityColor(item.venom_severity as any)
+          : null;
     const isHot =
       item.taxon === 'tarantulas'
         ? !!item.medically_significant_venom
         : item.taxon === 'scorpions' || item.taxon === 'centipedes'
           ? item.venom_severity === 'medically_significant'
-          : false; // whip spiders are harmless
+          : isGenericRow(item)
+            ? item.venom_severity === 'medically_significant'
+            : false; // whip spiders are harmless
 
     return (
       <TouchableOpacity
@@ -384,7 +477,7 @@ export default function UnifiedSpeciesScreen() {
                 <MaterialCommunityIcons name="alert" size={14} color="#ffffff" />
               </View>
             )}
-            {(item.taxon === 'scorpions' || item.taxon === 'whip_spiders') && item.communal_suitable && (
+            {(item.taxon === 'scorpions' || item.taxon === 'whip_spiders' || isGenericRow(item)) && item.communal_suitable && (
               <View style={[styles.warningBadge, { backgroundColor: '#3b82f6' }]}>
                 <MaterialCommunityIcons name="account-group" size={14} color="#ffffff" />
               </View>
@@ -436,18 +529,16 @@ export default function UnifiedSpeciesScreen() {
   // For the FlatList header that's why the search TextInput kept losing
   // focus after one keystroke. Inlining the JSX directly keeps the
   // same element identity across renders.
+  // Nine taxa no longer fit a fixed equal-width row, so the segment
+  // control scrolls horizontally and each pill sizes to its label.
   const TaxonSegment = () => (
-    <View style={[styles.segmentWrap, { backgroundColor: colors.surfaceElevated }]}>
-      {(['tarantulas', 'scorpions', 'centipedes', 'whip_spiders'] as Taxon[]).map((t) => {
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={[styles.segmentWrap, { backgroundColor: colors.surfaceElevated }]}
+    >
+      {TAXON_ORDER.map((t) => {
         const active = t === taxon;
-        const label =
-          t === 'tarantulas'
-            ? '🕷  Tarantulas'
-            : t === 'scorpions'
-              ? '🦂  Scorpions'
-              : t === 'centipedes'
-                ? '🐛  Centipedes'
-                : '🕸️  Whip spiders';
         return (
           <TouchableOpacity
             key={t}
@@ -465,12 +556,12 @@ export default function UnifiedSpeciesScreen() {
               ]}
               numberOfLines={1}
             >
-              {label}
+              {TAXON_META[t].tab}
             </Text>
           </TouchableOpacity>
         );
       })}
-    </View>
+    </ScrollView>
   );
 
   const FilterChip = ({
@@ -509,15 +600,7 @@ export default function UnifiedSpeciesScreen() {
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>Species Database</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {rows.length}{' '}
-          {taxon === 'tarantulas'
-            ? 'tarantula'
-            : taxon === 'scorpions'
-              ? 'scorpion'
-              : taxon === 'centipedes'
-                ? 'centipede'
-                : 'whip spider'}{' '}
-          species
+          {rows.length} {TAXON_META[taxon].noun} species
         </Text>
       </View>
 
@@ -529,15 +612,7 @@ export default function UnifiedSpeciesScreen() {
         <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
         <TextInput
           style={[styles.searchInput, { color: colors.textPrimary }]}
-          placeholder={
-            taxon === 'tarantulas'
-              ? 'Search tarantula species…'
-              : taxon === 'scorpions'
-                ? 'Search scorpion species…'
-                : taxon === 'centipedes'
-                  ? 'Search centipede species…'
-                  : 'Search whip spider species…'
-          }
+          placeholder={`Search ${TAXON_META[taxon].noun} species…`}
           placeholderTextColor={colors.textTertiary}
           value={searchTerm}
           onChangeText={setSearchTerm}
@@ -590,13 +665,7 @@ export default function UnifiedSpeciesScreen() {
         {HeaderContent}
         <View style={styles.loadingContainer}>
           <Text style={{ fontSize: 60, marginBottom: 16 }}>
-            {taxon === 'tarantulas'
-              ? '🕷️'
-              : taxon === 'scorpions'
-                ? '🦂'
-                : taxon === 'centipedes'
-                  ? '🐛'
-                  : '🕸️'}
+            {TAXON_META[taxon].glyph}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Loading species…
@@ -663,8 +732,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   segmentButton: {
-    flex: 1,
     paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 8,
     alignItems: 'center',
   },
