@@ -1609,9 +1609,12 @@ function CollectionScreen() {
     </View>
   );
 
-  // Collection is empty across BOTH taxa — show the welcome flow that
-  // offers either path.
-  const collectionEmpty = tarantulas.length === 0 && scorpions.length === 0;
+  // Collection is empty across ALL taxa — show the welcome flow.
+  const collectionEmpty =
+    tarantulas.length === 0
+    && scorpions.length === 0
+    && centipedes.length === 0
+    && whipSpiders.length === 0;
 
   return (
     <View style={styles.container}>
@@ -1724,7 +1727,9 @@ function CollectionScreen() {
                     </View>
                     <View style={styles.statsGrid}>
                       <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{collectionStats.total_tarantulas}</Text>
+                        <Text style={styles.statValue}>
+                          {tarantulas.length + scorpions.length + centipedes.length + whipSpiders.length}
+                        </Text>
                         <Text style={styles.statLabel}>Total</Text>
                       </View>
                       <View style={styles.statItem}>

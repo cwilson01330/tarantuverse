@@ -19,6 +19,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
+import { AddPickerSheet, type AddPickerTaxon } from '../../src/components/AddPickerSheet';
 import { useBreakpoint } from '../../src/hooks/useBreakpoint';
 import { getImageUrl } from '../../src/utils/image-url';
 
@@ -125,6 +126,10 @@ function DashboardHubScreen() {
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
+  // Cross-taxon collection total (from /inverts/). null until loaded;
+  // falls back to tarantulas.length if the call fails.
+  const [totalAnimals, setTotalAnimals] = useState<number | null>(null);
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tourChecked, setTourChecked] = useState(false);
@@ -179,10 +184,14 @@ function DashboardHubScreen() {
       // calendar-day metrics (days_since_last_feeding). Cheap to send
       // even to endpoints that ignore it.
       const tzOffset = new Date().getTimezoneOffset();
-      const [tarantulasRes, enclosuresRes, statsRes] = await Promise.all([
+      const [tarantulasRes, enclosuresRes, statsRes, invertsRes] = await Promise.all([
         apiClient.get('/tarantulas/').catch(() => null),
         apiClient.get('/enclosures/', { params: { tz_offset_minutes: tzOffset } }).catch(() => null),
         apiClient.get('/analytics/collection').catch(() => null),
+        // Unified inverts list = the whole cross-taxon collection
+        // (tarantulas are mirrored in, plus scorpions / centipedes /
+        // whip spiders). Drives the true "My Collection" total.
+        apiClient.get('/inverts/').catch(() => null),
       ]);
 
       if (tarantulasRes?.data) {
@@ -197,6 +206,10 @@ function DashboardHubScreen() {
 
       if (statsRes?.data) {
         setCollectionStats(statsRes.data);
+      }
+
+      if (Array.isArray(invertsRes?.data)) {
+        setTotalAnimals(invertsRes.data.length);
       }
     } catch {
       // Dashboard data fetch failed
@@ -675,22 +688,37 @@ function DashboardHubScreen() {
     );
   }
 
-  // Empty state
-  if (tarantulas.length === 0) {
+  // Cross-taxon collection total — falls back to tarantulas.length if the
+  // /inverts/ count failed to load.
+  const animalCount = totalAnimals ?? tarantulas.length;
+
+  // Route an add-picker choice to the right per-taxon add screen.
+  const handleAddPick = (taxon: AddPickerTaxon) => {
+    setAddPickerOpen(false);
+    if (taxon === 'tarantula') router.push('/tarantula/add');
+    else if (taxon === 'scorpion') router.push('/scorpion/add' as any);
+    else if (taxon === 'centipede') router.push('/centipede/add' as any);
+    else router.push('/whip-spider/add' as any);
+  };
+
+  // Empty state — gated on the whole collection, not just tarantulas, so
+  // a keeper who owns only scorpions/centipedes/whip spiders doesn't get
+  // told to add their "first tarantula."
+  if (animalCount === 0) {
     return (
       <View style={[styles.container, styles.emptyContainer]}>
         <Text style={styles.emptyEmoji}>🕷️</Text>
         <Text style={styles.emptyTitle}>Welcome to Tarantuverse!</Text>
         <Text style={styles.emptyText}>
-          Start your journey by adding your first tarantula to the collection.
+          Start your journey by adding your first animal to the collection.
         </Text>
         <View style={styles.emptyButtons}>
           <PrimaryButton
-            onPress={() => router.push('/tarantula/add')}
+            onPress={() => setAddPickerOpen(true)}
             style={styles.emptyButton}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.emptyButtonText}>Add Tarantula</Text>
+            <Text style={styles.emptyButtonText}>Add Animal</Text>
           </PrimaryButton>
           <TouchableOpacity
             style={styles.emptySecondaryButton}
@@ -699,6 +727,11 @@ function DashboardHubScreen() {
             <Text style={styles.emptySecondaryText}>📖 Species</Text>
           </TouchableOpacity>
         </View>
+        <AddPickerSheet
+          visible={addPickerOpen}
+          onClose={() => setAddPickerOpen(false)}
+          onPick={handleAddPick}
+        />
       </View>
     );
   }
@@ -727,7 +760,7 @@ function DashboardHubScreen() {
             onPress={() => router.push('/(tabs)/collection')}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={`My Collection: ${tarantulas.length} tarantulas. View all.`}
+            accessibilityLabel={`My Collection: ${animalCount} animals. View all.`}
           >
             <View style={styles.statIconRow}>
               <PrimaryButton iconBox size={40} style={styles.statIconBox}>
@@ -735,7 +768,7 @@ function DashboardHubScreen() {
               </PrimaryButton>
               <Text style={styles.statLabel}>My Collection</Text>
             </View>
-            <Text style={styles.statValue}>{tarantulas.length}</Text>
+            <Text style={styles.statValue}>{animalCount}</Text>
             <Text style={styles.statFooter}>View all →</Text>
           </TouchableOpacity>
 
@@ -959,7 +992,7 @@ function DashboardHubScreen() {
           <Text style={[styles.sectionTitle, { marginBottom: 14 }]}>Quick Actions</Text>
           <View style={styles.actionsGrid}>
             {([
-              { icon: 'plus-circle-outline', label: 'Add Tarantula', route: '/tarantula/add' },
+              { icon: 'plus-circle-outline', label: 'Add Animal', picker: true },
               { icon: 'spider', label: 'My Collection', route: '/(tabs)/collection' },
               { icon: 'bug-outline', label: 'Feeders', route: '/feeders' },
               { icon: 'chart-line', label: 'Analytics', route: '/analytics' },
@@ -973,7 +1006,11 @@ function DashboardHubScreen() {
                   styles.actionButton,
                   quickActionWidth ? { width: quickActionWidth } : null,
                 ]}
-                onPress={() => router.push(item.route as any)}
+                onPress={() =>
+                  'route' in item
+                    ? router.push(item.route as any)
+                    : setAddPickerOpen(true)
+                }
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={item.label}
@@ -994,6 +1031,13 @@ function DashboardHubScreen() {
         </WalkthroughableView>
         </CopilotStep>
       </ScrollView>
+
+      {/* Add-to-collection taxon picker — shared with the collection tab. */}
+      <AddPickerSheet
+        visible={addPickerOpen}
+        onClose={() => setAddPickerOpen(false)}
+        onPick={handleAddPick}
+      />
     </View>
   );
 }
