@@ -532,6 +532,12 @@ export default function TarantulaDetailScreen() {
   // render cycle pick up the resolved state.
   if (!tarantula) return null;
 
+  // Personalized header title (replaces the generic "Details"). Name first,
+  // then common/scientific name, then a taxon-typed fallback for unnamed
+  // animals. The header is a fixed bar, so this stays visible while scrolling.
+  const headerTitle =
+    tarantula.name || tarantula.common_name || tarantula.scientific_name || 'Unnamed Tarantula';
+
   const detailRightActions = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
       <TouchableOpacity style={{ padding: 6 }} onPress={handleShareTarantula} accessibilityLabel="Share">
@@ -554,7 +560,7 @@ export default function TarantulaDetailScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader title="Details" leftAction={backButton} rightAction={detailRightActions} />
+      <AppHeader title={headerTitle} leftAction={backButton} rightAction={detailRightActions} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Hero Image */}
