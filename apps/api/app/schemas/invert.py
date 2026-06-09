@@ -12,7 +12,9 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
 
-TAXON_PATTERN = "^(tarantula|scorpion|centipede)$"
+# Full ADR-006 taxon set — kept in sync with the inverts_taxon_check
+# CHECK constraint and INVERT_TAXON_VALUES.
+TAXON_PATTERN = "^(tarantula|scorpion|centipede|whip_spider|vinegaroon|true_spider|millipede|mantis|other)$"
 LIFE_STAGE_PATTERN = "^(sling|juvenile|adult)$"
 ENCLOSURE_TYPE_PATTERN = "^(terrestrial|arboreal|fossorial)$"
 

@@ -88,7 +88,7 @@ def _validate_colony(db: Session, user: User, colony_id: Optional[UUID]) -> None
 @router.get("/", response_model=List[InvertResponse])
 async def list_inverts(
     taxon: Optional[str] = Query(
-        None, pattern="^(tarantula|scorpion|centipede)$",
+        None, pattern="^(tarantula|scorpion|centipede|whip_spider|vinegaroon|true_spider|millipede|mantis|other)$",
         description="Filter to a single taxon. Omit for the whole collection.",
     ),
     colony_id: Optional[UUID] = Query(None),
