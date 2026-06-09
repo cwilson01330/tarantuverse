@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -43,6 +44,10 @@ function WhipSpiderDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
+  // Push the floating hero actions below the Android status bar / iOS
+  // notch — the hero is full-bleed, so without this the edit/delete
+  // buttons collide with the status bar icons.
+  const insets = useSafeAreaInsets();
 
   const [whipSpider, setWhipSpider] = useState<WhipSpider | null>(null);
   const [feedings, setFeedings] = useState<WhipSpiderFeedingLog[]>([]);
@@ -158,7 +163,7 @@ function WhipSpiderDetailScreen() {
             />
           </View>
         )}
-        <View style={styles.heroActions}>
+        <View style={[styles.heroActions, { top: insets.top + 12 }]}>
           <TouchableOpacity
             style={styles.heroButton}
             onPress={handleEdit}
