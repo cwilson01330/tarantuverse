@@ -27,6 +27,18 @@ interface Species {
   medically_significant_venom?: boolean;
 }
 
+// Taxon switcher config. Tarantulas read the legacy /species catalog;
+// the other taxa read the unified invert_species catalog via their
+// per-taxon facade endpoints. All return the same card-relevant fields.
+const TAXA = [
+  { key: 'tarantula', label: '🕷 Tarantulas', endpoint: '/api/v1/species', noun: 'tarantula' },
+  { key: 'scorpion', label: '🦂 Scorpions', endpoint: '/api/v1/scorpion-species', noun: 'scorpion' },
+  { key: 'centipede', label: '🐛 Centipedes', endpoint: '/api/v1/centipede-species', noun: 'centipede' },
+  { key: 'whip_spider', label: '🕸️ Whip spiders', endpoint: '/api/v1/whip-spider-species', noun: 'whip spider' },
+] as const;
+
+type TaxonKey = (typeof TAXA)[number]['key'];
+
 export default function SpeciesPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -41,10 +53,14 @@ export default function SpeciesPage() {
     verifiedOnly: false,
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [taxon, setTaxon] = useState<TaxonKey>('tarantula');
+
+  const activeTaxon = TAXA.find((t) => t.key === taxon) ?? TAXA[0];
 
   useEffect(() => {
     fetchSpecies();
-  }, [filters.verifiedOnly]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.verifiedOnly, taxon]);
 
   const fetchSpecies = async () => {
     try {
@@ -53,9 +69,12 @@ export default function SpeciesPage() {
       params.append('limit', '100');
       if (filters.verifiedOnly) params.append('verified_only', 'true');
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/species?${params}`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}${activeTaxon.endpoint}?${params}`,
+      );
       const data = await response.json();
-      // Handle paginated response format
+      // Tarantula /species returns {items}|array; per-taxon endpoints
+      // return a bare array.
       setSpecies(data.items || data);
     } catch (error) {
       console.error('Error fetching species:', error);
@@ -63,6 +82,11 @@ export default function SpeciesPage() {
       setLoading(false);
     }
   };
+
+  // Tarantula care sheets live at /species/{id}; the other taxa render
+  // through the generic invert care sheet.
+  const careSheetHref = (id: string) =>
+    taxon === 'tarantula' ? `/species/${id}` : `/species/inverts/${id}`;
 
   const filteredSpecies = species.filter(s => {
     const matchesSearch =
@@ -134,7 +158,7 @@ export default function SpeciesPage() {
           <div>
             <h1 className="text-4xl font-bold mb-3 text-gray-900 dark:text-white">Species Database</h1>
             <p className="text-gray-600 dark:text-gray-400 text-lg">
-              Browse comprehensive care guides for {species.length} tarantula species
+              Browse comprehensive care guides for {species.length} {activeTaxon.noun} species
             </p>
           </div>
 
@@ -157,6 +181,27 @@ export default function SpeciesPage() {
               </Link>
             </div>
           )}
+        </div>
+
+        {/* Taxon switcher */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          {TAXA.map((t) => {
+            const active = t.key === taxon;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTaxon(t.key)}
+                className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                  active
+                    ? 'bg-gradient-brand text-white shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+                aria-pressed={active}
+              >
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Search Bar */}
@@ -369,7 +414,7 @@ export default function SpeciesPage() {
             {filteredSpecies.slice(0, 50).map((s) => (
               <Link
                 key={s.id}
-                href={`/species/${s.id}`}
+                href={careSheetHref(s.id)}
                 className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden group border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500"
               >
                 {/* Image */}
@@ -446,7 +491,7 @@ export default function SpeciesPage() {
             {filteredSpecies.slice(0, 50).map((s) => (
               <Link
                 key={s.id}
-                href={`/species/${s.id}`}
+                href={careSheetHref(s.id)}
                 className="bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-4 flex gap-4 group border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500"
               >
                 {/* Thumbnail */}
