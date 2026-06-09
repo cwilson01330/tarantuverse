@@ -88,12 +88,13 @@ export default function InvertDetailPage() {
       const data: Invert = await res.json()
       setInvert(data)
 
-      const prefix = TAXON_META[data.taxon]?.prefix ?? 'inverts'
+      // Logs go through the generic /inverts/{id}/… endpoints (ADR-007),
+      // so this works for every taxon without a per-taxon prefix.
       const [f, m, s, p] = await Promise.all([
-        fetch(`${API_URL}/api/v1/${prefix}/${id}/feedings`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-        fetch(`${API_URL}/api/v1/${prefix}/${id}/molts`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-        fetch(`${API_URL}/api/v1/${prefix}/${id}/substrate-changes`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-        fetch(`${API_URL}/api/v1/${prefix}/${id}/photos`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetch(`${API_URL}/api/v1/inverts/${id}/feedings`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetch(`${API_URL}/api/v1/inverts/${id}/molts`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetch(`${API_URL}/api/v1/inverts/${id}/substrate-changes`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetch(`${API_URL}/api/v1/inverts/${id}/photos`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
       ])
       setFeedings(Array.isArray(f) ? f : [])
       setMolts(Array.isArray(m) ? m : [])

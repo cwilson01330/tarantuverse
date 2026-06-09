@@ -50,7 +50,7 @@ export default function AddInvertFeedingPage() {
     if (!token || !prefix) return
     setSaving(true)
     try {
-      const res = await fetch(`${API_URL}/api/v1/${prefix}/${id}/feedings`, {
+      const res = await fetch(`${API_URL}/api/v1/inverts/${id}/feedings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({

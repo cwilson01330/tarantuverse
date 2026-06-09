@@ -62,7 +62,7 @@ function AddInvertForm() {
     debounce.current = setTimeout(async () => {
       try {
         const res = await fetch(
-          `${API_URL}/api/v1/${meta.speciesPrefix}/search?q=${encodeURIComponent(text.trim())}&limit=8`,
+          `${API_URL}/api/v1/invert-species/search?q=${encodeURIComponent(text.trim())}&taxon=${taxon}&limit=8`,
         )
         setHits(res.ok ? await res.json() : [])
       } catch {
@@ -88,13 +88,13 @@ function AddInvertForm() {
     }
     setSaving(true)
     try {
-      // Post to the per-taxon create endpoint (taxon forced server-side),
-      // not the generic /inverts/ — the InvertCreate schema's taxon pattern
-      // doesn't yet include the newer taxa, and this matches the mobile path.
-      const res = await fetch(`${API_URL}/api/v1/${meta.prefix}/`, {
+      // Generic create — taxon in the body. TAXON_PATTERN now covers every
+      // taxon, so this works without per-taxon routers (ADR-007 parity).
+      const res = await fetch(`${API_URL}/api/v1/inverts/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          taxon,
           name: name.trim() || null,
           common_name: commonName.trim() || null,
           scientific_name: scientificName.trim() || null,

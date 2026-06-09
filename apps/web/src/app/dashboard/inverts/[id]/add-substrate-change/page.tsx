@@ -51,7 +51,7 @@ export default function AddInvertSubstrateChangePage() {
     if (!token || !prefix) return
     setSaving(true)
     try {
-      const res = await fetch(`${API_URL}/api/v1/${prefix}/${id}/substrate-changes`, {
+      const res = await fetch(`${API_URL}/api/v1/inverts/${id}/substrate-changes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({

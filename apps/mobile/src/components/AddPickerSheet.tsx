@@ -28,7 +28,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../contexts/ThemeContext';
 
-export type AddPickerTaxon = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider';
+export type AddPickerTaxon =
+  | 'tarantula'
+  | 'scorpion'
+  | 'centipede'
+  | 'whip_spider'
+  | 'vinegaroon'
+  | 'true_spider'
+  | 'millipede'
+  | 'mantis'
+  | 'other';
 
 interface AddPickerSheetProps {
   visible: boolean;
@@ -71,6 +80,11 @@ const ROWS: Row[] = [
     label: 'Whip spider',
     hint: 'New whip spider record',
   },
+  { key: 'vinegaroon', glyph: '🦂', label: 'Vinegaroon', hint: 'New vinegaroon record' },
+  { key: 'true_spider', glyph: '🕷', label: 'True spider', hint: 'New true spider record' },
+  { key: 'millipede', glyph: '🪱', label: 'Millipede', hint: 'New millipede record' },
+  { key: 'mantis', glyph: '🦗', label: 'Mantis', hint: 'New mantis record' },
+  { key: 'other', glyph: '🐾', label: 'Other invertebrate', hint: 'New invertebrate record' },
 ];
 
 export function AddPickerSheet({

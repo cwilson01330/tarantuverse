@@ -43,7 +43,7 @@ interface PremoltPrediction {
 // (feeding status + premolt); the other taxa render lean cards. Non-tarantula
 // detail/add pages are built in later web batches — until then those routes
 // 404 (collection list parity is this batch's scope).
-type TaxonKey = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider'
+type TaxonKey = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider' | 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'other'
 
 interface Animal {
   id: string
@@ -67,6 +67,13 @@ const TAXA: {
   { key: 'scorpion', label: 'Scorpions', glyph: '🦂', listEndpoint: '/api/v1/scorpions/', addPath: '/dashboard/inverts/add?taxon=scorpion', detailPath: (id) => `/dashboard/inverts/${id}` },
   { key: 'centipede', label: 'Centipedes', glyph: '🐛', listEndpoint: '/api/v1/centipedes/', addPath: '/dashboard/inverts/add?taxon=centipede', detailPath: (id) => `/dashboard/inverts/${id}` },
   { key: 'whip_spider', label: 'Whip spiders', glyph: '🕸️', listEndpoint: '/api/v1/whip-spiders/', addPath: '/dashboard/inverts/add?taxon=whip_spider', detailPath: (id) => `/dashboard/inverts/${id}` },
+  // Newer taxa have no per-taxon facade router — list them through the
+  // generic /inverts/?taxon= surface (ADR-007).
+  { key: 'vinegaroon', label: 'Vinegaroons', glyph: '🦂', listEndpoint: '/api/v1/inverts/?taxon=vinegaroon', addPath: '/dashboard/inverts/add?taxon=vinegaroon', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'true_spider', label: 'True spiders', glyph: '🕷', listEndpoint: '/api/v1/inverts/?taxon=true_spider', addPath: '/dashboard/inverts/add?taxon=true_spider', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'millipede', label: 'Millipedes', glyph: '🪱', listEndpoint: '/api/v1/inverts/?taxon=millipede', addPath: '/dashboard/inverts/add?taxon=millipede', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'mantis', label: 'Mantises', glyph: '🦗', listEndpoint: '/api/v1/inverts/?taxon=mantis', addPath: '/dashboard/inverts/add?taxon=mantis', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'other', label: 'Other', glyph: '🐾', listEndpoint: '/api/v1/inverts/?taxon=other', addPath: '/dashboard/inverts/add?taxon=other', detailPath: (id) => `/dashboard/inverts/${id}` },
 ]
 
 const TAXON_CONFIG: Record<TaxonKey, (typeof TAXA)[number]> = TAXA.reduce(

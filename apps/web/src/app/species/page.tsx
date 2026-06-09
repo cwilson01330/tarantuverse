@@ -35,6 +35,10 @@ const TAXA = [
   { key: 'scorpion', label: '🦂 Scorpions', endpoint: '/api/v1/scorpion-species', noun: 'scorpion' },
   { key: 'centipede', label: '🐛 Centipedes', endpoint: '/api/v1/centipede-species', noun: 'centipede' },
   { key: 'whip_spider', label: '🕸️ Whip spiders', endpoint: '/api/v1/whip-spider-species', noun: 'whip spider' },
+  { key: 'vinegaroon', label: '🦂 Vinegaroons', endpoint: '/api/v1/invert-species/?taxon=vinegaroon', noun: 'vinegaroon' },
+  { key: 'true_spider', label: '🕷 True spiders', endpoint: '/api/v1/invert-species/?taxon=true_spider', noun: 'true spider' },
+  { key: 'millipede', label: '🪱 Millipedes', endpoint: '/api/v1/invert-species/?taxon=millipede', noun: 'millipede' },
+  { key: 'mantis', label: '🦗 Mantises', endpoint: '/api/v1/invert-species/?taxon=mantis', noun: 'mantis' },
 ] as const;
 
 type TaxonKey = (typeof TAXA)[number]['key'];

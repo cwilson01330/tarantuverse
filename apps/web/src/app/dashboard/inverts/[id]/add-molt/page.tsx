@@ -48,7 +48,7 @@ export default function AddInvertMoltPage() {
     setSaving(true)
     try {
       const combinedNotes = [moltNum ? `Molt #${moltNum}` : null, notes.trim() || null].filter(Boolean).join('\n\n') || null
-      const res = await fetch(`${API_URL}/api/v1/${prefix}/${id}/molts`, {
+      const res = await fetch(`${API_URL}/api/v1/inverts/${id}/molts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ molted_at: new Date(date + 'T12:00:00').toISOString(), notes: combinedNotes }),

@@ -52,7 +52,7 @@ export default function AddInvertPhotoPage() {
       const form = new FormData()
       form.append('file', file)
       if (caption.trim()) form.append('caption', caption.trim())
-      const res = await fetch(`${API_URL}/api/v1/${prefix}/${id}/photos`, {
+      const res = await fetch(`${API_URL}/api/v1/inverts/${id}/photos`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }, // no Content-Type — browser sets multipart boundary
         body: form,

@@ -44,6 +44,17 @@ import {
   whipSpiderDisplayName,
   type WhipSpider,
 } from '../../src/lib/whip-spiders';
+import {
+  listInverts,
+  invertDisplayName,
+  INVERT_TAXA,
+  type Invert as GenericInvert,
+  type InvertTaxon,
+} from '../../src/lib/inverts';
+
+// Taxa that have no per-taxon list lib — fetched generically via /inverts/.
+// (scorpion/centipede/whip_spider keep their existing per-taxon fetches.)
+const GENERIC_TAXA: InvertTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'other'];
 
 interface Tarantula {
   id: string;
@@ -88,13 +99,14 @@ interface CollectionStats {
 // sheet), scorpions + centipedes render via a simpler card until
 // those features ship for the additional surfaces. New taxa land
 // here when added.
-type TaxonFilter = 'all' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders';
+type TaxonFilter = 'all' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | InvertTaxon;
 
 type Row =
   | { kind: 'tarantula'; data: Tarantula }
   | { kind: 'scorpion'; data: Scorpion }
   | { kind: 'centipede'; data: Centipede }
-  | { kind: 'whip_spider'; data: WhipSpider };
+  | { kind: 'whip_spider'; data: WhipSpider }
+  | { kind: 'invert'; data: GenericInvert };
 
 function CollectionScreen() {
   const router = useRouter();
@@ -104,6 +116,7 @@ function CollectionScreen() {
   const [scorpions, setScorpions] = useState<Scorpion[]>([]);
   const [centipedes, setCentipedes] = useState<Centipede[]>([]);
   const [whipSpiders, setWhipSpiders] = useState<WhipSpider[]>([]);
+  const [otherInverts, setOtherInverts] = useState<GenericInvert[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
@@ -157,6 +170,7 @@ function CollectionScreen() {
     fetchScorpions();
     fetchCentipedes();
     fetchWhipSpiders();
+    fetchOtherInverts();
     fetchCollectionStats();
   }, []);
 
@@ -202,6 +216,17 @@ function CollectionScreen() {
       setWhipSpiders(rows);
     } catch {
       setWhipSpiders([]);
+    }
+  };
+
+  const fetchOtherInverts = async () => {
+    // The newer taxa (vinegaroon/true_spider/millipede/mantis/other) have no
+    // per-taxon list lib — pull the unified collection and keep just those.
+    try {
+      const all = await listInverts();
+      setOtherInverts(all.filter((i) => GENERIC_TAXA.includes(i.taxon)));
+    } catch {
+      setOtherInverts([]);
     }
   };
 
@@ -360,6 +385,7 @@ function CollectionScreen() {
     if (row.kind === 'tarantula') return getDisplayName(row.data);
     if (row.kind === 'scorpion') return scorpionDisplayName(row.data);
     if (row.kind === 'whip_spider') return whipSpiderDisplayName(row.data);
+    if (row.kind === 'invert') return invertDisplayName(row.data);
     return centipedeDisplayName(row.data);
   };
 
@@ -385,12 +411,17 @@ function CollectionScreen() {
       taxonFilter === 'all' || taxonFilter === 'whip_spiders'
         ? whipSpiders.map((w) => ({ kind: 'whip_spider' as const, data: w }))
         : [];
+    // Newer generic taxa — included under 'all' or when their own chip is active.
+    const otherInvertRows: Row[] = otherInverts
+      .filter((i) => taxonFilter === 'all' || taxonFilter === i.taxon)
+      .map((i) => ({ kind: 'invert' as const, data: i }));
 
     let rows: Row[] = [
       ...tarantulaRows,
       ...scorpionRows,
       ...centipedeRows,
       ...whipSpiderRows,
+      ...otherInvertRows,
     ];
 
     // Search across name, common_name, and scientific_name regardless
@@ -440,6 +471,7 @@ function CollectionScreen() {
       fetchScorpions(),
       fetchCentipedes(),
       fetchWhipSpiders(),
+      fetchOtherInverts(),
       fetchCollectionStats(),
     ]);
     setRefreshing(false);
@@ -816,6 +848,54 @@ function CollectionScreen() {
           {item.common_name && (
             <Text style={styles.commonName}>{item.common_name}</Text>
           )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Generic card for the newer taxa (vinegaroon/true_spider/millipede/
+  // mantis/other). Glyph + label come from the registry; routes to the
+  // generic /invert/[id] detail.
+  const renderInvert = ({ item }: { item: GenericInvert }) => {
+    const meta = INVERT_TAXA[item.taxon];
+    const displayName = item.name || item.common_name || item.scientific_name || 'Unnamed';
+    const sexLabel = item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/invert/${item.id}` as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, ${meta?.label ?? 'invert'}`}
+        accessibilityHint="Opens this animal's detail page."
+      >
+        <View style={styles.imageContainer}>
+          {item.photo_url ? (
+            <Image
+              source={{ uri: getImageUrl(item.photo_url) }}
+              style={styles.image}
+              accessibilityLabel={`Photo of ${displayName}`}
+            />
+          ) : (
+            <View style={styles.placeholderImage} accessibilityElementsHidden importantForAccessibility="no">
+              <Text style={{ fontSize: 40 }}>{meta?.glyph ?? '🐾'}</Text>
+            </View>
+          )}
+          {item.sex && item.sex !== 'unknown' && (
+            <View
+              style={[styles.sexBadge, item.sex === 'female' ? styles.femaleBadge : styles.maleBadge]}
+              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
+            >
+              <MaterialCommunityIcons name={item.sex === 'female' ? 'gender-female' : 'gender-male'} size={16} color="#fff" />
+            </View>
+          )}
+          <View style={styles.taxonGlyph}>
+            <Text style={{ fontSize: 14 }}>{meta?.glyph ?? '🐾'}</Text>
+          </View>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.name}>{displayName}</Text>
+          {item.scientific_name && <Text style={styles.scientificName}>{item.scientific_name}</Text>}
+          {item.common_name && <Text style={styles.commonName}>{item.common_name}</Text>}
         </View>
       </TouchableOpacity>
     );
@@ -1534,6 +1614,9 @@ function CollectionScreen() {
     if (item.kind === 'whip_spider') {
       return renderWhipSpider({ item: item.data });
     }
+    if (item.kind === 'invert') {
+      return renderInvert({ item: item.data });
+    }
     return viewMode === 'card'
       ? renderTarantula({ item: item.data })
       : renderListItem({ item: item.data });
@@ -1550,6 +1633,11 @@ function CollectionScreen() {
           { value: 'scorpions' as const, label: '🦂 Scorpions' },
           { value: 'centipedes' as const, label: '🐛 Centipedes' },
           { value: 'whip_spiders' as const, label: '🕸️ Whip spiders' },
+          { value: 'vinegaroon' as const, label: '🦂 Vinegaroons' },
+          { value: 'true_spider' as const, label: '🕷 True spiders' },
+          { value: 'millipede' as const, label: '🪱 Millipedes' },
+          { value: 'mantis' as const, label: '🦗 Mantises' },
+          { value: 'other' as const, label: '🐾 Other' },
         ]
       ).map((opt) => {
         const active = taxonFilter === opt.value;
