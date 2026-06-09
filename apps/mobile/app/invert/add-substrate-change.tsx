@@ -8,23 +8,26 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
-import { getInvert, createInvertSubstrateChange, type InvertTaxon } from '../../src/lib/inverts';
+import { getInvert, createInvertSubstrateChange, updateInvertSubstrateChange, type InvertTaxon } from '../../src/lib/inverts';
 import { toISODateLocal } from '../../src/utils/date';
 
 const REASONS = ['Routine maintenance', 'Mold or mites', 'Rehouse', 'Other'];
 
 export default function AddInvertSubstrateChangeScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // logId present ⇒ edit mode (PUT) with the row's values prefilled.
+  const { id, logId, changed_at, substrate_type, substrate_depth, reason: reasonParam, notes: notesParam } =
+    useLocalSearchParams<{ id?: string; logId?: string; changed_at?: string; substrate_type?: string; substrate_depth?: string; reason?: string; notes?: string }>();
+  const isEdit = !!logId;
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [taxon, setTaxon] = useState<InvertTaxon | null>(null);
-  const [date, setDate] = useState(toISODateLocal(new Date()));
-  const [substrateType, setSubstrateType] = useState('');
-  const [substrateDepth, setSubstrateDepth] = useState('');
-  const [reason, setReason] = useState(REASONS[0]);
-  const [notes, setNotes] = useState('');
+  const [date, setDate] = useState(changed_at || toISODateLocal(new Date()));
+  const [substrateType, setSubstrateType] = useState(substrate_type || '');
+  const [substrateDepth, setSubstrateDepth] = useState(substrate_depth || '');
+  const [reason, setReason] = useState(reasonParam && REASONS.includes(reasonParam) ? reasonParam : REASONS[0]);
+  const [notes, setNotes] = useState(notesParam || '');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
@@ -33,7 +36,12 @@ export default function AddInvertSubstrateChangeScreen() {
     if (!id || !taxon) return;
     try {
       setSaving(true);
-      await createInvertSubstrateChange(taxon, id, { changed_at: date, substrate_type: substrateType.trim() || null, substrate_depth: substrateDepth.trim() || null, reason, notes: notes.trim() || null });
+      const payload = { changed_at: date, substrate_type: substrateType.trim() || null, substrate_depth: substrateDepth.trim() || null, reason, notes: notes.trim() || null };
+      if (isEdit && logId) {
+        await updateInvertSubstrateChange(logId, payload);
+      } else {
+        await createInvertSubstrateChange(taxon, id, payload);
+      }
       router.back();
     } catch (err) { Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.'); }
     finally { setSaving(false); }
@@ -42,7 +50,7 @@ export default function AddInvertSubstrateChangeScreen() {
   const styles = makeStyles(colors);
   return (
     <View style={styles.flex}>
-      <AppHeader title="Log substrate change" leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
+      <AppHeader title={isEdit ? 'Edit substrate change' : 'Log substrate change'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date" colors={colors}><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
@@ -58,7 +66,7 @@ export default function AddInvertSubstrateChangeScreen() {
           </Field>
           <Field label="Notes (optional)" colors={colors}><TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} multiline placeholderTextColor={colors.textTertiary} /></Field>
           <TouchableOpacity style={[styles.saveButton, (saving || !taxon) && { opacity: 0.6 }]} onPress={handleSave} disabled={saving || !taxon}>
-            <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save substrate change'}</Text>
+            <Text style={styles.saveText}>{saving ? 'Saving…' : isEdit ? 'Update substrate change' : 'Save substrate change'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

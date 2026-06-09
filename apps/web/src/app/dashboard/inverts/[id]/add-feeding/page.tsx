@@ -27,15 +27,32 @@ export default function AddInvertFeedingPage() {
   const { user, token, isAuthenticated, isLoading } = useAuth()
 
   const [prefix, setPrefix] = useState<string | null>(null)
+  // logId present ⇒ edit mode (PUT). Read from the query string via
+  // window.location (NOT useSearchParams — that forces a Suspense boundary
+  // or the Vercel static-prerender build fails).
+  const [logId, setLogId] = useState<string | null>(null)
   const [date, setDate] = useState(localToday())
   const [food, setFood] = useState('Cricket')
   const [accepted, setAccepted] = useState(true)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const isEdit = !!logId
 
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated || !token) { router.push('/login'); return }
+    // Prefill from query params in edit mode.
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search)
+      const lid = sp.get('logId')
+      if (lid) {
+        setLogId(lid)
+        const fa = sp.get('fed_at'); if (fa) { const d = new Date(fa); setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`) }
+        const ft = sp.get('food_type'); if (ft) setFood(ft)
+        const ac = sp.get('accepted'); if (ac != null) setAccepted(ac === 'true')
+        const nt = sp.get('notes'); if (nt != null) setNotes(nt)
+      }
+    }
     ;(async () => {
       try {
         const res = await fetch(`${API_URL}/api/v1/inverts/${id}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -50,16 +67,20 @@ export default function AddInvertFeedingPage() {
     if (!token || !prefix) return
     setSaving(true)
     try {
-      const res = await fetch(`${API_URL}/api/v1/inverts/${id}/feedings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          fed_at: new Date(date + 'T12:00:00').toISOString(),
-          food_type: food,
-          accepted,
-          notes: notes.trim() || null,
-        }),
+      const body = JSON.stringify({
+        fed_at: new Date(date + 'T12:00:00').toISOString(),
+        food_type: food,
+        accepted,
+        notes: notes.trim() || null,
       })
+      const res = await fetch(
+        isEdit ? `${API_URL}/api/v1/feedings/${logId}` : `${API_URL}/api/v1/inverts/${id}/feedings`,
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body,
+        },
+      )
       if (!res.ok) throw new Error()
       router.push(`/dashboard/inverts/${id}`)
     } catch {
@@ -73,7 +94,7 @@ export default function AddInvertFeedingPage() {
     <DashboardLayout userName={user?.name ?? undefined} userEmail={user?.email ?? undefined} userAvatar={user?.image ?? undefined}>
       <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <button onClick={() => router.back()} className="text-sm text-primary-600 hover:underline mb-4">← Back</button>
-        <h1 className="text-2xl font-bold text-theme-primary mb-6">Log feeding</h1>
+        <h1 className="text-2xl font-bold text-theme-primary mb-6">{isEdit ? 'Edit feeding' : 'Log feeding'}</h1>
         <div className="space-y-5">
           <div><label className={labelCls}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></div>
           <div>
@@ -92,7 +113,7 @@ export default function AddInvertFeedingPage() {
             </div>
           </div>
           <div><label className={labelCls}>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} /></div>
-          <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : 'Save feeding'}</button>
+          <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : isEdit ? 'Update feeding' : 'Save feeding'}</button>
         </div>
       </div>
     </DashboardLayout>

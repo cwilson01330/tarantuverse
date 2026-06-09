@@ -20,6 +20,8 @@ import { getImageUrl } from '../../src/utils/image-url';
 import {
   INVERT_TAXA, deleteInvert, getInvert, invertDisplayName,
   listInvertFeedings, listInvertMolts, listInvertPhotos, listInvertSubstrateChanges,
+  deleteInvertFeeding, deleteInvertMolt, deleteInvertSubstrateChange,
+  setInvertMainPhoto, deleteInvertPhoto,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
 } from '../../src/lib/inverts';
 import { SectionCard, InfoRow as UIInfoRow } from '../../src/components/ui';
@@ -69,6 +71,44 @@ function InvertDetailScreen() {
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try { await deleteInvert(id!); router.back(); }
         catch (err) { Alert.alert('Error', err instanceof Error ? err.message : 'Could not delete.'); }
+      } },
+    ]);
+  };
+
+  // ── Inline log management (ADR-008) ──────────────────────────────────────
+  // Delete confirms then refetches; edit routes to the matching add-* screen
+  // in edit mode (logId + prefilled values via params).
+  const confirmDeleteLog = (label: string, run: () => Promise<void>) => {
+    Alert.alert('Delete this log?', `This removes the ${label} entry. This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        try { await run(); await fetchAll(); }
+        catch (err) { Alert.alert('Error', err instanceof Error ? err.message : 'Could not delete.'); }
+      } },
+    ]);
+  };
+
+  const editFeeding = (f: InvertFeedingLog) => router.push(
+    `/invert/add-feeding?id=${id}&logId=${f.id}&fed_at=${encodeURIComponent(f.fed_at)}&food_type=${encodeURIComponent(f.food_type ?? '')}&accepted=${f.accepted}&notes=${encodeURIComponent(f.notes ?? '')}` as any,
+  );
+  const editMolt = (m: InvertMoltLog) => router.push(
+    `/invert/add-molt?id=${id}&logId=${m.id}&molted_at=${encodeURIComponent(m.molted_at)}&notes=${encodeURIComponent(m.notes ?? '')}` as any,
+  );
+  const editSubstrate = (c: InvertSubstrateChange) => router.push(
+    `/invert/add-substrate-change?id=${id}&logId=${c.id}&changed_at=${encodeURIComponent(c.changed_at)}&substrate_type=${encodeURIComponent(c.substrate_type ?? '')}&substrate_depth=${encodeURIComponent(c.substrate_depth ?? '')}&reason=${encodeURIComponent(c.reason ?? '')}&notes=${encodeURIComponent(c.notes ?? '')}` as any,
+  );
+
+  // ── Hero / photo management (ADR-008) ────────────────────────────────────
+  const handlePhotoLongPress = (photo: InvertPhoto) => {
+    const isHero = invert?.photo_url === photo.url;
+    Alert.alert('Photo options', photo.caption || 'Manage this photo', [
+      { text: 'Cancel', style: 'cancel' },
+      ...(!isHero ? [{ text: 'Set as hero photo', onPress: async () => {
+        try { await setInvertMainPhoto(photo.id); await fetchAll(); }
+        catch (err) { Alert.alert('Error', err instanceof Error ? err.message : 'Could not set hero photo.'); }
+      } }] : []),
+      { text: 'Delete photo', style: 'destructive' as const, onPress: () => {
+        confirmDeleteLog('photo', () => deleteInvertPhoto(photo.id));
       } },
     ]);
   };
@@ -135,22 +175,41 @@ function InvertDetailScreen() {
 
       <LogSection title="Feedings" emptyText="No feedings logged yet." ctaLabel="Log feeding"
         onCta={() => router.push(`/invert/add-feeding?id=${id}` as any)} items={feedings.slice(0, 5)}
-        renderItem={(item) => (<View style={styles.logRow}><Text style={styles.logRowTitle}>{item.food_type || 'Feeding'} · {item.accepted ? 'Accepted' : 'Refused'}</Text><Text style={styles.logRowMeta}>{fmtDate(item.fed_at)}</Text></View>)} colors={colors} />
+        onEdit={editFeeding} onDelete={(f) => confirmDeleteLog('feeding', () => deleteInvertFeeding(f.id))}
+        renderItem={(item) => (<><Text style={styles.logRowTitle}>{item.food_type || 'Feeding'} · {item.accepted ? 'Accepted' : 'Refused'}</Text><Text style={styles.logRowMeta}>{fmtDate(item.fed_at)}</Text></>)} colors={colors} />
 
       <LogSection title="Molts" emptyText="No molts logged yet." ctaLabel="Log molt"
         onCta={() => router.push(`/invert/add-molt?id=${id}` as any)} items={molts.slice(0, 5)}
-        renderItem={(item) => (<View style={styles.logRow}><Text style={styles.logRowTitle}>Molt</Text><Text style={styles.logRowMeta}>{fmtDate(item.molted_at)}</Text></View>)} colors={colors} />
+        onEdit={editMolt} onDelete={(m) => confirmDeleteLog('molt', () => deleteInvertMolt(m.id))}
+        renderItem={(item) => (<><Text style={styles.logRowTitle}>Molt</Text><Text style={styles.logRowMeta}>{fmtDate(item.molted_at)}</Text></>)} colors={colors} />
 
       <LogSection title="Substrate changes" emptyText="No substrate changes logged yet." ctaLabel="Log substrate change"
         onCta={() => router.push(`/invert/add-substrate-change?id=${id}` as any)} items={substrate.slice(0, 5)}
-        renderItem={(item) => (<View style={styles.logRow}><Text style={styles.logRowTitle}>{item.substrate_type || 'Substrate change'}</Text><Text style={styles.logRowMeta}>{fmtDate(item.changed_at)}</Text></View>)} colors={colors} />
+        onEdit={editSubstrate} onDelete={(c) => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id))}
+        renderItem={(item) => (<><Text style={styles.logRowTitle}>{item.substrate_type || 'Substrate change'}</Text><Text style={styles.logRowMeta}>{fmtDate(item.changed_at)}</Text></>)} colors={colors} />
 
       <Section title="Photos" actionLabel="Add photo" onAction={() => router.push(`/invert/add-photo?id=${id}` as any)}>
         {photos.length === 0 ? (
           <Text style={[s.empty, { color: colors.textTertiary }]}>No photos yet.</Text>
         ) : (
-          <FlatList horizontal data={photos} keyExtractor={(p) => p.id} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}
-            renderItem={({ item }) => <Image source={{ uri: getImageUrl(item.thumbnail_url ?? item.url) }} style={styles.photoThumb} />} />
+          <>
+            <FlatList horizontal data={photos} keyExtractor={(p) => p.id} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SPACING.sm }}
+              renderItem={({ item }) => {
+                const isHero = invert.photo_url === item.url;
+                return (
+                  <TouchableOpacity activeOpacity={0.8} onLongPress={() => handlePhotoLongPress(item)} accessibilityRole="imagebutton" accessibilityLabel={isHero ? 'Hero photo. Long-press to manage.' : 'Photo. Long-press to set as hero or delete.'}>
+                    <Image source={{ uri: getImageUrl(item.thumbnail_url ?? item.url) }} style={styles.photoThumb} />
+                    {isHero && (
+                      <View style={styles.heroTag}>
+                        <MaterialCommunityIcons name="star" size={11} color="#fff" />
+                        <Text style={styles.heroTagText}>Hero</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              }} />
+            <Text style={[s.empty, { color: colors.textTertiary, fontStyle: 'normal' }]}>Long-press a photo to set it as the hero or delete it.</Text>
+          </>
         )}
       </Section>
 
@@ -181,16 +240,34 @@ function InfoRow({ label, value }: { label: string; value: string; colors?: Retu
   return <UIInfoRow label={label} value={value} />;
 }
 
-function LogSection<T extends { id: string }>({ title, emptyText, ctaLabel, onCta, items, renderItem, colors }: { title: string; emptyText: string; ctaLabel: string; onCta: () => void; items: T[]; renderItem: (item: T) => React.ReactNode; colors: ReturnType<typeof useTheme>['colors'] }) {
+function LogSection<T extends { id: string }>({ title, emptyText, ctaLabel, onCta, items, renderItem, onEdit, onDelete, colors }: { title: string; emptyText: string; ctaLabel: string; onCta: () => void; items: T[]; renderItem: (item: T) => React.ReactNode; onEdit?: (item: T) => void; onDelete?: (item: T) => void; colors: ReturnType<typeof useTheme>['colors'] }) {
   return (
     <Section title={title} actionLabel={ctaLabel} onAction={onCta}>
-      {items.length === 0 ? <Text style={[s.empty, { color: colors.textTertiary }]}>{emptyText}</Text> : items.map((item) => <View key={item.id}>{renderItem(item)}</View>)}
+      {items.length === 0 ? (
+        <Text style={[s.empty, { color: colors.textTertiary }]}>{emptyText}</Text>
+      ) : items.map((item) => (
+        <View key={item.id} style={[s.logRow, { borderBottomColor: colors.border }]}>
+          <View style={s.logRowContent}>{renderItem(item)}</View>
+          {onEdit && (
+            <TouchableOpacity onPress={() => onEdit(item)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Edit ${title.toLowerCase()} entry`}>
+              <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+          {onDelete && (
+            <TouchableOpacity onPress={() => onDelete(item)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Delete ${title.toLowerCase()} entry`}>
+              <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.error} />
+            </TouchableOpacity>
+          )}
+        </View>
+      ))}
     </Section>
   );
 }
 
 const s = StyleSheet.create({
   empty: { ...TYPE.label, fontStyle: 'italic' },
+  logRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  logRowContent: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACING.sm },
 });
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
@@ -211,6 +288,8 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     logRowTitle: { ...TYPE.bodyStrong, color: colors.textPrimary, flex: 1 },
     logRowMeta: { ...TYPE.caption, color: colors.textTertiary },
     photoThumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: colors.surfaceElevated },
+    heroTag: { position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+    heroTagText: { ...TYPE.caption, color: '#fff' },
     notes: { ...TYPE.body, color: colors.textSecondary },
     errorText: { ...TYPE.body, color: colors.textPrimary, marginBottom: SPACING.lg },
     retryButton: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, backgroundColor: colors.primary, borderRadius: 8 },

@@ -8,19 +8,23 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
-import { getInvert, createInvertMolt, type InvertTaxon } from '../../src/lib/inverts';
+import { getInvert, createInvertMolt, updateInvertMolt, type InvertTaxon } from '../../src/lib/inverts';
 import { toISODateLocal } from '../../src/utils/date';
 
 export default function AddInvertMoltScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // logId present ⇒ edit mode. On edit we prefill notes verbatim (the molt
+  // number, if any, is embedded there) and leave the molt-number input blank.
+  const { id, logId, molted_at, notes: notesParam } =
+    useLocalSearchParams<{ id?: string; logId?: string; molted_at?: string; notes?: string }>();
+  const isEdit = !!logId;
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [taxon, setTaxon] = useState<InvertTaxon | null>(null);
-  const [date, setDate] = useState(toISODateLocal(new Date()));
+  const [date, setDate] = useState(molted_at ? toISODateLocal(new Date(molted_at)) : toISODateLocal(new Date()));
   const [moltNum, setMoltNum] = useState('');
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(notesParam || '');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
@@ -30,7 +34,12 @@ export default function AddInvertMoltScreen() {
     try {
       setSaving(true);
       const combined = [moltNum ? `Molt #${moltNum}` : null, notes.trim() || null].filter(Boolean).join('\n\n') || null;
-      await createInvertMolt(taxon, id, { molted_at: new Date(date + 'T12:00:00').toISOString(), notes: combined });
+      const payload = { molted_at: new Date(date + 'T12:00:00').toISOString(), notes: combined };
+      if (isEdit && logId) {
+        await updateInvertMolt(logId, payload);
+      } else {
+        await createInvertMolt(taxon, id, payload);
+      }
       router.back();
     } catch (err) { Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.'); }
     finally { setSaving(false); }
@@ -39,7 +48,7 @@ export default function AddInvertMoltScreen() {
   const styles = makeStyles(colors);
   return (
     <View style={styles.flex}>
-      <AppHeader title="Log molt" leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
+      <AppHeader title={isEdit ? 'Edit molt' : 'Log molt'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date molted" colors={colors}><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>

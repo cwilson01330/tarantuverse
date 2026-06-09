@@ -53,10 +53,10 @@ interface Invert {
   species_id?: string | null
 }
 
-interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean }
-interface MoltLog { id: string; molted_at: string }
-interface SubstrateChange { id: string; changed_at: string; substrate_type?: string | null }
-interface Photo { id: string; url: string; thumbnail_url?: string | null }
+interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
+interface MoltLog { id: string; molted_at: string; notes?: string | null }
+interface SubstrateChange { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
+interface Photo { id: string; url: string; thumbnail_url?: string | null; caption?: string | null }
 
 export default function InvertDetailPage() {
   const params = useParams()
@@ -130,6 +130,43 @@ export default function InvertDetailPage() {
       alert('Could not delete this animal. Please try again.')
     }
   }
+
+  // ── Inline log + photo management (ADR-008) ─────────────────────────────
+  const deleteLog = async (path: string, label: string) => {
+    if (!token) return
+    if (!confirm(`Delete this ${label} entry? This cannot be undone.`)) return
+    try {
+      const res = await fetch(`${API_URL}/api/v1/${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok && res.status !== 204) throw new Error()
+      fetchAll()
+    } catch { alert('Could not delete. Please try again.') }
+  }
+
+  const setHeroPhoto = async (photoId: string) => {
+    if (!token) return
+    try {
+      const res = await fetch(`${API_URL}/api/v1/photos/${photoId}/set-main`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) throw new Error()
+      fetchAll()
+    } catch { alert('Could not set hero photo.') }
+  }
+
+  const deletePhoto = async (photoId: string) => {
+    if (!token) return
+    if (!confirm('Delete this photo? This cannot be undone.')) return
+    try {
+      const res = await fetch(`${API_URL}/api/v1/photos/${photoId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok && res.status !== 204) throw new Error()
+      fetchAll()
+    } catch { alert('Could not delete photo.') }
+  }
+
+  // Build an edit query string (logId triggers edit mode on the add-* page).
+  const qp = (obj: Record<string, string | number | boolean | null | undefined>) =>
+    Object.entries(obj)
+      .filter(([, v]) => v !== null && v !== undefined)
+      .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`)
+      .join('&')
 
   const meta = invert ? TAXON_META[invert.taxon] : null
   const isWhipSpider = invert?.taxon === 'whip_spider'
@@ -238,6 +275,8 @@ export default function InvertDetailPage() {
                 key: x.id,
                 left: `${x.food_type || 'Feeding'} · ${x.accepted ? 'Accepted' : 'Refused'}`,
                 right: formatLocalDate(x.fed_at),
+                onEdit: () => router.push(`/dashboard/inverts/${id}/add-feeding?${qp({ logId: x.id, fed_at: x.fed_at, food_type: x.food_type, accepted: x.accepted, notes: x.notes })}`),
+                onDelete: () => deleteLog(`feedings/${x.id}`, 'feeding'),
               }))}
             />
             <LogSection
@@ -245,14 +284,22 @@ export default function InvertDetailPage() {
               cta="Log molt"
               onCta={() => router.push(`/dashboard/inverts/${id}/add-molt`)}
               empty="No molts logged yet."
-              rows={molts.slice(0, 8).map((x) => ({ key: x.id, left: 'Molt', right: formatLocalDate(x.molted_at) }))}
+              rows={molts.slice(0, 8).map((x) => ({
+                key: x.id, left: 'Molt', right: formatLocalDate(x.molted_at),
+                onEdit: () => router.push(`/dashboard/inverts/${id}/add-molt?${qp({ logId: x.id, molted_at: x.molted_at, notes: x.notes })}`),
+                onDelete: () => deleteLog(`molts/${x.id}`, 'molt'),
+              }))}
             />
             <LogSection
               title="Substrate changes"
               cta="Log substrate change"
               onCta={() => router.push(`/dashboard/inverts/${id}/add-substrate-change`)}
               empty="No substrate changes logged yet."
-              rows={substrate.slice(0, 8).map((x) => ({ key: x.id, left: x.substrate_type || 'Substrate change', right: formatLocalDate(x.changed_at) }))}
+              rows={substrate.slice(0, 8).map((x) => ({
+                key: x.id, left: x.substrate_type || 'Substrate change', right: formatLocalDate(x.changed_at),
+                onEdit: () => router.push(`/dashboard/inverts/${id}/add-substrate-change?${qp({ logId: x.id, changed_at: x.changed_at, substrate_type: x.substrate_type, substrate_depth: x.substrate_depth, reason: x.reason, notes: x.notes })}`),
+                onDelete: () => deleteLog(`substrate-changes/${x.id}`, 'substrate change'),
+              }))}
             />
 
             {/* Photos */}
@@ -264,15 +311,32 @@ export default function InvertDetailPage() {
                 <p className="text-sm text-theme-tertiary italic">No photos yet.</p>
               ) : (
                 <div className="flex gap-3 overflow-x-auto">
-                  {photos.map((p) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={p.id}
-                      src={getImageUrl(p.thumbnail_url || p.url)}
-                      alt=""
-                      className="w-24 h-24 rounded-lg object-cover flex-shrink-0"
-                    />
-                  ))}
+                  {photos.map((p) => {
+                    const isHero = invert.photo_url === p.url
+                    return (
+                      <div key={p.id} className="group relative flex-shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={getImageUrl(p.thumbnail_url || p.url)}
+                          alt={p.caption || ''}
+                          className="w-24 h-24 rounded-lg object-cover"
+                        />
+                        {isHero && (
+                          <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/65 text-white text-[10px] font-semibold">★ Hero</span>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 flex justify-center gap-2 bg-black/55 rounded-b-lg py-1 opacity-0 group-hover:opacity-100 transition">
+                          {!isHero && (
+                            <button onClick={() => setHeroPhoto(p.id)} className="text-[10px] font-semibold text-white hover:underline" aria-label="Set as hero photo">
+                              Set hero
+                            </button>
+                          )}
+                          <button onClick={() => deletePhoto(p.id)} className="text-[10px] font-semibold text-red-300 hover:underline" aria-label="Delete photo">
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </Section>
@@ -350,7 +414,7 @@ function LogSection({
   cta: string
   onCta: () => void
   empty: string
-  rows: { key: string; left: string; right: string }[]
+  rows: { key: string; left: string; right: string; onEdit?: () => void; onDelete?: () => void }[]
 }) {
   return (
     <Section title={title} action={{ label: cta, onClick: onCta }}>
@@ -358,9 +422,27 @@ function LogSection({
         <p className="text-sm text-theme-tertiary italic">{empty}</p>
       ) : (
         rows.map((r) => (
-          <div key={r.key} className="flex justify-between py-1.5 border-b border-theme last:border-0">
-            <span className="text-sm text-theme-primary">{r.left}</span>
+          <div key={r.key} className="group flex items-center gap-3 py-1.5 border-b border-theme last:border-0">
+            <span className="flex-1 text-sm text-theme-primary">{r.left}</span>
             <span className="text-sm text-theme-tertiary">{r.right}</span>
+            {r.onEdit && (
+              <button
+                onClick={r.onEdit}
+                className="text-xs font-semibold text-primary-600 hover:underline opacity-60 group-hover:opacity-100 transition"
+                aria-label={`Edit ${title.toLowerCase()} entry`}
+              >
+                Edit
+              </button>
+            )}
+            {r.onDelete && (
+              <button
+                onClick={r.onDelete}
+                className="text-xs font-semibold text-red-600 hover:underline opacity-60 group-hover:opacity-100 transition"
+                aria-label={`Delete ${title.toLowerCase()} entry`}
+              >
+                Delete
+              </button>
+            )}
           </div>
         ))
       )}

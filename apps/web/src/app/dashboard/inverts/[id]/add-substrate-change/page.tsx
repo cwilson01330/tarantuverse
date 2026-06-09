@@ -27,16 +27,32 @@ export default function AddInvertSubstrateChangePage() {
   const { user, token, isAuthenticated, isLoading } = useAuth()
 
   const [prefix, setPrefix] = useState<string | null>(null)
+  // logId present ⇒ edit mode (PUT). Query read via window.location to
+  // avoid the useSearchParams Suspense build requirement.
+  const [logId, setLogId] = useState<string | null>(null)
   const [date, setDate] = useState(localToday())
   const [type, setType] = useState('')
   const [depth, setDepth] = useState('')
   const [reason, setReason] = useState(REASONS[0])
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const isEdit = !!logId
 
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated || !token) { router.push('/login'); return }
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search)
+      const lid = sp.get('logId')
+      if (lid) {
+        setLogId(lid)
+        const ca = sp.get('changed_at'); if (ca) setDate(ca.slice(0, 10))
+        const st = sp.get('substrate_type'); if (st != null) setType(st)
+        const sd = sp.get('substrate_depth'); if (sd != null) setDepth(sd)
+        const rs = sp.get('reason'); if (rs && REASONS.includes(rs)) setReason(rs)
+        const nt = sp.get('notes'); if (nt != null) setNotes(nt)
+      }
+    }
     ;(async () => {
       try {
         const res = await fetch(`${API_URL}/api/v1/inverts/${id}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -51,17 +67,20 @@ export default function AddInvertSubstrateChangePage() {
     if (!token || !prefix) return
     setSaving(true)
     try {
-      const res = await fetch(`${API_URL}/api/v1/inverts/${id}/substrate-changes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          changed_at: date,
-          substrate_type: type.trim() || null,
-          substrate_depth: depth.trim() || null,
-          reason,
-          notes: notes.trim() || null,
-        }),
-      })
+      const res = await fetch(
+        isEdit ? `${API_URL}/api/v1/substrate-changes/${logId}` : `${API_URL}/api/v1/inverts/${id}/substrate-changes`,
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            changed_at: date,
+            substrate_type: type.trim() || null,
+            substrate_depth: depth.trim() || null,
+            reason,
+            notes: notes.trim() || null,
+          }),
+        },
+      )
       if (!res.ok) throw new Error()
       router.push(`/dashboard/inverts/${id}`)
     } catch {
@@ -75,7 +94,7 @@ export default function AddInvertSubstrateChangePage() {
     <DashboardLayout userName={user?.name ?? undefined} userEmail={user?.email ?? undefined} userAvatar={user?.image ?? undefined}>
       <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <button onClick={() => router.back()} className="text-sm text-primary-600 hover:underline mb-4">← Back</button>
-        <h1 className="text-2xl font-bold text-theme-primary mb-6">Log substrate change</h1>
+        <h1 className="text-2xl font-bold text-theme-primary mb-6">{isEdit ? 'Edit substrate change' : 'Log substrate change'}</h1>
         <div className="space-y-5">
           <div><label className={labelCls}>Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Substrate type</label><input value={type} onChange={(e) => setType(e.target.value)} placeholder="Coco fiber / topsoil" className={inputCls} /></div>
@@ -89,7 +108,7 @@ export default function AddInvertSubstrateChangePage() {
             </div>
           </div>
           <div><label className={labelCls}>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} /></div>
-          <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : 'Save substrate change'}</button>
+          <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : isEdit ? 'Update substrate change' : 'Save substrate change'}</button>
         </div>
       </div>
     </DashboardLayout>

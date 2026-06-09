@@ -25,14 +25,27 @@ export default function AddInvertMoltPage() {
   const { user, token, isAuthenticated, isLoading } = useAuth()
 
   const [prefix, setPrefix] = useState<string | null>(null)
+  // logId present ⇒ edit mode (PUT); prefill notes verbatim (molt # is
+  // embedded there). Query read via window.location to avoid useSearchParams.
+  const [logId, setLogId] = useState<string | null>(null)
   const [date, setDate] = useState(localToday())
   const [moltNum, setMoltNum] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const isEdit = !!logId
 
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated || !token) { router.push('/login'); return }
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search)
+      const lid = sp.get('logId')
+      if (lid) {
+        setLogId(lid)
+        const ma = sp.get('molted_at'); if (ma) { const d = new Date(ma); setDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`) }
+        const nt = sp.get('notes'); if (nt != null) setNotes(nt)
+      }
+    }
     ;(async () => {
       try {
         const res = await fetch(`${API_URL}/api/v1/inverts/${id}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -48,11 +61,14 @@ export default function AddInvertMoltPage() {
     setSaving(true)
     try {
       const combinedNotes = [moltNum ? `Molt #${moltNum}` : null, notes.trim() || null].filter(Boolean).join('\n\n') || null
-      const res = await fetch(`${API_URL}/api/v1/inverts/${id}/molts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ molted_at: new Date(date + 'T12:00:00').toISOString(), notes: combinedNotes }),
-      })
+      const res = await fetch(
+        isEdit ? `${API_URL}/api/v1/molts/${logId}` : `${API_URL}/api/v1/inverts/${id}/molts`,
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ molted_at: new Date(date + 'T12:00:00').toISOString(), notes: combinedNotes }),
+        },
+      )
       if (!res.ok) throw new Error()
       router.push(`/dashboard/inverts/${id}`)
     } catch {
@@ -66,12 +82,12 @@ export default function AddInvertMoltPage() {
     <DashboardLayout userName={user?.name ?? undefined} userEmail={user?.email ?? undefined} userAvatar={user?.image ?? undefined}>
       <div className="max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <button onClick={() => router.back()} className="text-sm text-primary-600 hover:underline mb-4">← Back</button>
-        <h1 className="text-2xl font-bold text-theme-primary mb-6">Log molt</h1>
+        <h1 className="text-2xl font-bold text-theme-primary mb-6">{isEdit ? 'Edit molt' : 'Log molt'}</h1>
         <div className="space-y-5">
           <div><label className={labelCls}>Date molted</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Molt number (optional)</label><input value={moltNum} onChange={(e) => setMoltNum(e.target.value)} inputMode="numeric" placeholder="e.g. 4" className={inputCls} /></div>
           <div><label className={labelCls}>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} /></div>
-          <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : 'Save molt'}</button>
+          <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : isEdit ? 'Update molt' : 'Save molt'}</button>
         </div>
       </div>
     </DashboardLayout>

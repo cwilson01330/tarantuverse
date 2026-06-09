@@ -301,6 +301,42 @@ export async function uploadInvertPhoto(_taxon: InvertTaxon, id: string, form: F
 }
 
 // ---------------------------------------------------------------------------
+// Log + photo mutations (ADR-008). These hit the by-id endpoints, which are
+// polymorphic on the backend (_*_owner_parent covers invert_id), so the same
+// rich edit/delete + set-hero UX tarantulas have works for every taxon.
+// ---------------------------------------------------------------------------
+
+export async function updateInvertFeeding(feedingId: string, payload: { fed_at?: string; food_type?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
+  const { data } = await apiClient.put<InvertFeedingLog>(`/feedings/${feedingId}`, payload);
+  return data;
+}
+export async function deleteInvertFeeding(feedingId: string): Promise<void> {
+  await apiClient.delete(`/feedings/${feedingId}`);
+}
+export async function updateInvertMolt(moltId: string, payload: { molted_at?: string; notes?: string | null }): Promise<InvertMoltLog> {
+  const { data } = await apiClient.put<InvertMoltLog>(`/molts/${moltId}`, payload);
+  return data;
+}
+export async function deleteInvertMolt(moltId: string): Promise<void> {
+  await apiClient.delete(`/molts/${moltId}`);
+}
+export async function updateInvertSubstrateChange(changeId: string, payload: { changed_at?: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }): Promise<InvertSubstrateChange> {
+  const { data } = await apiClient.put<InvertSubstrateChange>(`/substrate-changes/${changeId}`, payload);
+  return data;
+}
+export async function deleteInvertSubstrateChange(changeId: string): Promise<void> {
+  await apiClient.delete(`/substrate-changes/${changeId}`);
+}
+
+/** Promote an existing photo to the invert's hero/primary image. */
+export async function setInvertMainPhoto(photoId: string): Promise<void> {
+  await apiClient.patch(`/photos/${photoId}/set-main`);
+}
+export async function deleteInvertPhoto(photoId: string): Promise<void> {
+  await apiClient.delete(`/photos/${photoId}`);
+}
+
+// ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
 

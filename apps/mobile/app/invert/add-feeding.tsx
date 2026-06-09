@@ -8,22 +8,26 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
-import { getInvert, createInvertFeeding, type InvertTaxon } from '../../src/lib/inverts';
+import { getInvert, createInvertFeeding, updateInvertFeeding, type InvertTaxon } from '../../src/lib/inverts';
 import { toISODateLocal } from '../../src/utils/date';
 
 const FOOD_TYPES = ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'];
 
 export default function AddInvertFeedingScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  // logId present ⇒ edit mode (PUT). The detail screen passes the current
+  // values as params so we prefill without a single-log GET endpoint.
+  const { id, logId, fed_at, food_type, accepted: acceptedParam, notes: notesParam } =
+    useLocalSearchParams<{ id?: string; logId?: string; fed_at?: string; food_type?: string; accepted?: string; notes?: string }>();
+  const isEdit = !!logId;
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [taxon, setTaxon] = useState<InvertTaxon | null>(null);
-  const [date, setDate] = useState(toISODateLocal(new Date()));
-  const [foodType, setFoodType] = useState('Cricket');
-  const [accepted, setAccepted] = useState(true);
-  const [notes, setNotes] = useState('');
+  const [date, setDate] = useState(fed_at ? toISODateLocal(new Date(fed_at)) : toISODateLocal(new Date()));
+  const [foodType, setFoodType] = useState(food_type || 'Cricket');
+  const [accepted, setAccepted] = useState(acceptedParam ? acceptedParam === 'true' : true);
+  const [notes, setNotes] = useState(notesParam || '');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
@@ -32,7 +36,12 @@ export default function AddInvertFeedingScreen() {
     if (!id || !taxon) return;
     try {
       setSaving(true);
-      await createInvertFeeding(taxon, id, { fed_at: new Date(date + 'T12:00:00').toISOString(), food_type: foodType, accepted, notes: notes.trim() || null });
+      const payload = { fed_at: new Date(date + 'T12:00:00').toISOString(), food_type: foodType, accepted, notes: notes.trim() || null };
+      if (isEdit && logId) {
+        await updateInvertFeeding(logId, payload);
+      } else {
+        await createInvertFeeding(taxon, id, payload);
+      }
       router.back();
     } catch (err) { Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.'); }
     finally { setSaving(false); }
@@ -41,7 +50,7 @@ export default function AddInvertFeedingScreen() {
   const styles = makeStyles(colors);
   return (
     <View style={styles.flex}>
-      <AppHeader title="Log feeding" leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
+      <AppHeader title={isEdit ? 'Edit feeding' : 'Log feeding'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date" colors={colors}><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
@@ -64,7 +73,7 @@ export default function AddInvertFeedingScreen() {
           </Field>
           <Field label="Notes (optional)" colors={colors}><TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} multiline placeholderTextColor={colors.textTertiary} /></Field>
           <TouchableOpacity style={[styles.saveButton, (saving || !taxon) && { opacity: 0.6 }]} onPress={handleSave} disabled={saving || !taxon}>
-            <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save feeding'}</Text>
+            <Text style={styles.saveText}>{saving ? 'Saving…' : isEdit ? 'Update feeding' : 'Save feeding'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
