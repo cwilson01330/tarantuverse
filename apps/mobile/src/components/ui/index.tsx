@@ -15,9 +15,12 @@ import React from 'react';
 import {
   StyleProp, Text, TextStyle, TouchableOpacity, View, ViewStyle,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import { SPACING, TYPE, type TypeKey } from '../../theme/tokens';
+
+type MCIName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 type ColorRole =
   | 'textPrimary' | 'textSecondary' | 'textTertiary'
@@ -113,6 +116,28 @@ export function InfoRow({ label, value }: { label: string; value: string }) {
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.xs }}>
       <AppText variant="label" color="textTertiary">{label}</AppText>
       <AppText variant="bodyStrong" style={{ flexShrink: 1, textAlign: 'right', marginLeft: SPACING.md }}>{value}</AppText>
+    </View>
+  );
+}
+
+// ─── InfoGrid ─────────────────────────────────────────────────────────────
+// Rich two-column icon grid (icon + label + value per cell), modeled on the
+// tarantula husbandry block. The shareable PRESENTATION — each screen feeds
+// its own taxon-appropriate items, so inverts gain the richer look without
+// forcing an identical field set (ADR-008 convergence on the rich base).
+export type InfoGridItem = { icon: MCIName; label: string; value: string };
+
+export function InfoGrid({ items }: { items: InfoGridItem[] }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -SPACING.sm }}>
+      {items.map((it, i) => (
+        <View key={`${it.label}-${i}`} style={{ width: '50%', paddingHorizontal: SPACING.sm, marginBottom: SPACING.lg }}>
+          <MaterialCommunityIcons name={it.icon} size={20} color={colors.primary} />
+          <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: SPACING.xs, marginBottom: 2 }}>{it.label}</Text>
+          <Text style={{ fontSize: 16, fontWeight: '500', color: colors.textPrimary }}>{it.value}</Text>
+        </View>
+      ))}
     </View>
   );
 }

@@ -24,7 +24,7 @@ import {
   setInvertMainPhoto, deleteInvertPhoto,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
 } from '../../src/lib/inverts';
-import { SectionCard, InfoRow as UIInfoRow } from '../../src/components/ui';
+import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { SPACING, TYPE } from '../../src/theme/tokens';
 
 function InvertDetailScreen() {
@@ -151,6 +151,15 @@ function InvertDetailScreen() {
     </View>
   );
 
+  // Husbandry as a rich icon grid (shared InfoGrid) — the convergence look.
+  const husbandryItems: InfoGridItem[] = [];
+  if (invert.enclosure_type) husbandryItems.push({ icon: 'shape-outline', label: 'Type', value: invert.enclosure_type });
+  if (invert.enclosure_size) husbandryItems.push({ icon: 'cube-outline', label: 'Enclosure', value: invert.enclosure_size });
+  if (invert.substrate_type) husbandryItems.push({ icon: 'layers', label: 'Substrate', value: invert.substrate_depth ? `${invert.substrate_type} (${invert.substrate_depth})` : invert.substrate_type });
+  if (invert.target_temp_min || invert.target_temp_max) husbandryItems.push({ icon: 'thermometer', label: 'Temperature', value: `${invert.target_temp_min ?? '?'}–${invert.target_temp_max ?? '?'} °F` });
+  if (invert.target_humidity_min || invert.target_humidity_max) husbandryItems.push({ icon: 'water-percent', label: 'Humidity', value: `${invert.target_humidity_min ?? '?'}–${invert.target_humidity_max ?? '?'}%` });
+  husbandryItems.push({ icon: 'cup-water', label: 'Water dish', value: invert.water_dish ? 'Yes' : 'No' });
+
   return (
     <View style={styles.flex}>
       <AppHeader title={headerTitle} leftAction={backButton} rightAction={headerActions} />
@@ -180,12 +189,7 @@ function InvertDetailScreen() {
 
       {hasHusbandry(invert) && (
         <Section title="Husbandry">
-          {invert.enclosure_type && <InfoRow label="Type" value={invert.enclosure_type} colors={colors} />}
-          {invert.enclosure_size && <InfoRow label="Size" value={invert.enclosure_size} colors={colors} />}
-          {invert.substrate_type && <InfoRow label="Substrate" value={invert.substrate_depth ? `${invert.substrate_type} (${invert.substrate_depth})` : invert.substrate_type} colors={colors} />}
-          {(invert.target_temp_min || invert.target_temp_max) && <InfoRow label="Temperature" value={`${invert.target_temp_min ?? '?'}–${invert.target_temp_max ?? '?'} °F`} colors={colors} />}
-          {(invert.target_humidity_min || invert.target_humidity_max) && <InfoRow label="Humidity" value={`${invert.target_humidity_min ?? '?'}–${invert.target_humidity_max ?? '?'}%`} colors={colors} />}
-          <InfoRow label="Water dish" value={invert.water_dish ? 'Yes' : 'No'} colors={colors} />
+          <InfoGrid items={husbandryItems} />
         </Section>
       )}
 
