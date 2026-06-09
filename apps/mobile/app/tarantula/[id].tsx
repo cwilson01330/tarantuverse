@@ -132,25 +132,6 @@ interface FeedingStats {
   feeding_paused_until?: string | null;
 }
 
-interface PremoltIndicator {
-  name: string;
-  description: string;
-  score_contribution: number;
-  confidence: string;
-}
-
-interface PremoltPrediction {
-  tarantula_id: string;
-  probability: number;
-  confidence_level: string;
-  status_text: string;
-  indicators: PremoltIndicator[];
-  days_since_last_molt?: number;
-  consecutive_refusals: number;
-  recent_refusal_rate: number;
-  expected_molt_window?: string;
-}
-
 export default function TarantulaDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -175,7 +156,6 @@ export default function TarantulaDetailScreen() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null);
   const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null);
-  const [premoltPrediction, setPremoltPrediction] = useState<PremoltPrediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [loadErrorMsg, setLoadErrorMsg] = useState<string>('');
@@ -192,7 +172,10 @@ export default function TarantulaDetailScreen() {
     fetchPhotos();
     fetchGrowth();
     fetchFeedingStats();
-    fetchPremoltPrediction();
+    // Notification-only: schedules the molt-prediction push when premolt is
+    // likely. The premolt UI is rendered by <PremoltPredictionCard/>, which
+    // fetches its own (newer) data — this no longer drives any display.
+    scheduleMoltPredictionIfLikely();
   }, [id]);
 
   const fetchTarantula = async () => {
@@ -278,15 +261,14 @@ export default function TarantulaDetailScreen() {
     }
   };
 
-  const fetchPremoltPrediction = async () => {
+  // Notification-only side effect: when premolt looks likely, schedule the
+  // molt-prediction push. No UI — the on-screen premolt display is owned by
+  // <PremoltPredictionCard/> (which fetches its own newer prediction).
+  const scheduleMoltPredictionIfLikely = async () => {
     try {
       const response = await apiClient.get(`/tarantulas/${id}/premolt-prediction`);
       const prediction = response.data;
-      setPremoltPrediction(prediction);
-
-      // Schedule molt prediction notification if probability is high
       if (prediction && prediction.probability >= 70) {
-        // Check if molt predictions are enabled
         try {
           const prefsResponse = await apiClient.get('/notification-preferences/');
           if (prefsResponse.data.molt_predictions_enabled && tarantula) {
@@ -302,9 +284,8 @@ export default function TarantulaDetailScreen() {
           console.error('Error scheduling molt prediction notification:', error);
         }
       }
-    } catch (error: any) {
-      // Silently fail if no data available
-      setPremoltPrediction(null);
+    } catch {
+      // Silently ignore — no prediction data available.
     }
   };
 
@@ -515,7 +496,7 @@ export default function TarantulaDetailScreen() {
               fetchPhotos();
               fetchGrowth();
               fetchFeedingStats();
-              fetchPremoltPrediction();
+              scheduleMoltPredictionIfLikely();
             }}
             style={{ backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
           >
@@ -893,65 +874,9 @@ export default function TarantulaDetailScreen() {
           )}
         </View>
 
-        {/* Premolt Prediction */}
-        {premoltPrediction && (
-          <View style={styles.section}>
-            <View style={[
-              styles.premoltCard,
-              {
-                backgroundColor:
-                  premoltPrediction.confidence_level === 'very_high' ? '#ef4444' :
-                  premoltPrediction.confidence_level === 'high' ? '#f97316' :
-                  premoltPrediction.confidence_level === 'medium' ? '#eab308' :
-                  colors.textTertiary
-              }
-            ]}>
-              <View style={styles.premoltHeader}>
-                <Text style={styles.premoltTitle}>🦋 Premolt Predictor</Text>
-                <Text style={styles.premoltPercentage}>{premoltPrediction.probability}%</Text>
-              </View>
-
-              <Text style={styles.premoltStatus}>{premoltPrediction.status_text}</Text>
-
-              {/* Progress Bar */}
-              <View style={styles.premoltProgressBg}>
-                <View style={[styles.premoltProgressFill, { width: `${premoltPrediction.probability}%` }]} />
-              </View>
-
-              {/* Indicators */}
-              {premoltPrediction.indicators.length > 0 && (
-                <View style={styles.premoltIndicators}>
-                  <Text style={styles.premoltIndicatorsTitle}>WHY THIS SCORE?</Text>
-                  {premoltPrediction.indicators.map((indicator, idx) => (
-                    <View key={idx} style={styles.premoltIndicator}>
-                      <View style={styles.premoltIndicatorHeader}>
-                        <Text style={styles.premoltIndicatorName}>{indicator.name}</Text>
-                        <Text style={styles.premoltIndicatorScore}>+{indicator.score_contribution}</Text>
-                      </View>
-                      <Text style={styles.premoltIndicatorDesc}>{indicator.description}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Stats */}
-              {premoltPrediction.days_since_last_molt !== null && premoltPrediction.days_since_last_molt !== undefined && (
-                <View style={styles.premoltStats}>
-                  <View style={styles.premoltStat}>
-                    <Text style={styles.premoltStatLabel}>Days since last molt:</Text>
-                    <Text style={styles.premoltStatValue}>{premoltPrediction.days_since_last_molt}</Text>
-                  </View>
-                  {premoltPrediction.expected_molt_window && (
-                    <View style={styles.premoltStat}>
-                      <Text style={styles.premoltStatLabel}>Expected window:</Text>
-                      <Text style={styles.premoltStatValue}>{premoltPrediction.expected_molt_window}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </View>
-          </View>
-        )}
+        {/* Premolt is rendered once, near the top, by <PremoltPredictionCard/>
+            (the single premolt module — ADR-008). The legacy inline duplicate
+            that lived here has been removed. */}
 
         {/* Feeding Stats — when paused, the indigo banner inside is
             tappable so the keeper can resume/edit without leaving the
