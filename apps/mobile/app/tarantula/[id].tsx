@@ -25,6 +25,7 @@ import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleton';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { formatLocalDate } from '../../src/utils/date';
 import { getImageUrl } from '../../src/utils/image-url';
 // notifications imported dynamically below to avoid expo-notifications crashing at module load time
@@ -519,6 +520,14 @@ export default function TarantulaDetailScreen() {
   const headerTitle =
     tarantula.name || tarantula.common_name || tarantula.scientific_name || 'Unnamed Tarantula';
 
+  // Husbandry via the shared InfoGrid (ADR-008 convergence) — same fields,
+  // same look, now sourced from the shared component used by every taxon.
+  const husbandryItems: InfoGridItem[] = [];
+  if (tarantula.enclosure_size) husbandryItems.push({ icon: 'cube-outline', label: 'Enclosure', value: tarantula.enclosure_size });
+  if (tarantula.substrate_type) husbandryItems.push({ icon: 'layers', label: 'Substrate', value: tarantula.substrate_type });
+  if (tarantula.last_fed) husbandryItems.push({ icon: 'food', label: 'Last Fed', value: formatLocalDate(tarantula.last_fed) });
+  if (tarantula.last_molt) husbandryItems.push({ icon: 'refresh', label: 'Last Molt', value: formatLocalDate(tarantula.last_molt) });
+
   const detailRightActions = (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
       <TouchableOpacity style={{ padding: 6 }} onPress={handleShareTarantula} accessibilityLabel="Share">
@@ -610,40 +619,7 @@ export default function TarantulaDetailScreen() {
         {/* Husbandry */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Husbandry</Text>
-          <View style={styles.infoGrid}>
-            {tarantula.enclosure_size && (
-              <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="cube-outline" size={20} color={colors.primary} />
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Enclosure</Text>
-                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{tarantula.enclosure_size}</Text>
-              </View>
-            )}
-            {tarantula.substrate_type && (
-              <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="layers" size={20} color={colors.primary} />
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Substrate</Text>
-                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>{tarantula.substrate_type}</Text>
-              </View>
-            )}
-            {tarantula.last_fed && (
-              <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="food" size={20} color={colors.primary} />
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Last Fed</Text>
-                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
-                  {formatLocalDate(tarantula.last_fed)}
-                </Text>
-              </View>
-            )}
-            {tarantula.last_molt && (
-              <View style={styles.infoItem}>
-                <MaterialCommunityIcons name="refresh" size={20} color={colors.primary} />
-                <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Last Molt</Text>
-                <Text style={[styles.infoValue, { color: colors.textPrimary }]}>
-                  {formatLocalDate(tarantula.last_molt)}
-                </Text>
-              </View>
-            )}
-          </View>
+          <InfoGrid items={husbandryItems} />
         </View>
 
         {/* Feeding History */}
