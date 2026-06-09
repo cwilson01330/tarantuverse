@@ -41,6 +41,9 @@ import {
   listCentipedeSpecies,
   type CentipedeSpecies,
 } from '../../src/lib/centipedes';
+import {
+  listWhipSpiderSpecies,
+} from '../../src/lib/whip-spiders';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -50,7 +53,7 @@ const CARD_WIDTH = (width - 48) / 2;
 // the renderer can dispatch on `taxon` to show taxon-appropriate badges.
 // ---------------------------------------------------------------------------
 
-type Taxon = 'tarantulas' | 'scorpions' | 'centipedes';
+type Taxon = 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders';
 
 interface TarantulaRow {
   taxon: 'tarantulas';
@@ -97,7 +100,22 @@ interface CentipedeRow {
   developmental_class: CentipedeSpecies['developmental_class'];
 }
 
-type Row = TarantulaRow | ScorpionRow | CentipedeRow;
+interface WhipSpiderRow {
+  taxon: 'whip_spiders';
+  id: string;
+  scientific_name: string;
+  common_names: string[];
+  type: string | null;
+  care_level: string | null;
+  adult_size: string | null;
+  is_verified: boolean;
+  image_url: string | null;
+  /** Whip spiders are harmless (no venom). communal_suitable drives a
+   * "group-keepable" badge instead of a venom pill. */
+  communal_suitable: boolean;
+}
+
+type Row = TarantulaRow | ScorpionRow | CentipedeRow | WhipSpiderRow;
 
 export default function UnifiedSpeciesScreen() {
   const { colors } = useTheme();
@@ -109,7 +127,9 @@ export default function UnifiedSpeciesScreen() {
       ? 'scorpions'
       : taxonParam === 'centipedes'
         ? 'centipedes'
-        : 'tarantulas';
+        : taxonParam === 'whip_spiders'
+          ? 'whip_spiders'
+          : 'tarantulas';
 
   const [taxon, setTaxon] = useState<Taxon>(initialTaxon);
   const [rows, setRows] = useState<Row[]>([]);
@@ -180,8 +200,7 @@ export default function UnifiedSpeciesScreen() {
             communal_suitable: s.communal_suitable,
           })),
         );
-      } else {
-        // centipedes
+      } else if (which === 'centipedes') {
         const items = await listCentipedeSpecies({ limit: 200 });
         setRows(
           items.map((c) => ({
@@ -196,6 +215,23 @@ export default function UnifiedSpeciesScreen() {
             image_url: c.image_url,
             venom_severity: c.venom_severity,
             developmental_class: c.developmental_class,
+          })),
+        );
+      } else {
+        // whip spiders
+        const items = await listWhipSpiderSpecies({ limit: 200 });
+        setRows(
+          items.map((w) => ({
+            taxon: 'whip_spiders' as const,
+            id: w.id,
+            scientific_name: w.scientific_name,
+            common_names: w.common_names ?? [],
+            type: w.type,
+            care_level: w.care_level,
+            adult_size: w.adult_size,
+            is_verified: w.is_verified,
+            image_url: w.image_url,
+            communal_suitable: w.communal_suitable,
           })),
         );
       }
@@ -265,6 +301,14 @@ export default function UnifiedSpeciesScreen() {
         default: return '🐛';
       }
     }
+    if (which === 'whip_spiders') {
+      // Whip spiders are arboreal vertical-surface dwellers.
+      switch (type) {
+        case 'arboreal': return '🌳';
+        case 'terrestrial': return '🏜️';
+        default: return '🕸️';
+      }
+    }
     switch (type) {
       case 'terrestrial': return '🏜️';
       case 'arboreal': return '🌳';
@@ -279,7 +323,9 @@ export default function UnifiedSpeciesScreen() {
         ? `/species/${row.id}`
         : row.taxon === 'scorpions'
           ? `/scorpion-species/${row.id}`
-          : `/centipede-species/${row.id}`;
+          : row.taxon === 'centipedes'
+            ? `/centipede-species/${row.id}`
+            : `/whip-spider-species/${row.id}`;
     router.push(path as any);
   };
 
@@ -296,7 +342,9 @@ export default function UnifiedSpeciesScreen() {
     const isHot =
       item.taxon === 'tarantulas'
         ? !!item.medically_significant_venom
-        : item.venom_severity === 'medically_significant';
+        : item.taxon === 'scorpions' || item.taxon === 'centipedes'
+          ? item.venom_severity === 'medically_significant'
+          : false; // whip spiders are harmless
 
     return (
       <TouchableOpacity
@@ -338,7 +386,7 @@ export default function UnifiedSpeciesScreen() {
                 <MaterialCommunityIcons name="alert" size={14} color="#ffffff" />
               </View>
             )}
-            {item.taxon === 'scorpions' && item.communal_suitable && (
+            {(item.taxon === 'scorpions' || item.taxon === 'whip_spiders') && item.communal_suitable && (
               <View style={[styles.warningBadge, { backgroundColor: '#3b82f6' }]}>
                 <MaterialCommunityIcons name="account-group" size={14} color="#ffffff" />
               </View>
@@ -392,14 +440,16 @@ export default function UnifiedSpeciesScreen() {
   // same element identity across renders.
   const TaxonSegment = () => (
     <View style={[styles.segmentWrap, { backgroundColor: colors.surfaceElevated }]}>
-      {(['tarantulas', 'scorpions', 'centipedes'] as Taxon[]).map((t) => {
+      {(['tarantulas', 'scorpions', 'centipedes', 'whip_spiders'] as Taxon[]).map((t) => {
         const active = t === taxon;
         const label =
           t === 'tarantulas'
             ? '🕷  Tarantulas'
             : t === 'scorpions'
               ? '🦂  Scorpions'
-              : '🐛  Centipedes';
+              : t === 'centipedes'
+                ? '🐛  Centipedes'
+                : '🕸️  Whip spiders';
         return (
           <TouchableOpacity
             key={t}
@@ -466,7 +516,9 @@ export default function UnifiedSpeciesScreen() {
             ? 'tarantula'
             : taxon === 'scorpions'
               ? 'scorpion'
-              : 'centipede'}{' '}
+              : taxon === 'centipedes'
+                ? 'centipede'
+                : 'whip spider'}{' '}
           species
         </Text>
       </View>
@@ -484,7 +536,9 @@ export default function UnifiedSpeciesScreen() {
               ? 'Search tarantula species…'
               : taxon === 'scorpions'
                 ? 'Search scorpion species…'
-                : 'Search centipede species…'
+                : taxon === 'centipedes'
+                  ? 'Search centipede species…'
+                  : 'Search whip spider species…'
           }
           placeholderTextColor={colors.textTertiary}
           value={searchTerm}
@@ -542,7 +596,9 @@ export default function UnifiedSpeciesScreen() {
               ? '🕷️'
               : taxon === 'scorpions'
                 ? '🦂'
-                : '🐛'}
+                : taxon === 'centipedes'
+                  ? '🐛'
+                  : '🕸️'}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Loading species…

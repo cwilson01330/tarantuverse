@@ -28,7 +28,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../contexts/ThemeContext';
 
-export type AddPickerTaxon = 'tarantula' | 'scorpion' | 'centipede';
+export type AddPickerTaxon = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider';
 
 interface AddPickerSheetProps {
   visible: boolean;
@@ -61,6 +61,15 @@ const ROWS: Row[] = [
     glyph: '🐛',
     label: 'Centipede',
     hint: 'New centipede record',
+  },
+  {
+    // No dedicated whip-spider emoji exists (🕷 is the tarantula glyph
+    // here); 🕸️ reads as arachnid-adjacent and stays visually distinct
+    // from the other rows.
+    key: 'whip_spider',
+    glyph: '🕸️',
+    label: 'Whip spider',
+    hint: 'New whip spider record',
   },
 ];
 

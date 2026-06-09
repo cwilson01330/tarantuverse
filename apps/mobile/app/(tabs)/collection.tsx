@@ -39,6 +39,11 @@ import {
   centipedeDisplayName,
   type Centipede,
 } from '../../src/lib/centipedes';
+import {
+  listWhipSpiders,
+  whipSpiderDisplayName,
+  type WhipSpider,
+} from '../../src/lib/whip-spiders';
 
 interface Tarantula {
   id: string;
@@ -83,12 +88,13 @@ interface CollectionStats {
 // sheet), scorpions + centipedes render via a simpler card until
 // those features ship for the additional surfaces. New taxa land
 // here when added.
-type TaxonFilter = 'all' | 'tarantulas' | 'scorpions' | 'centipedes';
+type TaxonFilter = 'all' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders';
 
 type Row =
   | { kind: 'tarantula'; data: Tarantula }
   | { kind: 'scorpion'; data: Scorpion }
-  | { kind: 'centipede'; data: Centipede };
+  | { kind: 'centipede'; data: Centipede }
+  | { kind: 'whip_spider'; data: WhipSpider };
 
 function CollectionScreen() {
   const router = useRouter();
@@ -97,6 +103,7 @@ function CollectionScreen() {
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [scorpions, setScorpions] = useState<Scorpion[]>([]);
   const [centipedes, setCentipedes] = useState<Centipede[]>([]);
+  const [whipSpiders, setWhipSpiders] = useState<WhipSpider[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
@@ -149,6 +156,7 @@ function CollectionScreen() {
     fetchTarantulas();
     fetchScorpions();
     fetchCentipedes();
+    fetchWhipSpiders();
     fetchCollectionStats();
   }, []);
 
@@ -182,6 +190,18 @@ function CollectionScreen() {
       setCentipedes(rows);
     } catch {
       setCentipedes([]);
+    }
+  };
+
+  const fetchWhipSpiders = async () => {
+    // Same non-fatal pattern — whip spiders are the fourth additive
+    // taxon (ADR-006). A 404 on an API instance that lags behind is
+    // handled silently.
+    try {
+      const rows = await listWhipSpiders();
+      setWhipSpiders(rows);
+    } catch {
+      setWhipSpiders([]);
     }
   };
 
@@ -339,6 +359,7 @@ function CollectionScreen() {
   const getRowName = (row: Row): string => {
     if (row.kind === 'tarantula') return getDisplayName(row.data);
     if (row.kind === 'scorpion') return scorpionDisplayName(row.data);
+    if (row.kind === 'whip_spider') return whipSpiderDisplayName(row.data);
     return centipedeDisplayName(row.data);
   };
 
@@ -360,8 +381,17 @@ function CollectionScreen() {
       taxonFilter === 'all' || taxonFilter === 'centipedes'
         ? centipedes.map((c) => ({ kind: 'centipede' as const, data: c }))
         : [];
+    const whipSpiderRows: Row[] =
+      taxonFilter === 'all' || taxonFilter === 'whip_spiders'
+        ? whipSpiders.map((w) => ({ kind: 'whip_spider' as const, data: w }))
+        : [];
 
-    let rows: Row[] = [...tarantulaRows, ...scorpionRows, ...centipedeRows];
+    let rows: Row[] = [
+      ...tarantulaRows,
+      ...scorpionRows,
+      ...centipedeRows,
+      ...whipSpiderRows,
+    ];
 
     // Search across name, common_name, and scientific_name regardless
     // of taxon. Empty query short-circuits.
@@ -409,6 +439,7 @@ function CollectionScreen() {
       fetchTarantulas(),
       fetchScorpions(),
       fetchCentipedes(),
+      fetchWhipSpiders(),
       fetchCollectionStats(),
     ]);
     setRefreshing(false);
@@ -704,6 +735,77 @@ function CollectionScreen() {
           )}
           <View style={styles.taxonGlyph}>
             <Text style={{ fontSize: 14 }}>🐛</Text>
+          </View>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.name}>{displayName}</Text>
+          {item.scientific_name && (
+            <Text style={styles.scientificName}>{item.scientific_name}</Text>
+          )}
+          {item.common_name && (
+            <Text style={styles.commonName}>{item.common_name}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Whip spider card mirrors the centipede card. Icon is `spider`
+  // (closest MCI glyph) + a 🕸️ taxon stamp in the bottom-left.
+  const renderWhipSpider = ({ item }: { item: WhipSpider }) => {
+    const displayName =
+      item.name || item.common_name || item.scientific_name || 'Unnamed';
+    const sexLabel =
+      item.sex === 'female'
+        ? 'female'
+        : item.sex === 'male'
+          ? 'male'
+          : 'unknown sex';
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/whip-spider/${item.id}` as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, whip spider`}
+        accessibilityHint="Opens this whip spider's detail page."
+      >
+        <View style={styles.imageContainer}>
+          {item.photo_url ? (
+            <Image
+              source={{ uri: getImageUrl(item.photo_url) }}
+              style={styles.image}
+              accessibilityLabel={`Photo of ${displayName}`}
+            />
+          ) : (
+            <View
+              style={styles.placeholderImage}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              <MaterialCommunityIcons
+                name="spider"
+                size={40}
+                color={colors.textTertiary}
+              />
+            </View>
+          )}
+          {item.sex && item.sex !== 'unknown' && (
+            <View
+              style={[
+                styles.sexBadge,
+                item.sex === 'female' ? styles.femaleBadge : styles.maleBadge,
+              ]}
+              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
+            >
+              <MaterialCommunityIcons
+                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
+                size={16}
+                color="#fff"
+              />
+            </View>
+          )}
+          <View style={styles.taxonGlyph}>
+            <Text style={{ fontSize: 14 }}>🕸️</Text>
           </View>
         </View>
         <View style={styles.cardContent}>
@@ -1416,8 +1518,10 @@ function CollectionScreen() {
       router.push('/tarantula/add');
     } else if (taxon === 'scorpion') {
       router.push('/scorpion/add' as any);
-    } else {
+    } else if (taxon === 'centipede') {
       router.push('/centipede/add' as any);
+    } else {
+      router.push('/whip-spider/add' as any);
     }
   };
 
@@ -1429,6 +1533,9 @@ function CollectionScreen() {
     }
     if (item.kind === 'centipede') {
       return renderCentipede({ item: item.data });
+    }
+    if (item.kind === 'whip_spider') {
+      return renderWhipSpider({ item: item.data });
     }
     return viewMode === 'card'
       ? renderTarantula({ item: item.data })
@@ -1445,6 +1552,7 @@ function CollectionScreen() {
           { value: 'tarantulas' as const, label: '🕷 Tarantulas' },
           { value: 'scorpions' as const, label: '🦂 Scorpions' },
           { value: 'centipedes' as const, label: '🐛 Centipedes' },
+          { value: 'whip_spiders' as const, label: '🕸️ Whip spiders' },
         ]
       ).map((opt) => {
         const active = taxonFilter === opt.value;
