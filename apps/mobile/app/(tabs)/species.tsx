@@ -50,6 +50,7 @@ import {
   INVERT_TAXA,
   type InvertTaxon,
 } from '../../src/lib/inverts';
+import { Chip, Badge } from '../../src/components/ui';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2;
@@ -498,25 +499,9 @@ export default function UnifiedSpeciesScreen() {
           </Text>
 
           <View style={styles.quickInfo}>
-            <View style={[styles.infoChip, { backgroundColor: colors.surfaceElevated }]}>
-              <Text style={[styles.infoChipText, { color: colors.textSecondary }]}>
-                {typeIcon}
-              </Text>
-            </View>
-            {item.adult_size && (
-              <View style={[styles.infoChip, { backgroundColor: colors.surfaceElevated }]}>
-                <Text style={[styles.infoChipText, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {item.adult_size}
-                </Text>
-              </View>
-            )}
-            {venom && (
-              <View style={[styles.infoChip, { backgroundColor: venom.bg }]}>
-                <Text style={[styles.infoChipText, { color: venom.fg }]}>
-                  {venom.label}
-                </Text>
-              </View>
-            )}
+            <Chip>{typeIcon}</Chip>
+            {item.adult_size && <Chip>{item.adult_size}</Chip>}
+            {venom && <Badge label={venom.label} bg={venom.bg} fg={venom.fg} />}
           </View>
         </View>
       </TouchableOpacity>

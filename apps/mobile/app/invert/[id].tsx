@@ -22,6 +22,8 @@ import {
   listInvertFeedings, listInvertMolts, listInvertPhotos, listInvertSubstrateChanges,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
 } from '../../src/lib/inverts';
+import { SectionCard, InfoRow as UIInfoRow } from '../../src/components/ui';
+import { SPACING, TYPE } from '../../src/theme/tokens';
 
 function InvertDetailScreen() {
   const router = useRouter();
@@ -145,7 +147,7 @@ function InvertDetailScreen() {
 
       <Section title="Photos" actionLabel="Add photo" onAction={() => router.push(`/invert/add-photo?id=${id}` as any)}>
         {photos.length === 0 ? (
-          <Text style={styles.empty}>No photos yet.</Text>
+          <Text style={[s.empty, { color: colors.textTertiary }]}>No photos yet.</Text>
         ) : (
           <FlatList horizontal data={photos} keyExtractor={(p) => p.id} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}
             renderItem={({ item }) => <Image source={{ uri: getImageUrl(item.thumbnail_url ?? item.url) }} style={styles.photoThumb} />} />
@@ -163,26 +165,20 @@ function hasHusbandry(s: Invert): boolean {
   return Boolean(s.enclosure_type || s.enclosure_size || s.substrate_type || s.substrate_depth || s.target_temp_min || s.target_temp_max || s.target_humidity_min || s.target_humidity_max);
 }
 
+// Thin wrappers that preserve this screen's call sites while delegating to
+// the shared, preset-aware primitives (ADR-007). `colors` on InfoRow is now
+// unused — the shared primitive reads theme itself — but kept in the
+// signature so the many call sites don't need touching.
 function Section({ title, actionLabel, onAction, children }: { title: string; actionLabel?: string; onAction?: () => void; children: React.ReactNode }) {
-  const { colors } = useTheme();
   return (
-    <View style={[s.section, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={s.sectionHeader}>
-        <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>{title}</Text>
-        {actionLabel && onAction && <TouchableOpacity onPress={onAction}><Text style={{ color: colors.primary, fontWeight: '600' }}>{actionLabel}</Text></TouchableOpacity>}
-      </View>
+    <SectionCard title={title} actionLabel={actionLabel} onAction={onAction}>
       {children}
-    </View>
+    </SectionCard>
   );
 }
 
-function InfoRow({ label, value, colors }: { label: string; value: string; colors: ReturnType<typeof useTheme>['colors'] }) {
-  return (
-    <View style={s.infoRow}>
-      <Text style={[s.infoLabel, { color: colors.textTertiary }]}>{label}</Text>
-      <Text style={[s.infoValue, { color: colors.textPrimary }]}>{value}</Text>
-    </View>
-  );
+function InfoRow({ label, value }: { label: string; value: string; colors?: ReturnType<typeof useTheme>['colors'] }) {
+  return <UIInfoRow label={label} value={value} />;
 }
 
 function LogSection<T extends { id: string }>({ title, emptyText, ctaLabel, onCta, items, renderItem, colors }: { title: string; emptyText: string; ctaLabel: string; onCta: () => void; items: T[]; renderItem: (item: T) => React.ReactNode; colors: ReturnType<typeof useTheme>['colors'] }) {
@@ -194,37 +190,31 @@ function LogSection<T extends { id: string }>({ title, emptyText, ctaLabel, onCt
 }
 
 const s = StyleSheet.create({
-  section: { marginHorizontal: 16, marginVertical: 6, padding: 14, borderRadius: 12, borderWidth: 1, gap: 10 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  sectionTitle: { fontSize: 16, fontWeight: '600' },
-  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  infoLabel: { fontSize: 13 },
-  infoValue: { fontSize: 14, fontWeight: '500' },
-  empty: { fontSize: 13, fontStyle: 'italic' },
+  empty: { ...TYPE.label, fontStyle: 'italic' },
 });
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
     flex: { flex: 1, backgroundColor: colors.background },
     center: { alignItems: 'center', justifyContent: 'center' },
-    scroll: { paddingBottom: 32 },
+    scroll: { paddingBottom: SPACING.xxl },
     hero: { position: 'relative' },
     heroImage: { width: '100%', height: 280 },
     heroPlaceholder: { backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
-    heroActions: { position: 'absolute', right: 16, flexDirection: 'row', gap: 8 },
+    heroActions: { position: 'absolute', right: SPACING.lg, flexDirection: 'row', gap: SPACING.sm },
     heroButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
-    identity: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, gap: 4 },
-    name: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
-    scientific: { fontSize: 15, color: colors.textSecondary, fontStyle: 'italic' },
-    subtitle: { fontSize: 13, color: colors.textTertiary },
-    logRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-    logRowTitle: { fontSize: 14, fontWeight: '500', color: colors.textPrimary, flex: 1 },
-    logRowMeta: { fontSize: 12, color: colors.textTertiary },
+    identity: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg, paddingBottom: SPACING.sm, gap: SPACING.xs },
+    name: { ...TYPE.title, color: colors.textPrimary },
+    scientific: { ...TYPE.body, color: colors.textSecondary, fontStyle: 'italic' },
+    subtitle: { ...TYPE.label, color: colors.textTertiary },
+    logRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+    logRowTitle: { ...TYPE.bodyStrong, color: colors.textPrimary, flex: 1 },
+    logRowMeta: { ...TYPE.caption, color: colors.textTertiary },
     photoThumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: colors.surfaceElevated },
-    notes: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-    errorText: { color: colors.textPrimary, marginBottom: 16 },
-    retryButton: { paddingVertical: 10, paddingHorizontal: 16, backgroundColor: colors.primary, borderRadius: 8 },
-    retryText: { color: '#fff', fontWeight: '600' },
+    notes: { ...TYPE.body, color: colors.textSecondary },
+    errorText: { ...TYPE.body, color: colors.textPrimary, marginBottom: SPACING.lg },
+    retryButton: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, backgroundColor: colors.primary, borderRadius: 8 },
+    retryText: { ...TYPE.bodyStrong, color: '#fff' },
   });
 
 export default withErrorBoundary(InvertDetailScreen);
