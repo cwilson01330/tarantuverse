@@ -547,6 +547,112 @@ async def get_centipede_photos(
     ]
 
 
+@router.post("/whip-spiders/{whip_spider_id}/photos")
+async def upload_whip_spider_photo(
+    whip_spider_id: str,
+    file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a photo for a whip spider. Sets ONLY `invert_id` (ADR-006
+    consolidated surface). Same magic-byte validation + 15 MB cap + R2
+    upload + thumbnail path as the centipede route."""
+    whip_spider = db.query(Invert).filter(
+        Invert.id == whip_spider_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "whip_spider",
+    ).first()
+    if not whip_spider:
+        raise HTTPException(status_code=404, detail="Whip spider not found")
+
+    try:
+        file_data = await file.read()
+
+        try:
+            detected_mime = validate_image_bytes(file_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        max_size = 15 * 1024 * 1024
+        if len(file_data) > max_size:
+            raise HTTPException(status_code=400, detail="File size exceeds 15 MB limit")
+
+        photo_url, thumbnail_url = await storage_service.upload_photo(
+            file_data=file_data,
+            filename=file.filename or "upload.jpg",
+            content_type=detected_mime,
+        )
+
+        photo = Photo(
+            id=str(uuid.uuid4()),
+            invert_id=whip_spider_id,
+            url=photo_url,
+            thumbnail_url=thumbnail_url,
+            caption=caption,
+            taken_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+        )
+        db.add(photo)
+
+        if not whip_spider.photo_url:
+            whip_spider.photo_url = photo_url
+
+        db.commit()
+        db.refresh(photo)
+
+        return {
+            "id": photo.id,
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
+            "created_at": photo.created_at.isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Photo upload failed for whip spider %s", whip_spider_id)
+        raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
+
+
+@router.get("/whip-spiders/{whip_spider_id}/photos")
+async def get_whip_spider_photos(
+    whip_spider_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List photos for a whip spider, most recent first."""
+    whip_spider = db.query(Invert).filter(
+        Invert.id == whip_spider_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "whip_spider",
+    ).first()
+    if not whip_spider:
+        raise HTTPException(status_code=404, detail="Whip spider not found")
+
+    photos = (
+        db.query(Photo)
+        .filter(Photo.invert_id == whip_spider_id)
+        .order_by(Photo.created_at.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": photo.id,
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
+            "created_at": photo.created_at.isoformat(),
+        }
+        for photo in photos
+    ]
+
+
 @router.delete("/photos/{photo_id}")
 async def delete_photo(
     photo_id: str,

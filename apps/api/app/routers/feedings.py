@@ -340,6 +340,63 @@ async def create_centipede_feeding_log(
     return new_feeding
 
 
+@router.get("/whip-spiders/{whip_spider_id}/feedings", response_model=List[FeedingLogResponse])
+async def get_whip_spider_feeding_logs(
+    whip_spider_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List feeding logs for a whip spider, most recent first.
+
+    Whip spider logs are parented ONLY by `invert_id` (ADR-006 taxon on
+    the consolidated surface — no per-taxon FK column).
+    """
+    whip_spider = db.query(Invert).filter(
+        Invert.id == whip_spider_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "whip_spider",
+    ).first()
+    if not whip_spider:
+        raise HTTPException(status_code=404, detail="Whip spider not found")
+
+    return (
+        db.query(FeedingLog)
+        .filter(FeedingLog.invert_id == whip_spider_id)
+        .order_by(FeedingLog.fed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/whip-spiders/{whip_spider_id}/feedings",
+    response_model=FeedingLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_whip_spider_feeding_log(
+    whip_spider_id: uuid.UUID,
+    feeding_data: FeedingLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a feeding for a whip spider. Sets ONLY `invert_id`."""
+    whip_spider = db.query(Invert).filter(
+        Invert.id == whip_spider_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "whip_spider",
+    ).first()
+    if not whip_spider:
+        raise HTTPException(status_code=404, detail="Whip spider not found")
+
+    new_feeding = FeedingLog(
+        invert_id=whip_spider_id,
+        **feeding_data.model_dump(),
+    )
+    db.add(new_feeding)
+    db.commit()
+    db.refresh(new_feeding)
+    return new_feeding
+
+
 @router.get("/feedings/{feeding_id}", response_model=FeedingLogResponse)
 async def get_feeding_log(
     feeding_id: uuid.UUID,

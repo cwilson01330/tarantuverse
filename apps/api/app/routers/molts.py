@@ -237,6 +237,61 @@ async def create_centipede_molt_log(
     return new_molt
 
 
+@router.get("/whip-spiders/{whip_spider_id}/molts", response_model=List[MoltLogResponse])
+async def get_whip_spider_molt_logs(
+    whip_spider_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List molt logs for a whip spider, most recent first. Leg span
+    pre/post molt can be tracked via the shared molt schema's leg_span
+    fields."""
+    whip_spider = db.query(Invert).filter(
+        Invert.id == whip_spider_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "whip_spider",
+    ).first()
+    if not whip_spider:
+        raise HTTPException(status_code=404, detail="Whip spider not found")
+
+    return (
+        db.query(MoltLog)
+        .filter(MoltLog.invert_id == whip_spider_id)
+        .order_by(MoltLog.molted_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/whip-spiders/{whip_spider_id}/molts",
+    response_model=MoltLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_whip_spider_molt_log(
+    whip_spider_id: uuid.UUID,
+    molt_data: MoltLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a molt for a whip spider. Sets only `invert_id`."""
+    whip_spider = db.query(Invert).filter(
+        Invert.id == whip_spider_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "whip_spider",
+    ).first()
+    if not whip_spider:
+        raise HTTPException(status_code=404, detail="Whip spider not found")
+
+    new_molt = MoltLog(
+        invert_id=whip_spider_id,
+        **molt_data.model_dump(),
+    )
+    db.add(new_molt)
+    db.commit()
+    db.refresh(new_molt)
+    return new_molt
+
+
 @router.get("/molts/{molt_id}", response_model=MoltLogResponse)
 async def get_molt_log(
     molt_id: uuid.UUID,

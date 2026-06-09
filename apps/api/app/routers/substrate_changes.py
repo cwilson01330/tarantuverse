@@ -251,6 +251,74 @@ async def create_centipede_substrate_change(
     return new_change
 
 
+@router.get(
+    "/whip-spiders/{whip_spider_id}/substrate-changes",
+    response_model=List[SubstrateChangeResponse],
+)
+async def get_whip_spider_substrate_changes(
+    whip_spider_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List substrate-change logs for a whip spider, most recent first."""
+    whip_spider = db.query(Invert).filter(
+        Invert.id == whip_spider_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "whip_spider",
+    ).first()
+    if not whip_spider:
+        raise HTTPException(status_code=404, detail="Whip spider not found")
+
+    return (
+        db.query(SubstrateChange)
+        .filter(SubstrateChange.invert_id == whip_spider_id)
+        .order_by(SubstrateChange.changed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/whip-spiders/{whip_spider_id}/substrate-changes",
+    response_model=SubstrateChangeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_whip_spider_substrate_change(
+    whip_spider_id: uuid.UUID,
+    change_data: SubstrateChangeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a substrate change for a whip spider. Forward-only denorm of
+    date + type + depth onto the parent Invert (same as centipedes)."""
+    whip_spider = db.query(Invert).filter(
+        Invert.id == whip_spider_id,
+        Invert.user_id == current_user.id,
+        Invert.taxon == "whip_spider",
+    ).first()
+    if not whip_spider:
+        raise HTTPException(status_code=404, detail="Whip spider not found")
+
+    new_change = SubstrateChange(
+        invert_id=whip_spider_id,
+        **change_data.model_dump(),
+    )
+    db.add(new_change)
+
+    if (
+        whip_spider.last_substrate_change is None
+        or change_data.changed_at > whip_spider.last_substrate_change
+    ):
+        whip_spider.last_substrate_change = change_data.changed_at
+        if change_data.substrate_type:
+            whip_spider.substrate_type = change_data.substrate_type
+        if change_data.substrate_depth:
+            whip_spider.substrate_depth = change_data.substrate_depth
+
+    db.commit()
+    db.refresh(new_change)
+    return new_change
+
+
 @router.put("/substrate-changes/{change_id}", response_model=SubstrateChangeResponse)
 async def update_substrate_change(
     change_id: uuid.UUID,
