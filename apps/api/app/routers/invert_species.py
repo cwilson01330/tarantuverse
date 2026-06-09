@@ -26,7 +26,7 @@ from app.database import get_db
 from app.models.invert_species import InvertSpecies
 from app.models.user import User
 from app.schemas.invert_species import (
-    InvertSpeciesCreate, InvertSpeciesResponse, InvertSpeciesUpdate,
+    TAXON_PATTERN, InvertSpeciesCreate, InvertSpeciesResponse, InvertSpeciesUpdate,
 )
 from app.utils.dependencies import get_current_user
 
@@ -37,7 +37,7 @@ router = APIRouter()
 async def search_invert_species(
     q: str = Query(..., min_length=1, max_length=120),
     taxon: Optional[str] = Query(
-        None, pattern="^(tarantula|scorpion|centipede)$",
+        None, pattern=TAXON_PATTERN,
         description="Restrict search to a single taxon.",
     ),
     limit: int = Query(10, ge=1, le=50),
@@ -76,7 +76,7 @@ async def list_invert_species(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     taxon: Optional[str] = Query(
-        None, pattern="^(tarantula|scorpion|centipede)$",
+        None, pattern=TAXON_PATTERN,
     ),
     verified_only: bool = Query(False),
     care_level: Optional[str] = Query(

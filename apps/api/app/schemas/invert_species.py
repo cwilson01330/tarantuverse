@@ -14,7 +14,9 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field
 
 
-TAXON_PATTERN = "^(tarantula|scorpion|centipede)$"
+# Keep in lockstep with the InvertSpecies CHECK constraint, the model's
+# INVERT_TAXON_VALUES, and schemas/invert.py TAXON_PATTERN (ADR-006).
+TAXON_PATTERN = "^(tarantula|scorpion|centipede|whip_spider|vinegaroon|true_spider|millipede|mantis|other)$"
 CARE_LEVEL_PATTERN = "^(beginner|intermediate|advanced)$"
 VENOM_SEVERITY_PATTERN = "^(mild|moderate|medically_significant)$"
 SPECIES_TYPE_PATTERN = "^(terrestrial|arboreal|fossorial|scansorial|psammophile)$"
