@@ -87,7 +87,8 @@ export default function EditInvertPage() {
     }
   }
 
-  const meta = form && isInvertTaxon(form.taxon) ? INVERT_TAXA[form.taxon] : null
+  const formTaxon: string | undefined = form?.taxon
+  const meta = isInvertTaxon(formTaxon) ? INVERT_TAXA[formTaxon] : null
 
   return (
     <DashboardLayout userName={user?.name ?? undefined} userEmail={user?.email ?? undefined} userAvatar={user?.image ?? undefined}>

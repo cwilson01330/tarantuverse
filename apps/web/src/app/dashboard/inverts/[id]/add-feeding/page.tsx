@@ -40,7 +40,8 @@ export default function AddInvertFeedingPage() {
       try {
         const res = await fetch(`${API_URL}/api/v1/inverts/${id}`, { headers: { Authorization: `Bearer ${token}` } })
         const data = await res.json()
-        setPrefix(isInvertTaxon(data.taxon) ? INVERT_TAXA[data.taxon].prefix : null)
+        const t: string | undefined = data?.taxon
+        setPrefix(isInvertTaxon(t) ? INVERT_TAXA[t].prefix : null)
       } catch { /* leave null; save will warn */ }
     })()
   }, [id, token, isAuthenticated, isLoading, router])

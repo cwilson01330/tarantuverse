@@ -70,6 +70,9 @@ export default function DashboardHub() {
   // the bogus "Total Molts" derivation that was reading premolt predictions
   // (a count of in-premolt specimens, NOT a count of logged molts).
   const [collectionStats, setCollectionStats] = useState<{ total_molts: number } | null>(null)
+  // Cross-taxon collection total (from /inverts/); falls back to
+  // tarantulas.length until it loads or if the call fails.
+  const [totalAnimals, setTotalAnimals] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [subscriptionLimits, setSubscriptionLimits] = useState<any>(null)
   const [showWarning, setShowWarning] = useState(true)
@@ -112,11 +115,14 @@ export default function DashboardHub() {
       // Send the browser's TZ offset to endpoints that compute
       // calendar-day metrics (days_since_last_feeding on enclosures).
       const tzOffset = new Date().getTimezoneOffset()
-      const [tarantulasRes, enclosuresRes, limitsRes, statsRes] = await Promise.all([
+      const [tarantulasRes, enclosuresRes, limitsRes, statsRes, invertsRes] = await Promise.all([
         fetch(`${API_URL}/api/v1/tarantulas/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula&tz_offset_minutes=${tzOffset}`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/promo-codes/me/limits`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/analytics/collection`, { headers }).catch(() => null),
+        // Unified inverts list = the whole cross-taxon collection. Drives
+        // the true "My Collection" total + free-tier gate.
+        fetch(`${API_URL}/api/v1/inverts/`, { headers }).catch(() => null),
       ])
 
       // If the primary fetch returned 401, token is expired — redirect to login
@@ -143,6 +149,11 @@ export default function DashboardHub() {
 
       if (statsRes?.ok) {
         setCollectionStats(await statsRes.json())
+      }
+
+      if (invertsRes?.ok) {
+        const inv = await invertsRes.json()
+        if (Array.isArray(inv)) setTotalAnimals(inv.length)
       }
     } catch {
       // Dashboard data fetch failed
@@ -288,16 +299,20 @@ export default function DashboardHub() {
     )
   }
 
+  // Cross-taxon collection size — falls back to tarantulas.length if the
+  // /inverts/ count hasn't loaded.
+  const animalCount = totalAnimals ?? tarantulas.length
+
   const handleAddTarantula = () => {
-    if (!canAddTarantula(tarantulas.length)) {
+    if (!canAddTarantula(animalCount)) {
       setShowUpgradeModal(true)
     } else {
       router.push('/dashboard/tarantulas/add')
     }
   }
 
-  // Empty state - no tarantulas at all
-  if (tarantulas.length === 0 && !loading) {
+  // Empty state - no animals at all (any taxon)
+  if (animalCount === 0 && !loading) {
     return (
       <DashboardLayout
         userName={user.name ?? undefined}
@@ -340,8 +355,8 @@ export default function DashboardHub() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Free Tier Warning Banner */}
         {!subscriptionLimits?.is_premium &&
-         tarantulas.length >= (subscriptionLimits?.max_animals ?? 20) - 5 &&
-         tarantulas.length < (subscriptionLimits?.max_animals ?? 20) &&
+         animalCount >= (subscriptionLimits?.max_animals ?? 20) - 5 &&
+         animalCount < (subscriptionLimits?.max_animals ?? 20) &&
          showWarning && (
           <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 shadow-lg">
             <div className="flex items-start justify-between">
@@ -350,7 +365,7 @@ export default function DashboardHub() {
                 <div className="flex-1">
                   <h3 className="font-bold text-theme-primary mb-1">Approaching Free Tier Limit</h3>
                   <p className="text-sm text-theme-secondary mb-3">
-                    You have <strong>{tarantulas.length} of {subscriptionLimits?.max_animals ?? 20}</strong> animals on the free plan.
+                    You have <strong>{animalCount} of {subscriptionLimits?.max_animals ?? 20}</strong> animals on the free plan.
                     Upgrade to Premium for unlimited tracking!
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -381,7 +396,7 @@ export default function DashboardHub() {
             <div className="mt-3 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(tarantulas.length / 15) * 100}%` }}
+                style={{ width: `${(animalCount / (subscriptionLimits?.max_animals ?? 20)) * 100}%` }}
               />
             </div>
           </div>
@@ -398,7 +413,7 @@ export default function DashboardHub() {
           {/* Total Collection */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
-            aria-label={`My collection: ${tarantulas.length} tarantulas. View all.`}
+            aria-label={`My collection: ${animalCount} animals. View all.`}
             className="bg-surface rounded-2xl shadow-lg border border-theme p-6 hover:shadow-xl transition-all text-left group"
           >
             <div className="flex items-center gap-3">
@@ -407,7 +422,7 @@ export default function DashboardHub() {
               </div>
               <div>
                 <p className="text-sm text-theme-secondary font-medium">My Collection</p>
-                <p className="text-3xl font-bold text-theme-primary">{tarantulas.length}</p>
+                <p className="text-3xl font-bold text-theme-primary">{animalCount}</p>
               </div>
             </div>
             <p className="mt-3 text-sm text-theme-tertiary group-hover:text-theme-secondary transition-colors">
