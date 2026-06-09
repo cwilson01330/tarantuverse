@@ -318,14 +318,12 @@ export default function UnifiedSpeciesScreen() {
   };
 
   const handleOpen = (row: Row) => {
+    // Tarantulas keep their dedicated care sheet; all other taxa render
+    // through the generic invert care sheet (ADR-007).
     const path =
       row.taxon === 'tarantulas'
         ? `/species/${row.id}`
-        : row.taxon === 'scorpions'
-          ? `/scorpion-species/${row.id}`
-          : row.taxon === 'centipedes'
-            ? `/centipede-species/${row.id}`
-            : `/whip-spider-species/${row.id}`;
+        : `/invert-species/${row.id}`;
     router.push(path as any);
   };
 

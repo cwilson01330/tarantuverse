@@ -618,7 +618,7 @@ function CollectionScreen() {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => router.push(`/scorpion/${item.id}` as any)}
+        onPress={() => router.push(`/invert/${item.id}` as any)}
         accessibilityRole="button"
         accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, scorpion`}
         accessibilityHint="Opens this scorpion's detail page."
@@ -693,7 +693,7 @@ function CollectionScreen() {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => router.push(`/centipede/${item.id}` as any)}
+        onPress={() => router.push(`/invert/${item.id}` as any)}
         accessibilityRole="button"
         accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, centipede`}
         accessibilityHint="Opens this centipede's detail page."
@@ -764,7 +764,7 @@ function CollectionScreen() {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => router.push(`/whip-spider/${item.id}` as any)}
+        onPress={() => router.push(`/invert/${item.id}` as any)}
         accessibilityRole="button"
         accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, whip spider`}
         accessibilityHint="Opens this whip spider's detail page."
@@ -1516,12 +1516,9 @@ function CollectionScreen() {
     setAddPickerOpen(false);
     if (taxon === 'tarantula') {
       router.push('/tarantula/add');
-    } else if (taxon === 'scorpion') {
-      router.push('/scorpion/add' as any);
-    } else if (taxon === 'centipede') {
-      router.push('/centipede/add' as any);
     } else {
-      router.push('/whip-spider/add' as any);
+      // All non-tarantula taxa share the generic invert add screen (ADR-007).
+      router.push(`/invert/add?taxon=${taxon}` as any);
     }
   };
 
