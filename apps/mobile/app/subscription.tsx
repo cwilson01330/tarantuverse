@@ -35,7 +35,8 @@ import {
 } from '../src/services/iap';
 
 interface SubscriptionLimits {
-  max_tarantulas: number;
+  max_tarantulas: number; // legacy; retained for back-compat
+  max_animals?: number; // cross-taxon collection cap (-1 = unlimited)
   can_use_breeding: boolean;
   max_photos_per_tarantula: number;
   has_priority_support: boolean;
@@ -90,6 +91,7 @@ export default function SubscriptionScreen() {
       // Set default free tier limits
       setLimits({
         max_tarantulas: 15,
+        max_animals: 20,
         can_use_breeding: false,
         max_photos_per_tarantula: 5,
         has_priority_support: false,
@@ -572,13 +574,16 @@ export default function SubscriptionScreen() {
           </View>
 
           <View style={styles.limitRow}>
-            <Text style={styles.limitLabel}>Tarantulas</Text>
+            <Text style={styles.limitLabel}>Animals</Text>
             <Text style={styles.limitValue}>
-              {limits?.max_tarantulas === -1 ? 'Unlimited' : `${limits?.max_tarantulas} max`}
+              {(() => {
+                const cap = limits?.max_animals ?? limits?.max_tarantulas;
+                return cap === -1 ? 'Unlimited' : `${cap ?? 20} max`;
+              })()}
             </Text>
           </View>
           <View style={styles.limitRow}>
-            <Text style={styles.limitLabel}>Photos per tarantula</Text>
+            <Text style={styles.limitLabel}>Photos per animal</Text>
             <Text style={styles.limitValue}>
               {limits?.max_photos_per_tarantula === -1
                 ? 'Unlimited'
