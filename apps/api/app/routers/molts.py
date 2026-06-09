@@ -292,6 +292,56 @@ async def create_whip_spider_molt_log(
     return new_molt
 
 
+# ---------------------------------------------------------------------------
+# Generic invert molt endpoints (ADR-007) — taxon-agnostic.
+# ---------------------------------------------------------------------------
+
+@router.get("/inverts/{invert_id}/molts", response_model=List[MoltLogResponse])
+async def get_invert_molt_logs(
+    invert_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List molt logs for any invert the caller owns."""
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+    return (
+        db.query(MoltLog)
+        .filter(MoltLog.invert_id == invert_id)
+        .order_by(MoltLog.molted_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/inverts/{invert_id}/molts",
+    response_model=MoltLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_invert_molt_log(
+    invert_id: uuid.UUID,
+    molt_data: MoltLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a molt for any invert the caller owns. Sets only invert_id."""
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+    new_molt = MoltLog(invert_id=invert_id, **molt_data.model_dump())
+    db.add(new_molt)
+    db.commit()
+    db.refresh(new_molt)
+    return new_molt
+
+
 @router.get("/molts/{molt_id}", response_model=MoltLogResponse)
 async def get_molt_log(
     molt_id: uuid.UUID,

@@ -224,9 +224,10 @@ export async function getInvert(id: string): Promise<Invert> {
   return data;
 }
 
-/** Create via the per-taxon facade (taxon forced server-side). */
+/** Create via the generic surface — taxon goes in the body (works for
+ * every taxon; no per-taxon router required). */
 export async function createInvert(taxon: InvertTaxon, payload: InvertCreate): Promise<Invert> {
-  const { data } = await apiClient.post<Invert>(`/${INVERT_TAXA[taxon].prefix}/`, payload);
+  const { data } = await apiClient.post<Invert>('/inverts/', { taxon, ...payload });
   return data;
 }
 
@@ -244,12 +245,12 @@ export async function deleteInvert(id: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function listInvertSpecies(taxon: InvertTaxon, limit = 200): Promise<InvertSpecies[]> {
-  const { data } = await apiClient.get<InvertSpecies[]>(`/${INVERT_TAXA[taxon].speciesPrefix}/`, { params: { limit } });
+  const { data } = await apiClient.get<InvertSpecies[]>('/invert-species/', { params: { taxon, limit } });
   return data;
 }
 
 export async function searchInvertSpecies(taxon: InvertTaxon, q: string, limit = 8): Promise<InvertSpecies[]> {
-  const { data } = await apiClient.get<InvertSpecies[]>(`/${INVERT_TAXA[taxon].speciesPrefix}/search`, { params: { q, limit } });
+  const { data } = await apiClient.get<InvertSpecies[]>('/invert-species/search', { params: { q, taxon, limit } });
   return data;
 }
 
@@ -263,38 +264,39 @@ export async function getInvertSpecies(id: string): Promise<InvertSpecies> {
 // Logs (parented by invert_id, reached through the per-taxon prefix)
 // ---------------------------------------------------------------------------
 
-const prefixFor = (taxon: InvertTaxon) => INVERT_TAXA[taxon].prefix;
-
-export async function listInvertFeedings(taxon: InvertTaxon, id: string): Promise<InvertFeedingLog[]> {
-  const { data } = await apiClient.get<InvertFeedingLog[]>(`/${prefixFor(taxon)}/${id}/feedings`);
+// Logs go through the generic /inverts/{id}/… endpoints (ADR-007). The
+// `taxon` arg is kept on the signatures for call-site clarity but isn't
+// needed in the URL — any owned invert works.
+export async function listInvertFeedings(_taxon: InvertTaxon, id: string): Promise<InvertFeedingLog[]> {
+  const { data } = await apiClient.get<InvertFeedingLog[]>(`/inverts/${id}/feedings`);
   return data;
 }
-export async function createInvertFeeding(taxon: InvertTaxon, id: string, payload: { fed_at: string; food_type?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
-  const { data } = await apiClient.post<InvertFeedingLog>(`/${prefixFor(taxon)}/${id}/feedings`, payload);
+export async function createInvertFeeding(_taxon: InvertTaxon, id: string, payload: { fed_at: string; food_type?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
+  const { data } = await apiClient.post<InvertFeedingLog>(`/inverts/${id}/feedings`, payload);
   return data;
 }
-export async function listInvertMolts(taxon: InvertTaxon, id: string): Promise<InvertMoltLog[]> {
-  const { data } = await apiClient.get<InvertMoltLog[]>(`/${prefixFor(taxon)}/${id}/molts`);
+export async function listInvertMolts(_taxon: InvertTaxon, id: string): Promise<InvertMoltLog[]> {
+  const { data } = await apiClient.get<InvertMoltLog[]>(`/inverts/${id}/molts`);
   return data;
 }
-export async function createInvertMolt(taxon: InvertTaxon, id: string, payload: { molted_at: string; notes?: string | null }): Promise<InvertMoltLog> {
-  const { data } = await apiClient.post<InvertMoltLog>(`/${prefixFor(taxon)}/${id}/molts`, payload);
+export async function createInvertMolt(_taxon: InvertTaxon, id: string, payload: { molted_at: string; notes?: string | null }): Promise<InvertMoltLog> {
+  const { data } = await apiClient.post<InvertMoltLog>(`/inverts/${id}/molts`, payload);
   return data;
 }
-export async function listInvertSubstrateChanges(taxon: InvertTaxon, id: string): Promise<InvertSubstrateChange[]> {
-  const { data } = await apiClient.get<InvertSubstrateChange[]>(`/${prefixFor(taxon)}/${id}/substrate-changes`);
+export async function listInvertSubstrateChanges(_taxon: InvertTaxon, id: string): Promise<InvertSubstrateChange[]> {
+  const { data } = await apiClient.get<InvertSubstrateChange[]>(`/inverts/${id}/substrate-changes`);
   return data;
 }
-export async function createInvertSubstrateChange(taxon: InvertTaxon, id: string, payload: { changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }): Promise<InvertSubstrateChange> {
-  const { data } = await apiClient.post<InvertSubstrateChange>(`/${prefixFor(taxon)}/${id}/substrate-changes`, payload);
+export async function createInvertSubstrateChange(_taxon: InvertTaxon, id: string, payload: { changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }): Promise<InvertSubstrateChange> {
+  const { data } = await apiClient.post<InvertSubstrateChange>(`/inverts/${id}/substrate-changes`, payload);
   return data;
 }
-export async function listInvertPhotos(taxon: InvertTaxon, id: string): Promise<InvertPhoto[]> {
-  const { data } = await apiClient.get<InvertPhoto[]>(`/${prefixFor(taxon)}/${id}/photos`);
+export async function listInvertPhotos(_taxon: InvertTaxon, id: string): Promise<InvertPhoto[]> {
+  const { data } = await apiClient.get<InvertPhoto[]>(`/inverts/${id}/photos`);
   return data;
 }
-export async function uploadInvertPhoto(taxon: InvertTaxon, id: string, form: FormData): Promise<InvertPhoto> {
-  const { data } = await apiClient.post<InvertPhoto>(`/${prefixFor(taxon)}/${id}/photos`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
+export async function uploadInvertPhoto(_taxon: InvertTaxon, id: string, form: FormData): Promise<InvertPhoto> {
+  const { data } = await apiClient.post<InvertPhoto>(`/inverts/${id}/photos`, form, { headers: { 'Content-Type': 'multipart/form-data' } });
   return data;
 }
 

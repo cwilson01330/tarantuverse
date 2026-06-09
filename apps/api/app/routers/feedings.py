@@ -397,6 +397,58 @@ async def create_whip_spider_feeding_log(
     return new_feeding
 
 
+# ---------------------------------------------------------------------------
+# Generic invert log endpoints (ADR-007). Taxon-agnostic — they only verify
+# the invert belongs to the caller, so ANY taxon on the unified surface works
+# with no per-taxon route. The generic frontend uses these for every taxon.
+# ---------------------------------------------------------------------------
+
+@router.get("/inverts/{invert_id}/feedings", response_model=List[FeedingLogResponse])
+async def get_invert_feeding_logs(
+    invert_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List feeding logs for any invert the caller owns."""
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+    return (
+        db.query(FeedingLog)
+        .filter(FeedingLog.invert_id == invert_id)
+        .order_by(FeedingLog.fed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/inverts/{invert_id}/feedings",
+    response_model=FeedingLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_invert_feeding_log(
+    invert_id: uuid.UUID,
+    feeding_data: FeedingLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a feeding for any invert the caller owns. Sets only invert_id."""
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+    new_feeding = FeedingLog(invert_id=invert_id, **feeding_data.model_dump())
+    db.add(new_feeding)
+    db.commit()
+    db.refresh(new_feeding)
+    return new_feeding
+
+
 @router.get("/feedings/{feeding_id}", response_model=FeedingLogResponse)
 async def get_feeding_log(
     feeding_id: uuid.UUID,
