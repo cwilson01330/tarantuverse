@@ -26,6 +26,7 @@ import TarantulaDetailSkeleton from '../../src/components/TarantulaDetailSkeleto
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
+import { taxonHasModule } from '../../src/lib/taxon-modules';
 import { formatLocalDate } from '../../src/utils/date';
 import { getImageUrl } from '../../src/utils/image-url';
 // notifications imported dynamically below to avoid expo-notifications crashing at module load time
@@ -626,8 +627,10 @@ export default function TarantulaDetailScreen() {
           </View>
         </View>
 
-        {/* Premolt Prediction Card */}
-        <PremoltPredictionCard tarantulaId={id as string} />
+        {/* Premolt Prediction module (registry-gated — ADR-008 slice 4) */}
+        {taxonHasModule('tarantula', 'premolt') && (
+          <PremoltPredictionCard tarantulaId={id as string} />
+        )}
 
         {/* Husbandry */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
@@ -871,7 +874,7 @@ export default function TarantulaDetailScreen() {
             tappable so the keeper can resume/edit without leaving the
             detail screen. New keepers find the entry point in the
             log-feeding flow (more discoverable). */}
-        {feedingStats && (
+        {taxonHasModule('tarantula', 'feedingStats') && feedingStats && (
           <View style={styles.section}>
             <FeedingStatsCard
               data={feedingStats}
@@ -880,8 +883,8 @@ export default function TarantulaDetailScreen() {
           </View>
         )}
 
-        {/* Growth Analytics */}
-        {growthData && growthData.total_molts > 0 && (
+        {/* Growth Analytics module (registry-gated — ADR-008 slice 4) */}
+        {taxonHasModule('tarantula', 'growth') && growthData && growthData.total_molts > 0 && (
           <View style={styles.section}>
             <Suspense fallback={<ActivityIndicator color="#8B4513" />}>
               <GrowthChart data={growthData} />
