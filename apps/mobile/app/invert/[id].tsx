@@ -12,9 +12,9 @@ import {
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
 import {
@@ -30,8 +30,7 @@ import { SPACING, TYPE } from '../../src/theme/tokens';
 function InvertDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { colors, layout } = useTheme();
 
   const [invert, setInvert] = useState<Invert | null>(null);
   const [feedings, setFeedings] = useState<InvertFeedingLog[]>([]);
@@ -129,25 +128,42 @@ function InvertDetailScreen() {
 
   const meta = INVERT_TAXA[invert.taxon];
 
+  // Personalized header title (name → common → scientific → "Unnamed <taxon>"),
+  // mirroring the tarantula screen. The AppHeader is preset-aware (gradient in
+  // Hobbyist, flat in Keeper). Action set is honest: share / QR / reminder
+  // aren't wired for inverts yet (QR is tarantula-only on the roadmap), so the
+  // header carries edit + delete until those subsystems generalize.
+  const headerTitle = invertDisplayName(invert);
+  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const backButton = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back">
+      <MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} />
+    </TouchableOpacity>
+  );
+  const headerActions = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+      <TouchableOpacity style={{ padding: 6 }} onPress={() => router.push(`/invert/edit?id=${id}` as any)} accessibilityLabel="Edit">
+        <MaterialCommunityIcons name="pencil" size={22} color={iconColor} />
+      </TouchableOpacity>
+      <TouchableOpacity style={{ padding: 6 }} onPress={handleDelete} accessibilityLabel="Delete">
+        <MaterialCommunityIcons name="trash-can-outline" size={22} color={colors.error} />
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.scroll}>
-      <View style={styles.hero}>
-        {invert.photo_url ? (
-          <Image source={{ uri: getImageUrl(invert.photo_url) }} style={styles.heroImage} />
-        ) : (
-          <View style={[styles.heroImage, styles.heroPlaceholder]}>
-            <Text style={{ fontSize: 64 }}>{meta?.glyph ?? '🐾'}</Text>
-          </View>
-        )}
-        <View style={[styles.heroActions, { top: insets.top + 12 }]}>
-          <TouchableOpacity style={styles.heroButton} onPress={() => router.push(`/invert/edit?id=${id}` as any)} accessibilityLabel="Edit">
-            <MaterialCommunityIcons name="pencil" size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.heroButton, { backgroundColor: '#dc2626' }]} onPress={handleDelete} accessibilityLabel="Delete">
-            <MaterialCommunityIcons name="trash-can" size={20} color="#fff" />
-          </TouchableOpacity>
+    <View style={styles.flex}>
+      <AppHeader title={headerTitle} leftAction={backButton} rightAction={headerActions} />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.hero}>
+          {invert.photo_url ? (
+            <Image source={{ uri: getImageUrl(invert.photo_url) }} style={styles.heroImage} />
+          ) : (
+            <View style={[styles.heroImage, styles.heroPlaceholder]}>
+              <Text style={{ fontSize: 64 }}>{meta?.glyph ?? '🐾'}</Text>
+            </View>
+          )}
         </View>
-      </View>
 
       <View style={styles.identity}>
         <Text style={styles.name}>{invert.name || invert.common_name || `Unnamed ${meta?.label.toLowerCase() ?? 'invert'}`}</Text>
@@ -214,7 +230,8 @@ function InvertDetailScreen() {
       </Section>
 
       {invert.notes && <Section title="Notes"><Text style={styles.notes}>{invert.notes}</Text></Section>}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
