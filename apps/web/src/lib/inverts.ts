@@ -41,3 +41,37 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
 export function isInvertTaxon(t: string | null | undefined): t is InvertTaxon {
   return t != null && t in INVERT_TAXA
 }
+
+// ---------------------------------------------------------------------------
+// Feature-module registry (ADR-008) — web mirror of
+// apps/mobile/src/lib/taxon-modules.ts. Keep the two in lockstep.
+// Tarantula isn't listed here because its web pages are bespoke.
+// ---------------------------------------------------------------------------
+
+export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding'
+
+export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
+  scorpion: ['growth'],
+  centipede: ['growth'],
+  whip_spider: [],
+  vinegaroon: [],
+  true_spider: [],
+  millipede: [], // deliberately skipped: molts underground, rarely measured
+  mantis: ['growth'], // instar tracking is core to mantis keeping
+  other: [],
+}
+
+export function taxonHasModule(taxon: string, module: FeatureModule): boolean {
+  return isInvertTaxon(taxon) && TAXON_MODULES[taxon].includes(module)
+}
+
+/**
+ * Label for the linear growth measurement. Molt-log columns are named
+ * leg_span_* for legacy reasons; only spiders actually measure leg span —
+ * everything else records body length (honesty-first labeling).
+ */
+export function growthLengthLabel(taxon: string): string {
+  return taxon === 'true_spider' || taxon === 'whip_spider' || taxon === 'tarantula'
+    ? 'Leg span'
+    : 'Body length'
+}
