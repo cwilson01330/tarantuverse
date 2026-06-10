@@ -63,6 +63,13 @@ class Settings(BaseSettings):
     STRIPE_PRICE_YEARLY: str = ""   # price_xxx from Stripe Dashboard
     STRIPE_PRICE_LIFETIME: str = "" # price_xxx from Stripe Dashboard (one-time)
 
+    # Apple App Store Server Notifications (V2)
+    APPLE_BUNDLE_ID: str = "com.tarantuverse.app"
+    # Numeric Apple ID of the app (App Store Connect → App Information →
+    # General Information → Apple ID). Required to verify PRODUCTION
+    # notification signatures; sandbox works without it.
+    APPLE_APP_APPLE_ID: int = 0
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True

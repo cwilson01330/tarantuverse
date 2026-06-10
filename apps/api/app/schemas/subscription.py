@@ -80,6 +80,10 @@ class ReceiptValidationRequest(BaseModel):
     receipt: str  # Transaction receipt data
     product_id: str  # Product ID (e.g., 'com.tarantuverse.premium.monthly')
     transaction_id: str  # Transaction ID from store
+    # Apple's ORIGINAL transaction id — stable across renewals. App Store
+    # Server Notifications key on this, so when present it's what we
+    # store in payment_provider_id for later matching.
+    original_transaction_id: Optional[str] = None
 
 
 class ReceiptValidationResponse(BaseModel):

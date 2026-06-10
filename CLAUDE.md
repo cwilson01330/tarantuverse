@@ -1570,7 +1570,7 @@ hobbyist: header 130pt gradient | radius sm:12 md:16 lg:24 | row 52pt | shadow e
 4. ✅ Stripe payment integration LIVE — web checkout (`/pricing` → Checkout → webhook), Customer Portal, first real purchase 2026-05-23
 5. ✅ Billing hardening (2026-06-09) — expiry-aware entitlement reads (`utils/subscription.py::active_subscription_clause`), lazy expiry in `/subscriptions/me`, idempotent `checkout.session.completed` handling, renewal webhook revives lazily-expired rows
 6. ✅ Mobile → web checkout link-out (2026-06-09) — `subscription.tsx` shows a card-payment CTA (US storefronts only, gated on IAP product currency = USD), Stripe subscribers get a Manage Billing button that opens the Customer Portal, AppState listener refreshes premium status on return from browser
-7. 🚧 Apple App Store Server Notifications (renewals currently never extend `expires_at` for IAP subs — receipt validation is still MVP)
+7. ✅ Apple App Store Server Notifications V2 (2026-06-09) — `POST /subscriptions/apple-notifications` with pinned-root JWS verification (`services/apple_notification_service.py`, `app-store-server-library`), handles DID_RENEW/EXPIRED/REFUND/REVOKE/DID_CHANGE_RENEWAL_STATUS; `iap.ts` + `validate-receipt` now store `originalTransactionId` for matching. **Setup required:** Apple root certs in `apps/api/app/certs/apple/`, `APPLE_APP_APPLE_ID` env var on Render, URL configured in App Store Connect (prod + sandbox). Receipt validation itself is still MVP (no server-side receipt check on initial purchase).
 8. 🚧 Premium feature gating (full implementation)
 9. 🚧 Subscription management dashboard
 

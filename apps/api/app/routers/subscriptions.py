@@ -306,7 +306,10 @@ def validate_receipt(
         status="active",
         expires_at=expires_at,
         payment_provider="apple" if receipt_data.platform == "ios" else "google",
-        payment_provider_id=receipt_data.transaction_id,
+        # Prefer the original transaction id (stable across renewals) —
+        # App Store Server Notifications match on it. Fall back to the
+        # per-renewal transaction id for older clients / Android.
+        payment_provider_id=receipt_data.original_transaction_id or receipt_data.transaction_id,
         subscription_source=billing_period,
         auto_renew=True if billing_period in ["monthly", "yearly"] else False
     )
@@ -629,3 +632,137 @@ def get_billing_portal(
     except stripe.StripeError as e:
         logger.error(f"Stripe error creating portal session: {e}")
         raise HTTPException(status_code=500, detail="Failed to create billing portal session")
+
+
+# ============== APPLE APP STORE SERVER NOTIFICATIONS (V2) ==============
+
+@router.post("/apple-notifications")
+async def apple_server_notifications(request: Request, db: Session = Depends(get_db)):
+    """
+    Receive Apple App Store Server Notifications (V2).
+
+    Configure this URL in App Store Connect → App Information →
+    App Store Server Notifications (both Production and Sandbox):
+        https://tarantuverse-api.onrender.com/api/v1/subscriptions/apple-notifications
+
+    Keeps IAP subscriptions in sync: renewals extend expires_at,
+    expirations / refunds end premium. Signature is verified against
+    Apple's pinned root certificates — unverifiable payloads are
+    rejected with 401.
+    """
+    # Lazy import so the API still boots if the library/certs are
+    # missing — only this endpoint degrades.
+    from app.services.apple_notification_service import (
+        AppleNotificationError,
+        decode_notification,
+    )
+
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    signed_payload = body.get("signedPayload")
+    if not signed_payload:
+        raise HTTPException(status_code=400, detail="Missing signedPayload")
+
+    try:
+        notification_type, subtype, txn, environment = decode_notification(signed_payload)
+    except AppleNotificationError as e:
+        logger.error(f"Apple notification rejected: {e}")
+        raise HTTPException(status_code=401, detail="Signature verification failed")
+
+    logger.info(
+        f"Apple notification: {notification_type}"
+        f"{f'/{subtype}' if subtype else ''} ({environment})"
+    )
+
+    # TEST notifications (and some types) carry no transaction info
+    if txn is None:
+        return JSONResponse(content={"status": "ok"})
+
+    original_txn_id = getattr(txn, "originalTransactionId", None)
+    if not original_txn_id:
+        logger.warning(f"Apple notification {notification_type}: no originalTransactionId")
+        return JSONResponse(content={"status": "ok"})
+
+    # Match on the original transaction id stored at receipt validation.
+    # (Initial purchases store it directly; for the very first purchase
+    # the per-renewal transactionId equals the original one, so legacy
+    # rows usually match too.)
+    user_sub = db.query(UserSubscription).filter(
+        and_(
+            UserSubscription.payment_provider == "apple",
+            UserSubscription.payment_provider_id == original_txn_id,
+        )
+    ).order_by(UserSubscription.started_at.desc()).first()
+
+    if not user_sub:
+        # 200 anyway — Apple retries on errors, and a row that predates
+        # original-id storage will never match no matter how many retries.
+        logger.warning(
+            f"Apple notification {notification_type}: no subscription matches "
+            f"originalTransactionId {original_txn_id}"
+        )
+        return JSONResponse(content={"status": "ok"})
+
+    expires_ms = getattr(txn, "expiresDate", None)
+    new_expiry = datetime.utcfromtimestamp(expires_ms / 1000) if expires_ms else None
+
+    if notification_type in ("SUBSCRIBED", "DID_RENEW", "OFFER_REDEEMED"):
+        user_sub.status = "active"
+        if new_expiry:
+            user_sub.expires_at = new_expiry
+        user_sub.auto_renew = True
+        user_sub.cancelled_at = None
+
+        # Cancel shadow rows (e.g., the free row /me auto-creates while
+        # a row sat lazily expired)
+        others = db.query(UserSubscription).filter(
+            and_(
+                UserSubscription.user_id == user_sub.user_id,
+                UserSubscription.id != user_sub.id,
+                UserSubscription.status == "active",
+            )
+        ).all()
+        for other in others:
+            other.status = "cancelled"
+            other.cancelled_at = datetime.utcnow()
+
+        logger.info(
+            f"Apple {notification_type}: extended subscription for user "
+            f"{user_sub.user_id} to {new_expiry}"
+        )
+
+    elif notification_type == "DID_CHANGE_RENEWAL_STATUS":
+        user_sub.auto_renew = subtype == "AUTO_RENEW_ENABLED"
+        logger.info(
+            f"Apple renewal status for user {user_sub.user_id}: "
+            f"auto_renew={user_sub.auto_renew}"
+        )
+
+    elif notification_type in ("EXPIRED", "GRACE_PERIOD_EXPIRED"):
+        user_sub.status = "expired"
+        if new_expiry:
+            user_sub.expires_at = new_expiry
+        user_sub.auto_renew = False
+        logger.info(f"Apple {notification_type}: subscription ended for user {user_sub.user_id}")
+
+    elif notification_type in ("REFUND", "REVOKE"):
+        user_sub.status = "cancelled"
+        user_sub.cancelled_at = datetime.utcnow()
+        logger.info(f"Apple {notification_type}: subscription revoked for user {user_sub.user_id}")
+
+    elif notification_type == "DID_FAIL_TO_RENEW":
+        # GRACE_PERIOD subtype = keep access while Apple retries billing;
+        # without it, the EXPIRED notification will follow and end access.
+        logger.warning(
+            f"Apple DID_FAIL_TO_RENEW for user {user_sub.user_id}"
+            f"{' (grace period)' if subtype == 'GRACE_PERIOD' else ''}"
+        )
+
+    else:
+        logger.info(f"Apple notification {notification_type}: no handler, ignoring")
+
+    db.commit()
+    return JSONResponse(content={"status": "ok"})

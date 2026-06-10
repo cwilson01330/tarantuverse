@@ -282,6 +282,14 @@ export const validateReceiptWithBackend = async (
         receipt: receipt || '',
         product_id: purchase.productId,
         transaction_id: purchase.transactionId || purchase.orderId,
+        // Apple App Store Server Notifications key on the ORIGINAL
+        // transaction id (stable across renewals); the per-renewal
+        // transactionId won't match later DID_RENEW/EXPIRED events.
+        // Field casing differs across expo-iap versions, so try both.
+        original_transaction_id:
+          purchase.originalTransactionIdentifierIOS ||
+          purchase.originalTransactionIdentifierIos ||
+          null,
       }),
     });
 
