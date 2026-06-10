@@ -27,6 +27,7 @@ from app.schemas.subscription import (
     ReceiptValidationResponse
 )
 from app.utils.dependencies import get_current_user
+from app.utils.subscription import active_subscription_clause, expire_stale_subscriptions
 
 # Initialize Stripe
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -65,10 +66,15 @@ def get_my_subscription(
     db: Session = Depends(get_db)
 ):
     """Get current user's active subscription"""
+    # Lazily flip stale (past-expiry) rows to 'expired' so they stop
+    # masquerading as active and can't shadow the free fallback below.
+    if expire_stale_subscriptions(db, current_user.id):
+        db.commit()
+
     subscription = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == "active"
+            active_subscription_clause()
         )
     ).first()
 
@@ -183,7 +189,7 @@ def check_feature_access(
     subscription = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == "active"
+            active_subscription_clause()
         )
     ).first()
 
@@ -451,6 +457,27 @@ async def handle_checkout_completed(session: dict, db: Session):
         logger.error("No user_id in checkout session metadata")
         return
 
+    # Idempotency guard: Stripe retries webhooks (and events can be
+    # replayed from the dashboard). If this user already has an active
+    # Stripe subscription for the same customer + price type, this event
+    # was already processed — skip instead of cancelling and recreating.
+    duplicate = db.query(UserSubscription).filter(
+        and_(
+            UserSubscription.user_id == user_id,
+            UserSubscription.status == "active",
+            UserSubscription.payment_provider == "stripe",
+            UserSubscription.payment_provider_id == customer_id,
+            UserSubscription.subscription_source == price_type,
+        )
+    ).first()
+
+    if duplicate:
+        logger.info(
+            f"Duplicate checkout.session.completed for user {user_id} "
+            f"(customer {customer_id}, {price_type}) — already processed, skipping"
+        )
+        return
+
     # Get the premium plan
     plan = db.query(SubscriptionPlan).filter(
         SubscriptionPlan.name == "premium"
@@ -503,20 +530,37 @@ async def handle_subscription_updated(subscription: dict, db: Session):
     customer_id = subscription.get("customer")
     status = subscription.get("status")
 
+    # Include 'expired' rows: lazy expiry may have flipped the row just
+    # before a renewal webhook arrives — a renewal must reactivate it.
     user_sub = db.query(UserSubscription).filter(
         and_(
             UserSubscription.payment_provider == "stripe",
             UserSubscription.payment_provider_id == customer_id,
-            UserSubscription.status == "active"
+            UserSubscription.status.in_(["active", "expired"])
         )
-    ).first()
+    ).order_by(UserSubscription.started_at.desc()).first()
 
     if user_sub:
         if status == "active":
-            # Subscription renewed - update expiry
+            # Subscription renewed - update expiry (and revive if lazily expired)
             current_period_end = subscription.get("current_period_end")
             if current_period_end:
                 user_sub.expires_at = datetime.utcfromtimestamp(current_period_end)
+            user_sub.status = "active"
+
+            # A free-plan row may have been auto-created by /me while
+            # this row sat lazily expired — cancel any other active
+            # rows so entitlement reads stay unambiguous.
+            others = db.query(UserSubscription).filter(
+                and_(
+                    UserSubscription.user_id == user_sub.user_id,
+                    UserSubscription.id != user_sub.id,
+                    UserSubscription.status == "active",
+                )
+            ).all()
+            for other in others:
+                other.status = "cancelled"
+                other.cancelled_at = datetime.utcnow()
         elif status in ["past_due", "unpaid"]:
             # Payment issue - could add grace period logic here
             logger.warning(f"Subscription {customer_id} has payment issues: {status}")

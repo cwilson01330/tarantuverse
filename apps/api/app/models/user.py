@@ -154,6 +154,13 @@ class User(Base):
             UserSubscription.status == "active"
         ).first()
 
+        # Treat past-expiry rows as inactive (provider webhooks may never
+        # arrive to flip status — see utils/subscription.py)
+        if subscription and subscription.expires_at:
+            from datetime import datetime, timezone
+            if subscription.expires_at <= datetime.now(timezone.utc):
+                subscription = None
+
         if not subscription:
             # Return free tier defaults
             return {

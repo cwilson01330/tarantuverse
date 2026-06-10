@@ -17,7 +17,9 @@
 
 ---
 
-## 🎯 Current Status (As of 2025-11-22)
+## 🎯 Current Status (As of 2026-06-09)
+
+> **Agent quick-start (read first):** This is a multi-taxon invert platform on a unified `inverts` table (taxon discriminator). Nine taxa: tarantula, scorpion, centipede, whip_spider, vinegaroon, true_spider, millipede, mantis, other. **Adding a taxon is config-only** (ADR-007): seed species + add a registry entry in `apps/mobile/src/lib/inverts.ts` (`INVERT_TAXA`) and `apps/web/src/lib/inverts.ts`; the generic `/inverts/*` endpoints + generic screens handle the rest. Tarantula keeps a bespoke detail screen with opt-in feature modules (`apps/mobile/src/lib/taxon-modules.ts`); other taxa render through the generic invert screens. Design language is shared via tokens + primitives (`apps/mobile/src/theme/tokens.ts`, `apps/mobile/src/components/ui/`). Key ADRs: `docs/design/ADR-005` (consolidation), `ADR-006` (taxa+feeding_mode), `ADR-007` (generic UI), `ADR-008` (rich-base convergence). Deploy: backend→Render (auto on push to main), web→Vercel (auto), mobile→EAS (`cd apps/mobile && eas update --branch production`). Neon connector is READ-ONLY.
 
 ### ✅ Completed Features
 
@@ -1565,9 +1567,12 @@ hobbyist: header 130pt gradient | radius sm:12 md:16 lg:24 | row 52pt | shadow e
 1. ✅ Backend infrastructure complete
 2. ✅ Pricing page created
 3. ✅ Premium-gated advanced analytics (teaser + upgrade prompt)
-4. 🚧 Payment integration (Stripe/PayPal)
-5. 🚧 Premium feature gating (full implementation)
-6. 🚧 Subscription management dashboard
+4. ✅ Stripe payment integration LIVE — web checkout (`/pricing` → Checkout → webhook), Customer Portal, first real purchase 2026-05-23
+5. ✅ Billing hardening (2026-06-09) — expiry-aware entitlement reads (`utils/subscription.py::active_subscription_clause`), lazy expiry in `/subscriptions/me`, idempotent `checkout.session.completed` handling, renewal webhook revives lazily-expired rows
+6. ✅ Mobile → web checkout link-out (2026-06-09) — `subscription.tsx` shows a card-payment CTA (US storefronts only, gated on IAP product currency = USD), Stripe subscribers get a Manage Billing button that opens the Customer Portal, AppState listener refreshes premium status on return from browser
+7. 🚧 Apple App Store Server Notifications (renewals currently never extend `expires_at` for IAP subs — receipt validation is still MVP)
+8. 🚧 Premium feature gating (full implementation)
+9. 🚧 Subscription management dashboard
 
 ### Phase 5 - Advanced Features (Future)
 
@@ -1726,11 +1731,14 @@ Earlier migrations 1-19 (initial schema → token blocklist) listed in CHANGELOG
 21. `scp_20260522_add_scorpions.py` — Scorpion expansion: `scorpions`, `scorpion_species`, `scorpion_colonies`, `broods`, polymorphic FK extensions to feeding_logs / molt_logs / substrate_changes / photos / qr_upload_sessions
 22. `inv_20260527_inverts_consolidation_v1.py` — ADR-005 Phase A1: unified `inverts` + `invert_species` tables (taxon discriminator: tarantula | scorpion | centipede), nullable `invert_id` companion column on the five polymorphic-log tables
 23. `cip_20260527_widen_log_checks_for_inverts.py` — ADR-005 Phase C2: widens at-least-one-parent and exactly-one-parent CHECK constraints on the five log tables so centipede rows (invert_id only, no per-taxon FK) are accepted
+24. `sub_20260605_add_max_animals_to_plans.py` — ADR-006: adds `max_animals` to subscription plans; backfills `GREATEST(max_tarantulas, 20)`; `-1` stays unlimited. The free-tier cap is now CROSS-TAXON (counts `inverts` rows), not tarantula-only.
+25. `itx_20260605_expand_invert_taxa.py` — ADR-006: widens the taxon CHECK on `inverts` + `invert_species` to the full nine taxa (tarantula, scorpion, centipede, whip_spider, vinegaroon, true_spider, millipede, mantis, other) and adds `feeding_mode` (predator | detritivore | omnivore, default predator) + CHECK.
 
 **Data migrations not in Alembic:**
 - `backfill_inverts.py` (one-shot) — Phase B backfill. Run via Render shell after the inv_20260527 migration. Idempotent. 2026-05-27 prod run: 1440 tarantulas + 102 species + 25 scorpion species mirrored, 154 species_id links resolved, 1527 log rows linked (1234 feedings + 103 molts + 14 substrate changes + 173 photos + 3 QR sessions). All 16 verification checks clean.
 - `seed_scorpion_species.py` — 25-species catalog seed (Phase 1 scorpion expansion)
 - `seed_centipede_species.py` — 9-species catalog seed (Phase C2 centipede launch)
+- `seed_new_invert_species.py` — 8-species catalog seed for the ADR-006 expansion taxa (vinegaroon, true spider, millipede [feeding_mode=detritivore], mantis). Honest care data; "other" stays freeform/unseeded by design. Idempotent; run via Render shell.
 
 **All migrations applied to production database**
 
@@ -1911,7 +1919,14 @@ This includes:
 5. Health tracking module (medical logs, treatments, vet visits)
 6. ADR-005 Phase C1 — read cutover on legacy `/tarantulas/` + `/scorpions/` routes (after soak)
 7. ADR-005 Phase D — drop dual-write + legacy tables (gated, 2+ weeks after C1)
-8. Add-flow streamline — single form with taxon segment control + dual-mode species input (parked design, prototype on `centipede/add.tsx` first)
+8. Add-flow streamline — single form with taxon segment control + dual-mode species input (parked design)
+
+**Convergence follow-ups (ADR-008, optional):**
+- Feeding-stats module for predatory inverts (`feeding_mode='predator'`) — needs a generic `/analytics/inverts/{id}/feeding-stats` endpoint, then flip the taxon's entry in `apps/mobile/src/lib/taxon-modules.ts` and render in the invert detail's module slot. Growth module similarly needs per-molt measurement capture on invert molt logs first.
+- (Deferred, own project) Merge the tarantula + invert detail screens into one literal shared `<DetailBase>` component. Currently they're separate screen files sharing building blocks (tokens, primitives, `InfoGrid`, `AppHeader`, `PremoltPredictionCard`, the module registry) — composition got ~90% of the maintenance benefit; the physical merge is the risky last 10%.
+- `seed_new_invert_species.py` must be run on Render shell to populate the new taxa's care sheets (autocomplete/care sheets are empty until then).
+
+**Done this cycle (ADR-006/007/008 — see changelog):** nine-taxon expansion, `feeding_mode`, generic config-driven invert UI, cross-taxon 20-animal free cap, inline log edit/delete + hero photo on inverts, shared token/primitive design system, single premolt module, registry-gated feature modules, hero-photo mirror fix.
 
 ### Future Enhancements:
 - Offline mode with local storage and sync
@@ -1928,11 +1943,19 @@ This includes:
 
 ---
 
-**Last Updated**: 2026-06-04
-**Version**: 1.2.0 (Multi-taxon platform — tarantulas + scorpions + centipedes on unified `inverts`)
+**Last Updated**: 2026-06-09
+**Version**: 1.3.0 (Nine-taxon invert platform on unified `inverts`, generic config-driven UI, rich-base convergence)
 **Status**: Active Development
 
-**Recent Changes** (2026-04-14 → 2026-06-04):
+**Recent Changes** (2026-06-05 → 2026-06-09):
+- 🐾 **TAXA EXPANSION — ADR-006** (`docs/design/ADR-006-invert-taxa-expansion.md`): Five new taxa added on the consolidated surface to fulfill Jason's request — `whip_spider`, `vinegaroon`, `true_spider`, `millipede`, `mantis`, plus an `other` freeform catch-all. Taxon CHECK widened on `inverts` + `invert_species` (itx_20260605). New `feeding_mode` column (predator | detritivore | omnivore) — millipedes are detritivores (no live-prey cadence nudges). Canonical taxon regex lives in `schemas/invert.py::TAXON_PATTERN` and `models/invert.py::INVERT_TAXON_VALUES` (keep these in lockstep — a stale copy in `schemas/invert_species.py` / `routers/invert_species.py` caused a 422 on the species browser, since fixed). Honest species seeds via `seed_new_invert_species.py`.
+- 🧩 **GENERIC INVERT UI — ADR-007** (`docs/design/ADR-007-generic-invert-ui.md`): Adding a taxon is now config-only on BOTH platforms. Generic backend endpoints — `POST /inverts/` (taxon in body), `/inverts/{id}` CRUD, generic log endpoints `/inverts/{id}/{feedings,molts,substrate-changes,photos}`, `/invert-species/?taxon=` + `/search`. Mobile registry `src/lib/inverts.ts::INVERT_TAXA` + one set of taxon-driven screens (`app/invert/[id|add|edit|add-*].tsx`, `app/invert-species/[id].tsx`). Web uses `lib/inverts.ts` + generic `dashboard/inverts/*` pages. Per-taxon scorpion/centipede/whip-spider screens are retired (collection routes to `/invert/[id]`).
+- 🎨 **RICH-BASE CONVERGENCE — ADR-008** (`docs/design/ADR-008-rich-base-convergence.md`): Converge UP onto the rich tarantula interaction model, NOT down to lean. Inverts gained inline feeding/molt/substrate **log edit + delete** and **hero photo set/change** (web + mobile) — backend was already polymorphic (`_*_owner_parent` cover `invert_id`; `set-main` works for any taxon). Tarantula keeps its depth; premolt / feeding-stats / growth / breeding are opt-in **feature modules** gated by `src/lib/taxon-modules.ts` (only tarantula enabled today). Shared design tokens (`src/theme/tokens.ts` spacing + type) + shared primitives (`src/components/ui/index.tsx`: Card, SectionCard, InfoRow, Chip, Badge, AppText, **InfoGrid**). Husbandry now renders through the shared `InfoGrid` on tarantula AND every invert, with full field parity (water dish / temperature / humidity — the mobile tarantula screen previously omitted these). Personalized gradient `AppHeader` (animal name, not "Details") on every detail screen.
+- 💎 **CROSS-TAXON FREE LIMIT**: Free tier cap moved from tarantula-only to a cross-taxon **20 total animals** counted against `inverts` (`utils/limits.py::enforce_collection_limit`, wired into invert create). `subscription_plans.max_animals` column (sub_20260605); `useSubscription` hook + pricing/limit copy read `max_animals`.
+- 🖼️ **HERO PHOTO MIRROR FIX**: `set-main`, first-upload default, and photo delete now sync `photo_url` onto the unified `Invert` row (keyed on shared PK), so scorpion/tarantula heroes — whose photos resolve to the legacy parent first — show on the generic invert detail/collection. Delete promotes the next photo as hero. Reconciliation SQL available for pre-fix rows.
+- 🌐 **LANDING + COLLECTION**: Web landing page reworked for the multi-taxon story (scorpions + centipedes + the new taxa). Web collection list + species browser + mobile collection/species browser show all nine taxa with filter chips.
+
+**Previous Changes** (2026-04-14 → 2026-06-04):
 - 🦂 **SCORPION EXPANSION**: Full new taxon — 25-species catalog (`scorpion_species`), per-animal `scorpions` table, `scorpion_colonies` for communal setups, polymorphic FK extensions to feeding/molt/substrate/photo/QR (scp_20260522 migration), CRUD routers, mobile lib + screens + species browser. Venom severity tier ('mild' / 'moderate' / 'medically_significant') is the headline safety field. Breeding (`broods`) deferred to a later phase.
 - 🐛 **CENTIPEDE LAUNCH** (ADR-005 Phase C2 + C3): Third taxon shipped directly on the unified `inverts` surface — no legacy table. 9-species seed (Scolopendromorpha) covering beginner mild venom (E. trigonopodus, Rhysida longipes, S. polymorpha) through medically-significant (S. gigantea, S. subspinipes). `/centipedes/` + `/centipede-species/` per-taxon facade routers, centipede-parented log endpoints with widened CHECK constraints (cip_20260527), full mobile UI (lib, detail/add/edit/log/photo screens, care sheet with biology callout, species browser segment).
 - 🔄 **ADR-005 INVERTS CONSOLIDATION** (Phases A1, A2, B): Unified `inverts` + `invert_species` tables collapsing the tarantula + scorpion silos into one taxon-discriminated surface. A1 created the schema additively (inv_20260527). A2 wired dual-write on every legacy CRUD path so writes hit both surfaces atomically (`inverts_dualwrite.py` service, 13 mirror functions). B backfilled production cleanly — 1440 tarantulas + 102 species + 25 scorpion species mirrored, 154 species_id links resolved, 1527 log rows linked, all 16 verification checks at 0. Read cutover (C1) and legacy table drop (D) remain gated.

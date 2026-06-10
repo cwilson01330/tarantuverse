@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   Linking,
+  AppState,
 } from 'react-native';
 
 // URLs to manage subscriptions per platform
@@ -56,6 +57,12 @@ export default function SubscriptionScreen() {
   const [iapAvailable, setIapAvailable] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [revoking, setRevoking] = useState(false);
+  // Which provider the active subscription was bought through
+  // ('stripe' | 'apple' | 'google' | 'admin_grant' | null for free).
+  // Drives the Manage button: Stripe subs are managed via the Stripe
+  // billing portal, not the App Store / Play Store subscription pages.
+  const [paymentProvider, setPaymentProvider] = useState<string | null>(null);
+  const [openingPortal, setOpeningPortal] = useState(false);
 
   useEffect(() => {
     setIapAvailable(isIAPAvailable());
@@ -63,6 +70,19 @@ export default function SubscriptionScreen() {
 
     // Don't disconnect IAP on unmount - it breaks pending purchases
     // The connection is managed globally
+  }, []);
+
+  // Re-check subscription status whenever the app returns to the
+  // foreground — covers the user completing Stripe checkout in the
+  // browser and switching back (the webhook will have activated
+  // premium on this same account).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        loadSubscriptionStatus();
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   const loadData = async () => {
@@ -85,6 +105,16 @@ export default function SubscriptionScreen() {
     try {
       const response = await apiClient.get('/promo-codes/me/limits');
       setLimits(response.data);
+
+      // Fetch the subscription record for its payment provider (the
+      // limits endpoint doesn't include it). Non-fatal if it fails.
+      try {
+        const subResponse = await apiClient.get('/subscriptions/me');
+        setPaymentProvider(subResponse.data?.payment_provider ?? null);
+      } catch {
+        setPaymentProvider(null);
+      }
+
       return response.data;
     } catch (error) {
       console.error('Failed to load subscription status:', error);
@@ -199,6 +229,48 @@ export default function SubscriptionScreen() {
     } finally {
       setRestoring(false);
     }
+  };
+
+  const handleManageSubscription = async () => {
+    if (paymentProvider === 'stripe') {
+      // Stripe subscribers manage billing through the Stripe Customer
+      // Portal (cancel, update card, view invoices) — the App Store /
+      // Play Store subscription pages know nothing about this sub.
+      setOpeningPortal(true);
+      try {
+        const response = await apiClient.get('/subscriptions/billing-portal', {
+          params: { return_url: 'https://www.tarantuverse.com/dashboard' },
+        });
+        if (response.data?.portal_url) {
+          await Linking.openURL(response.data.portal_url);
+        }
+      } catch (error: any) {
+        Alert.alert(
+          'Unable to Open Billing Portal',
+          error.response?.data?.detail ||
+            'Please manage your subscription at tarantuverse.com.'
+        );
+      } finally {
+        setOpeningPortal(false);
+      }
+      return;
+    }
+
+    // Apple / Google subscriptions are managed in the store account
+    Linking.openURL(MANAGE_SUBSCRIPTIONS_URL!);
+  };
+
+  // Only offer the web-checkout link-out where it's compliant. The
+  // post-Epic rulings allow external purchase links on the US App
+  // Store / Play Store only, so gate on the storefront currency that
+  // came back with the IAP products (USD ⇒ US storefront). In Expo Go
+  // (no IAP) we always show it so the flow is testable in dev.
+  const storefrontCurrency =
+    products[0]?.currency || products[0]?.currencyCode || null;
+  const showWebCheckout = !iapAvailable || storefrontCurrency === 'USD';
+
+  const handleWebCheckout = () => {
+    Linking.openURL('https://www.tarantuverse.com/pricing');
   };
 
   const handleRevokePremium = () => {
@@ -520,6 +592,31 @@ export default function SubscriptionScreen() {
       fontSize: 14,
       marginBottom: 12,
     },
+    webCheckoutCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+      marginBottom: 8,
+      gap: 12,
+    },
+    webCheckoutTextWrap: {
+      flex: 1,
+    },
+    webCheckoutTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    webCheckoutSubtitle: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      lineHeight: 17,
+    },
   });
 
   if (loading) {
@@ -620,14 +717,28 @@ export default function SubscriptionScreen() {
               You have access to all features. Enjoy tracking your collection!
             </Text>
 
-            {/* Manage Subscription Button - Required by Apple & Google */}
-            <TouchableOpacity
-              style={styles.manageButton}
-              onPress={() => Linking.openURL(MANAGE_SUBSCRIPTIONS_URL!)}
-            >
-              <MaterialCommunityIcons name="cog" size={18} color={colors.primary} />
-              <Text style={styles.manageButtonText}>Manage Subscription</Text>
-            </TouchableOpacity>
+            {/* Manage Subscription Button - Required by Apple & Google.
+                Routes to the Stripe billing portal for web purchases,
+                store subscription settings for IAP. Hidden for promo /
+                admin grants (nothing to manage). */}
+            {['apple', 'google', 'stripe'].includes(paymentProvider ?? '') && (
+              <TouchableOpacity
+                style={styles.manageButton}
+                onPress={handleManageSubscription}
+                disabled={openingPortal}
+              >
+                {openingPortal ? (
+                  <ActivityIndicator color={colors.primary} size="small" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="cog" size={18} color={colors.primary} />
+                    <Text style={styles.manageButtonText}>
+                      {paymentProvider === 'stripe' ? 'Manage Billing' : 'Manage Subscription'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
 
             {/* Revoke Premium Button (for testing) */}
             <TouchableOpacity
@@ -739,6 +850,24 @@ export default function SubscriptionScreen() {
                 </TouchableOpacity>
               )}
             </LinearGradient>
+
+            {/* Web checkout link-out (US storefronts only — see
+                showWebCheckout). Stripe checkout on the website
+                activates premium on this same account via webhook;
+                the AppState listener picks it up on return. */}
+            {showWebCheckout && (
+              <TouchableOpacity style={styles.webCheckoutCard} onPress={handleWebCheckout}>
+                <MaterialCommunityIcons name="credit-card-outline" size={22} color={colors.primary} />
+                <View style={styles.webCheckoutTextWrap}>
+                  <Text style={styles.webCheckoutTitle}>Prefer to pay by card?</Text>
+                  <Text style={styles.webCheckoutSubtitle}>
+                    Subscribe on tarantuverse.com — sign in with this account and
+                    premium unlocks here automatically.
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="open-in-new" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            )}
 
             {/* Legal Links - Required by Apple */}
             <View style={styles.legalSection}>
