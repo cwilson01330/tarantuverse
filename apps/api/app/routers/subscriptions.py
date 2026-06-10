@@ -753,6 +753,15 @@ async def apple_server_notifications(request: Request, db: Session = Depends(get
         user_sub.cancelled_at = datetime.utcnow()
         logger.info(f"Apple {notification_type}: subscription revoked for user {user_sub.user_id}")
 
+    elif notification_type == "REFUND_REVERSED":
+        # Apple reversed an earlier refund — reinstate. If the period
+        # already lapsed, expiry-aware reads keep premium off anyway.
+        user_sub.status = "active"
+        user_sub.cancelled_at = None
+        if new_expiry:
+            user_sub.expires_at = new_expiry
+        logger.info(f"Apple REFUND_REVERSED: subscription reinstated for user {user_sub.user_id}")
+
     elif notification_type == "DID_FAIL_TO_RENEW":
         # GRACE_PERIOD subtype = keep access while Apple retries billing;
         # without it, the EXPIRED notification will follow and end access.
