@@ -25,9 +25,11 @@ from app.database import get_db
 from app.models.user import User
 from app.models.invert import Invert
 from app.models.invert_species import InvertSpecies
+from app.models.molt_log import MoltLog
 from app.models.scorpion_colony import ScorpionColony
 from app.models.tarantula import Sex, Source  # shared DB enums (UPPERCASE)
-from app.schemas.invert import InvertCreate, InvertResponse, InvertUpdate
+from app.schemas.invert import InvertCreate, InvertGrowthAnalytics, InvertResponse, InvertUpdate
+from app.services.growth_service import compute_growth_fields
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_collection_limit
 
@@ -88,7 +90,7 @@ def _validate_colony(db: Session, user: User, colony_id: Optional[UUID]) -> None
 @router.get("/", response_model=List[InvertResponse])
 async def list_inverts(
     taxon: Optional[str] = Query(
-        None, pattern="^(tarantula|scorpion|centipede|whip_spider|vinegaroon|true_spider|millipede|mantis|other)$",
+        None, pattern="^(tarantula|scorpion|centipede|whip_spider|vinegaroon|true_spider|millipede|mantis|roach|other)$",
         description="Filter to a single taxon. Omit for the whole collection.",
     ),
     colony_id: Optional[UUID] = Query(None),
@@ -225,3 +227,40 @@ async def delete_invert(
     db.delete(invert)
     db.commit()
     return None
+
+
+@router.get("/{invert_id}/growth", response_model=InvertGrowthAnalytics)
+async def get_invert_growth(
+    invert_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Growth analytics for any invert, from its molt history (ADR-008).
+
+    Taxon-agnostic: molt logs are matched on invert_id, which the
+    backfill + dual-write keep populated for tarantulas and scorpions
+    too, so this works for every taxon. The length measurement is
+    whatever the keeper recorded (leg span vs body length — the client
+    labels it via the taxon registry).
+    """
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invert not found",
+        )
+
+    molt_logs = (
+        db.query(MoltLog)
+        .filter(MoltLog.invert_id == invert_id)
+        .order_by(MoltLog.molted_at)
+        .all()
+    )
+
+    return InvertGrowthAnalytics(
+        invert_id=invert_id,
+        **compute_growth_fields(molt_logs),
+    )

@@ -27,6 +27,7 @@ export type InvertTaxon =
   | 'true_spider'
   | 'millipede'
   | 'mantis'
+  | 'roach'
   | 'other';
 
 export type FeedingMode = 'predator' | 'detritivore' | 'omnivore';
@@ -89,6 +90,11 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
     speciesPrefix: 'mantis-species', sizeLabel: 'Length (mm)', feedingMode: 'predator',
     safety: 'harmless', defaultEnclosureType: 'arboreal',
   },
+  roach: {
+    key: 'roach', label: 'Roach', glyph: '🪳', prefix: 'roaches',
+    speciesPrefix: 'roach-species', sizeLabel: 'Length (mm)', feedingMode: 'omnivore',
+    safety: 'harmless', defaultEnclosureType: 'terrestrial',
+  },
   other: {
     key: 'other', label: 'Other invertebrate', glyph: '🐾', prefix: 'other-inverts',
     speciesPrefix: 'other-invert-species', sizeLabel: 'Size (mm)', feedingMode: 'predator',
@@ -99,7 +105,7 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
 /** Taxa exposed in the add-picker / collection filter, in display order. */
 export const INVERT_TAXON_ORDER: InvertTaxon[] = [
   'scorpion', 'centipede', 'whip_spider', 'vinegaroon',
-  'true_spider', 'millipede', 'mantis', 'other',
+  'true_spider', 'millipede', 'mantis', 'roach', 'other',
 ];
 
 export function isInvertTaxon(t: string | null | undefined): t is InvertTaxon {
@@ -205,7 +211,48 @@ export interface InvertSpecies {
 }
 
 export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; accepted: boolean; notes: string | null; }
-export interface InvertMoltLog { id: string; invert_id: string | null; molted_at: string; notes: string | null; }
+export interface InvertMoltLog {
+  id: string;
+  invert_id: string | null;
+  molted_at: string;
+  notes: string | null;
+  // Per-molt measurements (ADR-008 growth module). Columns are named
+  // leg_span_* for legacy reasons; for non-spider taxa the value is the
+  // body length — labels come from growthLengthLabel() in taxon-modules.
+  leg_span_before?: number | string | null;
+  leg_span_after?: number | string | null;
+  weight_before?: number | string | null;
+  weight_after?: number | string | null;
+}
+
+/** Optional per-molt measurements accepted by the molt endpoints. */
+export interface InvertMoltMeasurements {
+  leg_span_before?: number | null;
+  leg_span_after?: number | null;
+  weight_before?: number | null;
+  weight_after?: number | null;
+}
+
+/** Growth analytics from /inverts/{id}/growth (mirrors GrowthChart's shape). */
+export interface InvertGrowthAnalytics {
+  invert_id: string;
+  data_points: {
+    date: string;
+    weight: number | string | null;
+    leg_span: number | string | null;
+    days_since_previous: number | null;
+    weight_change: number | string | null;
+    leg_span_change: number | string | null;
+  }[];
+  total_molts: number;
+  average_days_between_molts: number | null;
+  total_weight_gain: number | string | null;
+  total_leg_span_gain: number | string | null;
+  growth_rate_weight: number | string | null;
+  growth_rate_leg_span: number | string | null;
+  last_molt_date: string | null;
+  days_since_last_molt: number | null;
+}
 export interface InvertSubstrateChange { id: string; invert_id: string | null; changed_at: string; substrate_type: string | null; substrate_depth: string | null; reason: string | null; notes: string | null; }
 export interface InvertPhoto { id: string; url: string; thumbnail_url: string | null; caption: string | null; }
 
@@ -279,8 +326,18 @@ export async function listInvertMolts(_taxon: InvertTaxon, id: string): Promise<
   const { data } = await apiClient.get<InvertMoltLog[]>(`/inverts/${id}/molts`);
   return data;
 }
-export async function createInvertMolt(_taxon: InvertTaxon, id: string, payload: { molted_at: string; notes?: string | null }): Promise<InvertMoltLog> {
+export async function createInvertMolt(_taxon: InvertTaxon, id: string, payload: { molted_at: string; notes?: string | null } & InvertMoltMeasurements): Promise<InvertMoltLog> {
   const { data } = await apiClient.post<InvertMoltLog>(`/inverts/${id}/molts`, payload);
+  return data;
+}
+/** Growth analytics for any invert (generic endpoint — ADR-008). */
+export async function getInvertGrowth(id: string): Promise<InvertGrowthAnalytics> {
+  const { data } = await apiClient.get<InvertGrowthAnalytics>(`/inverts/${id}/growth`);
+  return data;
+}
+/** Single molt log by id — powers measurement prefill on the edit form. */
+export async function getInvertMolt(moltId: string): Promise<InvertMoltLog> {
+  const { data } = await apiClient.get<InvertMoltLog>(`/molts/${moltId}`);
   return data;
 }
 export async function listInvertSubstrateChanges(_taxon: InvertTaxon, id: string): Promise<InvertSubstrateChange[]> {
@@ -313,7 +370,7 @@ export async function updateInvertFeeding(feedingId: string, payload: { fed_at?:
 export async function deleteInvertFeeding(feedingId: string): Promise<void> {
   await apiClient.delete(`/feedings/${feedingId}`);
 }
-export async function updateInvertMolt(moltId: string, payload: { molted_at?: string; notes?: string | null }): Promise<InvertMoltLog> {
+export async function updateInvertMolt(moltId: string, payload: { molted_at?: string; notes?: string | null } & InvertMoltMeasurements): Promise<InvertMoltLog> {
   const { data } = await apiClient.put<InvertMoltLog>(`/molts/${moltId}`, payload);
   return data;
 }

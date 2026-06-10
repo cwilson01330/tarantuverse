@@ -37,7 +37,7 @@ class Invert(Base):
         CheckConstraint(
             "taxon IN ('tarantula', 'scorpion', 'centipede', "
             "'whip_spider', 'vinegaroon', 'true_spider', "
-            "'millipede', 'mantis', 'other')",
+            "'millipede', 'mantis', 'roach', 'other')",
             name='inverts_taxon_check',
         ),
         CheckConstraint(

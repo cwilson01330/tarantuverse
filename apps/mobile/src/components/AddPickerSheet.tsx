@@ -37,6 +37,7 @@ export type AddPickerTaxon =
   | 'true_spider'
   | 'millipede'
   | 'mantis'
+  | 'roach'
   | 'other';
 
 interface AddPickerSheetProps {
@@ -84,6 +85,7 @@ const ROWS: Row[] = [
   { key: 'true_spider', glyph: '🕷', label: 'True spider', hint: 'New true spider record' },
   { key: 'millipede', glyph: '🪱', label: 'Millipede', hint: 'New millipede record' },
   { key: 'mantis', glyph: '🦗', label: 'Mantis', hint: 'New mantis record' },
+  { key: 'roach', glyph: '🪳', label: 'Roach', hint: 'New roach record' },
   { key: 'other', glyph: '🐾', label: 'Other invertebrate', hint: 'New invertebrate record' },
 ];
 

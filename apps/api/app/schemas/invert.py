@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # Full ADR-006 taxon set — kept in sync with the inverts_taxon_check
 # CHECK constraint and INVERT_TAXON_VALUES.
-TAXON_PATTERN = "^(tarantula|scorpion|centipede|whip_spider|vinegaroon|true_spider|millipede|mantis|other)$"
+TAXON_PATTERN = "^(tarantula|scorpion|centipede|whip_spider|vinegaroon|true_spider|millipede|mantis|roach|other)$"
 LIFE_STAGE_PATTERN = "^(sling|juvenile|adult)$"
 ENCLOSURE_TYPE_PATTERN = "^(terrestrial|arboreal|fossorial)$"
 
@@ -97,3 +97,31 @@ class InvertResponse(InvertBase):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class InvertGrowthAnalytics(BaseModel):
+    """Growth analytics for any invert, computed from its molt history.
+
+    Same shape as the tarantula GrowthAnalytics but keyed on invert_id.
+    `leg_span` fields hold whatever length measurement the taxon uses —
+    leg span for spiders, body length for scorpions/centipedes; the
+    client labels them via the taxon registry.
+    """
+    invert_id: uuid.UUID
+    data_points: list["GrowthDataPoint"]
+    total_molts: int
+    average_days_between_molts: Optional[float] = None
+    total_weight_gain: Optional[Decimal] = None
+    total_leg_span_gain: Optional[Decimal] = None
+    growth_rate_weight: Optional[Decimal] = None
+    growth_rate_leg_span: Optional[Decimal] = None
+    last_molt_date: Optional[datetime] = None
+    days_since_last_molt: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Late import to reuse the existing data-point schema without a cycle
+from app.schemas.tarantula import GrowthDataPoint  # noqa: E402
+
+InvertGrowthAnalytics.model_rebuild()

@@ -54,7 +54,7 @@ import {
 
 // Taxa that have no per-taxon list lib — fetched generically via /inverts/.
 // (scorpion/centipede/whip_spider keep their existing per-taxon fetches.)
-const GENERIC_TAXA: InvertTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'other'];
+const GENERIC_TAXA: InvertTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'roach', 'other'];
 
 interface Tarantula {
   id: string;
@@ -1637,6 +1637,7 @@ function CollectionScreen() {
           { value: 'true_spider' as const, label: '🕷 True spiders' },
           { value: 'millipede' as const, label: '🪱 Millipedes' },
           { value: 'mantis' as const, label: '🦗 Mantises' },
+          { value: 'roach' as const, label: '🪳 Roaches' },
           { value: 'other' as const, label: '🐾 Other' },
         ]
       ).map((opt) => {

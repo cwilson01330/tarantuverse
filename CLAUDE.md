@@ -19,7 +19,7 @@
 
 ## 🎯 Current Status (As of 2026-06-09)
 
-> **Agent quick-start (read first):** This is a multi-taxon invert platform on a unified `inverts` table (taxon discriminator). Nine taxa: tarantula, scorpion, centipede, whip_spider, vinegaroon, true_spider, millipede, mantis, other. **Adding a taxon is config-only** (ADR-007): seed species + add a registry entry in `apps/mobile/src/lib/inverts.ts` (`INVERT_TAXA`) and `apps/web/src/lib/inverts.ts`; the generic `/inverts/*` endpoints + generic screens handle the rest. Tarantula keeps a bespoke detail screen with opt-in feature modules (`apps/mobile/src/lib/taxon-modules.ts`); other taxa render through the generic invert screens. Design language is shared via tokens + primitives (`apps/mobile/src/theme/tokens.ts`, `apps/mobile/src/components/ui/`). Key ADRs: `docs/design/ADR-005` (consolidation), `ADR-006` (taxa+feeding_mode), `ADR-007` (generic UI), `ADR-008` (rich-base convergence). Deploy: backend→Render (auto on push to main), web→Vercel (auto), mobile→EAS (`cd apps/mobile && eas update --branch production`). Neon connector is READ-ONLY.
+> **Agent quick-start (read first):** This is a multi-taxon invert platform on a unified `inverts` table (taxon discriminator). Ten taxa: tarantula, scorpion, centipede, whip_spider, vinegaroon, true_spider, millipede, mantis, roach, other. **Adding a taxon needs a migration to widen the taxon CHECK on `inverts` + `invert_species` (e.g. `rch_20260610_add_roach_taxon`) and the regex/value-list updates that MUST stay in lockstep (`schemas/invert.py` + `schemas/invert_species.py` TAXON_PATTERN, `models/invert.py` CHECK, `models/invert_species.py` INVERT_TAXON_VALUES + CHECK, `routers/inverts.py` list Query pattern), THEN it's config: seed species + registry entries in `apps/mobile/src/lib/inverts.ts` (`INVERT_TAXA`, `INVERT_TAXON_ORDER`), `apps/web/src/lib/inverts.ts`, plus the hardcoded taxon lists in the species browsers (`app/(tabs)/species.tsx`, web `species/page.tsx`), collection filter (`app/(tabs)/collection.tsx` GENERIC_TAXA + filter chips, web `dashboard/tarantulas/page.tsx`), and add-pickers (`AddPickerSheet.tsx`).** Generic `/inverts/*` endpoints + generic screens handle the rest. Tarantula keeps a bespoke detail screen with opt-in feature modules (`apps/mobile/src/lib/taxon-modules.ts`); other taxa render through the generic invert screens. Design language is shared via tokens + primitives (`apps/mobile/src/theme/tokens.ts`, `apps/mobile/src/components/ui/`). Key ADRs: `docs/design/ADR-005` (consolidation), `ADR-006` (taxa+feeding_mode), `ADR-007` (generic UI), `ADR-008` (rich-base convergence). Deploy: backend→Render (auto on push to main), web→Vercel (auto), mobile→EAS (`cd apps/mobile && eas update --branch production`). Neon connector is READ-ONLY.
 
 ### ✅ Completed Features
 
@@ -1946,7 +1946,7 @@ This includes:
 ---
 
 **Last Updated**: 2026-06-09
-**Version**: 1.3.0 (Nine-taxon invert platform on unified `inverts`, generic config-driven UI, rich-base convergence)
+**Version**: 1.3.0 (Ten-taxon invert platform — +roach 2026-06-10 — on unified `inverts`, generic config-driven UI, rich-base convergence)
 **Status**: Active Development
 
 **Recent Changes** (2026-06-05 → 2026-06-09):

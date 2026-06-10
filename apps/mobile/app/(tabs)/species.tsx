@@ -64,10 +64,10 @@ const CARD_WIDTH = (width - 48) / 2;
 // The ADR-006 expansion taxa use their singular `InvertTaxon` keys and
 // all flow through the generic `/invert-species/?taxon=` endpoint, so
 // adding another is a one-line edit to GENERIC_TAXA + the seed.
-type GenericTaxon = 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'other';
+type GenericTaxon = 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'roach' | 'other';
 type Taxon = 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | GenericTaxon;
 
-const GENERIC_TAXA: GenericTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'other'];
+const GENERIC_TAXA: GenericTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'roach', 'other'];
 const isGenericTaxon = (t: Taxon): t is GenericTaxon =>
   (GENERIC_TAXA as string[]).includes(t);
 
@@ -77,7 +77,7 @@ const isGenericTaxon = (t: Taxon): t is GenericTaxon =>
 // curated labels; the five expansion taxa pull glyph from the registry.
 const TAXON_ORDER: Taxon[] = [
   'tarantulas', 'scorpions', 'centipedes', 'whip_spiders',
-  'vinegaroon', 'true_spider', 'millipede', 'mantis', 'other',
+  'vinegaroon', 'true_spider', 'millipede', 'mantis', 'roach', 'other',
 ];
 const TAXON_META: Record<Taxon, { tab: string; noun: string; glyph: string }> = {
   tarantulas: { tab: '🕷  Tarantulas', noun: 'tarantula', glyph: '🕷️' },
@@ -88,6 +88,7 @@ const TAXON_META: Record<Taxon, { tab: string; noun: string; glyph: string }> = 
   true_spider: { tab: `${INVERT_TAXA.true_spider.glyph}  True spiders`, noun: 'true spider', glyph: INVERT_TAXA.true_spider.glyph },
   millipede: { tab: `${INVERT_TAXA.millipede.glyph}  Millipedes`, noun: 'millipede', glyph: INVERT_TAXA.millipede.glyph },
   mantis: { tab: `${INVERT_TAXA.mantis.glyph}  Mantises`, noun: 'mantis', glyph: INVERT_TAXA.mantis.glyph },
+  roach: { tab: `${INVERT_TAXA.roach.glyph}  Roaches`, noun: 'roach', glyph: INVERT_TAXA.roach.glyph },
   other: { tab: `${INVERT_TAXA.other.glyph}  Other`, noun: 'other invertebrate', glyph: INVERT_TAXA.other.glyph },
 };
 

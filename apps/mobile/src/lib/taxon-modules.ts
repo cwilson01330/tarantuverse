@@ -35,6 +35,7 @@ export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   true_spider: [],
   millipede: [], // deliberately skipped: molts underground, rarely measured
   mantis: ['growth'], // instar tracking is core to mantis keeping
+  roach: [], // growth off at launch — flip later if keepers want instar tracking
   other: [],
 };
 

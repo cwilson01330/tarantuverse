@@ -14,6 +14,7 @@ export type InvertTaxon =
   | 'true_spider'
   | 'millipede'
   | 'mantis'
+  | 'roach'
   | 'other'
 
 export interface InvertTaxonMeta {
@@ -35,6 +36,7 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
   true_spider: { label: 'True spider', glyph: '🕷', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Leg span (mm)' },
   millipede: { label: 'Millipede', glyph: '🪱', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Length (mm)' },
   mantis: { label: 'Mantis', glyph: '🦗', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Length (mm)' },
+  roach: { label: 'Roach', glyph: '🪳', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Length (mm)' },
   other: { label: 'Other invertebrate', glyph: '🐾', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Size (mm)' },
 }
 
@@ -58,6 +60,7 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   true_spider: [],
   millipede: [], // deliberately skipped: molts underground, rarely measured
   mantis: ['growth'], // instar tracking is core to mantis keeping
+  roach: [], // growth off at launch — flip later if keepers want instar tracking
   other: [],
 }
 
