@@ -47,7 +47,7 @@ export default function UpgradeModal({ isOpen, onClose, feature, description }: 
             </li>
             <li className="flex items-start gap-2">
               <span className="text-green-500 mt-0.5">✓</span>
-              <span>Unlimited photos per tarantula</span>
+              <span>Unlimited photos per animal</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-green-500 mt-0.5">✓</span>

@@ -2380,7 +2380,7 @@ export default function TarantulaDetailPage() {
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         feature="Unlimited Photos"
-        description="You've reached the free tier limit of 5 photos per tarantula. Upgrade to Premium for unlimited photo uploads!"
+        description="You've reached the free tier limit of 5 photos per animal. Upgrade to Premium for unlimited photo uploads!"
       />
       </div>
     </DashboardLayout>

@@ -81,8 +81,8 @@ export default function PricingScreen() {
   };
 
   const comparisonFeatures = [
-    { name: 'Tarantulas', free: '15', premium: 'Unlimited' },
-    { name: 'Photos per tarantula', free: '5', premium: 'Unlimited' },
+    { name: 'Animals (all taxa)', free: '20', premium: 'Unlimited' },
+    { name: 'Photos per animal', free: '5', premium: 'Unlimited' },
     { name: 'Breeding module', free: '-', premium: '✓' },
     { name: 'Analytics', free: 'Basic', premium: 'Advanced' },
     { name: 'Priority support', free: '-', premium: '✓' },
@@ -98,7 +98,9 @@ export default function PricingScreen() {
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.textPrimary }]}>Simple, Transparent Pricing</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Start free with generous limits. Upgrade for unlimited tracking and breeding features.
+          Track tarantulas, scorpions, centipedes, mantises, and more — all in one
+          collection. Start free with generous limits. Upgrade for unlimited
+          tracking and breeding features.
         </Text>
       </View>
 
@@ -263,7 +265,7 @@ export default function PricingScreen() {
       {/* CTA */}
       <View style={styles.ctaSection}>
         <Text style={styles.ctaTitle}>Ready to Start Your Journey?</Text>
-        <Text style={styles.ctaSubtitle}>Join the community of tarantula keepers today</Text>
+        <Text style={styles.ctaSubtitle}>Join the community of invertebrate keepers today</Text>
         <TouchableOpacity
           style={styles.ctaSectionButton}
           onPress={() => router.push('/register')}

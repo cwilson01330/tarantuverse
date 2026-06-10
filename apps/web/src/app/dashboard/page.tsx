@@ -706,8 +706,8 @@ export default function DashboardHub() {
       <UpgradeModal
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
-        feature="Unlimited Tarantulas"
-        description="You've reached the free tier limit of 15 tarantulas. Upgrade to Premium for unlimited tracking!"
+        feature="Unlimited Animals"
+        description="You've reached the free tier limit of 20 animals. Upgrade to Premium for unlimited tracking!"
       />
     </DashboardLayout>
   )

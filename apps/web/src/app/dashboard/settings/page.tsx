@@ -554,7 +554,7 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-theme-secondary">Photos per tarantula</p>
+                  <p className="text-theme-secondary">Photos per animal</p>
                   <p className="font-semibold text-theme-primary">
                     {subscriptionLimits?.max_photos_per_tarantula === -1 ? 'Unlimited' : `${subscriptionLimits?.max_photos_per_tarantula ?? 5} max`}
                   </p>

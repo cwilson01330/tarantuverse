@@ -94,6 +94,7 @@ export default function PricingPage() {
           Simple, Transparent Pricing
         </h1>
         <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
+          Track tarantulas, scorpions, centipedes, mantises, and more — all in one collection.
           Start free with generous limits. Upgrade for unlimited tracking and breeding features.
         </p>
       </section>
@@ -120,7 +121,7 @@ export default function PricingPage() {
                 <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span className="text-gray-700 dark:text-gray-300">5 photos per tarantula</span>
+                <span className="text-gray-700 dark:text-gray-300">5 photos per animal</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -337,12 +338,12 @@ export default function PricingPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               <tr>
-                <td className="px-6 py-4 text-gray-900 dark:text-white">Tarantulas</td>
-                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">15</td>
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Animals (tarantulas, scorpions, centipedes & more)</td>
+                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">20</td>
                 <td className="px-6 py-4 text-center text-purple-600 dark:text-purple-400 font-semibold">Unlimited</td>
               </tr>
               <tr className="bg-gray-50 dark:bg-gray-700/30">
-                <td className="px-6 py-4 text-gray-900 dark:text-white">Photos per tarantula</td>
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Photos per animal</td>
                 <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">5</td>
                 <td className="px-6 py-4 text-center text-purple-600 dark:text-purple-400 font-semibold">Unlimited</td>
               </tr>
@@ -398,7 +399,7 @@ export default function PricingPage() {
       <section className="bg-gradient-brand text-white py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl font-bold mb-6">Ready to Start Your Journey?</h2>
-          <p className="text-xl text-purple-100 mb-10">Join the community of tarantula keepers today</p>
+          <p className="text-xl text-purple-100 mb-10">Join the community of invertebrate keepers today</p>
           <Link
             href="/register"
             className="inline-block px-10 py-5 bg-white text-purple-600 rounded-xl hover:shadow-2xl transform hover:scale-105 transition font-bold text-lg"

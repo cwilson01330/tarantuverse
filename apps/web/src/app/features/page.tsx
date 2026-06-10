@@ -35,7 +35,7 @@ export default function FeaturesPage() {
           Passionate Keepers
         </h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-          Everything you need to manage your tarantula collection, track growth, and connect with the community.
+          Everything you need to manage your invertebrate collection — tarantulas, scorpions, centipedes, mantises, and more — track growth, and connect with the community.
         </p>
       </section>
 
@@ -49,7 +49,7 @@ export default function FeaturesPage() {
             </div>
             <h2 className="text-3xl font-bold mb-4">Collection Management</h2>
             <p className="text-gray-600 mb-6">
-              Keep detailed records of every tarantula in your collection with comprehensive profiles.
+              Keep detailed records of every animal in your collection with comprehensive profiles.
             </p>
             <ul className="space-y-3 text-gray-600">
               <li className="flex items-start gap-2">
@@ -165,7 +165,7 @@ export default function FeaturesPage() {
             </div>
             <h2 className="text-3xl font-bold mb-4">Photo Gallery</h2>
             <p className="text-gray-600 mb-6">
-              Upload unlimited photos to document your tarantulas' beauty and growth.
+              Upload unlimited photos to document your animals' beauty and growth.
             </p>
             <ul className="space-y-3 text-gray-600">
               <li className="flex items-start gap-2">
@@ -178,7 +178,7 @@ export default function FeaturesPage() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
-                <span>Photo galleries for each tarantula</span>
+                <span>Photo galleries for each animal</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-green-500 mt-1">✓</span>
@@ -194,7 +194,7 @@ export default function FeaturesPage() {
             </div>
             <h2 className="text-3xl font-bold mb-4">Community Features</h2>
             <p className="text-gray-600 mb-6">
-              Connect with fellow keepers and share your passion for tarantulas.
+              Connect with fellow keepers and share your passion for invertebrates.
             </p>
             <ul className="space-y-3 text-gray-600">
               <li className="flex items-start gap-2">

@@ -1042,7 +1042,7 @@ export default function Home() {
           Create your free account →
         </Link>
         <p className="text-center text-xs text-gray-400 mt-1.5">
-          Free forever · No credit card · 15 tarantulas included
+          Free forever · No credit card · 20 animals included
         </p>
       </div>
 

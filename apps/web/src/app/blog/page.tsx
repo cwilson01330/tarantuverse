@@ -49,7 +49,7 @@ export default function BlogPage() {
                 Welcome to Tarantuverse: Your New Husbandry Companion
               </h2>
               <p className="text-purple-100 mb-6 text-lg">
-                Discover how Tarantuverse is revolutionizing the way tarantula keepers manage their collections, 
+                Discover how Tarantuverse is revolutionizing the way invertebrate keepers manage their collections,
                 track growth, and connect with fellow enthusiasts worldwide.
               </p>
               <div className="flex items-center gap-4 text-sm text-purple-100 mb-6">
