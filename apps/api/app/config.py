@@ -70,6 +70,14 @@ class Settings(BaseSettings):
     # notification signatures; sandbox works without it.
     APPLE_APP_APPLE_ID: int = 0
 
+    # Apple App Store Server API (In-App Purchase key) — enables
+    # server-side transaction verification on /validate-receipt and the
+    # test-notification endpoints. From App Store Connect → Users and
+    # Access → Integrations → In-App Purchase.
+    APPLE_IAP_KEY_ID: str = ""       # e.g. MWS2VV3XBQ
+    APPLE_IAP_ISSUER_ID: str = ""    # UUID shown above the key list
+    APPLE_IAP_PRIVATE_KEY: str = ""  # full contents of the .p8 file
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True

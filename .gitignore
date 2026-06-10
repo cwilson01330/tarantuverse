@@ -15,6 +15,9 @@ build/
 *.pyc
 __pycache__/
 
+# Secrets — private keys must never be committed
+*.p8
+
 # Environment variables
 .env
 .env.local
@@ -103,3 +106,7 @@ scratch_*
 
 # Project documentation (internal use)
 CLAUDE.md
+
+mnt/
+apps/api/alembic/versions/_find_head.py
+

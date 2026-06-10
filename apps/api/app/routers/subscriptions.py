@@ -26,7 +26,7 @@ from app.schemas.subscription import (
     ReceiptValidationRequest,
     ReceiptValidationResponse
 )
-from app.utils.dependencies import get_current_user
+from app.utils.dependencies import get_current_user, get_current_admin
 from app.utils.subscription import active_subscription_clause, expire_stale_subscriptions
 
 # Initialize Stripe
@@ -228,11 +228,58 @@ def validate_receipt(
     db: Session = Depends(get_db)
 ):
     """
-    Validate an Apple/Google in-app purchase receipt and activate subscription
+    Validate an Apple/Google in-app purchase receipt and activate subscription.
 
-    For MVP: Basic validation and subscription activation
-    Production TODO: Validate with Apple/Google servers
+    iOS: when the App Store Server API key is configured (APPLE_IAP_*),
+    the transaction is verified against Apple's servers — product,
+    expiry, and original transaction id come from Apple, not the client.
+    Falls back to trust-the-client MVP behavior if unconfigured.
+    Android: still MVP (no server-side check yet).
     """
+    verified_txn = None
+    if receipt_data.platform == "ios":
+        from app.services.apple_notification_service import (
+            AppleNotificationError,
+            api_configured,
+            verify_transaction,
+        )
+
+        if api_configured():
+            try:
+                verified_txn, apple_env = verify_transaction(receipt_data.transaction_id)
+            except AppleNotificationError as e:
+                logger.warning(
+                    f"Receipt verification failed for user {current_user.id}, "
+                    f"transaction {receipt_data.transaction_id}: {e}"
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail="Could not verify this purchase with Apple. If you were "
+                    "charged, try Restore Previous Purchases in a few minutes.",
+                )
+
+            if getattr(verified_txn, "revocationDate", None):
+                raise HTTPException(
+                    status_code=400,
+                    detail="This purchase has been refunded or revoked.",
+                )
+
+            logger.info(
+                f"Apple verified transaction {receipt_data.transaction_id} "
+                f"({apple_env}): product {verified_txn.productId}"
+            )
+        else:
+            logger.warning(
+                "APPLE_IAP_* not configured — accepting iOS receipt without "
+                "server-side verification (MVP fallback)"
+            )
+
+    # Trust Apple's product id over the client's when we verified
+    effective_product_id = (
+        verified_txn.productId if verified_txn and verified_txn.productId
+        else receipt_data.product_id
+    )
+
     # Map product IDs to subscription plans
     # All premium products map to the "premium" plan (monthly/yearly/lifetime are billing periods)
     # iOS App Store Connect uses the `.v2` suffix on the monthly and yearly
@@ -258,13 +305,13 @@ def validate_receipt(
         "com.tarantuverse.lifetime": "lifetime",
     }
 
-    plan_name = product_to_plan_map.get(receipt_data.product_id)
-    billing_period = product_to_period_map.get(receipt_data.product_id, "monthly")
+    plan_name = product_to_plan_map.get(effective_product_id)
+    billing_period = product_to_period_map.get(effective_product_id, "monthly")
 
     if not plan_name:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown product ID: {receipt_data.product_id}"
+            detail=f"Unknown product ID: {effective_product_id}"
         )
 
     # Get the subscription plan
@@ -292,13 +339,28 @@ def validate_receipt(
         existing.cancelled_at = datetime.utcnow()
 
     # Create new subscription
-    # Set expiry based on billing period
+    # Expiry: prefer Apple's authoritative expiresDate (ms epoch) when
+    # the transaction was server-verified; otherwise fall back to the
+    # billing-period heuristic.
     expires_at = None
-    if billing_period == "monthly":
-        expires_at = datetime.utcnow() + timedelta(days=30)
-    elif billing_period == "yearly":
-        expires_at = datetime.utcnow() + timedelta(days=365)
-    # Lifetime has no expiry
+    verified_expires_ms = getattr(verified_txn, "expiresDate", None) if verified_txn else None
+    if verified_expires_ms:
+        expires_at = datetime.utcfromtimestamp(verified_expires_ms / 1000)
+    elif verified_txn is None:
+        if billing_period == "monthly":
+            expires_at = datetime.utcnow() + timedelta(days=30)
+        elif billing_period == "yearly":
+            expires_at = datetime.utcnow() + timedelta(days=365)
+    # Lifetime (verified, no expiresDate) has no expiry
+
+    # Original transaction id: Apple's verified value first, then the
+    # client-sent one, then the per-renewal id as a last resort. App
+    # Store Server Notifications match on this.
+    original_txn_id = (
+        (getattr(verified_txn, "originalTransactionId", None) if verified_txn else None)
+        or receipt_data.original_transaction_id
+        or receipt_data.transaction_id
+    )
 
     new_subscription = UserSubscription(
         user_id=current_user.id,
@@ -306,10 +368,7 @@ def validate_receipt(
         status="active",
         expires_at=expires_at,
         payment_provider="apple" if receipt_data.platform == "ios" else "google",
-        # Prefer the original transaction id (stable across renewals) —
-        # App Store Server Notifications match on it. Fall back to the
-        # per-renewal transaction id for older clients / Android.
-        payment_provider_id=receipt_data.original_transaction_id or receipt_data.transaction_id,
+        payment_provider_id=original_txn_id,
         subscription_source=billing_period,
         auto_renew=True if billing_period in ["monthly", "yearly"] else False
     )
@@ -775,3 +834,41 @@ async def apple_server_notifications(request: Request, db: Session = Depends(get
 
     db.commit()
     return JSONResponse(content={"status": "ok"})
+
+
+@router.post("/admin/apple-test-notification")
+def request_apple_test_notification(current_user: User = Depends(get_current_admin)):
+    """
+    Admin: ask Apple to send a TEST notification to our notifications URL.
+    Returns a token to check delivery status with the GET endpoint below.
+    """
+    from app.services.apple_notification_service import (
+        AppleNotificationError,
+        request_test_notification,
+    )
+
+    try:
+        environment, token = request_test_notification()
+    except AppleNotificationError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return {"environment": environment, "test_notification_token": token}
+
+
+@router.get("/admin/apple-test-notification/{token}")
+def check_apple_test_notification(token: str, current_user: User = Depends(get_current_admin)):
+    """
+    Admin: check how our server responded to a TEST notification —
+    Apple reports each delivery attempt and the result it recorded.
+    """
+    from app.services.apple_notification_service import (
+        AppleNotificationError,
+        get_test_notification_status,
+    )
+
+    try:
+        environment, attempts = get_test_notification_status(token)
+    except AppleNotificationError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return {"environment": environment, "send_attempts": attempts}
