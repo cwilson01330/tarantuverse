@@ -3,7 +3,7 @@ Substrate change log model
 """
 from sqlalchemy import Column, String, Text, Date, DateTime, ForeignKey, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
 import uuid
 from app.database import Base
@@ -47,10 +47,12 @@ class SubstrateChange(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    tarantula = relationship("Tarantula", backref="substrate_changes")
+    # passive_deletes=True — DB CASCADE handles deletion; nulling the parent
+    # FK would violate the polymorphic one-parent CHECK and 500 (2026-06 fix).
+    tarantula = relationship("Tarantula", backref=backref("substrate_changes", passive_deletes=True))
     enclosure = relationship("Enclosure", back_populates="substrate_changes")
-    scorpion = relationship("Scorpion", backref="substrate_changes")
-    invert = relationship("Invert", backref="substrate_changes")
+    scorpion = relationship("Scorpion", backref=backref("substrate_changes", passive_deletes=True))
+    invert = relationship("Invert", backref=backref("substrate_changes", passive_deletes=True))
 
     def __repr__(self):
         parent = self.tarantula_id or self.enclosure_id or self.scorpion_id

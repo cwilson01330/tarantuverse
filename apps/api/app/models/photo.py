@@ -9,7 +9,7 @@ lzp_20260423_extend_polymorphic_tables.
 """
 from sqlalchemy import Column, String, DateTime, ForeignKey, Text, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
 import uuid
 from app.database import Base
@@ -61,10 +61,13 @@ class Photo(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    tarantula = relationship("Tarantula", backref="photos")
-    animal = relationship("Animal", backref="photos")
-    scorpion = relationship("Scorpion", backref="photos")
-    invert = relationship("Invert", backref="photos")
+    # passive_deletes=True — DB CASCADE handles deletion. Nulling the parent
+    # FK on delete violated photos_must_have_exactly_one_parent and 500'd
+    # invert deletes for any animal with photos (2026-06 fix).
+    tarantula = relationship("Tarantula", backref=backref("photos", passive_deletes=True))
+    animal = relationship("Animal", backref=backref("photos", passive_deletes=True))
+    scorpion = relationship("Scorpion", backref=backref("photos", passive_deletes=True))
+    invert = relationship("Invert", backref=backref("photos", passive_deletes=True))
 
     def __repr__(self):
         parent = self.tarantula_id or self.animal_id or self.scorpion_id

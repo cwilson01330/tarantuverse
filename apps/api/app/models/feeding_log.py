@@ -3,7 +3,7 @@ Feeding log model
 """
 from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, Numeric, Text, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
 import uuid
 from app.database import Base
@@ -66,11 +66,15 @@ class FeedingLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    tarantula = relationship("Tarantula", backref="feeding_logs")
+    # passive_deletes=True lets the DB ON DELETE CASCADE remove these rows.
+    # Without it SQLAlchemy nulls the parent FK on delete, which violates the
+    # polymorphic "exactly one parent" CHECK (cip_20260527) and 500s — this
+    # was the invert-delete bug (2026-06).
+    tarantula = relationship("Tarantula", backref=backref("feeding_logs", passive_deletes=True))
     enclosure = relationship("Enclosure", back_populates="feeding_logs")
-    animal = relationship("Animal", backref="feeding_logs")
-    scorpion = relationship("Scorpion", backref="feeding_logs")
-    invert = relationship("Invert", backref="feeding_logs")
+    animal = relationship("Animal", backref=backref("feeding_logs", passive_deletes=True))
+    scorpion = relationship("Scorpion", backref=backref("feeding_logs", passive_deletes=True))
+    invert = relationship("Invert", backref=backref("feeding_logs", passive_deletes=True))
 
     def __repr__(self):
         parent = (

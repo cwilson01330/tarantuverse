@@ -3,7 +3,7 @@ Molt log model
 """
 from sqlalchemy import Column, Numeric, Boolean, DateTime, ForeignKey, Text, String, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
 import uuid
 from app.database import Base
@@ -55,10 +55,12 @@ class MoltLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
-    tarantula = relationship("Tarantula", backref="molt_logs")
+    # passive_deletes=True — DB CASCADE handles deletion; nulling the parent
+    # FK would violate the polymorphic one-parent CHECK and 500 (2026-06 fix).
+    tarantula = relationship("Tarantula", backref=backref("molt_logs", passive_deletes=True))
     enclosure = relationship("Enclosure", back_populates="molt_logs")
-    scorpion = relationship("Scorpion", backref="molt_logs")
-    invert = relationship("Invert", backref="molt_logs")
+    scorpion = relationship("Scorpion", backref=backref("molt_logs", passive_deletes=True))
+    invert = relationship("Invert", backref=backref("molt_logs", passive_deletes=True))
 
     def __repr__(self):
         parent = self.tarantula_id or self.enclosure_id or self.scorpion_id
