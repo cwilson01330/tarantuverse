@@ -40,6 +40,22 @@ function AddInvertForm() {
   const [sex, setSex] = useState<'unknown' | 'male' | 'female'>('unknown')
   const [molts, setMolts] = useState('')
   const [sizeMm, setSizeMm] = useState('')
+  // Acquisition + husbandry (parity with the tarantula add form)
+  const [dateAcquired, setDateAcquired] = useState('')
+  const [source, setSource] = useState<'bred' | 'bought' | 'wild_caught' | ''>('')
+  const [pricePaid, setPricePaid] = useState('')
+  const [enclosureType, setEnclosureType] = useState<'terrestrial' | 'arboreal' | 'fossorial'>('terrestrial')
+  const [enclosureSize, setEnclosureSize] = useState('')
+  const [substrateType, setSubstrateType] = useState('')
+  const [substrateDepth, setSubstrateDepth] = useState('')
+  const [tempMin, setTempMin] = useState('')
+  const [tempMax, setTempMax] = useState('')
+  const [humidityMin, setHumidityMin] = useState('')
+  const [humidityMax, setHumidityMax] = useState('')
+  const [waterDish, setWaterDish] = useState(true)
+  const [mistingSchedule, setMistingSchedule] = useState('')
+  const [lastCleaning, setLastCleaning] = useState('')
+  const [enclosureNotes, setEnclosureNotes] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -102,6 +118,21 @@ function AddInvertForm() {
           sex,
           current_instar: molts ? Number(molts) : null,
           current_length_mm: sizeMm.trim() || null,
+          date_acquired: dateAcquired.trim() || null,
+          source: source || null,
+          price_paid: pricePaid.trim() || null,
+          enclosure_type: enclosureType,
+          enclosure_size: enclosureSize.trim() || null,
+          substrate_type: substrateType.trim() || null,
+          substrate_depth: substrateDepth.trim() || null,
+          target_temp_min: tempMin.trim() || null,
+          target_temp_max: tempMax.trim() || null,
+          target_humidity_min: humidityMin.trim() || null,
+          target_humidity_max: humidityMax.trim() || null,
+          water_dish: waterDish,
+          misting_schedule: mistingSchedule.trim() || null,
+          last_enclosure_cleaning: lastCleaning.trim() || null,
+          enclosure_notes: enclosureNotes.trim() || null,
           notes: notes.trim() || null,
         }),
       })
@@ -176,6 +207,51 @@ function AddInvertForm() {
             <Field label="Molts"><input value={molts} onChange={(e) => setMolts(e.target.value)} inputMode="numeric" placeholder="e.g. 4" className={inputCls} /></Field>
             <Field label={meta.sizeLabel}><input value={sizeMm} onChange={(e) => setSizeMm(e.target.value)} inputMode="decimal" placeholder="e.g. 180" className={inputCls} /></Field>
           </div>
+
+          <h2 className="text-sm font-bold uppercase tracking-wide text-theme-secondary pt-2">Acquisition</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Date acquired"><input type="date" value={dateAcquired} onChange={(e) => setDateAcquired(e.target.value)} className={inputCls} /></Field>
+            <Field label="Price paid"><input value={pricePaid} onChange={(e) => setPricePaid(e.target.value)} inputMode="decimal" placeholder="e.g. 45" className={inputCls} /></Field>
+          </div>
+          <Field label="Source">
+            <div className="flex gap-2">
+              {([['bred', 'Captive bred'], ['bought', 'Bought'], ['wild_caught', 'Wild caught']] as const).map(([v, lbl]) => (
+                <button key={v} onClick={() => setSource(source === v ? '' : v)} className={`px-4 py-2 rounded-full text-sm font-semibold ${source === v ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}>{lbl}</button>
+              ))}
+            </div>
+          </Field>
+
+          <h2 className="text-sm font-bold uppercase tracking-wide text-theme-secondary pt-2">Husbandry</h2>
+          <Field label="Enclosure type">
+            <div className="flex gap-2">
+              {(['terrestrial', 'arboreal', 'fossorial'] as const).map((v) => (
+                <button key={v} onClick={() => setEnclosureType(v)} className={`px-4 py-2 rounded-full text-sm font-semibold capitalize ${enclosureType === v ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}>{v}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Enclosure size"><input value={enclosureSize} onChange={(e) => setEnclosureSize(e.target.value)} placeholder='e.g. 6x6x6"' className={inputCls} /></Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Substrate type"><input value={substrateType} onChange={(e) => setSubstrateType(e.target.value)} placeholder="e.g. coco fiber" className={inputCls} /></Field>
+            <Field label="Substrate depth"><input value={substrateDepth} onChange={(e) => setSubstrateDepth(e.target.value)} placeholder='e.g. 3"' className={inputCls} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Temp min (°F)"><input value={tempMin} onChange={(e) => setTempMin(e.target.value)} inputMode="numeric" placeholder="72" className={inputCls} /></Field>
+            <Field label="Temp max (°F)"><input value={tempMax} onChange={(e) => setTempMax(e.target.value)} inputMode="numeric" placeholder="82" className={inputCls} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Humidity min (%)"><input value={humidityMin} onChange={(e) => setHumidityMin(e.target.value)} inputMode="numeric" placeholder="60" className={inputCls} /></Field>
+            <Field label="Humidity max (%)"><input value={humidityMax} onChange={(e) => setHumidityMax(e.target.value)} inputMode="numeric" placeholder="75" className={inputCls} /></Field>
+          </div>
+          <Field label="Water dish">
+            <div className="flex gap-2">
+              {([['yes', true], ['no', false]] as const).map(([lbl, val]) => (
+                <button key={lbl} onClick={() => setWaterDish(val)} className={`px-4 py-2 rounded-full text-sm font-semibold capitalize ${waterDish === val ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}>{lbl}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Misting schedule"><input value={mistingSchedule} onChange={(e) => setMistingSchedule(e.target.value)} placeholder="e.g. 2x per week" className={inputCls} /></Field>
+          <Field label="Last enclosure cleaning"><input type="date" value={lastCleaning} onChange={(e) => setLastCleaning(e.target.value)} className={inputCls} /></Field>
+          <Field label="Enclosure notes"><textarea value={enclosureNotes} onChange={(e) => setEnclosureNotes(e.target.value)} rows={2} placeholder="Decor, modifications, etc." className={inputCls} /></Field>
 
           <Field label="Notes"><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} /></Field>
 

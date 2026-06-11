@@ -12,10 +12,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
-import { INVERT_TAXA, getInvert, updateInvert, type Invert, type Sex } from '../../src/lib/inverts';
+import { INVERT_TAXA, getInvert, updateInvert, type Invert, type Sex, type Source } from '../../src/lib/inverts';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'unknown', label: 'Unknown' }, { value: 'female', label: 'Female' }, { value: 'male', label: 'Male' },
+];
+const SOURCE_OPTIONS: { value: Source; label: string }[] = [
+  { value: 'bred', label: 'Captive bred' }, { value: 'bought', label: 'Bought' }, { value: 'wild_caught', label: 'Wild caught' },
 ];
 const ENCLOSURE_OPTIONS = ['arboreal', 'terrestrial', 'fossorial'] as const;
 
@@ -47,9 +50,10 @@ export default function EditInvertScreen() {
       await updateInvert(id, {
         name: form.name, common_name: form.common_name, scientific_name: form.scientific_name,
         species_id: form.species_id, sex: form.sex, current_instar: form.current_instar, current_length_mm: form.current_length_mm,
+        date_acquired: form.date_acquired, source: form.source, price_paid: form.price_paid,
         enclosure_type: form.enclosure_type, enclosure_size: form.enclosure_size, substrate_type: form.substrate_type, substrate_depth: form.substrate_depth,
         target_temp_min: form.target_temp_min, target_temp_max: form.target_temp_max, target_humidity_min: form.target_humidity_min, target_humidity_max: form.target_humidity_max,
-        water_dish: form.water_dish, misting_schedule: form.misting_schedule, notes: form.notes,
+        water_dish: form.water_dish, misting_schedule: form.misting_schedule, last_enclosure_cleaning: form.last_enclosure_cleaning, enclosure_notes: form.enclosure_notes, notes: form.notes,
       });
       router.back();
     } catch (err) {
@@ -77,6 +81,11 @@ export default function EditInvertScreen() {
           <Field label="Molts"><TextInput style={styles.input} value={form.current_instar?.toString() ?? ''} onChangeText={(t) => update('current_instar', t ? Number(t) : null)} keyboardType="number-pad" /></Field>
           <Field label={meta?.sizeLabel ?? 'Size (mm)'}><TextInput style={styles.input} value={form.current_length_mm ?? ''} onChangeText={(t) => update('current_length_mm', t)} keyboardType="decimal-pad" /></Field>
 
+          <SectionHeader title="Acquisition" colors={colors} />
+          <Field label="Date acquired"><TextInput style={styles.input} value={form.date_acquired ?? ''} onChangeText={(t) => update('date_acquired', t || null)} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
+          <Field label="Source"><ChipGroup options={SOURCE_OPTIONS} value={form.source ?? null} onChange={(v) => update('source', v)} colors={colors} /></Field>
+          <Field label="Price paid"><TextInput style={styles.input} value={form.price_paid ?? ''} onChangeText={(t) => update('price_paid', t || null)} keyboardType="decimal-pad" placeholderTextColor={colors.textTertiary} /></Field>
+
           <SectionHeader title="Enclosure" colors={colors} />
           <Field label="Type"><ChipGroup options={ENCLOSURE_OPTIONS.map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))} value={(form.enclosure_type as any) ?? meta?.defaultEnclosureType ?? 'terrestrial'} onChange={(v) => update('enclosure_type', v)} colors={colors} /></Field>
           <Field label="Size"><TextInput style={styles.input} value={form.enclosure_size ?? ''} onChangeText={(t) => update('enclosure_size', t)} placeholderTextColor={colors.textTertiary} /></Field>
@@ -94,6 +103,9 @@ export default function EditInvertScreen() {
             <Text style={[styles.fieldLabel, { color: colors.textPrimary }]}>Water dish</Text>
             <Switch value={form.water_dish} onValueChange={(v) => update('water_dish', v)} />
           </View>
+          <Field label="Misting schedule"><TextInput style={styles.input} value={form.misting_schedule ?? ''} onChangeText={(t) => update('misting_schedule', t || null)} placeholder="e.g. 2x per week" placeholderTextColor={colors.textTertiary} /></Field>
+          <Field label="Last enclosure cleaning"><TextInput style={styles.input} value={form.last_enclosure_cleaning ?? ''} onChangeText={(t) => update('last_enclosure_cleaning', t || null)} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
+          <Field label="Enclosure notes"><TextInput style={[styles.input, styles.textArea]} value={form.enclosure_notes ?? ''} onChangeText={(t) => update('enclosure_notes', t || null)} placeholder="Decor, modifications, etc." placeholderTextColor={colors.textTertiary} multiline /></Field>
           <Field label="Notes"><TextInput style={[styles.input, styles.textArea]} value={form.notes ?? ''} onChangeText={(t) => update('notes', t)} multiline /></Field>
 
           <TouchableOpacity style={[styles.saveButton, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
@@ -117,7 +129,7 @@ function Field({ label, flex, children }: { label: string; flex?: boolean; child
 function SectionHeader({ title, colors }: { title: string; colors: ReturnType<typeof useTheme>['colors'] }) {
   return <View style={{ borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: 14, paddingBottom: 6, marginTop: 4 }}><Text style={{ fontSize: 12, fontWeight: '700', color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.8 }}>{title}</Text></View>;
 }
-function ChipGroup<V extends string>({ options, value, onChange, colors }: { options: { value: V; label: string }[]; value: V; onChange: (v: V) => void; colors: ReturnType<typeof useTheme>['colors'] }) {
+function ChipGroup<V extends string>({ options, value, onChange, colors }: { options: { value: V; label: string }[]; value: V | null; onChange: (v: V) => void; colors: ReturnType<typeof useTheme>['colors'] }) {
   return (
     <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
       {options.map((opt) => {

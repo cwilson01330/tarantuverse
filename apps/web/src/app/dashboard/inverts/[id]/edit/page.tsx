@@ -66,6 +66,9 @@ export default function EditInvertPage() {
           sex: form.sex,
           current_instar: form.current_instar,
           current_length_mm: form.current_length_mm,
+          date_acquired: form.date_acquired || null,
+          source: form.source || null,
+          price_paid: form.price_paid || null,
           enclosure_type: form.enclosure_type,
           enclosure_size: form.enclosure_size,
           substrate_type: form.substrate_type,
@@ -75,6 +78,9 @@ export default function EditInvertPage() {
           target_humidity_min: form.target_humidity_min,
           target_humidity_max: form.target_humidity_max,
           water_dish: form.water_dish,
+          misting_schedule: form.misting_schedule || null,
+          last_enclosure_cleaning: form.last_enclosure_cleaning || null,
+          enclosure_notes: form.enclosure_notes || null,
           notes: form.notes,
         }),
       })
@@ -119,6 +125,19 @@ export default function EditInvertPage() {
                 <Field label={meta?.sizeLabel ?? 'Size (mm)'}><input value={form.current_length_mm ?? ''} onChange={(e) => set('current_length_mm', e.target.value)} inputMode="decimal" className={inputCls} /></Field>
               </div>
 
+              <h2 className="text-xs font-bold uppercase tracking-wide text-theme-tertiary border-b border-theme pb-2 pt-2">Acquisition</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Date acquired"><input type="date" value={form.date_acquired ?? ''} onChange={(e) => set('date_acquired', e.target.value)} className={inputCls} /></Field>
+                <Field label="Price paid"><input value={form.price_paid ?? ''} onChange={(e) => set('price_paid', e.target.value)} inputMode="decimal" className={inputCls} /></Field>
+              </div>
+              <Field label="Source">
+                <div className="flex gap-2 flex-wrap">
+                  {([['bred', 'Captive bred'], ['bought', 'Bought'], ['wild_caught', 'Wild caught']] as const).map(([v, lbl]) => (
+                    <button key={v} onClick={() => set('source', form.source === v ? null : v)} className={`px-4 py-2 rounded-full text-sm font-semibold ${form.source === v ? 'bg-gradient-brand text-white' : 'bg-surface border border-theme text-theme-secondary'}`}>{lbl}</button>
+                  ))}
+                </div>
+              </Field>
+
               <h2 className="text-xs font-bold uppercase tracking-wide text-theme-tertiary border-b border-theme pb-2 pt-2">Enclosure</h2>
 
               <Field label="Type">
@@ -143,6 +162,9 @@ export default function EditInvertPage() {
                 <input type="checkbox" checked={!!form.water_dish} onChange={(e) => set('water_dish', e.target.checked)} />
                 Water dish
               </label>
+              <Field label="Misting schedule"><input value={form.misting_schedule ?? ''} onChange={(e) => set('misting_schedule', e.target.value)} placeholder="e.g. 2x per week" className={inputCls} /></Field>
+              <Field label="Last enclosure cleaning"><input type="date" value={form.last_enclosure_cleaning ?? ''} onChange={(e) => set('last_enclosure_cleaning', e.target.value)} className={inputCls} /></Field>
+              <Field label="Enclosure notes"><textarea value={form.enclosure_notes ?? ''} onChange={(e) => set('enclosure_notes', e.target.value)} rows={2} placeholder="Decor, modifications, etc." className={inputCls} /></Field>
 
               <Field label="Notes"><textarea value={form.notes ?? ''} onChange={(e) => set('notes', e.target.value)} rows={3} className={inputCls} /></Field>
 
