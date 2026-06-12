@@ -27,6 +27,15 @@ from app.models.enclosure import Enclosure
 from app.models.pairing import Pairing
 from app.models.egg_sac import EggSac
 from app.models.offspring import Offspring
+# Herpetoverse (reptile) models — included so a reptile keeper's export
+# actually contains their data (GDPR data-portability + HV/TV parity).
+from app.models.animal import Animal
+from app.models.shed_log import ShedLog
+from app.models.weight_log import WeightLog
+from app.models.animal_genotype import AnimalGenotype
+from app.models.reptile_pairing import ReptilePairing
+from app.models.clutch import Clutch
+from app.models.reptile_offspring import ReptileOffspring
 
 
 # ---------------------------------------------------------------------------
@@ -72,8 +81,8 @@ TARANTULA_FIELDS = [
 ]
 
 FEEDING_FIELDS = [
-    "id", "tarantula_id", "enclosure_id", "fed_at", "food_type", "food_size",
-    "quantity", "accepted", "notes", "created_at",
+    "id", "tarantula_id", "animal_id", "enclosure_id", "fed_at", "food_type",
+    "food_size", "quantity", "accepted", "notes", "created_at",
 ]
 
 MOLT_FIELDS = [
@@ -88,8 +97,8 @@ SUBSTRATE_CHANGE_FIELDS = [
 ]
 
 PHOTO_FIELDS = [
-    "id", "tarantula_id", "url", "thumbnail_url", "caption", "taken_at",
-    "created_at",
+    "id", "tarantula_id", "animal_id", "url", "thumbnail_url", "caption",
+    "taken_at", "created_at",
 ]
 
 ENCLOSURE_FIELDS = [
@@ -123,6 +132,57 @@ USER_PROFILE_FIELDS = [
     "profile_bio", "profile_location", "profile_experience_level",
     "profile_years_keeping", "profile_specialties", "social_links",
     "is_breeder", "collection_visibility", "created_at",
+]
+
+# --- Herpetoverse (reptile/amphibian) field lists ---
+
+ANIMAL_FIELDS = [
+    "id", "user_id", "herp_species_id", "enclosure_id", "taxon", "name",
+    "common_name", "scientific_name", "sex", "date_acquired", "hatch_date",
+    "source", "source_breeder", "price_paid", "current_weight_g",
+    "current_length_in", "feeding_schedule", "last_fed_at", "last_shed_at",
+    "brumation_active", "brumation_started_at", "feeding_paused_reason",
+    "feeding_paused_until", "feeds_on_cgd_override", "photo_url", "is_public",
+    "visibility", "notes", "created_at", "updated_at",
+]
+
+SHED_FIELDS = [
+    "id", "animal_id", "shed_at", "in_blue_started_at", "weight_before_g",
+    "weight_after_g", "length_before_in", "length_after_in",
+    "is_complete_shed", "has_retained_shed", "retained_shed_notes", "notes",
+    "image_url", "created_at",
+]
+
+WEIGHT_FIELDS = [
+    "id", "animal_id", "weighed_at", "weight_g", "context", "notes",
+    "created_at",
+]
+
+GENOTYPE_FIELDS = [
+    "id", "animal_id", "gene_id", "zygosity", "poss_het_percentage",
+    "proven", "notes", "created_at",
+]
+
+REPTILE_PAIRING_FIELDS = [
+    "id", "user_id", "male_animal_id", "female_animal_id", "taxon",
+    "paired_date", "separated_date", "pairing_type", "outcome", "notes",
+    "created_at", "updated_at",
+]
+
+CLUTCH_FIELDS = [
+    "id", "pairing_id", "user_id", "laid_date", "pulled_date",
+    "expected_hatch_date", "hatch_date", "incubation_temp_min_f",
+    "incubation_temp_max_f", "incubation_humidity_min_pct",
+    "incubation_humidity_max_pct", "expected_count", "fertile_count",
+    "slug_count", "hatched_count", "viable_count", "notes", "photo_url",
+    "created_at", "updated_at",
+]
+
+REPTILE_OFFSPRING_FIELDS = [
+    "id", "clutch_id", "user_id", "animal_id", "morph_label",
+    "recorded_genotype", "status", "status_date", "buyer_info", "price_sold",
+    "hatch_weight_g", "hatch_length_in", "notes", "photo_url", "created_at",
+    "updated_at",
 ]
 
 
@@ -178,6 +238,54 @@ def _get_offspring(db: Session, user_id: UUID) -> List[Offspring]:
     return db.query(Offspring).filter(Offspring.user_id == user_id).order_by(Offspring.created_at).all()
 
 
+# --- Herpetoverse query helpers ---
+
+def _get_user_animals(db: Session, user_id: UUID) -> List[Animal]:
+    return db.query(Animal).filter(Animal.user_id == user_id).order_by(Animal.created_at).all()
+
+
+def _get_animal_feeding_logs(db: Session, animal_ids: List[UUID]) -> List[FeedingLog]:
+    if not animal_ids:
+        return []
+    return db.query(FeedingLog).filter(FeedingLog.animal_id.in_(animal_ids)).order_by(FeedingLog.fed_at).all()
+
+
+def _get_shed_logs(db: Session, animal_ids: List[UUID]) -> List[ShedLog]:
+    if not animal_ids:
+        return []
+    return db.query(ShedLog).filter(ShedLog.animal_id.in_(animal_ids)).order_by(ShedLog.shed_at).all()
+
+
+def _get_weight_logs(db: Session, animal_ids: List[UUID]) -> List[WeightLog]:
+    if not animal_ids:
+        return []
+    return db.query(WeightLog).filter(WeightLog.animal_id.in_(animal_ids)).order_by(WeightLog.weighed_at).all()
+
+
+def _get_genotypes(db: Session, animal_ids: List[UUID]) -> List[AnimalGenotype]:
+    if not animal_ids:
+        return []
+    return db.query(AnimalGenotype).filter(AnimalGenotype.animal_id.in_(animal_ids)).order_by(AnimalGenotype.created_at).all()
+
+
+def _get_animal_photos(db: Session, animal_ids: List[UUID]) -> List[Photo]:
+    if not animal_ids:
+        return []
+    return db.query(Photo).filter(Photo.animal_id.in_(animal_ids)).order_by(Photo.created_at).all()
+
+
+def _get_reptile_pairings(db: Session, user_id: UUID) -> List[ReptilePairing]:
+    return db.query(ReptilePairing).filter(ReptilePairing.user_id == user_id).order_by(ReptilePairing.created_at).all()
+
+
+def _get_clutches(db: Session, user_id: UUID) -> List[Clutch]:
+    return db.query(Clutch).filter(Clutch.user_id == user_id).order_by(Clutch.created_at).all()
+
+
+def _get_reptile_offspring(db: Session, user_id: UUID) -> List[ReptileOffspring]:
+    return db.query(ReptileOffspring).filter(ReptileOffspring.user_id == user_id).order_by(ReptileOffspring.created_at).all()
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -192,6 +300,12 @@ class ExportService:
         tarantulas = _get_user_tarantulas(db, user.id)
         t_ids = _get_tarantula_ids(tarantulas)
 
+        # Herpetoverse reptiles/amphibians (the `animals` table). Included
+        # unconditionally so a keeper who uses both apps gets one complete
+        # export, and an HV-only keeper's export isn't empty.
+        animals = _get_user_animals(db, user.id)
+        a_ids = [a.id for a in animals]
+
         return {
             "profile": _row_to_dict(user, USER_PROFILE_FIELDS),
             "tarantulas": [_row_to_dict(t, TARANTULA_FIELDS) for t in tarantulas],
@@ -203,6 +317,16 @@ class ExportService:
             "pairings": [_row_to_dict(p, PAIRING_FIELDS) for p in _get_pairings(db, user.id)],
             "egg_sacs": [_row_to_dict(e, EGG_SAC_FIELDS) for e in _get_egg_sacs(db, user.id)],
             "offspring": [_row_to_dict(o, OFFSPRING_FIELDS) for o in _get_offspring(db, user.id)],
+            # --- Herpetoverse ---
+            "animals": [_row_to_dict(a, ANIMAL_FIELDS) for a in animals],
+            "animal_feeding_logs": [_row_to_dict(f, FEEDING_FIELDS) for f in _get_animal_feeding_logs(db, a_ids)],
+            "shed_logs": [_row_to_dict(s, SHED_FIELDS) for s in _get_shed_logs(db, a_ids)],
+            "weight_logs": [_row_to_dict(w, WEIGHT_FIELDS) for w in _get_weight_logs(db, a_ids)],
+            "genotypes": [_row_to_dict(g, GENOTYPE_FIELDS) for g in _get_genotypes(db, a_ids)],
+            "animal_photos": [_row_to_dict(p, PHOTO_FIELDS) for p in _get_animal_photos(db, a_ids)],
+            "reptile_pairings": [_row_to_dict(p, REPTILE_PAIRING_FIELDS) for p in _get_reptile_pairings(db, user.id)],
+            "clutches": [_row_to_dict(c, CLUTCH_FIELDS) for c in _get_clutches(db, user.id)],
+            "reptile_offspring": [_row_to_dict(o, REPTILE_OFFSPRING_FIELDS) for o in _get_reptile_offspring(db, user.id)],
         }
 
     # ---- JSON export ----------------------------------------------------
@@ -228,6 +352,18 @@ class ExportService:
                 "egg_sacs": data["egg_sacs"],
                 "offspring": data["offspring"],
             },
+            # Herpetoverse reptile/amphibian data
+            "animals": data["animals"],
+            "animal_feeding_logs": data["animal_feeding_logs"],
+            "shed_logs": data["shed_logs"],
+            "weight_logs": data["weight_logs"],
+            "genotypes": data["genotypes"],
+            "animal_photos": data["animal_photos"],
+            "reptile_breeding": {
+                "pairings": data["reptile_pairings"],
+                "clutches": data["clutches"],
+                "offspring": data["reptile_offspring"],
+            },
             "counts": {
                 "tarantulas": len(data["tarantulas"]),
                 "feeding_logs": len(data["feeding_logs"]),
@@ -238,6 +374,15 @@ class ExportService:
                 "pairings": len(data["pairings"]),
                 "egg_sacs": len(data["egg_sacs"]),
                 "offspring": len(data["offspring"]),
+                "animals": len(data["animals"]),
+                "animal_feeding_logs": len(data["animal_feeding_logs"]),
+                "shed_logs": len(data["shed_logs"]),
+                "weight_logs": len(data["weight_logs"]),
+                "genotypes": len(data["genotypes"]),
+                "animal_photos": len(data["animal_photos"]),
+                "reptile_pairings": len(data["reptile_pairings"]),
+                "clutches": len(data["clutches"]),
+                "reptile_offspring": len(data["reptile_offspring"]),
             },
         }
 
@@ -272,6 +417,20 @@ class ExportService:
             zf.writestr("egg_sacs.csv", ExportService._to_csv_bytes(data["egg_sacs"], EGG_SAC_FIELDS))
             zf.writestr("offspring.csv", ExportService._to_csv_bytes(data["offspring"], OFFSPRING_FIELDS))
 
+            # Herpetoverse reptile CSVs — only written when the keeper has
+            # reptile data, so a tarantula-only export stays uncluttered.
+            if data["animals"]:
+                zf.writestr("animals.csv", ExportService._to_csv_bytes(data["animals"], ANIMAL_FIELDS))
+                zf.writestr("animal_feeding_logs.csv", ExportService._to_csv_bytes(data["animal_feeding_logs"], FEEDING_FIELDS))
+                zf.writestr("shed_logs.csv", ExportService._to_csv_bytes(data["shed_logs"], SHED_FIELDS))
+                zf.writestr("weight_logs.csv", ExportService._to_csv_bytes(data["weight_logs"], WEIGHT_FIELDS))
+                zf.writestr("genotypes.csv", ExportService._to_csv_bytes(data["genotypes"], GENOTYPE_FIELDS))
+                zf.writestr("animal_photos.csv", ExportService._to_csv_bytes(data["animal_photos"], PHOTO_FIELDS))
+            if data["reptile_pairings"] or data["clutches"] or data["reptile_offspring"]:
+                zf.writestr("reptile_pairings.csv", ExportService._to_csv_bytes(data["reptile_pairings"], REPTILE_PAIRING_FIELDS))
+                zf.writestr("clutches.csv", ExportService._to_csv_bytes(data["clutches"], CLUTCH_FIELDS))
+                zf.writestr("reptile_offspring.csv", ExportService._to_csv_bytes(data["reptile_offspring"], REPTILE_OFFSPRING_FIELDS))
+
             # Include user profile as JSON (not tabular)
             zf.writestr("profile.json", json.dumps(data["profile"], indent=2, default=str))
 
@@ -303,6 +462,13 @@ class ExportService:
         molts_by_t = _group_by_tid(data["molt_logs"])
         substrates_by_t = _group_by_tid(data["substrate_changes"])
         photos_by_t = _group_by_tid(data["photos"])
+
+        # Reptile logs grouped by animal_id
+        a_feedings = _group_by_tid(data["animal_feeding_logs"], "animal_id")
+        sheds_by_a = _group_by_tid(data["shed_logs"], "animal_id")
+        weights_by_a = _group_by_tid(data["weight_logs"], "animal_id")
+        genos_by_a = _group_by_tid(data["genotypes"], "animal_id")
+        a_photos = _group_by_tid(data["animal_photos"], "animal_id")
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -349,6 +515,45 @@ class ExportService:
                                     )
                         except Exception:
                             pass  # Skip photos that can't be downloaded
+
+            # Per-animal folders (Herpetoverse reptiles/amphibians)
+            for a in data["animals"]:
+                aid = a["id"]
+                slug = (a.get("name") or a.get("common_name") or aid)[:40]
+                safe_slug = "".join(c if c.isalnum() or c in " _-" else "_" for c in slug).strip()
+                folder = f"animals/{safe_slug}_{aid[:8]}"
+
+                a_bundle = {
+                    **a,
+                    "feeding_logs": a_feedings.get(aid, []),
+                    "shed_logs": sheds_by_a.get(aid, []),
+                    "weight_logs": weights_by_a.get(aid, []),
+                    "genotypes": genos_by_a.get(aid, []),
+                    "photos": a_photos.get(aid, []),
+                }
+                zf.writestr(f"{folder}/data.json", json.dumps(a_bundle, indent=2, default=str))
+
+                for photo in a_photos.get(aid, []):
+                    url = photo.get("url")
+                    if url:
+                        try:
+                            async with httpx.AsyncClient(timeout=15.0) as client:
+                                resp = await client.get(url)
+                                if resp.status_code == 200:
+                                    ext = url.rsplit(".", 1)[-1][:4] if "." in url else "jpg"
+                                    photo_id = photo["id"][:8]
+                                    zf.writestr(f"{folder}/photos/{photo_id}.{ext}", resp.content)
+                        except Exception:
+                            pass
+
+            # Reptile breeding
+            reptile_breeding = {
+                "pairings": data["reptile_pairings"],
+                "clutches": data["clutches"],
+                "offspring": data["reptile_offspring"],
+            }
+            if any(reptile_breeding.values()):
+                zf.writestr("reptile_breeding.json", json.dumps(reptile_breeding, indent=2, default=str))
 
             # Enclosures
             if data["enclosures"]:

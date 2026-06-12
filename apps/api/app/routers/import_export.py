@@ -180,6 +180,25 @@ async def export_preview(
     egg_sac_count = db.query(EggSac).filter(EggSac.user_id == current_user.id).count()
     offspring_count = db.query(Offspring).filter(Offspring.user_id == current_user.id).count()
 
+    # Herpetoverse reptile/amphibian counts — so an HV keeper's preview
+    # isn't all zeros (the export itself already includes this data).
+    from app.models.animal import Animal
+    from app.models.shed_log import ShedLog
+    from app.models.weight_log import WeightLog
+    from app.models.reptile_pairing import ReptilePairing
+    from app.models.clutch import Clutch
+    from app.models.reptile_offspring import ReptileOffspring
+
+    animals = db.query(Animal).filter(Animal.user_id == current_user.id).all()
+    a_ids = [a.id for a in animals]
+    animal_feeding_count = db.query(FeedingLog).filter(FeedingLog.animal_id.in_(a_ids)).count() if a_ids else 0
+    shed_count = db.query(ShedLog).filter(ShedLog.animal_id.in_(a_ids)).count() if a_ids else 0
+    weight_count = db.query(WeightLog).filter(WeightLog.animal_id.in_(a_ids)).count() if a_ids else 0
+    animal_photo_count = db.query(Photo).filter(Photo.animal_id.in_(a_ids)).count() if a_ids else 0
+    reptile_pairing_count = db.query(ReptilePairing).filter(ReptilePairing.user_id == current_user.id).count()
+    clutch_count = db.query(Clutch).filter(Clutch.user_id == current_user.id).count()
+    reptile_offspring_count = db.query(ReptileOffspring).filter(ReptileOffspring.user_id == current_user.id).count()
+
     return {
         "username": current_user.username,
         "counts": {
@@ -192,6 +211,14 @@ async def export_preview(
             "pairings": pairing_count,
             "egg_sacs": egg_sac_count,
             "offspring": offspring_count,
+            "animals": len(animals),
+            "animal_feeding_logs": animal_feeding_count,
+            "shed_logs": shed_count,
+            "weight_logs": weight_count,
+            "animal_photos": animal_photo_count,
+            "reptile_pairings": reptile_pairing_count,
+            "clutches": clutch_count,
+            "reptile_offspring": reptile_offspring_count,
         },
         "formats_available": ["json", "csv", "full"],
     }

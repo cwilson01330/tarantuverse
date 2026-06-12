@@ -2,8 +2,9 @@
  * Settings — account, support, and legal for Herpetoverse mobile.
  *
  * v1 (Bundle 1) scope: sign out, account deletion, support + legal
- * links, app version. Profile editing, notification preferences, and a
- * reptile-aware data export are tracked for later bundles.
+ * links, app version. Profile editing and notification preferences are
+ * live. Data export links out to the web (native in-app export needs a
+ * rebuild with expo-file-system/expo-sharing — see EXPORT_URL).
  *
  * Account deletion is an App Store requirement (Guideline 5.1.1(v)) —
  * any app offering account creation must offer in-app deletion. It
@@ -46,6 +47,12 @@ const PRIVACY_URL = 'https://www.tarantuverse.com/herpetoverse/privacy-policy';
 const TERMS_URL = 'https://www.tarantuverse.com/herpetoverse/terms';
 const SUPPORT_EMAIL = 'support@tarantuverse.com';
 const DELETE_CONFIRM_WORD = 'DELETE';
+// Data export runs on the web for now: native in-app download needs
+// expo-file-system + expo-sharing, which require a native rebuild (not an
+// OTA). The web settings page exports the same reptile-aware bundle, so we
+// link out to it as the interim. Replace with an in-app share sheet when a
+// native build adds those modules.
+const EXPORT_URL = 'https://herpetoverse.com/app/settings';
 
 function SettingsScreen() {
   const router = useRouter();
@@ -167,6 +174,26 @@ function SettingsScreen() {
             icon="bell-outline"
             label="Notifications"
             onPress={() => router.push('/notification-preferences' as never)}
+            colors={colors}
+          />
+        </View>
+
+        <SectionLabel text="Your data" colors={colors} />
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: layout.radius.lg,
+            },
+          ]}
+        >
+          <ActionRow
+            icon="download-outline"
+            label="Export your data"
+            external
+            onPress={() => openLink(EXPORT_URL)}
             colors={colors}
           />
         </View>
