@@ -36,6 +36,7 @@ from app.models.scorpion import Scorpion
 from app.models.invert import Invert
 from app.models.photo import Photo
 from app.models.user import User
+from app.models.follow import Follow
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.shed_log import ShedLog
@@ -667,6 +668,14 @@ async def get_public_tarantula_profile(
         "photo_url": tarantula.photo_url,
         "is_owner": is_owner,
         "owner_username": owner.username if owner else None,
+        # Lets a logged-in, non-owner viewer follow the keeper inline. False
+        # for anonymous viewers and for the owner themselves.
+        "is_following": (
+            db.query(Follow).filter(
+                Follow.follower_id == current_user.id,
+                Follow.followed_id == owner.id,
+            ).first() is not None
+        ) if (current_user and owner and not is_owner) else False,
         "species": species_data,
         "photos": [
             {

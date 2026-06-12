@@ -44,6 +44,7 @@ interface ProfileData {
   photo_url: string | null
   is_owner: boolean
   owner_username: string | null
+  is_following: boolean
   species: SpeciesData | null
   photos: Array<{ id: string; url: string; thumbnail_url: string | null; caption: string | null; taken_at: string | null }>
   lineage: {
@@ -107,9 +108,16 @@ export default function PublicProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activePhoto, setActivePhoto] = useState(0)
+  // Viewer auth state — drives the logged-in social layer (follow,
+  // keeper link, "keep your own"). Anonymous / QR viewers never see it,
+  // keeping the shareable card clean.
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [following, setFollowing] = useState(false)
+  const [followBusy, setFollowBusy] = useState(false)
 
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    setIsLoggedIn(!!token)
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
 
@@ -118,11 +126,33 @@ export default function PublicProfilePage() {
         if (res.status === 403) { setError('private'); return }
         if (res.status === 404) { setError('notfound'); return }
         if (!res.ok) throw new Error()
-        setProfile(await res.json())
+        const data = await res.json()
+        setProfile(data)
+        setFollowing(!!data.is_following)
       })
       .catch(() => setError('error'))
       .finally(() => setLoading(false))
   }, [id])
+
+  async function toggleFollow() {
+    if (!profile?.owner_username || followBusy) return
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) { router.push('/login'); return }
+    setFollowBusy(true)
+    const next = !following
+    setFollowing(next) // optimistic
+    try {
+      const res = await fetch(`${API}/api/v1/follows/${profile.owner_username}`, {
+        method: next ? 'POST' : 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      setFollowing(!next) // revert on failure
+    } finally {
+      setFollowBusy(false)
+    }
+  }
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -278,6 +308,42 @@ export default function PublicProfilePage() {
                   🔸 Urticating Hairs
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Logged-in viewer social layer — only for an authenticated
+              keeper who isn't the owner. Anonymous / QR viewers never see
+              this, keeping the shareable card clean. */}
+          {isLoggedIn && !profile.is_owner && profile.owner_username && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Kept by</p>
+                <Link
+                  href={`/keeper/${profile.owner_username}`}
+                  className="font-semibold text-gray-900 dark:text-white hover:text-purple-600 transition-colors"
+                >
+                  @{profile.owner_username}
+                </Link>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleFollow}
+                  disabled={followBusy}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 ${
+                    following
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                  }`}
+                >
+                  {following ? 'Following' : 'Follow'}
+                </button>
+                <Link
+                  href={`/keeper/${profile.owner_username}`}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  View collection
+                </Link>
+              </div>
             </div>
           )}
 
@@ -461,6 +527,18 @@ export default function PublicProfilePage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Keep-your-own nudge — logged-in non-owners only */}
+          {isLoggedIn && !profile.is_owner && (
+            <Link
+              href="/dashboard/tarantulas/add"
+              className="block bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl p-4 text-center font-semibold hover:shadow-lg transition-shadow"
+            >
+              {profile.scientific_name
+                ? `Keeping ${profile.scientific_name}? Add yours →`
+                : 'Track your own collection →'}
+            </Link>
           )}
 
           {/* Footer */}
