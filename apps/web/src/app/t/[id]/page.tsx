@@ -198,10 +198,25 @@ export default function PublicProfilePage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Top bar */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-xl">🕷️</span>
-          <span className="font-bold text-gray-900 dark:text-white text-sm">Tarantuverse</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          {/* Back into the app — logged-in viewers only, so the public /
+              QR view stays a clean standalone card. Falls back to the
+              dashboard if there's no in-app history to go back to. */}
+          {isLoggedIn && (
+            <button
+              onClick={() => (window.history.length > 1 ? router.back() : router.push('/dashboard'))}
+              aria-label="Back"
+              className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300 hover:text-purple-600 transition-colors"
+            >
+              <span className="text-lg leading-none">←</span>
+              <span className="hidden sm:inline">Back</span>
+            </button>
+          )}
+          <Link href={isLoggedIn ? '/dashboard' : '/'} className="flex items-center gap-2">
+            <span className="text-xl">🕷️</span>
+            <span className="font-bold text-gray-900 dark:text-white text-sm">Tarantuverse</span>
+          </Link>
+        </div>
         {profile.owner_username && (
           <Link href={`/keeper/${profile.owner_username}`} className="text-sm text-purple-600 hover:underline">
             @{profile.owner_username}
