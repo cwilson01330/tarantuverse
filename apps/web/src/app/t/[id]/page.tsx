@@ -12,6 +12,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/hooks/useAuth'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
 
@@ -108,19 +109,22 @@ export default function PublicProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activePhoto, setActivePhoto] = useState(0)
-  // Viewer auth state — drives the logged-in social layer (follow,
-  // keeper link, "keep your own"). Anonymous / QR viewers never see it,
-  // keeping the shareable card clean.
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  // Viewer auth comes from NextAuth (the app's canonical session), NOT
+  // localStorage — the JWT is only in session.accessToken. This drives the
+  // logged-in social layer; anonymous / QR viewers never see it.
+  const { token, isAuthenticated, isLoading: authLoading } = useAuth()
+  const isLoggedIn = isAuthenticated
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-    setIsLoggedIn(!!token)
+    // Wait for the session to resolve so the owner / follow state is
+    // correct on first paint (otherwise we'd fetch as anonymous).
+    if (authLoading) return
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
 
+    setLoading(true)
     fetch(`${API}/api/v1/t/${id}`, { headers })
       .then(async (res) => {
         if (res.status === 403) { setError('private'); return }
@@ -132,11 +136,10 @@ export default function PublicProfilePage() {
       })
       .catch(() => setError('error'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, token, authLoading])
 
   async function toggleFollow() {
     if (!profile?.owner_username || followBusy) return
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
     if (!token) { router.push('/login'); return }
     setFollowBusy(true)
     const next = !following
