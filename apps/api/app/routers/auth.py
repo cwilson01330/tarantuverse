@@ -1347,9 +1347,34 @@ async def delete_account(
 
     will be permanently deleted.
     """
+    # IMPORTANT: do NOT use `db.delete(current_user)` here. Every user-owned
+    # table (animals, tarantulas, inverts, scorpions, follows, messages, …)
+    # has a NOT NULL `user_id` with ON DELETE CASCADE at the DB level, but the
+    # ORM relationships are child-side backrefs without passive_deletes — so an
+    # ORM delete tries to NULL those non-nullable FKs and 500s for any user who
+    # owns animals (~half the user base). See docs/design/HV_AUDIT_2026-06-12.md.
+    #
+    # Instead: null the only FKs that would block a DB cascade — genes /
+    # herp_species submitted_by/verified_by are nullable but NO ACTION — then
+    # issue a bulk DELETE so PostgreSQL's ON DELETE CASCADE removes everything
+    # else atomically.
+    from app.models.gene import Gene
+    from app.models.reptile_species import ReptileSpecies
+
+    uid = current_user.id
     try:
-        # Delete the user - CASCADE will handle related data
-        db.delete(current_user)
+        db.query(Gene).filter(Gene.submitted_by == uid).update(
+            {Gene.submitted_by: None}, synchronize_session=False)
+        db.query(Gene).filter(Gene.verified_by == uid).update(
+            {Gene.verified_by: None}, synchronize_session=False)
+        db.query(ReptileSpecies).filter(ReptileSpecies.submitted_by == uid).update(
+            {ReptileSpecies.submitted_by: None}, synchronize_session=False)
+        db.query(ReptileSpecies).filter(ReptileSpecies.verified_by == uid).update(
+            {ReptileSpecies.verified_by: None}, synchronize_session=False)
+
+        # Bulk delete bypasses ORM relationship handling and relies on the
+        # DB's ON DELETE CASCADE for all dependent rows.
+        db.query(User).filter(User.id == uid).delete(synchronize_session=False)
         db.commit()
 
         return {"message": "Account deleted successfully"}
