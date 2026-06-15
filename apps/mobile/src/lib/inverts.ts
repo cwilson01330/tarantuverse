@@ -335,6 +335,36 @@ export async function getInvertGrowth(id: string): Promise<InvertGrowthAnalytics
   const { data } = await apiClient.get<InvertGrowthAnalytics>(`/inverts/${id}/growth`);
   return data;
 }
+
+/** Breeding (ADR-010 Phase D) — taxon-agnostic pairings on the inverts surface. */
+export interface InvertPairing {
+  id: string;
+  male_invert_id: string | null;
+  female_invert_id: string | null;
+  paired_date: string;
+  separated_date: string | null;
+  pairing_type: string;
+  outcome: string;
+  notes: string | null;
+}
+export async function listInvertPairings(id: string): Promise<InvertPairing[]> {
+  const { data } = await apiClient.get<InvertPairing[]>(`/inverts/${id}/pairings`);
+  return data;
+}
+export async function createInvertPairing(payload: {
+  male_invert_id: string;
+  female_invert_id: string;
+  paired_date: string;
+  pairing_type?: string;
+}): Promise<InvertPairing> {
+  const { data } = await apiClient.post<InvertPairing>(`/inverts/pairings`, payload);
+  return data;
+}
+/** Same-taxon collection for the breeding mate picker. */
+export async function listInvertsByTaxon(taxon: InvertTaxon): Promise<Invert[]> {
+  const { data } = await apiClient.get<Invert[]>(`/inverts/?taxon=${taxon}`);
+  return data;
+}
 /** Single molt log by id — powers measurement prefill on the edit form. */
 export async function getInvertMolt(moltId: string): Promise<InvertMoltLog> {
   const { data } = await apiClient.get<InvertMoltLog>(`/molts/${moltId}`);

@@ -21,11 +21,14 @@ import {
   INVERT_TAXA, deleteInvert, getInvert, invertDisplayName,
   listInvertFeedings, listInvertMolts, listInvertPhotos, listInvertSubstrateChanges,
   deleteInvertFeeding, deleteInvertMolt, deleteInvertSubstrateChange,
-  setInvertMainPhoto, deleteInvertPhoto,
+  setInvertMainPhoto, deleteInvertPhoto, getInvertGrowth, listInvertPairings,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
+  type InvertGrowthAnalytics, type InvertPairing,
 } from '../../src/lib/inverts';
 import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { SPACING, TYPE } from '../../src/theme/tokens';
+import { taxonHasModule, growthLengthLabel } from '../../src/lib/taxon-modules';
+import GrowthChart from '../../src/components/GrowthChart';
 
 function InvertDetailScreen() {
   const router = useRouter();
@@ -37,6 +40,8 @@ function InvertDetailScreen() {
   const [molts, setMolts] = useState<InvertMoltLog[]>([]);
   const [substrate, setSubstrate] = useState<InvertSubstrateChange[]>([]);
   const [photos, setPhotos] = useState<InvertPhoto[]>([]);
+  const [growth, setGrowth] = useState<InvertGrowthAnalytics | null>(null);
+  const [pairings, setPairings] = useState<InvertPairing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,13 +52,21 @@ function InvertDetailScreen() {
     try {
       const i = await getInvert(id);
       setInvert(i);
-      const [f, m, sub, p] = await Promise.all([
+      const [f, m, sub, p, g, pr] = await Promise.all([
         listInvertFeedings(i.taxon, id).catch(() => [] as InvertFeedingLog[]),
         listInvertMolts(i.taxon, id).catch(() => [] as InvertMoltLog[]),
         listInvertSubstrateChanges(i.taxon, id).catch(() => [] as InvertSubstrateChange[]),
         listInvertPhotos(i.taxon, id).catch(() => [] as InvertPhoto[]),
+        // Growth module is registry-gated (ADR-008) — only fetch where enabled
+        taxonHasModule(i.taxon, 'growth')
+          ? getInvertGrowth(id).catch(() => null)
+          : Promise.resolve(null),
+        // Breeding module is registry-gated (ADR-010 Phase D)
+        taxonHasModule(i.taxon, 'breeding')
+          ? listInvertPairings(id).catch(() => [] as InvertPairing[])
+          : Promise.resolve([] as InvertPairing[]),
       ]);
-      setFeedings(f); setMolts(m); setSubstrate(sub); setPhotos(p);
+      setFeedings(f); setMolts(m); setSubstrate(sub); setPhotos(p); setGrowth(g); setPairings(pr);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load this animal.");
     } finally {
@@ -203,6 +216,30 @@ function InvertDetailScreen() {
         onEdit={editMolt} onDelete={(m) => confirmDeleteLog('molt', () => deleteInvertMolt(m.id))}
         renderItem={(item) => (<><Text style={styles.logRowTitle}>Molt</Text><Text style={styles.logRowMeta}>{fmtDate(item.molted_at)}</Text></>)} colors={colors} />
 
+      {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot).
+          GrowthChart renders its own card, so no Section wrapper. */}
+      {taxonHasModule(invert.taxon, 'growth') && growth && growth.total_molts > 0 && (
+        <View style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.md }}>
+          <GrowthChart data={growth as any} lengthLabel={growthLengthLabel(invert.taxon)} />
+        </View>
+      )}
+
+      {/* Breeding module (registry-gated — ADR-010 Phase D) */}
+      {taxonHasModule(invert.taxon, 'breeding') && (
+        <Section title="Breeding" actionLabel="New pairing" onAction={() => router.push(`/invert/add-pairing?id=${id}` as any)}>
+          {pairings.length === 0 ? (
+            <Text style={[s.empty, { color: colors.textTertiary }]}>No pairings yet. Pair this animal with another to start tracking.</Text>
+          ) : (
+            pairings.map((p) => (
+              <View key={p.id} style={styles.breedRow}>
+                <Text style={styles.logRowTitle}>Pairing</Text>
+                <Text style={styles.logRowMeta}>{fmtDate(p.paired_date)} · {(p.outcome || '').replace(/_/g, ' ')}</Text>
+              </View>
+            ))
+          )}
+        </Section>
+      )}
+
       <LogSection title="Substrate changes" emptyText="No substrate changes logged yet." ctaLabel="Log substrate change"
         onCta={() => router.push(`/invert/add-substrate-change?id=${id}` as any)} items={substrate.slice(0, 5)}
         onEdit={editSubstrate} onDelete={(c) => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id))}
@@ -305,6 +342,7 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     subtitle: { ...TYPE.label, color: colors.textTertiary },
     logRowTitle: { ...TYPE.bodyStrong, color: colors.textPrimary, flex: 1 },
     logRowMeta: { ...TYPE.caption, color: colors.textTertiary },
+    breedRow: { paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     photoThumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: colors.surfaceElevated },
     heroTag: { position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
     heroTagText: { ...TYPE.caption, color: '#fff' },
