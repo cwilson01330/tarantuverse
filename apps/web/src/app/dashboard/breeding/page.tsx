@@ -46,14 +46,37 @@ interface Offspring {
   created_at: string
 }
 
+interface BreedingAnalytics {
+  totals: { pairings: number; egg_sacs: number; offspring: number }
+  pairing_success_rate: number | null
+  outcomes: Record<string, number>
+  egg_sacs: {
+    hatched: number
+    hatch_rate: number | null
+    avg_days_to_hatch: number | null
+    avg_clutch_size: number | null
+    avg_survival_rate: number | null
+  }
+  offspring: {
+    status_breakdown: Record<string, number>
+    total_revenue: number
+    sold_count: number
+    avg_sale_price: number | null
+    revenue_per_pairing: number | null
+  }
+  top_females: Array<{ id: string; name: string; egg_sacs: number; offspring: number }>
+  top_males: Array<{ id: string; name: string; egg_sacs: number; offspring: number }>
+}
+
 export default function BreedingPage() {
   const router = useRouter()
   const { user, token, isAuthenticated, isLoading } = useAuth()
   const { canUseBreeding, loading: subLoading } = useSubscription()
-  const [activeTab, setActiveTab] = useState<'pairings' | 'egg-sacs' | 'offspring'>('pairings')
+  const [activeTab, setActiveTab] = useState<'analytics' | 'pairings' | 'egg-sacs' | 'offspring'>('analytics')
   const [pairings, setPairings] = useState<Pairing[]>([])
   const [eggSacs, setEggSacs] = useState<EggSac[]>([])
   const [offspring, setOffspring] = useState<Offspring[]>([])
+  const [analytics, setAnalytics] = useState<BreedingAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -78,10 +101,11 @@ export default function BreedingPage() {
       const headers = { 'Authorization': `Bearer ${token}` }
 
       // Fetch all breeding data in parallel
-      const [pairingsRes, eggSacsRes, offspringRes] = await Promise.all([
+      const [pairingsRes, eggSacsRes, offspringRes, analyticsRes] = await Promise.all([
         fetch(`${API_URL}/api/v1/pairings/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/egg-sacs/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/offspring/`, { headers }).catch(() => null),
+        fetch(`${API_URL}/api/v1/analytics/breeding`, { headers }).catch(() => null),
       ])
 
       if (pairingsRes?.ok) {
@@ -92,6 +116,9 @@ export default function BreedingPage() {
       }
       if (offspringRes?.ok) {
         setOffspring(await offspringRes.json())
+      }
+      if (analyticsRes?.ok) {
+        setAnalytics(await analyticsRes.json())
       }
     } catch (err) {
       console.error('Unexpected error fetching breeding data:', err)
@@ -319,6 +346,16 @@ export default function BreedingPage() {
         <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
           <nav className="flex gap-4">
             <button
+              onClick={() => setActiveTab('analytics')}
+              className={`py-2 px-4 font-medium border-b-2 transition ${
+                activeTab === 'analytics'
+                  ? 'border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400'
+                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Analytics
+            </button>
+            <button
               onClick={() => setActiveTab('pairings')}
               className={`py-2 px-4 font-medium border-b-2 transition ${
                 activeTab === 'pairings'
@@ -353,6 +390,42 @@ export default function BreedingPage() {
 
         {/* Tab Content */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {/* Analytics Tab */}
+          {activeTab === 'analytics' && (
+            <div className="p-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Breeding Analytics</h2>
+              {!analytics || analytics.totals.pairings === 0 ? (
+                <div className="text-center py-12 px-4">
+                  <div className="text-5xl mb-4">📊</div>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No breeding data yet</h3>
+                  <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                    Record a pairing, egg sac, and offspring, and your success rates, survival rates, and revenue will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-8">
+                  {/* Metric cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Metric label="Pairing success" value={pctLabel(analytics.pairing_success_rate)} sub="produced an egg sac" />
+                    <Metric label="Hatch rate" value={pctLabel(analytics.egg_sacs.hatch_rate)} sub={`${analytics.egg_sacs.hatched} of ${analytics.totals.egg_sacs} sacs`} />
+                    <Metric label="Avg survival" value={pctLabel(analytics.egg_sacs.avg_survival_rate)} sub="viable ÷ clutch" />
+                    <Metric label="Avg clutch size" value={analytics.egg_sacs.avg_clutch_size != null ? String(analytics.egg_sacs.avg_clutch_size) : '—'} sub="spiderlings" />
+                    <Metric label="Avg days to hatch" value={analytics.egg_sacs.avg_days_to_hatch != null ? `${analytics.egg_sacs.avg_days_to_hatch}d` : '—'} sub="laid → hatched" />
+                    <Metric label="Total revenue" value={`$${analytics.offspring.total_revenue.toLocaleString()}`} sub={`${analytics.offspring.sold_count} sold`} />
+                    <Metric label="Avg sale price" value={analytics.offspring.avg_sale_price != null ? `$${analytics.offspring.avg_sale_price.toLocaleString()}` : '—'} sub="per offspring" />
+                    <Metric label="Revenue / pairing" value={analytics.offspring.revenue_per_pairing != null ? `$${analytics.offspring.revenue_per_pairing.toLocaleString()}` : '—'} sub="across all pairings" />
+                  </div>
+
+                  {/* Top performers */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <TopPerformers title="Top females ♀" rows={analytics.top_females} />
+                    <TopPerformers title="Top males ♂" rows={analytics.top_males} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Pairings Tab */}
           {activeTab === 'pairings' && (
             <div className="p-6">
@@ -532,5 +605,47 @@ export default function BreedingPage() {
         </div>
       </div>
     </DashboardLayout>
+  )
+}
+
+function pctLabel(v: number | null): string {
+  return v != null ? `${v}%` : '—'
+}
+
+function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{label}</p>
+      <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+      {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
+    </div>
+  )
+}
+
+function TopPerformers({
+  title,
+  rows,
+}: {
+  title: string
+  rows: Array<{ id: string; name: string; egg_sacs: number; offspring: number }>
+}) {
+  return (
+    <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+      <h3 className="font-semibold text-gray-900 dark:text-white mb-3">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">No data yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {rows.map((r) => (
+            <li key={r.id} className="flex items-center justify-between text-sm">
+              <span className="text-gray-900 dark:text-white truncate mr-2">{r.name}</span>
+              <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">
+                {r.offspring} offspring · {r.egg_sacs} sac{r.egg_sacs === 1 ? '' : 's'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }

@@ -27,6 +27,124 @@ from app.utils.dependencies import get_current_user
 router = APIRouter()
 
 
+@router.get("/breeding")
+async def breeding_analytics(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Breeding analytics for the current user (premium — ADR-010 depth tier).
+
+    Honesty-first: every rate/average is returned as null when there's no
+    data to compute it from, rather than a misleading 0.
+    """
+    from app.models.pairing import Pairing
+    from app.models.egg_sac import EggSac
+    from app.models.offspring import Offspring
+
+    limits = current_user.get_subscription_limits()
+    if not limits.get("can_use_breeding"):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": "Breeding analytics is a premium feature.",
+                "feature": "breeding",
+                "is_premium": limits.get("is_premium", False),
+            },
+        )
+
+    pairings = db.query(Pairing).filter(Pairing.user_id == current_user.id).all()
+    egg_sacs = db.query(EggSac).filter(EggSac.user_id == current_user.id).all()
+    offspring = db.query(Offspring).filter(Offspring.user_id == current_user.id).all()
+
+    def pct(n, d):
+        return round(100.0 * n / d, 1) if d else None
+
+    def avg(values):
+        vals = [v for v in values if v is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    # ── Pairing success: produced at least one egg sac ──
+    pairing_ids_with_sac = {s.pairing_id for s in egg_sacs}
+    outcomes = Counter(
+        (p.outcome.value if hasattr(p.outcome, "value") else p.outcome) for p in pairings
+    )
+
+    # ── Egg sac metrics ──
+    hatched = [s for s in egg_sacs if s.hatch_date]
+    days_to_hatch = [
+        (s.hatch_date - s.laid_date).days
+        for s in egg_sacs
+        if s.hatch_date and s.laid_date and s.hatch_date >= s.laid_date
+    ]
+    clutch_sizes = [s.spiderling_count for s in egg_sacs if s.spiderling_count]
+    survival_rates = [
+        100.0 * s.viable_count / s.spiderling_count
+        for s in egg_sacs
+        if s.spiderling_count and s.viable_count is not None
+    ]
+
+    # ── Offspring / revenue ──
+    status_breakdown = Counter(
+        (o.status.value if hasattr(o.status, "value") else o.status) for o in offspring
+    )
+    sold = [o for o in offspring if o.price_sold is not None]
+    total_revenue = float(sum(o.price_sold for o in sold)) if sold else 0.0
+
+    # ── Top performers (attribute each sac's clutch to its pairing's parents) ──
+    pairing_by_id = {p.id: p for p in pairings}
+    names = {
+        t.id: (t.name or t.common_name or t.scientific_name or "Unnamed")
+        for t in db.query(Tarantula).filter(Tarantula.user_id == current_user.id).all()
+    }
+
+    def perf_map(parent_attr):
+        agg: Dict[Any, Dict[str, Any]] = {}
+        for s in egg_sacs:
+            p = pairing_by_id.get(s.pairing_id)
+            if not p:
+                continue
+            pid = getattr(p, parent_attr)
+            row = agg.setdefault(pid, {"egg_sacs": 0, "offspring": 0})
+            row["egg_sacs"] += 1
+            row["offspring"] += s.spiderling_count or 0
+        out = []
+        for pid, row in agg.items():
+            out.append({
+                "id": str(pid),
+                "name": names.get(pid, "Unknown"),
+                "egg_sacs": row["egg_sacs"],
+                "offspring": row["offspring"],
+            })
+        out.sort(key=lambda r: (r["offspring"], r["egg_sacs"]), reverse=True)
+        return out[:5]
+
+    return {
+        "totals": {
+            "pairings": len(pairings),
+            "egg_sacs": len(egg_sacs),
+            "offspring": len(offspring),
+        },
+        "pairing_success_rate": pct(len(pairing_ids_with_sac), len(pairings)),
+        "outcomes": dict(outcomes),
+        "egg_sacs": {
+            "hatched": len(hatched),
+            "hatch_rate": pct(len(hatched), len(egg_sacs)),
+            "avg_days_to_hatch": avg(days_to_hatch),
+            "avg_clutch_size": avg(clutch_sizes),
+            "avg_survival_rate": avg(survival_rates),
+        },
+        "offspring": {
+            "status_breakdown": dict(status_breakdown),
+            "total_revenue": round(total_revenue, 2),
+            "sold_count": len(sold),
+            "avg_sale_price": round(total_revenue / len(sold), 2) if sold else None,
+            "revenue_per_pairing": round(total_revenue / len(pairings), 2) if pairings else None,
+        },
+        "top_females": perf_map("female_id"),
+        "top_males": perf_map("male_id"),
+    }
+
+
 @router.get("/collection", response_model=CollectionAnalytics)
 async def get_collection_analytics(
     current_user: User = Depends(get_current_user),
