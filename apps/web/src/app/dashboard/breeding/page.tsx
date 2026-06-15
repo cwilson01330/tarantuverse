@@ -672,8 +672,25 @@ export default function BreedingPage() {
                           {sac.spiderling_count && <p className="text-sm text-gray-900 dark:text-white">Count: {sac.spiderling_count} spiderlings</p>}
                           {sac.viable_count && <p className="text-sm text-gray-900 dark:text-white">Viable: {sac.viable_count}</p>}
                           {sac.hatch_date && <p className="text-sm text-gray-600 dark:text-gray-400">Hatched: {formatLocalDate(sac.hatch_date)}</p>}
+                          {(() => {
+                            const n = offspring.filter((o) => o.egg_sac_id === sac.id).length
+                            return n > 0 ? <p className="text-sm text-purple-600 dark:text-purple-400 mt-1">{n} offspring recorded</p> : null
+                          })()}
                           {sac.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{sac.notes}</p>}
                         </Link>
+                        <button
+                          onClick={() => {
+                            // Streamline sac → offspring: pre-fill the bulk-add
+                            // modal with this sac and its viable/clutch count.
+                            const prefill = sac.viable_count ?? sac.spiderling_count ?? ''
+                            setBulkAdd({ egg_sac_id: sac.id, count: prefill ? String(prefill) : '', status: 'unknown' })
+                            setActiveTab('offspring')
+                            setBulkAddOpen(true)
+                          }}
+                          className="flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-md border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition"
+                        >
+                          Record offspring
+                        </button>
                         <button
                           onClick={() => handleDelete('egg-sac', sac.id)}
                           aria-label="Delete egg sac"
