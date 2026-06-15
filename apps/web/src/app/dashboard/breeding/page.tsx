@@ -86,6 +86,10 @@ export default function BreedingPage() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkStatus, setBulkStatus] = useState('sold')
   const [bulkPrice, setBulkPrice] = useState('')
+  // Pairings declutter: a pairing that produced a sac auto-advances to
+  // "successful" (concluded), so the active view stays short. Default to
+  // active; concluded/all are one click away (history is never deleted).
+  const [pairingFilter, setPairingFilter] = useState<'active' | 'concluded' | 'all'>('active')
 
   useEffect(() => {
     if (isLoading) return
@@ -261,6 +265,16 @@ export default function BreedingPage() {
       setBulkBusy(false)
     }
   }
+
+  // Pairing lifecycle buckets for the declutter filter.
+  const activePairings = pairings.filter((p) => p.outcome === 'in_progress')
+  const concludedPairings = pairings.filter((p) => p.outcome !== 'in_progress')
+  const shownPairings =
+    pairingFilter === 'active'
+      ? activePairings
+      : pairingFilter === 'concluded'
+        ? concludedPairings
+        : pairings
 
   if (isLoading || loading || subLoading) {
     return (
@@ -540,8 +554,38 @@ export default function BreedingPage() {
                   </Link>
                 </div>
               ) : (
+                <>
+                  {/* Lifecycle filter — keeps the active list short without
+                      deleting anything. A pairing auto-concludes when it
+                      produces a sac. */}
+                  <div className="flex gap-2 mb-4">
+                    {([
+                      ['active', `Active (${activePairings.length})`],
+                      ['concluded', `Concluded (${concludedPairings.length})`],
+                      ['all', `All (${pairings.length})`],
+                    ] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => setPairingFilter(key)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                          pairingFilter === key
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {shownPairings.length === 0 ? (
+                    <div className="text-center py-10 px-4 text-gray-500 dark:text-gray-400 text-sm">
+                      {pairingFilter === 'active'
+                        ? 'No active pairings — every pairing has concluded. Switch to Concluded or All to see history.'
+                        : 'Nothing here.'}
+                    </div>
+                  ) : (
                 <div className="space-y-4">
-                  {pairings.map((pairing) => (
+                  {shownPairings.map((pairing) => (
                     // Row layout: Link wraps the textual content so the
                     // bulk of the row navigates to the detail page,
                     // while the trash button sits as a sibling. Putting
@@ -583,6 +627,8 @@ export default function BreedingPage() {
                     </div>
                   ))}
                 </div>
+                  )}
+                </>
               )}
             </div>
           )}

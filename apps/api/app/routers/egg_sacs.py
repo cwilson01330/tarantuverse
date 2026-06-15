@@ -83,6 +83,17 @@ async def create_egg_sac(
     )
 
     db.add(new_egg_sac)
+
+    # Streamline: a pairing that produced a sac has done its job — auto-advance
+    # it to "successful" so it drops out of the *active* pairings view. The
+    # pairing is kept (history + lineage stay traceable from the sac), not
+    # deleted. Only auto-advance from in_progress so we never override an
+    # outcome the keeper set deliberately. Multiple sacs from one pairing are
+    # fine — this is idempotent.
+    from app.models.pairing import PairingOutcome
+    if pairing.outcome == PairingOutcome.IN_PROGRESS:
+        pairing.outcome = PairingOutcome.SUCCESSFUL
+
     db.commit()
     db.refresh(new_egg_sac)
 
