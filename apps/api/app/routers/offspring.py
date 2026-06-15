@@ -11,11 +11,29 @@ from app.models.user import User
 from app.models.egg_sac import EggSac
 from app.models.tarantula import Tarantula
 from app.models.offspring import Offspring
-from app.schemas.offspring import OffspringCreate, OffspringUpdate, OffspringResponse
+from app.schemas.offspring import (
+    OffspringCreate, OffspringUpdate, OffspringResponse,
+    OffspringBulkCreate, OffspringBulkUpdate, OffspringBulkResult,
+)
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
 
 router = APIRouter()
+
+
+def _require_breeding(current_user: User) -> dict:
+    """Shared premium gate for breeding writes."""
+    limits = current_user.get_subscription_limits()
+    if not limits["can_use_breeding"]:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": "Breeding tracking is a premium feature. Upgrade to unlock pairings, egg sacs, and offspring management!",
+                "feature": "breeding",
+                "is_premium": limits["is_premium"],
+            },
+        )
+    return limits
 
 
 @router.get("/offspring/", response_model=List[OffspringResponse])
@@ -181,6 +199,79 @@ async def delete_offspring_record(
     db.commit()
 
     return None
+
+
+@router.post("/offspring/bulk", response_model=OffspringBulkResult, status_code=status.HTTP_201_CREATED)
+async def bulk_create_offspring(
+    payload: OffspringBulkCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create N offspring at once from one egg sac (Premium).
+
+    The high-volume add: a keeper with 50 slings creates 50 records in one
+    call instead of 50 form submissions.
+    """
+    _require_breeding(current_user)
+
+    egg_sac = db.query(EggSac).filter(
+        EggSac.id == payload.egg_sac_id,
+        EggSac.user_id == current_user.id,
+    ).first()
+    if not egg_sac:
+        raise HTTPException(status_code=404, detail="Egg sac not found")
+
+    shared = {
+        "status": payload.status,
+        "status_date": payload.status_date,
+        "price_sold": payload.price_sold,
+        "buyer_info": payload.buyer_info,
+        "notes": payload.notes,
+    }
+    db.add_all([
+        Offspring(user_id=current_user.id, egg_sac_id=payload.egg_sac_id, **shared)
+        for _ in range(payload.count)
+    ])
+    db.commit()
+
+    await create_activity(
+        db=db,
+        user_id=current_user.id,
+        action_type="offspring",
+        target_type="egg_sac",
+        target_id=egg_sac.id,
+        metadata={"bulk_count": payload.count, "status": payload.status.value},
+    )
+    return OffspringBulkResult(affected=payload.count)
+
+
+@router.post("/offspring/bulk-update", response_model=OffspringBulkResult)
+async def bulk_update_offspring(
+    payload: OffspringBulkUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Apply shared field changes to many offspring at once (Premium).
+
+    e.g. select 30 slings and mark them sold with one price/date. Only rows
+    owned by the caller are touched; only set fields are applied.
+    """
+    _require_breeding(current_user)
+
+    rows = db.query(Offspring).filter(
+        Offspring.id.in_(payload.ids),
+        Offspring.user_id == current_user.id,
+    ).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No matching offspring found")
+
+    changes = payload.model_dump(exclude_unset=True, exclude={"ids"})
+    for row in rows:
+        for field, value in changes.items():
+            setattr(row, field, value)
+    db.commit()
+
+    return OffspringBulkResult(affected=len(rows))
 
 
 @router.get("/egg-sacs/{egg_sac_id}/offspring", response_model=List[OffspringResponse])

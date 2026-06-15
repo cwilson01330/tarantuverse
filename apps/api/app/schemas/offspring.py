@@ -2,7 +2,7 @@
 Offspring schemas
 """
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal
 import uuid
@@ -34,6 +34,35 @@ class OffspringUpdate(BaseModel):
     buyer_info: Optional[str] = None
     price_sold: Optional[Decimal] = None
     notes: Optional[str] = None
+
+
+class OffspringBulkCreate(BaseModel):
+    """Create N offspring at once from one egg sac (the high-volume add)."""
+    egg_sac_id: uuid.UUID
+    count: int = Field(..., ge=1, le=1000)
+    status: OffspringStatus = OffspringStatus.UNKNOWN
+    status_date: Optional[date] = None
+    price_sold: Optional[Decimal] = Field(None, ge=0, le=99999999.99)
+    buyer_info: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class OffspringBulkUpdate(BaseModel):
+    """Apply shared field changes to many offspring at once (e.g. mark sold).
+
+    Only fields that are set are applied; ids must all belong to the caller.
+    """
+    ids: List[uuid.UUID] = Field(..., min_length=1, max_length=1000)
+    status: Optional[OffspringStatus] = None
+    status_date: Optional[date] = None
+    price_sold: Optional[Decimal] = Field(None, ge=0, le=99999999.99)
+    buyer_info: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class OffspringBulkResult(BaseModel):
+    """Summary returned by the bulk endpoints."""
+    affected: int
 
 
 class OffspringResponse(OffspringBase):

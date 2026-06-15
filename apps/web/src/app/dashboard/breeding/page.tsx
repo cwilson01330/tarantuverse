@@ -79,6 +79,13 @@ export default function BreedingPage() {
   const [analytics, setAnalytics] = useState<BreedingAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Bulk offspring actions
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkAddOpen, setBulkAddOpen] = useState(false)
+  const [bulkAdd, setBulkAdd] = useState({ egg_sac_id: '', count: '', status: 'unknown' })
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkStatus, setBulkStatus] = useState('sold')
+  const [bulkPrice, setBulkPrice] = useState('')
 
   useEffect(() => {
     if (isLoading) return
@@ -172,6 +179,86 @@ export default function BreedingPage() {
     } catch (err: any) {
       window.alert(err?.message || 'Could not delete that record.')
       return false
+    }
+  }
+
+  /**
+   * Inline-edit a single record's field (the common case is status /
+   * outcome). PUTs the change and refetches so analytics + lists stay
+   * in sync. Backend PUT endpoints already exist for all three kinds.
+   */
+  const patchRecord = async (
+    kind: 'pairing' | 'egg-sac' | 'offspring',
+    id: string,
+    body: Record<string, unknown>,
+  ) => {
+    if (!token) return
+    const paths = { pairing: 'pairings', 'egg-sac': 'egg-sacs', offspring: 'offspring' } as const
+    try {
+      const res = await fetch(`${API_URL}/api/v1/${paths[kind]}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error(`Update failed (${res.status}).`)
+      await fetchBreedingData()
+    } catch (err: any) {
+      window.alert(err?.message || 'Could not save that change.')
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleBulkAdd = async () => {
+    if (!token || bulkBusy) return
+    const count = parseInt(bulkAdd.count, 10)
+    if (!bulkAdd.egg_sac_id || !Number.isFinite(count) || count < 1) {
+      window.alert('Pick an egg sac and a count of 1 or more.')
+      return
+    }
+    setBulkBusy(true)
+    try {
+      const res = await fetch(`${API_URL}/api/v1/offspring/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ egg_sac_id: bulkAdd.egg_sac_id, count, status: bulkAdd.status }),
+      })
+      if (!res.ok) throw new Error(`Bulk add failed (${res.status}).`)
+      setBulkAddOpen(false)
+      setBulkAdd({ egg_sac_id: '', count: '', status: 'unknown' })
+      await fetchBreedingData()
+    } catch (err: any) {
+      window.alert(err?.message || 'Could not create those records.')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  const handleBulkUpdate = async () => {
+    if (!token || bulkBusy || selected.size === 0) return
+    setBulkBusy(true)
+    try {
+      const body: Record<string, unknown> = { ids: Array.from(selected), status: bulkStatus }
+      if (bulkPrice.trim()) body.price_sold = parseFloat(bulkPrice)
+      const res = await fetch(`${API_URL}/api/v1/offspring/bulk-update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error(`Bulk update failed (${res.status}).`)
+      setSelected(new Set())
+      setBulkPrice('')
+      await fetchBreedingData()
+    } catch (err: any) {
+      window.alert(err?.message || 'Could not update those records.')
+    } finally {
+      setBulkBusy(false)
     }
   }
 
@@ -472,6 +559,17 @@ export default function BreedingPage() {
                           <p className="text-sm text-gray-900 dark:text-white">Outcome: <span className="capitalize">{pairing.outcome.replace(/_/g, ' ')}</span></p>
                           {pairing.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{pairing.notes}</p>}
                         </Link>
+                        <select
+                          value={pairing.outcome}
+                          onChange={(e) => patchRecord('pairing', pairing.id, { outcome: e.target.value })}
+                          aria-label="Pairing outcome"
+                          className="flex-shrink-0 text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 capitalize"
+                        >
+                          <option value="in_progress">In progress</option>
+                          <option value="successful">Successful</option>
+                          <option value="unsuccessful">Unsuccessful</option>
+                          <option value="unknown">Unknown</option>
+                        </select>
                         <button
                           onClick={() => handleDelete('pairing', pairing.id)}
                           aria-label="Delete pairing"
@@ -551,13 +649,60 @@ export default function BreedingPage() {
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Offspring Records</h2>
-                <Link
-                  href="/dashboard/breeding/offspring/add"
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
-                >
-                  + New Offspring
-                </Link>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setBulkAddOpen(true)}
+                    className="px-4 py-2 border border-purple-600 text-purple-600 dark:text-purple-400 dark:border-purple-500 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition"
+                  >
+                    + Bulk add
+                  </button>
+                  <Link
+                    href="/dashboard/breeding/offspring/add"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                  >
+                    + New Offspring
+                  </Link>
+                </div>
               </div>
+
+              {/* Bulk-action bar — appears when rows are selected */}
+              {selected.size > 0 && (
+                <div className="flex flex-wrap items-center gap-3 mb-4 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{selected.size} selected</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Mark as</span>
+                  <select
+                    value={bulkStatus}
+                    onChange={(e) => setBulkStatus(e.target.value)}
+                    className="text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 capitalize"
+                  >
+                    {['unknown', 'kept', 'sold', 'traded', 'given_away', 'died'].map((s) => (
+                      <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                    ))}
+                  </select>
+                  {bulkStatus === 'sold' && (
+                    <input
+                      value={bulkPrice}
+                      onChange={(e) => setBulkPrice(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="Price each (optional)"
+                      className="text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 w-40"
+                    />
+                  )}
+                  <button
+                    onClick={handleBulkUpdate}
+                    disabled={bulkBusy}
+                    className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 transition disabled:opacity-50"
+                  >
+                    {bulkBusy ? 'Applying…' : 'Apply'}
+                  </button>
+                  <button
+                    onClick={() => setSelected(new Set())}
+                    className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
               {offspring.length === 0 ? (
                 <div className="text-center py-12 px-4">
                   <div className="text-5xl mb-4">🕷️</div>
@@ -577,16 +722,32 @@ export default function BreedingPage() {
                   {offspring.map((child) => (
                     <div key={child.id} className="border border-gray-200 dark:border-gray-700 rounded-lg hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition">
                       <div className="flex justify-between items-start gap-3 p-4">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(child.id)}
+                          onChange={() => toggleSelect(child.id)}
+                          aria-label="Select offspring"
+                          className="mt-1 flex-shrink-0 h-4 w-4 accent-purple-600"
+                        />
                         <Link
                           href={`/dashboard/breeding/offspring/${child.id}`}
                           className="min-w-0 flex-1 cursor-pointer"
                         >
-                          <p className="text-sm text-gray-900 dark:text-white">Status: <span className="capitalize">{child.status.replace('_', ' ')}</span></p>
                           {child.status_date && <p className="text-sm text-gray-600 dark:text-gray-400">{formatLocalDate(child.status_date)}</p>}
                           {child.price_sold && <p className="text-sm text-gray-900 dark:text-white">Sold for: ${child.price_sold}</p>}
                           {child.buyer_info && <p className="text-sm text-gray-600 dark:text-gray-400">Buyer: {child.buyer_info}</p>}
                           {child.notes && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{child.notes}</p>}
                         </Link>
+                        <select
+                          value={child.status}
+                          onChange={(e) => patchRecord('offspring', child.id, { status: e.target.value })}
+                          aria-label="Offspring status"
+                          className="flex-shrink-0 text-xs rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-2 py-1 capitalize"
+                        >
+                          {['unknown', 'kept', 'sold', 'traded', 'given_away', 'died'].map((s) => (
+                            <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                          ))}
+                        </select>
                         <button
                           onClick={() => handleDelete('offspring', child.id)}
                           aria-label="Delete offspring record"
@@ -604,6 +765,77 @@ export default function BreedingPage() {
           )}
         </div>
       </div>
+
+      {/* Bulk-add offspring modal */}
+      {bulkAddOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !bulkBusy && setBulkAddOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl p-6 border border-gray-200 dark:border-gray-700"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Bulk add offspring</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Create many records at once from one egg sac.
+            </p>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Egg sac</label>
+            <select
+              value={bulkAdd.egg_sac_id}
+              onChange={(e) => setBulkAdd({ ...bulkAdd, egg_sac_id: e.target.value })}
+              className="w-full mb-4 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="">Select an egg sac…</option>
+              {eggSacs.map((s) => (
+                <option key={s.id} value={s.id}>
+                  Laid {formatLocalDate(s.laid_date)}{s.spiderling_count ? ` · ${s.spiderling_count} slings` : ''}
+                </option>
+              ))}
+            </select>
+            <div className="grid grid-cols-2 gap-4 mb-5">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Count</label>
+                <input
+                  value={bulkAdd.count}
+                  onChange={(e) => setBulkAdd({ ...bulkAdd, count: e.target.value.replace(/[^0-9]/g, '') })}
+                  inputMode="numeric"
+                  placeholder="e.g. 50"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Status</label>
+                <select
+                  value={bulkAdd.status}
+                  onChange={(e) => setBulkAdd({ ...bulkAdd, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white capitalize"
+                >
+                  {['unknown', 'kept', 'sold', 'traded', 'given_away', 'died'].map((s) => (
+                    <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setBulkAddOpen(false)}
+                disabled={bulkBusy}
+                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkAdd}
+                disabled={bulkBusy}
+                className="px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
+              >
+                {bulkBusy ? 'Adding…' : 'Add offspring'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   )
 }
