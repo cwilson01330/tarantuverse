@@ -15,7 +15,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
+import UpgradeModal from '../../src/components/UpgradeModal';
 import { INVERT_TAXA, createInvert, isInvertTaxon, type Sex, type Source, type InvertTaxon } from '../../src/lib/inverts';
+import { getErrorMessage, isPaymentRequired } from '../../src/utils/errors';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'unknown', label: 'Unknown' },
@@ -49,6 +51,7 @@ export default function AddInvertScreen() {
   const taxon: InvertTaxon = isInvertTaxon(taxonParam) ? taxonParam : 'scorpion';
   const meta = INVERT_TAXA[taxon];
 
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [name, setName] = useState('');
   const [speciesId, setSpeciesId] = useState<string | null>(null);
   const [commonName, setCommonName] = useState('');
@@ -110,10 +113,10 @@ export default function AddInvertScreen() {
       });
       router.replace(`/invert/${created.id}` as any);
     } catch (err: any) {
-      if (err?.response?.status === 402) {
-        Alert.alert('Collection limit reached', "You've reached the free tier limit of 20 animals. Upgrade to premium for unlimited tracking.");
+      if (isPaymentRequired(err)) {
+        setShowUpgradeModal(true);
       } else {
-        Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong saving.');
+        Alert.alert('Could not save', getErrorMessage(err, 'Something went wrong saving.'));
       }
     } finally {
       setSaving(false);
@@ -238,6 +241,14 @@ export default function AddInvertScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Upgrade to Premium"
+        message="Track unlimited animals"
+        feature="Unlimited animals"
+      />
     </View>
   );
 }

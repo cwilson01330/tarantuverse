@@ -550,7 +550,7 @@ export default function SettingsPage() {
                 <div>
                   <p className="text-theme-secondary">Animals</p>
                   <p className="font-semibold text-theme-primary">
-                    {subscriptionLimits?.max_animals === -1 ? 'Unlimited' : `${subscriptionLimits?.max_animals ?? 20} max`}
+                    {subscriptionLimits?.max_animals === -1 ? 'Unlimited' : `${subscriptionLimits?.max_animals ?? 15} max`}
                   </p>
                 </div>
                 <div>

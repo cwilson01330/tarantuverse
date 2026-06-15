@@ -524,7 +524,7 @@ function AddTarantulaContent() {
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         feature="Unlimited Animals"
-        description="You've reached the free tier limit of 20 animals. Upgrade to Premium for unlimited tracking!"
+        description="You've reached the free tier limit of 15 animals. Upgrade to Premium for unlimited tracking!"
       />
     </DashboardLayout>
   )

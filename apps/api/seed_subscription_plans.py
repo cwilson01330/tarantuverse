@@ -37,7 +37,8 @@ def seed_plans():
                 price_monthly=0,
                 price_yearly=0,
                 price_lifetime=0,
-                max_tarantulas=15,  # Free tier limit
+                max_tarantulas=15,  # Free tier limit (legacy tarantula-only)
+                max_animals=15,  # Cross-taxon free cap (ADR-006). Lowered 20→15 2026-06-15.
                 can_edit_species=False,
                 can_submit_species=True,  # Can submit species for review
                 has_advanced_filters=False,

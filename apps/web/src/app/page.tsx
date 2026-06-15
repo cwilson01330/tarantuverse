@@ -118,7 +118,7 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-6 text-sm text-gray-400">
-              <div className="flex items-center gap-2"><span className="text-green-400">✓</span><span>Free for up to 20 animals</span></div>
+              <div className="flex items-center gap-2"><span className="text-green-400">✓</span><span>Free for up to 15 animals</span></div>
               <div className="flex items-center gap-2"><span className="text-green-400">✓</span><span>Web & iOS / Android</span></div>
               <div className="flex items-center gap-2"><span className="text-green-400">✓</span><span>No credit card needed</span></div>
             </div>
@@ -942,7 +942,7 @@ export default function Home() {
               <div className="mb-4"><span className="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">$0</span></div>
               <p className="text-gray-400 mb-6 text-sm">Perfect for casual keepers</p>
               <ul className="space-y-3 mb-6 text-sm">
-                {['Up to 20 animals', '5 photos per animal', 'Feeding & molt tracking', 'Growth analytics', 'Web + mobile apps', 'Species care database', 'Community access'].map(f => (
+                {['Up to 15 animals', '5 photos per animal', 'Feeding & molt tracking', 'Growth analytics', 'Web + mobile apps', 'Species care database', 'Community access'].map(f => (
                   <li key={f} className="flex items-start gap-2">
                     <span className="text-electric-blue-400 font-bold">✓</span>
                     <span className="text-gray-300">{f}</span>
@@ -1023,7 +1023,7 @@ export default function Home() {
               Log In
             </Link>
           </div>
-          <p className="mt-6 text-white/60 text-sm">Free forever for up to 20 animals · Premium from $4.99/mo</p>
+          <p className="mt-6 text-white/60 text-sm">Free forever for up to 15 animals · Premium from $4.99/mo</p>
         </div>
       </section>
 
@@ -1042,7 +1042,7 @@ export default function Home() {
           Create your free account →
         </Link>
         <p className="text-center text-xs text-gray-400 mt-1.5">
-          Free forever · No credit card · 20 animals included
+          Free forever · No credit card · 15 animals included
         </p>
       </div>
 

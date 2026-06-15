@@ -16,6 +16,8 @@ import * as ImagePicker from 'expo-image-picker';
 import apiClient from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import UpgradeModal from '../../src/components/UpgradeModal';
+import { getErrorMessage, isPaymentRequired } from '../../src/utils/errors';
 
 export default function AddPhotoScreen() {
   const router = useRouter();
@@ -25,6 +27,7 @@ export default function AddPhotoScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const requestCameraPermission = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -137,8 +140,11 @@ export default function AddPhotoScreen() {
       ]);
     } catch (error: any) {
       console.error('Upload error:', error);
-      const message = error.response?.data?.detail || 'Failed to upload photo. Please try again.';
-      Alert.alert('Error', message);
+      if (isPaymentRequired(error)) {
+        setShowUpgradeModal(true);
+      } else {
+        Alert.alert('Error', getErrorMessage(error, 'Failed to upload photo. Please try again.'));
+      }
     } finally {
       setUploading(false);
     }
@@ -247,6 +253,14 @@ export default function AddPhotoScreen() {
         {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Upgrade to Premium"
+        message="Unlock unlimited photo uploads"
+        feature="Unlimited photos"
+      />
     </View>
   );
 }

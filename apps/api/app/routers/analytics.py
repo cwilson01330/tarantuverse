@@ -404,6 +404,21 @@ async def get_advanced_analytics(
     - Total activity counts
     """
 
+    # Premium gate. Previously this endpoint was only gated client-side
+    # (the teaser screen), so a crafted request returned the full payload
+    # for free. Enforce server-side. can_use_analytics currently mirrors
+    # can_use_breeding (single premium tier) — see User.get_subscription_limits.
+    limits = current_user.get_subscription_limits()
+    if not limits.get("can_use_analytics"):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": "Advanced analytics is a premium feature.",
+                "feature": "analytics",
+                "is_premium": limits.get("is_premium", False),
+            },
+        )
+
     # Get all user's tarantulas
     tarantulas = db.query(Tarantula).filter(
         Tarantula.user_id == current_user.id

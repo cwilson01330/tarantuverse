@@ -137,7 +137,7 @@ function AddInvertForm() {
         }),
       })
       if (res.status === 402) {
-        alert("You've reached the free tier limit of 20 animals. Upgrade to Premium for unlimited tracking.")
+        alert("You've reached the free tier limit of 15 animals. Upgrade to Premium for unlimited tracking.")
         return
       }
       if (!res.ok) throw new Error()

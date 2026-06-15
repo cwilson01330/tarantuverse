@@ -121,7 +121,7 @@ export default function SubscriptionScreen() {
       // Set default free tier limits
       setLimits({
         max_tarantulas: 15,
-        max_animals: 20,
+        max_animals: 15,
         can_use_breeding: false,
         max_photos_per_tarantula: 5,
         has_priority_support: false,

@@ -9,6 +9,19 @@ import uuid
 from app.database import Base
 
 
+# Free-tier collection cap (cross-taxon, counted against `inverts`).
+# Single source of truth — referenced by the entitlement fallbacks below
+# and by utils/limits.py. Lowered 20 → 15 (2026-06-15, breeding-premium-gating
+# brief §5 P1): only ~3 keepers ever reached 20; 15 surfaces the upgrade
+# prompt to ~5 keepers (13% of active keepers) while staying gentle on
+# existing free users. The `free` plan ROW in subscription_plans is the
+# authoritative value when a subscription exists; these constants are the
+# no-subscription fallback and must stay in lockstep with that row
+# (see migration cap_20260615_lower_free_animal_cap).
+FREE_TIER_MAX_ANIMALS = 15
+FREE_TIER_MAX_TARANTULAS = 15
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -139,9 +152,10 @@ class User(Base):
         if not session:
             # Return free tier defaults
             return {
-                "max_tarantulas": 15,
-                "max_animals": 20,
+                "max_tarantulas": FREE_TIER_MAX_TARANTULAS,
+                "max_animals": FREE_TIER_MAX_ANIMALS,
                 "can_use_breeding": False,
+                "can_use_analytics": False,
                 "max_photos_per_tarantula": 5,
                 "has_priority_support": False,
                 "is_premium": False
@@ -164,9 +178,10 @@ class User(Base):
         if not subscription:
             # Return free tier defaults
             return {
-                "max_tarantulas": 15,
-                "max_animals": 20,
+                "max_tarantulas": FREE_TIER_MAX_TARANTULAS,
+                "max_animals": FREE_TIER_MAX_ANIMALS,
                 "can_use_breeding": False,
+                "can_use_analytics": False,
                 "max_photos_per_tarantula": 5,
                 "has_priority_support": False,
                 "is_premium": False
@@ -180,9 +195,10 @@ class User(Base):
         if not plan:
             # Fallback to free tier
             return {
-                "max_tarantulas": 15,
-                "max_animals": 20,
+                "max_tarantulas": FREE_TIER_MAX_TARANTULAS,
+                "max_animals": FREE_TIER_MAX_ANIMALS,
                 "can_use_breeding": False,
+                "can_use_analytics": False,
                 "max_photos_per_tarantula": 5,
                 "has_priority_support": False,
                 "is_premium": False
@@ -192,8 +208,14 @@ class User(Base):
             "max_tarantulas": plan.max_tarantulas,
             # Older plan rows (pre-sub_20260605) may not have max_animals
             # populated; fall back to the free default rather than None.
-            "max_animals": plan.max_animals if plan.max_animals is not None else 20,
+            "max_animals": plan.max_animals if plan.max_animals is not None else FREE_TIER_MAX_ANIMALS,
             "can_use_breeding": plan.can_use_breeding,
+            # Advanced analytics currently rides the same premium boolean as
+            # breeding (single premium tier). Mirroring it here — rather than
+            # reusing can_use_breeding at the call site — means packaging
+            # analytics separately later is a column add + this line, not a
+            # router change. (Brief BRIEF-breeding-premium-gating §5 P2.)
+            "can_use_analytics": plan.can_use_breeding,
             "max_photos_per_tarantula": plan.max_photos_per_tarantula,
             "has_priority_support": plan.has_priority_support,
             "is_premium": plan.name != "free"

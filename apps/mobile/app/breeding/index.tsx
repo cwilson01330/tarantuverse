@@ -47,6 +47,7 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { apiClient } from '../../src/services/api';
+import { getErrorMessage } from '../../src/utils/errors';
 
 // ─── Inline types — match the response_model shapes on the API ────────
 
@@ -141,9 +142,30 @@ function BreedingOverviewScreen() {
   const [offspring, setOffspring] = useState<Offspring[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // null = entitlement not yet known; true/false once /limits resolves.
+  const [canBreed, setCanBreed] = useState<boolean | null>(null);
 
   const fetchAll = useCallback(async () => {
     try {
+      // Entitlement first — breeding is a premium feature. The list GETs
+      // aren't server-gated (they'd just return empty for free users),
+      // so we read the limits to decide whether to show the upsell wall
+      // instead of a misleading "no records yet" empty state.
+      let breeding = false;
+      try {
+        const limits = await apiClient.get('/promo-codes/me/limits');
+        breeding = !!limits.data?.can_use_breeding;
+      } catch {
+        // If limits can't be read, fail open to the list (the create
+        // endpoints still enforce the 402 server-side).
+        breeding = true;
+      }
+      setCanBreed(breeding);
+      if (!breeding) {
+        setLoadError(null);
+        return;
+      }
+
       // All three in parallel — independent of each other and the
       // overview always needs all three.
       const [p, s, o] = await Promise.all([
@@ -156,11 +178,7 @@ function BreedingOverviewScreen() {
       setOffspring(o.data);
       setLoadError(null);
     } catch (err: any) {
-      setLoadError(
-        err?.response?.data?.detail ||
-          err?.message ||
-          "Couldn't load breeding records.",
-      );
+      setLoadError(getErrorMessage(err, "Couldn't load breeding records."));
     }
   }, []);
 
@@ -223,9 +241,7 @@ function BreedingOverviewScreen() {
           } catch (err: any) {
             Alert.alert(
               "Couldn't delete",
-              err?.response?.data?.detail ||
-                err?.message ||
-                'Try again in a moment.',
+              getErrorMessage(err, 'Try again in a moment.'),
             );
           }
         },
@@ -235,6 +251,62 @@ function BreedingOverviewScreen() {
 
   const allLoaded =
     pairings !== null && eggSacs !== null && offspring !== null;
+
+  // ─── Premium gate (web parity) ──────────────────────────────────────
+  // Free keepers see an upsell wall instead of an empty list. Mirrors the
+  // web 💎 "Breeding Module — Premium Feature" screen.
+  if (canBreed === false) {
+    return (
+      <SafeAreaView
+        edges={['left', 'right', 'bottom']}
+        style={[styles.safeArea, { backgroundColor: colors.background }]}
+      >
+        <AppHeader title="Breeding" leftAction={backButton} />
+        <ScrollView contentContainerStyle={styles.gateScroll}>
+          <View style={styles.gateIconWrap}>
+            <Text style={styles.gateIcon}>💎</Text>
+          </View>
+          <Text style={[styles.gateTitle, { color: colors.textPrimary }]}>
+            Breeding is a Premium feature
+          </Text>
+          <Text style={[styles.gateSubtitle, { color: colors.textSecondary }]}>
+            Track pairings, egg sacs, and offspring across the whole season —
+            plus breeding analytics — with Tarantuverse Premium.
+          </Text>
+
+          <View
+            style={[
+              styles.gateCard,
+              { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
+            ]}
+          >
+            {[
+              'Unlimited pairings, egg sacs & offspring',
+              'Egg-sac → offspring lifecycle tracking',
+              'Bulk offspring records & status updates',
+              'Breeding success analytics',
+            ].map((line) => (
+              <View key={line} style={styles.gateFeatureRow}>
+                <Text style={styles.gateCheck}>✓</Text>
+                <Text style={[styles.gateFeatureText, { color: colors.textSecondary }]}>
+                  {line}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={styles.gateButton}
+            onPress={() => router.push('/subscription' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="View premium plans"
+          >
+            <Text style={styles.gateButtonText}>View Premium Plans</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -626,6 +698,70 @@ const styles = StyleSheet.create({
   trashButton: {
     padding: 4,
     marginLeft: 4,
+  },
+
+  // ─── Premium gate wall ────────────────────────────────────────────
+  gateScroll: {
+    padding: 24,
+    paddingTop: 32,
+    alignItems: 'center',
+  },
+  gateIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    backgroundColor: 'rgba(168,85,247,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  gateIcon: { fontSize: 36 },
+  gateTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  gateSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  gateCard: {
+    width: '100%',
+    borderWidth: 1,
+    padding: 18,
+    gap: 12,
+    marginBottom: 24,
+  },
+  gateFeatureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  gateCheck: {
+    color: '#a855f7',
+    fontSize: 16,
+    fontWeight: '700',
+    marginRight: 10,
+    marginTop: 1,
+  },
+  gateFeatureText: {
+    fontSize: 14,
+    flex: 1,
+    lineHeight: 20,
+  },
+  gateButton: {
+    width: '100%',
+    backgroundColor: '#a855f7',
+    paddingVertical: 15,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  gateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
 

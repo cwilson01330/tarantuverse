@@ -22,7 +22,7 @@ export default function PricingScreen() {
       period: '/forever',
       description: 'Perfect for casual keepers with small collections',
       features: [
-        'Up to 20 animals',
+        'Up to 15 animals',
         '5 photos per animal',
         'Feeding & molt tracking',
         'Basic analytics',

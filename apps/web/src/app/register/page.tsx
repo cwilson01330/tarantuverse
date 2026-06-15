@@ -170,7 +170,7 @@ function RegisterForm() {
       <div className="w-full max-w-md">
         <h1 className="text-4xl font-bold mb-2 text-center">Create Account</h1>
         <p className="text-center text-sm text-theme-secondary mb-6">
-          Free forever for up to 20 animals · No credit card required
+          Free forever for up to 15 animals · No credit card required
         </p>
 
         {error && (

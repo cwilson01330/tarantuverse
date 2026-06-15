@@ -90,6 +90,7 @@ export default function AdvancedAnalyticsPage() {
   const [analytics, setAnalytics] = useState<AdvancedAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gated, setGated] = useState(false);
 
   const fetchAdvancedAnalytics = useCallback(async () => {
     try {
@@ -97,11 +98,22 @@ export default function AdvancedAnalyticsPage() {
       const response = await apiClient.get("/api/v1/analytics/advanced/");
       setAnalytics(response.data);
       setError(null);
+      setGated(false);
     } catch (err: any) {
       console.error("Failed to fetch advanced analytics:", err);
-      setError(err.response?.data?.detail || "Failed to load advanced analytics");
-      if (err.response?.status === 401) {
+      if (err.response?.status === 402) {
+        // Server now enforces the premium gate (P2). Show the upsell, not
+        // a raw error — detail is an object here, never set it as a string.
+        setGated(true);
+      } else if (err.response?.status === 401) {
         router.push("/login");
+      } else {
+        const detail = err.response?.data?.detail;
+        setError(
+          typeof detail === "string"
+            ? detail
+            : detail?.message || "Failed to load advanced analytics"
+        );
       }
     } finally {
       setLoading(false);
@@ -138,6 +150,40 @@ export default function AdvancedAnalyticsPage() {
               </Card>
             ))}
           </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (gated) {
+    return (
+      <DashboardLayout
+        userName={user?.name ?? undefined}
+        userEmail={user?.email ?? undefined}
+        userAvatar={user?.image ?? undefined}
+      >
+        <div className="container mx-auto p-6">
+          <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-white">
+            ✨ Advanced Analytics
+          </h1>
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+            <CardContent className="p-8 text-center">
+              <div className="text-5xl mb-4">💎</div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                Advanced Analytics is a Premium feature
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+                Collection value, molt heatmaps, growth timelines, species and
+                cost breakdowns — unlock the full picture with Premium.
+              </p>
+              <button
+                onClick={() => router.push("/pricing")}
+                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold"
+              >
+                View Premium Plans
+              </button>
+            </CardContent>
+          </Card>
         </div>
       </DashboardLayout>
     );

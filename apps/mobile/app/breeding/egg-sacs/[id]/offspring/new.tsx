@@ -34,9 +34,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../../../../src/components/AppHeader';
 import { withErrorBoundary } from '../../../../../src/components/ErrorBoundary';
 import DateInput from '../../../../../src/components/DateInput';
+import UpgradeModal from '../../../../../src/components/UpgradeModal';
 import { useTheme } from '../../../../../src/contexts/ThemeContext';
 import { apiClient } from '../../../../../src/services/api';
 import { toISODateLocal } from '../../../../../src/utils/date';
+import { getErrorMessage, isPaymentRequired } from '../../../../../src/utils/errors';
 
 type Status = 'kept' | 'sold' | 'traded' | 'given_away' | 'died' | 'unknown';
 
@@ -69,6 +71,7 @@ function NewOffspringScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   async function handleSubmit() {
     if (submitting) return;
@@ -102,11 +105,12 @@ function NewOffspringScreen() {
       const res = await apiClient.post('/offspring/', payload);
       router.replace(`/breeding/offspring/${res.data.id}` as never);
     } catch (err: any) {
-      setError(
-        err?.response?.data?.detail ||
-          err?.message ||
-          "Couldn't save this offspring.",
-      );
+      if (isPaymentRequired(err)) {
+        setShowUpgradeModal(true);
+        setSubmitting(false);
+        return;
+      }
+      setError(getErrorMessage(err, "Couldn't save this offspring."));
       setSubmitting(false);
     }
   }
@@ -256,6 +260,14 @@ function NewOffspringScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Upgrade to Premium"
+        message="Unlock the full breeding module"
+        feature="Breeding"
+      />
     </SafeAreaView>
   );
 }

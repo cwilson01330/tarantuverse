@@ -13,6 +13,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import UpgradeModal from '../../src/components/UpgradeModal';
+import { isPaymentRequired } from '../../src/utils/errors';
 
 interface MoltHeatmapEntry {
   month: string;
@@ -74,6 +76,8 @@ export default function AdvancedAnalyticsScreen() {
   );
   const [analytics, setAnalytics] = useState<AdvancedAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [gated, setGated] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     fetchAdvancedAnalytics();
@@ -84,8 +88,14 @@ export default function AdvancedAnalyticsScreen() {
       setLoading(true);
       const response = await apiClient.get('/analytics/advanced/');
       setAnalytics(response.data);
-    } catch (error) {
-      console.error('Failed to fetch advanced analytics:', error);
+      setGated(false);
+    } catch (error: any) {
+      if (isPaymentRequired(error)) {
+        // Server now enforces the premium gate (previously client-only).
+        setGated(true);
+      } else {
+        console.error('Failed to fetch advanced analytics:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -308,6 +318,46 @@ export default function AdvancedAnalyticsScreen() {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      </View>
+    );
+  }
+
+  if (gated) {
+    return (
+      <View style={styles.container}>
+        <AppHeader title="✨ Advanced Analytics" leftAction={backButton} />
+        <ScrollView contentContainerStyle={{ padding: 24, alignItems: 'center' }}>
+          <Text style={{ fontSize: 40, marginTop: 16, marginBottom: 12 }}>💎</Text>
+          <Text style={[styles.emptyTitle, { textAlign: 'center' }]}>
+            Advanced Analytics is Premium
+          </Text>
+          <Text style={[styles.emptyText, { textAlign: 'center', marginBottom: 24 }]}>
+            Collection value, molt heatmaps, growth timelines, species and cost
+            breakdowns — unlock the full picture with Tarantuverse Premium.
+          </Text>
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#a855f7',
+              paddingVertical: 14,
+              paddingHorizontal: 28,
+              borderRadius: 14,
+            }}
+            onPress={() => setShowUpgradeModal(true)}
+            accessibilityRole="button"
+            accessibilityLabel="View premium plans"
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>
+              View Premium Plans
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+        <UpgradeModal
+          visible={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          title="Upgrade to Premium"
+          message="Unlock advanced analytics & insights"
+          feature="Advanced Analytics"
+        />
       </View>
     );
   }

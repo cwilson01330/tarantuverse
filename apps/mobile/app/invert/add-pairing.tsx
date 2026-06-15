@@ -12,11 +12,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import UpgradeModal from '../../src/components/UpgradeModal';
 import {
   getInvert, listInvertsByTaxon, createInvertPairing, invertDisplayName,
   type Invert,
 } from '../../src/lib/inverts';
 import { toISODateLocal } from '../../src/utils/date';
+import { getErrorMessage, isPaymentRequired } from '../../src/utils/errors';
 
 const TYPE_OPTIONS = [
   { value: 'natural', label: 'Natural' },
@@ -36,6 +38,7 @@ export default function AddInvertPairingScreen() {
   const [date, setDate] = useState(toISODateLocal(new Date()));
   const [pairType, setPairType] = useState('natural');
   const [saving, setSaving] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -62,10 +65,10 @@ export default function AddInvertPairingScreen() {
       });
       router.back();
     } catch (err: any) {
-      if (err?.response?.status === 402) {
-        Alert.alert('Premium feature', 'Breeding tracking is a premium feature.');
+      if (isPaymentRequired(err)) {
+        setShowUpgradeModal(true);
       } else {
-        Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.');
+        Alert.alert('Could not save', getErrorMessage(err));
       }
     } finally {
       setSaving(false);
@@ -124,6 +127,14 @@ export default function AddInvertPairingScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        title="Upgrade to Premium"
+        message="Unlock the full breeding module"
+        feature="Breeding"
+      />
     </View>
   );
 }

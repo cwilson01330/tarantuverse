@@ -35,12 +35,15 @@ interface GrowthAnalytics {
 
 interface GrowthChartProps {
   data: GrowthAnalytics;
+  /** Label for the linear measurement — "Leg Span" for spiders (default),
+   *  "Body Length" for scorpions/centipedes etc. (ADR-008 growth module). */
+  lengthLabel?: string;
 }
 
 type DateRange = 'all' | '1y' | '6m' | '3m';
 type Metric = 'weight' | 'leg_span' | 'both';
 
-const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
+const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span' }) => {
   const { colors } = useTheme();
   const [dateRange, setDateRange] = useState<DateRange>('all');
   const [metric, setMetric] = useState<Metric>('both');
@@ -129,7 +132,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
             disabled={!hasLegSpanData}
           >
             <Text style={[styles.buttonText, { color: colors.textSecondary }, metric === 'leg_span' && { color: colors.primary }, !hasLegSpanData && { color: colors.textTertiary }]}>
-              Leg Span
+              {lengthLabel}
             </Text>
           </TouchableOpacity>
         </View>
@@ -238,7 +241,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data }) => {
         )}
         {(metric === 'both' || metric === 'leg_span') && hasLegSpanData && (
           <View style={styles.chartWrapper}>
-            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>Leg Span (cm)</Text>
+            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>{lengthLabel} (cm)</Text>
             <LineChart
               data={{
                 labels: chartData.map((d) => d.date),

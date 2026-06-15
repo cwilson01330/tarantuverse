@@ -12,7 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.invert import Invert
-from app.models.user import User
+from app.models.user import User, FREE_TIER_MAX_ANIMALS
 
 
 def enforce_collection_limit(db: Session, user: User) -> None:
@@ -23,7 +23,7 @@ def enforce_collection_limit(db: Session, user: User) -> None:
     reflects only existing records.
     """
     limits = user.get_subscription_limits()
-    max_animals = limits.get("max_animals", 20)
+    max_animals = limits.get("max_animals", FREE_TIER_MAX_ANIMALS)
 
     # -1 means unlimited (premium / verified).
     if max_animals == -1:

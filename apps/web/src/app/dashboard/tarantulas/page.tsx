@@ -407,8 +407,8 @@ export default function TarantulasPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tarantula Count Warning */}
         {!subscriptionLimits?.is_premium &&
-         allAnimals.length >= (subscriptionLimits?.max_animals ?? 20) - 5 &&
-         allAnimals.length < (subscriptionLimits?.max_animals ?? 20) &&
+         allAnimals.length >= (subscriptionLimits?.max_animals ?? 15) - 5 &&
+         allAnimals.length < (subscriptionLimits?.max_animals ?? 15) &&
          showWarning && (
           <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 shadow-lg">
             <div className="flex items-start justify-between">
@@ -419,7 +419,7 @@ export default function TarantulasPage() {
                     Approaching Free Tier Limit
                   </h3>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    You have <strong>{allAnimals.length} of {subscriptionLimits?.max_animals ?? 20}</strong> animals on the free plan.
+                    You have <strong>{allAnimals.length} of {subscriptionLimits?.max_animals ?? 15}</strong> animals on the free plan.
                     Upgrade to Premium for unlimited tracking!
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -451,7 +451,7 @@ export default function TarantulasPage() {
             <div className="mt-3 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(allAnimals.length / (subscriptionLimits?.max_animals ?? 20)) * 100}%` }}
+                style={{ width: `${(allAnimals.length / (subscriptionLimits?.max_animals ?? 15)) * 100}%` }}
               />
             </div>
           </div>
@@ -834,7 +834,7 @@ export default function TarantulasPage() {
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         feature="Unlimited Animals"
-        description="You've reached the free tier limit of 20 animals. Upgrade to Premium for unlimited tracking!"
+        description="You've reached the free tier limit of 15 animals. Upgrade to Premium for unlimited tracking!"
       />
     </DashboardLayout>
   )
