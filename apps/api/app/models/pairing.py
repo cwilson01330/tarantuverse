@@ -29,8 +29,11 @@ class Pairing(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    male_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="CASCADE"), nullable=False, index=True)
-    female_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Nullable since ADR-010 Phase C: invert-only pairings (e.g. scorpions)
+    # populate male_invert_id/female_invert_id instead. Tarantula pairings
+    # still set both (shared PK).
+    male_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="CASCADE"), nullable=True, index=True)
+    female_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="CASCADE"), nullable=True, index=True)
     # ADR-010 Phase A — generic parents on the unified `inverts` surface.
     # Backfilled verbatim from male_id/female_id (Invert.id == Tarantula.id).
     # Nullable during expand; becomes the canonical parent ref at contract.

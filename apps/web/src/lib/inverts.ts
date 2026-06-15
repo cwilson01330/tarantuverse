@@ -53,7 +53,7 @@ export function isInvertTaxon(t: string | null | undefined): t is InvertTaxon {
 export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding'
 
 export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
-  scorpion: ['growth'],
+  scorpion: ['growth', 'breeding'], // breeding pilot — ADR-010 Phase D
   centipede: ['growth'],
   whip_spider: [],
   vinegaroon: [],

@@ -15,6 +15,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import GrowthChart from '@/components/GrowthChart'
+import { taxonHasModule, growthLengthLabel } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -69,6 +71,18 @@ export default function InvertDetailPage() {
   const [molts, setMolts] = useState<MoltLog[]>([])
   const [substrate, setSubstrate] = useState<SubstrateChange[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [growth, setGrowth] = useState<any | null>(null)
+  // Breeding module (registry-gated, ADR-010 Phase D)
+  const [pairings, setPairings] = useState<any[]>([])
+  const [mates, setMates] = useState<Invert[]>([])
+  const [pairOpen, setPairOpen] = useState(false)
+  const [pairMateId, setPairMateId] = useState('')
+  const [pairDate, setPairDate] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })
+  const [pairType, setPairType] = useState('natural')
+  const [pairBusy, setPairBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -90,16 +104,32 @@ export default function InvertDetailPage() {
 
       // Logs go through the generic /inverts/{id}/… endpoints (ADR-007),
       // so this works for every taxon without a per-taxon prefix.
-      const [f, m, s, p] = await Promise.all([
+      const [f, m, s, p, g] = await Promise.all([
         fetch(`${API_URL}/api/v1/inverts/${id}/feedings`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
         fetch(`${API_URL}/api/v1/inverts/${id}/molts`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
         fetch(`${API_URL}/api/v1/inverts/${id}/substrate-changes`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
         fetch(`${API_URL}/api/v1/inverts/${id}/photos`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        // Growth module is registry-gated (ADR-008) — only fetch where enabled
+        taxonHasModule(data.taxon, 'growth')
+          ? fetch(`${API_URL}/api/v1/inverts/${id}/growth`, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+          : Promise.resolve(null),
       ])
       setFeedings(Array.isArray(f) ? f : [])
       setMolts(Array.isArray(m) ? m : [])
       setSubstrate(Array.isArray(s) ? s : [])
       setPhotos(Array.isArray(p) ? p : [])
+      setGrowth(g)
+
+      // Breeding module (registry-gated — ADR-010 Phase D). Fetch this
+      // animal's pairings + the same-taxon collection for the mate picker.
+      if (taxonHasModule(data.taxon, 'breeding')) {
+        const [pr, coll] = await Promise.all([
+          fetch(`${API_URL}/api/v1/inverts/${id}/pairings`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+          fetch(`${API_URL}/api/v1/inverts/?taxon=${data.taxon}`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        ])
+        setPairings(Array.isArray(pr) ? pr : [])
+        setMates((Array.isArray(coll) ? coll : []).filter((x: Invert) => x.id !== id))
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong.')
     } finally {
@@ -159,6 +189,45 @@ export default function InvertDetailPage() {
       if (!res.ok && res.status !== 204) throw new Error()
       fetchAll()
     } catch { alert('Could not delete photo.') }
+  }
+
+  const createPairing = async () => {
+    if (!token || !invert || pairBusy) return
+    if (!pairMateId) { alert('Pick a mate.'); return }
+    setPairBusy(true)
+    try {
+      // Infer male/female from this animal's sex (default self→male unless
+      // explicitly female). The pairing's parents can be refined later; the
+      // backend validates same-taxon, not sex.
+      const selfFemale = invert.sex === 'female'
+      const body = {
+        male_invert_id: selfFemale ? pairMateId : invert.id,
+        female_invert_id: selfFemale ? invert.id : pairMateId,
+        paired_date: pairDate,
+        pairing_type: pairType,
+      }
+      const res = await fetch(`${API_URL}/api/v1/inverts/pairings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      })
+      if (res.status === 402) { alert('Breeding is a premium feature.'); return }
+      if (!res.ok) throw new Error()
+      setPairOpen(false)
+      setPairMateId('')
+      fetchAll()
+    } catch {
+      alert('Could not create the pairing. Please try again.')
+    } finally {
+      setPairBusy(false)
+    }
+  }
+
+  // Resolve the "other parent" name for a pairing row.
+  const mateName = (p: any): string => {
+    const otherId = p.male_invert_id === id ? p.female_invert_id : p.male_invert_id
+    const m = mates.find((x) => x.id === otherId)
+    return m ? displayName(m) : 'Unknown mate'
   }
 
   // Build an edit query string (logId triggers edit mode on the add-* page).
@@ -290,6 +359,35 @@ export default function InvertDetailPage() {
                 onDelete: () => deleteLog(`molts/${x.id}`, 'molt'),
               }))}
             />
+
+            {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot) */}
+            {invert && taxonHasModule(invert.taxon, 'growth') && growth && growth.total_molts > 0 && (
+              <GrowthChart data={growth} lengthLabel={growthLengthLabel(invert.taxon)} />
+            )}
+
+            {/* Breeding module (registry-gated — ADR-010 Phase D) */}
+            {invert && taxonHasModule(invert.taxon, 'breeding') && (
+              <Section title="Breeding" action={{ label: '+ New pairing', onClick: () => setPairOpen(true) }}>
+                {pairings.length === 0 ? (
+                  <p className="text-sm text-theme-tertiary">
+                    No pairings yet. Pair this {meta?.label.toLowerCase()} with another from your collection to start tracking.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {pairings.map((p) => (
+                      <div key={p.id} className="p-3 rounded-lg border border-theme">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-theme-primary">with {mateName(p)}</span>
+                          <span className="text-xs text-theme-tertiary capitalize">{(p.outcome || '').replace(/_/g, ' ')}</span>
+                        </div>
+                        <p className="text-xs text-theme-tertiary mt-0.5">Paired {formatLocalDate(p.paired_date)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Section>
+            )}
+
             <LogSection
               title="Substrate changes"
               cta="Log substrate change"
@@ -349,6 +447,81 @@ export default function InvertDetailPage() {
           </>
         )}
       </div>
+
+      {/* New pairing modal (breeding module) */}
+      {pairOpen && invert && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !pairBusy && setPairOpen(false)}
+        >
+          <div
+            className="w-full max-w-md bg-surface rounded-2xl p-6 border border-theme"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-theme-primary mb-1">New pairing</h3>
+            <p className="text-sm text-theme-tertiary mb-4">
+              Pair {displayName(invert)} with another {meta?.label.toLowerCase()} from your collection.
+            </p>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-theme-tertiary mb-1">Mate</label>
+            <select
+              value={pairMateId}
+              onChange={(e) => setPairMateId(e.target.value)}
+              className="w-full mb-1 px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary"
+            >
+              <option value="">Select…</option>
+              {mates.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {displayName(m)}{m.sex ? ` (${m.sex})` : ''}
+                </option>
+              ))}
+            </select>
+            {mates.length === 0 && (
+              <p className="text-xs text-theme-tertiary mb-3">
+                No other {meta?.label.toLowerCase()}s in your collection yet — add one to pair.
+              </p>
+            )}
+            <div className="grid grid-cols-2 gap-4 mt-3 mb-5">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-theme-tertiary mb-1">Paired date</label>
+                <input
+                  type="date"
+                  value={pairDate}
+                  onChange={(e) => setPairDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wide text-theme-tertiary mb-1">Type</label>
+                <select
+                  value={pairType}
+                  onChange={(e) => setPairType(e.target.value)}
+                  className="w-full px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary capitalize"
+                >
+                  <option value="natural">Natural</option>
+                  <option value="assisted">Assisted</option>
+                  <option value="forced">Forced</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setPairOpen(false)}
+                disabled={pairBusy}
+                className="px-4 py-2 text-sm font-medium text-theme-secondary hover:text-theme-primary transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createPairing}
+                disabled={pairBusy || !pairMateId}
+                className="px-4 py-2 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700 transition disabled:opacity-50"
+              >
+                {pairBusy ? 'Saving…' : 'Create pairing'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   )
 }
