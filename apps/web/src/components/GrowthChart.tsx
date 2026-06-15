@@ -38,11 +38,14 @@ interface GrowthAnalytics {
 
 interface GrowthChartProps {
   data: GrowthAnalytics;
+  /** Label for the linear measurement — "Leg Span" for spiders (default),
+   *  "Body Length" for scorpions/centipedes etc. (ADR-008 growth module). */
+  lengthLabel?: string;
 }
 
 type DateRange = "all" | "1y" | "6m" | "3m";
 
-export default function GrowthChart({ data }: GrowthChartProps) {
+export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthChartProps) {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === "dark";
 
@@ -145,7 +148,7 @@ export default function GrowthChart({ data }: GrowthChartProps) {
                   : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               }`}
             >
-              Leg Span
+              {lengthLabel}
             </button>
           </div>
 
@@ -257,7 +260,7 @@ export default function GrowthChart({ data }: GrowthChartProps) {
                 orientation="right"
                 tick={tickStyle}
                 label={{
-                  value: "Leg Span (cm)",
+                  value: `${lengthLabel} (cm)`,
                   angle: 90,
                   position: "insideRight",
                   style: labelStyle,
@@ -269,7 +272,7 @@ export default function GrowthChart({ data }: GrowthChartProps) {
               formatter={(value, name) => {
                 if (name === "weight") return [`${(value as number).toFixed(1)}g`, "Weight"];
                 if (name === "legSpan")
-                  return [`${(value as number).toFixed(1)} cm`, "Leg Span"];
+                  return [`${(value as number).toFixed(1)} cm`, lengthLabel];
                 return [value, name || ""];
               }}
             />
@@ -295,7 +298,7 @@ export default function GrowthChart({ data }: GrowthChartProps) {
                   stroke="#3b82f6"
                   strokeWidth={2}
                   dot={{ fill: "#3b82f6", r: 4 }}
-                  name="Leg Span"
+                  name={lengthLabel}
                   connectNulls
                 />
               )}
