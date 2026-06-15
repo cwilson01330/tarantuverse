@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import GrowthChart from '@/components/GrowthChart'
+import UpgradeModal from '@/components/UpgradeModal'
 import { taxonHasModule, growthLengthLabel } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 
@@ -83,6 +84,7 @@ export default function InvertDetailPage() {
   })
   const [pairType, setPairType] = useState('natural')
   const [pairBusy, setPairBusy] = useState(false)
+  const [showUpgrade, setShowUpgrade] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -211,7 +213,7 @@ export default function InvertDetailPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       })
-      if (res.status === 402) { alert('Breeding is a premium feature.'); return }
+      if (res.status === 402) { setPairOpen(false); setShowUpgrade(true); return }
       if (!res.ok) throw new Error()
       setPairOpen(false)
       setPairMateId('')
@@ -522,6 +524,13 @@ export default function InvertDetailPage() {
           </div>
         </div>
       )}
+
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        feature="Breeding Module"
+        description="Track pairings, egg sacs, and offspring across the season. Upgrade to unlock breeding for your whole collection."
+      />
     </DashboardLayout>
   )
 }

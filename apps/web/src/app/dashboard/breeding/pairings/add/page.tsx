@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
+import UpgradeModal from '@/components/UpgradeModal'
 import DateInput from '@/components/DateInput'
 import { toISODateLocal } from '@/lib/date'
 
@@ -56,6 +57,7 @@ export default function AddPairingPage() {
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -152,9 +154,15 @@ export default function AddPairingPage() {
         body: JSON.stringify(submitData),
       })
 
+      if (response.status === 402) {
+        setShowUpgrade(true)
+        setLoading(false)
+        return
+      }
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to create pairing')
+        const errorData = await response.json().catch(() => ({}))
+        const d = errorData.detail
+        throw new Error(typeof d === 'string' ? d : d?.message || 'Failed to create pairing')
       }
 
       // Success - redirect to breeding page
@@ -391,6 +399,13 @@ export default function AddPairingPage() {
           </form>
         )}
       </div>
+
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        feature="Breeding Module"
+        description="Record pairings, egg sacs, and offspring across the season. Upgrade to unlock the breeding module."
+      />
     </DashboardLayout>
   )
 }

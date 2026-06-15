@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
+import UpgradeModal from '@/components/UpgradeModal'
 import DateInput from '@/components/DateInput'
 import { formatLocalDate } from '@/lib/date'
 
@@ -58,6 +59,7 @@ function AddOffspringInner() {
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -148,9 +150,15 @@ function AddOffspringInner() {
         body: JSON.stringify(submitData),
       })
 
+      if (response.status === 402) {
+        setShowUpgrade(true)
+        setLoading(false)
+        return
+      }
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to create offspring record')
+        const errorData = await response.json().catch(() => ({}))
+        const d = errorData.detail
+        throw new Error(typeof d === 'string' ? d : d?.message || 'Failed to create offspring record')
       }
 
       // Success - redirect to breeding page
@@ -364,6 +372,13 @@ function AddOffspringInner() {
           </form>
         )}
       </div>
+
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        feature="Breeding Module"
+        description="Record pairings, egg sacs, and offspring across the season. Upgrade to unlock the breeding module."
+      />
     </DashboardLayout>
   )
 }

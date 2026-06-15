@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
+import UpgradeModal from '@/components/UpgradeModal'
 import DateInput from '@/components/DateInput'
 import { toISODateLocal } from '@/lib/date'
 
@@ -52,6 +53,7 @@ function AddEggSacInner() {
   const [pairings, setPairings] = useState<Pairing[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -143,9 +145,15 @@ function AddEggSacInner() {
         body: JSON.stringify(submitData),
       })
 
+      if (response.status === 402) {
+        setShowUpgrade(true)
+        setLoading(false)
+        return
+      }
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to create egg sac')
+        const errorData = await response.json().catch(() => ({}))
+        const d = errorData.detail
+        throw new Error(typeof d === 'string' ? d : d?.message || 'Failed to create egg sac')
       }
 
       // Success - redirect to breeding page
@@ -403,6 +411,13 @@ function AddEggSacInner() {
           </form>
         )}
       </div>
+
+      <UpgradeModal
+        isOpen={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        feature="Breeding Module"
+        description="Record pairings, egg sacs, and offspring across the season. Upgrade to unlock the breeding module."
+      />
     </DashboardLayout>
   )
 }
