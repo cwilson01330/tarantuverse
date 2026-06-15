@@ -31,6 +31,11 @@ class Pairing(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     male_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="CASCADE"), nullable=False, index=True)
     female_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="CASCADE"), nullable=False, index=True)
+    # ADR-010 Phase A — generic parents on the unified `inverts` surface.
+    # Backfilled verbatim from male_id/female_id (Invert.id == Tarantula.id).
+    # Nullable during expand; becomes the canonical parent ref at contract.
+    male_invert_id = Column(UUID(as_uuid=True), ForeignKey("inverts.id", ondelete="CASCADE"), nullable=True, index=True)
+    female_invert_id = Column(UUID(as_uuid=True), ForeignKey("inverts.id", ondelete="CASCADE"), nullable=True, index=True)
 
     paired_date = Column(Date, nullable=False, index=True)
     separated_date = Column(Date, nullable=True)
@@ -61,4 +66,9 @@ class Pairing(Base):
     user = relationship("User", back_populates="pairings")
     male = relationship("Tarantula", foreign_keys=[male_id], back_populates="pairings_as_male")
     female = relationship("Tarantula", foreign_keys=[female_id], back_populates="pairings_as_female")
+    # No backref to Invert: the DB ON DELETE CASCADE handles parent deletion,
+    # and a backref without passive_deletes would try to NULL these on invert
+    # delete (the bug class fixed 2026-06-11). Read-only nav only.
+    male_invert = relationship("Invert", foreign_keys=[male_invert_id])
+    female_invert = relationship("Invert", foreign_keys=[female_invert_id])
     egg_sacs = relationship("EggSac", back_populates="pairing", cascade="all, delete-orphan")

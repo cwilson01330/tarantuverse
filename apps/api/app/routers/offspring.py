@@ -86,9 +86,12 @@ async def create_offspring_record(
         if not tarantula:
             raise HTTPException(status_code=404, detail="Tarantula not found")
 
-    # Create offspring record
+    # Create offspring record. ADR-010 dual-write: mirror the kept-link onto
+    # the generic invert ref (a kept offspring's tarantula shares its primary
+    # key with its Invert row).
     new_offspring = Offspring(
         user_id=current_user.id,
+        invert_id=offspring_data.tarantula_id,
         **offspring_data.model_dump()
     )
 

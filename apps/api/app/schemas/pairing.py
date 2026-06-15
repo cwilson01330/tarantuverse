@@ -41,6 +41,10 @@ class PairingResponse(PairingBase):
     id: uuid.UUID
     user_id: uuid.UUID
     created_at: date
+    # ADR-010 — generic parent refs on the inverts surface (Phase A:
+    # populated by dual-write; equal to male_id/female_id for tarantulas).
+    male_invert_id: Optional[uuid.UUID] = None
+    female_invert_id: Optional[uuid.UUID] = None
 
     class Config:
         from_attributes = True

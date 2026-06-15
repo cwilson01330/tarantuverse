@@ -41,6 +41,9 @@ class OffspringResponse(OffspringBase):
     id: uuid.UUID
     user_id: uuid.UUID
     created_at: date
+    # ADR-010 — generic "kept" link on the inverts surface (equals
+    # tarantula_id for tarantula offspring).
+    invert_id: Optional[uuid.UUID] = None
 
     class Config:
         from_attributes = True

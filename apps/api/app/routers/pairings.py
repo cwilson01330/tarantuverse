@@ -84,9 +84,13 @@ async def create_pairing(
     if not female:
         raise HTTPException(status_code=404, detail="Female tarantula not found")
 
-    # Create pairing
+    # Create pairing. ADR-010 dual-write: also populate the generic invert
+    # parent refs. The tarantula's mirrored Invert shares its primary key
+    # (Invert.id == Tarantula.id), so the ids are identical.
     new_pairing = Pairing(
         user_id=current_user.id,
+        male_invert_id=pairing_data.male_id,
+        female_invert_id=pairing_data.female_id,
         **pairing_data.model_dump()
     )
 

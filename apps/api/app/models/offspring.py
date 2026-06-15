@@ -28,6 +28,9 @@ class Offspring(Base):
 
     # Optional link to tarantula record if kept in collection
     tarantula_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="SET NULL"), nullable=True, index=True)
+    # ADR-010 Phase A — generic "kept" link on the unified `inverts` surface.
+    # Backfilled verbatim from tarantula_id (Invert.id == Tarantula.id).
+    invert_id = Column(UUID(as_uuid=True), ForeignKey("inverts.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # The offspringstatus PG enum was created with the lowercase Python
     # enum *values* ("kept", "sold", "given_away", …). SQLAlchemy defaults
@@ -52,3 +55,6 @@ class Offspring(Base):
     user = relationship("User", back_populates="offspring")
     egg_sac = relationship("EggSac", back_populates="offspring")
     tarantula = relationship("Tarantula", back_populates="offspring_record")
+    # Read-only nav; DB SET NULL handles parent deletion (no backref — see
+    # pairing.py note on the passive_deletes bug class).
+    invert = relationship("Invert", foreign_keys=[invert_id])
