@@ -54,6 +54,9 @@ export default function ClaimPage() {
   const [preview, setPreview] = useState<Preview | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'claiming' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
+  // True when the register page flagged this claim as the reason for a brand-new
+  // signup (BRIEF §6 resume-path marker). Drives an authoritative was_new_signup.
+  const [fromSignup, setFromSignup] = useState(false)
 
   const claimPath = `/claim/${token}`
 
@@ -76,6 +79,18 @@ export default function ClaimPage() {
 
   useEffect(() => { loadPreview() }, [loadPreview])
 
+  // Consume the one-shot resume-path marker set by the register page when this
+  // claim drove the signup. Consume-once (remove immediately) so a later re-claim
+  // in the same tab can't falsely reuse it. Scoped to this token via the value.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('tv_claim_new_signup') === claimPath) {
+        setFromSignup(true)
+        sessionStorage.removeItem('tv_claim_new_signup')
+      }
+    } catch {}
+  }, [claimPath])
+
   const handleClaim = useCallback(async () => {
     if (!isAuthenticated || !authToken) {
       router.push(`/login?redirect=${encodeURIComponent(claimPath)}`)
@@ -86,7 +101,13 @@ export default function ClaimPage() {
     try {
       const res = await fetch(`${API}/api/v1/transfers/${token}/claim`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          ...(fromSignup ? { 'Content-Type': 'application/json' } : {}),
+        },
+        // Assert new-signup only when we *know* it (marker present). Otherwise omit
+        // the body so the server's account-age backstop decides instead of guessing.
+        body: fromSignup ? JSON.stringify({ new_signup: true }) : undefined,
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({} as any))
@@ -102,7 +123,7 @@ export default function ClaimPage() {
       setError('Something went wrong claiming this animal. Please try again.')
       setState('ready')
     }
-  }, [isAuthenticated, authToken, token, claimPath, router, loadPreview])
+  }, [isAuthenticated, authToken, token, claimPath, router, loadPreview, fromSignup])
 
   // ── render ──────────────────────────────────────────────────────────────
   const wrap = (children: React.ReactNode) => (

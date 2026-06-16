@@ -119,6 +119,12 @@ function RegisterForm() {
         // Prefer the ?redirect=... param when present (e.g. user clicked
         // Sign up from a gated page); otherwise drop them at the dashboard.
         const target = redirectTo || '/dashboard'
+        // Resume-path marker for the transfer funnel: a claim-driven registration
+        // is a *known* new signup (BRIEF §6). The claim page consumes this one-shot
+        // flag and reports was_new_signup=true instead of relying on the heuristic.
+        if (redirectTo.startsWith('/claim/')) {
+          try { sessionStorage.setItem('tv_claim_new_signup', redirectTo) } catch {}
+        }
         router.push(target)
         router.refresh()
         return

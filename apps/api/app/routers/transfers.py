@@ -15,6 +15,7 @@ from typing import Optional
 import uuid as uuidlib
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -233,9 +234,16 @@ async def preview_transfer(
     )
 
 
+class ClaimBody(BaseModel):
+    # Resume-path marker carried by the client through register→claim. None means
+    # "client didn't assert" → server falls back to the account-age backstop.
+    new_signup: Optional[bool] = None
+
+
 @router.post("/transfers/{token}/claim")
 async def claim_transfer(
     token: str,
+    body: Optional[ClaimBody] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -349,23 +357,32 @@ async def claim_transfer(
     db.commit()
     db.refresh(new_invert)
 
-    # was_new_signup: did this claim onboard a brand-new keeper? The brief's
-    # preferred source is a resume-path marker from register→claim; until that's
-    # wired through NextAuth, use the account-age backstop (created within the
-    # last 15 min ⇒ this claim almost certainly drove the signup).
-    was_new_signup = False
-    try:
-        created = current_user.created_at
-        if created is not None:
-            if created.tzinfo is None:
-                created = created.replace(tzinfo=timezone.utc)
-            was_new_signup = (_now() - created) <= timedelta(minutes=15)
-    except Exception:
-        pass
+    # was_new_signup: did this claim onboard a brand-new keeper? Primary signal is
+    # the resume-path marker the client carries through register→claim (BRIEF §6:
+    # "known, not guessed"). When the client doesn't assert it (older client, OAuth
+    # signup, email-verification login path), fall back to the account-age backstop
+    # (account created within the last 15 min ⇒ this claim almost certainly drove
+    # the signup). signup_attribution lets the funnel separate trustworthy
+    # marker-sourced rows from backstop guesses.
+    if body is not None and body.new_signup is not None:
+        was_new_signup = body.new_signup
+        signup_attribution = "resume_marker"
+    else:
+        was_new_signup = False
+        signup_attribution = "age_backstop"
+        try:
+            created = current_user.created_at
+            if created is not None:
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                was_new_signup = (_now() - created) <= timedelta(minutes=15)
+        except Exception:
+            pass
 
     analytics_events.capture("transfer_claimed", current_user.id, {
         "taxon": new_invert.taxon,
         "was_new_signup": was_new_signup,
+        "signup_attribution": signup_attribution,
     })
     if was_new_signup:
         analytics_events.capture("transfer_signup", current_user.id, {"taxon": new_invert.taxon})
