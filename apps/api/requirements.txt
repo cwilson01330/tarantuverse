@@ -36,6 +36,9 @@ httpx==0.28.0
 stripe==11.3.0
 app-store-server-library==3.1.2
 
+# Product analytics (server-side custom events — BRIEF growth funnel)
+posthog==3.7.0
+
 # Development
 pytest==8.3.3
 pytest-asyncio==0.24.0
