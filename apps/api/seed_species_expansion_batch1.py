@@ -187,11 +187,10 @@ def seed():
             species = InvertSpecies(
                 id=uuid.uuid4(),
                 taxon=taxon,
-                scientific_name=name,
                 scientific_name_lower=name.lower(),
                 slug=_slugify(name),
                 is_verified=True,  # curated, research-backed seed data
-                **row,
+                **row,  # includes scientific_name + all care fields
             )
             db.add(species)
             added += 1
