@@ -150,7 +150,7 @@ SPECIES_DATA = [
         "common_names": ["Flat Rock Scorpion"],
         "genus": "Hadogenes", "family": "Hormuridae", "order_name": "Scorpiones",
         "care_level": "beginner", "temperament": "docile but fast", "native_region": "Southern Africa",
-        "adult_size": "up to 8 inches incl. tail (one of the longest scorpions)", "growth_rate": "very slow",
+        "adult_size": "up to 8 inches incl. tail", "growth_rate": "very slow",
         "type": "scansorial", "temperature_min": 65, "temperature_max": 80, "humidity_min": 50, "humidity_max": 60,
         "enclosure_size_adult": "14x10x10 inches with stacked flat rocks / crevices", "substrate_depth": "1-2 inches",
         "substrate_type": "sandy/rocky, mostly dry; tightly stacked flat rocks/bark for crevice hides",
