@@ -15,6 +15,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
@@ -123,7 +124,7 @@ export default function ClaimPage() {
       <div className="p-8 text-center">
         <div className="text-4xl mb-3">🔗</div>
         <p className="text-gray-700 dark:text-gray-200 font-medium mb-4">{error || 'Transfer not found.'}</p>
-        <a href="/" className="text-purple-600 dark:text-purple-400 font-semibold">Go to Tarantuverse</a>
+        <Link href="/" className="text-purple-600 dark:text-purple-400 font-semibold">Go to Tarantuverse</Link>
       </div>
     )
   }
@@ -139,7 +140,7 @@ export default function ClaimPage() {
       <div className="p-8 text-center">
         <div className="text-4xl mb-3">⏳</div>
         <p className="text-gray-700 dark:text-gray-200 font-medium mb-4">{msg}</p>
-        <a href="/" className="text-purple-600 dark:text-purple-400 font-semibold">Explore Tarantuverse</a>
+        <Link href="/" className="text-purple-600 dark:text-purple-400 font-semibold">Explore Tarantuverse</Link>
       </div>
     )
   }
@@ -218,9 +219,9 @@ export default function ClaimPage() {
         {!isAuthenticated && (
           <p className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
             New here?{' '}
-            <a href={`/register?redirect=${encodeURIComponent(claimPath)}`} className="text-purple-600 dark:text-purple-400 font-semibold">
+            <Link href={`/register?redirect=${encodeURIComponent(claimPath)}`} className="text-purple-600 dark:text-purple-400 font-semibold">
               Create a free account
-            </a>{' '}
+            </Link>{' '}
             — your new animal will be waiting.
           </p>
         )}
