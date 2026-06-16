@@ -157,7 +157,10 @@ class Invert(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", backref="inverts")
+    # foreign_keys pinned: bred_by_user_id adds a SECOND inverts→users FK path
+    # (provenance), so the owner relationship must say which column it uses or
+    # SQLAlchemy can't determine the join condition.
+    user = relationship("User", foreign_keys=[user_id], backref="inverts")
     species = relationship("InvertSpecies", backref="inverts")
     enclosure = relationship("Enclosure")
     colony = relationship("ScorpionColony")
