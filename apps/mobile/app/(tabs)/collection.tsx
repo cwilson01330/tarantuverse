@@ -12,6 +12,7 @@ import {
   TextInput,
   Platform,
   ToastAndroid,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
@@ -311,7 +312,9 @@ function CollectionScreen() {
       );
     }
 
-    if (status.days_since_last_feeding === undefined) return null;
+    // null (never fed / no accepted feeding) is just as "no data" as undefined —
+    // guard both, or `${null}d ago` renders the literal "nulld ago" badge.
+    if (status.days_since_last_feeding === undefined || status.days_since_last_feeding === null) return null;
 
     const days = status.days_since_last_feeding;
     let badgeStyle = styles.feedingBadgeGreen;
@@ -987,7 +990,7 @@ function CollectionScreen() {
               }
             />
           </View>
-          {days !== undefined && (
+          {days !== undefined && days !== null && (
             <View
               style={[styles.listBadge, { backgroundColor: feedingColor }]}
               accessibilityLabel={days === 0 ? 'Fed today' : `Last fed ${days} days ago`}
@@ -1625,7 +1628,11 @@ function CollectionScreen() {
   // Inline three-chip taxon filter — sits at the top of the list
   // header so the keeper can switch focus without leaving the screen.
   const TaxonFilterChips = () => (
-    <View style={styles.sortContainer}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.sortContainer}
+    >
       {(
         [
           { value: 'all' as const, label: 'All' },
@@ -1666,7 +1673,7 @@ function CollectionScreen() {
           </TouchableOpacity>
         );
       })}
-    </View>
+    </ScrollView>
   );
 
   // Empty state card component for when collection is empty.
