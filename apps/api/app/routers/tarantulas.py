@@ -54,8 +54,19 @@ async def get_tarantulas(
 
     Returns a list of all tarantulas owned by the current user.
     """
+    # Exclude tarantulas handed off via a transfer. The flag lives on the
+    # unified `inverts` mirror (Invert.id == Tarantula.id under dual-write),
+    # so the collection grid + count match the cap (BRIEF §4b — transfer
+    # provenance). Until C1 read-cutover, this legacy route is still what the
+    # collection screens call, so the filter has to be applied here too.
+    from app.models.invert import Invert
+    transferred_ids = db.query(Invert.id).filter(
+        Invert.user_id == current_user.id,
+        Invert.transferred_out_at.isnot(None),
+    )
     tarantulas = db.query(Tarantula).filter(
-        Tarantula.user_id == current_user.id
+        Tarantula.user_id == current_user.id,
+        Tarantula.id.notin_(transferred_ids),
     ).order_by(Tarantula.created_at.desc()).all()
 
     return tarantulas

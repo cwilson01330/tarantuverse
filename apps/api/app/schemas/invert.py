@@ -96,6 +96,13 @@ class InvertResponse(InvertBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
+    # Provenance / transfer (BRIEF-animal-transfer-provenance)
+    bred_by_user_id: Optional[uuid.UUID] = None
+    origin_keeper_name: Optional[str] = None
+    source_transfer_id: Optional[uuid.UUID] = None
+    provenance: Optional[dict] = None
+    transferred_out_at: Optional[datetime] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 

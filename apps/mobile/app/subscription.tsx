@@ -267,7 +267,21 @@ export default function SubscriptionScreen() {
   // (no IAP) we always show it so the flow is testable in dev.
   const storefrontCurrency =
     products[0]?.currency || products[0]?.currencyCode || null;
-  const showWebCheckout = !iapAvailable || storefrontCurrency === 'USD';
+  // Show the web (Stripe) link-out whenever the user otherwise has NO working
+  // purchase path, so we never strand them on a dead "coming soon":
+  //   - Expo Go / no IAP at all
+  //   - IAP available but the store returned zero products (misconfig, region,
+  //     sandbox) — the bug Cory caught: previously this hid BOTH paths
+  //   - Android always (Google permits external purchase links)
+  //   - US App Store (post-Epic external-link entitlement)
+  // When real IAP products ARE shown on a non-US iOS storefront, we still keep
+  // the link hidden to respect Apple's entitlement scope.
+  const noIapProducts = products.length === 0;
+  const showWebCheckout =
+    !iapAvailable ||
+    noIapProducts ||
+    Platform.OS === 'android' ||
+    storefrontCurrency === 'USD';
 
   const handleWebCheckout = () => {
     Linking.openURL('https://www.tarantuverse.com/pricing');
@@ -823,7 +837,11 @@ export default function SubscriptionScreen() {
               ) : productsLoaded ? (
                 <View style={styles.productCard}>
                   <Text style={styles.noProductsText}>
-                    Subscriptions coming soon!
+                    In-app subscriptions aren’t available on this device right now.
+                  </Text>
+                  <Text style={styles.noProductsText}>
+                    You can subscribe by card below — it unlocks premium on this
+                    same account.
                   </Text>
                 </View>
               ) : (

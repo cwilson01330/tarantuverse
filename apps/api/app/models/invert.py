@@ -131,6 +131,26 @@ class Invert(Base):
     visibility = Column(String(20), default='private')
     notes = Column(Text)
 
+    # Provenance / transfer ("rehome") — BRIEF-animal-transfer-provenance.
+    # bred_by_user_id: on-platform breeder if known. origin_keeper_name: free-text
+    # display fallback (off-platform seller). source_transfer_id: the transfer this
+    # record was claimed from. provenance: immutable pedigree snapshot copied on
+    # claim. transferred_out_at: set on the SOURCE record at handoff — drives the
+    # "Transferred" badge AND exclusion from the cap, counts, and reminders.
+    bred_by_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    origin_keeper_name = Column(String(120))
+    source_transfer_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("animal_transfers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    provenance = Column(JSONB, nullable=True)
+    transferred_out_at = Column(DateTime(timezone=True), nullable=True, index=True)
+
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )

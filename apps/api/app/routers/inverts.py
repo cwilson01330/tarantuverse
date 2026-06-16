@@ -94,17 +94,25 @@ async def list_inverts(
         description="Filter to a single taxon. Omit for the whole collection.",
     ),
     colony_id: Optional[UUID] = Query(None),
+    transferred: bool = Query(
+        False,
+        description="When false (default) returns only ACTIVE animals; when true "
+        "returns only animals handed off via transfer (the 'Transferred' view).",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """List the authenticated user's inverts, newest first.
 
-    Phase A1 returns rows from the new `inverts` table only — empty
-    until backfill in Phase B. Existing keepers continue to see their
-    collection via the legacy /tarantulas/ and /scorpions/ routes
-    until C1 cuts those over.
+    By default excludes transferred-out animals so the displayed collection +
+    count match what the cap enforces (BRIEF §4b). Pass `transferred=true` for
+    the separate "Transferred" history view.
     """
     query = db.query(Invert).filter(Invert.user_id == current_user.id)
+    if transferred:
+        query = query.filter(Invert.transferred_out_at.isnot(None))
+    else:
+        query = query.filter(Invert.transferred_out_at.is_(None))
     if taxon:
         query = query.filter(Invert.taxon == taxon)
     if colony_id is not None:

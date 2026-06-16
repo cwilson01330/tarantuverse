@@ -55,6 +55,7 @@ interface ProfileData {
   }
   last_feeding: { date: string; food_type: string; food_size: string; accepted: boolean } | null
   last_molt: { date: string; leg_span_after: number | null; weight_after: number | null } | null
+  provenance: Record<string, any> | null
   husbandry?: {
     enclosure_type: string | null
     enclosure_size: string | null
@@ -502,6 +503,33 @@ export default function PublicProfilePage() {
                     </div>
                   )
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Provenance — frozen transfer snapshot (BRIEF §6). Render only the
+              facts we have; full pedigree rows only when dam/sire exist. */}
+          {profile.provenance && (profile.provenance.breeder_handle || profile.provenance.dam_scientific_name || profile.provenance.sire_scientific_name) && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="font-semibold text-gray-900 dark:text-white text-sm">📜 Provenance</h2>
+              </div>
+              <div className="px-4 py-3 space-y-1 text-sm">
+                {profile.provenance.breeder_handle && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-500 dark:text-gray-400">Bred / sold by</span>
+                    <Link href={`/keeper/${profile.provenance.breeder_handle}`} className="text-purple-600 hover:underline">@{profile.provenance.breeder_handle}</Link>
+                  </div>
+                )}
+                {profile.provenance.dam_scientific_name && (
+                  <div className="flex justify-between gap-4"><span className="text-gray-500 dark:text-gray-400">Dam</span><span className="italic text-gray-900 dark:text-white text-right">{profile.provenance.dam_scientific_name}</span></div>
+                )}
+                {profile.provenance.sire_scientific_name && (
+                  <div className="flex justify-between gap-4"><span className="text-gray-500 dark:text-gray-400">Sire</span><span className="italic text-gray-900 dark:text-white text-right">{profile.provenance.sire_scientific_name}</span></div>
+                )}
+                {profile.provenance.sac_laid_date && (
+                  <div className="flex justify-between gap-4"><span className="text-gray-500 dark:text-gray-400">Sac laid</span><span className="text-gray-900 dark:text-white">{profile.provenance.sac_laid_date}</span></div>
+                )}
               </div>
             </div>
           )}

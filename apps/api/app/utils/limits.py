@@ -15,6 +15,22 @@ from app.models.invert import Invert
 from app.models.user import User, FREE_TIER_MAX_ANIMALS
 
 
+def active_inverts_query(db: Session, user_id):
+    """Base query for a user's ACTIVE inverts — the single source of truth for
+    "how many animals does this user have."
+
+    Excludes records handed off via a transfer (`transferred_out_at IS NOT NULL`),
+    so a breeder who sold 50 slings doesn't have them counting against the free
+    cap or appearing in active collection counts (BRIEF §4b). Every count/list
+    over a user's inverts should start from this query so the filter can't be
+    forgotten in a new call site.
+    """
+    return db.query(Invert).filter(
+        Invert.user_id == user_id,
+        Invert.transferred_out_at.is_(None),
+    )
+
+
 def enforce_collection_limit(db: Session, user: User) -> None:
     """Raise HTTP 402 if the user is at or above their animal cap.
 
@@ -29,7 +45,7 @@ def enforce_collection_limit(db: Session, user: User) -> None:
     if max_animals == -1:
         return
 
-    current_count = db.query(Invert).filter(Invert.user_id == user.id).count()
+    current_count = active_inverts_query(db, user.id).count()
 
     if current_count >= max_animals:
         raise HTTPException(

@@ -236,6 +236,57 @@ class StorageService:
         # Return relative URL (served by FastAPI StaticFiles)
         return f"/{directory}/{filename}"
     
+    async def copy_photo(
+        self,
+        photo_url: str,
+        thumbnail_url: Optional[str] = None,
+    ) -> Tuple[str, Optional[str]]:
+        """Make an INDEPENDENT copy of an existing photo (+ thumbnail).
+
+        Used by the animal-transfer claim flow: the buyer's record must own its
+        own image objects so the seller later deleting their copy can't break the
+        buyer's provenance record (BRIEF §5). Returns (new_photo_url, new_thumb_url).
+
+        R2: server-side `copy_object` to fresh UUID keys — no re-download, no
+        re-thumbnail. Local dev: read + rewrite to new filenames.
+        """
+        if self.use_r2:
+            new_photo_key = f"photos/{uuid.uuid4()}.jpg"
+            new_photo_url = self._copy_in_r2(photo_url, new_photo_key)
+            new_thumb_url = None
+            if thumbnail_url:
+                new_thumb_key = f"thumbnails/thumb_{uuid.uuid4()}.jpg"
+                new_thumb_url = self._copy_in_r2(thumbnail_url, new_thumb_key)
+            return new_photo_url, new_thumb_url
+        else:
+            new_photo_url = self._copy_local(photo_url, self.upload_dir, prefix="")
+            new_thumb_url = (
+                self._copy_local(thumbnail_url, self.thumbnail_dir, prefix="thumb_")
+                if thumbnail_url else None
+            )
+            return new_photo_url, new_thumb_url
+
+    def _copy_in_r2(self, source_url: str, dest_key: str) -> str:
+        """Server-side copy of one R2 object to a new key. Returns its public URL."""
+        source_key = source_url.replace(f"{self.public_url_base}/", "")
+        self.s3_client.copy_object(
+            Bucket=self.bucket_name,
+            CopySource={"Bucket": self.bucket_name, "Key": source_key},
+            Key=dest_key,
+            CacheControl="public, max-age=31536000",
+            MetadataDirective="COPY",
+        )
+        return f"{self.public_url_base}/{dest_key}"
+
+    def _copy_local(self, source_url: str, directory: str, prefix: str = "") -> str:
+        """Copy a local-FS photo to a new filename. Dev-mode fallback."""
+        source_path = source_url.lstrip("/")
+        new_filename = f"{prefix}{uuid.uuid4()}.jpg"
+        dest_path = os.path.join(directory, new_filename)
+        with open(source_path, "rb") as src, open(dest_path, "wb") as dst:
+            dst.write(src.read())
+        return f"/{directory}/{new_filename}"
+
     async def delete_photo(self, photo_url: str, thumbnail_url: str) -> None:
         """
         Delete a photo and its thumbnail.

@@ -54,6 +54,10 @@ interface Invert {
   photo_url?: string | null
   notes?: string | null
   species_id?: string | null
+  provenance?: Record<string, any> | null
+  bred_by_user_id?: string | null
+  origin_keeper_name?: string | null
+  transferred_out_at?: string | null
 }
 
 interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
@@ -85,6 +89,13 @@ export default function InvertDetailPage() {
   const [pairType, setPairType] = useState('natural')
   const [pairBusy, setPairBusy] = useState(false)
   const [showUpgrade, setShowUpgrade] = useState(false)
+  // Transfer ("rehome")
+  const [transferOpen, setTransferOpen] = useState(false)
+  const [transferBusy, setTransferBusy] = useState(false)
+  const [transferNote, setTransferNote] = useState('')
+  const [transferPrice, setTransferPrice] = useState('')
+  const [claimUrl, setClaimUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -225,6 +236,39 @@ export default function InvertDetailPage() {
     }
   }
 
+  const createTransfer = async () => {
+    if (transferBusy) return
+    setTransferBusy(true)
+    try {
+      const res = await fetch(`${API_URL}/api/v1/inverts/${id}/transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          note: transferNote.trim() || null,
+          sale_price: transferPrice.trim() ? Number(transferPrice) : null,
+          include_photos: true,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as any))
+        const d = body?.detail
+        alert(typeof d === 'string' ? d : d?.message || 'Could not create the transfer.')
+        return
+      }
+      const data = await res.json()
+      setClaimUrl(data.claim_url)
+    } catch {
+      alert('Could not create the transfer. Please try again.')
+    } finally {
+      setTransferBusy(false)
+    }
+  }
+
+  const copyClaim = async () => {
+    if (!claimUrl) return
+    try { await navigator.clipboard.writeText(claimUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) } catch {}
+  }
+
   // Resolve the "other parent" name for a pairing row.
   const mateName = (p: any): string => {
     const otherId = p.male_invert_id === id ? p.female_invert_id : p.male_invert_id
@@ -361,6 +405,48 @@ export default function InvertDetailPage() {
                 onDelete: () => deleteLog(`molts/${x.id}`, 'molt'),
               }))}
             />
+
+            {/* Provenance block (BRIEF §6) — render only what we actually know.
+                Full "Pedigree" only when dam/sire present; else plain provenance. */}
+            {invert?.provenance && (
+              <Section title="Provenance">
+                <dl className="text-sm text-theme-secondary space-y-1">
+                  {invert.provenance.breeder_handle && (
+                    <div className="flex justify-between gap-4"><dt className="text-theme-tertiary">Bred / sold by</dt><dd>@{invert.provenance.breeder_handle}</dd></div>
+                  )}
+                  {invert.provenance.dam_scientific_name && (
+                    <div className="flex justify-between gap-4"><dt className="text-theme-tertiary">Dam</dt><dd className="italic text-right">{invert.provenance.dam_scientific_name}</dd></div>
+                  )}
+                  {invert.provenance.sire_scientific_name && (
+                    <div className="flex justify-between gap-4"><dt className="text-theme-tertiary">Sire</dt><dd className="italic text-right">{invert.provenance.sire_scientific_name}</dd></div>
+                  )}
+                  {invert.provenance.sac_laid_date && (
+                    <div className="flex justify-between gap-4"><dt className="text-theme-tertiary">Sac laid</dt><dd>{invert.provenance.sac_laid_date}</dd></div>
+                  )}
+                  {invert.provenance.transferred_at && (
+                    <div className="flex justify-between gap-4"><dt className="text-theme-tertiary">Acquired via transfer</dt><dd>{formatLocalDate(invert.provenance.transferred_at)}</dd></div>
+                  )}
+                </dl>
+              </Section>
+            )}
+
+            {/* Transfer / rehome (BRIEF §6) — owner action. Hidden once handed off. */}
+            {invert && !invert.transferred_out_at && (
+              <Section title="Transfer / rehome" action={{ label: 'Generate claim link', onClick: () => { setClaimUrl(null); setTransferOpen(true) } }}>
+                <p className="text-sm text-theme-tertiary">
+                  Sold or rehoming this {meta?.label.toLowerCase()}? Generate a claim link the
+                  buyer can use to add it to their collection — pre-loaded with species,
+                  provenance, and photos. We never process the sale.
+                </p>
+              </Section>
+            )}
+            {invert?.transferred_out_at && (
+              <Section title="Transfer / rehome">
+                <p className="text-sm text-theme-tertiary">
+                  ✓ Transferred {formatLocalDate(invert.transferred_out_at)}. This is a historical record.
+                </p>
+              </Section>
+            )}
 
             {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot) */}
             {invert && taxonHasModule(invert.taxon, 'growth') && growth && growth.total_molts > 0 && (
@@ -531,6 +617,51 @@ export default function InvertDetailPage() {
         feature="Breeding Module"
         description="Track pairings, egg sacs, and offspring across the season. Upgrade to unlock breeding for your whole collection."
       />
+
+      {transferOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !transferBusy && setTransferOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 p-6 border border-gray-200 dark:border-gray-700 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Transfer this animal</h3>
+            {!claimUrl ? (
+              <>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  Generate a one-time claim link to hand this {meta?.label.toLowerCase()} to its
+                  new keeper. The sale happens on your own channel — this only moves the record.
+                </p>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note to buyer (optional)</label>
+                <textarea
+                  value={transferNote} onChange={(e) => setTransferNote(e.target.value)}
+                  placeholder="e.g. 0.0.1 sling, last molt 6/1, eating well"
+                  className="w-full px-3 py-2 mb-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+                  rows={2}
+                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sale price (private — for your records only)</label>
+                <input
+                  value={transferPrice} onChange={(e) => setTransferPrice(e.target.value)}
+                  inputMode="decimal" placeholder="$ optional"
+                  className="w-full px-3 py-2 mb-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => setTransferOpen(false)} disabled={transferBusy} className="flex-1 px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold">Cancel</button>
+                  <button onClick={createTransfer} disabled={transferBusy} className="flex-1 px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 disabled:opacity-60">{transferBusy ? 'Generating…' : 'Generate link'}</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  Share this link with the buyer. When they claim it, this animal moves to their
+                  collection and yours becomes a transferred record.
+                </p>
+                <div className="flex items-center gap-2 mb-4">
+                  <input readOnly value={claimUrl} className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-200 text-xs" />
+                  <button onClick={copyClaim} className="px-3 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold whitespace-nowrap">{copied ? 'Copied!' : 'Copy'}</button>
+                </div>
+                <button onClick={() => { setTransferOpen(false); fetchAll() }} className="w-full px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-semibold">Done</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   )
 }

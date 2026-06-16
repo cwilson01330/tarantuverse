@@ -97,7 +97,17 @@ async def list_scorpions(
     db: Session = Depends(get_db),
 ):
     """List the authenticated user's scorpions, newest first."""
-    query = db.query(Scorpion).filter(Scorpion.user_id == current_user.id)
+    # Exclude scorpions handed off via a transfer (flag on the inverts mirror,
+    # shared PK). Keeps the grid + count consistent with the cap. BRIEF §4b.
+    from app.models.invert import Invert
+    transferred_ids = db.query(Invert.id).filter(
+        Invert.user_id == current_user.id,
+        Invert.transferred_out_at.isnot(None),
+    )
+    query = db.query(Scorpion).filter(
+        Scorpion.user_id == current_user.id,
+        Scorpion.id.notin_(transferred_ids),
+    )
     if colony_id is not None:
         query = query.filter(Scorpion.colony_id == colony_id)
     return query.order_by(Scorpion.created_at.desc()).all()

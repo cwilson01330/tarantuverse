@@ -8,7 +8,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator, Alert, FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, FlatList, Image, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ import {
   listInvertFeedings, listInvertMolts, listInvertPhotos, listInvertSubstrateChanges,
   deleteInvertFeeding, deleteInvertMolt, deleteInvertSubstrateChange,
   setInvertMainPhoto, deleteInvertPhoto, getInvertGrowth, listInvertPairings,
+  createInvertTransfer,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
   type InvertGrowthAnalytics, type InvertPairing,
 } from '../../src/lib/inverts';
@@ -29,6 +30,7 @@ import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '
 import { SPACING, TYPE } from '../../src/theme/tokens';
 import { taxonHasModule, growthLengthLabel } from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
+import { getErrorMessage } from '../../src/utils/errors';
 
 function InvertDetailScreen() {
   const router = useRouter();
@@ -42,8 +44,38 @@ function InvertDetailScreen() {
   const [photos, setPhotos] = useState<InvertPhoto[]>([]);
   const [growth, setGrowth] = useState<InvertGrowthAnalytics | null>(null);
   const [pairings, setPairings] = useState<InvertPairing[]>([]);
+  const [transferring, setTransferring] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleTransfer = useCallback(async () => {
+    if (!id || transferring) return;
+    // Confirm intent first — generating a claim link is the start of handing
+    // the animal off. (Claiming itself happens on the web claim page by design.)
+    Alert.alert(
+      'Transfer this animal?',
+      'Generate a one-time claim link to hand this animal to its new keeper. The buyer adds it to their collection — pre-loaded with species, provenance, and photos. We never process the sale.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Generate link',
+          onPress: async () => {
+            try {
+              setTransferring(true);
+              const res = await createInvertTransfer(id, { include_photos: true });
+              await Share.share({
+                message: `I'm sending you my ${invertDisplayName(invert!)} on Tarantuverse — claim it here: ${res.claim_url}`,
+              });
+            } catch (err) {
+              Alert.alert('Could not create transfer', getErrorMessage(err));
+            } finally {
+              setTransferring(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [id, invert, transferring]);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -203,6 +235,44 @@ function InvertDetailScreen() {
       {hasHusbandry(invert) && (
         <Section title="Husbandry">
           <InfoGrid items={husbandryItems} />
+        </Section>
+      )}
+
+      {/* Provenance (BRIEF §6) — render only the facts we actually have. */}
+      {invert.provenance && (
+        <Section title="Provenance">
+          {invert.provenance.breeder_handle ? (
+            <InfoRow label="Bred / sold by" value={`@${invert.provenance.breeder_handle}`} colors={colors} />
+          ) : null}
+          {invert.provenance.dam_scientific_name ? (
+            <InfoRow label="Dam" value={invert.provenance.dam_scientific_name} colors={colors} />
+          ) : null}
+          {invert.provenance.sire_scientific_name ? (
+            <InfoRow label="Sire" value={invert.provenance.sire_scientific_name} colors={colors} />
+          ) : null}
+          {invert.provenance.sac_laid_date ? (
+            <InfoRow label="Sac laid" value={invert.provenance.sac_laid_date} colors={colors} />
+          ) : null}
+          {invert.provenance.transferred_at ? (
+            <InfoRow label="Acquired via transfer" value={fmtDate(invert.provenance.transferred_at)} colors={colors} />
+          ) : null}
+        </Section>
+      )}
+
+      {/* Transfer / rehome (BRIEF §6). Claiming happens on the web claim page. */}
+      {invert.transferred_out_at ? (
+        <Section title="Transfer / rehome">
+          <Text style={[s.empty, { color: colors.textTertiary }]}>
+            ✓ Transferred {fmtDate(invert.transferred_out_at)}. This is a historical record.
+          </Text>
+        </Section>
+      ) : (
+        <Section title="Transfer / rehome" actionLabel={transferring ? 'Working…' : 'Generate claim link'} onAction={handleTransfer}>
+          <Text style={[s.empty, { color: colors.textTertiary }]}>
+            Sold or rehoming this animal? Generate a claim link the buyer can use to
+            add it to their collection — pre-loaded with species, provenance, and
+            photos. We never process the sale.
+          </Text>
         </Section>
       )}
 

@@ -657,6 +657,12 @@ async def get_public_tarantula_profile(
     # Lineage — parents via Pairing / Offspring
     lineage = _get_lineage(tarantula_id, db)
 
+    # Provenance — the immutable transfer snapshot on the unified Invert mirror
+    # (Invert.id == Tarantula.id). Public-safe: the snapshot never holds
+    # sale_price. None for animals that were never transferred in.
+    invert_mirror = db.query(Invert).filter(Invert.id == t_uuid).first()
+    provenance = invert_mirror.provenance if invert_mirror else None
+
     # Build response
     base = {
         "id": str(tarantula.id),
@@ -688,6 +694,7 @@ async def get_public_tarantula_profile(
             for p in photos
         ],
         "lineage": lineage,
+        "provenance": provenance,
         "last_feeding": {
             "date": last_feeding.fed_at.isoformat(),
             "food_type": last_feeding.food_type,

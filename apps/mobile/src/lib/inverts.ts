@@ -163,6 +163,17 @@ export interface Invert {
   notes: string | null;
   created_at: string;
   updated_at: string | null;
+  // Provenance / transfer ("rehome") — BRIEF-animal-transfer-provenance
+  provenance?: Record<string, any> | null;
+  bred_by_user_id?: string | null;
+  origin_keeper_name?: string | null;
+  transferred_out_at?: string | null;
+}
+
+export interface TransferCreateResponse {
+  token: string;
+  claim_url: string;
+  expires_at: string;
 }
 
 export type InvertCreate = Partial<Omit<Invert, 'id' | 'user_id' | 'taxon' | 'created_at' | 'updated_at' | 'is_public'>>;
@@ -285,6 +296,15 @@ export async function updateInvert(id: string, payload: InvertUpdate): Promise<I
 
 export async function deleteInvert(id: string): Promise<void> {
   await apiClient.delete(`/inverts/${id}`);
+}
+
+/** Create a transfer ("rehome") claim link for an animal the caller owns. */
+export async function createInvertTransfer(
+  id: string,
+  payload: { note?: string | null; sale_price?: number | null; include_photos?: boolean },
+): Promise<TransferCreateResponse> {
+  const { data } = await apiClient.post<TransferCreateResponse>(`/inverts/${id}/transfer`, payload);
+  return data;
 }
 
 // ---------------------------------------------------------------------------

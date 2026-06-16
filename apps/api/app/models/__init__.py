@@ -67,6 +67,7 @@ from app.models.brood import Brood
 # during Phases A-C; legacy models retire in Phase D.
 from app.models.invert_species import InvertSpecies
 from app.models.invert import Invert
+from app.models.animal_transfer import AnimalTransfer
 
 __all__ = [
     "User",
@@ -125,4 +126,5 @@ __all__ = [
     "Brood",
     "InvertSpecies",
     "Invert",
+    "AnimalTransfer",
 ]
