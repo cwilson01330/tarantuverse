@@ -14,6 +14,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import UpgradeModal from '@/components/UpgradeModal'
 import { INVERT_TAXA, isInvertTaxon, type InvertTaxon } from '@/lib/inverts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -58,6 +59,7 @@ function AddInvertForm() {
   const [enclosureNotes, setEnclosureNotes] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null)
 
   // Species autocomplete
   const [query, setQuery] = useState('')
@@ -137,7 +139,15 @@ function AddInvertForm() {
         }),
       })
       if (res.status === 402) {
-        alert("You've reached the free tier limit of 15 animals. Upgrade to Premium for unlimited tracking.")
+        // Pull the cap from the 402 payload so this copy never drifts from
+        // the server's actual limit. detail = { message, current_count, limit, is_premium }
+        const body = await res.json().catch(() => ({} as any))
+        const limit = body?.detail?.limit
+        setUpgradeMsg(
+          typeof body?.detail?.message === 'string'
+            ? body.detail.message
+            : `You've reached the free plan limit${typeof limit === 'number' ? ` of ${limit} animals` : ''}. Upgrade to Premium for unlimited tracking.`
+        )
         return
       }
       if (!res.ok) throw new Error()
@@ -264,6 +274,13 @@ function AddInvertForm() {
           </button>
         </div>
       </div>
+
+      <UpgradeModal
+        isOpen={upgradeMsg !== null}
+        onClose={() => setUpgradeMsg(null)}
+        feature="Unlimited Animals"
+        description={upgradeMsg ?? ''}
+      />
     </DashboardLayout>
   )
 }
