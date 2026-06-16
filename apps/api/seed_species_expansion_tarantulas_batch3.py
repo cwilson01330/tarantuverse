@@ -181,6 +181,107 @@ SPECIES_DATA = [
         ),
         "source_url": "https://exoticsunlimitedusa.com/products/cyriopagopus-valhalla-tarantula-for-sale",
     },
+    # ── Self-sourced additions ────────────────────────────────────────
+    {
+        "scientific_name": "Caribena laeta",
+        "common_names": ["Puerto Rican Pinktoe"],
+        "genus": "Caribena", "family": "Theraphosidae",
+        "care_level": I, "temperament": "docile but skittish; flees / flicks hair / kicks feces",
+        "native_region": "Puerto Rico", "adult_size": "3.5-4.25 inches", "growth_rate": "medium-fast",
+        "type": "arboreal", "temperature_min": 75, "temperature_max": 82, "humidity_min": 75, "humidity_max": 80,
+        "enclosure_size_adult": "8x8x12 inches (vertical)", "substrate_depth": "2-3 inches",
+        "substrate_type": "coco fiber lightly moist; cork bark + plants; strong cross-ventilation",
+        "feeding_frequency_adult": "1-2 prey per week", "water_dish_required": True,
+        "webbing_amount": "moderate", "burrowing": False, "urticating_hairs": True,
+        "medically_significant_venom": False, "venom_potency": "Mild",
+        "care_guide": (
+            "A shy, beautiful Caribbean pinktoe. Like all Caribena/Avicularia, ventilation is "
+            "everything — high humidity (75-80%) MUST be paired with strong cross-flow or "
+            "stuffy warmth will kill it. Tall enclosure with plenty of vertical structure and "
+            "plants to build a silk lair. Docile but skittish; has urticating hairs, mild venom."
+        ),
+        "source_url": "https://www.thetarantulacollective.com/caresheets/caribena-laeta",
+    },
+    {
+        "scientific_name": "Pamphobeteus sp. 'platyomma'",
+        "common_names": ["Brazilian Pink Bloom"],
+        "genus": "Pamphobeteus", "family": "Theraphosidae",
+        "care_level": I, "temperament": "bold, high-energy; strong feeding response",
+        "native_region": "Brazil", "adult_size": "7-9 inches", "growth_rate": "fast",
+        "type": "terrestrial", "temperature_min": 72, "temperature_max": 82, "humidity_min": 65, "humidity_max": 75,
+        "enclosure_size_adult": "18x18x14 inches", "substrate_depth": "5-6 inches",
+        "substrate_type": "deep coco fiber, slightly damp (not swampy); water dish",
+        "feeding_frequency_adult": "1-2 prey per week", "water_dish_required": True,
+        "webbing_amount": "light", "burrowing": True, "urticating_hairs": True,
+        "medically_significant_venom": False, "venom_potency": "Mild",
+        "care_guide": (
+            "A New World giant (7-9in) with purple iridescence on mature males. Bold, fast, "
+            "and famously food-motivated — it'll mistake vibrations for prey, so be deliberate "
+            "during maintenance. Floor space over height with deep substrate to burrow, one "
+            "damp area, water dish. Urticating hairs, mild venom. Best for intermediate keepers."
+        ),
+        "source_url": "https://www.thetarantulacollective.com/caresheets/pamphobeteus-sp-platyomma",
+    },
+    {
+        "scientific_name": "Poecilotheria vittata",
+        "common_names": ["Ghost Ornamental", "Pederson's Ornamental"],
+        "genus": "Poecilotheria", "family": "Theraphosidae",
+        "care_level": A, "temperament": "very fast, skittish, defensive; potent venom",
+        "native_region": "Sri Lanka", "adult_size": "5-6 inches", "growth_rate": "medium-fast",
+        "type": "arboreal", "temperature_min": 75, "temperature_max": 82, "humidity_min": 70, "humidity_max": 80,
+        "enclosure_size_adult": "12x12x18 inches (vertical)", "substrate_depth": "2-3 inches",
+        "substrate_type": "coco fiber lightly moist; tall cork bark for a webbed retreat; ventilated",
+        "feeding_frequency_adult": "1-2 prey per week", "water_dish_required": True,
+        "webbing_amount": "moderate", "burrowing": False, "urticating_hairs": False,
+        "medically_significant_venom": True, "venom_potency": "Significant",
+        "care_guide": (
+            "A grey-patterned Sri Lankan ornamental — incredibly fast and skittish with "
+            "medically significant venom: advanced keepers only, no handling. No urticating "
+            "hairs (Old World). Tall enclosure with a vertical cork-bark retreat, light "
+            "moisture and good ventilation. Slings desiccate easily — watch humidity."
+        ),
+        "source_url": "https://www.thetarantulacollective.com/caresheets/poecilotheria-vittata",
+    },
+    {
+        "scientific_name": "Encyocratella olivacea",
+        "common_names": ["Tanzanian Black and Olive"],
+        "genus": "Encyocratella", "family": "Theraphosidae",
+        "care_level": A, "temperament": "defensive, stands its ground; potent venom",
+        "native_region": "Tanzania (highlands)", "adult_size": "around 4 inches", "growth_rate": "fast",
+        "type": "arboreal", "temperature_min": 65, "temperature_max": 80, "humidity_min": 60, "humidity_max": 70,
+        "enclosure_size_adult": "10x10x14 inches", "substrate_depth": "3-4 inches (will burrow)",
+        "substrate_type": "coco fiber; provide vertical cork bark — it both webs up and burrows",
+        "feeding_frequency_adult": "1 prey per week", "water_dish_required": True,
+        "webbing_amount": "heavy", "burrowing": True, "urticating_hairs": False,
+        "medically_significant_venom": True, "venom_potency": "Significant",
+        "care_guide": (
+            "An Old World species from cooler Tanzanian mountain slopes — tolerates and even "
+            "prefers cooler temps. No urticating hairs; overtly defensive (will threat-pose at "
+            "a glance) with potent venom, so experienced keepers only. A heavy webber that "
+            "stays visible and eats well; makes its own burrow, so no hide needed. No handling."
+        ),
+        "source_url": "https://arachnoboards.com/threads/encyocratella-olivacea-info.281499/",
+    },
+    {
+        "scientific_name": "Holothele longipes",
+        "common_names": ["Trinidad Pink"],
+        "genus": "Holothele", "family": "Theraphosidae",
+        "care_level": I, "temperament": "jumpy, fast to bolt; heavy webber",
+        "native_region": "Trinidad & Venezuela", "adult_size": "2-2.75 inches (dwarf)", "growth_rate": "medium-fast",
+        "type": "fossorial", "temperature_min": 70, "temperature_max": 80, "humidity_min": 70, "humidity_max": 80,
+        "enclosure_size_adult": "6x6x6 inches", "substrate_depth": "3-4 inches",
+        "substrate_type": "coco fiber kept slightly moist; lots of web anchor points",
+        "feeding_frequency_adult": "1-2 prey per week", "water_dish_required": True,
+        "webbing_amount": "heavy", "burrowing": True, "urticating_hairs": True,
+        "medically_significant_venom": False, "venom_potency": "Moderate",
+        "care_guide": (
+            "A tiny, fast dwarf that webs heavily and burrows. Skittish and quick to bolt, and "
+            "desiccates easily at this size, so keep substrate slightly moist with a water "
+            "dish — better as a second species despite easy care. Venom is potent for a New "
+            "World dwarf; keep singly (cannibalistic)."
+        ),
+        "source_url": "https://thepetfaq.com/trinidad-pink-tarantula/",
+    },
 ]
 
 
