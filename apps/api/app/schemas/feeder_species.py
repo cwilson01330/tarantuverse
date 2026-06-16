@@ -63,6 +63,12 @@ class FeederSpeciesResponse(FeederSpeciesBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
+    # Pattern-free output overrides — response must serialize stored VARCHAR
+    # values even if one diverges from the regex (else the whole list 500s).
+    # Input validation stays strict on Base/Create/Update.
+    category: Optional[str] = None
+    care_level: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 

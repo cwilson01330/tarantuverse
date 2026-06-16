@@ -120,4 +120,13 @@ class ScorpionSpeciesResponse(ScorpionSpeciesBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
+    # Pattern-free output overrides — a response model must serialize whatever
+    # is stored (plain VARCHAR cols). A regex on the inherited Base fields 500s
+    # the WHOLE list via ResponseValidationError if one row diverges (the trap
+    # that took down /invert-species/). Input validation stays strict on Base.
+    care_level: Optional[str] = None
+    type: Optional[str] = None
+    burrowing: Optional[str] = None
+    venom_severity: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)

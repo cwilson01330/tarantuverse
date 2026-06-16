@@ -285,6 +285,21 @@ class ReptileSpeciesUpdate(BaseModel):
 
 
 class ReptileSpeciesResponse(ReptileSpeciesBase):
+    # Pattern-free output overrides — a response model must serialize whatever
+    # is stored (plain VARCHAR cols). A regex on the inherited Base fields 500s
+    # the WHOLE list via ResponseValidationError if a single seeded row diverges
+    # (the documented HV trap; same class as the /invert-species/ 500). Input
+    # validation stays strict on Base/Create/Update.
+    care_level: Optional[str] = None
+    handleability: Optional[str] = None
+    activity_period: Optional[str] = None
+    uvb_type: Optional[str] = None
+    enclosure_type: Optional[str] = None
+    diet_type: Optional[str] = None
+    cites_appendix: Optional[str] = None
+    iucn_status: Optional[str] = None
+    morph_complexity: Optional[str] = None
+
     id: uuid.UUID
     # URL slug — always populated on read (DB NOT NULL after migration
     # slg_20260423). The create path generates it server-side, so it's

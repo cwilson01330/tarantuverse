@@ -138,6 +138,11 @@ class SpeciesResponse(SpeciesBase):
     created_at: datetime
     updated_at: Optional[datetime]
 
+    # Pattern-free output override — the 100+ species catalog must serialize
+    # even if one stored care_level diverges from the regex (would otherwise
+    # 500 the whole list). Input validation stays strict on SpeciesBase/Create.
+    care_level: Optional[str] = None
+
     class Config:
         from_attributes = True
 
