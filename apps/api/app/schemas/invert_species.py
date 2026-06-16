@@ -37,7 +37,11 @@ class InvertSpeciesBase(BaseModel):
     adult_length_min_mm: Optional[Decimal] = None
     adult_length_max_mm: Optional[Decimal] = None
     growth_rate: Optional[str] = Field(None, max_length=50)
-    type: Optional[str] = Field(None, pattern=SPECIES_TYPE_PATTERN)
+    # NOT a strict enum: real care data uses composite/ranged descriptors
+    # ("terrestrial/fossorial", "semi-arboreal"). A regex pattern here 500s the
+    # whole list endpoint via ResponseValidationError on stored rows that don't
+    # match (the schema-pattern-vs-VARCHAR trap). Keep it a length-bounded string.
+    type: Optional[str] = Field(None, max_length=60)
 
     temperature_min: Optional[int] = None
     temperature_max: Optional[int] = None
@@ -104,7 +108,11 @@ class InvertSpeciesUpdate(BaseModel):
     adult_length_min_mm: Optional[Decimal] = None
     adult_length_max_mm: Optional[Decimal] = None
     growth_rate: Optional[str] = Field(None, max_length=50)
-    type: Optional[str] = Field(None, pattern=SPECIES_TYPE_PATTERN)
+    # NOT a strict enum: real care data uses composite/ranged descriptors
+    # ("terrestrial/fossorial", "semi-arboreal"). A regex pattern here 500s the
+    # whole list endpoint via ResponseValidationError on stored rows that don't
+    # match (the schema-pattern-vs-VARCHAR trap). Keep it a length-bounded string.
+    type: Optional[str] = Field(None, max_length=60)
     temperature_min: Optional[int] = None
     temperature_max: Optional[int] = None
     humidity_min: Optional[int] = None
@@ -150,5 +158,16 @@ class InvertSpeciesResponse(InvertSpeciesBase):
     times_kept: int
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    # Pattern-free overrides for serialization. A response model must reflect
+    # whatever is stored (these columns are plain VARCHAR); a regex on the
+    # inherited Base fields raises ResponseValidationError and 500s the WHOLE
+    # list if a single stored row diverges (e.g. care_level "beginner-intermediate",
+    # a composite type). Input validation stays strict on Base/Create/Update.
+    care_level: Optional[str] = None
+    feeding_mode: Optional[str] = None
+    burrowing: Optional[str] = None
+    venom_severity: Optional[str] = None
+    developmental_class: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
