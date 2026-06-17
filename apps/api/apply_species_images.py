@@ -58,9 +58,11 @@ def run(csv_path: str, dry_run: bool, allow_commons: bool) -> int:
              would_apply=0, updated=0, unchanged=0, not_found=0)
 
     db = None
+    InvertSpecies = Species = None
     if not dry_run:
         from app.database import SessionLocal
         from app.models.invert_species import InvertSpecies
+        from app.models.species import Species  # legacy tarantula table the care pages read
         db = SessionLocal()
 
     try:
@@ -89,22 +91,31 @@ def run(csv_path: str, dry_run: bool, allow_commons: bool) -> int:
                 print(f"  WOULD SET:           {name} -> {url}")
                 continue
 
-            obj = (
-                db.query(InvertSpecies)
-                .filter(InvertSpecies.scientific_name_lower == name)
-                .first()
-            )
-            if obj is None:
+            # Write BOTH tables: invert_species (read by /species/inverts/{id}) and
+            # the legacy `species` row for tarantulas (read by /species/{id}). A
+            # tarantula's image must be on the legacy row or its care guide renders
+            # imageless; non-tarantulas have no legacy row (that lookup is a no-op).
+            targets = [
+                db.query(InvertSpecies).filter(InvertSpecies.scientific_name_lower == name).first(),
+                db.query(Species).filter(Species.scientific_name_lower == name).first(),
+            ]
+            if not any(targets):
                 n["not_found"] += 1
                 print(f"  NOT IN DB:           {name}")
                 continue
-            if obj.image_url == url and obj.image_attribution == attribution:
+            changed = False
+            for target in targets:
+                if target is not None and (
+                    target.image_url != url or target.image_attribution != attribution
+                ):
+                    target.image_url = url
+                    target.image_attribution = attribution
+                    changed = True
+            if changed:
+                n["updated"] += 1
+                print(f"  UPDATED:             {name}")
+            else:
                 n["unchanged"] += 1
-                continue
-            obj.image_url = url
-            obj.image_attribution = attribution
-            n["updated"] += 1
-            print(f"  UPDATED:             {name}")
 
         if not dry_run:
             db.commit()
