@@ -18,6 +18,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 interface AdminStats {
   total_users: number;
   total_species: number;
+  species_by_taxon?: Record<string, number>;
   premium_users: number;
   pending_reports: number;
 }
@@ -116,6 +117,27 @@ export default function AdminIndexScreen() {
           ))}
         </View>
 
+        {/* Species-by-taxon breakdown — confirms Total Species spans all taxa. */}
+        {stats?.species_by_taxon && Object.keys(stats.species_by_taxon).length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>SPECIES BY TAXON</Text>
+            <View style={styles.taxonWrap}>
+              {Object.entries(stats.species_by_taxon)
+                .sort((a, b) => b[1] - a[1])
+                .map(([taxon, count]) => (
+                  <View
+                    key={taxon}
+                    style={[styles.taxonChip, { backgroundColor: colors.primary + '15', borderColor: colors.border }]}
+                  >
+                    <Text style={[styles.taxonChipText, { color: colors.textPrimary }]}>
+                      {taxon.replace(/_/g, ' ')}: {count.toLocaleString()}
+                    </Text>
+                  </View>
+                ))}
+            </View>
+          </>
+        )}
+
         {/* Navigation Cards */}
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>MANAGEMENT</Text>
         {navCards.map(card => (
@@ -194,6 +216,19 @@ const styles = StyleSheet.create({
   },
   statValue: { fontSize: 26, fontWeight: '700', marginBottom: 2 },
   statLabel: { fontSize: 12, textAlign: 'center' },
+  taxonWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 24,
+  },
+  taxonChip: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  taxonChipText: { fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
   navCard: {
     flexDirection: 'row',
     alignItems: 'center',
