@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
-import DashboardLayout from '@/components/DashboardLayout'
+import PublicCareShell from '@/components/PublicCareShell'
 
 interface Species {
   id: string
@@ -137,28 +137,20 @@ export default function EnhancedSpeciesDetailPage() {
 
   if (loading) {
     return (
-      <DashboardLayout
-        userName={authUser?.name ?? undefined}
-        userEmail={authUser?.email ?? undefined}
-        userAvatar={authUser?.image ?? undefined}
-      >
+      <PublicCareShell authUser={authUser}>
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
             <div className="text-6xl mb-4 animate-bounce">🕷️</div>
             <p className="text-gray-600 dark:text-gray-400">Loading species details...</p>
           </div>
         </div>
-      </DashboardLayout>
+      </PublicCareShell>
     )
   }
 
   if (error || !species) {
     return (
-      <DashboardLayout
-        userName={authUser?.name ?? undefined}
-        userEmail={authUser?.email ?? undefined}
-        userAvatar={authUser?.image ?? undefined}
-      >
+      <PublicCareShell authUser={authUser}>
         <div className="p-8">
           <div className="max-w-4xl mx-auto">
             <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg">
@@ -167,7 +159,7 @@ export default function EnhancedSpeciesDetailPage() {
             </div>
           </div>
         </div>
-      </DashboardLayout>
+      </PublicCareShell>
     )
   }
 
@@ -176,11 +168,7 @@ export default function EnhancedSpeciesDetailPage() {
   const canEdit = false // TODO: Add admin/superuser check when roles are implemented
 
   return (
-    <DashboardLayout
-      userName={authUser?.name ?? undefined}
-      userEmail={authUser?.email ?? undefined}
-      userAvatar={authUser?.image ?? undefined}
-    >
+    <Shell authUser={authUser}>
       <div>
 
       {/* Hero Section */}
@@ -713,7 +701,7 @@ export default function EnhancedSpeciesDetailPage() {
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={() => router.push(`/register?redirect=/species/${id}`)}
-                className="px-6 py-3 bg-white text-primary-800 rounded-xl font-semibold shadow-lg hover:bg-gray-100 transition"
+                className="px-6 py-3 bg-white text-gray-900 rounded-xl font-semibold shadow-lg hover:bg-gray-100 transition"
               >
                 Start tracking free
               </button>
@@ -729,6 +717,6 @@ export default function EnhancedSpeciesDetailPage() {
         </div>
       )}
       </div>
-    </DashboardLayout>
+    </Shell>
   )
 }

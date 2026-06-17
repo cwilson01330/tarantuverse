@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
-import DashboardLayout from '@/components/DashboardLayout'
+import PublicCareShell from '@/components/PublicCareShell'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -109,11 +109,7 @@ export default function InvertCareSheetPage() {
   const harmless = species?.taxon === 'whip_spider' || !species?.venom_severity
 
   return (
-    <DashboardLayout
-      userName={user?.name ?? undefined}
-      userEmail={user?.email ?? undefined}
-      userAvatar={user?.image ?? undefined}
-    >
+    <PublicCareShell authUser={user}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Link
           href="/species"
@@ -280,7 +276,7 @@ export default function InvertCareSheetPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
+    </PublicCareShell>
   )
 }
 
