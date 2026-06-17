@@ -64,6 +64,7 @@ export default function EnhancedSpeciesDetailPage() {
 
   useEffect(() => {
     fetchSpecies()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const fetchSpecies = async () => {
@@ -168,7 +169,7 @@ export default function EnhancedSpeciesDetailPage() {
   const canEdit = false // TODO: Add admin/superuser check when roles are implemented
 
   return (
-    <Shell authUser={authUser}>
+    <PublicCareShell authUser={authUser}>
       <div>
 
       {/* Hero Section */}
@@ -717,6 +718,6 @@ export default function EnhancedSpeciesDetailPage() {
         </div>
       )}
       </div>
-    </Shell>
+    </PublicCareShell>
   )
 }
