@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, distinct
 from app.database import get_db
 from app.models.user import User
 from app.models.species import Species
-from app.models.subscription import UserSubscription
+from app.models.invert_species import InvertSpecies
+from app.models.subscription import UserSubscription, SubscriptionPlan
 from app.models.content_report import ContentReport
+from app.utils.subscription import active_subscription_clause
 from app.schemas.user import UserResponse
 from app.utils.dependencies import get_current_admin
 from app.services.email import EmailService
@@ -27,13 +29,30 @@ async def get_admin_stats(
     # Total users
     total_users = db.query(func.count(User.id)).scalar() or 0
 
-    # Total species
-    total_species = db.query(func.count(Species.id)).scalar() or 0
+    # Total species across ALL taxa — count the unified `invert_species` catalog,
+    # not the legacy tarantula-only `species` table (which omits scorpions,
+    # centipedes, mantises, roaches, etc.).
+    total_species = db.query(func.count(InvertSpecies.id)).scalar() or 0
+    species_by_taxon = {
+        taxon: count
+        for taxon, count in (
+            db.query(InvertSpecies.taxon, func.count(InvertSpecies.id))
+            .group_by(InvertSpecies.taxon)
+            .all()
+        )
+    }
 
-    # Premium users (users with active subscriptions)
-    premium_users = db.query(func.count(UserSubscription.id)).filter(
-        UserSubscription.status == 'active'
-    ).scalar() or 0
+    # Premium users: DISTINCT users on a PAID plan whose subscription is active
+    # and not past expires_at. Mirrors User.is_premium / get_subscription_limits
+    # and utils/subscription.active_subscription_clause. Counting raw
+    # status='active' rows overcounts expired-but-unflipped rows + free-plan rows
+    # and double-counts renewals.
+    premium_users = (
+        db.query(func.count(distinct(UserSubscription.user_id)))
+        .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(active_subscription_clause(), SubscriptionPlan.name != "free")
+        .scalar()
+    ) or 0
 
     # Pending reports (not resolved)
     pending_reports = db.query(func.count(ContentReport.id)).filter(
@@ -43,6 +62,7 @@ async def get_admin_stats(
     return {
         "total_users": total_users,
         "total_species": total_species,
+        "species_by_taxon": species_by_taxon,
         "premium_users": premium_users,
         "pending_reports": pending_reports
     }

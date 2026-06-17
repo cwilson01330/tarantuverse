@@ -11,6 +11,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 interface AdminStats {
   total_users: number;
   total_species: number;
+  species_by_taxon?: Record<string, number>;
   premium_users: number;
   pending_reports: number;
 }
@@ -58,7 +59,7 @@ const adminSections: AdminSection[] = [
     title: 'Content Moderation',
     description: 'Review reports, manage blocks, and moderate user content',
     icon: '🛡️',
-    href: '/dashboard/admin/moderation',
+    href: '/dashboard/admin/moderation/reports',
     color: 'from-red-500 to-orange-500',
     items: [
       { label: 'Pending Reports', href: '/dashboard/admin/moderation/reports' },
@@ -326,6 +327,27 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+          {/* Species-by-taxon breakdown — confirms the Total Species count spans
+              all taxa, not just tarantulas. */}
+          {!statsLoading && stats?.species_by_taxon && Object.keys(stats.species_by_taxon).length > 0 && (
+            <div className="mt-5 pt-4 border-t border-gray-100 dark:border-gray-700">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 text-center">
+                Species by taxon
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {Object.entries(stats.species_by_taxon)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([taxon, count]) => (
+                    <span
+                      key={taxon}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize"
+                    >
+                      {taxon.replace(/_/g, ' ')}: {count.toLocaleString()}
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
           {!statsLoading && stats && (
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
               ✅ Live stats updated from database

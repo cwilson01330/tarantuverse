@@ -22,6 +22,7 @@ from app.models.molt_log import MoltLog
 from app.models.substrate_change import SubstrateChange
 from app.models.species import Species
 from app.models.subscription import UserSubscription, SubscriptionPlan
+from app.utils.subscription import active_subscription_clause
 from app.models.activity_feed import ActivityFeed
 from app.models.forum import ForumCategory, ForumThread, ForumPost
 from app.models.direct_message import DirectMessage
@@ -133,16 +134,22 @@ async def get_analytics_overview(
     if new_users_prev_30d > 0:
         user_growth_rate = ((new_users_30d - new_users_prev_30d) / new_users_prev_30d) * 100
 
-    # Premium users
-    total_premium_users = db.query(func.count(UserSubscription.id)).filter(
-        UserSubscription.status == "active"
-    ).scalar() or 0
+    # Premium users: DISTINCT users on a paid plan, active and not past expires_at
+    # (expiry-aware — see utils/subscription.active_subscription_clause). Raw
+    # status='active' row counts overcount stale/free rows and renewals.
+    total_premium_users = (
+        db.query(func.count(distinct(UserSubscription.user_id)))
+        .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(active_subscription_clause(), SubscriptionPlan.name != "free")
+        .scalar()
+    ) or 0
 
-    # MRR calculation (count active monthly subscriptions * price)
+    # MRR: sum monthly price of active, non-expired, auto-renewing PAID subs.
     mrr_result = db.query(func.sum(SubscriptionPlan.price_monthly)).join(
         UserSubscription, UserSubscription.plan_id == SubscriptionPlan.id
     ).filter(
-        UserSubscription.status == "active",
+        active_subscription_clause(),
+        SubscriptionPlan.name != "free",
         UserSubscription.auto_renew == True
     ).scalar() or 0.0
     mrr = float(mrr_result)
