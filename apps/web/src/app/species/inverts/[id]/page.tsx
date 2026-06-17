@@ -1,356 +1,145 @@
-'use client'
-
 /**
- * Generic invert care sheet (web) — ADR-006.
+ * Invert care-guide page — SERVER component (SEO surface).
  *
- * Renders any non-tarantula invert species (whip_spider, scorpion,
- * centipede) from the unified `invert_species` catalog via
- * GET /api/v1/invert-species/{id}. Tarantulas keep their dedicated
- * /species/[id] care sheet.
- *
- * Safety is taxon-honest: whip spiders show a green "Harmless" treatment
- * (no venom, no sting); scorpions + centipedes show their venom tier.
+ * Non-tarantula care guides (scorpion, mantis, jumping spider, roach, millipede,
+ * centipede, whip spider, vinegaroon, …) live here. The interactive UI is in
+ * InvertCareSheetClient.tsx ('use client'); this thin server wrapper ships real
+ * per-species <title>/meta + Open Graph + JSON-LD in the initial HTML and is
+ * cached via ISR — without it these pages crawled as the generic site title only.
+ * Mirrors the tarantula route at species/[id]/page.tsx.
  */
-import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import { useAuth } from '@/hooks/useAuth'
-import PublicCareShell from '@/components/PublicCareShell'
+import type { Metadata } from 'next'
+import InvertCareSheetClient from './InvertCareSheetClient'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Revalidate cached HTML hourly — care content changes rarely.
+export const revalidate = 3600
 
-interface InvertSpecies {
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
+const SITE =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  process.env.NEXTAUTH_URL ||
+  'https://tarantuverse.com'
+
+const TAXON_LABELS: Record<string, string> = {
+  whip_spider: 'whip spider',
+  scorpion: 'scorpion',
+  centipede: 'centipede',
+  tarantula: 'tarantula',
+  mantis: 'mantis',
+  roach: 'roach',
+  millipede: 'millipede',
+  vinegaroon: 'vinegaroon',
+  true_spider: 'jumping/true spider',
+  other: 'invertebrate',
+}
+
+interface Invert {
   id: string
   taxon: string
   scientific_name: string
-  common_names: string[]
-  genus: string | null
-  family: string | null
-  native_region: string | null
-  care_level: string | null
-  temperament: string | null
-  type: string | null
-  adult_size: string | null
-  adult_length_min_mm: number | string | null
-  adult_length_max_mm: number | string | null
-  growth_rate: string | null
-  temperature_min: number | null
-  temperature_max: number | null
-  humidity_min: number | null
-  humidity_max: number | null
-  enclosure_size_sling: string | null
-  enclosure_size_juvenile: string | null
-  enclosure_size_adult: string | null
-  substrate_type: string | null
-  substrate_depth: string | null
-  feeding_mode: string | null
-  prey_size: string | null
-  feeding_frequency_sling: string | null
-  feeding_frequency_juvenile: string | null
-  feeding_frequency_adult: string | null
-  water_dish_required: boolean
-  communal_suitable: boolean
-  venom_severity: string | null
-  venom_notes: string | null
-  care_guide: string | null
-  image_url: string | null
-  is_verified: boolean
-  times_kept: number
-  slug: string
+  common_names?: string[]
+  care_guide?: string | null
+  native_region?: string | null
+  image_url?: string | null
 }
 
-const TAXON_LABELS: Record<string, string> = {
-  whip_spider: 'Whip spider',
-  scorpion: 'Scorpion',
-  centipede: 'Centipede',
-  tarantula: 'Tarantula',
+async function getSpecies(id: string): Promise<Invert | null> {
+  try {
+    const res = await fetch(`${API}/api/v1/invert-species/${id}`, {
+      next: { revalidate },
+    })
+    if (!res.ok) return null
+    return (await res.json()) as Invert
+  } catch {
+    return null
+  }
 }
 
-const VENOM_LABELS: Record<string, string> = {
-  mild: 'Mild',
-  moderate: 'Moderate',
-  medically_significant: 'Medically significant',
+function buildDescription(s: Invert): string {
+  const name = s.common_names?.[0] || s.scientific_name
+  if (s.care_guide && s.care_guide.trim()) {
+    const flat = s.care_guide.replace(/[#*_>`\-]/g, ' ').replace(/\s+/g, ' ').trim()
+    if (flat.length > 0) return flat.slice(0, 155)
+  }
+  const taxon = TAXON_LABELS[s.taxon] ?? 'invertebrate'
+  const bits = [
+    `${name} (${taxon}) care guide`,
+    'enclosure, temperature, humidity, feeding & temperament',
+  ]
+  if (s.native_region) bits.push(`native to ${s.native_region}`)
+  return `${bits.join(' — ')}. Track your collection free on Tarantuverse.`
 }
 
-const FEEDING_MODE_LABELS: Record<string, string> = {
-  predator: 'Predator (live prey)',
-  detritivore: 'Detritivore (decaying matter)',
-  omnivore: 'Omnivore',
-}
-
-export default function InvertCareSheetPage() {
-  const params = useParams()
-  const id = params?.id as string
-  const { user } = useAuth()
-
-  const [species, setSpecies] = useState<InvertSpecies | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchSpecies = useCallback(async () => {
-    if (!id) return
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`${API_URL}/api/v1/invert-species/${id}`)
-      if (!res.ok) throw new Error('Could not load this care sheet.')
-      setSpecies(await res.json())
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.')
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
-
-  useEffect(() => {
-    fetchSpecies()
-  }, [fetchSpecies])
-
-  const harmless = species?.taxon === 'whip_spider' || !species?.venom_severity
-
-  return (
-    <PublicCareShell authUser={user}>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link
-          href="/species"
-          className="text-sm text-primary-600 hover:underline mb-4 inline-block"
-        >
-          ← Back to species
-        </Link>
-
-        {loading && (
-          <p className="text-gray-600 dark:text-gray-400">Loading care sheet…</p>
-        )}
-
-        {error && !loading && (
-          <div className="text-center py-12">
-            <p className="text-gray-700 dark:text-gray-300 mb-4">{error}</p>
-            <button
-              onClick={fetchSpecies}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {species && !loading && (
-          <>
-            {/* Header */}
-            <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                {species.common_names?.[0] || species.scientific_name}
-              </h1>
-              <p className="text-lg italic text-gray-600 dark:text-gray-400">
-                {species.scientific_name}
-              </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <Badge className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                  {TAXON_LABELS[species.taxon] ?? species.taxon}
-                </Badge>
-                {species.care_level && (
-                  <Badge className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 capitalize">
-                    {species.care_level}
-                  </Badge>
-                )}
-                {harmless ? (
-                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                    Harmless
-                  </Badge>
-                ) : (
-                  <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
-                    Venom: {VENOM_LABELS[species.venom_severity!] ?? species.venom_severity}
-                  </Badge>
-                )}
-                {species.communal_suitable && (
-                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
-                    Communal OK
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            {/* Safety callout */}
-            {harmless ? (
-              <Callout color="green" title="No venom, no sting">
-                Whip spiders are completely harmless to humans. They&apos;re fast
-                and can deliver a harmless pinch with the pedipalps, but have no
-                venom and no sting.
-              </Callout>
-            ) : (
-              (species.venom_notes ||
-                species.venom_severity === 'medically_significant') && (
-                <Callout
-                  color="red"
-                  title={
-                    species.venom_severity === 'medically_significant'
-                      ? 'Medically significant venom'
-                      : 'Venom note'
-                  }
-                >
-                  {species.venom_notes ||
-                    'Venom is medically significant. Experienced keepers only — check local legality and have a protocol.'}
-                </Callout>
-              )
-            )}
-
-            {/* About */}
-            {species.care_guide && (
-              <Section title="About">
-                <p className="text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-                  {species.care_guide.replace(/\*\*(.*?)\*\*/g, '$1')}
-                </p>
-              </Section>
-            )}
-
-            {/* Taxonomy */}
-            <Section title="Taxonomy">
-              <Fact label="Family" value={species.family} />
-              <Fact label="Genus" value={species.genus} />
-              <Fact label="Native region" value={species.native_region} />
-              <Fact label="Type" value={cap(species.type)} />
-              <Fact label="Temperament" value={species.temperament} />
-            </Section>
-
-            {/* Size & growth */}
-            <Section title="Size & growth">
-              <Fact label="Adult size" value={species.adult_size} />
-              {(species.adult_length_min_mm || species.adult_length_max_mm) && (
-                <Fact
-                  label={species.taxon === 'whip_spider' ? 'Leg span' : 'Length'}
-                  value={`${species.adult_length_min_mm ?? '?'}–${species.adult_length_max_mm ?? '?'} mm`}
-                />
-              )}
-              <Fact label="Growth rate" value={species.growth_rate} />
-            </Section>
-
-            {/* Climate */}
-            <Section title="Climate">
-              {(species.temperature_min || species.temperature_max) && (
-                <Fact
-                  label="Temperature"
-                  value={`${species.temperature_min ?? '?'}–${species.temperature_max ?? '?'} °F`}
-                />
-              )}
-              {(species.humidity_min || species.humidity_max) && (
-                <Fact
-                  label="Humidity"
-                  value={`${species.humidity_min ?? '?'}–${species.humidity_max ?? '?'}%`}
-                />
-              )}
-            </Section>
-
-            {/* Enclosure */}
-            <Section title="Enclosure">
-              <Fact label="Sling size" value={species.enclosure_size_sling} />
-              <Fact label="Juvenile size" value={species.enclosure_size_juvenile} />
-              <Fact label="Adult size" value={species.enclosure_size_adult} />
-              <Fact label="Substrate" value={species.substrate_type} />
-              <Fact label="Substrate depth" value={species.substrate_depth} />
-              <Fact
-                label="Water dish"
-                value={species.water_dish_required ? 'Required' : 'Optional'}
-              />
-            </Section>
-
-            {/* Feeding */}
-            <Section title="Feeding">
-              <Fact
-                label="Feeding mode"
-                value={
-                  species.feeding_mode
-                    ? FEEDING_MODE_LABELS[species.feeding_mode] ?? species.feeding_mode
-                    : null
-                }
-              />
-              <Fact label="Prey size" value={species.prey_size} />
-              <Fact label="Sling cadence" value={species.feeding_frequency_sling} />
-              <Fact label="Juvenile cadence" value={species.feeding_frequency_juvenile} />
-              <Fact label="Adult cadence" value={species.feeding_frequency_adult} />
-            </Section>
-
-            <p className="text-xs text-gray-400 text-center mt-6">
-              Times kept: {species.times_kept}
-              {!species.is_verified && ' · Unverified community entry'}
-            </p>
-          </>
-        )}
-      </div>
-    </PublicCareShell>
-  )
-}
-
-function cap(s: string | null | undefined): string | null {
-  if (!s) return null
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
-function Badge({
-  className,
-  children,
+export async function generateMetadata({
+  params,
 }: {
-  className: string
-  children: React.ReactNode
-}) {
-  return (
-    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${className}`}>
-      {children}
-    </span>
-  )
+  params: Promise<{ id: string }>
+}): Promise<Metadata> {
+  const { id } = await params
+  const s = await getSpecies(id)
+  if (!s) {
+    return { title: 'Care Guide | Tarantuverse' }
+  }
+  const common = s.common_names?.[0]
+  const title = `${s.scientific_name}${common ? ` (${common})` : ''} Care Guide | Tarantuverse`
+  const description = buildDescription(s)
+  const url = `${SITE}/species/inverts/${id}`
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      type: 'article',
+      siteName: 'Tarantuverse',
+      images: s.image_url ? [{ url: s.image_url }] : undefined,
+    },
+    twitter: {
+      card: s.image_url ? 'summary_large_image' : 'summary',
+      title,
+      description,
+      images: s.image_url ? [s.image_url] : undefined,
+    },
+  }
 }
 
-function Section({
-  title,
-  children,
+export default async function InvertSpeciesDetailPage({
+  params,
 }: {
-  title: string
-  children: React.ReactNode
+  params: Promise<{ id: string }>
 }) {
-  return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-4">
-      <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3">
-        {title}
-      </h2>
-      {children}
-    </div>
-  )
-}
+  const { id } = await params
+  const s = await getSpecies(id)
 
-function Fact({
-  label,
-  value,
-}: {
-  label: string
-  value: string | null | undefined
-}) {
-  if (!value) return null
-  return (
-    <div className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
-      <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
-      <span className="text-sm font-medium text-gray-900 dark:text-white text-right ml-3">
-        {value}
-      </span>
-    </div>
-  )
-}
+  // JSON-LD for rich results — rendered server-side so crawlers see it without JS.
+  const jsonLd = s
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: `${s.scientific_name} Care Guide`,
+        about: s.scientific_name,
+        description: buildDescription(s),
+        ...(s.image_url ? { image: s.image_url } : {}),
+        publisher: {
+          '@type': 'Organization',
+          name: 'Tarantuverse',
+          url: SITE,
+        },
+        mainEntityOfPage: `${SITE}/species/inverts/${id}`,
+      }
+    : null
 
-function Callout({
-  color,
-  title,
-  children,
-}: {
-  color: 'green' | 'red'
-  title: string
-  children: React.ReactNode
-}) {
-  const styles =
-    color === 'green'
-      ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-800 dark:text-green-300'
-      : 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-800 dark:text-red-300'
   return (
-    <div className={`border-l-4 rounded-r-lg p-4 mb-4 ${styles}`}>
-      <p className="font-bold text-sm mb-1">{title}</p>
-      <p className="text-sm leading-relaxed">{children}</p>
-    </div>
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      <InvertCareSheetClient />
+    </>
   )
 }
