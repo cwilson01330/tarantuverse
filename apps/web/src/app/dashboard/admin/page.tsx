@@ -49,6 +49,13 @@ const adminSections: AdminSection[] = [
     color: 'from-blue-500 to-cyan-500',
   },
   {
+    title: 'Subscriptions',
+    description: 'View Apple, Stripe, and granted premium subs — provider, plan, renewal, transaction ID',
+    icon: '💳',
+    href: '/dashboard/admin/subscriptions',
+    color: 'from-teal-500 to-cyan-500',
+  },
+  {
     title: 'Promo Codes',
     description: 'Create and manage promotional codes for premium access',
     icon: '🎟️',

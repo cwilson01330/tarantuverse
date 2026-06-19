@@ -101,6 +101,58 @@ async def list_users(
 
     return result
 
+
+@router.get("/subscriptions")
+async def list_subscriptions(
+    active_only: bool = Query(True, description="Only currently-active (paid, non-expired) subs."),
+    db: Session = Depends(get_db),
+):
+    """List subscriptions with full detail for the admin Subscriptions view.
+
+    Surfaces provider (apple/stripe/admin grant), plan, dates, transaction id,
+    auto-renew, and an expiry-aware `is_active` so Apple/Stripe purchases are
+    visible (the users list only shows a premium yes/no badge).
+    """
+    now = datetime.now(timezone.utc)
+    q = (
+        db.query(UserSubscription, User, SubscriptionPlan)
+        .join(User, User.id == UserSubscription.user_id)
+        .outerjoin(SubscriptionPlan, SubscriptionPlan.id == UserSubscription.plan_id)
+    )
+    if active_only:
+        q = q.join(
+            SubscriptionPlan, SubscriptionPlan.id == UserSubscription.plan_id
+        ).filter(active_subscription_clause(), SubscriptionPlan.name != "free")
+
+    rows = q.order_by(UserSubscription.created_at.desc()).all()
+
+    out = []
+    for sub, user, plan in rows:
+        expires = sub.expires_at
+        if expires is not None and expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        is_active = sub.status == "active" and (expires is None or expires > now)
+        out.append({
+            "id": str(sub.id),
+            "username": user.username,
+            "email": user.email,
+            "plan": plan.name if plan else None,
+            "status": sub.status,
+            "is_active": is_active,
+            "payment_provider": sub.payment_provider,
+            "subscription_source": sub.subscription_source,
+            "payment_provider_id": sub.payment_provider_id,
+            "auto_renew": sub.auto_renew,
+            "granted_by_admin": sub.granted_by_admin,
+            "promo_code_used": sub.promo_code_used,
+            "started_at": sub.started_at,
+            "expires_at": sub.expires_at,
+            "cancelled_at": sub.cancelled_at,
+            "created_at": sub.created_at,
+        })
+    return out
+
+
 @router.post("/users/{user_id}/reset-password")
 async def trigger_password_reset(
     user_id: str,
