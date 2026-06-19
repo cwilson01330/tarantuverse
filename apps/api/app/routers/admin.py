@@ -120,9 +120,10 @@ async def list_subscriptions(
         .outerjoin(SubscriptionPlan, SubscriptionPlan.id == UserSubscription.plan_id)
     )
     if active_only:
-        q = q.join(
-            SubscriptionPlan, SubscriptionPlan.id == UserSubscription.plan_id
-        ).filter(active_subscription_clause(), SubscriptionPlan.name != "free")
+        # SubscriptionPlan is already outer-joined above; filtering on its name
+        # (non-null) effectively makes it an inner join — do NOT join it again
+        # (a second join emits the table twice and 500s).
+        q = q.filter(active_subscription_clause(), SubscriptionPlan.name != "free")
 
     rows = q.order_by(UserSubscription.created_at.desc()).all()
 
