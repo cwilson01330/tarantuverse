@@ -30,6 +30,7 @@ interface User {
     is_superuser: boolean;
     is_verified: boolean;
     is_premium?: boolean;
+    invert_count?: number;
     created_at: string;
 }
 
@@ -559,6 +560,9 @@ export default function ManageUsersPage() {
                                         Premium
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Animals
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Joined
                                     </th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -618,6 +622,9 @@ export default function ManageUsersPage() {
                                                     <>Free</>
                                                 )}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-700 dark:text-gray-200 tabular-nums">
+                                            {user.invert_count ?? 0}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                             {format(new Date(user.created_at), 'MMM d, yyyy')}

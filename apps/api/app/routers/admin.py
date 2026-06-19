@@ -5,6 +5,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.species import Species
 from app.models.invert_species import InvertSpecies
+from app.models.invert import Invert
 from app.models.subscription import UserSubscription, SubscriptionPlan
 from app.models.content_report import ContentReport
 from app.utils.subscription import active_subscription_clause
@@ -90,6 +91,19 @@ async def list_users(
 
     users = query.order_by(User.created_at.desc()).offset(skip).limit(limit).all()
 
+    # Per-user kept-invert counts — one grouped query (no N+1), scoped to this
+    # page, excluding transferred-out animals so it reflects what each user is
+    # currently keeping.
+    user_ids = [u.id for u in users]
+    counts: dict = {}
+    if user_ids:
+        counts = dict(
+            db.query(Invert.user_id, func.count(Invert.id))
+            .filter(Invert.user_id.in_(user_ids), Invert.transferred_out_at.is_(None))
+            .group_by(Invert.user_id)
+            .all()
+        )
+
     # Build response with is_premium computed from subscription
     result = []
     for user in users:
@@ -97,6 +111,7 @@ async def list_users(
         # Check if user has premium subscription
         limits = user.get_subscription_limits()
         user_dict['is_premium'] = limits.get('is_premium', False)
+        user_dict['invert_count'] = counts.get(user.id, 0)
         result.append(user_dict)
 
     return result
