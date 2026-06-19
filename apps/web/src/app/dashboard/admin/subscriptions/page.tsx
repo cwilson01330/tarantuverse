@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardLayout from '@/components/DashboardLayout';
@@ -50,24 +50,28 @@ export default function AdminSubscriptionsPage() {
     if (!user.is_admin && !user.is_superuser) { router.push('/dashboard'); return; }
   }, [isLoading, isAuthenticated, user, router]);
 
-  const fetchSubs = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/v1/admin/subscriptions?active_only=${activeOnly}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) setSubs(await res.json());
-    } catch (e) {
-      console.error('Failed to load subscriptions', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [token, activeOnly]);
-
+  // Depend only on stable primitives (token, activeOnly). Depending on the
+  // useAuth `user` object — which gets a fresh identity every render — caused an
+  // infinite refetch loop (the "Loading…" flash). cancelled-guard avoids setting
+  // state after unmount / rapid toggle.
   useEffect(() => {
-    if (token && user && (user.is_admin || user.is_superuser)) fetchSubs();
-  }, [token, user, fetchSubs]);
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/api/v1/admin/subscriptions?active_only=${activeOnly}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!cancelled && res.ok) setSubs(await res.json());
+      } catch (e) {
+        if (!cancelled) console.error('Failed to load subscriptions', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [token, activeOnly]);
 
   if (isLoading || !user || (!user.is_admin && !user.is_superuser)) return null;
 
