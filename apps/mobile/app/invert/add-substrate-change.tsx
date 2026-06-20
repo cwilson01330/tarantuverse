@@ -8,8 +8,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import DateInput from '../../src/components/DateInput';
 import { getInvert, createInvertSubstrateChange, updateInvertSubstrateChange, type InvertTaxon } from '../../src/lib/inverts';
-import { toISODateLocal } from '../../src/utils/date';
+import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 const REASONS = ['Routine maintenance', 'Mold or mites', 'Rehouse', 'Other'];
 
@@ -53,7 +54,7 @@ export default function AddInvertSubstrateChangeScreen() {
       <AppHeader title={isEdit ? 'Edit substrate change' : 'Log substrate change'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Field label="Date" colors={colors}><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
+          <Field label="Date" colors={colors}><DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Substrate change date" /></Field>
           <Field label="Substrate type" colors={colors}><TextInput style={styles.input} value={substrateType} onChangeText={setSubstrateType} placeholder="Coco fiber / topsoil" placeholderTextColor={colors.textTertiary} /></Field>
           <Field label="Substrate depth" colors={colors}><TextInput style={styles.input} value={substrateDepth} onChangeText={setSubstrateDepth} placeholder="3 inches" placeholderTextColor={colors.textTertiary} /></Field>
           <Field label="Reason" colors={colors}>

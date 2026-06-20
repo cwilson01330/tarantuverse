@@ -8,9 +8,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import DateInput from '../../src/components/DateInput';
 import { getInvert, getInvertMolt, createInvertMolt, updateInvertMolt, type InvertTaxon } from '../../src/lib/inverts';
 import { growthLengthLabel } from '../../src/lib/taxon-modules';
-import { toISODateLocal } from '../../src/utils/date';
+import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 export default function AddInvertMoltScreen() {
   const router = useRouter();
@@ -84,7 +85,7 @@ export default function AddInvertMoltScreen() {
       <AppHeader title={isEdit ? 'Edit molt' : 'Log molt'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Field label="Date molted" colors={colors}><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
+          <Field label="Date molted" colors={colors}><DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Date molted" /></Field>
           <Field label="Molt number (optional)" colors={colors}><TextInput style={styles.input} value={moltNum} onChangeText={setMoltNum} placeholder="e.g. 4" placeholderTextColor={colors.textTertiary} keyboardType="number-pad" /></Field>
           <View style={styles.measureRow}>
             <View style={styles.measureCol}>

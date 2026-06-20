@@ -11,8 +11,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import DateInput from '../../src/components/DateInput';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
 import { INVERT_TAXA, getInvert, updateInvert, type Invert, type Sex, type Source } from '../../src/lib/inverts';
+import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'unknown', label: 'Unknown' }, { value: 'female', label: 'Female' }, { value: 'male', label: 'Male' },
@@ -82,7 +84,7 @@ export default function EditInvertScreen() {
           <Field label={meta?.sizeLabel ?? 'Size (mm)'}><TextInput style={styles.input} value={form.current_length_mm ?? ''} onChangeText={(t) => update('current_length_mm', t)} keyboardType="decimal-pad" /></Field>
 
           <SectionHeader title="Acquisition" colors={colors} />
-          <Field label="Date acquired"><TextInput style={styles.input} value={form.date_acquired ?? ''} onChangeText={(t) => update('date_acquired', t || null)} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
+          <Field label="Date acquired"><DateInput value={parseLocalDate(form.date_acquired) ?? new Date()} onChange={(d) => update('date_acquired', toISODateLocal(d))} maximumDate={new Date()} label="Date acquired" /></Field>
           <Field label="Source"><ChipGroup options={SOURCE_OPTIONS} value={form.source ?? null} onChange={(v) => update('source', v)} colors={colors} /></Field>
           <Field label="Price paid"><TextInput style={styles.input} value={form.price_paid ?? ''} onChangeText={(t) => update('price_paid', t || null)} keyboardType="decimal-pad" placeholderTextColor={colors.textTertiary} /></Field>
 
@@ -104,7 +106,7 @@ export default function EditInvertScreen() {
             <Switch value={form.water_dish} onValueChange={(v) => update('water_dish', v)} />
           </View>
           <Field label="Misting schedule"><TextInput style={styles.input} value={form.misting_schedule ?? ''} onChangeText={(t) => update('misting_schedule', t || null)} placeholder="e.g. 2x per week" placeholderTextColor={colors.textTertiary} /></Field>
-          <Field label="Last enclosure cleaning"><TextInput style={styles.input} value={form.last_enclosure_cleaning ?? ''} onChangeText={(t) => update('last_enclosure_cleaning', t || null)} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
+          <Field label="Last enclosure cleaning"><DateInput value={parseLocalDate(form.last_enclosure_cleaning) ?? new Date()} onChange={(d) => update('last_enclosure_cleaning', toISODateLocal(d))} maximumDate={new Date()} label="Last enclosure cleaning" /></Field>
           <Field label="Enclosure notes"><TextInput style={[styles.input, styles.textArea]} value={form.enclosure_notes ?? ''} onChangeText={(t) => update('enclosure_notes', t || null)} placeholder="Decor, modifications, etc." placeholderTextColor={colors.textTertiary} multiline /></Field>
           <Field label="Notes"><TextInput style={[styles.input, styles.textArea]} value={form.notes ?? ''} onChangeText={(t) => update('notes', t)} multiline /></Field>
 

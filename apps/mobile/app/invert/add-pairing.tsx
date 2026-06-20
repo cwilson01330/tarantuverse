@@ -12,12 +12,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import DateInput from '../../src/components/DateInput';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import {
   getInvert, listInvertsByTaxon, createInvertPairing, invertDisplayName,
   type Invert,
 } from '../../src/lib/inverts';
-import { toISODateLocal } from '../../src/utils/date';
+import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 import { getErrorMessage, isPaymentRequired } from '../../src/utils/errors';
 
 const TYPE_OPTIONS = [
@@ -106,7 +107,7 @@ export default function AddInvertPairingScreen() {
           </Field>
 
           <Field label="Paired date" colors={colors}>
-            <TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" />
+            <DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Paired date" />
           </Field>
 
           <Field label="Type" colors={colors}>

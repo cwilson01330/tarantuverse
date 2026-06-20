@@ -8,8 +8,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import DateInput from '../../src/components/DateInput';
 import { getInvert, createInvertFeeding, updateInvertFeeding, type InvertTaxon } from '../../src/lib/inverts';
-import { toISODateLocal } from '../../src/utils/date';
+import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 const FOOD_TYPES = ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'];
 
@@ -53,7 +54,7 @@ export default function AddInvertFeedingScreen() {
       <AppHeader title={isEdit ? 'Edit feeding' : 'Log feeding'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll}>
-          <Field label="Date" colors={colors}><TextInput style={styles.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} autoCapitalize="none" /></Field>
+          <Field label="Date" colors={colors}><DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Feeding date" /></Field>
           <Field label="Food type" colors={colors}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {FOOD_TYPES.map((f) => { const sel = f === foodType; return (

@@ -14,10 +14,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import DateInput from '../../src/components/DateInput';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import { INVERT_TAXA, createInvert, isInvertTaxon, type Sex, type Source, type InvertTaxon } from '../../src/lib/inverts';
 import { getErrorMessage, isPaymentRequired } from '../../src/utils/errors';
+import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'unknown', label: 'Unknown' },
@@ -173,7 +175,12 @@ export default function AddInvertScreen() {
 
           <Text style={styles.sectionHeading}>Acquisition</Text>
           <Field label="Date acquired">
-            <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} value={dateAcquired} onChangeText={setDateAcquired} autoCapitalize="none" />
+            <DateInput
+              value={parseLocalDate(dateAcquired) ?? new Date()}
+              onChange={(d) => setDateAcquired(toISODateLocal(d))}
+              maximumDate={new Date()}
+              label="Date acquired"
+            />
           </Field>
           <Field label="Source">
             <ChipGroup options={SOURCE_OPTIONS} value={source} onChange={setSource} colors={colors} />
@@ -226,7 +233,12 @@ export default function AddInvertScreen() {
             <TextInput style={styles.input} placeholder="e.g. 2x per week" placeholderTextColor={colors.textTertiary} value={mistingSchedule} onChangeText={setMistingSchedule} />
           </Field>
           <Field label="Last enclosure cleaning">
-            <TextInput style={styles.input} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} value={lastCleaning} onChangeText={setLastCleaning} autoCapitalize="none" />
+            <DateInput
+              value={parseLocalDate(lastCleaning) ?? new Date()}
+              onChange={(d) => setLastCleaning(toISODateLocal(d))}
+              maximumDate={new Date()}
+              label="Last enclosure cleaning"
+            />
           </Field>
           <Field label="Enclosure notes">
             <TextInput style={[styles.input, styles.textArea]} placeholder="Decor, modifications, etc." placeholderTextColor={colors.textTertiary} value={enclosureNotes} onChangeText={setEnclosureNotes} multiline />
