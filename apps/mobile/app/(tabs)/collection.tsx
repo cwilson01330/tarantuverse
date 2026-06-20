@@ -119,6 +119,12 @@ function CollectionScreen() {
   const [whipSpiders, setWhipSpiders] = useState<WhipSpider[]>([]);
   const [otherInverts, setOtherInverts] = useState<GenericInvert[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
+  // Separate map for non-tarantula taxa so the four invert fetchers can merge
+  // into it without racing the tarantula fetch (which replaces feedingStatuses
+  // wholesale). Only predator-mode taxa are populated — detritivores
+  // (millipedes) and omnivores (roaches) have no live-prey cadence, so an
+  // "overdue" badge would be misleading.
+  const [invertFeedingStatuses, setInvertFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -190,6 +196,7 @@ function CollectionScreen() {
     try {
       const rows = await listScorpions();
       setScorpions(rows);
+      loadInvertFeedingStatuses(rows.map((r) => ({ id: r.id, taxon: 'scorpion' })));
     } catch {
       setScorpions([]);
     }
@@ -203,6 +210,7 @@ function CollectionScreen() {
     try {
       const rows = await listCentipedes();
       setCentipedes(rows);
+      loadInvertFeedingStatuses(rows.map((r) => ({ id: r.id, taxon: 'centipede' })));
     } catch {
       setCentipedes([]);
     }
@@ -215,6 +223,7 @@ function CollectionScreen() {
     try {
       const rows = await listWhipSpiders();
       setWhipSpiders(rows);
+      loadInvertFeedingStatuses(rows.map((r) => ({ id: r.id, taxon: 'whip_spider' })));
     } catch {
       setWhipSpiders([]);
     }
@@ -225,7 +234,9 @@ function CollectionScreen() {
     // per-taxon list lib — pull the unified collection and keep just those.
     try {
       const all = await listInverts();
-      setOtherInverts(all.filter((i) => GENERIC_TAXA.includes(i.taxon)));
+      const others = all.filter((i) => GENERIC_TAXA.includes(i.taxon));
+      setOtherInverts(others);
+      loadInvertFeedingStatuses(others.map((i) => ({ id: i.id, taxon: i.taxon })));
     } catch {
       setOtherInverts([]);
     }
@@ -293,6 +304,44 @@ function CollectionScreen() {
     );
 
     setPremoltPredictions(predictionMap);
+  };
+
+  // Feeding statuses for predator-mode inverts → invertFeedingStatuses (merged,
+  // not replaced, so the four taxon fetchers don't clobber each other). Skips
+  // detritivores/omnivores. Fails silently per animal, and is a no-op against an
+  // API that predates /inverts/{id}/feeding-stats — older instances just show no
+  // badge instead of erroring.
+  const loadInvertFeedingStatuses = async (
+    rows: { id: string; taxon: InvertTaxon }[],
+  ) => {
+    const predators = rows.filter(
+      (r) => INVERT_TAXA[r.taxon]?.feedingMode === 'predator',
+    );
+    if (predators.length === 0) return;
+    const tzOffset = new Date().getTimezoneOffset();
+    const entries = await Promise.all(
+      predators.map(async (r) => {
+        try {
+          const res = await apiClient.get(`/inverts/${r.id}/feeding-stats`, {
+            params: { tz_offset_minutes: tzOffset },
+          });
+          const status: FeedingStatus = {
+            tarantula_id: r.id,
+            days_since_last_feeding: res.data.days_since_last_feeding ?? undefined,
+            acceptance_rate: res.data.acceptance_rate ?? 0,
+            is_feeding_paused: res.data.is_feeding_paused ?? false,
+          };
+          return [r.id, status] as const;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    setInvertFeedingStatuses((prev) => {
+      const next = new Map(prev);
+      for (const e of entries) if (e) next.set(e[0], e[1]);
+      return next;
+    });
   };
 
   const getFeedingStatusBadge = (tarantulaId: string) => {
@@ -1036,11 +1085,22 @@ function CollectionScreen() {
     },
     glyph: string,
     taxonLabel: string,
+    feedingStatus?: FeedingStatus,
   ) => {
     const displayName =
       item.name || item.common_name || item.scientific_name || 'Unnamed';
     const sexLabel =
       item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
+
+    // Feeding badge (predator taxa only — see loadInvertFeedingStatuses).
+    // Paused trumps the days-since treatment, same as the tarantula row.
+    const feedingDays = feedingStatus?.days_since_last_feeding;
+    let feedingColor = colors.success;
+    if (feedingDays !== undefined && feedingDays !== null) {
+      if (feedingDays >= 21) feedingColor = '#ef4444';
+      else if (feedingDays >= 14) feedingColor = '#f97316';
+      else if (feedingDays >= 7) feedingColor = '#eab308';
+    }
     return (
       <TouchableOpacity
         style={styles.listItem}
@@ -1107,6 +1167,25 @@ function CollectionScreen() {
               }
             />
           </View>
+          {feedingStatus?.is_feeding_paused ? (
+            <View
+              style={[styles.listBadge, { backgroundColor: colors.textTertiary }]}
+              accessibilityLabel="Feeding paused"
+            >
+              <Text style={styles.listBadgeText}>⏸</Text>
+            </View>
+          ) : feedingDays !== undefined && feedingDays !== null ? (
+            <View
+              style={[styles.listBadge, { backgroundColor: feedingColor }]}
+              accessibilityLabel={
+                feedingDays === 0 ? 'Fed today' : `Last fed ${feedingDays} days ago`
+              }
+            >
+              <Text style={styles.listBadgeText}>
+                {feedingDays === 0 ? 'Today' : `${feedingDays}d`}
+              </Text>
+            </View>
+          ) : null}
         </View>
         <MaterialCommunityIcons
           name="chevron-right"
@@ -1712,23 +1791,28 @@ function CollectionScreen() {
     if (item.kind === 'scorpion') {
       return viewMode === 'card'
         ? renderScorpion({ item: item.data })
-        : renderInvertListItem(item.data, '🦂', 'scorpion');
+        : renderInvertListItem(item.data, '🦂', 'scorpion', invertFeedingStatuses.get(item.data.id));
     }
     if (item.kind === 'centipede') {
       return viewMode === 'card'
         ? renderCentipede({ item: item.data })
-        : renderInvertListItem(item.data, '🐛', 'centipede');
+        : renderInvertListItem(item.data, '🐛', 'centipede', invertFeedingStatuses.get(item.data.id));
     }
     if (item.kind === 'whip_spider') {
       return viewMode === 'card'
         ? renderWhipSpider({ item: item.data })
-        : renderInvertListItem(item.data, '🕸️', 'whip spider');
+        : renderInvertListItem(item.data, '🕸️', 'whip spider', invertFeedingStatuses.get(item.data.id));
     }
     if (item.kind === 'invert') {
       const meta = INVERT_TAXA[item.data.taxon];
       return viewMode === 'card'
         ? renderInvert({ item: item.data })
-        : renderInvertListItem(item.data, meta?.glyph ?? '🐾', meta?.label ?? 'invert');
+        : renderInvertListItem(
+            item.data,
+            meta?.glyph ?? '🐾',
+            meta?.label ?? 'invert',
+            invertFeedingStatuses.get(item.data.id),
+          );
     }
     return viewMode === 'card'
       ? renderTarantula({ item: item.data })

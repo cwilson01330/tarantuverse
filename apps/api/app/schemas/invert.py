@@ -119,6 +119,28 @@ class InvertResponse(InvertBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class InvertFeedingStats(BaseModel):
+    """Lean feeding summary for any invert — drives the collection list
+    feeding badge (days-since + paused), not the full analytics card.
+
+    Only the fields the mobile/web list rows consume. days_since_last_feeding
+    refers to the last ACCEPTED feeding (refusals are tracked but don't count
+    as a meal — same rule as the tarantula feeding-stats endpoint). Computed
+    from feeding logs matched on invert_id, so it is taxon-agnostic.
+    """
+    invert_id: uuid.UUID
+    total_feedings: int = 0
+    total_accepted: int = 0
+    acceptance_rate: float = 0.0
+    last_feeding_date: Optional[datetime] = None
+    days_since_last_feeding: Optional[int] = None
+    is_feeding_paused: bool = False
+    feeding_paused_reason: Optional[str] = None
+    feeding_paused_until: Optional[date] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class InvertGrowthAnalytics(BaseModel):
     """Growth analytics for any invert, computed from its molt history.
 

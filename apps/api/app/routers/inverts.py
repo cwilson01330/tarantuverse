@@ -16,6 +16,7 @@ from their own tables; dual-write lands in A2 and the read cutover in
 C1.
 """
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -28,15 +29,37 @@ from app.database import get_db
 from app.models.user import User
 from app.models.invert import Invert
 from app.models.invert_species import InvertSpecies
+from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.scorpion_colony import ScorpionColony
 from app.models.tarantula import Sex, Source  # shared DB enums (UPPERCASE)
-from app.schemas.invert import InvertCreate, InvertGrowthAnalytics, InvertResponse, InvertUpdate
+from app.schemas.invert import (
+    InvertCreate,
+    InvertFeedingStats,
+    InvertGrowthAnalytics,
+    InvertResponse,
+    InvertUpdate,
+)
 from app.services.growth_service import compute_growth_fields
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_collection_limit
 
 router = APIRouter()
+
+
+def _calendar_day_diff(later: datetime, earlier: datetime, tz_offset_minutes: Optional[int]) -> int:
+    """Calendar-day difference in the user's local timezone.
+
+    Mirrors tarantulas._calendar_day_diff so "days since last feeding"
+    flips at the keeper's local midnight, not UTC midnight. JS
+    getTimezoneOffset() is positive west of UTC (EDT=240); negate to shift
+    UTC into local time. Falls back to a UTC delta for legacy clients that
+    don't pass an offset.
+    """
+    if tz_offset_minutes is None:
+        return (later - earlier).days
+    local_delta = timedelta(minutes=-tz_offset_minutes)
+    return ((later + local_delta).date() - (earlier + local_delta).date()).days
 
 
 def _coerce_enums(data: dict) -> dict:
@@ -284,4 +307,85 @@ async def get_invert_growth(
     return InvertGrowthAnalytics(
         invert_id=invert_id,
         **compute_growth_fields(molt_logs),
+    )
+
+
+@router.get("/{invert_id}/feeding-stats", response_model=InvertFeedingStats)
+async def get_invert_feeding_stats(
+    invert_id: UUID,
+    tz_offset_minutes: Optional[int] = Query(
+        None,
+        description=(
+            "User's local timezone offset in minutes (JS Date.getTimezoneOffset(): "
+            "positive west of UTC, EDT=240). When provided, days_since_last_feeding "
+            "is computed in calendar days in the user's zone. Optional."
+        ),
+    ),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Lean feeding summary for any invert — powers the collection list
+    feeding badge (days-since + paused), taxon-agnostic.
+
+    `days_since_last_feeding` is measured from the last ACCEPTED feeding;
+    refusals are tracked but aren't meals (same rule as the tarantula
+    feeding-stats endpoint). Feeding logs are matched on invert_id, which
+    dual-write/backfill keep populated for every taxon.
+    """
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invert not found",
+        )
+
+    # Pause state — a paused animal (premolt / recovering / etc.) shouldn't
+    # trigger overdue treatment. Trumps the days-since badge on the client.
+    today_local = (
+        datetime.now(timezone.utc) + timedelta(minutes=-(tz_offset_minutes or 0))
+    ).date() if tz_offset_minutes is not None else datetime.now(timezone.utc).date()
+    is_feeding_paused = bool(
+        invert.feeding_paused_reason
+        and (
+            invert.feeding_paused_until is None
+            or invert.feeding_paused_until >= today_local
+        )
+    )
+
+    feeding_logs = (
+        db.query(FeedingLog)
+        .filter(FeedingLog.invert_id == invert_id)
+        .order_by(FeedingLog.fed_at)
+        .all()
+    )
+
+    total_feedings = len(feeding_logs)
+    accepted_logs = [log for log in feeding_logs if log.accepted]
+    total_accepted = len(accepted_logs)
+    acceptance_rate = (
+        round(total_accepted / total_feedings * 100, 1) if total_feedings else 0.0
+    )
+
+    if accepted_logs:
+        last_feeding_date = accepted_logs[-1].fed_at
+        days_since_last_feeding = _calendar_day_diff(
+            datetime.now(timezone.utc), last_feeding_date, tz_offset_minutes
+        )
+    else:
+        last_feeding_date = None
+        days_since_last_feeding = None
+
+    return InvertFeedingStats(
+        invert_id=invert_id,
+        total_feedings=total_feedings,
+        total_accepted=total_accepted,
+        acceptance_rate=acceptance_rate,
+        last_feeding_date=last_feeding_date,
+        days_since_last_feeding=days_since_last_feeding,
+        is_feeding_paused=is_feeding_paused,
+        feeding_paused_reason=invert.feeding_paused_reason,
+        feeding_paused_until=invert.feeding_paused_until,
     )
