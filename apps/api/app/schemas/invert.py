@@ -103,6 +103,19 @@ class InvertResponse(InvertBase):
     provenance: Optional[dict] = None
     transferred_out_at: Optional[datetime] = None
 
+    # Pattern-free overrides for serialization. These columns are plain VARCHAR and
+    # store UPPERCASE enum casing (the shared DB convention: sex/source are
+    # MALE/FEMALE/UNKNOWN, BOUGHT/BRED/WILD_CAUGHT). The strict lowercase patterns on
+    # InvertBase/Create/Update are correct for INPUT, but on the response they make a
+    # single stored row raise ResponseValidationError and 500 the WHOLE list/detail —
+    # which is why collections weren't showing. The response must reflect whatever is
+    # stored; input validation stays strict on Base/Create/Update.
+    sex: Optional[str] = None
+    source: Optional[str] = None
+    life_stage: Optional[str] = None
+    enclosure_type: Optional[str] = None
+    visibility: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
