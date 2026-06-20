@@ -15,11 +15,14 @@ table. The legacy /tarantulas/ and /scorpions/ routes continue to read
 from their own tables; dual-write lands in A2 and the read cutover in
 C1.
 """
+import logging
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models.user import User
@@ -117,7 +120,17 @@ async def list_inverts(
         query = query.filter(Invert.taxon == taxon)
     if colony_id is not None:
         query = query.filter(Invert.colony_id == colony_id)
-    return query.order_by(Invert.created_at.desc()).all()
+    # Defense in depth: serialize each invert individually so a single bad row
+    # (e.g. an unexpected enum/format value) can't ResponseValidationError and blank
+    # the WHOLE collection. Bad rows are skipped + logged rather than 500ing the list.
+    items: List[InvertResponse] = []
+    for inv in query.order_by(Invert.created_at.desc()).all():
+        try:
+            items.append(InvertResponse.model_validate(inv))
+        except Exception as e:  # noqa: BLE001 — never let one row break the list
+            logger.warning("inverts list: skipping invert %s (serialization failed): %s",
+                           getattr(inv, "id", "?"), e)
+    return items
 
 
 @router.post(
