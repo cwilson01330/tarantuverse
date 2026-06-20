@@ -1018,6 +1018,107 @@ function CollectionScreen() {
     );
   };
 
+  // Compact list row for every non-tarantula taxon. Mirrors the tarantula
+  // renderListItem chrome (same styles.listItem / listImage / listContent /
+  // sexChip) so list view reads as one collection. Feeding-status + premolt
+  // badges are tarantula-only today, so this row omits them. The placeholder
+  // shows the taxon emoji glyph instead of the spider icon. Without this, the
+  // taxon cards fell through to renderRow's card branch and rendered as big
+  // cards even in list view (the "scorpions look larger in list view" bug).
+  const renderInvertListItem = (
+    item: {
+      id: string;
+      name?: string | null;
+      common_name?: string | null;
+      scientific_name?: string | null;
+      sex?: string | null;
+      photo_url?: string | null;
+    },
+    glyph: string,
+    taxonLabel: string,
+  ) => {
+    const displayName =
+      item.name || item.common_name || item.scientific_name || 'Unnamed';
+    const sexLabel =
+      item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
+    return (
+      <TouchableOpacity
+        style={styles.listItem}
+        onPress={() => router.push(`/invert/${item.id}` as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, ${taxonLabel}`}
+        accessibilityHint="Opens this animal's detail page."
+      >
+        <View style={styles.listImageContainer}>
+          {item.photo_url ? (
+            <Image
+              source={{ uri: getImageUrl(item.photo_url) }}
+              style={styles.listImage}
+              accessibilityLabel={`Photo of ${displayName}`}
+            />
+          ) : (
+            <View
+              style={styles.listPlaceholder}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
+              <Text style={{ fontSize: 22 }}>{glyph}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.listContent}>
+          <Text style={styles.listName} numberOfLines={1}>{displayName}</Text>
+          {!!item.scientific_name && (
+            <Text style={styles.listScientificName} numberOfLines={1}>
+              {item.scientific_name}
+            </Text>
+          )}
+        </View>
+        <View style={styles.listBadges}>
+          <View
+            style={[
+              styles.sexChip,
+              {
+                backgroundColor:
+                  item.sex === 'female'
+                    ? '#ec489920'
+                    : item.sex === 'male'
+                      ? '#3b82f620'
+                      : colors.border,
+              },
+            ]}
+            accessibilityLabel={sexLabel}
+          >
+            <MaterialCommunityIcons
+              name={
+                item.sex === 'female'
+                  ? 'gender-female'
+                  : item.sex === 'male'
+                    ? 'gender-male'
+                    : 'help-circle-outline'
+              }
+              size={14}
+              color={
+                item.sex === 'female'
+                  ? '#ec4899'
+                  : item.sex === 'male'
+                    ? '#3b82f6'
+                    : colors.textTertiary
+              }
+            />
+          </View>
+        </View>
+        <MaterialCommunityIcons
+          name="chevron-right"
+          size={24}
+          color={colors.textTertiary}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
+      </TouchableOpacity>
+    );
+  };
+
   const ViewToggle = () => (
     <View style={styles.viewToggleContainer} accessibilityRole="radiogroup">
       <TouchableOpacity
@@ -1609,16 +1710,25 @@ function CollectionScreen() {
   // FlatList itself stays homogeneous; renderItem dispatches.
   const renderRow = ({ item }: { item: Row }) => {
     if (item.kind === 'scorpion') {
-      return renderScorpion({ item: item.data });
+      return viewMode === 'card'
+        ? renderScorpion({ item: item.data })
+        : renderInvertListItem(item.data, '🦂', 'scorpion');
     }
     if (item.kind === 'centipede') {
-      return renderCentipede({ item: item.data });
+      return viewMode === 'card'
+        ? renderCentipede({ item: item.data })
+        : renderInvertListItem(item.data, '🐛', 'centipede');
     }
     if (item.kind === 'whip_spider') {
-      return renderWhipSpider({ item: item.data });
+      return viewMode === 'card'
+        ? renderWhipSpider({ item: item.data })
+        : renderInvertListItem(item.data, '🕸️', 'whip spider');
     }
     if (item.kind === 'invert') {
-      return renderInvert({ item: item.data });
+      const meta = INVERT_TAXA[item.data.taxon];
+      return viewMode === 'card'
+        ? renderInvert({ item: item.data })
+        : renderInvertListItem(item.data, meta?.glyph ?? '🐾', meta?.label ?? 'invert');
     }
     return viewMode === 'card'
       ? renderTarantula({ item: item.data })
