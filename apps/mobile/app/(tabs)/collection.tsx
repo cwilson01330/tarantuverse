@@ -25,6 +25,7 @@ import TarantulaCardSkeleton from '../../src/components/TarantulaCardSkeleton';
 import PremoltAlertCard from '../../src/components/PremoltAlertCard';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
+import { feedingStatusColor } from '../../src/utils/status-colors';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 import {
   AddPickerSheet,
@@ -957,13 +958,7 @@ function CollectionScreen() {
     const feedingStatus = feedingStatuses.get(item.id);
     const premoltPrediction = premoltPredictions.get(item.id);
     const days = feedingStatus?.days_since_last_feeding;
-
-    let feedingColor = colors.success;
-    if (days !== undefined) {
-      if (days >= 21) feedingColor = '#ef4444';
-      else if (days >= 14) feedingColor = '#f97316';
-      else if (days >= 7) feedingColor = '#eab308';
-    }
+    const feedingColor = feedingStatusColor(days, colors);
 
     const displayName = item.name || item.common_name || 'Unknown';
     const sexLabel = item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
@@ -1013,9 +1008,9 @@ function CollectionScreen() {
               {
                 backgroundColor:
                   item.sex === 'female'
-                    ? '#ec489920' // pink tint
+                    ? colors.female + '20' // pink tint
                     : item.sex === 'male'
-                      ? '#3b82f620' // blue tint
+                      ? colors.male + '20' // blue tint
                       : colors.border,
               },
             ]}
@@ -1032,9 +1027,9 @@ function CollectionScreen() {
               size={14}
               color={
                 item.sex === 'female'
-                  ? '#ec4899'
+                  ? colors.female
                   : item.sex === 'male'
-                    ? '#3b82f6'
+                    ? colors.male
                     : colors.textTertiary
               }
             />
@@ -1095,12 +1090,7 @@ function CollectionScreen() {
     // Feeding badge (predator taxa only — see loadInvertFeedingStatuses).
     // Paused trumps the days-since treatment, same as the tarantula row.
     const feedingDays = feedingStatus?.days_since_last_feeding;
-    let feedingColor = colors.success;
-    if (feedingDays !== undefined && feedingDays !== null) {
-      if (feedingDays >= 21) feedingColor = '#ef4444';
-      else if (feedingDays >= 14) feedingColor = '#f97316';
-      else if (feedingDays >= 7) feedingColor = '#eab308';
-    }
+    const feedingColor = feedingStatusColor(feedingDays, colors);
     return (
       <TouchableOpacity
         style={styles.listItem}
@@ -1141,9 +1131,9 @@ function CollectionScreen() {
               {
                 backgroundColor:
                   item.sex === 'female'
-                    ? '#ec489920'
+                    ? colors.female + '20'
                     : item.sex === 'male'
-                      ? '#3b82f620'
+                      ? colors.male + '20'
                       : colors.border,
               },
             ]}
@@ -1160,9 +1150,9 @@ function CollectionScreen() {
               size={14}
               color={
                 item.sex === 'female'
-                  ? '#ec4899'
+                  ? colors.female
                   : item.sex === 'male'
-                    ? '#3b82f6'
+                    ? colors.male
                     : colors.textTertiary
               }
             />
@@ -2034,11 +2024,11 @@ function CollectionScreen() {
                     </View>
                     <View style={styles.sexDistribution}>
                       <View style={styles.sexItem}>
-                        <MaterialCommunityIcons name="gender-male" size={16} color="#3b82f6" />
+                        <MaterialCommunityIcons name="gender-male" size={16} color={colors.male} />
                         <Text style={styles.sexText}>{collectionStats.sex_distribution.male} ♂</Text>
                       </View>
                       <View style={styles.sexItem}>
-                        <MaterialCommunityIcons name="gender-female" size={16} color="#ec4899" />
+                        <MaterialCommunityIcons name="gender-female" size={16} color={colors.female} />
                         <Text style={styles.sexText}>{collectionStats.sex_distribution.female} ♀</Text>
                       </View>
                       <View style={styles.sexItem}>
