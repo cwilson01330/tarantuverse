@@ -1,0 +1,34 @@
+name: Design Token Gate
+
+# Ratchet gate (design system audit 2026-06-22, Action 3).
+# Fails only when the number of hardcoded design values (raw hex colors,
+# numeric fontSize, numeric borderRadius) in apps/mobile INCREASES versus the
+# committed baseline — so existing debt is tolerated but new debt is blocked.
+#
+# To reduce the baseline after a cleanup:  cd apps/mobile && npm run lint:tokens -- --update
+# then commit scripts/design-tokens-baseline.json.
+#
+# The check script has zero dependencies, so no install step is needed.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+  workflow_dispatch:
+
+jobs:
+  token-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check design-token ratchet
+        working-directory: apps/mobile
+        run: node scripts/check-design-tokens.js

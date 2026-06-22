@@ -1,0 +1,569 @@
+{
+  "app/(tabs)/_layout.tsx": {
+    "hex": 1,
+    "fontSize": 1,
+    "borderRadius": 1
+  },
+  "app/(tabs)/collection.tsx": {
+    "hex": 4,
+    "fontSize": 28,
+    "borderRadius": 19
+  },
+  "app/(tabs)/community.tsx": {
+    "hex": 11,
+    "fontSize": 26,
+    "borderRadius": 9
+  },
+  "app/(tabs)/enclosures.tsx": {
+    "fontSize": 8,
+    "borderRadius": 9
+  },
+  "app/(tabs)/forums.tsx": {
+    "fontSize": 10,
+    "borderRadius": 4
+  },
+  "app/(tabs)/index.tsx": {
+    "hex": 10,
+    "fontSize": 28,
+    "borderRadius": 18
+  },
+  "app/(tabs)/profile.tsx": {
+    "hex": 6,
+    "fontSize": 10,
+    "borderRadius": 6
+  },
+  "app/(tabs)/species.tsx": {
+    "hex": 10,
+    "fontSize": 15,
+    "borderRadius": 8
+  },
+  "app/achievements.tsx": {
+    "fontSize": 12,
+    "borderRadius": 5
+  },
+  "app/admin/index.tsx": {
+    "hex": 7,
+    "fontSize": 8,
+    "borderRadius": 6
+  },
+  "app/admin/settings.tsx": {
+    "hex": 13,
+    "fontSize": 10,
+    "borderRadius": 5
+  },
+  "app/admin/species.tsx": {
+    "hex": 16,
+    "fontSize": 14,
+    "borderRadius": 9
+  },
+  "app/admin/users.tsx": {
+    "hex": 24,
+    "fontSize": 12,
+    "borderRadius": 6
+  },
+  "app/analytics/advanced.tsx": {
+    "hex": 11,
+    "fontSize": 18,
+    "borderRadius": 8
+  },
+  "app/analytics/index.tsx": {
+    "hex": 1,
+    "fontSize": 21,
+    "borderRadius": 6
+  },
+  "app/breeding/egg-sacs/[id]/offspring/new.tsx": {
+    "hex": 1,
+    "fontSize": 8,
+    "borderRadius": 3
+  },
+  "app/breeding/egg-sacs/[id].tsx": {
+    "hex": 4,
+    "fontSize": 14,
+    "borderRadius": 1
+  },
+  "app/breeding/index.tsx": {
+    "hex": 7,
+    "fontSize": 14,
+    "borderRadius": 3
+  },
+  "app/breeding/offspring/[id].tsx": {
+    "hex": 21,
+    "fontSize": 27,
+    "borderRadius": 1
+  },
+  "app/breeding/pairings/[id]/egg-sacs/new.tsx": {
+    "hex": 1,
+    "fontSize": 7,
+    "borderRadius": 2
+  },
+  "app/breeding/pairings/[id].tsx": {
+    "hex": 9,
+    "fontSize": 14
+  },
+  "app/breeding/pairings/new.tsx": {
+    "hex": 1,
+    "fontSize": 15,
+    "borderRadius": 3
+  },
+  "app/centipede/[id].tsx": {
+    "hex": 1,
+    "fontSize": 10,
+    "borderRadius": 4
+  },
+  "app/centipede/add-feeding.tsx": {
+    "fontSize": 4,
+    "borderRadius": 4
+  },
+  "app/centipede/add-molt.tsx": {
+    "fontSize": 3,
+    "borderRadius": 2
+  },
+  "app/centipede/add-photo.tsx": {
+    "fontSize": 5,
+    "borderRadius": 5
+  },
+  "app/centipede/add-substrate-change.tsx": {
+    "fontSize": 4,
+    "borderRadius": 3
+  },
+  "app/centipede/add.tsx": {
+    "fontSize": 4,
+    "borderRadius": 3
+  },
+  "app/centipede/edit.tsx": {
+    "fontSize": 6,
+    "borderRadius": 3
+  },
+  "app/centipede-species/[id].tsx": {
+    "hex": 4,
+    "fontSize": 8,
+    "borderRadius": 4
+  },
+  "app/community/[username].tsx": {
+    "hex": 34,
+    "fontSize": 27,
+    "borderRadius": 15
+  },
+  "app/community/board.tsx": {
+    "hex": 1,
+    "fontSize": 28,
+    "borderRadius": 13
+  },
+  "app/community/forums/[slug]/[threadId].tsx": {
+    "hex": 3,
+    "fontSize": 19,
+    "borderRadius": 7
+  },
+  "app/community/forums/[slug].tsx": {
+    "fontSize": 14,
+    "borderRadius": 3
+  },
+  "app/discover.tsx": {
+    "hex": 2,
+    "fontSize": 31,
+    "borderRadius": 14
+  },
+  "app/enclosure/[id].tsx": {
+    "hex": 43,
+    "fontSize": 30,
+    "borderRadius": 21
+  },
+  "app/enclosure/add.tsx": {
+    "fontSize": 9,
+    "borderRadius": 5
+  },
+  "app/enclosure/edit.tsx": {
+    "fontSize": 9,
+    "borderRadius": 5
+  },
+  "app/feeders/[id]/edit.tsx": {
+    "fontSize": 15,
+    "borderRadius": 7
+  },
+  "app/feeders/[id].tsx": {
+    "hex": 13,
+    "fontSize": 33,
+    "borderRadius": 2
+  },
+  "app/feeders/add.tsx": {
+    "fontSize": 12,
+    "borderRadius": 5
+  },
+  "app/feeders/index.tsx": {
+    "hex": 7,
+    "fontSize": 16,
+    "borderRadius": 4
+  },
+  "app/forgot-password.tsx": {
+    "fontSize": 5,
+    "borderRadius": 2
+  },
+  "app/forums/[category].tsx": {
+    "fontSize": 12,
+    "borderRadius": 5
+  },
+  "app/forums/new-thread.tsx": {
+    "fontSize": 10,
+    "borderRadius": 6
+  },
+  "app/forums/thread/[id].tsx": {
+    "hex": 1,
+    "fontSize": 24,
+    "borderRadius": 17
+  },
+  "app/index.tsx": {
+    "fontSize": 2
+  },
+  "app/invert/[id].tsx": {
+    "fontSize": 1,
+    "borderRadius": 3
+  },
+  "app/invert/add-feeding.tsx": {
+    "fontSize": 4,
+    "borderRadius": 4
+  },
+  "app/invert/add-molt.tsx": {
+    "fontSize": 3,
+    "borderRadius": 2
+  },
+  "app/invert/add-pairing.tsx": {
+    "fontSize": 6,
+    "borderRadius": 4
+  },
+  "app/invert/add-photo.tsx": {
+    "fontSize": 5,
+    "borderRadius": 5
+  },
+  "app/invert/add-substrate-change.tsx": {
+    "fontSize": 4,
+    "borderRadius": 3
+  },
+  "app/invert/add.tsx": {
+    "fontSize": 5,
+    "borderRadius": 3
+  },
+  "app/invert/edit.tsx": {
+    "fontSize": 6,
+    "borderRadius": 3
+  },
+  "app/invert-species/[id].tsx": {
+    "hex": 16,
+    "fontSize": 8,
+    "borderRadius": 4
+  },
+  "app/login.tsx": {
+    "fontSize": 10,
+    "borderRadius": 4
+  },
+  "app/messages/[username].tsx": {
+    "hex": 4,
+    "fontSize": 14,
+    "borderRadius": 7
+  },
+  "app/messages/index.tsx": {
+    "hex": 2,
+    "fontSize": 16,
+    "borderRadius": 7
+  },
+  "app/onboarding.tsx": {
+    "fontSize": 6,
+    "borderRadius": 3
+  },
+  "app/pricing.tsx": {
+    "hex": 13,
+    "fontSize": 31,
+    "borderRadius": 10
+  },
+  "app/privacy.tsx": {
+    "hex": 2,
+    "fontSize": 8,
+    "borderRadius": 7
+  },
+  "app/register.tsx": {
+    "hex": 5,
+    "fontSize": 14,
+    "borderRadius": 7
+  },
+  "app/scorpion/[id].tsx": {
+    "hex": 1,
+    "fontSize": 10,
+    "borderRadius": 4
+  },
+  "app/scorpion/add-feeding.tsx": {
+    "fontSize": 4,
+    "borderRadius": 4
+  },
+  "app/scorpion/add-molt.tsx": {
+    "fontSize": 3,
+    "borderRadius": 2
+  },
+  "app/scorpion/add-photo.tsx": {
+    "fontSize": 5,
+    "borderRadius": 5
+  },
+  "app/scorpion/add-substrate-change.tsx": {
+    "fontSize": 4,
+    "borderRadius": 3
+  },
+  "app/scorpion/add.tsx": {
+    "fontSize": 4,
+    "borderRadius": 3
+  },
+  "app/scorpion/edit.tsx": {
+    "fontSize": 6,
+    "borderRadius": 3
+  },
+  "app/scorpion-species/[id].tsx": {
+    "hex": 4,
+    "fontSize": 8,
+    "borderRadius": 4
+  },
+  "app/search.tsx": {
+    "fontSize": 8
+  },
+  "app/settings/appearance.tsx": {
+    "fontSize": 15,
+    "borderRadius": 13
+  },
+  "app/settings/data-export.tsx": {
+    "hex": 15,
+    "fontSize": 12,
+    "borderRadius": 6
+  },
+  "app/settings/notifications.tsx": {
+    "hex": 3,
+    "fontSize": 6,
+    "borderRadius": 5
+  },
+  "app/settings/referrals.tsx": {
+    "hex": 6,
+    "fontSize": 29,
+    "borderRadius": 15
+  },
+  "app/settings.tsx": {
+    "hex": 6,
+    "fontSize": 15,
+    "borderRadius": 9
+  },
+  "app/species/[id].tsx": {
+    "hex": 14,
+    "fontSize": 22,
+    "borderRadius": 8
+  },
+  "app/subscription.tsx": {
+    "hex": 3,
+    "fontSize": 25,
+    "borderRadius": 9
+  },
+  "app/support.tsx": {
+    "hex": 2,
+    "fontSize": 11,
+    "borderRadius": 6
+  },
+  "app/tarantula/[id].tsx": {
+    "hex": 3,
+    "fontSize": 25,
+    "borderRadius": 8
+  },
+  "app/tarantula/add-feeding.tsx": {
+    "fontSize": 11,
+    "borderRadius": 7
+  },
+  "app/tarantula/add-molt.tsx": {
+    "fontSize": 9,
+    "borderRadius": 4
+  },
+  "app/tarantula/add-photo.tsx": {
+    "fontSize": 9,
+    "borderRadius": 7
+  },
+  "app/tarantula/add-substrate-change.tsx": {
+    "fontSize": 8,
+    "borderRadius": 5
+  },
+  "app/tarantula/add.tsx": {
+    "fontSize": 17,
+    "borderRadius": 7
+  },
+  "app/tarantula/edit.tsx": {
+    "fontSize": 11,
+    "borderRadius": 3
+  },
+  "app/tarantula/public/[username]/[name].tsx": {
+    "hex": 3,
+    "fontSize": 52,
+    "borderRadius": 18
+  },
+  "app/terms.tsx": {
+    "fontSize": 7
+  },
+  "app/verify-email.tsx": {
+    "hex": 4,
+    "fontSize": 5,
+    "borderRadius": 2
+  },
+  "app/whip-spider/[id].tsx": {
+    "hex": 1,
+    "fontSize": 10,
+    "borderRadius": 4
+  },
+  "app/whip-spider/add-feeding.tsx": {
+    "fontSize": 4,
+    "borderRadius": 4
+  },
+  "app/whip-spider/add-molt.tsx": {
+    "fontSize": 3,
+    "borderRadius": 2
+  },
+  "app/whip-spider/add-photo.tsx": {
+    "fontSize": 5,
+    "borderRadius": 5
+  },
+  "app/whip-spider/add-substrate-change.tsx": {
+    "fontSize": 4,
+    "borderRadius": 3
+  },
+  "app/whip-spider/add.tsx": {
+    "fontSize": 4,
+    "borderRadius": 3
+  },
+  "app/whip-spider/edit.tsx": {
+    "fontSize": 6,
+    "borderRadius": 3
+  },
+  "app/whip-spider-species/[id].tsx": {
+    "hex": 10,
+    "fontSize": 8,
+    "borderRadius": 4
+  },
+  "src/components/AchievementBadge.tsx": {
+    "hex": 5,
+    "fontSize": 3,
+    "borderRadius": 2
+  },
+  "src/components/ActivityFeedItem.tsx": {
+    "hex": 8,
+    "fontSize": 7,
+    "borderRadius": 4
+  },
+  "src/components/AddPickerSheet.tsx": {
+    "fontSize": 5,
+    "borderRadius": 3
+  },
+  "src/components/AnnouncementBanner.tsx": {
+    "hex": 5,
+    "fontSize": 7,
+    "borderRadius": 3
+  },
+  "src/components/AppHeader.tsx": {
+    "fontSize": 2
+  },
+  "src/components/CentipedeSpeciesPicker.tsx": {
+    "fontSize": 5,
+    "borderRadius": 3
+  },
+  "src/components/CommunitySkeletons.tsx": {
+    "borderRadius": 2
+  },
+  "src/components/DateInput.tsx": {
+    "fontSize": 6,
+    "borderRadius": 3
+  },
+  "src/components/ErrorBoundary.tsx": {
+    "hex": 9,
+    "fontSize": 5,
+    "borderRadius": 3
+  },
+  "src/components/FeedingStatsCard.tsx": {
+    "hex": 24,
+    "fontSize": 14,
+    "borderRadius": 4
+  },
+  "src/components/GoogleLogo.tsx": {
+    "hex": 4
+  },
+  "src/components/GrowthChart.tsx": {
+    "fontSize": 9,
+    "borderRadius": 6
+  },
+  "src/components/InvertSpeciesPicker.tsx": {
+    "hex": 8,
+    "fontSize": 5,
+    "borderRadius": 3
+  },
+  "src/components/PauseFeedingSheet.tsx": {
+    "hex": 3,
+    "fontSize": 10,
+    "borderRadius": 4
+  },
+  "src/components/PhotoViewer.tsx": {
+    "hex": 2,
+    "fontSize": 3,
+    "borderRadius": 6
+  },
+  "src/components/PremoltAlertCard.tsx": {
+    "hex": 13,
+    "fontSize": 6,
+    "borderRadius": 4
+  },
+  "src/components/PremoltPredictionCard.tsx": {
+    "hex": 25,
+    "fontSize": 11,
+    "borderRadius": 8
+  },
+  "src/components/PrimaryButton.tsx": {
+    "fontSize": 1
+  },
+  "src/components/QRSheet.tsx": {
+    "hex": 1,
+    "fontSize": 11,
+    "borderRadius": 5
+  },
+  "src/components/ReportModal.tsx": {
+    "hex": 2,
+    "fontSize": 6,
+    "borderRadius": 3
+  },
+  "src/components/ScorpionSpeciesPicker.tsx": {
+    "fontSize": 5,
+    "borderRadius": 3
+  },
+  "src/components/SpeciesAutocomplete.tsx": {
+    "hex": 6,
+    "fontSize": 5,
+    "borderRadius": 6
+  },
+  "src/components/TarantulaActionSheet.tsx": {
+    "fontSize": 4,
+    "borderRadius": 3
+  },
+  "src/components/TarantulaCardSkeleton.tsx": {
+    "borderRadius": 1
+  },
+  "src/components/TarantulaDetailSkeleton.tsx": {
+    "borderRadius": 1
+  },
+  "src/components/TourTooltip.tsx": {
+    "fontSize": 5,
+    "borderRadius": 4
+  },
+  "src/components/UpgradeModal.tsx": {
+    "hex": 9,
+    "fontSize": 20,
+    "borderRadius": 6
+  },
+  "src/components/WhipSpiderSpeciesPicker.tsx": {
+    "hex": 8,
+    "fontSize": 5,
+    "borderRadius": 3
+  },
+  "src/components/ui/index.tsx": {
+    "fontSize": 2
+  },
+  "src/lib/centipedes.ts": {
+    "hex": 8
+  },
+  "src/lib/scorpions.ts": {
+    "hex": 8
+  }
+}
