@@ -501,7 +501,7 @@ export default function AnalyticsScreen() {
       {/* Notable Tarantulas */}
       {(analytics.most_active_molter || analytics.newest_acquisition || analytics.oldest_acquisition) && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Notable Tarantulas</Text>
+          <Text style={styles.cardTitle}>Notable Animals</Text>
 
           {analytics.most_active_molter && (
             <View style={[styles.notableItem, styles.purpleBg]}>

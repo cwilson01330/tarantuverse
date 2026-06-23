@@ -208,7 +208,7 @@ export default function AnalyticsPage() {
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
-              Total Tarantulas
+              Total Animals
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -313,7 +313,7 @@ export default function AnalyticsPage() {
         {/* Notable Tarantulas */}
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
           <CardHeader>
-            <CardTitle className="text-gray-900 dark:text-white">Notable Tarantulas</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white">Notable Animals</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {analytics.most_active_molter && (

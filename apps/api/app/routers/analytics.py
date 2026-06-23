@@ -10,6 +10,7 @@ from sqlalchemy import func, distinct, extract
 from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
+from app.models.invert import Invert
 from app.models.molt_log import MoltLog
 from app.models.feeding_log import FeedingLog
 from app.models.substrate_change import SubstrateChange
@@ -164,9 +165,15 @@ async def get_collection_analytics(
     - Recent activity
     """
     
-    # Get all user's tarantulas
-    tarantulas = db.query(Tarantula).filter(
-        Tarantula.user_id == current_user.id
+    # Get all the user's animals across EVERY taxon from the unified `inverts`
+    # table (tarantulas are mirrored there too), excluding transferred-out
+    # animals so the stats match the displayed collection + cap. The variable
+    # keeps the name `tarantulas` only to minimize churn below — it now holds
+    # all taxa. Polymorphic feeding/molt/substrate logs are matched on
+    # invert_id, which dual-write + backfill keep populated for every taxon.
+    tarantulas = db.query(Invert).filter(
+        Invert.user_id == current_user.id,
+        Invert.transferred_out_at.is_(None),
     ).all()
 
     total_count = len(tarantulas)
@@ -227,19 +234,19 @@ async def get_collection_analytics(
     # Get feeding statistics
     tarantula_ids = [t.id for t in tarantulas]
     total_feedings = db.query(func.count(FeedingLog.id)).filter(
-        FeedingLog.tarantula_id.in_(tarantula_ids)
+        FeedingLog.invert_id.in_(tarantula_ids)
     ).scalar() or 0
-    
-    # Calculate average days between feedings across collection
-    # Batch-fetch all feedings in one query instead of per-tarantula
-    all_feedings = db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id.in_(tarantula_ids)
-    ).order_by(FeedingLog.tarantula_id, FeedingLog.fed_at.asc()).all()
 
-    # Group feedings by tarantula
+    # Calculate average days between feedings across collection
+    # Batch-fetch all feedings in one query instead of per-animal
+    all_feedings = db.query(FeedingLog).filter(
+        FeedingLog.invert_id.in_(tarantula_ids)
+    ).order_by(FeedingLog.invert_id, FeedingLog.fed_at.asc()).all()
+
+    # Group feedings by animal
     feedings_by_tarantula: Dict[Any, list] = {}
     for feeding in all_feedings:
-        feedings_by_tarantula.setdefault(feeding.tarantula_id, []).append(feeding)
+        feedings_by_tarantula.setdefault(feeding.invert_id, []).append(feeding)
 
     feeding_intervals = []
     for t_id, feedings in feedings_by_tarantula.items():
@@ -253,20 +260,20 @@ async def get_collection_analytics(
     
     # Get molt statistics
     total_molts = db.query(func.count(MoltLog.id)).filter(
-        MoltLog.tarantula_id.in_(tarantula_ids)
+        MoltLog.invert_id.in_(tarantula_ids)
     ).scalar() or 0
-    
+
     # Find most active molter
     molt_counts = db.query(
-        MoltLog.tarantula_id,
+        MoltLog.invert_id,
         func.count(MoltLog.id).label('molt_count')
     ).filter(
-        MoltLog.tarantula_id.in_(tarantula_ids)
-    ).group_by(MoltLog.tarantula_id).order_by(func.count(MoltLog.id).desc()).first()
-    
+        MoltLog.invert_id.in_(tarantula_ids)
+    ).group_by(MoltLog.invert_id).order_by(func.count(MoltLog.id).desc()).first()
+
     most_active_molter = None
     if molt_counts:
-        molter = db.query(Tarantula).filter(Tarantula.id == molt_counts[0]).first()
+        molter = db.query(Invert).filter(Invert.id == molt_counts[0]).first()
         if molter:
             most_active_molter = {
                 "tarantula_id": str(molter.id),
@@ -276,7 +283,7 @@ async def get_collection_analytics(
     
     # Get substrate change statistics
     total_substrate_changes = db.query(func.count(SubstrateChange.id)).filter(
-        SubstrateChange.tarantula_id.in_(tarantula_ids)
+        SubstrateChange.invert_id.in_(tarantula_ids)
     ).scalar() or 0
     
     # Find newest and oldest acquisitions
@@ -308,11 +315,11 @@ async def get_collection_analytics(
 
     # Get recent feedings
     recent_feedings = db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id.in_(tarantula_ids)
+        FeedingLog.invert_id.in_(tarantula_ids)
     ).order_by(FeedingLog.fed_at.desc()).limit(5).all()
 
     for feeding in recent_feedings:
-        tarantula = tarantula_map.get(feeding.tarantula_id)
+        tarantula = tarantula_map.get(feeding.invert_id)
         if tarantula:
             recent_activity.append(ActivityItem(
                 type="feeding",
@@ -324,11 +331,11 @@ async def get_collection_analytics(
 
     # Get recent molts
     recent_molts = db.query(MoltLog).filter(
-        MoltLog.tarantula_id.in_(tarantula_ids)
+        MoltLog.invert_id.in_(tarantula_ids)
     ).order_by(MoltLog.molted_at.desc()).limit(5).all()
 
     for molt in recent_molts:
-        tarantula = tarantula_map.get(molt.tarantula_id)
+        tarantula = tarantula_map.get(molt.invert_id)
         if tarantula:
             description = "Molted successfully"
             if molt.weight_after or molt.leg_span_after:
@@ -349,11 +356,11 @@ async def get_collection_analytics(
 
     # Get recent substrate changes
     recent_substrate = db.query(SubstrateChange).filter(
-        SubstrateChange.tarantula_id.in_(tarantula_ids)
+        SubstrateChange.invert_id.in_(tarantula_ids)
     ).order_by(SubstrateChange.changed_at.desc()).limit(5).all()
 
     for change in recent_substrate:
-        tarantula = tarantula_map.get(change.tarantula_id)
+        tarantula = tarantula_map.get(change.invert_id)
         if tarantula:
             recent_activity.append(ActivityItem(
                 type="substrate_change",
