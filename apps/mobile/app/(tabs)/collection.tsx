@@ -1887,11 +1887,15 @@ function CollectionScreen() {
   );
 
   // Collection is empty across ALL taxa — show the welcome flow.
+  // NB: must include otherInverts (vinegaroon/true_spider/millipede/mantis/
+  // roach/other) or a keeper whose only animals are those taxa wrongly sees
+  // the "No animals yet" welcome screen.
   const collectionEmpty =
     tarantulas.length === 0
     && scorpions.length === 0
     && centipedes.length === 0
-    && whipSpiders.length === 0;
+    && whipSpiders.length === 0
+    && otherInverts.length === 0;
 
   return (
     <View style={styles.container}>
@@ -1900,8 +1904,9 @@ function CollectionScreen() {
           <MaterialCommunityIcons name="paw" size={64} color={colors.textTertiary} />
           <Text style={styles.emptyTitle}>No animals yet</Text>
           <Text style={styles.emptyText}>
-            Start building your collection — add a tarantula or a
-            scorpion. Not sure which species? Browse the care sheets first.
+            Start building your collection — tarantulas, scorpions, centipedes,
+            mantises, millipedes, roaches and more are all supported. Not sure
+            which species? Browse the care sheets first.
           </Text>
           <PrimaryButton
             onPress={openAddPicker}
