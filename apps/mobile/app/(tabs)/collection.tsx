@@ -1897,6 +1897,22 @@ function CollectionScreen() {
     && whipSpiders.length === 0
     && otherInverts.length === 0;
 
+  // Cross-taxon Total + Species for the stats card. The /analytics/collection
+  // endpoint counts ONLY the legacy tarantula table, so its total_tarantulas /
+  // unique_species reflect tarantulas alone — which is what made a keeper report
+  // "the app only recognizes tarantulas as species." Compute both here from the
+  // loaded lists so every taxon counts. (Feedings/Molts/sex on the card still
+  // come from the tarantula-only endpoint — a backend follow-up.)
+  const allCollectionAnimals: any[] = [
+    ...tarantulas, ...scorpions, ...centipedes, ...whipSpiders, ...otherInverts,
+  ];
+  const totalAnimals = allCollectionAnimals.length;
+  const uniqueSpeciesCount = new Set(
+    allCollectionAnimals
+      .map((a) => (a.scientific_name || a.common_name || '').trim().toLowerCase())
+      .filter((s) => s.length > 0),
+  ).size;
+
   return (
     <View style={styles.container}>
       {collectionEmpty ? (
@@ -2009,13 +2025,11 @@ function CollectionScreen() {
                     </View>
                     <View style={styles.statsGrid}>
                       <View style={styles.statItem}>
-                        <Text style={styles.statValue}>
-                          {tarantulas.length + scorpions.length + centipedes.length + whipSpiders.length}
-                        </Text>
+                        <Text style={styles.statValue}>{totalAnimals}</Text>
                         <Text style={styles.statLabel}>Total</Text>
                       </View>
                       <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{collectionStats.unique_species}</Text>
+                        <Text style={styles.statValue}>{uniqueSpeciesCount}</Text>
                         <Text style={styles.statLabel}>Species</Text>
                       </View>
                       <View style={styles.statItem}>
