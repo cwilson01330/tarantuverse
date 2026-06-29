@@ -14,6 +14,10 @@ const meta = {
   title: 'Brand/DateInput',
   component: DateInput,
   tags: ['autodocs'],
+  // DateInput has required props (value/onChange). Providing defaults at the
+  // meta level satisfies the type for the render-only stories below, which
+  // supply their own state and ignore these.
+  args: { value: '', onChange: () => {} },
 } satisfies Meta<typeof DateInput>;
 
 export default meta;
