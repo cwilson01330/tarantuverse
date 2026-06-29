@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider } from '../src/contexts/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { UpdateBanner } from '../src/components/UpdateBanner';
 import {
   identifyUser,
   initPostHog,
@@ -110,6 +111,7 @@ function RootLayoutContent() {
     <>
       <PostHogBridge />
       <QuickActionsBridge />
+      <UpdateBanner />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
