@@ -1,5 +1,13 @@
 import { MetadataRoute } from 'next'
 
+// Generate on-request, not during `next build`. The species lists come from the
+// Render API, which cold-starts on the free tier; prerendering at build time made
+// a cold start hang past Vercel's 60s budget and fail the build. As a dynamic
+// route it's produced when first requested (API typically warm), and the per-fetch
+// data cache below keeps repeat crawls cheap.
+export const dynamic = 'force-dynamic'
+export const revalidate = 3600
+
 /**
  * XML sitemap for search engines.
  *
@@ -32,7 +40,12 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 async function getJson(url: string): Promise<any | null> {
   try {
-    const res = await fetch(url, { next: { revalidate: 86400 } })
+    // Hard 8s cap per request so a cold/slow API degrades gracefully (sitemap
+    // falls back to static routes) instead of hanging the whole render.
+    const res = await fetch(url, {
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(8000),
+    })
     if (!res.ok) return null
     return await res.json()
   } catch (e) {

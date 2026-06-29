@@ -531,6 +531,7 @@ export default function UnifiedSpeciesScreen() {
             onPress={() => setTaxon(t)}
             style={[
               styles.segmentButton,
+              { borderColor: active ? colors.primary : colors.border },
               active && { backgroundColor: colors.primary },
             ]}
             activeOpacity={0.7}
@@ -591,6 +592,20 @@ export default function UnifiedSpeciesScreen() {
       </View>
 
       <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
+        <Text
+          style={[
+            styles.subtitle,
+            {
+              color: colors.textTertiary,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              fontWeight: '700',
+              marginBottom: 6,
+            },
+          ]}
+        >
+          Browse by animal type
+        </Text>
         <TaxonSegment />
       </View>
 
@@ -721,6 +736,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
+    borderWidth: 1,
     alignItems: 'center',
   },
   segmentText: { fontSize: 14, fontWeight: '600' },

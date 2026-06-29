@@ -80,7 +80,10 @@
       "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add apps/mobile/app.json)",
       "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"chore: Bump version to 0.1.6 for App Store submission\")",
       "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" add \"apps/mobile/app/\\(tabs\\)/species.tsx\")",
-      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"$\\(cat <<''EOF''\nfix: Hide Stack header on Species tab to remove dead space\n\nThe Species tab had duplicate headers causing dead black space - \nboth the Expo Router Stack header and a custom internal header.\nHide the Stack header since the component provides its own styled one.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git -C \"c:/Users/gwiza/Desktop/Dev/tarantuverse\" commit -m \"$\\(cat <<''EOF''\nfix: Hide Stack header on Species tab to remove dead space\n\nThe Species tab had duplicate headers causing dead black space - \nboth the Expo Router Stack header and a custom internal header.\nHide the Stack header since the component provides its own styled one.\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cat .design-sync/config.json)",
+      "Bash(cat design-sync.config.json)",
+      "Bash(cat .design-sync/NOTES.md)"
     ],
     "deny": [],
     "ask": []

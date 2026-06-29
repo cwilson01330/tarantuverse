@@ -47,6 +47,8 @@ export default function ManageUsersPage() {
     const [verifyAllLoading, setVerifyAllLoading] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    // Sort toggle for the Animals (kept-invert count) column. null = server order.
+    const [animalSort, setAnimalSort] = useState<'asc' | 'desc' | null>(null);
 
     // Per-row action menu — collapses the 4–6 action buttons that used to
     // overflow horizontally into a single ⋮ trigger that opens a fixed-
@@ -427,6 +429,20 @@ export default function ManageUsersPage() {
         );
     }
 
+    // Free tier cap — keep in sync with FREE_TIER_MAX_ANIMALS in apps/api models/user.py.
+    const FREE_ANIMAL_CAP = 15;
+
+    // Sorted view of the loaded page when the Animals column header is toggled.
+    const displayedUsers = animalSort
+        ? [...users].sort((a, b) => {
+            const d = (a.invert_count ?? 0) - (b.invert_count ?? 0);
+            return animalSort === 'asc' ? d : -d;
+        })
+        : users;
+
+    const toggleAnimalSort = () =>
+        setAnimalSort((s) => (s === 'desc' ? 'asc' : s === 'asc' ? null : 'desc'));
+
     return (
         <DashboardLayout
             userName={authUser?.name ?? undefined}
@@ -560,7 +576,14 @@ export default function ManageUsersPage() {
                                         Premium
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Animals
+                                        <button
+                                            onClick={toggleAnimalSort}
+                                            className="inline-flex items-center gap-1 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-100"
+                                            title="Sort by animals kept"
+                                        >
+                                            Animals
+                                            <span className="text-[10px]">{animalSort === 'asc' ? '▲' : animalSort === 'desc' ? '▼' : '↕'}</span>
+                                        </button>
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Joined
@@ -571,7 +594,7 @@ export default function ManageUsersPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {users.map((user) => (
+                                {displayedUsers.map((user) => (
                                     <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col">
@@ -623,8 +646,16 @@ export default function ManageUsersPage() {
                                                 )}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-700 dark:text-gray-200 tabular-nums">
-                                            {user.invert_count ?? 0}
+                                        <td className="px-6 py-4 text-sm font-medium tabular-nums">
+                                            <span className="text-gray-700 dark:text-gray-200">{user.invert_count ?? 0}</span>
+                                            {!user.is_premium && (user.invert_count ?? 0) >= FREE_ANIMAL_CAP && (
+                                                <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold ${(user.invert_count ?? 0) > FREE_ANIMAL_CAP
+                                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                                                    }`}>
+                                                    {(user.invert_count ?? 0) > FREE_ANIMAL_CAP ? 'over cap' : 'at cap'}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                             {format(new Date(user.created_at), 'MMM d, yyyy')}
