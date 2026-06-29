@@ -158,3 +158,43 @@ commits to:
 * HV ADR-003 (`Migration: consolidate snakes/lizards/frogs into animals` in
   the changelog) — the proof-of-concept this ADR adapts
 * `docs/design/PLAN-inverts-consolidation-v1.md` — the operational plan
+
+---
+
+## Progress log
+
+### 2026-06-29 — Scorpion read partially cut over to `inverts` (Phase C1, scorpion slice)
+
+Trigger: a keeper ("Ember_and_the_Inverts") had 3 scorpions created through the
+generic invert add flow (`POST /inverts/`, taxon=scorpion). Those write ONLY to
+`inverts`, but `GET /scorpions/` still read the legacy `scorpions` table, so they
+were invisible in the collection. A wider audit found 6 inverts-only scorpions
+and 1 legacy-only scorpion platform-wide (the two tables had drifted; neither was
+a superset).
+
+Changes shipped:
+
+* **`GET /scorpions/` now reads from `inverts` (taxon='scorpion')**, UNIONed with
+  any legacy-only scorpions not yet mirrored — so nothing is dropped during the
+  transition and the fix reaches every client (incl. old app builds) without an
+  app update. (`routers/scorpions.py`)
+* **`ScorpionResponse` got pattern-free enum overrides** (sex/source/
+  enclosure_type/visibility) — `inverts` stores the shared UPPERCASE casing, which
+  would otherwise `ResponseValidationError` through the lowercase patterns. Same
+  trap previously fixed on `InvertResponse`.
+* **`reconcile_scorpions_to_inverts.py`** (one-shot, idempotent) mirrored the 1
+  legacy-only straggler ("Stacy's Mom", *Heterometrus spinifer*) into `inverts`.
+  Verified after run: `legacy scorpions = 3`, `inverts scorpions = 9`,
+  `legacy_missing_from_inverts = 0`.
+* **`/analytics/collection`** was switched to count from `inverts` (all taxa) in
+  the same cycle, so scorpion logs/counts are now cross-taxon too.
+
+Remaining for full C1 / Phase D:
+
+* **Tarantula read cutover** — `GET /tarantulas/` + the mobile collection's
+  `listTarantulas`/`listScorpions` still read legacy tables. Once soaked, route
+  these through `inverts` the same way (tarantula `inverts` mirror is already
+  complete: 22/22 verified for the audited keeper, 1440 backfilled platform-wide).
+* **Phase D** — after a 2+ week soak with reads on `inverts`, drop the dual-write
+  and the legacy `tarantulas` / `scorpions` tables. Gated; do not start until C1
+  reads are fully cut over and verified.
