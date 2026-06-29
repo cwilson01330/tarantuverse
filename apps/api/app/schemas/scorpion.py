@@ -90,4 +90,15 @@ class ScorpionResponse(ScorpionBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
+    # Pattern-free overrides for serialization. The scorpion list now also
+    # serves rows from the unified `inverts` table, where these columns store
+    # the shared UPPERCASE enum casing (MALE/FEMALE/UNKNOWN, BOUGHT/WILD_CAUGHT,
+    # etc.). The strict lowercase patterns on ScorpionBase are correct for INPUT
+    # but on the response a single stored row would raise ResponseValidationError
+    # and 500 the whole list — same trap fixed on InvertResponse.
+    sex: Optional[str] = None
+    source: Optional[str] = None
+    enclosure_type: Optional[str] = None
+    visibility: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)

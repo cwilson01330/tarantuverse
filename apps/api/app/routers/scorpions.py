@@ -96,21 +96,45 @@ async def list_scorpions(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List the authenticated user's scorpions, newest first."""
-    # Exclude scorpions handed off via a transfer (flag on the inverts mirror,
-    # shared PK). Keeps the grid + count consistent with the cap. BRIEF §4b.
+    """List the authenticated user's scorpions, newest first.
+
+    Reads from the unified `inverts` table (taxon='scorpion') so scorpions
+    created through the generic invert flow — which write ONLY to `inverts` —
+    are visible (they previously vanished because this endpoint read just the
+    legacy `scorpions` table). To lose nothing during the migration we UNION in
+    any legacy-only scorpions not yet mirrored into `inverts`. Both row types
+    serialize to ScorpionResponse (Invert is a field superset; the response's
+    pattern-free enum overrides accept the uppercase casing inverts stores).
+    """
     from app.models.invert import Invert
+
+    invert_q = db.query(Invert).filter(
+        Invert.user_id == current_user.id,
+        Invert.taxon == "scorpion",
+        Invert.transferred_out_at.is_(None),
+    )
+    if colony_id is not None:
+        invert_q = invert_q.filter(Invert.colony_id == colony_id)
+    invert_rows = invert_q.all()
+    invert_ids = {r.id for r in invert_rows}
+
+    # Legacy stragglers: scorpions still only in the legacy table (a dual-write /
+    # backfill gap). Served from the legacy row so they never disappear.
     transferred_ids = db.query(Invert.id).filter(
         Invert.user_id == current_user.id,
         Invert.transferred_out_at.isnot(None),
     )
-    query = db.query(Scorpion).filter(
+    legacy_q = db.query(Scorpion).filter(
         Scorpion.user_id == current_user.id,
         Scorpion.id.notin_(transferred_ids),
     )
     if colony_id is not None:
-        query = query.filter(Scorpion.colony_id == colony_id)
-    return query.order_by(Scorpion.created_at.desc()).all()
+        legacy_q = legacy_q.filter(Scorpion.colony_id == colony_id)
+    legacy_only = [s for s in legacy_q.all() if s.id not in invert_ids]
+
+    combined = invert_rows + legacy_only
+    combined.sort(key=lambda r: r.created_at, reverse=True)
+    return combined
 
 
 @router.post(
