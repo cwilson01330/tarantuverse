@@ -3,8 +3,12 @@ import { useState } from 'react';
 import DateInput from './DateInput';
 
 /**
- * Calendar date field (YYYY-MM-DD). Controlled — the stories wrap it in local
+ * Calendar date field (YYYY-MM-DD). Controlled — the demos wrap it in local
  * state so the popover + selection are fully interactive in isolation.
+ *
+ * NB: each story renders a named (uppercase) component rather than calling
+ * useState inside `render`, which would violate react-hooks/rules-of-hooks and
+ * fail the Next.js (Vercel) lint/build.
  */
 const meta = {
   title: 'Brand/DateInput',
@@ -17,24 +21,30 @@ type Story = StoryObj<typeof meta>;
 
 const today = new Date().toISOString().slice(0, 10);
 
-export const Empty: Story = {
-  render: () => {
-    const [v, setV] = useState('');
-    return <div className="w-64"><DateInput value={v} onChange={setV} /></div>;
-  },
-};
+function EmptyDemo() {
+  const [value, setValue] = useState('');
+  return <div className="w-64"><DateInput value={value} onChange={setValue} /></div>;
+}
 
-export const Prefilled: Story = {
-  render: () => {
-    const [v, setV] = useState('2026-05-01');
-    return <div className="w-64"><DateInput value={v} onChange={setV} /></div>;
-  },
-};
+function PrefilledDemo() {
+  const [value, setValue] = useState('2026-05-01');
+  return <div className="w-64"><DateInput value={value} onChange={setValue} /></div>;
+}
+
+function MaxTodayDemo() {
+  const [value, setValue] = useState('');
+  return (
+    <div className="w-64">
+      <DateInput value={value} onChange={setValue} max={today} placeholder="Date acquired" />
+    </div>
+  );
+}
+
+export const Empty: Story = { render: () => <EmptyDemo /> };
+
+export const Prefilled: Story = { render: () => <PrefilledDemo /> };
 
 export const MaxToday: Story = {
   name: 'Max = today (no future dates)',
-  render: () => {
-    const [v, setV] = useState('');
-    return <div className="w-64"><DateInput value={v} onChange={setV} max={today} placeholder="Date acquired" /></div>;
-  },
+  render: () => <MaxTodayDemo />,
 };

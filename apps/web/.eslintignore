@@ -1,0 +1,5 @@
+# Storybook stories + config are linted/built by Storybook itself, not by the
+# Next.js (Vercel) production build. Keeping them out of `next build`'s lint
+# pass means a story can never break the production web deploy.
+**/*.stories.tsx
+.storybook
