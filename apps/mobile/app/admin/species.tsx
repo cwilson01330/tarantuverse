@@ -299,7 +299,7 @@ export default function AdminSpeciesScreen() {
 
       {/* Edit Modal */}
       <Modal visible={!!editingSpecies} transparent animationType="slide" onRequestClose={() => setEditingSpecies(null)}>
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Edit Species</Text>

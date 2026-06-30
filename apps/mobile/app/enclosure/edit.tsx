@@ -360,7 +360,7 @@ export default function EditEnclosureScreen() {
         <Text style={styles.headerTitle}>Edit Enclosure</Text>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
         {/* Basic Info */}
         <View style={styles.section}>

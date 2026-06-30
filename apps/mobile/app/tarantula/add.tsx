@@ -594,7 +594,7 @@ export default function AddTarantulaScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Add Tarantula" leftAction={closeAction} rightAction={headerRightAction} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       {/* ── GUIDED WIZARD MODE ─────────────────────────────────────────── */}
       {!quickMode && (
         <>

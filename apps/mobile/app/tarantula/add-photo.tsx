@@ -176,7 +176,7 @@ export default function AddPhotoScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Add Photo" leftAction={closeAction} rightAction={uploadAction} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Image Preview or Placeholder */}
         {imageUri ? (

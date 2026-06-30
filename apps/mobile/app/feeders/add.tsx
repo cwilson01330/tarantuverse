@@ -245,7 +245,7 @@ export default function AddFeederColonyScreen() {
         rightAction={saveAction}
       />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         style={styles.content}
         keyboardShouldPersistTaps="handled"

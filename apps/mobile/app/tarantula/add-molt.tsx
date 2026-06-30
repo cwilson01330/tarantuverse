@@ -111,7 +111,7 @@ export default function AddMoltScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title={isEdit ? 'Edit Molt' : 'Log Molt'} leftAction={closeAction} rightAction={saveAction} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Molt Date */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>

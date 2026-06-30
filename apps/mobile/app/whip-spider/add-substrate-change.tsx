@@ -87,7 +87,7 @@ export default function AddWhipSpiderSubstrateChangeScreen() {
       />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date" colors={colors}>

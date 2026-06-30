@@ -80,7 +80,7 @@ export default function AddInvertPairingScreen() {
   return (
     <View style={styles.flex}>
       <AppHeader title="New pairing" leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Mate" colors={colors}>
             {mates.length === 0 ? (

@@ -453,7 +453,7 @@ export default function BoardScreen() {
         >
           <KeyboardAvoidingView
             style={[styles.modalContainer, { backgroundColor: colors.surface }]}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <TouchableOpacity onPress={() => setShowNewPostModal(false)}>

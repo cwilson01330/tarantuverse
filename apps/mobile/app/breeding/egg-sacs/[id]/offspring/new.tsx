@@ -126,7 +126,7 @@ function NewOffspringScreen() {
       <AppHeader title="New offspring" leftAction={backButton} />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
         <ScrollView

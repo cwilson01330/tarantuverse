@@ -305,7 +305,7 @@ export default function AddEnclosureScreen() {
         <Text style={styles.headerTitle}>Add Enclosure</Text>
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
         {/* Basic Info */}
         <View style={styles.section}>

@@ -432,7 +432,7 @@ export default function FeederColonyDetailScreen() {
         rightAction={editAction}
       />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         style={styles.content}
         keyboardShouldPersistTaps="handled"

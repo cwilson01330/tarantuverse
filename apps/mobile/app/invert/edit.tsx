@@ -70,7 +70,7 @@ export default function EditInvertScreen() {
   return (
     <View style={styles.flex}>
       <AppHeader title={`Edit ${meta?.label.toLowerCase() ?? 'invert'}`} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scroll}>
           {!meta?.freeform && (
             <Field label="Species">

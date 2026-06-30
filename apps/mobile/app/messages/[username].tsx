@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image, ActionSheetIOS, AppState } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Alert, Image, AppState, Modal, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,6 +42,7 @@ export default function ConversationScreen() {
   const [error, setError] = useState('');
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [actionsVisible, setActionsVisible] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Tracks the last-seen message count so we only auto-scroll when new
@@ -258,37 +259,23 @@ export default function ConversationScreen() {
     );
   };
 
+  // Custom action sheet (replaces ActionSheetIOS + Android Alert). Android's
+  // Alert.alert silently caps at 3 buttons, so the old 4-action menu (Report /
+  // Block / View Profile / Cancel) rendered broken on Android. A small Modal
+  // works identically on both platforms.
   const showActions = () => {
     if (!conversation) return;
+    setActionsVisible(true);
+  };
 
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Report User', 'Block User', 'View Profile'],
-          destructiveButtonIndex: 2,
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            setReportModalVisible(true);
-          } else if (buttonIndex === 2) {
-            handleBlockUser();
-          } else if (buttonIndex === 3) {
-            router.push(`/community/${conversation.other_user.username}`);
-          }
-        }
-      );
-    } else {
-      Alert.alert(
-        'Actions',
-        '',
-        [
-          { text: 'Report User', onPress: () => setReportModalVisible(true) },
-          { text: 'Block User', onPress: handleBlockUser, style: 'destructive' },
-          { text: 'View Profile', onPress: () => router.push(`/community/${conversation.other_user.username}`) },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
+  const runAction = (action: 'report' | 'block' | 'profile') => {
+    setActionsVisible(false);
+    if (action === 'report') {
+      setReportModalVisible(true);
+    } else if (action === 'block') {
+      handleBlockUser();
+    } else if (action === 'profile' && conversation) {
+      router.push(`/community/${conversation.other_user.username}`);
     }
   };
 
@@ -369,7 +356,7 @@ export default function ConversationScreen() {
       />
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ScrollView
@@ -488,6 +475,43 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Conversation actions sheet — custom because Android Alert caps at 3 buttons */}
+      <Modal
+        visible={actionsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionsVisible(false)}
+      >
+        <Pressable style={styles.actionsBackdrop} onPress={() => setActionsVisible(false)}>
+          <Pressable
+            style={[
+              styles.actionsSheet,
+              { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, 12) },
+            ]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <TouchableOpacity style={styles.actionRow} onPress={() => runAction('profile')}>
+              <MaterialCommunityIcons name="account-outline" size={22} color={colors.textPrimary} />
+              <Text style={[styles.actionText, { color: colors.textPrimary }]}>View Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionRow} onPress={() => runAction('report')}>
+              <MaterialCommunityIcons name="flag-outline" size={22} color={colors.textPrimary} />
+              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Report User</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionRow} onPress={() => runAction('block')}>
+              <MaterialCommunityIcons name="block-helper" size={22} color={colors.error} />
+              <Text style={[styles.actionText, { color: colors.error }]}>Block User</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionRow, styles.actionCancel, { borderTopColor: colors.border }]}
+              onPress={() => setActionsVisible(false)}
+            >
+              <Text style={[styles.actionText, styles.actionCancelText, { color: colors.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Report Modal */}
       {conversation && (
@@ -692,6 +716,38 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  actionsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  actionsSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 8,
+    paddingHorizontal: 8,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  actionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  actionCancel: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 4,
+    justifyContent: 'center',
+  },
+  actionCancelText: {
+    flex: 1,
+    textAlign: 'center',
     fontWeight: '600',
   },
 });
