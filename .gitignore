@@ -110,3 +110,4 @@ CLAUDE.md
 mnt/
 apps/api/alembic/versions/_find_head.py
 
+app_badge_images/

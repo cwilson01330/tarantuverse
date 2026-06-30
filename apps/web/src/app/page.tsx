@@ -91,8 +91,9 @@ export default function Home() {
 
             <p className="text-xl text-gray-300 mb-8 leading-relaxed">
               Track feedings, predict molts, manage breeding projects, and connect with
-              the keeper community — for your tarantulas, scorpions, and centipedes, all
-              in one place. Built by keepers who got tired of juggling spreadsheets.
+              the keeper community — for tarantulas, scorpions, centipedes, mantises,
+              millipedes, roaches and more, all in one place. Built by keepers who got
+              tired of juggling spreadsheets.
             </p>
 
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
@@ -114,6 +115,28 @@ export default function Home() {
                 className="text-electric-blue-300 hover:text-electric-blue-200 font-medium text-base underline-offset-4 hover:underline transition text-center sm:text-left"
               >
                 Or see the features first ↓
+              </a>
+            </div>
+
+            {/* Live on both stores. Official, unmodified badge assets self-hosted
+                in /public per each store's brand guidelines (badges must not be
+                recreated or restyled). */}
+            <div className="flex flex-wrap items-center gap-3 mb-8">
+              <a
+                href="https://play.google.com/store/apps/details?id=com.tarantuverse.app"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Get Tarantuverse on Google Play"
+              >
+                <img src="/google-play-badge.png" alt="Get it on Google Play" className="h-14 w-auto" />
+              </a>
+              <a
+                href="https://apps.apple.com/us/app/tarantuverse/id6756224640"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Download Tarantuverse on the App Store"
+              >
+                <img src="/app-store-badge.svg" alt="Download on the App Store" className="h-14 w-auto" />
               </a>
             </div>
 
@@ -203,7 +226,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div>
-              <div className="text-2xl md:text-3xl font-bold text-electric-blue-400">130+</div>
+              <div className="text-2xl md:text-3xl font-bold text-electric-blue-400">270+</div>
               <div className="text-xs md:text-sm text-gray-400 mt-1">Species Care Sheets</div>
             </div>
             <div>
@@ -226,13 +249,13 @@ export default function Home() {
       <section id="taxa" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            <span className="text-gray-100">Three taxa, </span>
+            <span className="text-gray-100">Ten taxa, </span>
             <span className="bg-gradient-primary bg-clip-text text-transparent">one platform</span>
           </h2>
           <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-            Tarantuverse started with tarantulas — and now tracks scorpions and centipedes
-            on the same husbandry tools. Feeding, molt, substrate, and photo logs work the
-            same across every animal in your collection.
+            Tarantuverse started with tarantulas — and now tracks scorpions, centipedes,
+            and a growing range of other invertebrates on the same husbandry tools. Feeding,
+            molt, substrate, and photo logs work the same across every animal in your collection.
           </p>
         </div>
 
@@ -243,7 +266,7 @@ export default function Home() {
               <span className="text-3xl">🕷️</span>
               <div>
                 <h3 className="text-lg font-bold text-gray-100">Tarantulas</h3>
-                <div className="text-xs text-electric-blue-400 font-semibold">100+ species care sheets</div>
+                <div className="text-xs text-electric-blue-400 font-semibold">150+ species care sheets</div>
               </div>
             </div>
             <p className="text-gray-300 text-sm leading-relaxed">
@@ -259,7 +282,7 @@ export default function Home() {
               <span className="text-3xl">🦂</span>
               <div>
                 <h3 className="text-lg font-bold text-gray-100">Scorpions</h3>
-                <div className="text-xs text-neon-pink-400 font-semibold">25 species care sheets</div>
+                <div className="text-xs text-neon-pink-400 font-semibold">35+ species care sheets</div>
               </div>
             </div>
             <p className="text-gray-300 text-sm leading-relaxed">
@@ -275,7 +298,7 @@ export default function Home() {
               <span className="text-3xl">🐛</span>
               <div>
                 <h3 className="text-lg font-bold text-gray-100">Centipedes</h3>
-                <div className="text-xs text-green-400 font-semibold">9 species care sheets</div>
+                <div className="text-xs text-green-400 font-semibold">13 species care sheets</div>
               </div>
             </div>
             <p className="text-gray-300 text-sm leading-relaxed">
@@ -285,6 +308,11 @@ export default function Home() {
             </p>
           </div>
         </div>
+
+        <p className="text-center text-sm text-gray-400 mt-8 max-w-2xl mx-auto">
+          Plus whip spiders, vinegaroons, true spiders, millipedes, mantises, and roaches —
+          each with their own care sheets and the same tracking tools.
+        </p>
       </section>
 
       {/* ── For Keepers ─────────────────────────────────────────── */}
@@ -369,9 +397,9 @@ export default function Home() {
 
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/10 transition">
             <div className="text-3xl mb-3">📚</div>
-            <h3 className="text-lg font-bold mb-2 text-gray-100">130+ Species Care Sheets</h3>
+            <h3 className="text-lg font-bold mb-2 text-gray-100">270+ Species Care Sheets</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Link any tarantula, scorpion, or centipede to our species database and get instant
+              Link any animal — across all ten taxa — to our species database and get instant
               care requirements — temperature, humidity, enclosure size, feeding frequency, and
               safety warnings for Old World species and medically significant venom.
             </p>
@@ -1055,7 +1083,7 @@ export default function Home() {
                 <TarantuverseLogoTransparent className="w-8 h-8" />
                 <span className="font-bold text-gray-100">Tarantuverse</span>
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed">Built by keepers, for keepers. Made specifically for tarantula, scorpion, and centipede enthusiasts.</p>
+              <p className="text-sm text-gray-400 leading-relaxed">Built by keepers, for keepers. Made for tarantula, scorpion, centipede, mantis, and every other invertebrate enthusiast.</p>
             </div>
             <div>
               <h4 className="font-semibold text-gray-100 mb-3">Product</h4>
