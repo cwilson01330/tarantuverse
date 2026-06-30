@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -592,11 +594,12 @@ export default function AddTarantulaScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Add Tarantula" leftAction={closeAction} rightAction={headerRightAction} />
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {/* ── GUIDED WIZARD MODE ─────────────────────────────────────────── */}
       {!quickMode && (
         <>
           {renderStepIndicator()}
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.stepHeader}>
               <Text style={styles.stepTitle}>{STEPS[currentStep].title}</Text>
               <Text style={styles.stepSubtitle}>{STEPS[currentStep].subtitle}</Text>
@@ -634,7 +637,7 @@ export default function AddTarantulaScreen() {
 
       {/* ── SIMPLE SCROLL MODE (all fields) ────────────────────────────── */}
       {quickMode && (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Basic Information</Text>
             {renderBasicFields()}
@@ -650,6 +653,7 @@ export default function AddTarantulaScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
+      </KeyboardAvoidingView>
 
       <Suspense fallback={null}>
         <UpgradeModal

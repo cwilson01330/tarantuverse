@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -410,7 +410,8 @@ export default function SettingsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Edit Profile" leftAction={backButton} />
 
-      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
 
         {/* ── Username Change ─────────────────────────────────────────────── */}
         <View style={styles.section}>
@@ -768,6 +769,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

@@ -9,6 +9,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -187,7 +189,10 @@ export default function ReportModal({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Report Content</Text>
@@ -200,7 +205,7 @@ export default function ReportModal({
             Help us keep Tarantuverse safe. All reports are reviewed within 24 hours.
           </Text>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.reasonsContainer}>
               {REPORT_REASONS.map((reason) => (
                 <TouchableOpacity
@@ -266,7 +271,7 @@ export default function ReportModal({
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

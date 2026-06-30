@@ -23,7 +23,9 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -197,6 +199,10 @@ export function PauseFeedingSheet({
       onRequestClose={onClose}
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ width: '100%' }}
+        >
         <Pressable
           style={[
             styles.sheet,
@@ -385,6 +391,7 @@ export function PauseFeedingSheet({
             </View>
           </SafeAreaView>
         </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
     </Modal>
   );

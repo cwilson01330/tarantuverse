@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -146,7 +148,8 @@ export default function AddCentipedePhotoScreen() {
         }
       />
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {imageUri ? (
           <View style={styles.preview}>
             <Image source={{ uri: imageUri }} style={styles.previewImage} />
@@ -210,6 +213,7 @@ export default function AddCentipedePhotoScreen() {
           />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

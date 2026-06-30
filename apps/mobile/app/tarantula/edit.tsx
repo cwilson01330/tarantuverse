@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -174,7 +176,8 @@ export default function EditTarantulaScreen() {
         }
       />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Basic Information */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Basic Information</Text>
@@ -538,6 +541,7 @@ export default function EditTarantulaScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

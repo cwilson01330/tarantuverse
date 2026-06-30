@@ -9,6 +9,8 @@ import {
   Alert,
   Switch,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -303,6 +305,7 @@ export default function AddEnclosureScreen() {
         <Text style={styles.headerTitle}>Add Enclosure</Text>
       </View>
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
         {/* Basic Info */}
         <View style={styles.section}>
@@ -558,6 +561,7 @@ export default function AddEnclosureScreen() {
           )}
         </PrimaryButton>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

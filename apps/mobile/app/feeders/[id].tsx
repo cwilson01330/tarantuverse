@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -430,8 +432,10 @@ export default function FeederColonyDetailScreen() {
         rightAction={editAction}
       />
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         style={styles.content}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.contentInner}
         refreshControl={
           <RefreshControl
@@ -920,6 +924,7 @@ export default function FeederColonyDetailScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Delete colony modal */}
       <Modal

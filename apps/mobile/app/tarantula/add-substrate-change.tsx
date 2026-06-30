@@ -7,6 +7,8 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -132,7 +134,8 @@ export default function AddSubstrateChangeScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Log Substrate Change" leftAction={closeAction} rightAction={saveAction} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Date */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.label, { color: colors.textPrimary }]}>Date Changed</Text>
@@ -229,6 +232,7 @@ export default function AddSubstrateChangeScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

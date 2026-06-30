@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Alert,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -368,6 +370,7 @@ export default function EditFeederColonyScreen() {
         rightAction={saveAction}
       />
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         style={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -816,6 +819,7 @@ export default function EditFeederColonyScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

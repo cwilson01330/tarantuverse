@@ -9,6 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -297,7 +299,7 @@ export default function AdminSpeciesScreen() {
 
       {/* Edit Modal */}
       <Modal visible={!!editingSpecies} transparent animationType="slide" onRequestClose={() => setEditingSpecies(null)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Edit Species</Text>
@@ -306,7 +308,7 @@ export default function AdminSpeciesScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalForm}>
+            <ScrollView showsVerticalScrollIndicator={false} style={styles.modalForm} keyboardShouldPersistTaps="handled">
               <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Scientific Name</Text>
               <TextInput
                 style={[styles.fieldInput, { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surfaceElevated }]}
@@ -420,7 +422,7 @@ export default function AdminSpeciesScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

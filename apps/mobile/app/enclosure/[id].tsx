@@ -10,6 +10,8 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -1387,7 +1389,9 @@ export default function EnclosureDetailScreen() {
         leftAction={backButton}
         rightAction={headerRightActions}
       />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
@@ -1471,6 +1475,7 @@ export default function EnclosureDetailScreen() {
           {activeTab === 'incidents' && renderIncidentsTab()}
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

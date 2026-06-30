@@ -9,6 +9,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -174,7 +176,8 @@ export default function AddPhotoScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Add Photo" leftAction={closeAction} rightAction={uploadAction} />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Image Preview or Placeholder */}
         {imageUri ? (
           <View style={styles.previewContainer}>
@@ -253,6 +256,7 @@ export default function AddPhotoScreen() {
         {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <UpgradeModal
         visible={showUpgradeModal}

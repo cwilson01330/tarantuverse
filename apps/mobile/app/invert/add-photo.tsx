@@ -2,7 +2,7 @@
  * Generic invert: add photo — ADR-007.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -59,7 +59,8 @@ export default function AddInvertPhotoScreen() {
         leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="close" size={26} color={iconColor} /></TouchableOpacity>}
         rightAction={<TouchableOpacity onPress={handleUpload} disabled={uploading || !imageUri || !taxon} style={{ opacity: uploading || !imageUri || !taxon ? 0.4 : 1 }}>{uploading ? <ActivityIndicator color={iconColor} size="small" /> : <Text style={{ color: iconColor, fontSize: 16, fontWeight: '600' }}>Upload</Text>}</TouchableOpacity>}
       />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {imageUri ? (
           <View style={styles.preview}>
             <Image source={{ uri: imageUri }} style={styles.previewImage} />
@@ -77,6 +78,7 @@ export default function AddInvertPhotoScreen() {
           <TextInput style={styles.captionInput} value={caption} onChangeText={setCaption} placeholder="Fresh molt, full grown, enclosure shot, etc." placeholderTextColor={colors.textTertiary} multiline maxLength={500} />
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

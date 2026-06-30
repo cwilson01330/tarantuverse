@@ -9,6 +9,7 @@ import {
   Alert,
   StyleSheet,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -177,7 +178,8 @@ export default function NewThreadScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="New Thread" leftAction={closeAction} rightAction={postAction} />
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Category Selector */}
         <View style={styles.section}>
           <Text style={[styles.label, { color: colors.textPrimary }]}>Category *</Text>
@@ -296,6 +298,7 @@ export default function NewThreadScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
