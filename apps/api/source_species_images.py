@@ -97,6 +97,7 @@ class Candidate:
     attribution: str = ""
     image_url: str = ""
     commons_file: str = ""
+    deep: bool = False
 
 
 def http_get_json(url: str) -> Optional[dict]:
@@ -168,7 +169,7 @@ def _attribution(author: str, license: str) -> str:
     return ", ".join(parts)
 
 
-def build_candidate(scientific_name: str, taxon: str) -> Candidate:
+def _wiki_candidate(scientific_name: str, taxon: str) -> Candidate:
     c = Candidate(scientific_name=scientific_name, taxon=taxon)
 
     summary = wikipedia_summary(scientific_name)
@@ -212,6 +213,76 @@ def build_candidate(scientific_name: str, taxon: str) -> Candidate:
     return c
 
 
+def commons_search_files(query: str, limit: int = 20) -> list:
+    """Search the Commons File namespace for images matching `query`
+    (relevance-ranked). Returns a list of imageinfo dicts, each with its 'title'."""
+    url = (
+        f"{COMMONS_API_BASE}?action=query&generator=search"
+        f"&gsrsearch={quote(query)}&gsrnamespace=6&gsrlimit={limit}"
+        "&prop=imageinfo&iiprop=url|extmetadata|user&format=json&formatversion=2"
+    )
+    data = http_get_json(url)
+    if not data:
+        return []
+    pages = data.get("query", {}).get("pages", [])
+    pages.sort(key=lambda p: p.get("index", 1_000_000))  # search relevance order
+    files = []
+    for p in pages:
+        ii = p.get("imageinfo") or []
+        if ii:
+            files.append({"title": p.get("title", ""), **ii[0]})
+    return files
+
+
+_IMAGE_EXTS = (".jpg", ".jpeg", ".png")
+
+
+def _deep_commons_candidate(c: Candidate) -> Candidate:
+    """Fallback when the Wikipedia lead image misses: search Commons directly for a
+    commercial-CC photo of the species. Honesty guard — since we can't see the image,
+    the file title must reference the genus or species epithet, and the human phase-3
+    review still applies (deep hits especially warrant eyeballing)."""
+    parts = c.scientific_name.split()
+    genus = parts[0].lower() if parts else ""
+    epithet = parts[1].lower() if len(parts) > 1 else ""
+    for f in commons_search_files(c.scientific_name):
+        url = f.get("url") or ""
+        if not url.lower().endswith(_IMAGE_EXTS):
+            continue
+        title_l = (f.get("title") or "").lower()
+        if genus and genus not in title_l and (not epithet or epithet not in title_l):
+            continue  # skip files not clearly labeled with this species
+        ext = f.get("extmetadata", {}) or {}
+
+        def _field(key: str) -> str:
+            return _strip_html(ext.get(key, {}).get("value", "") or "")
+
+        license = _field("LicenseShortName") or _field("License")
+        if not is_license_acceptable(license):
+            continue
+        author = _field("Artist") or _field("Credit") or f.get("user", "")
+        c.image_url = url
+        c.commons_file = (f.get("title") or "").replace("File:", "")
+        c.license = license
+        c.attribution = _attribution(author, license)
+        c.status = "verified"
+        c.deep = True
+        return c
+    return c  # unchanged; caller annotates the original miss reason
+
+
+def build_candidate(scientific_name: str, taxon: str, deep: bool = False) -> Candidate:
+    """Try the Wikipedia lead image first; if it misses and deep=True, fall back to a
+    direct Commons search (license-filtered, title-guarded)."""
+    c = _wiki_candidate(scientific_name, taxon)
+    if deep and c.status != "verified":
+        miss = c.status
+        c = _deep_commons_candidate(c)
+        if c.status != "verified":
+            c.status = f"{miss}; no_commons_match"
+    return c
+
+
 def cmd_find(args: argparse.Namespace) -> None:
     db = SessionLocal()
     try:
@@ -249,9 +320,9 @@ def cmd_candidates(args: argparse.Namespace) -> None:
     print(f"[candidates] sourcing {len(pairs)} species from Wikipedia/Commons…")
     out: list[Candidate] = []
     for i, (name, taxon) in enumerate(pairs, 1):
-        c = build_candidate(name, taxon)
+        c = build_candidate(name, taxon, deep=getattr(args, "deep", False))
         out.append(c)
-        print(f"  [{i}/{len(pairs)}] {name} → {c.status}")
+        print(f"  [{i}/{len(pairs)}] {name} → {c.status}" + (" [deep]" if c.deep else ""))
         time.sleep(0.4)  # polite throttle
 
     with open(SOURCED_CSV_PATH, "w", encoding="utf-8", newline="") as f:
@@ -275,7 +346,9 @@ def main() -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
     pf = sub.add_parser("find", help="List species missing image_url (all taxa).")
     pf.add_argument("--taxon", default=None, help="Restrict to one taxon (e.g. mantis).")
-    sub.add_parser("candidates", help="Query Wikipedia/Commons for licensed images.")
+    pc = sub.add_parser("candidates", help="Query Wikipedia/Commons for licensed images.")
+    pc.add_argument("--deep", action="store_true",
+                    help="If the Wikipedia lead image misses, fall back to a direct Commons search.")
     args = p.parse_args()
     {"find": cmd_find, "candidates": cmd_candidates}[args.cmd](args)
 
