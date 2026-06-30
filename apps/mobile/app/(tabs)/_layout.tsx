@@ -25,6 +25,7 @@ export default function TabLayout() {
         headerBackground: () =>
           layout.useGradient ? (
             <LinearGradient
+              pointerEvents="none"
               colors={[colors.primary, colors.secondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -32,6 +33,7 @@ export default function TabLayout() {
             />
           ) : (
             <View
+              pointerEvents="none"
               style={{
                 flex: 1,
                 backgroundColor: colors.surface,

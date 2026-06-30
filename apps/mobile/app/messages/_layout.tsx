@@ -11,7 +11,12 @@ export default function MessagesLayout() {
       screenOptions={{
         headerBackground: () =>
           layout.useGradient ? (
+            // pointerEvents="none" is critical: without it, this full-bleed
+            // headerBackground intercepts taps on the headerRight kebab on
+            // Android (the native back button still works, the custom button
+            // doesn't), making the 3-dot menu appear dead.
             <LinearGradient
+              pointerEvents="none"
               colors={[colors.primary, colors.secondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -19,6 +24,7 @@ export default function MessagesLayout() {
             />
           ) : (
             <View
+              pointerEvents="none"
               style={{
                 flex: 1,
                 backgroundColor: colors.surface,

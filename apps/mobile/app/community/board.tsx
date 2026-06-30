@@ -273,13 +273,14 @@ export default function BoardScreen() {
           headerBackground: () =>
             layout.useGradient ? (
               <LinearGradient
+                pointerEvents="none"
                 colors={[colors.primary, colors.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={{ flex: 1 }}
               />
             ) : (
-              <RNView style={{ flex: 1, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }} />
+              <RNView pointerEvents="none" style={{ flex: 1, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }} />
             ),
           headerTintColor: layout.useGradient ? '#fff' : colors.textPrimary,
           headerTitleStyle: { fontWeight: 'bold', color: layout.useGradient ? '#fff' : colors.textPrimary },
