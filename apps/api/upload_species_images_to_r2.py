@@ -37,9 +37,11 @@ import urllib.request
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DEFAULT_IN = os.path.join(_REPO_ROOT, "docs", "design", "species_images_wikimedia.csv")
-DEFAULT_OUT = os.path.join(_REPO_ROOT, "docs", "design", "species_images_r2.csv")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Default to the LIVE pipeline output from source_species_images.py (candidates),
+# anchored to apps/api — NOT the stale committed docs/design/*_wikimedia.csv.
+DEFAULT_IN = os.path.join(_SCRIPT_DIR, "species_images_sourced.csv")
+DEFAULT_OUT = os.path.join(_SCRIPT_DIR, "species_images_r2.csv")
 KEY_PREFIX = "species-images"
 
 # Wikimedia BLOCKS requests without a descriptive User-Agent (returns 403). Per

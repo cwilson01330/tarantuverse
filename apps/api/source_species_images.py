@@ -67,8 +67,11 @@ from app.database import SessionLocal
 from app.models.invert_species import InvertSpecies
 
 
-MISSING_LIST_PATH = "species_without_images.txt"
-SOURCED_CSV_PATH = "species_images_sourced.csv"
+# Anchor pipeline files to this script's dir (apps/api) so they're cwd-independent
+# and match the upload/apply defaults. These are git-ignored runtime artifacts.
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MISSING_LIST_PATH = os.path.join(_SCRIPT_DIR, "species_without_images.txt")
+SOURCED_CSV_PATH = os.path.join(_SCRIPT_DIR, "species_images_sourced.csv")
 
 ACCEPTED_LICENSE_PREFIXES = (
     "Public domain", "PD", "CC0", "CC BY", "CC-BY",

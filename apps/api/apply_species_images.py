@@ -28,8 +28,10 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DEFAULT_CSV = os.path.join(_REPO_ROOT, "docs", "design", "species_images_wikimedia.csv")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Default to the LIVE R2 CSV from upload_species_images_to_r2.py, anchored to
+# apps/api — NOT the stale committed docs/design/*_wikimedia.csv.
+DEFAULT_CSV = os.path.join(_SCRIPT_DIR, "species_images_r2.csv")
 
 # Substrings that mean "this is still a Commons/Wikipedia hotlink, not an R2 object".
 _HOTLINK_HOSTS = ("wikimedia.org", "wikipedia.org")
