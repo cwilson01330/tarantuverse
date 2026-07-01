@@ -441,6 +441,29 @@ function ProfileScreen() {
             importantForAccessibility="no"
           />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => router.push('/linked-accounts')}
+          accessibilityRole="button"
+          accessibilityLabel="Sign-in methods"
+          accessibilityHint="Manage which accounts you can sign in with"
+        >
+          <MaterialCommunityIcons
+            name="key-variant"
+            size={24}
+            color={colors.primary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <Text style={styles.menuText}>Sign-in Methods</Text>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={24}
+            color={colors.textTertiary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+        </TouchableOpacity>
       </View>
 
       {/* Customization */}

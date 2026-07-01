@@ -55,3 +55,18 @@ class LinkAccountRequest(BaseModel):
     code: str  # OAuth authorization code
     id_token: Optional[str] = None  # Required for Apple
     redirect_uri: Optional[str] = None  # For mobile apps
+
+
+class LinkAccountDirectRequest(BaseModel):
+    """Link a provider using identity already obtained by a native SDK.
+
+    Mirrors the trust model of /auth/oauth-login: native Google/Apple SDKs
+    return the verified provider identity directly, so the client sends the
+    identity fields rather than an authorization code to exchange. Used by the
+    mobile "Linked sign-in methods" screen.
+    """
+    provider: str  # 'google' or 'apple'
+    id: str  # provider's unique user id (Google sub / Apple sub)
+    email: Optional[str] = None
+    name: Optional[str] = None
+    picture: Optional[str] = None

@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.user_oauth_account import UserOAuthAccount
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest, ForgotPasswordRequest, UsernameChangeRequest, UsernameAvailabilityResponse
-from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse, LinkedAccountResponse, LinkAccountRequest
+from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse, LinkedAccountResponse, LinkAccountRequest, LinkAccountDirectRequest
 from app.utils.auth import get_password_hash, verify_password, create_access_token, revoke_token, decode_access_token
 from app.utils.dependencies import get_current_user
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -1085,6 +1085,99 @@ async def link_account(
         provider_avatar=picture,
     )
     db.add(oauth_account)
+    db.commit()
+    db.refresh(oauth_account)
+
+    return LinkedAccountResponse(
+        id=str(oauth_account.id),
+        provider=oauth_account.provider,
+        provider_email=oauth_account.provider_email,
+        provider_name=oauth_account.provider_name,
+        provider_avatar=oauth_account.provider_avatar,
+        created_at=oauth_account.created_at.isoformat() if oauth_account.created_at else None,
+    )
+
+
+@router.post("/link-account-direct", response_model=LinkedAccountResponse)
+async def link_account_direct(
+    link_data: LinkAccountDirectRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Link an OAuth provider to the current user using identity already obtained
+    by a native SDK (Google Sign-In / Apple Authentication on mobile).
+
+    Unlike /link-account (which exchanges an authorization code server-side),
+    this trusts the SDK-provided identity exactly like /oauth-login already does
+    — the native SDKs verify the provider sign-in on-device. This is what lets a
+    logged-in keeper add a second sign-in method so either provider reaches the
+    same account.
+    """
+    provider = link_data.provider.lower()
+    if provider not in ("google", "apple"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported provider: {provider}. Use 'google' or 'apple'",
+        )
+
+    provider_id = (link_data.id or "").strip()
+    if not provider_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provider account id is required",
+        )
+
+    # Already have this provider on the current account?
+    existing = db.query(UserOAuthAccount).filter(
+        UserOAuthAccount.user_id == current_user.id,
+        UserOAuthAccount.provider == provider,
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A {provider} account is already linked to your account",
+        )
+
+    # Is this exact provider identity attached to some account already?
+    existing_link = db.query(UserOAuthAccount).filter(
+        UserOAuthAccount.provider == provider,
+        UserOAuthAccount.provider_account_id == provider_id,
+    ).first()
+    if existing_link:
+        if existing_link.user_id == current_user.id:
+            # Idempotent — already linked to this same user.
+            return LinkedAccountResponse(
+                id=str(existing_link.id),
+                provider=existing_link.provider,
+                provider_email=existing_link.provider_email,
+                provider_name=existing_link.provider_name,
+                provider_avatar=existing_link.provider_avatar,
+                created_at=existing_link.created_at.isoformat() if existing_link.created_at else None,
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"This {provider} sign-in is already attached to a different account. "
+                "Sign in with it directly, or contact support to merge the accounts."
+            ),
+        )
+
+    oauth_account = UserOAuthAccount(
+        user_id=current_user.id,
+        provider=provider,
+        provider_account_id=provider_id,
+        provider_email=link_data.email,
+        provider_name=link_data.name,
+        provider_avatar=link_data.picture,
+    )
+    db.add(oauth_account)
+
+    # Backfill legacy columns if the user had none (keeps old lookups working).
+    if not current_user.oauth_provider:
+        current_user.oauth_provider = provider
+        current_user.oauth_id = provider_id
+
     db.commit()
     db.refresh(oauth_account)
 

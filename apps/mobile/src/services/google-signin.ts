@@ -45,6 +45,74 @@ if (!isExpoGo) {
   console.log('[GoogleSignIn] Use a development build to test Google Sign-In');
 }
 
+export type ProviderIdentity = {
+  provider: 'google' | 'apple';
+  id: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+};
+
+/**
+ * Run the native Google Sign-In flow and return the raw provider identity,
+ * WITHOUT logging in / creating a session. Used to link Google as an extra
+ * sign-in method on the already-authenticated account.
+ */
+export const getGoogleIdentity = async (): Promise<ProviderIdentity> => {
+  if (!GoogleSignin) {
+    throw new Error(
+      'Google Sign-In is not available in Expo Go. Use a development or production build.'
+    );
+  }
+  await GoogleSignin.hasPlayServices();
+  // Force the account chooser so the keeper can pick which Google account to
+  // attach (rather than silently reusing a cached session).
+  try {
+    await GoogleSignin.signOut();
+  } catch {
+    // ignore — nothing was signed in
+  }
+  const userInfo = await GoogleSignin.signIn();
+  const u = userInfo.data?.user;
+  if (!u?.id) {
+    throw new Error('Could not read your Google account details. Please try again.');
+  }
+  return {
+    provider: 'google',
+    id: u.id,
+    email: u.email ?? undefined,
+    name: u.name ?? undefined,
+    picture: u.photo ?? undefined,
+  };
+};
+
+/**
+ * Run the native Apple Sign-In flow and return the raw provider identity,
+ * WITHOUT logging in. Used to link Apple as an extra sign-in method.
+ */
+export const getAppleIdentity = async (): Promise<ProviderIdentity> => {
+  const isAvailable = await AppleAuthentication.isAvailableAsync();
+  if (!isAvailable) {
+    throw new Error('Apple Sign In is not available on this device.');
+  }
+  const credential = await AppleAuthentication.signInAsync({
+    requestedScopes: [
+      AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+      AppleAuthentication.AppleAuthenticationScope.EMAIL,
+    ],
+  });
+  let name = '';
+  if (credential.fullName) {
+    name = `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim();
+  }
+  return {
+    provider: 'apple',
+    id: credential.user,
+    email: credential.email ?? undefined,
+    name: name || undefined,
+  };
+};
+
 /**
  * Sign in with Google using @react-native-google-signin/google-signin
  * This properly handles Android OAuth with package name + SHA-1

@@ -204,6 +204,11 @@
     "fontSize": 18,
     "borderRadius": 4
   },
+  "app/linked-accounts.tsx": {
+    "hex": 5,
+    "fontSize": 7,
+    "borderRadius": 1
+  },
   "app/forgot-password.tsx": {
     "fontSize": 5,
     "borderRadius": 2
