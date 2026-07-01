@@ -192,8 +192,8 @@
   },
   "app/feeders/[id].tsx": {
     "hex": 13,
-    "fontSize": 11,
-    "borderRadius": 1
+    "fontSize": 36,
+    "borderRadius": 2
   },
   "app/feeders/add.tsx": {
     "fontSize": 12,
@@ -201,8 +201,8 @@
   },
   "app/feeders/index.tsx": {
     "hex": 7,
-    "fontSize": 8,
-    "borderRadius": 2
+    "fontSize": 18,
+    "borderRadius": 4
   },
   "app/forgot-password.tsx": {
     "fontSize": 5,
