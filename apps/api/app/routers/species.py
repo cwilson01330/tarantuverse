@@ -67,7 +67,7 @@ async def search_species(
 @router.get("/", response_model=SpeciesPaginatedResponse)
 async def get_all_species(
     skip: int = Query(0, ge=0),
-    limit: int = Query(25, ge=1, le=100),
+    limit: int = Query(25, ge=1, le=1000),
     verified_only: bool = False,
     care_level: Optional[str] = Query(None, pattern="^(beginner|intermediate|advanced)$"),
     type: Optional[str] = Query(None, pattern="^(terrestrial|arboreal|fossorial)$"),

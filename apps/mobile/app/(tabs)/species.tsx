@@ -215,12 +215,11 @@ export default function UnifiedSpeciesScreen() {
         // fallback to the prod host, so the request works even when
         // EXPO_PUBLIC_API_URL isn't injected at runtime.
         //
-        // NB: the species router caps limit at 100 (`le=100`). Asking
-        // for more returns 422 and a silently-empty grid. Keep this
-        // value at 100 until the backend cap is raised. The scorpion
-        // catalog uses `le=200` so its fetch is unaffected.
+        // Species router limit cap raised to le=1000 (2026-07-01) so the full
+        // tarantula catalog loads (was capped at 100, showing only 100 of 166+).
+        // Bump both this and the router's `le=` if the catalog ever nears 1000.
         const { data } = await apiClient.get<any>('/species', {
-          params: { limit: 100 },
+          params: { limit: 1000 },
         });
         // API has historically returned either a bare array or a
         // {items, total} envelope — handle both defensively.
