@@ -41,6 +41,19 @@ interface FeederColony {
   species_missing: boolean
 }
 
+interface FeederSpeciesSummary {
+  id: string
+  scientific_name: string
+  common_names: string[] | null
+  category: string
+  care_level: string | null
+  temperature_min: number | null
+  temperature_max: number | null
+  humidity_min: number | null
+  humidity_max: number | null
+  prey_size_notes: string | null
+}
+
 interface FeederCareLog {
   id: string
   feeder_colony_id: string
@@ -121,6 +134,38 @@ function categoryEmoji(name: string | null): string {
   return '🦗'
 }
 
+function careGuideCareLevelClasses(level: string | null): string {
+  switch (level) {
+    case 'easy':
+      return 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200'
+    case 'moderate':
+      return 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200'
+    case 'hard':
+      return 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200'
+    default:
+      return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
+  }
+}
+
+function careGuideClimateSummary(s: FeederSpeciesSummary): string | null {
+  const parts: string[] = []
+  if (s.temperature_min != null && s.temperature_max != null) {
+    parts.push(`${s.temperature_min}–${s.temperature_max} °F`)
+  } else if (s.temperature_min != null) {
+    parts.push(`from ${s.temperature_min} °F`)
+  } else if (s.temperature_max != null) {
+    parts.push(`up to ${s.temperature_max} °F`)
+  }
+  if (s.humidity_min != null && s.humidity_max != null) {
+    parts.push(`${s.humidity_min}–${s.humidity_max}%`)
+  } else if (s.humidity_min != null) {
+    parts.push(`from ${s.humidity_min}%`)
+  } else if (s.humidity_max != null) {
+    parts.push(`up to ${s.humidity_max}%`)
+  }
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
 function daysSince(iso: string | null): number | null {
   if (!iso) return null
   const then = new Date(iso)
@@ -177,6 +222,7 @@ export default function FeederColonyDetailPage() {
 
   const [colony, setColony] = useState<FeederColony | null>(null)
   const [logs, setLogs] = useState<FeederCareLog[]>([])
+  const [careSpecies, setCareSpecies] = useState<FeederSpeciesSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -210,6 +256,17 @@ export default function FeederColonyDetailPage() {
       }
       const colonyData = (await colonyRes.json()) as FeederColony
       setColony(colonyData)
+
+      // Nice-to-have: fetch the linked feeder species care sheet (public endpoint).
+      // Failures are swallowed — this only enhances the page.
+      if (colonyData.feeder_species_id && !colonyData.species_missing) {
+        fetch(`${API_URL}/api/v1/feeder-species/${colonyData.feeder_species_id}`)
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data: FeederSpeciesSummary | null) => setCareSpecies(data))
+          .catch(() => setCareSpecies(null))
+      } else {
+        setCareSpecies(null)
+      }
 
       if (logsRes.ok) {
         const logsData = (await logsRes.json()) as FeederCareLog[]
@@ -550,6 +607,51 @@ export default function FeederColonyDetailPage() {
             </div>
           )}
         </section>
+
+        {/* Care guide card (nice-to-have; only when a linked care sheet loaded) */}
+        {careSpecies && (
+          <section
+            aria-labelledby="careguide-heading"
+            className="mb-6 p-6 rounded-2xl border border-theme bg-surface"
+          >
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <h2
+                id="careguide-heading"
+                className="text-sm font-semibold text-theme-tertiary uppercase tracking-wide"
+              >
+                Care guide
+              </h2>
+              {careSpecies.care_level && (
+                <span
+                  className={`flex-shrink-0 text-xs font-semibold px-2 py-1 rounded-full capitalize ${careGuideCareLevelClasses(
+                    careSpecies.care_level,
+                  )}`}
+                >
+                  {careSpecies.care_level}
+                </span>
+              )}
+            </div>
+
+            <div className="text-sm text-theme-secondary space-y-1">
+              <div className="text-theme-primary font-medium capitalize">
+                {careSpecies.category}
+              </div>
+              {careGuideClimateSummary(careSpecies) && (
+                <div>{careGuideClimateSummary(careSpecies)}</div>
+              )}
+              {careSpecies.prey_size_notes && (
+                <div className="truncate">{careSpecies.prey_size_notes}</div>
+              )}
+            </div>
+
+            <Link
+              href={`/dashboard/feeders/species/${colony.feeder_species_id}`}
+              className="inline-block mt-4 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              View full care sheet →
+            </Link>
+          </section>
+        )}
 
         {/* Quick-log actions */}
         <section aria-labelledby="quicklog-heading" className="mb-6">

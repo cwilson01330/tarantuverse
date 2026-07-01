@@ -140,6 +140,27 @@ export default function FeedersListScreen() {
           />
         }
       >
+        {/* Browse care sheets */}
+        <TouchableOpacity
+          onPress={() => router.push('/feeder-species' as any)}
+          activeOpacity={0.7}
+          accessibilityLabel="Browse feeder care sheets"
+          style={[
+            styles.browseBtn,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: layout.radius.md,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons name="book-open-variant" size={20} color={colors.primary} />
+          <Text style={[styles.browseText, { color: colors.textPrimary }]}>
+            Browse feeder care sheets
+          </Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         {/* Low-stock banner */}
         {!loading && lowStockCount > 0 && (
           <View
@@ -222,6 +243,15 @@ export default function FeedersListScreen() {
             >
               <Text style={styles.emptyCtaText}>＋  Add Your First Colony</Text>
             </PrimaryButton>
+            <TouchableOpacity
+              onPress={() => router.push('/feeder-species' as any)}
+              accessibilityLabel="Browse feeder care sheets"
+              style={{ marginTop: 16 }}
+            >
+              <Text style={[styles.browseLink, { color: colors.primary }]}>
+                Browse feeder care sheets →
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -393,6 +423,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   emptyCtaText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  browseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  browseText: { flex: 1, fontSize: 14, fontWeight: '600' },
+  browseLink: { fontSize: 14, fontWeight: '700' },
   cardsWrap: { gap: 12 },
   card: {
     borderWidth: 1,

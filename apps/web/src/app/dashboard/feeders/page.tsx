@@ -93,12 +93,20 @@ export default function FeedersPage() {
               Track your live feeder colonies — crickets, roaches, larvae.
             </p>
           </div>
-          <Link
-            href="/dashboard/feeders/add"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-brand text-white rounded-xl shadow-gradient-brand hover:opacity-90 transition font-medium"
-          >
-            <span aria-hidden="true">＋</span> Add Colony
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/feeders/species"
+              className="inline-flex items-center gap-2 px-4 py-2 border border-theme bg-surface text-theme-primary rounded-xl hover:bg-surface-elevated transition font-medium"
+            >
+              <span aria-hidden="true">📖</span> Browse care sheets
+            </Link>
+            <Link
+              href="/dashboard/feeders/add"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-brand text-white rounded-xl shadow-gradient-brand hover:opacity-90 transition font-medium"
+            >
+              <span aria-hidden="true">＋</span> Add Colony
+            </Link>
+          </div>
         </div>
 
         {/* Low-stock banner */}
@@ -156,12 +164,20 @@ export default function FeedersPage() {
               Add your first feeder colony to start tracking feeds, cleanings, and restocks.
               Keepers typically keep crickets, dubia, hissers, or mealworms.
             </p>
-            <Link
-              href="/dashboard/feeders/add"
-              className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-brand text-white rounded-xl shadow-gradient-brand hover:opacity-90 transition font-medium"
-            >
-              <span aria-hidden="true">＋</span> Add Your First Colony
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href="/dashboard/feeders/add"
+                className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-brand text-white rounded-xl shadow-gradient-brand hover:opacity-90 transition font-medium"
+              >
+                <span aria-hidden="true">＋</span> Add Your First Colony
+              </Link>
+              <Link
+                href="/dashboard/feeders/species"
+                className="inline-flex items-center gap-2 px-5 py-3 border border-theme bg-surface text-theme-primary rounded-xl hover:bg-surface-elevated transition font-medium"
+              >
+                <span aria-hidden="true">📖</span> Browse care sheets
+              </Link>
+            </div>
           </div>
         )}
 

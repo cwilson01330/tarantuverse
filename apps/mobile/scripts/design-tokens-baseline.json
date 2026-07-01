@@ -176,14 +176,24 @@
     "fontSize": 9,
     "borderRadius": 5
   },
+  "app/feeder-species/[id].tsx": {
+    "hex": 3,
+    "fontSize": 11,
+    "borderRadius": 1
+  },
+  "app/feeder-species/index.tsx": {
+    "hex": 6,
+    "fontSize": 11,
+    "borderRadius": 2
+  },
   "app/feeders/[id]/edit.tsx": {
     "fontSize": 15,
     "borderRadius": 7
   },
   "app/feeders/[id].tsx": {
     "hex": 13,
-    "fontSize": 33,
-    "borderRadius": 2
+    "fontSize": 11,
+    "borderRadius": 1
   },
   "app/feeders/add.tsx": {
     "fontSize": 12,
@@ -191,8 +201,8 @@
   },
   "app/feeders/index.tsx": {
     "hex": 7,
-    "fontSize": 16,
-    "borderRadius": 4
+    "fontSize": 8,
+    "borderRadius": 2
   },
   "app/forgot-password.tsx": {
     "fontSize": 5,

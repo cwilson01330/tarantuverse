@@ -63,6 +63,17 @@ interface FeederCareLog {
   created_at: string;
 }
 
+interface FeederCareSummary {
+  id: string;
+  category: string | null;
+  care_level: string | null;
+  temperature_min: number | null;
+  temperature_max: number | null;
+  humidity_min: number | null;
+  humidity_max: number | null;
+  prey_size_notes: string | null;
+}
+
 interface QuickAction {
   type: LogType;
   label: string;
@@ -188,6 +199,7 @@ export default function FeederColonyDetailScreen() {
 
   const [colony, setColony] = useState<FeederColony | null>(null);
   const [logs, setLogs] = useState<FeederCareLog[]>([]);
+  const [careSpecies, setCareSpecies] = useState<FeederCareSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -238,6 +250,27 @@ export default function FeederColonyDetailScreen() {
     setRefreshing(true);
     fetchColony();
   };
+
+  // Fetch the linked feeder care sheet (public) to surface a care-guide card.
+  useEffect(() => {
+    const sid = colony?.feeder_species_id;
+    if (!sid || colony?.species_missing) {
+      setCareSpecies(null);
+      return;
+    }
+    let cancelled = false;
+    apiClient
+      .get<FeederCareSummary>(`/feeder-species/${sid}`)
+      .then((res) => {
+        if (!cancelled) setCareSpecies(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setCareSpecies(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [colony?.feeder_species_id, colony?.species_missing]);
 
   const openAction = (type: LogType) => {
     setActiveAction((prev) => (prev === type ? null : type));
@@ -423,6 +456,22 @@ export default function FeederColonyDetailScreen() {
       ? Object.entries(colony.life_stage_counts)
       : [];
 
+  const careLine = careSpecies
+    ? [
+        careSpecies.care_level
+          ? `${careSpecies.care_level.charAt(0).toUpperCase()}${careSpecies.care_level.slice(1)} care`
+          : null,
+        careSpecies.temperature_min != null && careSpecies.temperature_max != null
+          ? `${careSpecies.temperature_min}–${careSpecies.temperature_max}°F`
+          : null,
+        careSpecies.humidity_min != null && careSpecies.humidity_max != null
+          ? `${careSpecies.humidity_min}–${careSpecies.humidity_max}% RH`
+          : null,
+      ]
+        .filter(Boolean)
+        .join('  ·  ')
+    : '';
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader
@@ -577,6 +626,46 @@ export default function FeederColonyDetailScreen() {
             </Text>
           )}
         </View>
+
+        {/* Care guide (from linked feeder species) */}
+        {careSpecies && (
+          <TouchableOpacity
+            onPress={() => router.push(`/feeder-species/${careSpecies.id}` as any)}
+            activeOpacity={0.7}
+            accessibilityLabel="View care sheet for this feeder species"
+            style={[
+              styles.careCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderRadius: layout.radius.md,
+              },
+            ]}
+          >
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.sectionHeading, { color: colors.textTertiary, marginBottom: 6 }]}>
+                CARE GUIDE
+              </Text>
+              {careLine !== '' && (
+                <Text style={[styles.careSummary, { color: colors.textPrimary }]} numberOfLines={2}>
+                  {careLine}
+                </Text>
+              )}
+              {careSpecies.prey_size_notes && (
+                <Text
+                  style={[styles.carePrey, { color: colors.textSecondary }]}
+                  numberOfLines={2}
+                >
+                  {careSpecies.prey_size_notes}
+                </Text>
+              )}
+              <Text style={[styles.careLink, { color: colors.primary }]}>
+                View full care sheet →
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="book-open-variant" size={26} color={colors.primary} />
+          </TouchableOpacity>
+        )}
 
         {/* Quick-log actions */}
         <Text style={[styles.sectionHeading, { color: colors.textTertiary, marginBottom: 8 }]}>
@@ -1199,6 +1288,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   detailBody: { fontSize: 14, lineHeight: 20, marginTop: 4 },
+  careCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 16,
+  },
+  careSummary: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  carePrey: { fontSize: 12, lineHeight: 17, marginTop: 4 },
+  careLink: { fontSize: 13, fontWeight: '700', marginTop: 8 },
   emptyHistory: { fontSize: 14, textAlign: 'center', padding: 8 },
   historyWrap: {
     borderWidth: 1,
