@@ -295,7 +295,7 @@ function NewPairingScreen() {
       <AppHeader title="New pairing" leftAction={backButton} />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
         style={styles.flex}
       >
         <ScrollView

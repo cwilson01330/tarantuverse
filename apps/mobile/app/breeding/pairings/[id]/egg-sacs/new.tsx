@@ -145,7 +145,7 @@ function NewEggSacScreen() {
       <AppHeader title="New egg sac" leftAction={backButton} />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
         style={styles.flex}
       >
         <ScrollView

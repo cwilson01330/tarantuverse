@@ -561,7 +561,7 @@ export default function ThreadDetailScreen() {
 
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
       {/* Thread Info Bar */}
@@ -825,7 +825,7 @@ export default function ThreadDetailScreen() {
         onRequestClose={handleCloseReportModal}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={'padding'}
           style={styles.modalOverlay}
         >
           <View style={[styles.reportModal, { backgroundColor: colors.surface }]}>

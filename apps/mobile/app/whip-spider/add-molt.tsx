@@ -81,7 +81,7 @@ export default function AddWhipSpiderMoltScreen() {
       />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
       >
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date molted" colors={colors}>

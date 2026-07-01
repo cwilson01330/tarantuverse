@@ -134,7 +134,7 @@ export default function AddSubstrateChangeScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader title="Log Substrate Change" leftAction={closeAction} rightAction={saveAction} />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Date */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>

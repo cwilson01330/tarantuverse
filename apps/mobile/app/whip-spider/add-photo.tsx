@@ -147,7 +147,7 @@ export default function AddWhipSpiderPhotoScreen() {
         }
       />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {imageUri ? (
           <View style={styles.preview}>

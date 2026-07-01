@@ -130,7 +130,7 @@ export default function AddCentipedeScreen() {
       />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
       >
         <ScrollView contentContainerStyle={styles.scroll}>
           {/* Species picker — comes first because picking a species

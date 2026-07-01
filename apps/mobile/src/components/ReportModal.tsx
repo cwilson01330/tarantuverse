@@ -191,7 +191,7 @@ export default function ReportModal({
     >
       <KeyboardAvoidingView
         style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
       >
         <View style={styles.container}>
           <View style={styles.header}>

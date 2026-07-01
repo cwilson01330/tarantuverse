@@ -44,7 +44,9 @@ export default function MessagesLayout() {
     >
       {/* index uses AppHeader directly (headerShown: false set inline) */}
       <Stack.Screen name="index" options={{ title: 'Messages' }} />
-      <Stack.Screen name="[username]" />
+      {/* headerShown:false — [username] renders its own in-screen header so the
+          gradient headerBackground can't intercept the kebab tap on Android. */}
+      <Stack.Screen name="[username]" options={{ headerShown: false }} />
     </Stack>
   );
 }

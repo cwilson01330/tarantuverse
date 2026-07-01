@@ -144,7 +144,7 @@ export default function EditWhipSpiderScreen() {
       />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
       >
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Species">

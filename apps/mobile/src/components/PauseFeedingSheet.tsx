@@ -200,7 +200,7 @@ export function PauseFeedingSheet({
     >
       <Pressable style={styles.backdrop} onPress={onClose}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={'padding'}
           style={{ width: '100%' }}
         >
         <Pressable

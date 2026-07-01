@@ -1389,7 +1389,7 @@ export default function EnclosureDetailScreen() {
         leftAction={backButton}
         rightAction={headerRightActions}
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         refreshControl={

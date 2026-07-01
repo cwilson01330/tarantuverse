@@ -59,7 +59,7 @@ export default function AddInvertPhotoScreen() {
         leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="close" size={26} color={iconColor} /></TouchableOpacity>}
         rightAction={<TouchableOpacity onPress={handleUpload} disabled={uploading || !imageUri || !taxon} style={{ opacity: uploading || !imageUri || !taxon ? 0.4 : 1 }}>{uploading ? <ActivityIndicator color={iconColor} size="small" /> : <Text style={{ color: iconColor, fontSize: 16, fontWeight: '600' }}>Upload</Text>}</TouchableOpacity>}
       />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {imageUri ? (
           <View style={styles.preview}>

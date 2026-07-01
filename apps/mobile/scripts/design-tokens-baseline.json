@@ -257,7 +257,7 @@
   },
   "app/messages/[username].tsx": {
     "hex": 4,
-    "fontSize": 14,
+    "fontSize": 16,
     "borderRadius": 7
   },
   "app/messages/index.tsx": {

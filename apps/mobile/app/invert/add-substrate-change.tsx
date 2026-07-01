@@ -52,7 +52,7 @@ export default function AddInvertSubstrateChangeScreen() {
   return (
     <View style={styles.flex}>
       <AppHeader title={isEdit ? 'Edit substrate change' : 'Log substrate change'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={styles.flex} behavior={'padding'}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date" colors={colors}><DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Substrate change date" /></Field>
           <Field label="Substrate type" colors={colors}><TextInput style={styles.input} value={substrateType} onChangeText={setSubstrateType} placeholder="Coco fiber / topsoil" placeholderTextColor={colors.textTertiary} /></Field>

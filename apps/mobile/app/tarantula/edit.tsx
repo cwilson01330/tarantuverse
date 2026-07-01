@@ -176,7 +176,7 @@ export default function EditTarantulaScreen() {
         }
       />
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Basic Information */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>

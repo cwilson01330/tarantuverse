@@ -43,7 +43,6 @@ export default function ConversationScreen() {
   const [error, setError] = useState('');
   const [reportModalVisible, setReportModalVisible] = useState(false);
   const [blocking, setBlocking] = useState(false);
-  const [actionsVisible, setActionsVisible] = useState(false);
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Tracks the last-seen message count so we only auto-scroll when new
@@ -260,24 +259,21 @@ export default function ConversationScreen() {
     );
   };
 
-  // Custom action sheet (replaces ActionSheetIOS + Android Alert). Android's
-  // Alert.alert silently caps at 3 buttons, so the old 4-action menu (Report /
-  // Block / View Profile / Cancel) rendered broken on Android. A small Modal
-  // works identically on both platforms.
+  // Native action menu. Kept to 3 buttons (Android's Alert.alert cap) — a native
+  // Alert is the most reliable menu primitive on Android, avoiding any custom
+  // Modal/gradient-layer touch issues. "View Profile" is reachable by tapping
+  // the header name instead.
   const showActions = () => {
     if (!conversation) return;
-    setActionsVisible(true);
-  };
-
-  const runAction = (action: 'report' | 'block' | 'profile') => {
-    setActionsVisible(false);
-    if (action === 'report') {
-      setReportModalVisible(true);
-    } else if (action === 'block') {
-      handleBlockUser();
-    } else if (action === 'profile' && conversation) {
-      router.push(`/community/${conversation.other_user.username}`);
-    }
+    Alert.alert(
+      conversation.other_user.display_name,
+      undefined,
+      [
+        { text: 'Report User', onPress: () => setReportModalVisible(true) },
+        { text: 'Block User', style: 'destructive', onPress: handleBlockUser },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
   };
 
   // Custom in-screen header (headerShown:false below). We render our own header
@@ -286,13 +282,19 @@ export default function ConversationScreen() {
   // kebab was dead. As a plain in-flow Pressable it always receives touches.
   const headerTint = layout.useGradient ? '#fff' : colors.textPrimary;
 
-  const renderHeader = (headerTitle: string, showKebab: boolean) => {
+  const renderHeader = (headerTitle: string, showKebab: boolean, onTitlePress?: () => void) => {
     const inner = (
-      <View style={[styles.headerRow, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.headerRow, { paddingTop: insets.top + 2 }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Back">
           <MaterialCommunityIcons name="arrow-left" size={26} color={headerTint} />
         </Pressable>
-        <Text numberOfLines={1} style={[styles.headerTitle, { color: headerTint }]}>{headerTitle}</Text>
+        {onTitlePress ? (
+          <Pressable style={{ flex: 1 }} onPress={onTitlePress} accessibilityRole="button" accessibilityLabel="View profile">
+            <Text numberOfLines={1} style={[styles.headerTitle, { color: headerTint }]}>{headerTitle}</Text>
+          </Pressable>
+        ) : (
+          <Text numberOfLines={1} style={[styles.headerTitle, { color: headerTint }]}>{headerTitle}</Text>
+        )}
         {showKebab ? (
           <Pressable onPress={showActions} hitSlop={12} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Conversation actions">
             <MaterialCommunityIcons name="dots-vertical" size={24} color={headerTint} />
@@ -360,10 +362,10 @@ export default function ConversationScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack.Screen options={{ headerShown: false }} />
-      {renderHeader(conversation.other_user.display_name, true)}
+      {renderHeader(conversation.other_user.display_name, true, () => router.push(`/community/${conversation.other_user.username}`))}
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
         keyboardVerticalOffset={0}
       >
         <ScrollView
@@ -482,43 +484,6 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-
-      {/* Conversation actions sheet — custom because Android Alert caps at 3 buttons */}
-      <Modal
-        visible={actionsVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setActionsVisible(false)}
-      >
-        <Pressable style={styles.actionsBackdrop} onPress={() => setActionsVisible(false)}>
-          <Pressable
-            style={[
-              styles.actionsSheet,
-              { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, 12) },
-            ]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <TouchableOpacity style={styles.actionRow} onPress={() => runAction('profile')}>
-              <MaterialCommunityIcons name="account-outline" size={22} color={colors.textPrimary} />
-              <Text style={[styles.actionText, { color: colors.textPrimary }]}>View Profile</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionRow} onPress={() => runAction('report')}>
-              <MaterialCommunityIcons name="flag-outline" size={22} color={colors.textPrimary} />
-              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Report User</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionRow} onPress={() => runAction('block')}>
-              <MaterialCommunityIcons name="block-helper" size={22} color={colors.error} />
-              <Text style={[styles.actionText, { color: colors.error }]}>Block User</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionRow, styles.actionCancel, { borderTopColor: colors.border }]}
-              onPress={() => setActionsVisible(false)}
-            >
-              <Text style={[styles.actionText, styles.actionCancelText, { color: colors.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       {/* Report Modal */}
       {conversation && (
@@ -761,18 +726,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingBottom: 12,
+    paddingBottom: 8,
     gap: 4,
   },
   headerBtn: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
     flex: 1,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginHorizontal: 4,
   },

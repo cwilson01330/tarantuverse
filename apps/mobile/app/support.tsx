@@ -102,7 +102,7 @@ export default function SupportScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
         keyboardVerticalOffset={0}
       >
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

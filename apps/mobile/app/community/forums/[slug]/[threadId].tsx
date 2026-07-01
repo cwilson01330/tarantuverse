@@ -211,7 +211,7 @@ export default function ThreadDetailScreen() {
       <AppHeader title={threadTitle} subtitle={threadSubtitle} leftAction={backButton} />
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
         keyboardVerticalOffset={0}
       >
 

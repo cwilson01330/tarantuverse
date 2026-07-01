@@ -122,7 +122,7 @@ export default function AddWhipSpiderScreen() {
       />
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={'padding'}
       >
         <ScrollView contentContainerStyle={styles.scroll}>
           {/* Species picker first — picking auto-fills common + scientific name. */}
