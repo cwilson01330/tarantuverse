@@ -9,11 +9,13 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../../src/services/api';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
+import * as Updates from 'expo-updates';
 
 function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
   const { theme, toggleTheme, colors } = useTheme();
   const router = useRouter();
+  const { isUpdatePending } = Updates.useUpdates();
 
   // Refresh user data when screen is focused
   useFocusEffect(
@@ -26,6 +28,7 @@ function ProfileScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
@@ -43,6 +46,42 @@ function ProfileScreen() {
         },
       ]
     );
+  };
+
+  const handleCheckForUpdate = async () => {
+    if (__DEV__ || !Updates.isEnabled) {
+      Alert.alert('Updates unavailable', 'Update checks only work in a released build of the app.');
+      return;
+    }
+    const offerRestart = () =>
+      Alert.alert(
+        'Update ready',
+        'A new version has been downloaded. Restart now to apply it?',
+        [
+          { text: 'Later', style: 'cancel' },
+          { text: 'Restart', onPress: () => { Updates.reloadAsync(); } },
+        ],
+      );
+    // A bundle may already be downloaded (expo-updates fetches on launch), in
+    // which case checkForUpdateAsync reports "not available" — offer restart.
+    if (isUpdatePending) {
+      offerRestart();
+      return;
+    }
+    setCheckingUpdate(true);
+    try {
+      const result = await Updates.checkForUpdateAsync();
+      if (result.isAvailable) {
+        await Updates.fetchUpdateAsync();
+        offerRestart();
+      } else {
+        Alert.alert("You're up to date", 'You already have the latest version.');
+      }
+    } catch {
+      Alert.alert('Check failed', 'Could not check for updates. Try again on a stable connection.');
+    } finally {
+      setCheckingUpdate(false);
+    }
   };
 
   const handleAvatarPress = async () => {
@@ -536,6 +575,34 @@ function ProfileScreen() {
         Help
       </Text>
       <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={handleCheckForUpdate}
+          disabled={checkingUpdate}
+          accessibilityRole="button"
+          accessibilityLabel="Check for updates"
+          accessibilityHint="Checks for and downloads the latest app update"
+        >
+          <MaterialCommunityIcons
+            name="cloud-download"
+            size={24}
+            color={colors.textSecondary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <Text style={styles.menuText}>Check for Updates</Text>
+          {checkingUpdate ? (
+            <ActivityIndicator color={colors.textTertiary} />
+          ) : (
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={24}
+              color={colors.textTertiary}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+          )}
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
           onPress={() => router.push('/support')}

@@ -166,10 +166,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'My Profile',
-          tabBarLabel: 'Profile',
+          title: 'Settings',
+          tabBarLabel: 'Settings',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account" size={size} color={color} />
+            <MaterialCommunityIcons name="cog" size={size} color={color} />
           ),
         }}
       />

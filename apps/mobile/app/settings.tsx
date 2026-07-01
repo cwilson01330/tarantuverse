@@ -8,7 +8,6 @@ import { useTheme } from '../src/contexts/ThemeContext';
 import { AppHeader } from '../src/components/AppHeader';
 import { apiClient } from '../src/services/api';
 import { normalizeSocialHandle } from '../src/utils/social-links';
-import * as Updates from 'expo-updates';
 
 const specialtyOptions = [
   { value: 'terrestrial', label: 'Terrestrial' },
@@ -41,44 +40,6 @@ export default function SettingsScreen() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const { isUpdatePending } = Updates.useUpdates();
-
-  const handleCheckForUpdate = async () => {
-    if (__DEV__ || !Updates.isEnabled) {
-      Alert.alert('Updates unavailable', 'Update checks only work in a released build of the app.');
-      return;
-    }
-    const offerRestart = () =>
-      Alert.alert(
-        'Update ready',
-        'A new version has been downloaded. Restart now to apply it?',
-        [
-          { text: 'Later', style: 'cancel' },
-          { text: 'Restart', onPress: () => { Updates.reloadAsync(); } },
-        ],
-      );
-    // A bundle may already be downloaded (expo-updates fetches on launch), in
-    // which case checkForUpdateAsync reports "not available" — offer restart.
-    if (isUpdatePending) {
-      offerRestart();
-      return;
-    }
-    setCheckingUpdate(true);
-    try {
-      const result = await Updates.checkForUpdateAsync();
-      if (result.isAvailable) {
-        await Updates.fetchUpdateAsync();
-        offerRestart();
-      } else {
-        Alert.alert("You're up to date", 'You already have the latest version.');
-      }
-    } catch {
-      Alert.alert('Check failed', 'Could not check for updates. Try again on a stable connection.');
-    } finally {
-      setCheckingUpdate(false);
-    }
-  };
 
   // Username change state
   const [newUsername, setNewUsername] = useState('');
@@ -805,24 +766,6 @@ export default function SettingsScreen() {
             onPress={() => router.back()}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App</Text>
-          <Text style={styles.label}>
-            Pull the latest version without reinstalling — if an update is available you'll be prompted to restart.
-          </Text>
-          <TouchableOpacity
-            style={[styles.cancelButton, { marginTop: 12 }]}
-            onPress={handleCheckForUpdate}
-            disabled={checkingUpdate}
-          >
-            {checkingUpdate ? (
-              <ActivityIndicator color={colors.textPrimary} />
-            ) : (
-              <Text style={styles.cancelButtonText}>Check for updates</Text>
-            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
