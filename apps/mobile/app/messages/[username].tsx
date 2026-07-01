@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Keyboa
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import ReportModal from '../../src/components/ReportModal';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -279,30 +280,60 @@ export default function ConversationScreen() {
     }
   };
 
-  // Tint color for header icons — matches _layout.tsx's headerTintColor
-  const headerTintColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  // Custom in-screen header (headerShown:false below). We render our own header
+  // instead of the native stack header because on Android the gradient
+  // headerBackground intercepts taps on a native headerRight button — the 3-dot
+  // kebab was dead. As a plain in-flow Pressable it always receives touches.
+  const headerTint = layout.useGradient ? '#fff' : colors.textPrimary;
 
-  const headerOptions = {
-    headerTintColor,
-    headerTitleStyle: { fontWeight: 'bold' as const, color: headerTintColor },
+  const renderHeader = (headerTitle: string, showKebab: boolean) => {
+    const inner = (
+      <View style={[styles.headerRow, { paddingTop: insets.top + 6 }]}>
+        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Back">
+          <MaterialCommunityIcons name="arrow-left" size={26} color={headerTint} />
+        </Pressable>
+        <Text numberOfLines={1} style={[styles.headerTitle, { color: headerTint }]}>{headerTitle}</Text>
+        {showKebab ? (
+          <Pressable onPress={showActions} hitSlop={12} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel="Conversation actions">
+            <MaterialCommunityIcons name="dots-vertical" size={24} color={headerTint} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerBtn} />
+        )}
+      </View>
+    );
+    if (layout.useGradient) {
+      return (
+        <LinearGradient colors={[colors.primary, colors.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          {inner}
+        </LinearGradient>
+      );
+    }
+    return (
+      <View style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        {inner}
+      </View>
+    );
   };
 
   if (loading) {
     return (
-      <>
-        <Stack.Screen options={{ title: 'Loading...', headerBackTitle: 'Messages', ...headerOptions }} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Stack.Screen options={{ headerShown: false }} />
+        {renderHeader('Loading…', false)}
         <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
           <Text style={styles.loadingEmoji}>💬</Text>
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading conversation...</Text>
         </View>
-      </>
+      </View>
     );
   }
 
   if (!conversation) {
     return (
-      <>
-        <Stack.Screen options={{ title: 'Error', headerBackTitle: 'Messages', ...headerOptions }} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Stack.Screen options={{ headerShown: false }} />
+        {renderHeader('Conversation', false)}
         <View style={[styles.centerContainer, { backgroundColor: colors.background }]}>
           <Text style={styles.errorEmoji}>❌</Text>
           <Text style={[styles.errorTitle, { color: colors.textPrimary }]}>Error loading conversation</Text>
@@ -322,42 +353,18 @@ export default function ConversationScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </>
+      </View>
     );
   }
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          title: conversation.other_user.display_name,
-          headerBackTitle: 'Messages',
-          ...headerOptions,
-          headerRight: () => (
-            // Explicit width:44/height:44 on a header button causes the
-            // native header-button pill on iOS to offset oddly against
-            // the gradient — the kebab then reads as vertically off.
-            // Using padding-based sizing + hitSlop lets the header center
-            // the icon naturally while still meeting Apple's 44pt hit
-            // target. dots-vertical (MCI) also has a slightly top-heavy
-            // glyph; paddingVertical:8 compensates so the visible dots
-            // land at the vertical midline of the header.
-            <TouchableOpacity
-              onPress={showActions}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={{ paddingHorizontal: 10, paddingVertical: 8 }}
-              accessibilityRole="button"
-              accessibilityLabel="Conversation actions"
-            >
-              <MaterialCommunityIcons name="dots-vertical" size={22} color={headerTintColor} />
-            </TouchableOpacity>
-          ),
-        }}
-      />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      {renderHeader(conversation.other_user.display_name, true)}
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           ref={scrollViewRef}
@@ -523,7 +530,7 @@ export default function ConversationScreen() {
           reportedUserId={conversation.other_user.id}
         />
       )}
-    </>
+    </View>
   );
 }
 
@@ -749,5 +756,24 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontWeight: '600',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingBottom: 12,
+    gap: 4,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginHorizontal: 4,
   },
 });
