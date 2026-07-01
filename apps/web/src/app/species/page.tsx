@@ -71,7 +71,7 @@ export default function SpeciesPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      params.append('limit', '100');
+      params.append('limit', '1000');
       if (filters.verifiedOnly) params.append('verified_only', 'true');
 
       // New-taxon endpoints already carry a ?taxon= query, so join with
@@ -419,7 +419,7 @@ export default function SpeciesPage() {
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredSpecies.slice(0, 50).map((s) => (
+            {filteredSpecies.map((s) => (
               <Link
                 key={s.id}
                 href={careSheetHref(s.id)}
@@ -496,7 +496,7 @@ export default function SpeciesPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredSpecies.slice(0, 50).map((s) => (
+            {filteredSpecies.map((s) => (
               <Link
                 key={s.id}
                 href={careSheetHref(s.id)}
@@ -589,12 +589,7 @@ export default function SpeciesPage() {
           </div>
         )}
 
-        {/* Showing limited results message */}
-        {!loading && filteredSpecies.length > 50 && (
-          <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-            Showing first 50 of {filteredSpecies.length} results. Use filters to narrow down your search.
-          </div>
-        )}
+        {/* Full catalog renders; no artificial display cap. */}
       </div>
     </DashboardLayout>
   );
