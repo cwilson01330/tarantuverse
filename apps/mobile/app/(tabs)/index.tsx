@@ -107,7 +107,7 @@ function DashboardHubWrapper() {
 function DashboardHubScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
   const { start: startTour } = useCopilot();
   const { breakpoint } = useBreakpoint();
 
@@ -432,6 +432,15 @@ function DashboardHubScreen() {
       fontSize: 18,
       fontWeight: '700',
       color: colors.textPrimary,
+    },
+    feedingDayCta: {
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    feedingDayCtaText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '700',
     },
     sectionLink: {
       fontSize: 14,
@@ -849,6 +858,23 @@ function DashboardHubScreen() {
         </WalkthroughableView>
         </CopilotStep>
 
+        {/* Feeding Day — prominent bulk-feeding CTA */}
+        <PrimaryButton
+          onPress={() => router.push('/feeding-day')}
+          style={styles.feedingDayCta}
+          outerStyle={{ borderRadius: layout.radius.lg, marginBottom: 16 }}
+          accessibilityLabel={
+            overdueFeedings.length > 0
+              ? `Feeding Day: ${overdueFeedings.length} due. Log feedings in bulk.`
+              : 'Feeding Day. Log feedings in bulk.'
+          }
+        >
+          <Text style={styles.feedingDayCtaText}>
+            🍽️  Feeding Day
+            {overdueFeedings.length > 0 ? `  ·  ${overdueFeedings.length} due` : ''}
+          </Text>
+        </PrimaryButton>
+
         {/* Feeding Alerts Section */}
         <CopilotStep
           text="Tarantulas overdue for feeding show up here, sorted by urgency. Tap any row to log a feeding."
@@ -856,16 +882,7 @@ function DashboardHubScreen() {
           name="Feeding Alerts"
         >
         <WalkthroughableView style={styles.sectionCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={styles.sectionTitle}>🍽️ Feeding Alerts</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/feeding-day')}
-              accessibilityRole="button"
-              accessibilityLabel="Open Feeding Day to log feedings in bulk"
-            >
-              <Text style={[styles.statFooter, { color: colors.primary }]}>Feeding Day →</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.sectionTitle}>🍽️ Feeding Alerts</Text>
           {overdueFeedings.length === 0 ? (
             <View style={styles.allFedContainer}>
               <Text style={styles.allFedEmoji}>✅</Text>

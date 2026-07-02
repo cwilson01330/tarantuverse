@@ -24,7 +24,7 @@
   },
   "app/(tabs)/index.tsx": {
     "hex": 10,
-    "fontSize": 28,
+    "fontSize": 29,
     "borderRadius": 18
   },
   "app/(tabs)/profile.tsx": {
