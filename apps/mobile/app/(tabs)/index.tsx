@@ -22,6 +22,13 @@ import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { AddPickerSheet, type AddPickerTaxon } from '../../src/components/AddPickerSheet';
 import { useBreakpoint } from '../../src/hooks/useBreakpoint';
 import { getImageUrl } from '../../src/utils/image-url';
+import { listColonies, formatColonyCount, type ColonyListItem } from '../../src/lib/colonies';
+import { INVERT_TAXA } from '../../src/lib/inverts';
+
+/** Emoji for a colony's taxon — INVERT_TAXA excludes tarantula, so map it here. */
+function colonyGlyph(taxon: string): string {
+  return (INVERT_TAXA as any)[taxon]?.glyph ?? (taxon === 'tarantula' ? '🕷️' : '👥');
+}
 
 const WalkthroughableView = walkthroughable(View);
 
@@ -125,6 +132,7 @@ function DashboardHubScreen() {
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
+  const [colonies, setColonies] = useState<ColonyListItem[]>([]);
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   // Cross-taxon collection total (from /inverts/). null until loaded;
   // falls back to tarantulas.length if the call fails.
@@ -184,7 +192,7 @@ function DashboardHubScreen() {
       // calendar-day metrics (days_since_last_feeding). Cheap to send
       // even to endpoints that ignore it.
       const tzOffset = new Date().getTimezoneOffset();
-      const [tarantulasRes, enclosuresRes, statsRes, invertsRes] = await Promise.all([
+      const [tarantulasRes, enclosuresRes, statsRes, invertsRes, coloniesRes] = await Promise.all([
         apiClient.get('/tarantulas/').catch(() => null),
         apiClient.get('/enclosures/', { params: { tz_offset_minutes: tzOffset } }).catch(() => null),
         apiClient.get('/analytics/collection').catch(() => null),
@@ -192,6 +200,8 @@ function DashboardHubScreen() {
         // (tarantulas are mirrored in, plus scorpions / centipedes /
         // whip spiders). Drives the true "My Collection" total.
         apiClient.get('/inverts/').catch(() => null),
+        // Colony mode (ADR-010) — population entries for the Colonies card.
+        listColonies().catch(() => [] as ColonyListItem[]),
       ]);
 
       if (tarantulasRes?.data) {
@@ -210,6 +220,10 @@ function DashboardHubScreen() {
 
       if (Array.isArray(invertsRes?.data)) {
         setTotalAnimals(invertsRes.data.length);
+      }
+
+      if (Array.isArray(coloniesRes)) {
+        setColonies(coloniesRes);
       }
     } catch {
       // Dashboard data fetch failed
@@ -947,35 +961,46 @@ function DashboardHubScreen() {
         </WalkthroughableView>
         </CopilotStep>
 
-        {/* Communal Setups (conditional) */}
-        {communalEnclosures.length > 0 && (
+        {/* Colonies (ADR-010) — population entries, taxon-aware. Replaces the
+            legacy enclosure-based "Communal Setups" section. */}
+        {colonies.length > 0 && (
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>📦 Communal Setups</Text>
-              <TouchableOpacity onPress={() => router.push('/enclosure/add')}>
-                <Text style={styles.sectionLink}>All Enclosures →</Text>
+              <Text style={styles.sectionTitle}>👥 Colonies</Text>
+              <TouchableOpacity onPress={() => router.push('/collection')}>
+                <Text style={styles.sectionLink}>View all →</Text>
               </TouchableOpacity>
             </View>
-            {communalEnclosures.map(enc => (
-              <TouchableOpacity
-                key={enc.id}
-                style={styles.communalRow}
-                onPress={() => router.push(`/enclosure/${enc.id}`)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.communalIcon, { backgroundColor: colors.primary + '20' }]}>
-                  <Text style={{ fontSize: 20 }}>📦</Text>
-                </View>
-                <View style={styles.communalInfo}>
-                  <Text style={styles.communalName}>{enc.name}</Text>
-                  <Text style={styles.communalMeta}>
-                    👥 {enc.population_count || enc.inhabitant_count} spiders
-                    {enc.species_name ? ` · ${enc.species_name}` : ''}
-                  </Text>
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
-              </TouchableOpacity>
-            ))}
+            {colonies.map(col => {
+              const species = col.species_display_name || col.species_scientific_name;
+              const photo = getImageUrl(col.photo_url);
+              return (
+                <TouchableOpacity
+                  key={col.id}
+                  style={styles.communalRow}
+                  onPress={() => router.push(`/colony/${col.id}`)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${col.name} colony, ${formatColonyCount(col.total_count, col.count_is_estimated)} individuals`}
+                >
+                  {photo ? (
+                    <Image source={{ uri: photo }} style={styles.communalIcon} />
+                  ) : (
+                    <View style={[styles.communalIcon, { backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Text style={{ fontSize: 20 }}>{colonyGlyph(col.taxon)}</Text>
+                    </View>
+                  )}
+                  <View style={styles.communalInfo}>
+                    <Text style={styles.communalName} numberOfLines={1}>{col.name}</Text>
+                    <Text style={styles.communalMeta} numberOfLines={1}>
+                      👥 {formatColonyCount(col.total_count, col.count_is_estimated)}
+                      {species ? ` · ${species}` : ''}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 

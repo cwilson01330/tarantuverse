@@ -12,6 +12,19 @@ import AnnouncementBanner from '@/components/AnnouncementBanner'
 import UpgradeModal from '@/components/UpgradeModal'
 import PremoltAlertsCard from '@/components/PremoltAlertsCard'
 import { PlusCircle, LayoutGrid, LineChart, BookOpen, Egg, Upload, Utensils } from 'lucide-react'
+import type { ColonyListItem } from '@/lib/colonies'
+
+// Colony mode (ADR-010) presentation helpers for the dashboard card.
+const COLONY_EMOJI: Record<string, string> = {
+  scorpion: '🦂', centipede: '🐛', millipede: '🪱', roach: '🪳',
+  mantis: '🦗', whip_spider: '🕸️', vinegaroon: '🦂', true_spider: '🕷',
+  tarantula: '🕷️', other: '👥',
+}
+const colonyEmoji = (taxon: string): string => COLONY_EMOJI[taxon] ?? '👥'
+const colonyCountLabel = (c: ColonyListItem): string => {
+  const n = (c.total_count ?? 0).toLocaleString()
+  return c.count_is_estimated ? `≈${n}` : n
+}
 
 interface Tarantula {
   id: string
@@ -66,6 +79,7 @@ export default function DashboardHub() {
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
   const [enclosures, setEnclosures] = useState<Enclosure[]>([])
+  const [colonies, setColonies] = useState<ColonyListItem[]>([])
   // Real collection-level aggregate from /analytics/collection. Replaces
   // the bogus "Total Molts" derivation that was reading premolt predictions
   // (a count of in-premolt specimens, NOT a count of logged molts).
@@ -115,7 +129,7 @@ export default function DashboardHub() {
       // Send the browser's TZ offset to endpoints that compute
       // calendar-day metrics (days_since_last_feeding on enclosures).
       const tzOffset = new Date().getTimezoneOffset()
-      const [tarantulasRes, enclosuresRes, limitsRes, statsRes, invertsRes] = await Promise.all([
+      const [tarantulasRes, enclosuresRes, limitsRes, statsRes, invertsRes, coloniesRes] = await Promise.all([
         fetch(`${API_URL}/api/v1/tarantulas/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula&tz_offset_minutes=${tzOffset}`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/promo-codes/me/limits`, { headers }).catch(() => null),
@@ -123,6 +137,8 @@ export default function DashboardHub() {
         // Unified inverts list = the whole cross-taxon collection. Drives
         // the true "My Collection" total + free-tier gate.
         fetch(`${API_URL}/api/v1/inverts/`, { headers }).catch(() => null),
+        // Colony mode (ADR-010) — population entries for the Colonies card.
+        fetch(`${API_URL}/api/v1/colonies/`, { headers }).catch(() => null),
       ])
 
       // If the primary fetch returned 401, token is expired — redirect to login
@@ -154,6 +170,11 @@ export default function DashboardHub() {
       if (invertsRes?.ok) {
         const inv = await invertsRes.json()
         if (Array.isArray(inv)) setTotalAnimals(inv.length)
+      }
+
+      if (coloniesRes?.ok) {
+        const cols = await coloniesRes.json()
+        if (Array.isArray(cols)) setColonies(cols)
       }
     } catch {
       // Dashboard data fetch failed
@@ -583,42 +604,51 @@ export default function DashboardHub() {
               )}
             </div>
 
-            {/* Communal Setups Section (conditional) */}
-            {communalEnclosures.length > 0 && (
+            {/* Colonies Section (ADR-010) — population entries, taxon-aware.
+                Replaces the legacy enclosure-based "Communal Setups". */}
+            {colonies.length > 0 && (
               <div className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-theme-primary flex items-center gap-2">
-                    📦 Communal Setups
+                    👥 Colonies
                   </h2>
                   <button
-                    onClick={() => router.push('/dashboard/enclosures')}
+                    onClick={() => router.push('/dashboard/tarantulas')}
                     className="text-sm text-theme-secondary hover:text-theme-primary font-medium transition-colors"
                   >
-                    All Enclosures →
+                    View all →
                   </button>
                 </div>
                 <div className="space-y-3">
-                  {communalEnclosures.map(enc => (
-                    <div
-                      key={enc.id}
-                      onClick={() => router.push(`/dashboard/enclosures/${enc.id}`)}
-                      className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated hover:shadow-md transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-xl">
-                          📦
+                  {colonies.map(col => {
+                    const species = col.species_display_name || col.species_scientific_name
+                    return (
+                      <div
+                        key={col.id}
+                        onClick={() => router.push(`/dashboard/colonies/${col.id}`)}
+                        className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated hover:shadow-md transition cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          {col.photo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={col.photo_url} alt={col.name} className="w-10 h-10 rounded-lg object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-xl">
+                              {colonyEmoji(col.taxon)}
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold text-theme-primary">{col.name}</p>
+                            <p className="text-sm text-theme-secondary">
+                              👥 {colonyCountLabel(col)}
+                              {species && ` · ${species}`}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold text-theme-primary">{enc.name}</p>
-                          <p className="text-sm text-theme-secondary">
-                            👥 {enc.population_count || enc.inhabitant_count} spiders
-                            {enc.species_name && ` · ${enc.species_name}`}
-                          </p>
-                        </div>
+                        <span className="text-sm text-theme-tertiary">View →</span>
                       </div>
-                      <span className="text-sm text-theme-tertiary">View →</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
