@@ -27,6 +27,9 @@ from app.models.enclosure import Enclosure
 from app.models.pairing import Pairing
 from app.models.egg_sac import EggSac
 from app.models.offspring import Offspring
+# Colony mode (ADR-010) — population-level tracking. Included so a colony
+# keeper's export is complete (GDPR data portability).
+from app.models.colony import Colony, ColonyEvent
 # Herpetoverse (reptile) models — included so a reptile keeper's export
 # actually contains their data (GDPR data-portability + HV/TV parity).
 from app.models.animal import Animal
@@ -125,6 +128,21 @@ EGG_SAC_FIELDS = [
 OFFSPRING_FIELDS = [
     "id", "egg_sac_id", "user_id", "tarantula_id", "status", "status_date",
     "buyer_info", "price_sold", "notes", "created_at",
+]
+
+COLONY_FIELDS = [
+    "id", "user_id", "taxon", "species_id", "enclosure_id", "name",
+    "date_acquired", "founded_date", "source", "stage_counts",
+    "count_is_estimated", "substrate_type", "substrate_depth",
+    "last_substrate_change", "target_temp_min", "target_temp_max",
+    "target_humidity_min", "target_humidity_max", "water_dish",
+    "notes", "photo_url", "visibility", "is_active", "transferred_out_at",
+    "created_at", "updated_at",
+]
+
+COLONY_EVENT_FIELDS = [
+    "id", "colony_id", "user_id", "event_type", "stage", "count_delta",
+    "occurred_at", "severity", "notes", "created_at",
 ]
 
 USER_PROFILE_FIELDS = [
@@ -238,6 +256,21 @@ def _get_offspring(db: Session, user_id: UUID) -> List[Offspring]:
     return db.query(Offspring).filter(Offspring.user_id == user_id).order_by(Offspring.created_at).all()
 
 
+def _get_colonies(db: Session, user_id: UUID) -> List[Colony]:
+    return db.query(Colony).filter(Colony.user_id == user_id).order_by(Colony.created_at).all()
+
+
+def _get_colony_events(db: Session, colony_ids: List[UUID]) -> List[ColonyEvent]:
+    if not colony_ids:
+        return []
+    return (
+        db.query(ColonyEvent)
+        .filter(ColonyEvent.colony_id.in_(colony_ids))
+        .order_by(ColonyEvent.occurred_at)
+        .all()
+    )
+
+
 # --- Herpetoverse query helpers ---
 
 def _get_user_animals(db: Session, user_id: UUID) -> List[Animal]:
@@ -306,6 +339,10 @@ class ExportService:
         animals = _get_user_animals(db, user.id)
         a_ids = [a.id for a in animals]
 
+        # Colony mode (ADR-010) — population entries + their event log.
+        colonies = _get_colonies(db, user.id)
+        c_ids = [c.id for c in colonies]
+
         return {
             "profile": _row_to_dict(user, USER_PROFILE_FIELDS),
             "tarantulas": [_row_to_dict(t, TARANTULA_FIELDS) for t in tarantulas],
@@ -327,6 +364,9 @@ class ExportService:
             "reptile_pairings": [_row_to_dict(p, REPTILE_PAIRING_FIELDS) for p in _get_reptile_pairings(db, user.id)],
             "clutches": [_row_to_dict(c, CLUTCH_FIELDS) for c in _get_clutches(db, user.id)],
             "reptile_offspring": [_row_to_dict(o, REPTILE_OFFSPRING_FIELDS) for o in _get_reptile_offspring(db, user.id)],
+            # --- Colony mode (ADR-010) ---
+            "colonies": [_row_to_dict(c, COLONY_FIELDS) for c in colonies],
+            "colony_events": [_row_to_dict(e, COLONY_EVENT_FIELDS) for e in _get_colony_events(db, c_ids)],
         }
 
     # ---- JSON export ----------------------------------------------------
@@ -364,6 +404,9 @@ class ExportService:
                 "clutches": data["clutches"],
                 "offspring": data["reptile_offspring"],
             },
+            # Colony mode (ADR-010) population entries + their event log
+            "colonies": data["colonies"],
+            "colony_events": data["colony_events"],
             "counts": {
                 "tarantulas": len(data["tarantulas"]),
                 "feeding_logs": len(data["feeding_logs"]),
@@ -383,6 +426,8 @@ class ExportService:
                 "reptile_pairings": len(data["reptile_pairings"]),
                 "clutches": len(data["clutches"]),
                 "reptile_offspring": len(data["reptile_offspring"]),
+                "colonies": len(data["colonies"]),
+                "colony_events": len(data["colony_events"]),
             },
         }
 
@@ -430,6 +475,11 @@ class ExportService:
                 zf.writestr("reptile_pairings.csv", ExportService._to_csv_bytes(data["reptile_pairings"], REPTILE_PAIRING_FIELDS))
                 zf.writestr("clutches.csv", ExportService._to_csv_bytes(data["clutches"], CLUTCH_FIELDS))
                 zf.writestr("reptile_offspring.csv", ExportService._to_csv_bytes(data["reptile_offspring"], REPTILE_OFFSPRING_FIELDS))
+
+            # Colony mode CSVs — only when the keeper has colonies.
+            if data["colonies"]:
+                zf.writestr("colonies.csv", ExportService._to_csv_bytes(data["colonies"], COLONY_FIELDS))
+                zf.writestr("colony_events.csv", ExportService._to_csv_bytes(data["colony_events"], COLONY_EVENT_FIELDS))
 
             # Include user profile as JSON (not tabular)
             zf.writestr("profile.json", json.dumps(data["profile"], indent=2, default=str))
@@ -559,6 +609,15 @@ class ExportService:
             if data["enclosures"]:
                 zf.writestr("enclosures.json", json.dumps(data["enclosures"], indent=2, default=str))
 
+            # Colony mode (ADR-010) — each colony with its event log inlined.
+            if data["colonies"]:
+                events_by_colony = _group_by_tid(data["colony_events"], "colony_id")
+                colonies_bundle = [
+                    {**c, "events": events_by_colony.get(c["id"], [])}
+                    for c in data["colonies"]
+                ]
+                zf.writestr("colonies.json", json.dumps(colonies_bundle, indent=2, default=str))
+
             # Breeding
             breeding = {
                 "pairings": data["pairings"],
@@ -598,6 +657,8 @@ Files included:
   pairings.csv          – Breeding pairing records
   egg_sacs.csv          – Egg sac tracking records
   offspring.csv         – Offspring records
+  colonies.csv          – Colony/population records (if any)
+  colony_events.csv     – Colony population events (if any)
   profile.json          – Your profile information
 
 To re-import your tarantulas into Tarantuverse, use the Import feature

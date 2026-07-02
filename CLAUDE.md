@@ -521,11 +521,24 @@
 **GDPR-compliant data export in multiple formats**
 
 - **Formats**: JSON, CSV, Full ZIP (with photos)
-- **Data included**: profile, tarantulas, all logs, breeding records, photos, forum posts, achievements
+- **Data included**: profile, tarantulas, inverts, colonies + colony events, all logs, breeding records, photos, forum posts, achievements
 - **API**: `import_export.py` router — `/export/json`, `/export/csv`, `/export/full`, `/export/preview`
 - **UI**:
   - Web: `/dashboard/settings/data-export`
   - Mobile: `/settings/data-export` with share sheet
+
+#### Colony Mode 👥 (✅ COMPLETE — ADR-010, 2026-07-02)
+**Population-level tracking for communal / colony keepers** (isopods, springtails, roaches, communal setups) — a colony is ONE first-class collection entry with per-life-stage headcounts, not N individual animals.
+
+- **Design**: `docs/design/ADR-010-colony-mode.md`. A dedicated `colonies` table modeled on `FeederColony` — deliberately NOT a flavor of `inverts` (would leak `if colony` branches through feeding-status/growth/breeding/transfers) and NOT bolted to `enclosures` (that overload is what sank the earlier communal-enclosure attempt). Individual animals (`inverts`), grouped individuals (`ScorpionColony`, unchanged), and population colonies coexist as clearly-labeled modes.
+- **Tables**: `colonies` (taxon, species_id → `invert_species`, enclosure_id, `stage_counts` JSONB per-life-stage buckets always, `count_is_estimated`, husbandry fields, is_active, transferred_out_at) + `colony_events` (birth/death/added/removed/cannibalism/aggression/molt_found/split/merge/observation/count_correction; a `count_delta` adjusts a bucket on write, missing stage → "mixed"). Migration `col_20260702_colonies` (down_revision `ntf2_20260701_digest`).
+- **API**: `colonies.py` router at `/api/v1/colonies` — CRUD + `/{id}/events` + `/events/{id}`. `total_count` always an int (0 for empty). Species `times_kept` bumped on create.
+- **Cap**: a colony counts as **1** toward the free-tier cap. `utils/limits.py::active_colonies_query` + colonies added to `enforce_collection_limit` (cross-taxon: inverts + colonies).
+- **Web**: `lib/colonies.ts` + `dashboard/colonies/{add,[id],[id]/edit}` + merged into the collection list (`dashboard/tarantulas/page.tsx`) with a "Colony" badge + population count + filter chip + cap-gated add option.
+- **Mobile**: `src/lib/colonies.ts` + `app/colony/{add,[id],[id]/edit}.tsx` + merged into the Collection tab (`app/(tabs)/collection.tsx`) + `AddPickerSheet` "Add colony" row. Taxon reuses the shared `INVERT_TAXA` registry (tarantula excluded from the picker; still valid at the DB level for migrated communal Ts).
+- **Export**: colonies + colony_events included in JSON/CSV/full-ZIP (`export_service.py`).
+- **Legacy migration**: `migrate_communal_enclosures_to_colonies.py` (one-shot, idempotent, `--dry-run`) converts surviving `enclosures.is_communal`/`population_count` rows into colonies; leaves the enclosure dormant.
+- **Deferred (Phase 3)**: Feeding Day / daily-digest inclusion (would need `colony_id` added to the polymorphic feeding/substrate CHECK) — intentionally skipped since colony taxa are mostly detritivore/casual-feed and don't fit a per-animal feeding cadence.
 
 #### Smart Feeding Reminders 🍽️ (✅ COMPLETE)
 **Per-species automatic feeding interval calculation**
@@ -1945,8 +1958,8 @@ This includes:
 
 ---
 
-**Last Updated**: 2026-06-09
-**Version**: 1.3.0 (Ten-taxon invert platform — +roach 2026-06-10 — on unified `inverts`, generic config-driven UI, rich-base convergence)
+**Last Updated**: 2026-07-02
+**Version**: 1.4.0 (Colony mode — population-level tracking for communal keepers — on the ten-taxon unified `inverts` platform)
 **Status**: Active Development
 
 **Recent Changes** (2026-06-05 → 2026-06-09):
