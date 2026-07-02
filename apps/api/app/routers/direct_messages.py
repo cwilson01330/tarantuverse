@@ -14,6 +14,7 @@ from app.models.direct_message import Conversation, DirectMessage
 from app.models.notification_preferences import NotificationPreferences
 from app.utils.dependencies import get_current_user
 from app.utils.push_notifications import send_direct_message_notification
+from app.services.notification_service import create_notification
 from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/messages/direct", tags=["direct_messages"])
@@ -139,27 +140,21 @@ async def send_message(
     db.commit()
     db.refresh(message)
 
-    # Send push notification to recipient if enabled
+    # Notification center row (+ best-effort push) for the recipient.
     try:
-        recipient_prefs = db.query(NotificationPreferences).filter(
-            NotificationPreferences.user_id == recipient.id
-        ).first()
-
-        if (recipient_prefs and
-            recipient_prefs.push_notifications_enabled and
-            recipient_prefs.direct_messages_enabled and
-            recipient_prefs.expo_push_token):
-
-            # Truncate message for preview
-            preview = payload.content[:100] + "..." if len(payload.content) > 100 else payload.content
-
-            send_direct_message_notification(
-                expo_push_token=recipient_prefs.expo_push_token,
-                sender_username=current_user.username,
-                message_preview=preview
-            )
+        preview = payload.content[:100] + "..." if len(payload.content) > 100 else payload.content
+        create_notification(
+            db,
+            user_id=recipient.id,
+            type="direct_message",
+            title=f"New message from {current_user.username}",
+            body=preview,
+            deeplink=f"/messages/{current_user.username}",
+            data={"sender": current_user.username},
+            push_category="direct_messages_enabled",
+        )
     except Exception:
-        pass  # Push notification failed - don't block the request
+        pass  # never block the message send on notification issues
 
     return {
         "id": str(message.id),

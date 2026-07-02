@@ -14,6 +14,31 @@ interface TopBarProps {
   onMenuClick: () => void
 }
 
+interface AppNotification {
+  id: string
+  type: string
+  title: string
+  body: string | null
+  deeplink: string | null
+  data: Record<string, unknown> | null
+  is_read: boolean
+  created_at: string
+}
+
+function notificationRelativeTime(iso: string): string {
+  const then = new Date(iso)
+  if (Number.isNaN(then.getTime())) return ''
+  const diffSec = Math.floor((Date.now() - then.getTime()) / 1000)
+  if (diffSec < 45) return 'just now'
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHr = Math.floor(diffMin / 60)
+  if (diffHr < 24) return `${diffHr}h ago`
+  const diffDay = Math.floor(diffHr / 24)
+  if (diffDay < 7) return `${diffDay}d ago`
+  return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }: TopBarProps) {
   const router = useRouter()
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -21,6 +46,12 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
   const { theme, toggleTheme } = useThemeStore()
   const { token } = useAuth()
   const [unreadCount, setUnreadCount] = useState(0)
+
+  // Notification center state
+  const [notifUnreadCount, setNotifUnreadCount] = useState(0)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+  const [notifLoading, setNotifLoading] = useState(false)
 
   const handleLogout = async () => {
     await signOut({ redirect: false })
@@ -55,6 +86,93 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
     const interval = setInterval(fetchUnreadCount, 30000)
     return () => clearInterval(interval)
   }, [token])
+
+  // Fetch unread notification count (polled)
+  useEffect(() => {
+    const fetchNotifUnreadCount = async () => {
+      if (!token) return
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        const response = await fetch(`${API_URL}/api/v1/notifications/unread-count`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (response.ok) {
+          const data = (await response.json()) as { unread_count: number }
+          setNotifUnreadCount(data.unread_count || 0)
+        }
+      } catch {
+        // Unread notification count fetch failed silently
+      }
+    }
+
+    fetchNotifUnreadCount()
+
+    // Poll every 30 seconds for new notifications
+    const interval = setInterval(fetchNotifUnreadCount, 30000)
+    return () => clearInterval(interval)
+  }, [token])
+
+  const fetchNotifications = async () => {
+    if (!token) return
+    setNotifLoading(true)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(
+        `${API_URL}/api/v1/notifications/?limit=15&offset=0&unread_only=false`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      )
+      if (response.ok) {
+        const data = (await response.json()) as AppNotification[]
+        setNotifications(data)
+        setNotifUnreadCount(data.filter((n) => !n.is_read).length)
+      }
+    } catch {
+      // Notifications fetch failed silently
+    } finally {
+      setNotifLoading(false)
+    }
+  }
+
+  const toggleNotifications = () => {
+    const next = !showNotifications
+    setShowNotifications(next)
+    if (next) fetchNotifications()
+  }
+
+  const handleNotificationClick = async (item: AppNotification) => {
+    if (!item.is_read) {
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, is_read: true } : n)),
+      )
+      setNotifUnreadCount((c) => Math.max(0, c - 1))
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        await fetch(`${API_URL}/api/v1/notifications/${item.id}/read`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      } catch {
+        // Non-fatal
+      }
+    }
+    setShowNotifications(false)
+    if (item.deeplink) router.push(item.deeplink)
+  }
+
+  const markAllNotificationsRead = async () => {
+    if (!token) return
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+    setNotifUnreadCount(0)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      await fetch(`${API_URL}/api/v1/notifications/read-all`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    } catch {
+      // Non-fatal
+    }
+  }
 
   return (
     <>
@@ -131,6 +249,133 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
                   </span>
                 )}
               </button>
+            )}
+
+            {/* Notifications bell — authenticated only */}
+            {token && (
+              <div className="relative">
+                <button
+                  onClick={toggleNotifications}
+                  className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  aria-label={
+                    notifUnreadCount > 0
+                      ? `Notifications, ${notifUnreadCount} unread`
+                      : 'Notifications'
+                  }
+                  aria-haspopup="true"
+                  aria-expanded={showNotifications}
+                  title="Notifications"
+                >
+                  <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {notifUnreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {notifUnreadCount > 99 ? '99+' : notifUnreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifications && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowNotifications(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-[70vh] flex flex-col bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-20 overflow-hidden">
+                      {/* Header */}
+                      <div className="flex items-center justify-between gap-2 p-3 border-b border-gray-200 dark:border-gray-700">
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                          Notifications
+                        </p>
+                        {notifUnreadCount > 0 && (
+                          <button
+                            onClick={markAllNotificationsRead}
+                            className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+                      </div>
+
+                      {/* List */}
+                      <div className="flex-1 overflow-y-auto">
+                        {notifLoading ? (
+                          <div className="p-4 space-y-3">
+                            <div className="h-12 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse" />
+                            <div className="h-12 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse" />
+                            <div className="h-12 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse" />
+                          </div>
+                        ) : notifications.length === 0 ? (
+                          <div className="p-8 text-center">
+                            <div className="text-3xl mb-2" aria-hidden="true">🔔</div>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              No notifications yet
+                            </p>
+                          </div>
+                        ) : (
+                          <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+                            {notifications.map((n) => (
+                              <li key={n.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleNotificationClick(n)}
+                                  className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                    n.is_read ? '' : 'bg-primary-50 dark:bg-primary-900/10'
+                                  }`}
+                                >
+                                  <span className="flex-shrink-0 pt-1.5" aria-hidden="true">
+                                    {n.is_read ? (
+                                      <span className="block w-2 h-2" />
+                                    ) : (
+                                      <span className="block w-2 h-2 rounded-full bg-gradient-brand" />
+                                    )}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-baseline justify-between gap-2">
+                                      <p
+                                        className={`text-sm truncate ${
+                                          n.is_read
+                                            ? 'font-medium text-gray-900 dark:text-white'
+                                            : 'font-semibold text-gray-900 dark:text-white'
+                                        }`}
+                                      >
+                                        {n.title}
+                                        {!n.is_read && <span className="sr-only"> (unread)</span>}
+                                      </p>
+                                      <span className="flex-shrink-0 text-[11px] text-gray-400 dark:text-gray-500">
+                                        {notificationRelativeTime(n.created_at)}
+                                      </span>
+                                    </div>
+                                    {n.body && (
+                                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                                        {n.body}
+                                      </p>
+                                    )}
+                                  </div>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      {/* Footer */}
+                      <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+                        <button
+                          onClick={() => {
+                            setShowNotifications(false)
+                            router.push('/dashboard/notifications')
+                          }}
+                          className="w-full text-center text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg py-2 transition-colors"
+                        >
+                          See all
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
 
             {/* User menu — authenticated */}

@@ -374,6 +374,29 @@ function ProfileScreen() {
       <View style={styles.section}>
         <TouchableOpacity
           style={styles.menuItem}
+          onPress={() => router.push('/notification-center')}
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+          accessibilityHint="Opens your notification center"
+        >
+          <MaterialCommunityIcons
+            name="bell"
+            size={24}
+            color={colors.primary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <Text style={styles.menuText}>Notifications</Text>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={24}
+            color={colors.textTertiary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.menuItem}
           onPress={() => router.push('/settings')}
           accessibilityRole="button"
           accessibilityLabel="Edit profile"

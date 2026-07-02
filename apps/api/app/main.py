@@ -30,6 +30,7 @@ import app.routers.pairings as pairings
 import app.routers.egg_sacs as egg_sacs
 import app.routers.offspring as offspring
 import app.routers.notification_preferences as notification_preferences
+import app.routers.notifications as notifications
 import app.routers.import_export as import_export
 import app.routers.admin as admin
 import app.routers.admin_analytics as admin_analytics
@@ -229,6 +230,7 @@ app.include_router(offspring.router, prefix="/api/v1", tags=["offspring", "breed
 
 # Registering notification preferences router...
 app.include_router(notification_preferences.router, prefix="/api/v1", tags=["notifications"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["notifications"])
 
 print("[STARTUP] Registering import/export router...")
 app.include_router(import_export.router, prefix="/api/v1", tags=["import-export"])

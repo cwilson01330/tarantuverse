@@ -14,6 +14,7 @@ from app.models.notification_preferences import NotificationPreferences
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
 from app.utils.push_notifications import send_new_follower_notification
+from app.services.notification_service import create_notification
 from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/follows", tags=["follows"])
@@ -67,23 +68,20 @@ async def follow_user(
         }
     )
 
-    # Send push notification to the followed user
+    # Notification center row (+ best-effort push) for the followed user.
     try:
-        followed_prefs = db.query(NotificationPreferences).filter(
-            NotificationPreferences.user_id == user_to_follow.id
-        ).first()
-
-        if (followed_prefs and
-            followed_prefs.push_notifications_enabled and
-            followed_prefs.new_followers_enabled and
-            followed_prefs.expo_push_token):
-
-            send_new_follower_notification(
-                expo_push_token=followed_prefs.expo_push_token,
-                follower_username=current_user.username
-            )
+        create_notification(
+            db,
+            user_id=user_to_follow.id,
+            type="new_follower",
+            title="New follower",
+            body=f"{current_user.username} started following you",
+            deeplink=f"/community/{current_user.username}",
+            data={"follower": current_user.username},
+            push_category="new_followers_enabled",
+        )
     except Exception:
-        pass  # Push notification failed - don't block the request
+        pass  # never block the follow on notification issues
 
     return {"message": "Successfully followed user", "username": username}
 

@@ -219,6 +219,11 @@
     "fontSize": 31,
     "borderRadius": 3
   },
+  "app/notification-center.tsx": {
+    "hex": 3,
+    "fontSize": 8,
+    "borderRadius": 1
+  },
   "app/forgot-password.tsx": {
     "fontSize": 5,
     "borderRadius": 2
