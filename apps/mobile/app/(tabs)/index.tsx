@@ -18,7 +18,6 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
-import { NotificationBell } from '../../src/components/NotificationBell';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { AddPickerSheet, type AddPickerTaxon } from '../../src/components/AddPickerSheet';
 import { useBreakpoint } from '../../src/hooks/useBreakpoint';
@@ -443,20 +442,13 @@ function DashboardHubScreen() {
       fontSize: 16,
       fontWeight: '700',
     },
-    topBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      marginTop: 8,
-      marginBottom: 4,
-    },
     topGreeting: {
-      flex: 1,
-      marginRight: 12,
       fontSize: 18,
       fontWeight: '700',
       color: colors.textPrimary,
+      paddingHorizontal: 16,
+      marginTop: 8,
+      marginBottom: 8,
     },
     sectionLink: {
       fontSize: 14,
@@ -769,13 +761,10 @@ function DashboardHubScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        {/* Top bar: greeting + notifications bell */}
-        <View style={styles.topBar}>
-          <Text style={styles.topGreeting} numberOfLines={1}>
-            {user?.display_name ? `Hi, ${user.display_name}` : 'Home'}
-          </Text>
-          <NotificationBell />
-        </View>
+        {/* Greeting (notifications bell lives in the tab header) */}
+        <Text style={styles.topGreeting} numberOfLines={1}>
+          {user?.display_name ? `Hi, ${user.display_name}` : 'Home'}
+        </Text>
 
         {/* Announcement Banner */}
         <AnnouncementBanner />

@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useUnreadMessages } from '../../src/hooks/useUnreadMessages';
+import { NotificationBell } from '../../src/components/NotificationBell';
 
 export default function TabLayout() {
   const { colors, layout } = useTheme();
@@ -58,24 +59,27 @@ export default function TabLayout() {
             <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
           ),
           headerRight: () => (
-            <TouchableOpacity
-              onPress={() => router.push('/messages' as any)}
-              style={styles.headerButton}
-              accessibilityLabel={
-                unreadCount > 0
-                  ? `Messages — ${unreadCount} unread`
-                  : 'Messages'
-              }
-            >
-              <MaterialCommunityIcons name="message-outline" size={24} color={tintColor} />
-              {unreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 4 }}>
+              <NotificationBell color={tintColor} />
+              <TouchableOpacity
+                onPress={() => router.push('/messages' as any)}
+                style={styles.headerButton}
+                accessibilityLabel={
+                  unreadCount > 0
+                    ? `Messages — ${unreadCount} unread`
+                    : 'Messages'
+                }
+              >
+                <MaterialCommunityIcons name="message-outline" size={24} color={tintColor} />
+                {unreadCount > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
