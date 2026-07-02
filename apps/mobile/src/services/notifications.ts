@@ -89,9 +89,16 @@ export async function getExpoPushToken(): Promise<string | null> {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return null;
 
-    const token = await Notifications.getExpoPushTokenAsync({
-      projectId: '9c77e4ff-6ee4-4dc8-8866-e56c72bf8f75', // Your Expo project ID from app.json
-    });
+    // Use the app's REAL EAS project id (app.json extra.eas.projectId). A wrong
+    // id makes getExpoPushTokenAsync throw → null token → nothing saved, which
+    // is why 0 tokens were ever stored (ADR-009). Read it dynamically so it
+    // can't drift from app.json again; fall back to the known id.
+    const projectId =
+      (Constants.expoConfig as any)?.extra?.eas?.projectId ??
+      (Constants as any)?.easConfig?.projectId ??
+      '1d412361-4866-482a-a0a6-5d525508d8b8';
+
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
 
     return token.data;
   } catch (error) {

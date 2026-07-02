@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, useCallback, Rea
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, authEvents, AUTH_EXPIRED_EVENT } from '../services/api';
 import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable } from '../services/google-signin';
+import { getExpoPushToken } from '../services/notifications';
 
 // Re-export for convenience so login screens can import from one place
 export { isGoogleSignInAvailable };
@@ -79,6 +80,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       authEvents.off(AUTH_EXPIRED_EVENT, handleAuthExpired);
     };
   }, [handleAuthExpired]);
+
+  // Register this device's Expo push token whenever we have an auth session
+  // (fresh login OR app relaunch once the stored token hydrates). Previously
+  // this only happened if a user opened Settings > Notifications, so almost no
+  // tokens were ever stored (ADR-009). Fire-and-forget; returns null in Expo Go
+  // or if permission is denied, and never blocks the app.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const pushToken = await getExpoPushToken();
+        if (!cancelled && pushToken) {
+          await apiClient.post('/notification-preferences/push-token', { token: pushToken });
+        }
+      } catch {
+        // non-fatal — user can still enable from Settings > Notifications
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const loadStoredAuth = async () => {
     try {
