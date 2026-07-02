@@ -9,7 +9,7 @@ import { useTheme } from '../contexts/ThemeContext';
  * Notifications bell with an unread badge. Taps through to the notification
  * center (`/notification-center`). Polls the unread count on focus + every 30s.
  */
-export function NotificationBell({ color }: { color?: string }) {
+export function NotificationBell({ color, size = 24 }: { color?: string; size?: number }) {
   const router = useRouter();
   const { colors } = useTheme();
   const [count, setCount] = useState(0);
@@ -39,7 +39,7 @@ export function NotificationBell({ color }: { color?: string }) {
       style={styles.wrap}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <MaterialCommunityIcons name="bell-outline" size={24} color={color ?? colors.textPrimary} />
+      <MaterialCommunityIcons name="bell-outline" size={size} color={color ?? colors.textPrimary} />
       {count > 0 && (
         <View style={[styles.badge, { backgroundColor: colors.error ?? '#ef4444' }]}>
           <Text style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
@@ -50,7 +50,7 @@ export function NotificationBell({ color }: { color?: string }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { padding: 4 },
+  wrap: { padding: 8 },
   badge: {
     position: 'absolute',
     top: -2,

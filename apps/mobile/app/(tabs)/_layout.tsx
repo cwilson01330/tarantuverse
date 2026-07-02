@@ -59,8 +59,8 @@ export default function TabLayout() {
             <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
           ),
           headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 4 }}>
-              <NotificationBell color={tintColor} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 4 }}>
+              <NotificationBell color={tintColor} size={26} />
               <TouchableOpacity
                 onPress={() => router.push('/messages' as any)}
                 style={styles.headerButton}
@@ -70,7 +70,7 @@ export default function TabLayout() {
                     : 'Messages'
                 }
               >
-                <MaterialCommunityIcons name="message-outline" size={24} color={tintColor} />
+                <MaterialCommunityIcons name="message-outline" size={26} color={tintColor} />
                 {unreadCount > 0 && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
@@ -183,7 +183,8 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   headerButton: {
-    marginRight: 16,
+    marginRight: 12,
+    padding: 6,
     position: 'relative',
   },
   badge: {
