@@ -10,6 +10,7 @@ Day screen uses, and — only if something is due — writes ONE notification
 ("N animals are due for feeding") which pushes best-effort. Never nags when
 nothing is due.
 """
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -69,29 +70,45 @@ def _overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
     return count
 
 
-def run_feeding_digests(db: Session) -> dict:
-    """Send one feeding digest per eligible user at their local digest_hour."""
+def run_feeding_digests(
+    db: Session,
+    only_user_id: Optional[str] = None,
+    ignore_schedule: bool = False,
+) -> dict:
+    """Send one feeding digest per eligible user at their local digest_hour.
+
+    Test hooks (secret-gated at the endpoint): `only_user_id` restricts to one
+    user, and `ignore_schedule` bypasses the hour + already-sent-today gates so a
+    digest can be fired on demand for verification.
+    """
     now = datetime.now(timezone.utc)
     checked = 0
     sent = 0
 
-    prefs_list = (
-        db.query(NotificationPreferences)
-        .filter(NotificationPreferences.daily_digest_enabled.is_(True))
-        .all()
+    q = db.query(NotificationPreferences).filter(
+        NotificationPreferences.daily_digest_enabled.is_(True)
     )
-    for prefs in prefs_list:
+    if only_user_id is not None:
+        try:
+            q = q.filter(NotificationPreferences.user_id == uuid.UUID(str(only_user_id)))
+        except (ValueError, AttributeError):
+            return {"checked": 0, "sent": 0, "error": "invalid user id"}
+
+    for prefs in q.all():
         tz = prefs.tz_offset_minutes
         local = now + timedelta(minutes=-(tz or 0))
-        if prefs.digest_hour is not None and local.hour != prefs.digest_hour:
-            continue
-        if prefs.last_digest_sent_on == local.date():
-            continue
+        if not ignore_schedule:
+            if prefs.digest_hour is not None and local.hour != prefs.digest_hour:
+                continue
+            if prefs.last_digest_sent_on == local.date():
+                continue
 
         checked += 1
         # Mark processed today up front so a mid-loop error can't double-fire.
-        prefs.last_digest_sent_on = local.date()
-        db.commit()
+        # Skipped in test mode so a manual run doesn't lock out the real one.
+        if not ignore_schedule:
+            prefs.last_digest_sent_on = local.date()
+            db.commit()
 
         overdue = _overdue_count(db, prefs.user_id, tz)
         if overdue > 0:

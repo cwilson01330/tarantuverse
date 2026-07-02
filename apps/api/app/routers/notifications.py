@@ -83,15 +83,20 @@ async def mark_all_read(
 @router.post("/run-digests")
 async def run_digests(
     x_cron_secret: str = Header(None),
+    test_user_id: str = Query(None, description="Test: run the digest for just this user id."),
+    ignore_schedule: bool = Query(False, description="Test: bypass the hour + already-sent gates."),
     db: Session = Depends(get_db),
 ):
     """Secret-gated cron entrypoint (Render Cron, hourly): sends the daily
     feeding digest to users whose local digest hour is now. Not user-auth'd —
     guarded by the CRON_SECRET env var via the X-Cron-Secret header.
+
+    Test hooks (still secret-gated): pass ?ignore_schedule=true&test_user_id=<uuid>
+    to fire a digest for one user on demand, ignoring the schedule.
     """
     secret = os.environ.get("CRON_SECRET")
     if not secret or x_cron_secret != secret:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     # Local import avoids any import-time cycle (digest_service imports inverts router).
     from app.services.digest_service import run_feeding_digests
-    return run_feeding_digests(db)
+    return run_feeding_digests(db, only_user_id=test_user_id, ignore_schedule=ignore_schedule)
