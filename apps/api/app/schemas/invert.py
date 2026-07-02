@@ -155,10 +155,14 @@ class InvertFeedingStatusItem(BaseModel):
     scientific_name: Optional[str] = None
     taxon: str
     photo_url: Optional[str] = None
+    life_stage: Optional[str] = None
     last_feeding_date: Optional[datetime] = None
     days_since_last_feeding: Optional[int] = None
     is_feeding_paused: bool = False
     is_overdue: bool = False
+    # Recommended days between feedings for this animal's species + life stage
+    # (None for detritivores, which graze and have no live-prey cadence).
+    interval_days: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

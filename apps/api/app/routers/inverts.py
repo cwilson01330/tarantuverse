@@ -43,6 +43,7 @@ from app.schemas.invert import (
     InvertUpdate,
 )
 from app.services.growth_service import compute_growth_fields
+from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_collection_limit
 
@@ -199,7 +200,47 @@ async def create_invert(
     return new_invert
 
 
-FEEDING_OVERDUE_DAYS = 14  # soft heuristic for the Feeding Day "overdue" flag
+# Fallback feeding intervals (days) when species/stage data is missing.
+# Slings and juveniles eat more often, so we lean SHORTER when unsure —
+# better to flag early than let a small animal go hungry.
+_STAGE_DEFAULT_INTERVAL = {"sling": 5, "juvenile": 7, "adult": 10}
+_UNKNOWN_INTERVAL = 7  # no species AND no life stage → conservative middle
+
+
+def _recommended_feeding_interval(
+    life_stage: Optional[str], species: Optional[InvertSpecies]
+) -> Optional[int]:
+    """Days-between-feedings threshold for an animal's species + life stage.
+
+    Uses the species' per-stage feeding frequency when available (upper bound
+    of the range = "should have fed by now"). Returns None for detritivores
+    (millipedes etc.) — they graze substrate and have no live-prey cadence, so
+    they're never marked overdue. Leans SHORTER on missing data (safety-first).
+    """
+    stage = (life_stage or "").lower().strip() or None
+
+    if species is not None:
+        if (species.feeding_mode or "predator") == "detritivore":
+            return None  # no overdue concept for grazers
+
+        by_stage = {
+            "sling": species.feeding_frequency_sling,
+            "juvenile": species.feeding_frequency_juvenile,
+            "adult": species.feeding_frequency_adult,
+        }
+        freq_str = by_stage.get(stage) if stage else None
+        if freq_str:
+            return parse_frequency_string(freq_str)[1]  # upper bound
+        # Stage unknown or that stage's frequency blank → use the SHORTEST
+        # defined frequency across stages (safer: flags soonest).
+        defined = [parse_frequency_string(v)[1] for v in by_stage.values() if v]
+        if defined:
+            return min(defined)
+
+    # No species (or no usable frequency) → stage-based default, else unknown.
+    if stage in _STAGE_DEFAULT_INTERVAL:
+        return _STAGE_DEFAULT_INTERVAL[stage]
+    return _UNKNOWN_INTERVAL
 
 
 @router.get("/feeding-status", response_model=List[InvertFeedingStatusItem])
@@ -212,9 +253,10 @@ async def list_feeding_status(
     Feeding Day screen. One grouped query for the last ACCEPTED feeding per
     animal (no N+1).
 
-    is_overdue is a soft flag (never fed, or >= FEEDING_OVERDUE_DAYS since, and
-    not currently paused). The screen sorts by longest-since-fed so the keeper
-    decides — this is not a precise per-species schedule.
+    is_overdue is species + life-stage aware: an animal is overdue when it's
+    never been fed, or days-since-last-feeding has reached its recommended
+    interval (from the species' per-stage feeding frequency, shortest-wins when
+    stage is unknown). Paused animals and detritivores are never flagged.
 
     NOTE: this static route MUST stay declared before `/{invert_id}` or the
     dynamic route would swallow "feeding-status" and 422 on UUID parsing.
@@ -232,6 +274,15 @@ async def list_feeding_status(
     )
     last_by_id = {row[0]: row[1] for row in rows}
 
+    # Batch-load the species referenced by this collection (avoid N+1).
+    species_ids = {inv.species_id for inv in inverts if inv.species_id}
+    species_by_id = {}
+    if species_ids:
+        species_by_id = {
+            sp.id: sp
+            for sp in db.query(InvertSpecies).filter(InvertSpecies.id.in_(species_ids)).all()
+        }
+
     now = datetime.now(timezone.utc)
     today_local = (
         (now + timedelta(minutes=-(tz_offset_minutes or 0))).date()
@@ -247,8 +298,12 @@ async def list_feeding_status(
             inv.feeding_paused_reason
             and (inv.feeding_paused_until is None or inv.feeding_paused_until >= today_local)
         )
-        is_overdue = (not paused) and (
-            last is None or (days is not None and days >= FEEDING_OVERDUE_DAYS)
+        species = species_by_id.get(inv.species_id) if inv.species_id else None
+        interval = _recommended_feeding_interval(inv.life_stage, species)
+        is_overdue = (
+            (not paused)
+            and interval is not None
+            and (last is None or (days is not None and days >= interval))
         )
         items.append(
             InvertFeedingStatusItem(
@@ -258,10 +313,12 @@ async def list_feeding_status(
                 scientific_name=inv.scientific_name,
                 taxon=inv.taxon,
                 photo_url=inv.photo_url,
+                life_stage=inv.life_stage,
                 last_feeding_date=last,
                 days_since_last_feeding=days,
                 is_feeding_paused=paused,
                 is_overdue=is_overdue,
+                interval_days=interval,
             )
         )
 
