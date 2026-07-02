@@ -9,6 +9,8 @@ import { SkeletonCard } from '@/components/ui/skeleton'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
 import { formatLocalDate } from '@/lib/date'
+import { listColonies, type ColonyListItem } from '@/lib/colonies'
+import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 
 interface Tarantula {
   id: string
@@ -90,7 +92,10 @@ export default function TarantulasPage() {
   // Non-tarantula animals (scorpions + centipedes + whip spiders), each tagged
   // with its taxon. Merged with tarantulas for the unified collection list.
   const [otherAnimals, setOtherAnimals] = useState<Animal[]>([])
-  const [taxonFilter, setTaxonFilter] = useState<'all' | TaxonKey>('all')
+  // Colonies (ADR-010) — population-level entries, tracked as ONE entry each.
+  // Merged into the collection view alongside individual animals.
+  const [colonies, setColonies] = useState<ColonyListItem[]>([])
+  const [taxonFilter, setTaxonFilter] = useState<'all' | TaxonKey | 'colony'>('all')
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
@@ -116,8 +121,8 @@ export default function TarantulasPage() {
 
   const handleAddTarantula = () => {
     // Gate on the whole collection (cross-taxon) since the cap counts all
-    // animals, not just tarantulas.
-    if (!canAddTarantula(tarantulas.length + otherAnimals.length)) {
+    // animals, not just tarantulas. Colonies count as 1 each toward the cap.
+    if (!canAddTarantula(tarantulas.length + otherAnimals.length + colonies.length)) {
       setShowUpgradeModal(true)
     } else {
       router.push('/dashboard/tarantulas/add')
@@ -191,6 +196,13 @@ export default function TarantulasPage() {
         }),
       )
       setOtherAnimals(otherResults.flat())
+
+      // Fetch colonies (non-fatal — a lagging endpoint just hides colonies).
+      try {
+        setColonies(await listColonies(token))
+      } catch {
+        setColonies([])
+      }
 
       // Fetch subscription limits
       const limitsResponse = await fetch(`${API_URL}/api/v1/promo-codes/me/limits`, {
@@ -376,6 +388,8 @@ export default function TarantulasPage() {
   ]
 
   const filteredAnimals = allAnimals.filter((a) => {
+    // When filtering to colonies only, hide individual animals entirely.
+    if (taxonFilter === 'colony') return false
     if (taxonFilter !== 'all' && a.taxon !== taxonFilter) return false
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -386,6 +400,26 @@ export default function TarantulasPage() {
     }
     return true
   })
+
+  const filteredColonies = colonies.filter((c) => {
+    if (taxonFilter !== 'all' && taxonFilter !== 'colony' && c.taxon !== taxonFilter)
+      return false
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      return (
+        (c.name || '').toLowerCase().includes(q) ||
+        (c.species_display_name || '').toLowerCase().includes(q) ||
+        (c.species_scientific_name || '').toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+
+  // Cross-taxon total (animals + colonies) — the cap counts colonies as 1 each.
+  const totalCollectionCount = allAnimals.length + colonies.length
+
+  const colonyGlyph = (taxon: string): string =>
+    isInvertTaxon(taxon) ? INVERT_TAXA[taxon].glyph : '👥'
 
   // Route the "Add Animal" choice to the right add flow.
   const handleAddPick = (taxon: TaxonKey) => {
@@ -407,8 +441,8 @@ export default function TarantulasPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Tarantula Count Warning */}
         {!subscriptionLimits?.is_premium &&
-         allAnimals.length >= (subscriptionLimits?.max_animals ?? 15) - 5 &&
-         allAnimals.length < (subscriptionLimits?.max_animals ?? 15) &&
+         totalCollectionCount >= (subscriptionLimits?.max_animals ?? 15) - 5 &&
+         totalCollectionCount < (subscriptionLimits?.max_animals ?? 15) &&
          showWarning && (
           <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 shadow-lg">
             <div className="flex items-start justify-between">
@@ -419,7 +453,7 @@ export default function TarantulasPage() {
                     Approaching Free Tier Limit
                   </h3>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    You have <strong>{allAnimals.length} of {subscriptionLimits?.max_animals ?? 15}</strong> animals on the free plan.
+                    You have <strong>{totalCollectionCount} of {subscriptionLimits?.max_animals ?? 15}</strong> animals on the free plan.
                     Upgrade to Premium for unlimited tracking!
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -451,7 +485,7 @@ export default function TarantulasPage() {
             <div className="mt-3 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
                 className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(allAnimals.length / (subscriptionLimits?.max_animals ?? 15)) * 100}%` }}
+                style={{ width: `${(totalCollectionCount / (subscriptionLimits?.max_animals ?? 15)) * 100}%` }}
               />
             </div>
           </div>
@@ -461,7 +495,7 @@ export default function TarantulasPage() {
         <div className="flex flex-wrap justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-theme-primary">My Collection</h1>
-            <p className="text-theme-secondary mt-1">{allAnimals.length} in your collection</p>
+            <p className="text-theme-secondary mt-1">{totalCollectionCount} in your collection</p>
           </div>
         </div>
 
@@ -470,7 +504,7 @@ export default function TarantulasPage() {
           {/* Main content - Collection */}
           <div className="lg:col-span-2">
             {/* Search Bar */}
-            {allAnimals.length > 0 && (
+            {totalCollectionCount > 0 && (
               <div className="mb-6">
                 <div className="relative">
                   <input
@@ -488,14 +522,15 @@ export default function TarantulasPage() {
             )}
 
             {/* Taxon filter */}
-            {allAnimals.length > 0 && (
+            {totalCollectionCount > 0 && (
               <div className="flex flex-wrap gap-2 mb-6">
                 {([{ key: 'all' as const, label: 'All', glyph: '' }, ...TAXA]).map((t) => {
                   const active = taxonFilter === t.key
                   const count =
                     t.key === 'all'
-                      ? allAnimals.length
-                      : allAnimals.filter((a) => a.taxon === t.key).length
+                      ? totalCollectionCount
+                      : allAnimals.filter((a) => a.taxon === t.key).length +
+                        colonies.filter((c) => c.taxon === t.key).length
                   return (
                     <button
                       key={t.key}
@@ -511,11 +546,25 @@ export default function TarantulasPage() {
                     </button>
                   )
                 })}
+                {/* Colonies-only filter (ADR-010) */}
+                {colonies.length > 0 && (
+                  <button
+                    onClick={() => setTaxonFilter('colony')}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                      taxonFilter === 'colony'
+                        ? 'bg-gradient-brand text-white shadow-md'
+                        : 'bg-surface border border-theme text-theme-secondary hover:text-theme-primary'
+                    }`}
+                    aria-pressed={taxonFilter === 'colony'}
+                  >
+                    👥 Colonies ({colonies.length})
+                  </button>
+                )}
               </div>
             )}
 
             {/* Collection Grid */}
-            {allAnimals.length === 0 ? (
+            {totalCollectionCount === 0 ? (
               <div className="bg-surface rounded-2xl shadow-lg border border-theme p-12 text-center">
                 <div className="text-6xl mb-4">🕷️</div>
                 <h2 className="text-2xl font-bold mb-3 text-theme-primary">Your Collection is Empty</h2>
@@ -586,12 +635,12 @@ export default function TarantulasPage() {
                   </div>
                 </div>
 
-                {filteredAnimals.length === 0 ? (
+                {filteredAnimals.length === 0 && filteredColonies.length === 0 ? (
                   <div className="bg-surface rounded-2xl shadow-lg border border-theme p-12 text-center">
                     <div className="text-4xl mb-3">🔍</div>
-                    <p className="text-theme-secondary">No animals match your search.</p>
+                    <p className="text-theme-secondary">Nothing matches your filters.</p>
                   </div>
-                ) : viewMode === 'list' ? (
+                ) : filteredAnimals.length === 0 ? null : viewMode === 'list' ? (
                   /* List View */
                   <div className="bg-surface rounded-2xl shadow-lg border border-theme overflow-hidden">
                     <table className="w-full">
@@ -771,6 +820,98 @@ export default function TarantulasPage() {
                     ))}
                   </div>
                 )}
+
+                {/* Colonies (ADR-010) — population entries, always rendered as
+                    cards regardless of view mode; distinguished by a badge. */}
+                {filteredColonies.length > 0 && (
+                  <div className="mt-8">
+                    <div className="flex items-center gap-2 mb-4">
+                      <h3 className="text-xl font-bold text-theme-primary">Colonies</h3>
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200">
+                        {filteredColonies.length}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {filteredColonies.map((c) => {
+                        const speciesLabel = c.species_missing
+                          ? 'Species removed'
+                          : c.species_display_name ||
+                            c.species_scientific_name ||
+                            'No species set'
+                        const totalLabel =
+                          c.total_count == null
+                            ? '—'
+                            : `${c.count_is_estimated ? '≈' : ''}${c.total_count.toLocaleString()}`
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => router.push(`/dashboard/colonies/${c.id}`)}
+                            className="group relative overflow-hidden rounded-2xl bg-surface shadow-lg hover:shadow-lg transition-all duration-300 cursor-pointer border border-theme hover:border-electric-blue-500/40"
+                          >
+                            <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
+                              {c.photo_url ? (
+                                <>
+                                  <img
+                                    src={getImageUrl(c.photo_url)}
+                                    alt={c.name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                </>
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
+                                  {colonyGlyph(c.taxon)}
+                                </div>
+                              )}
+                              <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
+                                <span className="px-3 py-1 rounded-full bg-purple-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
+                                  👥 Colony
+                                </span>
+                                <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-primary text-xs font-bold shadow-lg border border-theme">
+                                  {totalLabel}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="p-5">
+                              <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
+                                {colonyGlyph(c.taxon)} {c.name}
+                              </h3>
+                              <p
+                                className={`text-sm mb-3 line-clamp-1 ${
+                                  c.species_missing
+                                    ? 'italic text-theme-tertiary'
+                                    : 'italic text-theme-secondary'
+                                }`}
+                              >
+                                {speciesLabel}
+                              </p>
+                              {c.stage_counts &&
+                                Object.keys(c.stage_counts).length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {Object.entries(c.stage_counts)
+                                      .slice(0, 3)
+                                      .map(([stage, n]) => (
+                                        <span
+                                          key={stage}
+                                          className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30"
+                                        >
+                                          <span className="capitalize">{stage}</span> {n}
+                                        </span>
+                                      ))}
+                                    {Object.keys(c.stage_counts).length > 3 && (
+                                      <span className="px-2 py-0.5 text-xs text-theme-tertiary">
+                                        +{Object.keys(c.stage_counts).length - 3} more
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -786,7 +927,7 @@ export default function TarantulasPage() {
       </div>
 
       {/* Floating Action Button (Mobile-friendly) */}
-      {allAnimals.length > 0 && (
+      {totalCollectionCount > 0 && (
         <button
           onClick={() => setShowAddMenu(true)}
           className="fixed bottom-6 right-6 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-brand text-white shadow-2xl shadow-gradient-brand hover:scale-110 hover:shadow-2xl transition-all duration-200 flex items-center justify-center text-2xl sm:text-3xl z-50"
@@ -819,6 +960,29 @@ export default function TarantulasPage() {
                 <span className="text-theme-tertiary">›</span>
               </button>
             ))}
+            {/* Colony mode (ADR-010) — a population, tracked as one entry. */}
+            <div className="my-2 border-t border-theme" />
+            <button
+              onClick={() => {
+                setShowAddMenu(false)
+                // Colonies count as 1 toward the cross-taxon cap.
+                if (!canAddTarantula(tarantulas.length + otherAnimals.length + colonies.length)) {
+                  setShowUpgradeModal(true)
+                } else {
+                  router.push('/dashboard/colonies/add')
+                }
+              }}
+              className="w-full flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-surface-elevated transition text-left"
+            >
+              <span className="text-2xl w-8 text-center">👥</span>
+              <span className="flex-1 font-semibold text-theme-primary">
+                Colony
+                <span className="block text-xs font-normal text-theme-tertiary">
+                  Track a whole population as one entry
+                </span>
+              </span>
+              <span className="text-theme-tertiary">›</span>
+            </button>
             <button
               onClick={() => setShowAddMenu(false)}
               className="w-full mt-2 py-3 rounded-xl bg-surface-elevated text-theme-secondary font-semibold"

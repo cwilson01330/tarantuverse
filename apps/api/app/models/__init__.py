@@ -68,6 +68,10 @@ from app.models.brood import Brood
 from app.models.invert_species import InvertSpecies
 from app.models.invert import Invert
 from app.models.animal_transfer import AnimalTransfer
+# Colony mode (ADR-010, col_20260702). Population-level tracking for
+# communal/colony keepers. Depends on InvertSpecies + Enclosure being
+# imported first (FK targets), which they are above.
+from app.models.colony import Colony, ColonyEvent
 
 __all__ = [
     "User",
@@ -127,4 +131,6 @@ __all__ = [
     "InvertSpecies",
     "Invert",
     "AnimalTransfer",
+    "Colony",
+    "ColonyEvent",
 ]

@@ -6,8 +6,20 @@
   },
   "app/(tabs)/collection.tsx": {
     "hex": 4,
-    "fontSize": 28,
-    "borderRadius": 19
+    "fontSize": 34,
+    "borderRadius": 22
+  },
+  "app/colony/add.tsx": {
+    "fontSize": 11,
+    "borderRadius": 7
+  },
+  "app/colony/[id].tsx": {
+    "fontSize": 32,
+    "borderRadius": 5
+  },
+  "app/colony/[id]/edit.tsx": {
+    "fontSize": 11,
+    "borderRadius": 5
   },
   "app/(tabs)/community.tsx": {
     "hex": 11,

@@ -38,7 +38,11 @@ export type AddPickerTaxon =
   | 'millipede'
   | 'mantis'
   | 'roach'
-  | 'other';
+  | 'other'
+  // Colony mode (ADR-010) — a population entry rather than an individual
+  // animal. The taxon is chosen inside the colony add form, so this maps to
+  // a single "Add colony" row that routes to /colony/add.
+  | 'colony';
 
 interface AddPickerSheetProps {
   visible: boolean;
@@ -87,6 +91,15 @@ const ROWS: Row[] = [
   { key: 'mantis', glyph: '🦗', label: 'Mantis', hint: 'New mantis record' },
   { key: 'roach', glyph: '🪳', label: 'Roach', hint: 'New roach record' },
   { key: 'other', glyph: '🐾', label: 'Other invertebrate', hint: 'New invertebrate record' },
+  {
+    // Colony mode — a population you track as one entry (headcounts by
+    // life stage) rather than an individual animal. Taxon is picked in the
+    // add form.
+    key: 'colony',
+    glyph: '🐜',
+    label: 'Colony',
+    hint: 'Track a communal/colony population',
+  },
 ];
 
 export function AddPickerSheet({

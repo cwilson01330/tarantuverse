@@ -51,6 +51,7 @@ import app.routers.qr as qr
 import app.routers.transfers as transfers
 import app.routers.feeder_species as feeder_species
 import app.routers.feeder_colonies as feeder_colonies
+import app.routers.colonies as colonies  # ADR-010 pet colony mode
 import app.routers.waitlist as waitlist
 import app.routers.animals as animals  # Herpetoverse — unified taxon table (ADR-003)
 import app.routers.sheds as sheds  # Herpetoverse v1
@@ -285,6 +286,7 @@ app.include_router(transfers.router, prefix="/api/v1", tags=["transfers", "prove
 print("[STARTUP] Registering feeder routers...")
 app.include_router(feeder_species.router, prefix="/api/v1/feeder-species", tags=["feeders"])
 app.include_router(feeder_colonies.router, prefix="/api/v1/feeder-colonies", tags=["feeders"])
+app.include_router(colonies.router, prefix="/api/v1/colonies", tags=["colonies"])
 
 print("[STARTUP] Registering waitlist router...")
 app.include_router(waitlist.router, prefix="/api/v1", tags=["waitlist", "public"])

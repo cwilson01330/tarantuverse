@@ -12,7 +12,23 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.invert import Invert
+from app.models.colony import Colony
 from app.models.user import User, FREE_TIER_MAX_ANIMALS
+
+
+def active_colonies_query(db: Session, user_id):
+    """Base query for a user's ACTIVE colonies (ADR-010).
+
+    A colony is a first-class collection entry, so it counts as 1 animal
+    toward the free-tier cap. Excludes archived (`is_active=False`) and
+    handed-off (`transferred_out_at`) colonies — same exclusions the
+    collection list uses, so counts and lists agree.
+    """
+    return db.query(Colony).filter(
+        Colony.user_id == user_id,
+        Colony.transferred_out_at.is_(None),
+        Colony.is_active.is_(True),
+    )
 
 
 def active_inverts_query(db: Session, user_id):
@@ -45,7 +61,12 @@ def enforce_collection_limit(db: Session, user: User) -> None:
     if max_animals == -1:
         return
 
-    current_count = active_inverts_query(db, user.id).count()
+    # Cross-taxon count: individual animals (inverts) + population colonies,
+    # each colony counting as 1 entry regardless of headcount (ADR-010).
+    current_count = (
+        active_inverts_query(db, user.id).count()
+        + active_colonies_query(db, user.id).count()
+    )
 
     if current_count >= max_animals:
         raise HTTPException(

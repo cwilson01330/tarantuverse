@@ -54,6 +54,11 @@ import {
   type Invert as GenericInvert,
   type InvertTaxon,
 } from '../../src/lib/inverts';
+import {
+  listColonies,
+  formatColonyCount,
+  type ColonyListItem,
+} from '../../src/lib/colonies';
 
 // Taxa that have no per-taxon list lib — fetched generically via /inverts/.
 // (scorpion/centipede/whip_spider keep their existing per-taxon fetches.)
@@ -109,7 +114,9 @@ type Row =
   | { kind: 'scorpion'; data: Scorpion }
   | { kind: 'centipede'; data: Centipede }
   | { kind: 'whip_spider'; data: WhipSpider }
-  | { kind: 'invert'; data: GenericInvert };
+  | { kind: 'invert'; data: GenericInvert }
+  // Colony mode (ADR-010) — a population entry, merged into the same list.
+  | { kind: 'colony'; data: ColonyListItem };
 
 function CollectionScreen() {
   const router = useRouter();
@@ -121,6 +128,7 @@ function CollectionScreen() {
   const [centipedes, setCentipedes] = useState<Centipede[]>([]);
   const [whipSpiders, setWhipSpiders] = useState<WhipSpider[]>([]);
   const [otherInverts, setOtherInverts] = useState<GenericInvert[]>([]);
+  const [colonies, setColonies] = useState<ColonyListItem[]>([]);
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   // Separate map for non-tarantula taxa so the four invert fetchers can merge
   // into it without racing the tarantula fetch (which replaces feedingStatuses
@@ -181,6 +189,7 @@ function CollectionScreen() {
     fetchCentipedes();
     fetchWhipSpiders();
     fetchOtherInverts();
+    fetchColonies();
     fetchCollectionStats();
   }, []);
 
@@ -242,6 +251,18 @@ function CollectionScreen() {
       loadInvertFeedingStatuses(others.map((i) => ({ id: i.id, taxon: i.taxon })));
     } catch {
       setOtherInverts([]);
+    }
+  };
+
+  const fetchColonies = async () => {
+    // Colony mode (ADR-010) — a separate first-class collection source merged
+    // into the same list. Non-fatal: an API instance that predates colonies
+    // just shows none instead of blanking the collection.
+    try {
+      const rows = await listColonies();
+      setColonies(rows);
+    } catch {
+      setColonies([]);
     }
   };
 
@@ -441,6 +462,7 @@ function CollectionScreen() {
     if (row.kind === 'scorpion') return scorpionDisplayName(row.data);
     if (row.kind === 'whip_spider') return whipSpiderDisplayName(row.data);
     if (row.kind === 'invert') return invertDisplayName(row.data);
+    if (row.kind === 'colony') return row.data.name;
     return centipedeDisplayName(row.data);
   };
 
@@ -471,18 +493,34 @@ function CollectionScreen() {
       .filter((i) => taxonFilter === 'all' || taxonFilter === i.taxon)
       .map((i) => ({ kind: 'invert' as const, data: i }));
 
+    // Colonies (ADR-010) — a colony shows under 'all' or under its taxon's
+    // chip (a roach colony appears when the Roaches filter is active).
+    const colonyRows: Row[] = colonies
+      .filter((c) => taxonFilter === 'all' || taxonFilter === c.taxon)
+      .map((c) => ({ kind: 'colony' as const, data: c }));
+
     let rows: Row[] = [
       ...tarantulaRows,
       ...scorpionRows,
       ...centipedeRows,
       ...whipSpiderRows,
       ...otherInvertRows,
+      ...colonyRows,
     ];
 
     // Search across name, common_name, and scientific_name regardless
-    // of taxon. Empty query short-circuits.
+    // of taxon. Empty query short-circuits. Colonies have no common_name /
+    // scientific_name fields — match their name + species labels instead.
     if (query) {
       rows = rows.filter((row) => {
+        if (row.kind === 'colony') {
+          const c = row.data;
+          return (
+            c.name.toLowerCase().includes(query)
+            || (c.species_display_name || '').toLowerCase().includes(query)
+            || (c.species_scientific_name || '').toLowerCase().includes(query)
+          );
+        }
         const d = row.data;
         return (
           (d.name || '').toLowerCase().includes(query)
@@ -527,6 +565,7 @@ function CollectionScreen() {
       fetchCentipedes(),
       fetchWhipSpiders(),
       fetchOtherInverts(),
+      fetchColonies(),
       fetchCollectionStats(),
     ]);
     setRefreshing(false);
@@ -956,6 +995,55 @@ function CollectionScreen() {
     );
   };
 
+  // Colony card (ADR-010). Same card frame, but tagged as a "Colony" with the
+  // population count (≈N when estimated) instead of a sex badge. Taxon glyph in
+  // the bottom-left, same as the other invert cards. Routes to /colony/[id].
+  const renderColony = ({ item }: { item: ColonyListItem }) => {
+    const meta = INVERT_TAXA[item.taxon];
+    const countLabel = formatColonyCount(item.total_count, item.count_is_estimated);
+    const speciesLabel = item.species_missing
+      ? 'Species removed'
+      : item.species_display_name || item.species_scientific_name || `${meta?.label ?? 'Colony'} colony`;
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/colony/${item.id}` as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, colony, ${countLabel} animals, ${speciesLabel}`}
+        accessibilityHint="Opens this colony's detail page."
+      >
+        <View style={styles.imageContainer}>
+          {item.photo_url ? (
+            <Image
+              source={{ uri: getImageUrl(item.photo_url) }}
+              style={styles.image}
+              accessibilityLabel={`Photo of ${item.name}`}
+            />
+          ) : (
+            <View style={styles.placeholderImage} accessibilityElementsHidden importantForAccessibility="no">
+              <Text style={{ fontSize: 40 }}>{meta?.glyph ?? '🐜'}</Text>
+            </View>
+          )}
+          {/* Colony tag — top-right, where the sex badge sits on animal cards. */}
+          <View style={styles.colonyTag} accessibilityLabel="Colony">
+            <Text style={styles.colonyTagText}>Colony</Text>
+          </View>
+          {/* Population count — top-left. */}
+          <View style={styles.colonyCountBadge} accessibilityLabel={`${countLabel} animals`}>
+            <Text style={styles.colonyCountText}>{countLabel}</Text>
+          </View>
+          <View style={styles.taxonGlyph}>
+            <Text style={{ fontSize: 14 }}>{meta?.glyph ?? '🐜'}</Text>
+          </View>
+        </View>
+        <View style={styles.cardContent}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.scientificName}>{speciesLabel}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   const renderListItem = ({ item }: { item: Tarantula }) => {
     const feedingStatus = feedingStatuses.get(item.id);
     const premoltPrediction = premoltPredictions.get(item.id);
@@ -1178,6 +1266,55 @@ function CollectionScreen() {
               </Text>
             </View>
           ) : null}
+        </View>
+        <MaterialCommunityIcons
+          name="chevron-right"
+          size={24}
+          color={colors.textTertiary}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        />
+      </TouchableOpacity>
+    );
+  };
+
+  // Colony list row (ADR-010). Mirrors renderInvertListItem chrome but shows
+  // the population count pill + a "Colony" tag instead of a sex chip.
+  const renderColonyListItem = (item: ColonyListItem) => {
+    const meta = INVERT_TAXA[item.taxon];
+    const glyph = meta?.glyph ?? '🐜';
+    const countLabel = formatColonyCount(item.total_count, item.count_is_estimated);
+    const speciesLabel = item.species_missing
+      ? 'Species removed'
+      : item.species_display_name || item.species_scientific_name || `${meta?.label ?? 'Colony'} colony`;
+    return (
+      <TouchableOpacity
+        style={styles.listItem}
+        onPress={() => router.push(`/colony/${item.id}` as any)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, colony, ${countLabel} animals, ${speciesLabel}`}
+        accessibilityHint="Opens this colony's detail page."
+      >
+        <View style={styles.listImageContainer}>
+          {item.photo_url ? (
+            <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.listImage} accessibilityLabel={`Photo of ${item.name}`} />
+          ) : (
+            <View style={styles.listPlaceholder} accessibilityElementsHidden importantForAccessibility="no">
+              <Text style={{ fontSize: 22 }}>{glyph}</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.listContent}>
+          <Text style={styles.listName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.listScientificName} numberOfLines={1}>{speciesLabel}</Text>
+        </View>
+        <View style={styles.listBadges}>
+          <View style={[styles.colonyListTag, { backgroundColor: colors.primary + '20' }]} accessibilityLabel="Colony">
+            <Text style={[styles.colonyListTagText, { color: colors.primary }]}>Colony</Text>
+          </View>
+          <View style={[styles.listBadge, { backgroundColor: colors.primary }]} accessibilityLabel={`${countLabel} animals`}>
+            <Text style={styles.listBadgeText}>{countLabel}</Text>
+          </View>
         </View>
         <MaterialCommunityIcons
           name="chevron-right"
@@ -1413,6 +1550,49 @@ function CollectionScreen() {
       backgroundColor: 'rgba(0,0,0,0.45)',
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    // Colony card overlays (ADR-010). "Colony" tag top-right (where the sex
+    // badge sits), population count top-left (where the feeding badge sits).
+    colonyTag: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 10,
+      backgroundColor: 'rgba(139, 92, 246, 0.9)',
+    },
+    colonyTagText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    colonyCountBadge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 12,
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    },
+    colonyCountText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    colonyListTag: {
+      height: 22,
+      paddingHorizontal: 8,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    colonyListTagText: {
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.3,
     },
     feedingBadge: {
       position: 'absolute',
@@ -1771,6 +1951,9 @@ function CollectionScreen() {
     setAddPickerOpen(false);
     if (taxon === 'tarantula') {
       router.push('/tarantula/add');
+    } else if (taxon === 'colony') {
+      // Colony mode (ADR-010) — taxon is chosen inside the colony add form.
+      router.push('/colony/add' as any);
     } else {
       // All non-tarantula taxa share the generic invert add screen (ADR-007).
       router.push(`/invert/add?taxon=${taxon}` as any);
@@ -1805,6 +1988,11 @@ function CollectionScreen() {
             meta?.label ?? 'invert',
             invertFeedingStatuses.get(item.data.id),
           );
+    }
+    if (item.kind === 'colony') {
+      return viewMode === 'card'
+        ? renderColony({ item: item.data })
+        : renderColonyListItem(item.data);
     }
     return viewMode === 'card'
       ? renderTarantula({ item: item.data })
@@ -1897,7 +2085,8 @@ function CollectionScreen() {
     && scorpions.length === 0
     && centipedes.length === 0
     && whipSpiders.length === 0
-    && otherInverts.length === 0;
+    && otherInverts.length === 0
+    && colonies.length === 0;
 
   // Cross-taxon Total + Species for the stats card. The /analytics/collection
   // endpoint counts ONLY the legacy tarantula table, so its total_tarantulas /
@@ -1908,11 +2097,14 @@ function CollectionScreen() {
   const allCollectionAnimals: any[] = [
     ...tarantulas, ...scorpions, ...centipedes, ...whipSpiders, ...otherInverts,
   ];
-  const totalAnimals = allCollectionAnimals.length;
+  // Colonies count as ONE entry each toward the collection Total (ADR-010:
+  // 1 toward the cap regardless of headcount).
+  const totalAnimals = allCollectionAnimals.length + colonies.length;
   const uniqueSpeciesCount = new Set(
-    allCollectionAnimals
-      .map((a) => (a.scientific_name || a.common_name || '').trim().toLowerCase())
-      .filter((s) => s.length > 0),
+    [
+      ...allCollectionAnimals.map((a) => (a.scientific_name || a.common_name || '').trim().toLowerCase()),
+      ...colonies.map((c) => (c.species_scientific_name || c.species_display_name || '').trim().toLowerCase()),
+    ].filter((s) => s.length > 0),
   ).size;
 
   return (
