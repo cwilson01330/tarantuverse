@@ -387,6 +387,23 @@ async def claim_transfer(
     if was_new_signup:
         analytics_events.capture("transfer_signup", current_user.id, {"taxon": new_invert.taxon})
 
+    # Tell the seller their animal was claimed (notification center + best-effort
+    # push). Transactional + low-volume, so no per-category toggle.
+    try:
+        from app.services.notification_service import create_notification
+        animal_label = source.name or source.scientific_name or "your animal"
+        create_notification(
+            db,
+            user_id=transfer.from_user_id,
+            type="transfer_claimed",
+            title="Transfer claimed",
+            body=f"{current_user.username} claimed {animal_label}.",
+            deeplink="/dashboard/transfers",
+            data={"claimer": current_user.username, "transfer_id": str(transfer.id)},
+        )
+    except Exception:
+        pass  # never block the claim on notification issues
+
     return {
         "id": str(new_invert.id),
         "taxon": new_invert.taxon,

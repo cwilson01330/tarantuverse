@@ -1,7 +1,7 @@
 """
 Notification preferences model
 """
-from sqlalchemy import Column, String, Boolean, Integer, ForeignKey
+from sqlalchemy import Column, String, Boolean, Integer, Date, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -45,6 +45,13 @@ class NotificationPreferences(Base):
 
     # Expo push token (for push notifications)
     expo_push_token = Column(String(255), nullable=True)
+
+    # Daily care digest (ADR-009 Phase 3). One "N animals due for feeding" push
+    # per day at the user's local digest_hour, instead of per-animal spam.
+    daily_digest_enabled = Column(Boolean, default=True, nullable=False)
+    digest_hour = Column(Integer, default=9, nullable=False)  # 0-23, user's local hour
+    tz_offset_minutes = Column(Integer, nullable=True)  # JS getTimezoneOffset(); positive = west of UTC
+    last_digest_sent_on = Column(Date, nullable=True)  # local date the digest last ran, prevents double-fire
 
     # Relationship
     user = relationship("User", back_populates="notification_preferences")

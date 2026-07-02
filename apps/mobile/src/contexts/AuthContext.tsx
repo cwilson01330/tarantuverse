@@ -93,7 +93,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const pushToken = await getExpoPushToken();
         if (!cancelled && pushToken) {
-          await apiClient.post('/notification-preferences/push-token', { token: pushToken });
+          await apiClient.post('/notification-preferences/push-token', {
+            token: pushToken,
+            tz_offset_minutes: new Date().getTimezoneOffset(),
+          });
         }
       } catch {
         // non-fatal — user can still enable from Settings > Notifications

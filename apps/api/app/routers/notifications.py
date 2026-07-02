@@ -4,10 +4,11 @@ In-app notification center endpoints (ADR-009).
 Reads the `notifications` table. Independent of push delivery — the center works
 even before FCM/APNs are configured.
 """
+import os
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -77,3 +78,20 @@ async def mark_all_read(
     ).update({"is_read": True})
     db.commit()
     return {"ok": True}
+
+
+@router.post("/run-digests")
+async def run_digests(
+    x_cron_secret: str = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Secret-gated cron entrypoint (Render Cron, hourly): sends the daily
+    feeding digest to users whose local digest hour is now. Not user-auth'd —
+    guarded by the CRON_SECRET env var via the X-Cron-Secret header.
+    """
+    secret = os.environ.get("CRON_SECRET")
+    if not secret or x_cron_secret != secret:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    # Local import avoids any import-time cycle (digest_service imports inverts router).
+    from app.services.digest_service import run_feeding_digests
+    return run_feeding_digests(db)

@@ -80,13 +80,26 @@ async def update_notification_preferences(
     return prefs
 
 
+from pydantic import BaseModel
+
+
+class PushTokenBody(BaseModel):
+    token: str
+    tz_offset_minutes: int | None = None
+
+
 @router.post("/push-token", response_model=NotificationPreferencesResponse)
 async def update_push_token(
-    token: str,
+    payload: PushTokenBody,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
-    """Update Expo push notification token"""
+    """Register the Expo push token (+ device timezone for the daily digest).
+
+    Accepts a JSON body {token, tz_offset_minutes?}. The previous signature took
+    `token` as a bare str, which FastAPI treats as a QUERY param — so the app's
+    JSON-body registration 422'd and no tokens were ever saved (ADR-009).
+    """
     prefs = db.query(NotificationPreferences).filter(
         NotificationPreferences.user_id == current_user.id
     ).first()
@@ -95,7 +108,9 @@ async def update_push_token(
         prefs = NotificationPreferences(user_id=current_user.id)
         db.add(prefs)
 
-    prefs.expo_push_token = token
+    prefs.expo_push_token = payload.token
+    if payload.tz_offset_minutes is not None:
+        prefs.tz_offset_minutes = payload.tz_offset_minutes
     db.commit()
     db.refresh(prefs)
     return prefs
