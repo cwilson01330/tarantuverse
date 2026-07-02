@@ -778,10 +778,10 @@ function DashboardHubScreen() {
               styles.statCard,
               overdueFeedings.length > 0 && styles.statCardAlert,
             ]}
-            onPress={() => router.push('/(tabs)/collection')}
+            onPress={() => router.push('/feeding-day')}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={`Needs Feeding: ${overdueFeedings.length} tarantulas. ${overdueFeedings.length > 0 ? '7 or more days overdue.' : 'All on schedule.'}`}
+            accessibilityLabel={`Needs Feeding: ${overdueFeedings.length} tarantulas. ${overdueFeedings.length > 0 ? '7 or more days overdue.' : 'All on schedule.'} Opens Feeding Day to log feedings in bulk.`}
           >
             <View style={styles.statIconRow}>
               <View style={[
@@ -856,7 +856,16 @@ function DashboardHubScreen() {
           name="Feeding Alerts"
         >
         <WalkthroughableView style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>🍽️ Feeding Alerts</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={styles.sectionTitle}>🍽️ Feeding Alerts</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/feeding-day')}
+              accessibilityRole="button"
+              accessibilityLabel="Open Feeding Day to log feedings in bulk"
+            >
+              <Text style={[styles.statFooter, { color: colors.primary }]}>Feeding Day →</Text>
+            </TouchableOpacity>
+          </View>
           {overdueFeedings.length === 0 ? (
             <View style={styles.allFedContainer}>
               <Text style={styles.allFedEmoji}>✅</Text>

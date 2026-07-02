@@ -2,7 +2,7 @@
 Feeding log schemas
 """
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
 import uuid
@@ -36,6 +36,33 @@ class FeedingLogUpdate(BaseModel):
     accepted: Optional[bool] = None
     prey_weight_g: Optional[Decimal] = Field(None, ge=0, le=999999.99)
     notes: Optional[str] = None
+
+
+class BulkFeedingRequest(BaseModel):
+    """Log one feeding event across many inverts at once (Feeding Day).
+
+    Applies the same fed_at / accepted / food_type / notes to every animal in
+    invert_ids. `accepted=False` records a group refusal. Ownership is verified
+    per id server-side; ids the caller doesn't own are skipped, not fatal.
+    """
+    invert_ids: List[uuid.UUID] = Field(..., min_length=1, max_length=500)
+    fed_at: Optional[datetime] = None  # defaults to now (UTC) server-side
+    accepted: bool = True
+    food_type: Optional[str] = None
+    food_size: Optional[str] = None
+    quantity: int = 1
+    notes: Optional[str] = None
+
+
+class BulkFeedingSkip(BaseModel):
+    invert_id: uuid.UUID
+    reason: str
+
+
+class BulkFeedingResult(BaseModel):
+    created_count: int
+    created_ids: List[uuid.UUID]
+    skipped: List[BulkFeedingSkip] = []
 
 
 class FeedingLogResponse(FeedingLogBase):

@@ -141,6 +141,28 @@ class InvertFeedingStats(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class InvertFeedingStatusItem(BaseModel):
+    """One animal's feeding status for the cross-taxon Feeding Day screen.
+
+    days_since_last_feeding is measured from the last ACCEPTED feeding.
+    is_overdue is a soft heuristic (not fed in >= OVERDUE_DAYS, and not
+    currently paused) — the screen sorts by longest-since-fed so keepers
+    make the call; it's not a precise per-species schedule.
+    """
+    id: uuid.UUID
+    name: Optional[str] = None
+    common_name: Optional[str] = None
+    scientific_name: Optional[str] = None
+    taxon: str
+    photo_url: Optional[str] = None
+    last_feeding_date: Optional[datetime] = None
+    days_since_last_feeding: Optional[int] = None
+    is_feeding_paused: bool = False
+    is_overdue: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class InvertGrowthAnalytics(BaseModel):
     """Growth analytics for any invert, computed from its molt history.
 

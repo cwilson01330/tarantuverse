@@ -209,6 +209,11 @@
     "fontSize": 7,
     "borderRadius": 1
   },
+  "app/feeding-day.tsx": {
+    "hex": 6,
+    "fontSize": 17,
+    "borderRadius": 5
+  },
   "app/forgot-password.tsx": {
     "fontSize": 5,
     "borderRadius": 2

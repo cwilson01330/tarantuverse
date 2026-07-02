@@ -11,7 +11,7 @@ import DashboardTour from '@/components/DashboardTour'
 import AnnouncementBanner from '@/components/AnnouncementBanner'
 import UpgradeModal from '@/components/UpgradeModal'
 import PremoltAlertsCard from '@/components/PremoltAlertsCard'
-import { PlusCircle, LayoutGrid, LineChart, BookOpen, Egg, Upload } from 'lucide-react'
+import { PlusCircle, LayoutGrid, LineChart, BookOpen, Egg, Upload, Utensils } from 'lucide-react'
 
 interface Tarantula {
   id: string
@@ -515,9 +515,17 @@ export default function DashboardHub() {
           <div className="lg:col-span-2 space-y-8">
             {/* Feeding Alerts Section */}
             <div data-tour="feeding-alerts" className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
-              <h2 className="text-xl font-bold text-theme-primary mb-4 flex items-center gap-2">
-                🍽️ Feeding Alerts
-              </h2>
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h2 className="text-xl font-bold text-theme-primary flex items-center gap-2">
+                  🍽️ Feeding Alerts
+                </h2>
+                <button
+                  onClick={() => router.push('/dashboard/feeding-day')}
+                  className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition font-semibold text-sm flex-shrink-0"
+                >
+                  🍽️ Feeding Day
+                </button>
+              </div>
               {overdueFeedings.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-3">✅</div>

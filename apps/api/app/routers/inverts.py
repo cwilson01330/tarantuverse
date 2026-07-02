@@ -21,6 +21,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ from app.models.tarantula import Sex, Source  # shared DB enums (UPPERCASE)
 from app.schemas.invert import (
     InvertCreate,
     InvertFeedingStats,
+    InvertFeedingStatusItem,
     InvertGrowthAnalytics,
     InvertResponse,
     InvertUpdate,
@@ -195,6 +197,79 @@ async def create_invert(
             db.commit()
 
     return new_invert
+
+
+FEEDING_OVERDUE_DAYS = 14  # soft heuristic for the Feeding Day "overdue" flag
+
+
+@router.get("/feeding-status", response_model=List[InvertFeedingStatusItem])
+async def list_feeding_status(
+    tz_offset_minutes: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cross-taxon feeding status for every animal the caller owns — powers the
+    Feeding Day screen. One grouped query for the last ACCEPTED feeding per
+    animal (no N+1).
+
+    is_overdue is a soft flag (never fed, or >= FEEDING_OVERDUE_DAYS since, and
+    not currently paused). The screen sorts by longest-since-fed so the keeper
+    decides — this is not a precise per-species schedule.
+
+    NOTE: this static route MUST stay declared before `/{invert_id}` or the
+    dynamic route would swallow "feeding-status" and 422 on UUID parsing.
+    """
+    inverts = db.query(Invert).filter(Invert.user_id == current_user.id).all()
+    if not inverts:
+        return []
+
+    ids = [inv.id for inv in inverts]
+    rows = (
+        db.query(FeedingLog.invert_id, func.max(FeedingLog.fed_at))
+        .filter(FeedingLog.invert_id.in_(ids), FeedingLog.accepted.is_(True))
+        .group_by(FeedingLog.invert_id)
+        .all()
+    )
+    last_by_id = {row[0]: row[1] for row in rows}
+
+    now = datetime.now(timezone.utc)
+    today_local = (
+        (now + timedelta(minutes=-(tz_offset_minutes or 0))).date()
+        if tz_offset_minutes is not None
+        else now.date()
+    )
+
+    items: List[InvertFeedingStatusItem] = []
+    for inv in inverts:
+        last = last_by_id.get(inv.id)
+        days = _calendar_day_diff(now, last, tz_offset_minutes) if last else None
+        paused = bool(
+            inv.feeding_paused_reason
+            and (inv.feeding_paused_until is None or inv.feeding_paused_until >= today_local)
+        )
+        is_overdue = (not paused) and (
+            last is None or (days is not None and days >= FEEDING_OVERDUE_DAYS)
+        )
+        items.append(
+            InvertFeedingStatusItem(
+                id=inv.id,
+                name=inv.name,
+                common_name=inv.common_name,
+                scientific_name=inv.scientific_name,
+                taxon=inv.taxon,
+                photo_url=inv.photo_url,
+                last_feeding_date=last,
+                days_since_last_feeding=days,
+                is_feeding_paused=paused,
+                is_overdue=is_overdue,
+            )
+        )
+
+    # Never-fed first, then longest-since-fed, so the neediest float to the top.
+    items.sort(
+        key=lambda x: (0 if x.days_since_last_feeding is None else 1, -(x.days_since_last_feeding or 0))
+    )
+    return items
 
 
 @router.get("/{invert_id}", response_model=InvertResponse)

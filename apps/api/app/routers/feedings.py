@@ -15,7 +15,14 @@ from app.models.animal import Animal
 from app.models.scorpion import Scorpion
 from app.models.invert import Invert
 from app.models.feeding_log import FeedingLog
-from app.schemas.feeding import FeedingLogCreate, FeedingLogUpdate, FeedingLogResponse
+from app.schemas.feeding import (
+    FeedingLogCreate,
+    FeedingLogUpdate,
+    FeedingLogResponse,
+    BulkFeedingRequest,
+    BulkFeedingResult,
+    BulkFeedingSkip,
+)
 from app.schemas.feeding_reminder import FeedingReminderSummary
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
@@ -447,6 +454,59 @@ async def create_invert_feeding_log(
     db.commit()
     db.refresh(new_feeding)
     return new_feeding
+
+
+@router.post(
+    "/inverts/bulk-feedings",
+    response_model=BulkFeedingResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def bulk_create_invert_feedings(
+    payload: BulkFeedingRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log one feeding event across many owned inverts at once (Feeding Day).
+
+    The same fed_at / accepted / food_type / food_size / notes is applied to
+    each animal. Ids the caller doesn't own are skipped (reported in
+    `skipped`), never fatal. All writes commit together.
+    """
+    # De-dupe while preserving the caller's order.
+    requested = list(dict.fromkeys(payload.invert_ids))
+    owned_ids = {
+        row[0]
+        for row in db.query(Invert.id)
+        .filter(Invert.id.in_(requested), Invert.user_id == current_user.id)
+        .all()
+    }
+    fed_at = payload.fed_at or datetime.now(timezone.utc)
+
+    created_ids = []
+    skipped = []
+    for iid in requested:
+        if iid not in owned_ids:
+            skipped.append(BulkFeedingSkip(invert_id=iid, reason="Not found or not yours"))
+            continue
+        db.add(
+            FeedingLog(
+                invert_id=iid,
+                fed_at=fed_at,
+                food_type=payload.food_type,
+                food_size=payload.food_size,
+                quantity=payload.quantity,
+                accepted=payload.accepted,
+                notes=payload.notes,
+            )
+        )
+        created_ids.append(iid)
+
+    db.commit()
+    return BulkFeedingResult(
+        created_count=len(created_ids),
+        created_ids=created_ids,
+        skipped=skipped,
+    )
 
 
 @router.get("/feedings/{feeding_id}", response_model=FeedingLogResponse)
