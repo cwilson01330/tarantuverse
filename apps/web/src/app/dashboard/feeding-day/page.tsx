@@ -20,6 +20,8 @@ interface FeedingStatus {
   days_since_last_feeding: number | null
   is_feeding_paused: boolean
   is_overdue: boolean
+  life_stage: string | null
+  interval_days: number | null
 }
 
 // Mirrors the /inverts/bulk-feedings response shape.
@@ -64,6 +66,23 @@ function taxonEmoji(taxon: string): string {
 /** Display name resolution: name → common_name → scientific_name → fallback. */
 function displayName(a: FeedingStatus): string {
   return a.name || a.common_name || a.scientific_name || 'Unnamed'
+}
+
+/**
+ * Small meta line: life stage + feeding cadence, joined by " · ".
+ * Returns null when there's nothing to show.
+ */
+function lifeStageMeta(a: FeedingStatus): string | null {
+  const stage = a.life_stage
+    ? a.life_stage.charAt(0).toUpperCase() + a.life_stage.slice(1)
+    : null
+  const cadence = a.interval_days
+    ? `every ~${a.interval_days}d`
+    : a.taxon === 'millipede'
+      ? 'grazer'
+      : null
+  const parts = [stage, cadence].filter((p): p is string => Boolean(p))
+  return parts.length > 0 ? parts.join(' · ') : null
 }
 
 function getImageUrl(url: string | null): string {
@@ -443,6 +462,11 @@ export default function FeedingDayPage() {
                       {a.scientific_name && (
                         <p className="text-sm text-theme-tertiary italic truncate">
                           {a.scientific_name}
+                        </p>
+                      )}
+                      {lifeStageMeta(a) && (
+                        <p className="text-xs text-theme-tertiary truncate">
+                          {lifeStageMeta(a)}
                         </p>
                       )}
                     </div>

@@ -27,10 +27,12 @@ interface FeedingStatus {
   scientific_name: string | null;
   taxon: string;
   photo_url: string | null;
+  life_stage: string | null;
   last_feeding_date: string | null;
   days_since_last_feeding: number | null;
   is_feeding_paused: boolean;
   is_overdue: boolean;
+  interval_days: number | null;
 }
 
 type FilterKey = 'all' | 'overdue' | 'never';
@@ -316,6 +318,22 @@ export default function FeedingDayScreen() {
                     {a.scientific_name}
                   </Text>
                 ) : null}
+                {(() => {
+                  const stageLabel = a.life_stage
+                    ? a.life_stage.charAt(0).toUpperCase() + a.life_stage.slice(1)
+                    : null;
+                  const cadence = a.interval_days
+                    ? `every ~${a.interval_days}d`
+                    : a.taxon === 'millipede'
+                      ? 'grazer'
+                      : null;
+                  const meta = [stageLabel, cadence].filter(Boolean).join(' · ');
+                  return meta ? (
+                    <Text style={[styles.rowMeta, { color: colors.textTertiary }]} numberOfLines={1}>
+                      {meta}
+                    </Text>
+                  ) : null;
+                })()}
               </View>
               <View style={[styles.pill, { backgroundColor: `${pill.color}22` }]}>
                 <Text style={[styles.pillText, { color: pill.color }]}>{pill.label}</Text>
@@ -459,6 +477,7 @@ const styles = StyleSheet.create({
   thumbEmoji: { fontSize: 22 },
   rowName: { fontSize: 15, fontWeight: '600' },
   rowSci: { fontSize: 12, fontStyle: 'italic', marginTop: 2 },
+  rowMeta: { fontSize: 11, marginTop: 2 },
   pill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   pillText: { fontSize: 11, fontWeight: '700' },
   actionBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', padding: 16, borderTopWidth: 1 },
