@@ -8,6 +8,7 @@ import {
   StyleSheet,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,6 +31,7 @@ interface Enclosure {
 export default function EnclosuresScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -377,7 +379,7 @@ export default function EnclosuresScreen() {
             fab
             size={56}
             onPress={() => router.push('/enclosure/add')}
-            outerStyle={styles.fab}
+            outerStyle={[styles.fab, { bottom: insets.bottom + 20 }]}
           >
             <MaterialCommunityIcons name="plus" size={28} color="#fff" />
           </PrimaryButton>

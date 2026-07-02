@@ -15,6 +15,7 @@ import {
   ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -114,6 +115,7 @@ function CollectionScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [scorpions, setScorpions] = useState<Scorpion[]>([]);
   const [centipedes, setCentipedes] = useState<Centipede[]>([]);
@@ -2067,7 +2069,7 @@ function CollectionScreen() {
             fab
             size={56}
             onPress={openAddPicker}
-            outerStyle={styles.fab}
+            outerStyle={[styles.fab, { bottom: insets.bottom + 20 }]}
           >
             <MaterialCommunityIcons name="plus" size={28} color="#fff" />
           </PrimaryButton>

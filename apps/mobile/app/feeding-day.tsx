@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppHeader } from '../src/components/AppHeader';
 import { PrimaryButton } from '../src/components/PrimaryButton';
@@ -69,6 +70,7 @@ function displayName(a: FeedingStatus): string {
 export default function FeedingDayScreen() {
   const router = useRouter();
   const { colors, layout } = useTheme();
+  const insets = useSafeAreaInsets();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [items, setItems] = useState<FeedingStatus[]>([]);
@@ -347,7 +349,7 @@ export default function FeedingDayScreen() {
 
       {/* Action bar */}
       {selected.size > 0 && (
-        <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
           <PrimaryButton
             onPress={() => setSheetOpen(true)}
             style={styles.actionBtn}
@@ -361,7 +363,7 @@ export default function FeedingDayScreen() {
       {/* Batch sheet */}
       <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={() => !submitting && setSheetOpen(false)}>
         <KeyboardAvoidingView style={styles.modalWrap} behavior={'padding'}>
-          <View style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border, borderTopLeftRadius: layout.radius.lg, borderTopRightRadius: layout.radius.lg }]}>
+          <View style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border, borderTopLeftRadius: layout.radius.lg, borderTopRightRadius: layout.radius.lg, paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.sheetHandleWrap}>
               <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
             </View>

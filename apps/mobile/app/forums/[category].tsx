@@ -9,6 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
@@ -35,6 +36,7 @@ export default function CategoryScreen() {
   const router = useRouter();
   const { category } = useLocalSearchParams();
   const { colors, layout } = useTheme();
+  const insets = useSafeAreaInsets();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const backButton = (
     <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
@@ -277,7 +279,7 @@ export default function CategoryScreen() {
 
       {/* FAB for new thread */}
       <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.primary }]}
+        style={[styles.fab, { backgroundColor: colors.primary, bottom: insets.bottom + 20 }]}
         onPress={() => router.push(`/forums/new-thread?category=${category}`)}
       >
         <MaterialCommunityIcons name="plus" size={28} color="#fff" />

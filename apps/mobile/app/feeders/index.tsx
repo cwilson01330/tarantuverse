@@ -8,7 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppHeader } from '../../src/components/AppHeader';
@@ -58,6 +58,7 @@ function formatDaysLabel(days: number | null, zeroLabel: string, neverLabel: str
 export default function FeedersListScreen() {
   const router = useRouter();
   const { colors, layout } = useTheme();
+  const insets = useSafeAreaInsets();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [colonies, setColonies] = useState<FeederColonyListItem[]>([]);
@@ -366,7 +367,7 @@ export default function FeedersListScreen() {
           fab
           size={56}
           onPress={() => router.push('/feeders/add')}
-          outerStyle={styles.fab}
+          outerStyle={[styles.fab, { bottom: insets.bottom + 28 }]}
         >
           <MaterialCommunityIcons name="plus" size={28} color="#fff" />
         </PrimaryButton>

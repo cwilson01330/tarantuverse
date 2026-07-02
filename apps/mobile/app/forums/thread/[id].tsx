@@ -14,6 +14,7 @@ import {
   Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { AppHeader } from '../../../src/components/AppHeader';
@@ -49,6 +50,7 @@ export default function ThreadDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { colors, layout } = useTheme();
+  const insets = useSafeAreaInsets();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const backButton = (
     <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Go back">
@@ -779,7 +781,7 @@ export default function ThreadDetailScreen() {
 
       {/* Reply Form */}
       {!thread.is_locked && (
-        <View style={[styles.replyForm, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <View style={[styles.replyForm, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
           <TextInput
             style={[styles.replyInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
             placeholder="Write a reply..."
@@ -808,7 +810,7 @@ export default function ThreadDetailScreen() {
       )}
 
       {thread.is_locked && (
-        <View style={[styles.lockedBanner, { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border }]}>
+        <View style={[styles.lockedBanner, { backgroundColor: colors.surfaceElevated, borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
           <MaterialCommunityIcons name="lock" size={20} color={colors.textTertiary} />
           <Text style={[styles.lockedText, { color: colors.textSecondary }]}>
             This thread is locked. No new replies can be added.

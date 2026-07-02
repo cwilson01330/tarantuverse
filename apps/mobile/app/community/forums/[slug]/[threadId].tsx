@@ -13,6 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../../../src/contexts/ThemeContext';
@@ -60,6 +61,7 @@ export default function ThreadDetailScreen() {
   const { slug, threadId } = useLocalSearchParams<{ slug: string; threadId: string }>();
   const router = useRouter();
   const { colors, layout } = useTheme();
+  const insets = useSafeAreaInsets();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [thread, setThread] = useState<Thread | null>(null);
@@ -329,7 +331,7 @@ export default function ThreadDetailScreen() {
 
         {/* Reply Input */}
         {!thread.is_locked ? (
-          <View style={[styles.replyContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <View style={[styles.replyContainer, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom + 12 }]}>
             <TextInput
               style={[styles.replyInput, { color: colors.textPrimary, backgroundColor: colors.background }]}
               placeholder="Write a reply..."
@@ -360,7 +362,7 @@ export default function ThreadDetailScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={[styles.lockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <View style={[styles.lockedBanner, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
             <MaterialCommunityIcons name="lock" size={16} color={colors.textSecondary} />
             <Text style={[styles.lockedText, { color: colors.textSecondary }]}>This thread is locked</Text>
           </View>
