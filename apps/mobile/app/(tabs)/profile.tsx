@@ -651,6 +651,29 @@ function ProfileScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
+          onPress={() => router.push('/import')}
+          accessibilityRole="button"
+          accessibilityLabel="Import collection"
+          accessibilityHint="Opens the collection importer to bring in animals from a sheet"
+        >
+          <MaterialCommunityIcons
+            name="database-import"
+            size={24}
+            color={colors.primary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <Text style={styles.menuText}>Import Collection</Text>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={24}
+            color={colors.textTertiary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.menuItem}
           onPress={() => router.push('/settings/data-export')}
           accessibilityRole="button"
           accessibilityLabel="Export my data"

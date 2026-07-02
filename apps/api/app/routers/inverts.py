@@ -159,32 +159,32 @@ async def list_inverts(
     return items
 
 
-@router.post(
-    "/", response_model=InvertResponse, status_code=status.HTTP_201_CREATED,
-)
-async def create_invert(
+def create_invert_row(
+    db: Session,
+    user: User,
     payload: InvertCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Create a new invert. `taxon` is required and immutable."""
-    # Cross-taxon collection cap (counts inverts: tarantulas + scorpions + centipedes).
-    enforce_collection_limit(db, current_user)
+    enforce_limit: bool = True,
+) -> Invert:
+    """Create one invert for `user`. Shared by the create endpoint and the
+    bulk importer so both go through the same validation, enum coercion,
+    default visibility, and species times_kept bump.
+
+    enforce_limit=False lets the importer gate capacity itself (it catches the
+    402 once, rather than per row) — callers that pass False must handle the cap.
+    """
+    if enforce_limit:
+        enforce_collection_limit(db, user)
     _validate_species(db, payload.species_id, payload.taxon)
-    _validate_colony(db, current_user, payload.colony_id)
+    _validate_colony(db, user, payload.colony_id)
 
     data = _coerce_enums(payload.model_dump())
 
-    # Default visibility to the owner's profile visibility — matches
-    # the tarantula + scorpion router behavior so the consolidated
-    # surface doesn't surprise keepers.
     if not data.get("visibility"):
         data["visibility"] = (
-            "public" if current_user.collection_visibility == "public"
-            else "private"
+            "public" if user.collection_visibility == "public" else "private"
         )
 
-    new_invert = Invert(user_id=current_user.id, **data)
+    new_invert = Invert(user_id=user.id, **data)
     db.add(new_invert)
     db.commit()
     db.refresh(new_invert)
@@ -198,6 +198,19 @@ async def create_invert(
             db.commit()
 
     return new_invert
+
+
+@router.post(
+    "/", response_model=InvertResponse, status_code=status.HTTP_201_CREATED,
+)
+async def create_invert(
+    payload: InvertCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new invert. `taxon` is required and immutable."""
+    # Cross-taxon collection cap (counts inverts: tarantulas + scorpions + centipedes).
+    return create_invert_row(db, current_user, payload)
 
 
 # Fallback feeding intervals (days) when species/stage data is missing.

@@ -5,21 +5,26 @@ Export endpoints are available to ALL users (free + premium) for GDPR
 compliance.  Import is also available to all users (subject to the
 per-tier tarantula limit enforced by the tarantulas router).
 """
-from fastapi import APIRouter, Depends, Request, UploadFile, File, HTTPException, status
+from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 import io
+import json
+import re
+import httpx
 
 from app.database import get_db
 from app.models.user import User
-from app.models.tarantula import Tarantula
 from app.utils.dependencies import get_current_user
 from app.utils.rate_limit import limiter
-from app.services.import_service import ImportService
+from app.services import import_service
 from app.services.export_service import ExportService
 from app.services.activity_service import create_activity
+from app.routers.inverts import create_invert_row
+from app.schemas.invert import InvertCreate
+from app.utils.limits import active_inverts_query
 
 router = APIRouter(
     tags=["import-export"]
@@ -30,46 +35,165 @@ router = APIRouter(
 # Import
 # ---------------------------------------------------------------------------
 
-@router.post("/import/collection", status_code=status.HTTP_200_OK)
-async def import_collection(
-    file: UploadFile = File(...),
+_SHEET_ID_RE = re.compile(r"/spreadsheets/d/([a-zA-Z0-9_-]+)")
+_SHEET_GID_RE = re.compile(r"[#&?]gid=([0-9]+)")
+
+
+async def _read_source(
+    file: Optional[UploadFile], sheet_url: Optional[str]
+) -> tuple[bytes, str]:
+    """Return (content, filename) from an uploaded file or a Google Sheet link.
+
+    For Sheets we convert the link to its CSV export URL and fetch it
+    server-side. The sheet must be link-shared ('Anyone with the link') or
+    Published to web, or Google returns an HTML sign-in page (handled below).
+    OAuth account-connect is a planned fast-follow.
+    """
+    if file is not None:
+        return await file.read(), (file.filename or "upload.csv")
+    if sheet_url and sheet_url.strip():
+        url = sheet_url.strip()
+        if "format=csv" in url or "output=csv" in url:
+            csv_url = url
+        else:
+            m = _SHEET_ID_RE.search(url)
+            if not m:
+                raise HTTPException(status_code=400, detail="That doesn't look like a Google Sheets link.")
+            gid_m = _SHEET_GID_RE.search(url)
+            gid = gid_m.group(1) if gid_m else "0"
+            csv_url = f"https://docs.google.com/spreadsheets/d/{m.group(1)}/export?format=csv&gid={gid}"
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=20) as client:
+                resp = await client.get(csv_url)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Couldn't reach that Google Sheet — check the link and try again.")
+        if resp.status_code != 200 or "text/html" in resp.headers.get("content-type", ""):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Couldn't read that sheet. In Google Sheets, share it as "
+                    "'Anyone with the link → Viewer' (or File → Share → Publish to web), "
+                    "then paste the link again."
+                ),
+            )
+        return resp.content, "sheet.csv"
+    raise HTTPException(status_code=400, detail="Provide a file or a Google Sheet link.")
+
+
+@router.post("/import/analyze", status_code=status.HTTP_200_OK)
+async def import_analyze(
+    file: UploadFile = File(None),
+    sheet_url: str = Form(None),
+    default_taxon: str = Form("tarantula"),
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-    Import tarantula collection from CSV, JSON, or Excel file.
-    """
-    valid_tarantulas, errors = await ImportService.process_file(file)
+    """Parse a file or Google Sheet, auto-map columns (header + value inference),
+    match species against the catalog, and return a preview for the confirm
+    screen. No writes."""
+    content, filename = await _read_source(file, sheet_url)
+    try:
+        return import_service.analyze(db, current_user, content, filename, default_taxon or "tarantula")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Couldn't read that file: {e}")
 
-    imported_count = 0
 
-    for tarantula_data in valid_tarantulas:
-        new_tarantula = Tarantula(
-            user_id=current_user.id,
-            **tarantula_data.model_dump()
+@router.post("/import/commit", status_code=status.HTTP_200_OK)
+async def import_commit(
+    file: UploadFile = File(None),
+    sheet_url: str = Form(None),
+    mapping: str = Form(...),
+    default_taxon: str = Form("tarantula"),
+    duplicate_mode: str = Form("skip"),
+    unmapped_to_notes: bool = Form(True),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create (or update) inverts from the confirmed column mapping. Cap-aware:
+    stops at the free-tier limit and reports it. Duplicates (same name +
+    scientific name) are skipped or updated per `duplicate_mode`."""
+    content, filename = await _read_source(file, sheet_url)
+    try:
+        col_map: Dict[str, Optional[str]] = json.loads(mapping)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid column mapping.")
+
+    _headers, rows = import_service.parse_bytes(content, filename)
+
+    existing_by_key: Dict[tuple, Any] = {}
+    for inv in active_inverts_query(db, current_user.id).all():
+        key = ((inv.name or "").strip().lower(), (inv.scientific_name or "").strip().lower())
+        existing_by_key.setdefault(key, inv)
+
+    imported = updated = skipped = error_rows = 0
+    errors: List[str] = []
+    cap_reached = False
+
+    for i, raw in enumerate(rows):
+        norm = import_service.normalize_row(
+            db, raw, col_map, default_taxon or "tarantula", unmapped_to_notes
         )
-        db.add(new_tarantula)
-        imported_count += 1
+        if norm["errors"]:
+            error_rows += 1
+            errors.append(f"Row {i + 1} ({norm['display_name']}): {', '.join(norm['errors'])}")
+            continue
 
-    if imported_count > 0:
-        db.commit()
+        payload = norm["payload"]
+        key = (
+            (payload.get("name") or "").strip().lower(),
+            (payload.get("scientific_name") or "").strip().lower(),
+        )
+        existing = existing_by_key.get(key) if key != ("", "") else None
 
+        if existing is not None:
+            if duplicate_mode == "update":
+                for fld, val in payload.items():
+                    if fld == "taxon":  # taxon is immutable
+                        continue
+                    if hasattr(existing, fld):
+                        setattr(existing, fld, val)
+                db.commit()
+                updated += 1
+            else:
+                skipped += 1
+            continue
+
+        try:
+            create = InvertCreate(**payload)
+        except Exception as e:
+            error_rows += 1
+            errors.append(f"Row {i + 1} ({norm['display_name']}): {e}")
+            continue
+
+        try:
+            inv = create_invert_row(db, current_user, create, enforce_limit=True)
+        except HTTPException as he:
+            if he.status_code == status.HTTP_402_PAYMENT_REQUIRED:
+                cap_reached = True
+                break
+            raise
+        imported += 1
+        existing_by_key[key] = inv  # dedupe later rows within the same file
+
+    if imported or updated:
         await create_activity(
             db=db,
             user_id=current_user.id,
             action_type="import_collection",
             target_type="collection",
             target_id=current_user.id,
-            metadata={
-                "count": imported_count,
-                "filename": file.filename
-            }
+            metadata={"imported": imported, "updated": updated},
         )
 
     return {
-        "message": f"Processed {len(valid_tarantulas) + len(errors)} rows.",
-        "imported_count": imported_count,
-        "errors": errors
+        "imported": imported,
+        "updated": updated,
+        "skipped_duplicates": skipped,
+        "error_rows": error_rows,
+        "errors": errors[:50],
+        "cap_reached": cap_reached,
     }
 
 
