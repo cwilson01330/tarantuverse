@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -55,6 +56,7 @@ export default function NotificationCenterScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [markingAll, setMarkingAll] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -93,6 +95,43 @@ export default function NotificationCenterScreen() {
     }
   };
 
+  const dismissNotification = async (id: string) => {
+    // Optimistic remove
+    const prev = items;
+    setItems((cur) => cur.filter((n) => n.id !== id));
+    try {
+      await apiClient.delete(`/notifications/${id}`);
+    } catch {
+      // Restore by refetching on error
+      setItems(prev);
+      await fetchNotifications();
+    }
+  };
+
+  const clearAll = () => {
+    if (clearingAll || items.length === 0) return;
+    Alert.alert('Clear all notifications?', 'This will remove all notifications. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear all',
+        style: 'destructive',
+        onPress: async () => {
+          setClearingAll(true);
+          // Optimistic
+          setItems([]);
+          try {
+            await apiClient.delete('/notifications/');
+            await fetchNotifications();
+          } catch {
+            await fetchNotifications();
+          } finally {
+            setClearingAll(false);
+          }
+        },
+      },
+    ]);
+  };
+
   const openNotification = async (n: Notification) => {
     if (!n.is_read) {
       setItems((prev) => prev.map((it) => (it.id === n.id ? { ...it, is_read: true } : it)));
@@ -125,25 +164,47 @@ export default function NotificationCenterScreen() {
     </TouchableOpacity>
   );
 
-  const markAllAction = hasUnread ? (
-    <TouchableOpacity
-      onPress={markAllRead}
-      disabled={markingAll}
-      accessibilityLabel="Mark all as read"
-      accessibilityRole="button"
-      style={{ paddingLeft: 4 }}
-    >
-      {markingAll ? (
-        <ActivityIndicator color={iconColor} />
-      ) : (
-        <MaterialCommunityIcons name="checkbox-multiple-marked-outline" size={24} color={iconColor} />
-      )}
-    </TouchableOpacity>
-  ) : undefined;
+  const hasAny = items.length > 0;
+
+  const headerActions =
+    hasUnread || hasAny ? (
+      <View style={styles.headerActions}>
+        {hasUnread ? (
+          <TouchableOpacity
+            onPress={markAllRead}
+            disabled={markingAll}
+            accessibilityLabel="Mark all as read"
+            accessibilityRole="button"
+            style={{ paddingLeft: 4 }}
+          >
+            {markingAll ? (
+              <ActivityIndicator color={iconColor} />
+            ) : (
+              <MaterialCommunityIcons name="checkbox-multiple-marked-outline" size={24} color={iconColor} />
+            )}
+          </TouchableOpacity>
+        ) : null}
+        {hasAny ? (
+          <TouchableOpacity
+            onPress={clearAll}
+            disabled={clearingAll}
+            accessibilityLabel="Clear all notifications"
+            accessibilityRole="button"
+            style={{ paddingLeft: 4 }}
+          >
+            {clearingAll ? (
+              <ActivityIndicator color={iconColor} />
+            ) : (
+              <MaterialCommunityIcons name="trash-can-outline" size={24} color={iconColor} />
+            )}
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    ) : undefined;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader title="Notifications" leftAction={backAction} rightAction={markAllAction} />
+      <AppHeader title="Notifications" leftAction={backAction} rightAction={headerActions} />
 
       <ScrollView
         style={styles.content}
@@ -199,13 +260,8 @@ export default function NotificationCenterScreen() {
 
         {!loading &&
           items.map((n) => (
-            <TouchableOpacity
+            <View
               key={n.id}
-              onPress={() => openNotification(n)}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`${n.title}${n.is_read ? '' : ', unread'}`}
-              accessibilityHint={n.body ?? undefined}
               style={[
                 styles.row,
                 {
@@ -215,27 +271,45 @@ export default function NotificationCenterScreen() {
                 },
               ]}
             >
-              <View style={styles.dotColumn}>
-                {!n.is_read ? (
-                  <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />
-                ) : (
-                  <View style={styles.dotSpacer} />
-                )}
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.rowTitle, { color: colors.textPrimary }]} numberOfLines={2}>
-                  {n.title}
-                </Text>
-                {n.body ? (
-                  <Text style={[styles.rowBody, { color: colors.textSecondary }]} numberOfLines={2}>
-                    {n.body}
+              <TouchableOpacity
+                onPress={() => openNotification(n)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${n.title}${n.is_read ? '' : ', unread'}`}
+                accessibilityHint={n.body ?? undefined}
+                style={styles.rowMain}
+              >
+                <View style={styles.dotColumn}>
+                  {!n.is_read ? (
+                    <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />
+                  ) : (
+                    <View style={styles.dotSpacer} />
+                  )}
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.rowTitle, { color: colors.textPrimary }]} numberOfLines={2}>
+                    {n.title}
                   </Text>
-                ) : null}
-                <Text style={[styles.rowTime, { color: colors.textTertiary }]}>
-                  {relativeTime(n.created_at)}
-                </Text>
-              </View>
-            </TouchableOpacity>
+                  {n.body ? (
+                    <Text style={[styles.rowBody, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {n.body}
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.rowTime, { color: colors.textTertiary }]}>
+                    {relativeTime(n.created_at)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => dismissNotification(n.id)}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss notification"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.dismissBtn}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
           ))}
 
         <View style={{ height: 32 }} />
@@ -264,14 +338,22 @@ const styles = StyleSheet.create({
   emptyEmoji: { fontSize: 52, marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
   emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
     borderWidth: 1,
-    padding: 14,
     marginBottom: 10,
   },
+  rowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 14,
+    minWidth: 0,
+  },
+  dismissBtn: { padding: 12, alignSelf: 'flex-start' },
   dotColumn: { width: 10, paddingTop: 5, alignItems: 'center' },
   unreadDot: { width: 8, height: 8, borderRadius: 4 },
   dotSpacer: { width: 8, height: 8 },

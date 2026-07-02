@@ -45,6 +45,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [markingAll, setMarkingAll] = useState(false)
+  const [clearingAll, setClearingAll] = useState(false)
 
   const fetchNotifications = useCallback(async () => {
     if (!token) return
@@ -118,6 +119,48 @@ export default function NotificationsPage() {
     }
   }
 
+  const dismissNotification = async (
+    e: React.MouseEvent,
+    item: AppNotification,
+  ) => {
+    e.stopPropagation()
+    if (!token) return
+    const prev = notifications
+    // Optimistic remove
+    setNotifications((cur) => cur.filter((n) => n.id !== item.id))
+    try {
+      const res = await fetch(`${API_URL}/api/v1/notifications/${item.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Failed to dismiss')
+    } catch {
+      // Restore on failure
+      setNotifications(prev)
+    }
+  }
+
+  const clearAll = async () => {
+    if (!token) return
+    if (!window.confirm('Clear all notifications? This cannot be undone.')) return
+    const prev = notifications
+    setClearingAll(true)
+    // Optimistic clear
+    setNotifications([])
+    try {
+      const res = await fetch(`${API_URL}/api/v1/notifications/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Failed to clear')
+    } catch {
+      // Restore on failure
+      setNotifications(prev)
+    } finally {
+      setClearingAll(false)
+    }
+  }
+
   const hasUnread = notifications.some((n) => !n.is_read)
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -168,15 +211,26 @@ export default function NotificationsPage() {
               Feeding reminders, community activity, and more.
             </p>
           </div>
-          {hasUnread && (
-            <button
-              onClick={markAllRead}
-              disabled={markingAll}
-              className="self-start sm:self-auto px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition disabled:opacity-50"
-            >
-              {markingAll ? 'Marking…' : 'Mark all read'}
-            </button>
-          )}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            {hasUnread && (
+              <button
+                onClick={markAllRead}
+                disabled={markingAll}
+                className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition disabled:opacity-50"
+              >
+                {markingAll ? 'Marking…' : 'Mark all read'}
+              </button>
+            )}
+            {notifications.length > 0 && (
+              <button
+                onClick={clearAll}
+                disabled={clearingAll}
+                className="px-4 py-2 rounded-xl border border-red-300 dark:border-red-800 bg-surface text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition disabled:opacity-50"
+              >
+                {clearingAll ? 'Clearing…' : 'Clear all'}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Empty state */}
@@ -195,11 +249,11 @@ export default function NotificationsPage() {
         ) : (
           <ul className="divide-y divide-theme rounded-2xl border border-theme bg-surface overflow-hidden">
             {notifications.map((n) => (
-              <li key={n.id}>
+              <li key={n.id} className="relative">
                 <button
                   type="button"
                   onClick={() => handleItemClick(n)}
-                  className={`w-full text-left p-4 flex items-start gap-3 transition hover:bg-surface-elevated ${
+                  className={`w-full text-left pl-4 pr-12 py-4 flex items-start gap-3 transition hover:bg-surface-elevated ${
                     n.is_read ? '' : 'bg-primary-50 dark:bg-primary-900/10'
                   }`}
                 >
@@ -235,6 +289,17 @@ export default function NotificationsPage() {
                       </p>
                     )}
                   </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => dismissNotification(e, n)}
+                  aria-label="Dismiss notification"
+                  title="Dismiss"
+                  className="absolute top-3 right-3 p-1.5 rounded-md text-theme-tertiary hover:text-theme-primary hover:bg-surface-elevated transition"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </li>
             ))}

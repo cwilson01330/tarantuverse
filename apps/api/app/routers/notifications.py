@@ -80,6 +80,36 @@ async def mark_all_read(
     return {"ok": True}
 
 
+@router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_notification(
+    notification_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Dismiss (delete) a single notification."""
+    notif = (
+        db.query(Notification)
+        .filter(Notification.id == notification_id, Notification.user_id == current_user.id)
+        .first()
+    )
+    if not notif:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    db.delete(notif)
+    db.commit()
+    return None
+
+
+@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_all_notifications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Clear (delete) all of the current user's notifications."""
+    db.query(Notification).filter(Notification.user_id == current_user.id).delete()
+    db.commit()
+    return None
+
+
 @router.post("/run-digests")
 async def run_digests(
     x_cron_secret: str = Header(None),

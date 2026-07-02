@@ -174,6 +174,50 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
     }
   }
 
+  const dismissNotification = async (
+    e: React.MouseEvent,
+    item: AppNotification,
+  ) => {
+    e.stopPropagation()
+    if (!token) return
+    const wasUnread = !item.is_read
+    // Optimistic remove
+    setNotifications((prev) => prev.filter((n) => n.id !== item.id))
+    if (wasUnread) setNotifUnreadCount((c) => Math.max(0, c - 1))
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const res = await fetch(`${API_URL}/api/v1/notifications/${item.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Failed to dismiss')
+    } catch {
+      // On failure, refetch to restore accurate state
+      fetchNotifications()
+    }
+  }
+
+  const clearAllNotifications = async () => {
+    if (!token) return
+    if (!window.confirm('Clear all notifications? This cannot be undone.')) return
+    const prev = notifications
+    // Optimistic clear
+    setNotifications([])
+    setNotifUnreadCount(0)
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const res = await fetch(`${API_URL}/api/v1/notifications/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Failed to clear')
+    } catch {
+      // Restore on failure
+      setNotifications(prev)
+      setNotifUnreadCount(prev.filter((n) => !n.is_read).length)
+    }
+  }
+
   return (
     <>
       <GlobalSearch isOpen={showSearch} onClose={() => setShowSearch(false)} />
@@ -288,14 +332,24 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
                         <p className="text-sm font-semibold text-gray-900 dark:text-white">
                           Notifications
                         </p>
-                        {notifUnreadCount > 0 && (
-                          <button
-                            onClick={markAllNotificationsRead}
-                            className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
-                          >
-                            Mark all read
-                          </button>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {notifUnreadCount > 0 && (
+                            <button
+                              onClick={markAllNotificationsRead}
+                              className="text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                            >
+                              Mark all read
+                            </button>
+                          )}
+                          {notifications.length > 0 && (
+                            <button
+                              onClick={clearAllNotifications}
+                              className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline"
+                            >
+                              Clear all
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* List */}
@@ -316,11 +370,11 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
                         ) : (
                           <ul className="divide-y divide-gray-100 dark:divide-gray-700">
                             {notifications.map((n) => (
-                              <li key={n.id}>
+                              <li key={n.id} className="relative group">
                                 <button
                                   type="button"
                                   onClick={() => handleNotificationClick(n)}
-                                  className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                  className={`w-full text-left pl-4 pr-10 py-3 flex items-start gap-3 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700 ${
                                     n.is_read ? '' : 'bg-primary-50 dark:bg-primary-900/10'
                                   }`}
                                 >
@@ -353,6 +407,17 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
                                       </p>
                                     )}
                                   </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => dismissNotification(e, n)}
+                                  aria-label="Dismiss notification"
+                                  title="Dismiss"
+                                  className="absolute top-2 right-2 p-1 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
                                 </button>
                               </li>
                             ))}
