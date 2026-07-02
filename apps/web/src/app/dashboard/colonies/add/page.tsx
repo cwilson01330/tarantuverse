@@ -78,8 +78,10 @@ function AddColonyForm() {
   const { user, token } = useAuth()
 
   const taxonParam = searchParams.get('taxon')
+  // isInvertTaxon already excludes 'tarantula' (not in the web INVERT_TAXA
+  // registry), so a ?taxon=tarantula link simply falls through to the default.
   const initialTaxon: ColonyTaxon =
-    taxonParam && isInvertTaxon(taxonParam) && taxonParam !== 'tarantula'
+    taxonParam && isInvertTaxon(taxonParam) && COLONY_TAXA.includes(taxonParam as ColonyTaxon)
       ? (taxonParam as ColonyTaxon)
       : 'roach'
 
