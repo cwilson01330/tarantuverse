@@ -513,19 +513,23 @@ export default function DashboardHub() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left column (2/3 width) */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Feeding Day — prominent bulk-feeding CTA */}
+            <button
+              onClick={() => router.push('/dashboard/feeding-day')}
+              aria-label={overdueFeedings.length > 0 ? `Feeding Day, ${overdueFeedings.length} due` : 'Feeding Day'}
+              className="w-full px-5 py-4 rounded-2xl bg-gradient-brand text-white font-bold shadow-gradient-brand hover:opacity-90 transition flex items-center justify-center gap-2"
+            >
+              <span>🍽️ Feeding Day</span>
+              {overdueFeedings.length > 0 && (
+                <span className="font-semibold opacity-90">· {overdueFeedings.length} due</span>
+              )}
+            </button>
+
             {/* Feeding Alerts Section */}
             <div data-tour="feeding-alerts" className="bg-surface rounded-2xl shadow-lg border border-theme p-6">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <h2 className="text-xl font-bold text-theme-primary flex items-center gap-2">
-                  🍽️ Feeding Alerts
-                </h2>
-                <button
-                  onClick={() => router.push('/dashboard/feeding-day')}
-                  className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition font-semibold text-sm flex-shrink-0"
-                >
-                  🍽️ Feeding Day
-                </button>
-              </div>
+              <h2 className="text-xl font-bold text-theme-primary flex items-center gap-2 mb-4">
+                🍽️ Feeding Alerts
+              </h2>
               {overdueFeedings.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-3">✅</div>
