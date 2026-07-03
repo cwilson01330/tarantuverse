@@ -20,7 +20,7 @@ import PublicCareShell from '@/components/PublicCareShell'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-interface InvertSpecies {
+export interface InvertSpecies {
   id: string
   taxon: string
   scientific_name: string
@@ -85,13 +85,19 @@ const FEEDING_MODE_LABELS: Record<string, string> = {
   omnivore: 'Omnivore',
 }
 
-export default function InvertCareSheetClient() {
+export default function InvertCareSheetClient({
+  initialSpecies,
+}: {
+  initialSpecies?: InvertSpecies | null
+} = {}) {
   const params = useParams()
   const id = params?.id as string
   const { user } = useAuth()
 
-  const [species, setSpecies] = useState<InvertSpecies | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Seed from the server fetch so the full care sheet ships in the SSR HTML
+  // (SEO) with no loading flash; only fetch client-side if it wasn't provided.
+  const [species, setSpecies] = useState<InvertSpecies | null>(initialSpecies ?? null)
+  const [loading, setLoading] = useState(!initialSpecies)
   const [error, setError] = useState<string | null>(null)
 
   const fetchSpecies = useCallback(async () => {
@@ -110,7 +116,8 @@ export default function InvertCareSheetClient() {
   }, [id])
 
   useEffect(() => {
-    fetchSpecies()
+    if (!initialSpecies) fetchSpecies()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchSpecies])
 
   const harmless = species?.taxon === 'whip_spider' || !species?.venom_severity

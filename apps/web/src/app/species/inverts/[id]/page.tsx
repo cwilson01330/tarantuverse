@@ -9,7 +9,7 @@
  * Mirrors the tarantula route at species/[id]/page.tsx.
  */
 import type { Metadata } from 'next'
-import InvertCareSheetClient from './InvertCareSheetClient'
+import InvertCareSheetClient, { type InvertSpecies } from './InvertCareSheetClient'
 
 // Revalidate cached HTML hourly — care content changes rarely.
 export const revalidate = 3600
@@ -33,29 +33,23 @@ const TAXON_LABELS: Record<string, string> = {
   other: 'invertebrate',
 }
 
-interface Invert {
-  id: string
-  taxon: string
-  scientific_name: string
-  common_names?: string[]
-  care_guide?: string | null
-  native_region?: string | null
-  image_url?: string | null
-}
+// Full InvertSpecies shape lives in the client component; the server fetches
+// the complete record and hands it over as `initialSpecies` so the whole care
+// sheet renders into the SSR HTML.
 
-async function getSpecies(id: string): Promise<Invert | null> {
+async function getSpecies(id: string): Promise<InvertSpecies | null> {
   try {
     const res = await fetch(`${API}/api/v1/invert-species/${id}`, {
       next: { revalidate },
     })
     if (!res.ok) return null
-    return (await res.json()) as Invert
+    return (await res.json()) as InvertSpecies
   } catch {
     return null
   }
 }
 
-function buildDescription(s: Invert): string {
+function buildDescription(s: InvertSpecies): string {
   const name = s.common_names?.[0] || s.scientific_name
   if (s.care_guide && s.care_guide.trim()) {
     const flat = s.care_guide.replace(/[#*_>`\-]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -139,7 +133,7 @@ export default async function InvertSpeciesDetailPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <InvertCareSheetClient />
+      <InvertCareSheetClient initialSpecies={s} />
     </>
   )
 }

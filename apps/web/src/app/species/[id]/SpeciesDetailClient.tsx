@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import PublicCareShell from '@/components/PublicCareShell'
 
-interface Species {
+export interface Species {
   id: string
   scientific_name: string
   common_names: string[]
@@ -51,19 +51,26 @@ interface Species {
   community_rating?: number
 }
 
-export default function EnhancedSpeciesDetailPage() {
+export default function EnhancedSpeciesDetailPage({
+  initialSpecies,
+}: {
+  initialSpecies?: Species | null
+} = {}) {
   const router = useRouter()
   const params = useParams()
   const id = params?.id as string
   const { user: authUser } = useAuth()
 
-  const [species, setSpecies] = useState<Species | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Seed from the server-fetched species so the FULL care guide is present in
+  // the server-rendered HTML (SEO) and there's no "Loading…" flash. Only fall
+  // back to a client fetch when the data wasn't provided (e.g. client-side nav).
+  const [species, setSpecies] = useState<Species | null>(initialSpecies ?? null)
+  const [loading, setLoading] = useState(!initialSpecies)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
 
   useEffect(() => {
-    fetchSpecies()
+    if (!initialSpecies) fetchSpecies()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
@@ -325,8 +332,9 @@ export default function EnhancedSpeciesDetailPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
+        {/* Overview Tab — always rendered (CSS-hidden when inactive) so all
+            content ships in the server HTML for SEO. */}
+        <div className={activeTab === 'overview' ? '' : 'hidden'}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Info */}
             <div className="lg:col-span-2 space-y-6">
@@ -426,10 +434,10 @@ export default function EnhancedSpeciesDetailPage() {
               </div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Husbandry Tab */}
-        {activeTab === 'husbandry' && (
+        <div className={activeTab === 'husbandry' ? '' : 'hidden'}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Temperature & Humidity */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
@@ -580,10 +588,10 @@ export default function EnhancedSpeciesDetailPage() {
               </div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Behavior Tab */}
-        {activeTab === 'behavior' && (
+        <div className={activeTab === 'behavior' ? '' : 'hidden'}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2">
@@ -641,10 +649,10 @@ export default function EnhancedSpeciesDetailPage() {
               </div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Stats Tab */}
-        {activeTab === 'stats' && (
+        <div className={activeTab === 'stats' ? '' : 'hidden'}>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Species Statistics</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -681,7 +689,7 @@ export default function EnhancedSpeciesDetailPage() {
               </div>
             )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* App-marketing conversion banner — for logged-out visitors who land

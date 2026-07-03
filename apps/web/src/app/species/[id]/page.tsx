@@ -8,7 +8,7 @@
  * (previously the page was 'use client' with only the generic site title).
  */
 import type { Metadata } from 'next'
-import SpeciesDetailClient from './SpeciesDetailClient'
+import SpeciesDetailClient, { type Species } from './SpeciesDetailClient'
 
 // Revalidate cached HTML hourly — care content changes rarely.
 export const revalidate = 3600
@@ -19,18 +19,9 @@ const SITE =
   process.env.NEXTAUTH_URL ||
   'https://tarantuverse.com'
 
-interface Species {
-  id: string
-  scientific_name: string
-  common_names?: string[]
-  care_guide?: string | null
-  care_level?: string | null
-  temperament?: string | null
-  type?: string | null
-  native_region?: string | null
-  adult_size?: string | null
-  image_url?: string | null
-}
+// The full Species shape is defined once in the client component and reused
+// here so the server can fetch the complete record and hand it to the client
+// as `initialSpecies` — that's what puts the whole care guide in the SSR HTML.
 
 async function getSpecies(id: string): Promise<Species | null> {
   try {
@@ -128,7 +119,7 @@ export default async function SpeciesDetailPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <SpeciesDetailClient />
+      <SpeciesDetailClient initialSpecies={s} />
     </>
   )
 }
