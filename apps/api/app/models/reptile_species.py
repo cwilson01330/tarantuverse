@@ -60,6 +60,12 @@ class ReptileSpecies(Base):
     family = Column(String(100))
     order_name = Column(String(100))  # 'order' is a SQL reserved word — avoid
 
+    # Group discriminator (ADR-011) — lets the species browser + care sheets
+    # segment the catalog by herp group. Nullable until backfilled on the
+    # species-research track; CHECK (in htx_20260703) allows NULL. Values from
+    # ANIMAL_TAXON_VALUES (snake/lizard/turtle/tortoise/frog/salamander/other).
+    taxon = Column(String(20), index=True, nullable=True)
+
     # Care classification
     care_level = Column(
         SQLEnum(

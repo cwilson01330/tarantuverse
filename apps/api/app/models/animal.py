@@ -30,6 +30,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    CheckConstraint,
     Enum as SQLEnum,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -40,21 +41,26 @@ from app.database import Base
 from app.models.tarantula import Sex, Source  # shared DB enums
 
 
-class AnimalTaxon(str, enum.Enum):
-    """Discriminator for the unified animals table.
-
-    Stored lowercase in the `animal_taxon` PG enum. SQLEnum columns
-    referencing this MUST use values_callable so SQLAlchemy writes the
-    value (lowercase) rather than the name — same rule as the TV
-    breeding enums (see feedback_tv_breeding_enum_values_callable).
-    """
-    SNAKE = "snake"
-    LIZARD = "lizard"
-    FROG = "frog"
+# Taxon discriminator values (ADR-011). Single source of truth for the
+# `animals.taxon` VARCHAR column + CHECK. Adding a herp group = add a value
+# here, widen the CHECK in a migration, update the two frontend registries,
+# and seed species — no PG-enum migration (that's why the old `animal_taxon`
+# enum was retired). Kept in lockstep with the CHECK in
+# htx_20260703_animal_taxon and the frontend `ANIMAL_TAXA` registries.
+ANIMAL_TAXON_VALUES = (
+    "snake", "lizard", "turtle", "tortoise", "frog", "salamander", "other",
+)
 
 
 class Animal(Base):
     __tablename__ = "animals"
+    __table_args__ = (
+        CheckConstraint(
+            "taxon IN ('snake', 'lizard', 'turtle', 'tortoise', "
+            "'frog', 'salamander', 'other')",
+            name="animals_taxon_check",
+        ),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(
@@ -75,17 +81,10 @@ class Animal(Base):
         nullable=True,
     )
 
-    # Discriminator — every animal has a taxon.
-    taxon = Column(
-        SQLEnum(
-            AnimalTaxon,
-            name="animal_taxon",
-            create_type=False,
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-        index=True,
-    )
+    # Discriminator — every animal has a taxon. VARCHAR + CHECK (ADR-011),
+    # not a PG enum, so adding a herp group is cheap. Lowercase values from
+    # ANIMAL_TAXON_VALUES.
+    taxon = Column(String(20), nullable=False, index=True)
 
     # Basic identity
     name = Column(String(100))

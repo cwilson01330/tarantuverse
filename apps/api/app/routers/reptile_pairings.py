@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.animal import Animal, AnimalTaxon
+from app.models.animal import Animal
 from app.models.clutch import Clutch
 from app.models.reptile_pairing import (
     ReptilePairing,
@@ -61,12 +61,8 @@ def _enrich_response(
         db.query(Clutch).filter(Clutch.pairing_id == pairing.id).count()
     )
 
-    # `taxon` is a real column now (an AnimalTaxon enum) — emit its value.
-    taxon_str = (
-        pairing.taxon.value
-        if hasattr(pairing.taxon, "value")
-        else pairing.taxon
-    )
+    # `taxon` is a plain VARCHAR now (ADR-011) — emit it directly.
+    taxon_str = pairing.taxon
 
     return ReptilePairingResponse(
         id=pairing.id,
@@ -96,7 +92,7 @@ def _resolve_parents(
     """Validate the parent IDs, that the keeper owns both, that both
     are the declared taxon, and that the sex slots line up. Returns the
     column kwargs for the new pairing row."""
-    taxon = AnimalTaxon(payload.taxon)
+    taxon = payload.taxon  # plain string now (ADR-011); compared to Animal.taxon (also str)
 
     male = db.query(Animal).filter(
         Animal.id == payload.male_id,

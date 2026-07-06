@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.models.user import User
-from app.models.animal import Animal, AnimalTaxon
+from app.models.animal import Animal, ANIMAL_TAXON_VALUES
 from app.models.shed_log import ShedLog
 from app.models.weight_log import WeightLog
 from app.models.animal_genotype import AnimalGenotype
@@ -34,13 +34,12 @@ router = APIRouter()
 
 
 def _coerce_enums(data: dict) -> dict:
-    """Map string sex/source/taxon values onto their SQLAlchemy enum
-    members so SQLAlchemy stores the right thing.
+    """Map string sex/source values onto their SQLAlchemy enum members.
 
     - sex / source: shared DB enums, UPPERCASE names (Sex/Source default
       serialization writes .name).
-    - taxon: AnimalTaxon, lowercase values (the column uses
-      values_callable, so .value is what lands in the DB).
+    - taxon: plain VARCHAR now (ADR-011) — the lowercase string is stored
+      as-is; validated against ANIMAL_TAXON_VALUES at the schema layer.
     """
     if data.get("sex"):
         try:
@@ -52,18 +51,13 @@ def _coerce_enums(data: dict) -> dict:
             data["source"] = Source(data["source"])
         except ValueError:
             pass
-    if data.get("taxon"):
-        try:
-            data["taxon"] = AnimalTaxon(data["taxon"])
-        except ValueError:
-            pass
     return data
 
 
 @router.get("/", response_model=List[AnimalResponse])
 async def get_animals(
     taxon: Optional[str] = Query(
-        None, pattern="^(snake|lizard|frog)$",
+        None, pattern="^(snake|lizard|turtle|tortoise|frog|salamander|other)$",
         description="Filter to a single taxon. Omit for the whole collection.",
     ),
     current_user: User = Depends(get_current_user),
@@ -83,7 +77,7 @@ async def get_animals(
         .filter(Animal.user_id == current_user.id)
     )
     if taxon:
-        query = query.filter(Animal.taxon == AnimalTaxon(taxon))
+        query = query.filter(Animal.taxon == taxon)
     return query.order_by(Animal.created_at.desc()).all()
 
 

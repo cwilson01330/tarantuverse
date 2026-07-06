@@ -20,6 +20,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SQLEnum,
     ForeignKey,
+    String,
     Text,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -27,7 +28,6 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
-from app.models.animal import AnimalTaxon
 
 
 class ReptilePairingType(str, enum.Enum):
@@ -80,15 +80,8 @@ class ReptilePairing(Base):
     )
     # Denormalized taxon — both parents share it (app-enforced). Lets
     # the breeding overview filter/group without joining to animals.
-    taxon = Column(
-        SQLEnum(
-            AnimalTaxon,
-            name="animal_taxon",
-            create_type=False,
-            values_callable=lambda x: [e.value for e in x],
-        ),
-        nullable=False,
-    )
+    # VARCHAR + CHECK (ADR-011), matching animals.taxon — not a PG enum.
+    taxon = Column(String(20), nullable=False)
 
     paired_date = Column(Date, nullable=False, index=True)
     separated_date = Column(Date, nullable=True)

@@ -60,7 +60,9 @@ class AnimalBase(BaseModel):
 class AnimalCreate(AnimalBase):
     """Schema for creating a new animal. `taxon` is required and
     immutable — it never appears in AnimalUpdate."""
-    taxon: str = Field(..., pattern="^(snake|lizard|frog)$")
+    # Kept in lockstep with ANIMAL_TAXON_VALUES (models/animal.py) + the
+    # animals_taxon_check CHECK + the frontend ANIMAL_TAXA registries (ADR-011).
+    taxon: str = Field(..., pattern="^(snake|lizard|turtle|tortoise|frog|salamander|other)$")
     herp_species_id: Optional[uuid.UUID] = None
     enclosure_id: Optional[uuid.UUID] = None
 

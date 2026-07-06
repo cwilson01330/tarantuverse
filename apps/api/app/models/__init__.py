@@ -38,7 +38,7 @@ from app.models.waitlist import WaitlistSignup
 # herp_species) MUST be imported before Animal so SQLAlchemy sees the
 # FK target.
 from app.models.reptile_species import ReptileSpecies
-from app.models.animal import Animal, AnimalTaxon
+from app.models.animal import Animal, ANIMAL_TAXON_VALUES
 from app.models.shed_log import ShedLog
 from app.models.weight_log import WeightLog
 from app.models.gene import Gene
@@ -113,7 +113,7 @@ __all__ = [
     "WaitlistSignup",
     "ReptileSpecies",
     "Animal",
-    "AnimalTaxon",
+    "ANIMAL_TAXON_VALUES",
     "ShedLog",
     "WeightLog",
     "Gene",
