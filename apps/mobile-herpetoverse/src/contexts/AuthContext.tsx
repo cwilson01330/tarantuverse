@@ -20,6 +20,7 @@ import {
   USER_KEY,
 } from '../services/api';
 import { getExpoPushToken } from '../services/notifications';
+import { signInWithGoogle, signInWithApple } from '../services/google-signin';
 
 export interface AuthUser {
   id: string;
@@ -41,6 +42,8 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  loginWithApple: () => Promise<void>;
   register: (
     email: string,
     username: string,
@@ -143,6 +146,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // OAuth: run the native provider flow, exchange with the shared backend,
+  // then persist the returned session exactly like email/password login.
+  async function loginWithGoogle() {
+    try {
+      const { accessToken, user: userData } = await signInWithGoogle();
+      await AsyncStorage.setItem(TOKEN_KEY, accessToken);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
+      setToken(accessToken);
+      setUser(userData as AuthUser);
+    } catch (error: any) {
+      throw new Error(error?.message || 'Google sign-in failed');
+    }
+  }
+
+  async function loginWithApple() {
+    try {
+      const { accessToken, user: userData } = await signInWithApple();
+      await AsyncStorage.setItem(TOKEN_KEY, accessToken);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
+      setToken(accessToken);
+      setUser(userData as AuthUser);
+    } catch (error: any) {
+      throw new Error(error?.message || 'Apple sign-in failed');
+    }
+  }
+
   async function register(
     email: string,
     username: string,
@@ -182,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, isLoading, login, register, logout, refreshUser }}
+      value={{ user, token, isLoading, login, loginWithGoogle, loginWithApple, register, logout, refreshUser }}
     >
       {children}
     </AuthContext.Provider>

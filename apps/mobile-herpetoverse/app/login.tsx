@@ -18,21 +18,31 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { captureEvent } from '../src/services/posthog';
 import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
+import {
+  isGoogleSignInAvailable,
+  isAppleSignInAvailable,
+} from '../src/services/google-signin';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loginWithGoogle, loginWithApple } = useAuth();
   const { colors, layout } = useTheme();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+
+  useEffect(() => {
+    isAppleSignInAvailable().then(setAppleAvailable).catch(() => setAppleAvailable(false));
+  }, []);
 
   // Kick the Render container awake the moment this screen mounts. By
   // the time the user finishes typing credentials, the API is likely
@@ -56,6 +66,30 @@ export default function LoginScreen() {
     } catch (err: any) {
       captureEvent('login_failed', { method: 'email' });
       setError(err.message || 'Could not sign in.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleOAuth(provider: 'google' | 'apple') {
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      if (provider === 'google') {
+        await loginWithGoogle();
+      } else {
+        await loginWithApple();
+      }
+      captureEvent('login_success', { method: provider });
+      router.replace('/(tabs)/dashboard');
+    } catch (err: any) {
+      const msg = err?.message || '';
+      // Swallow user-cancelled flows quietly.
+      if (!/cancel/i.test(msg)) {
+        captureEvent('login_failed', { method: provider });
+        setError(msg || 'Could not sign in.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -193,6 +227,50 @@ export default function LoginScreen() {
             )}
           </View>
 
+          {(isGoogleSignInAvailable || appleAvailable) && (
+            <View style={styles.socialWrap}>
+              <View style={styles.dividerRow}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              </View>
+              {isGoogleSignInAvailable && (
+                <TouchableOpacity
+                  onPress={() => handleOAuth('google')}
+                  disabled={submitting}
+                  style={[
+                    styles.socialButton,
+                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with Google"
+                >
+                  <MaterialCommunityIcons name="google" size={18} color={colors.textPrimary} />
+                  <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
+                    Continue with Google
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {appleAvailable && (
+                <TouchableOpacity
+                  onPress={() => handleOAuth('apple')}
+                  disabled={submitting}
+                  style={[
+                    styles.socialButton,
+                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with Apple"
+                >
+                  <MaterialCommunityIcons name="apple" size={20} color={colors.textPrimary} />
+                  <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
+                    Continue with Apple
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           <View style={styles.footer}>
             <Text style={[styles.footerText, { color: colors.textTertiary }]}>
               New to Herpetoverse?
@@ -243,6 +321,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  socialWrap: { marginTop: 24, gap: 12 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 12, fontWeight: '500' },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 13,
+    borderWidth: 1,
+  },
+  socialButtonText: { fontSize: 15, fontWeight: '600' },
   footer: {
     marginTop: 32,
     flexDirection: 'row',

@@ -19,15 +19,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { captureEvent } from '../src/services/posthog';
 import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
+import {
+  isGoogleSignInAvailable,
+  isAppleSignInAvailable,
+} from '../src/services/google-signin';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, login } = useAuth();
+  const { register, login, loginWithGoogle, loginWithApple } = useAuth();
   const { colors, layout } = useTheme();
 
   const [email, setEmail] = useState('');
@@ -36,11 +41,13 @@ export default function RegisterScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   // Warm the Render container while the user fills the form so the
   // submit hits a hot worker.
   useEffect(() => {
     warmupApi();
+    isAppleSignInAvailable().then(setAppleAvailable).catch(() => setAppleAvailable(false));
   }, []);
 
   const showColdStartHint = useColdStartIndicator(submitting, 3000);
@@ -62,6 +69,31 @@ export default function RegisterScreen() {
     } catch (err: any) {
       captureEvent('signup_failed');
       setError(err.message || 'Could not create account.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // OAuth signs the keeper straight in (no email-verification step — the
+  // provider already verified the email), then lands them on the dashboard.
+  async function handleOAuth(provider: 'google' | 'apple') {
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      if (provider === 'google') {
+        await loginWithGoogle();
+      } else {
+        await loginWithApple();
+      }
+      captureEvent('signup_success', { method: provider });
+      router.replace('/(tabs)/dashboard');
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (!/cancel/i.test(msg)) {
+        captureEvent('signup_failed', { method: provider });
+        setError(msg || 'Could not sign in.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -218,6 +250,50 @@ export default function RegisterScreen() {
                   </Text>
                 </View>
               )}
+
+              {(isGoogleSignInAvailable || appleAvailable) && (
+                <View style={styles.socialWrap}>
+                  <View style={styles.dividerRow}>
+                    <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                    <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
+                    <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                  </View>
+                  {isGoogleSignInAvailable && (
+                    <TouchableOpacity
+                      onPress={() => handleOAuth('google')}
+                      disabled={submitting}
+                      style={[
+                        styles.socialButton,
+                        { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Continue with Google"
+                    >
+                      <MaterialCommunityIcons name="google" size={18} color={colors.textPrimary} />
+                      <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
+                        Continue with Google
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                  {appleAvailable && (
+                    <TouchableOpacity
+                      onPress={() => handleOAuth('apple')}
+                      disabled={submitting}
+                      style={[
+                        styles.socialButton,
+                        { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Continue with Apple"
+                    >
+                      <MaterialCommunityIcons name="apple" size={20} color={colors.textPrimary} />
+                      <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
+                        Continue with Apple
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
             </View>
           )}
 
@@ -279,6 +355,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  socialWrap: { marginTop: 24, gap: 12 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 12, fontWeight: '500' },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 13,
+    borderWidth: 1,
+  },
+  socialButtonText: { fontSize: 15, fontWeight: '600' },
   verifyBox: {
     padding: 20,
     borderWidth: 1,
