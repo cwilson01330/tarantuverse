@@ -43,13 +43,21 @@ interface Tarantula {
   photo_url?: string;
 }
 
-interface FeedingStatus {
-  tarantula_id: string;
-  days_since_last_feeding?: number;
-  acceptance_rate: number;
-  // Exclude paused tarantulas from the dashboard's "overdue" widget —
-  // see migration pst_20260502.
-  is_feeding_paused?: boolean;
+// One row from the all-taxa /inverts/feeding-status endpoint — the SAME
+// source Feeding Day and the daily digest read, so the dashboard's overdue
+// widget now agrees with them (was tarantula-only + flat-7-day before). The
+// server's `is_overdue` is species/life-stage aware and already excludes
+// paused animals and never-fed animals.
+interface FeedingStatusItem {
+  id: string;
+  name: string | null;
+  common_name: string | null;
+  scientific_name: string | null;
+  taxon: string;
+  photo_url: string | null;
+  days_since_last_feeding: number | null;
+  is_feeding_paused: boolean;
+  is_overdue: boolean;
 }
 
 // Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction. We
@@ -129,7 +137,7 @@ function DashboardHubScreen() {
     breakpoint === 'md' ? '23.5%' :
     undefined;
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
-  const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
+  const [feedingStatusItems, setFeedingStatusItems] = useState<FeedingStatusItem[]>([]);
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
   const [colonies, setColonies] = useState<ColonyListItem[]>([]);
@@ -206,9 +214,11 @@ function DashboardHubScreen() {
 
       if (tarantulasRes?.data) {
         setTarantulas(tarantulasRes.data);
-        fetchAllFeedingStatuses(tarantulasRes.data);
         fetchAllPremoltPredictions(tarantulasRes.data);
       }
+      // Feeding status is cross-taxon (one all-taxa call), independent of the
+      // tarantulas list — so scorpions/centipedes/etc. show in the widget too.
+      fetchAllFeedingStatuses();
 
       if (enclosuresRes?.data) {
         setEnclosures(enclosuresRes.data);
@@ -232,32 +242,22 @@ function DashboardHubScreen() {
     }
   };
 
-  const fetchAllFeedingStatuses = async (tarantulasList: Tarantula[]) => {
-    const statusMap = new Map<string, FeedingStatus>();
-    // Pass the device's local offset so the API computes
-    // days_since_last_feeding as a calendar-day diff in the user's
-    // timezone, not a UTC delta. Without this, evening feedings show
-    // as "0 days ago" the next morning until UTC midnight rolls over.
+  const fetchAllFeedingStatuses = async () => {
+    // ONE all-taxa call — the same endpoint Feeding Day + the daily digest
+    // read, so all three surfaces agree. `is_overdue` is species/life-stage
+    // aware and already excludes paused + never-fed animals. Pass the device's
+    // local offset so days_since_last_feeding is a calendar-day diff in the
+    // user's timezone, not a UTC delta.
     const tzOffset = new Date().getTimezoneOffset();
-    await Promise.all(
-      tarantulasList.map(async (t) => {
-        try {
-          const response = await apiClient.get(
-            `/tarantulas/${t.id}/feeding-stats`,
-            { params: { tz_offset_minutes: tzOffset } },
-          );
-          statusMap.set(t.id, {
-            tarantula_id: t.id,
-            days_since_last_feeding: response.data.days_since_last_feeding,
-            acceptance_rate: response.data.acceptance_rate,
-            is_feeding_paused: response.data.is_feeding_paused,
-          });
-        } catch {
-          // skip
-        }
-      })
-    );
-    setFeedingStatuses(statusMap);
+    try {
+      const response = await apiClient.get<FeedingStatusItem[]>(
+        `/inverts/feeding-status`,
+        { params: { tz_offset_minutes: tzOffset } },
+      );
+      setFeedingStatusItems(response.data ?? []);
+    } catch {
+      // leave prior items in place on transient failure
+    }
   };
 
   const fetchAllPremoltPredictions = async (_tarantulasList: Tarantula[]) => {
@@ -285,25 +285,15 @@ function DashboardHubScreen() {
     setRefreshing(false);
   }, []);
 
-  // Computed stats. `!= null` excludes both null (spider has no
-  // accepted feedings yet) and undefined (status hasn't loaded). Old
-  // `!== undefined` worked by accident (null >= 7 is false) but read
-  // as a bug.
-  const overdueFeedings = tarantulas.filter(t => {
-    const status = feedingStatuses.get(t.id);
-    // Paused tarantulas (premolt / post-rehouse / etc.) are excluded —
-    // a 7-month premolt sling shouldn't headline this widget.
-    return (
-      status &&
-      !status.is_feeding_paused &&
-      status.days_since_last_feeding != null &&
-      status.days_since_last_feeding >= 7
+  // Overdue = the server's species/life-stage-aware `is_overdue` (already
+  // excludes paused + never-fed), across ALL taxa — matches Feeding Day and
+  // the daily digest exactly. Sorted most-overdue first.
+  const overdueFeedings = feedingStatusItems
+    .filter((i) => i.is_overdue)
+    .sort(
+      (a, b) =>
+        (b.days_since_last_feeding ?? 0) - (a.days_since_last_feeding ?? 0),
     );
-  }).sort((a, b) => {
-    const daysA = feedingStatuses.get(a.id)?.days_since_last_feeding ?? 0;
-    const daysB = feedingStatuses.get(b.id)?.days_since_last_feeding ?? 0;
-    return daysB - daysA;
-  });
 
   // Source of truth: the canonical `is_premolt_likely` boolean from
   // the premolt service. PremoltAlertCard on the collection screen uses
@@ -817,7 +807,7 @@ function DashboardHubScreen() {
             onPress={() => router.push('/feeding-day')}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={`Needs Feeding: ${overdueFeedings.length} tarantulas. ${overdueFeedings.length > 0 ? '7 or more days overdue.' : 'All on schedule.'} Opens Feeding Day to log feedings in bulk.`}
+            accessibilityLabel={`Needs Feeding: ${overdueFeedings.length} animals overdue. ${overdueFeedings.length > 0 ? 'Overdue for feeding.' : 'All on schedule.'} Opens Feeding Day to log feedings in bulk.`}
           >
             <View style={styles.statIconRow}>
               <View style={[
@@ -832,7 +822,7 @@ function DashboardHubScreen() {
             </View>
             <Text style={styles.statValue}>{overdueFeedings.length}</Text>
             <Text style={styles.statFooter}>
-              {overdueFeedings.length > 0 ? '7+ days overdue' : 'All on schedule'}
+              {overdueFeedings.length > 0 ? 'Overdue for feeding' : 'All on schedule'}
             </Text>
           </TouchableOpacity>
 
@@ -913,37 +903,49 @@ function DashboardHubScreen() {
           {overdueFeedings.length === 0 ? (
             <View style={styles.allFedContainer}>
               <Text style={styles.allFedEmoji}>✅</Text>
-              <Text style={styles.allFedTitle}>All tarantulas are fed on schedule!</Text>
+              <Text style={styles.allFedTitle}>All animals are fed on schedule!</Text>
               <Text style={styles.allFedSubtitle}>Great job keeping up with feedings.</Text>
             </View>
           ) : (
             <>
-              {overdueFeedings.slice(0, 10).map(t => {
-                const days = feedingStatuses.get(t.id)?.days_since_last_feeding ?? 0;
+              {overdueFeedings.slice(0, 10).map(item => {
+                const days = item.days_since_last_feeding ?? 0;
+                const label = item.common_name || item.name || item.scientific_name || 'Unnamed';
+                // Taxon-aware detail route: tarantulas keep their bespoke
+                // screen; every other taxon renders through the generic
+                // invert detail. Mirrors the web dashboard's link logic.
+                const href =
+                  item.taxon === 'tarantula'
+                    ? `/tarantula/${item.id}`
+                    : `/invert/${item.id}`;
                 return (
                   <TouchableOpacity
-                    key={t.id}
+                    key={item.id}
                     style={styles.alertRow}
-                    onPress={() => router.push(`/tarantula/${t.id}`)}
+                    onPress={() => router.push(href as any)}
                     activeOpacity={0.7}
                   >
-                    {t.photo_url ? (
-                      <Image source={{ uri: getImageUrl(t.photo_url) }} style={styles.alertImage} />
+                    {item.photo_url ? (
+                      <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.alertImage} />
                     ) : (
                       <View style={styles.alertImagePlaceholder}>
-                        <MaterialCommunityIcons name="spider" size={20} color={colors.textTertiary} />
+                        {item.taxon === 'tarantula' ? (
+                          <MaterialCommunityIcons name="spider" size={20} color={colors.textTertiary} />
+                        ) : (
+                          <Text style={{ fontSize: 18 }}>{colonyGlyph(item.taxon)}</Text>
+                        )}
                       </View>
                     )}
                     <View style={styles.alertInfo}>
-                      <Text style={styles.alertName}>{t.common_name || t.name}</Text>
+                      <Text style={styles.alertName}>{label}</Text>
                       <Text style={[styles.alertDays, { color: getFeedingDaysColor(days) }]}>
                         {days} days since last feeding
                       </Text>
                     </View>
                     <PrimaryButton
-                      onPress={() => router.push(`/tarantula/${t.id}`)}
+                      onPress={() => router.push(href as any)}
                       style={styles.alertButton}
-                      accessibilityLabel={`Log feeding for ${t.common_name || t.name}`}
+                      accessibilityLabel={`Log feeding for ${label}`}
                       accessibilityRole="button"
                     >
                       <Text style={styles.alertButtonText}>Log</Text>
