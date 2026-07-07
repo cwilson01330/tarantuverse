@@ -8,6 +8,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -32,7 +33,15 @@ async def list_hv_feeder_species(
         query = query.filter(HvFeederSpecies.category == category)
     if q:
         like = f"%{q.strip().lower()}%"
-        query = query.filter(HvFeederSpecies.scientific_name_lower.ilike(like))
+        # Match scientific name OR any common name ("mouse" → Mus musculus).
+        query = query.filter(
+            or_(
+                HvFeederSpecies.scientific_name_lower.ilike(like),
+                func.lower(
+                    func.array_to_string(HvFeederSpecies.common_names, " ")
+                ).ilike(like),
+            )
+        )
     return query.order_by(HvFeederSpecies.scientific_name).limit(limit).all()
 
 
