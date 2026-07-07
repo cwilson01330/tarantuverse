@@ -18,6 +18,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { icon: '🏠', label: 'Dashboard', path: '/app' },
   { icon: '🦎', label: 'Reptiles', path: '/app/reptiles' },
+  { icon: '🐁', label: 'Feeders', path: '/app/feeders' },
   { icon: '📖', label: 'Species', path: '/app/species' },
   { icon: '🥚', label: 'Breeding', path: '/app/breeding' },
   { icon: '↪', label: 'Transfers', path: '/app/transfers' },

@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import UpdateBanner from '../src/components/UpdateBanner';
 import {
   identifyUser,
   initPostHog,
@@ -56,6 +57,7 @@ function RootLayoutContent() {
     <>
       <StatusBar style="light" />
       <PostHogBridge />
+      <UpdateBanner />
       <Stack
         screenOptions={{
           headerShown: false,

@@ -97,6 +97,15 @@ function CollectionScreen() {
     <View style={styles.headerActions}>
       <NotificationBell color={colors.primary} size={22} />
       <TouchableOpacity
+        onPress={() => router.push('/feeders' as never)}
+        hitSlop={8}
+        style={styles.headerAction}
+        accessibilityRole="button"
+        accessibilityLabel="Feeders — track feeder stock and freezer inventory"
+      >
+        <MaterialCommunityIcons name="fridge-outline" size={22} color={colors.primary} />
+      </TouchableOpacity>
+      <TouchableOpacity
         onPress={() => router.push('/import' as never)}
         hitSlop={8}
         style={styles.headerAction}

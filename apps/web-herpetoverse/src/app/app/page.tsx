@@ -38,6 +38,12 @@ export default function AppHomePage() {
           href="/app/feeding-day"
         />
         <DashCard
+          icon="🐁"
+          title="Feeder stock"
+          body="Track frozen rodents and live colonies. Log what you use and get low-stock heads-ups."
+          href="/app/feeders"
+        />
+        <DashCard
           icon="📖"
           title="Species library"
           body="Browse care sheets for geckos, snakes, monitors, and more."

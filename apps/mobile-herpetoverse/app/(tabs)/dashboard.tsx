@@ -166,6 +166,7 @@ function DashboardScreen() {
   }[] = [
     { icon: 'plus-circle-outline', label: 'Add Animal', route: '/reptile/add' },
     { icon: 'silverware-fork-knife', label: 'Feeding Day', route: '/feeding-day' },
+    { icon: 'fridge-outline', label: 'Feeders', route: '/feeders' },
     { icon: 'tray-arrow-down', label: 'Import', route: '/import' },
     { icon: 'book-open-variant', label: 'Species', route: '/(tabs)/species' },
   ];

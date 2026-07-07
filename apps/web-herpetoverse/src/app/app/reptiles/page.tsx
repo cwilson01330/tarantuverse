@@ -210,6 +210,12 @@ export default function ReptilesPage() {
             <span aria-hidden="true">📥</span> Import
           </Link>
           <Link
+            href="/app/feeders"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-300 hover:text-white hover:border-neutral-700 transition-colors"
+          >
+            <span aria-hidden="true">🐁</span> Feeders
+          </Link>
+          <Link
             href="/app/transfers"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-300 hover:text-white hover:border-neutral-700 transition-colors"
           >

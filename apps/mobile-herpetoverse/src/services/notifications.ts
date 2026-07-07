@@ -238,6 +238,102 @@ export async function cancelFeedingReminder(animalId: string): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Low-stock feeder reminders (ADR-012 — feeder keeping)
+// ---------------------------------------------------------------------------
+
+const FEEDER_LOW_STOCK_KEY = (stockId: string) =>
+  `hv_feeder_low_stock_${stockId}`;
+
+/**
+ * Schedule a "running low" reminder for a feeder stock that just crossed its
+ * low-stock threshold. Best-effort and guarded — reuses the feeding-reminder
+ * pattern: cancel any prior reminder for the same stock first (so re-saving
+ * never stacks duplicates), then schedule a single nudge a fixed delay out.
+ *
+ * We deliberately keep this dumb: a fixed ~48h TIME_INTERVAL nudge rather than
+ * a recurring alarm. The keeper sees the low-stock badge in-app immediately;
+ * this is just a gentle "don't forget to restock" a couple days later. Quiet
+ * hours are respected so it doesn't buzz at 3am.
+ *
+ * Returns the notification ID, or null on failure / missing permission.
+ */
+export async function scheduleLowStockReminder(
+  stockId: string,
+  feederName: string,
+  quietHours?: QuietHours,
+  hoursUntilReminder = 48,
+): Promise<string | null> {
+  try {
+    await cancelLowStockReminder(stockId);
+
+    const granted = await hasNotificationPermissions();
+    if (!granted) return null;
+
+    const baseSeconds = Math.max(60, Math.round(hoursUntilReminder * 3600));
+    const adjustedSeconds = adjustForQuietHours(baseSeconds, quietHours);
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `${feederName} is running low`,
+        body: `Your ${feederName} feeder stock has dropped below your low-stock threshold. Time to restock?`,
+        sound: true,
+        data: { type: 'feeder_low_stock', stockId },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: adjustedSeconds,
+      },
+    });
+
+    await AsyncStorage.setItem(FEEDER_LOW_STOCK_KEY(stockId), id);
+    return id;
+  } catch (err) {
+    console.warn('[notifications] scheduleLowStockReminder failed:', err);
+    return null;
+  }
+}
+
+/** Cancel a previously-scheduled low-stock reminder (e.g. after a restock). */
+export async function cancelLowStockReminder(stockId: string): Promise<void> {
+  try {
+    const id = await AsyncStorage.getItem(FEEDER_LOW_STOCK_KEY(stockId));
+    if (!id) return;
+    await Notifications.cancelScheduledNotificationAsync(id);
+    await AsyncStorage.removeItem(FEEDER_LOW_STOCK_KEY(stockId));
+  } catch (err) {
+    console.warn('[notifications] cancelLowStockReminder failed:', err);
+  }
+}
+
+/**
+ * Reconcile a stock's low-stock reminder against its current state. Call this
+ * after any inventory change: schedules a reminder when the stock is low and
+ * doesn't already have one queued, and cancels the queued reminder once the
+ * stock is back above threshold. Fully guarded — a no-op on any failure.
+ */
+export async function syncLowStockReminder(
+  stockId: string,
+  feederName: string,
+  isLow: boolean,
+  quietHours?: QuietHours,
+): Promise<void> {
+  try {
+    if (isLow) {
+      const existing = await AsyncStorage.getItem(
+        FEEDER_LOW_STOCK_KEY(stockId),
+      );
+      if (!existing) {
+        await scheduleLowStockReminder(stockId, feederName, quietHours);
+      }
+    } else {
+      await cancelLowStockReminder(stockId);
+    }
+  } catch (err) {
+    console.warn('[notifications] syncLowStockReminder failed:', err);
+  }
+}
+
 /** Cancel every scheduled local notification this app owns. */
 export async function cancelAllReminders(): Promise<void> {
   try {
