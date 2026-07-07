@@ -36,6 +36,7 @@ import {
   listAnimals,
 } from '../../src/lib/animals';
 import { AppHeader } from '../../src/components/AppHeader';
+import { NotificationBell } from '../../src/components/NotificationBell';
 import { AnimalActionSheet } from '../../src/components/AnimalActionSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { daysSince, relativeDays } from '../../src/utils/relative-days';
@@ -85,19 +86,23 @@ function CollectionScreen() {
   const router = useRouter();
   const { colors, layout } = useTheme();
 
-  // Feeding Day entry — bulk-log feedings across the collection. Rendered
-  // in the header's right slot so it's reachable from the loading, empty,
-  // and populated states without restructuring the list.
+  // Header right slot — notification bell (in-app notification center) +
+  // Feeding Day entry (bulk-log feedings across the collection). Rendered
+  // here so both are reachable from the loading, empty, and populated
+  // states without restructuring the list.
   const feedingDayAction = (
-    <TouchableOpacity
-      onPress={() => router.push('/feeding-day' as never)}
-      hitSlop={8}
-      style={styles.headerAction}
-      accessibilityRole="button"
-      accessibilityLabel="Feeding Day — log feeding for many animals at once"
-    >
-      <MaterialCommunityIcons name="silverware-fork-knife" size={22} color={colors.primary} />
-    </TouchableOpacity>
+    <View style={styles.headerActions}>
+      <NotificationBell color={colors.primary} size={22} />
+      <TouchableOpacity
+        onPress={() => router.push('/feeding-day' as never)}
+        hitSlop={8}
+        style={styles.headerAction}
+        accessibilityRole="button"
+        accessibilityLabel="Feeding Day — log feeding for many animals at once"
+      >
+        <MaterialCommunityIcons name="silverware-fork-knife" size={22} color={colors.primary} />
+      </TouchableOpacity>
+    </View>
   );
 
   const [rows, setRows] = useState<ReptileRow[] | null>(null);
@@ -615,6 +620,10 @@ function ReptileCard({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerAction: {
     width: 44,
     height: 36,

@@ -1,5 +1,7 @@
 'use client'
 
+import NotificationBell from './NotificationBell'
+
 interface TopBarProps {
   onMenuClick: () => void
 }
@@ -34,6 +36,9 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
             </span>
           </div>
         </div>
+
+        {/* Notification bell — renders only when signed in */}
+        <NotificationBell />
 
         {/* User stub */}
         <div className="flex items-center gap-2">
