@@ -577,14 +577,18 @@ function DashboardHubScreen() {
       gap: 10,
     },
     actionButton: {
-      width: '31.5%',
-      aspectRatio: 1,
+      // 2-col base with flexGrow so an odd trailing button fills its row
+      // instead of sitting orphaned at half width (matches Herpetoverse).
+      // Responsive overrides below bump to 4/5/6 cols on large screens.
+      width: '47%',
+      flexGrow: 1,
       backgroundColor: colors.surfaceElevated,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 14,
       justifyContent: 'center',
       alignItems: 'center',
+      paddingVertical: 20,
       paddingHorizontal: 6,
       gap: 8,
     },
