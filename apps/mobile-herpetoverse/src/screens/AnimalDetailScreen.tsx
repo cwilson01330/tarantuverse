@@ -39,6 +39,7 @@ import { FeedingStatusBanner } from '../components/FeedingStatusBanner';
 import { GenotypeSection } from '../components/GenotypeSection';
 import { PauseFeedingSheet } from '../components/PauseFeedingSheet';
 import { ReptileShareSheet } from '../components/ReptileShareSheet';
+import { AnimalTransferSection } from '../components/AnimalTransferSection';
 import {
   FeedingsList,
   LoadingShell,
@@ -310,6 +311,14 @@ export function AnimalDetailScreen() {
             }
           />
         </Section>
+
+        {/* Provenance + Transfer/Rehome. The section renders a Provenance
+            card only when the animal carries a claimed snapshot, and either a
+            "Transferred" badge or the rehome action depending on
+            transferred_out_at. Claiming is web-first — no mobile claim
+            screen. onTransferred refetches so the badge flips after a link is
+            generated. */}
+        <AnimalTransferSection animal={animal} onTransferred={onRefresh} />
 
         {/* Genetics — gated to snakes for now: the gene catalog is
             ball-python-scoped. When the catalog gains lizard/frog genes

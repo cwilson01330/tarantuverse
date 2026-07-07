@@ -31,6 +31,12 @@ class AnimalTransfer(Base):
             "status IN ('pending', 'claimed', 'cancelled', 'expired')",
             name="animal_transfers_status_check",
         ),
+        # Polymorphic source — exactly one of invert_id (TV) / animal_id (HV).
+        # See htr_20260707.
+        CheckConstraint(
+            "(invert_id IS NOT NULL)::int + (animal_id IS NOT NULL)::int = 1",
+            name="animal_transfers_one_source_check",
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -38,11 +44,17 @@ class AnimalTransfer(Base):
     # Short-lived public token — secrets.token_urlsafe(32), same as QR sessions.
     token = Column(String(64), unique=True, nullable=False, index=True)
 
-    # Source animal being handed off.
+    # Source record being handed off. Polymorphic: TV inverts set invert_id,
+    # HV reptiles/amphibians set animal_id (exactly one — see CHECK above).
     invert_id = Column(
         UUID(as_uuid=True),
         ForeignKey("inverts.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        nullable=True, index=True,
+    )
+    animal_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("animals.id", ondelete="CASCADE"),
+        nullable=True, index=True,
     )
     # Seller.
     from_user_id = Column(
@@ -56,10 +68,15 @@ class AnimalTransfer(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True, index=True,
     )
-    # The NEW invert created for the buyer on claim.
+    # The NEW record created for the buyer on claim — invert (TV) or animal (HV).
     claimed_invert_id = Column(
         UUID(as_uuid=True),
         ForeignKey("inverts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    claimed_animal_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("animals.id", ondelete="SET NULL"),
         nullable=True,
     )
 
@@ -80,11 +97,14 @@ class AnimalTransfer(Base):
     claimed_at = Column(DateTime(timezone=True), nullable=True)
     cancelled_at = Column(DateTime(timezone=True), nullable=True)
 
-    # Relationships — disambiguate the two inverts FKs with foreign_keys.
+    # Relationships — disambiguate the multiple FKs with foreign_keys.
     invert = relationship("Invert", foreign_keys=[invert_id])
     claimed_invert = relationship("Invert", foreign_keys=[claimed_invert_id])
+    animal = relationship("Animal", foreign_keys=[animal_id])
+    claimed_animal = relationship("Animal", foreign_keys=[claimed_animal_id])
     from_user = relationship("User", foreign_keys=[from_user_id])
     to_user = relationship("User", foreign_keys=[to_user_id])
 
     def __repr__(self):
-        return f"<AnimalTransfer {self.status} invert={self.invert_id}>"
+        src = self.invert_id or self.animal_id
+        return f"<AnimalTransfer {self.status} source={src}>"

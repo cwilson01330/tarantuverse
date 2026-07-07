@@ -33,7 +33,7 @@ from sqlalchemy import (
     CheckConstraint,
     Enum as SQLEnum,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -131,6 +131,21 @@ class Animal(Base):
     # Media
     photo_url = Column(String(500))
 
+    # Provenance / transfer (htr_20260707 — mirrors inverts). A non-null
+    # transferred_out_at badges a handed-off SOURCE record so it drops from
+    # the owner's active collection + feeding reminders. The buyer's CLAIMED
+    # record carries bred_by_user_id / origin_keeper_name / source_transfer_id
+    # and a frozen `provenance` snapshot.
+    transferred_out_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    bred_by_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    origin_keeper_name = Column(String(255), nullable=True)
+    source_transfer_id = Column(UUID(as_uuid=True), nullable=True)
+    provenance = Column(JSONB, nullable=True)
+
     # Privacy
     is_public = Column(Boolean, default=False)
     visibility = Column(String(20), default="private")
@@ -142,8 +157,9 @@ class Animal(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relationships
-    user = relationship("User", backref="animals")
+    # Relationships. foreign_keys pins the owner FK — bred_by_user_id is a
+    # SECOND users FK (provenance), so the join is otherwise ambiguous.
+    user = relationship("User", foreign_keys=[user_id], backref="animals")
     herp_species = relationship("ReptileSpecies", backref="animals")
     enclosure = relationship("Enclosure", backref="animal_inhabitants")
 

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.invert import Invert
+from app.models.animal import Animal
 from app.models.animal_transfer import AnimalTransfer
 from app.models.photo import Photo
 from app.models.offspring import Offspring
@@ -132,8 +133,49 @@ def _build_snapshot(db: Session, invert: Invert, seller: User) -> dict:
     }
 
 
+def _build_animal_snapshot(db: Session, animal: Animal, seller: User) -> dict:
+    """Freeze pedigree facts for an HV animal transfer.
+
+    Reptile/amphibian lineage (reptile_pairings + genotypes) isn't resolved
+    yet — the snapshot degrades to a plain provenance block (honesty-first),
+    same contract as an invert with no linked Offspring. Weight/length + last
+    shed are carried so the buyer's record starts pre-populated.
+    """
+    return {
+        "domain": "animal",
+        "taxon": animal.taxon,
+        "scientific_name": animal.scientific_name,
+        "common_name": animal.common_name,
+        "name": animal.name,
+        "sex": animal.sex.value if animal.sex else None,
+        "life_stage": None,  # animals don't use the invert life_stage axis
+        "species_id": str(animal.herp_species_id) if animal.herp_species_id else None,
+        "breeder_handle": seller.username,
+        "bred_by_user_id": str(seller.id),
+        "origin_keeper_name": seller.display_name or seller.username,
+        "dam_scientific_name": None,
+        "sire_scientific_name": None,
+        "sac_laid_date": None,
+        "dob_or_acquired": (
+            animal.date_acquired.isoformat() if animal.date_acquired
+            else (animal.hatch_date.isoformat() if animal.hatch_date else None)
+        ),
+        "weight_g": float(animal.current_weight_g) if animal.current_weight_g is not None else None,
+        "length_in": float(animal.current_length_in) if animal.current_length_in is not None else None,
+        "last_shed_at": animal.last_shed_at.isoformat() if animal.last_shed_at else None,
+        "molt_count_at_transfer": None,
+        "last_molt_at_transfer": None,
+        "source_animal_id": str(animal.id),
+        "transferred_at": None,  # stamped at claim
+    }
+
+
 def _web_base() -> str:
     return getattr(settings, "FRONTEND_URL", "https://tarantuverse.com")
+
+
+def _herp_web_base() -> str:
+    return getattr(settings, "HERPETOVERSE_FRONTEND_URL", "https://herpetoverse.com")
 
 
 # ─── endpoints ──────────────────────────────────────────────────────────────
@@ -187,6 +229,56 @@ async def create_transfer(
     )
 
 
+@router.post("/animals/{animal_id}/transfer", response_model=TransferCreateResponse)
+async def create_animal_transfer(
+    animal_id: str,
+    body: TransferCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a pending transfer for an HV animal the caller owns. Free (no gate)."""
+    animal = db.query(Animal).filter(
+        Animal.id == animal_id,
+        Animal.user_id == current_user.id,
+    ).first()
+    if not animal:
+        raise HTTPException(status_code=404, detail="Animal not found")
+    if animal.transferred_out_at is not None:
+        raise HTTPException(status_code=400, detail="This animal has already been transferred.")
+
+    snapshot = _build_animal_snapshot(db, animal, current_user)
+    token = secrets.token_urlsafe(32)
+    expires_at = _now() + timedelta(days=body.expires_in_days or TRANSFER_DEFAULT_TTL_DAYS)
+
+    transfer = AnimalTransfer(
+        id=uuidlib.uuid4(),
+        token=token,
+        animal_id=animal.id,
+        from_user_id=current_user.id,
+        status="pending",
+        snapshot=snapshot,
+        note=(body.note or None),
+        sale_price=body.sale_price,
+        include_photos=body.include_photos,
+        expires_at=expires_at,
+    )
+    db.add(transfer)
+    db.commit()
+    db.refresh(transfer)
+
+    analytics_events.capture("transfer_created", current_user.id, {
+        "taxon": animal.taxon,
+        "species_id": snapshot.get("species_id"),
+        "domain": "animal",
+    })
+
+    return TransferCreateResponse(
+        token=token,
+        claim_url=f"{_herp_web_base()}/claim/{token}",
+        expires_at=transfer.expires_at,
+    )
+
+
 @router.get("/transfers/{token}", response_model=TransferPreview)
 async def preview_transfer(
     token: str,
@@ -201,9 +293,15 @@ async def preview_transfer(
     snap = transfer.snapshot or {}
     photo_urls: list[str] = []
     if transfer.include_photos:
+        # Polymorphic source — HV animals attach photos via Photo.animal_id.
+        photo_filter = (
+            Photo.animal_id == transfer.animal_id
+            if transfer.animal_id is not None
+            else Photo.invert_id == transfer.invert_id
+        )
         photos = (
             db.query(Photo)
-            .filter(Photo.invert_id == transfer.invert_id)
+            .filter(photo_filter)
             .order_by(Photo.created_at.desc())
             .all()
         )
@@ -240,6 +338,134 @@ class ClaimBody(BaseModel):
     new_signup: Optional[bool] = None
 
 
+async def _claim_animal_transfer(
+    db: Session,
+    transfer: AnimalTransfer,
+    current_user: User,
+    body: "Optional[ClaimBody]",
+) -> dict:
+    """HV claim path — create a new Animal owned by the buyer, copy photos,
+    badge the source animal handed-off. Mirrors the invert claim (§5)."""
+    source = db.query(Animal).filter(Animal.id == transfer.animal_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="The source animal no longer exists.")
+
+    snap = transfer.snapshot or {}
+    snap_for_record = {**snap, "transferred_at": _now().isoformat()}
+
+    from app.models.tarantula import Source as SourceEnum
+    new_animal = Animal(
+        id=uuidlib.uuid4(),
+        user_id=current_user.id,
+        taxon=source.taxon,
+        herp_species_id=source.herp_species_id,
+        name=source.name,
+        common_name=source.common_name,
+        scientific_name=source.scientific_name,
+        sex=source.sex,
+        date_acquired=_now().date(),
+        hatch_date=source.hatch_date,
+        source=SourceEnum.BOUGHT,
+        # current state carried so the buyer's record starts pre-populated
+        current_weight_g=source.current_weight_g,
+        current_length_in=source.current_length_in,
+        feeding_schedule=source.feeding_schedule,
+        feeds_on_cgd_override=source.feeds_on_cgd_override,
+        # provenance
+        bred_by_user_id=transfer.from_user_id,
+        origin_keeper_name=snap.get("origin_keeper_name"),
+        source_transfer_id=transfer.id,
+        provenance=snap_for_record,
+    )
+    db.add(new_animal)
+    db.flush()  # need new_animal.id for photo rows + transfer link
+
+    if transfer.include_photos:
+        src_photos = (
+            db.query(Photo)
+            .filter(Photo.animal_id == source.id)
+            .order_by(Photo.created_at.desc())
+            .all()
+        )
+        hero_set = False
+        for p in src_photos:
+            try:
+                new_url, new_thumb = await storage_service.copy_photo(p.url, p.thumbnail_url)
+            except Exception:
+                logger.exception("photo copy failed during claim (transfer %s, photo %s)", transfer.id, p.id)
+                continue
+            db.add(Photo(
+                id=str(uuidlib.uuid4()),
+                animal_id=new_animal.id,
+                url=new_url,
+                thumbnail_url=new_thumb,
+                caption=p.caption,
+                taken_at=p.taken_at,
+                created_at=datetime.utcnow(),
+            ))
+            if not hero_set:
+                new_animal.photo_url = new_url
+                hero_set = True
+
+    transfer.status = "claimed"
+    transfer.to_user_id = current_user.id
+    transfer.claimed_animal_id = new_animal.id
+    transfer.claimed_at = _now()
+
+    # Badge the source record handed off — drops from active collection + reminders.
+    source.transferred_out_at = _now()
+
+    db.commit()
+    db.refresh(new_animal)
+
+    # was_new_signup — same attribution logic as the invert path.
+    if body is not None and body.new_signup is not None:
+        was_new_signup = body.new_signup
+        signup_attribution = "resume_marker"
+    else:
+        was_new_signup = False
+        signup_attribution = "age_backstop"
+        try:
+            created = current_user.created_at
+            if created is not None:
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                was_new_signup = (_now() - created) <= timedelta(minutes=15)
+        except Exception:
+            pass
+
+    analytics_events.capture("transfer_claimed", current_user.id, {
+        "taxon": new_animal.taxon,
+        "was_new_signup": was_new_signup,
+        "signup_attribution": signup_attribution,
+        "domain": "animal",
+    })
+    if was_new_signup:
+        analytics_events.capture("transfer_signup", current_user.id, {"taxon": new_animal.taxon})
+
+    try:
+        from app.services.notification_service import create_notification
+        animal_label = source.name or source.scientific_name or "your animal"
+        create_notification(
+            db,
+            user_id=transfer.from_user_id,
+            type="transfer_claimed",
+            title="Transfer claimed",
+            body=f"{current_user.username} claimed {animal_label}.",
+            deeplink="/app/transfers",
+            data={"claimer": current_user.username, "transfer_id": str(transfer.id)},
+        )
+    except Exception:
+        pass
+
+    return {
+        "id": str(new_animal.id),
+        "taxon": new_animal.taxon,
+        "name": new_animal.name,
+        "scientific_name": new_animal.scientific_name,
+    }
+
+
 @router.post("/transfers/{token}/claim")
 async def claim_transfer(
     token: str,
@@ -269,6 +495,10 @@ async def claim_transfer(
         raise HTTPException(status_code=409, detail="This transfer link has expired.")
     if transfer.from_user_id == current_user.id:
         raise HTTPException(status_code=400, detail="You can't claim your own transfer.")
+
+    # HV animals take the parallel claim path (creates an Animal, not an Invert).
+    if transfer.animal_id is not None:
+        return await _claim_animal_transfer(db, transfer, current_user, body)
 
     source = db.query(Invert).filter(Invert.id == transfer.invert_id).first()
     if not source:
@@ -467,6 +697,8 @@ async def list_transfers(
             role=role,
             invert_id=str(t.invert_id) if t.invert_id else None,
             claimed_invert_id=str(t.claimed_invert_id) if t.claimed_invert_id else None,
+            animal_id=str(t.animal_id) if t.animal_id else None,
+            claimed_animal_id=str(t.claimed_animal_id) if t.claimed_animal_id else None,
             taxon=snap.get("taxon"),
             display_name=snap.get("name") or snap.get("common_name") or snap.get("scientific_name"),
             counterparty=counterparty,

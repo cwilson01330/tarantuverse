@@ -72,6 +72,10 @@ import {
   relativeDays,
 } from '@/lib/animals'
 import { CGD_BRANDS, DEFAULT_CGD_FOOD_TYPE } from '@/lib/cgd'
+import {
+  type InitiateTransferResponse,
+  initiateTransfer,
+} from '@/lib/transfers'
 
 // ---------------------------------------------------------------------------
 // Page
@@ -317,7 +321,290 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
         <LogShedForm animalId={animal.id} onCreated={refetchSheds} />
         <ShedList sheds={sheds} onDelete={refetchSheds} />
       </Section>
+
+      {/* Provenance — only when the animal arrived via a claimed transfer.
+          Honest & plain: origin keeper, breeder handle, date acquired, and
+          any weight / length / last-shed captured in the frozen snapshot. No
+          fabricated lineage. */}
+      {animal.provenance && (
+        <Section title="Provenance">
+          <ProvenanceBlock provenance={animal.provenance} />
+        </Section>
+      )}
+
+      {/* Owner actions — transfer / rehome. Suppressed once handed off. */}
+      <Section title="Owner actions">
+        {animal.transferred_out_at ? (
+          <div className="p-4 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-400 flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300">
+              Transferred
+            </span>
+            <span>
+              Handed off {fmtDate(animal.transferred_out_at)}. This is now a
+              historical record.
+            </span>
+          </div>
+        ) : (
+          <TransferSection animal={animal} />
+        )}
+      </Section>
     </article>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Provenance
+// ---------------------------------------------------------------------------
+
+function ProvenanceBlock({
+  provenance,
+}: {
+  provenance: NonNullable<Animal['provenance']>
+}) {
+  const rows: { label: string; value: string }[] = []
+  if (provenance.origin_keeper_name)
+    rows.push({ label: 'Origin keeper', value: provenance.origin_keeper_name })
+  if (provenance.breeder_handle)
+    rows.push({ label: 'Breeder', value: `@${provenance.breeder_handle}` })
+  if (provenance.dob_or_acquired)
+    rows.push({
+      label: 'Date acquired',
+      value: fmtDate(provenance.dob_or_acquired) || provenance.dob_or_acquired,
+    })
+  const weight = fmtGrams(provenance.weight_g)
+  if (weight) rows.push({ label: 'Weight at transfer', value: weight })
+  const length = fmtDecimal(provenance.length_in, 1)
+  if (length) rows.push({ label: 'Length at transfer', value: `${length} in` })
+  if (provenance.last_shed_at)
+    rows.push({
+      label: 'Last shed at transfer',
+      value: fmtDate(provenance.last_shed_at) || provenance.last_shed_at,
+    })
+  if (provenance.transferred_at)
+    rows.push({
+      label: 'Acquired via transfer',
+      value: fmtDate(provenance.transferred_at) || provenance.transferred_at,
+    })
+
+  if (rows.length === 0) {
+    return (
+      <div className="p-4 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-400">
+        This animal arrived through a transfer, but no provenance details were
+        captured.
+      </div>
+    )
+  }
+
+  return (
+    <dl className="rounded-md border border-neutral-800 bg-neutral-900/40 divide-y divide-neutral-800">
+      {rows.map((r) => (
+        <div key={r.label} className="flex justify-between gap-4 px-4 py-2.5 text-sm">
+          <dt className="text-neutral-500">{r.label}</dt>
+          <dd className="text-neutral-100 text-right">{r.value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Transfer / rehome
+// ---------------------------------------------------------------------------
+
+function TransferSection({ animal }: { animal: Animal }) {
+  const [open, setOpen] = useState(false)
+  const [note, setNote] = useState('')
+  const [price, setPrice] = useState('')
+  const [includePhotos, setIncludePhotos] = useState(true)
+  const [expiresInDays, setExpiresInDays] = useState(14)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<InitiateTransferResponse | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const reset = () => {
+    setNote('')
+    setPrice('')
+    setIncludePhotos(true)
+    setExpiresInDays(14)
+    setError(null)
+    setResult(null)
+    setCopied(false)
+  }
+
+  async function handleGenerate() {
+    if (busy) return
+    setError(null)
+    setBusy(true)
+    try {
+      const res = await initiateTransfer(animal.id, {
+        note: note.trim() || null,
+        sale_price: price.trim() ? Number(price) : null,
+        include_photos: includePhotos,
+        expires_in_days: expiresInDays,
+      })
+      setResult(res)
+    } catch (err) {
+      setError(errMsg(err, 'Could not create the transfer.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleCopy() {
+    if (!result) return
+    try {
+      await navigator.clipboard.writeText(result.claim_url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard blocked — the input is selectable as a fallback.
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="p-4 rounded-md border border-neutral-800 bg-neutral-900/40 space-y-2">
+        <p className="text-sm text-neutral-300">
+          Rehoming this animal? Generate a one-time claim link. The new keeper
+          gets its identity, provenance, and photos. We never process the sale.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            reset()
+            setOpen(true)
+          }}
+          className="text-sm text-herp-teal hover:text-herp-lime transition-colors"
+        >
+          ↪ Transfer / rehome
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 rounded-md border border-neutral-800 bg-neutral-900/40 space-y-4">
+      {!result ? (
+        <>
+          <p className="text-sm text-neutral-400">
+            Generate a one-time claim link to hand{' '}
+            {animalTitle(animal)} to its new keeper. The sale happens on your
+            own channel — this only moves the record.
+          </p>
+
+          <Field label="Note to buyer (optional)">
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              className={INPUT_CLS}
+              placeholder="e.g. Feeding f/t medium rats, last shed 6/1, calm handler."
+            />
+          </Field>
+
+          <Field label="Sale price (private — never shown to the buyer)">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="0"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className={INPUT_CLS}
+              placeholder="$ optional — for your records only"
+            />
+          </Field>
+
+          <label className="flex items-center gap-2 text-sm text-neutral-300">
+            <input
+              type="checkbox"
+              checked={includePhotos}
+              onChange={(e) => setIncludePhotos(e.target.checked)}
+              className="accent-herp-teal"
+            />
+            Include this animal&apos;s photos in the transfer
+          </label>
+
+          <Field label="Link expires in">
+            <select
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(Number(e.target.value))}
+              className={INPUT_CLS}
+            >
+              {[1, 3, 7, 14, 30, 60, 90].map((d) => (
+                <option key={d} value={d}>
+                  {d} {d === 1 ? 'day' : 'days'}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {error && <InlineError message={error} />}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={busy}
+              className="herp-gradient-bg text-herp-dark font-semibold text-sm px-4 py-2 rounded-md disabled:opacity-50"
+            >
+              {busy ? 'Generating…' : 'Generate claim link'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                reset()
+                setOpen(false)
+              }}
+              className="text-sm text-neutral-400 hover:text-neutral-200 px-3 py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-neutral-400">
+            Share this link with the buyer. When they claim it, this animal
+            moves to their collection and yours becomes a transferred record.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={result.claim_url}
+              onFocus={(e) => e.currentTarget.select()}
+              className={`${INPUT_CLS} text-xs`}
+            />
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="px-3 py-2 rounded-md herp-gradient-bg text-herp-dark text-sm font-semibold whitespace-nowrap"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-xs text-neutral-500">
+            Expires {fmtDate(result.expires_at) || result.expires_at}. You can
+            cancel it any time from{' '}
+            <Link href="/app/transfers" className="text-herp-teal hover:text-herp-lime">
+              Transfers
+            </Link>
+            .
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              reset()
+              setOpen(false)
+            }}
+            className="text-sm text-neutral-400 hover:text-neutral-200"
+          >
+            Done
+          </button>
+        </>
+      )}
+    </div>
   )
 }
 

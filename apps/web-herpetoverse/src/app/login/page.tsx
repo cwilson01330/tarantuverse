@@ -158,15 +158,13 @@ function LoginForm() {
 
           <p className="text-center text-xs text-neutral-500 pt-2">
             New here?{' '}
-            <a
-              href="https://tarantuverse.com/register"
+            <Link
+              href={next ? `/register?next=${encodeURIComponent(next)}` : '/register'}
               className="text-herp-teal hover:text-herp-lime transition-colors"
-              target="_blank"
-              rel="noreferrer"
             >
-              Create a Tarantuverse account
-            </a>{' '}
-            — it works for both.
+              Create an account
+            </Link>{' '}
+            — it works for Tarantuverse too.
           </p>
         </form>
 

@@ -10,7 +10,7 @@ reptile_species in anh_20260514). The catalog *route* stays
 — only the table + this FK field were renamed.
 """
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Any, Optional
 from datetime import date, datetime
 from decimal import Decimal
 import uuid
@@ -109,6 +109,14 @@ class AnimalResponse(AnimalBase):
     enclosure_id: Optional[uuid.UUID] = None
     last_fed_at: Optional[datetime] = None
     last_shed_at: Optional[date] = None
+    # Provenance / transfer (htr_20260707, read-only). transferred_out_at is
+    # non-null on a handed-off SOURCE record; the others populate a claimed
+    # record's provenance block. `provenance` is the frozen snapshot dict.
+    transferred_out_at: Optional[datetime] = None
+    origin_keeper_name: Optional[str] = None
+    bred_by_user_id: Optional[uuid.UUID] = None
+    source_transfer_id: Optional[uuid.UUID] = None
+    provenance: Optional[Any] = None
     # Resolved CGD flag (override ?? species default ?? false). Populated
     # from the @property on the Animal model. Clients use this to switch
     # the collection card to CGD-aware cadence thresholds and to surface

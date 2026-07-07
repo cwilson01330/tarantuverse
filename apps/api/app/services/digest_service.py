@@ -81,7 +81,10 @@ def _animal_overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int
     animals = (
         db.query(Animal)
         .options(selectinload(Animal.herp_species))
-        .filter(Animal.user_id == user_id)
+        .filter(
+            Animal.user_id == user_id,
+            Animal.transferred_out_at.is_(None),
+        )
         .all()
     )
     if not animals:

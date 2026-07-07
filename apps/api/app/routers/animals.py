@@ -200,7 +200,12 @@ async def get_animals(
     query = (
         db.query(Animal)
         .options(selectinload(Animal.herp_species))
-        .filter(Animal.user_id == current_user.id)
+        .filter(
+            Animal.user_id == current_user.id,
+            # Handed-off animals (transferred to another keeper) drop out of
+            # the active collection — see htr_20260707.
+            Animal.transferred_out_at.is_(None),
+        )
     )
     if taxon:
         query = query.filter(Animal.taxon == taxon)
@@ -248,7 +253,10 @@ async def list_feeding_status(
     animals = (
         db.query(Animal)
         .options(selectinload(Animal.herp_species))
-        .filter(Animal.user_id == current_user.id)
+        .filter(
+            Animal.user_id == current_user.id,
+            Animal.transferred_out_at.is_(None),
+        )
         .all()
     )
     if not animals:

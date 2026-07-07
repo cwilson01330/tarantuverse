@@ -125,6 +125,34 @@ export interface Animal {
   last_shed_at: string | null
   created_at: string
   updated_at: string | null
+
+  // Transfer / provenance (rehome). Non-null `transferred_out_at` ⇒ this
+  // record has been handed off and is now a historical record; the transfer
+  // action is suppressed. `provenance` is a frozen snapshot present only when
+  // the animal arrived via a claimed transfer. See lib/transfers.ts.
+  transferred_out_at?: string | null
+  origin_keeper_name?: string | null
+  bred_by_user_id?: string | null
+  source_transfer_id?: string | null
+  provenance?: AnimalProvenance | null
+}
+
+/** Frozen provenance snapshot captured at claim time. Kept here (not only in
+ *  lib/transfers.ts) so the Animal type is self-contained for the detail
+ *  screen; the transfers module re-exports the same shape. */
+export interface AnimalProvenance {
+  origin_keeper_name: string | null
+  breeder_handle: string | null
+  dob_or_acquired: string | null
+  weight_g: string | number | null
+  length_in: string | number | null
+  last_shed_at: string | null
+  scientific_name: string | null
+  common_name: string | null
+  name: string | null
+  sex: string | null
+  taxon: string | null
+  transferred_at: string | null
 }
 
 export type WeightContext =

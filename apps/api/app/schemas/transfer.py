@@ -53,6 +53,9 @@ class TransferListItem(BaseModel):
     role: str  # 'sent' | 'received'
     invert_id: Optional[str] = None
     claimed_invert_id: Optional[str] = None
+    # HV (animals) polymorphic source — mutually exclusive with invert_id.
+    animal_id: Optional[str] = None
+    claimed_animal_id: Optional[str] = None
     taxon: Optional[str] = None
     display_name: Optional[str] = None
     counterparty: Optional[str] = None  # buyer (sent) or seller (received) handle

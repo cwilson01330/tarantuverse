@@ -137,6 +137,41 @@ export interface Animal {
   last_shed_at: string | null;
   created_at: string;
   updated_at: string | null;
+
+  // Provenance / transfer (backend htr_20260707, read-only). When this
+  // record has been handed off, transferred_out_at is set (SOURCE record).
+  // The rest populate a CLAIMED record's provenance block. `provenance` is
+  // the frozen snapshot dict — see AnimalProvenance.
+  transferred_out_at?: string | null;
+  origin_keeper_name?: string | null;
+  bred_by_user_id?: string | null;
+  source_transfer_id?: string | null;
+  provenance?: AnimalProvenance | null;
+}
+
+/**
+ * Frozen snapshot carried onto a claimed animal (BRIEF §6). Reptile/amphibian
+ * lineage isn't resolved on-platform yet, so dam/sire are always null — the
+ * block renders honestly (no fabricated pedigree). Mirrors
+ * `_build_animal_snapshot` in apps/api/app/routers/transfers.py.
+ */
+export interface AnimalProvenance {
+  taxon?: string | null;
+  scientific_name?: string | null;
+  common_name?: string | null;
+  name?: string | null;
+  sex?: string | null;
+  species_id?: string | null;
+  breeder_handle?: string | null;
+  bred_by_user_id?: string | null;
+  origin_keeper_name?: string | null;
+  dam_scientific_name?: string | null;
+  sire_scientific_name?: string | null;
+  dob_or_acquired?: string | null;
+  weight_g?: number | null;
+  length_in?: number | null;
+  last_shed_at?: string | null;
+  transferred_at?: string | null;
 }
 
 export interface WeightLog {
@@ -550,4 +585,45 @@ export async function bulkFeedAnimals(
     payload,
   );
   return data;
+}
+
+// ---------------------------------------------------------------------------
+// Transfer / rehome (provenance). Claiming itself is web-first (the shared
+// claim link opens the HV web claim page) — there is no mobile claim screen.
+// ---------------------------------------------------------------------------
+
+export interface CreateTransferPayload {
+  note?: string | null;
+  /** PRIVATE seller ledger — never shown to the buyer. */
+  sale_price?: number | null;
+  include_photos?: boolean;
+  /** 1–90 days; backend defaults to 30. */
+  expires_in_days?: number;
+}
+
+export interface TransferCreateResponse {
+  token: string;
+  claim_url: string;
+  expires_at: string;
+}
+
+/**
+ * Create a one-time claim link ("rehome") for an animal the caller owns.
+ * Returns the claim_url to copy/share. The buyer claims on the HV web page.
+ * Mirrors POST /animals/{id}/transfer (transfers.py).
+ */
+export async function createAnimalTransfer(
+  animalId: string,
+  payload: CreateTransferPayload,
+): Promise<TransferCreateResponse> {
+  const { data } = await apiClient.post<TransferCreateResponse>(
+    `/animals/${encodeURIComponent(animalId)}/transfer`,
+    payload,
+  );
+  return data;
+}
+
+/** Seller cancels a still-pending transfer. */
+export async function cancelAnimalTransfer(token: string): Promise<void> {
+  await apiClient.post(`/transfers/${encodeURIComponent(token)}/cancel`);
 }
