@@ -481,3 +481,73 @@ export function animalTitle(
 ): string {
   return a.name || a.common_name || a.scientific_name || 'Unnamed';
 }
+
+// ---------------------------------------------------------------------------
+// Feeding Day — bulk feeding across the whole collection
+// ---------------------------------------------------------------------------
+
+/**
+ * One row of the Feeding Day status board. Mirrors the backend
+ * `GET /animals/feeding-status` response — already sorted neediest-first
+ * (never-fed and overdue bubble to the top). `days_since_last_feeding`
+ * counts from the last ACCEPTED feeding (refusals don't reset the clock),
+ * and is null when the animal has never been fed.
+ */
+export interface AnimalFeedingStatus {
+  id: string;
+  name: string | null;
+  common_name: string | null;
+  scientific_name: string | null;
+  taxon: AnimalTaxon;
+  photo_url: string | null;
+  last_feeding_date: string | null;
+  days_since_last_feeding: number | null;
+  is_feeding_paused: boolean;
+  is_overdue: boolean;
+  interval_days: number | null;
+  feeds_on_cgd: boolean;
+}
+
+/**
+ * Fetch the feeding-status board for the whole collection. `tz` is the
+ * device's `getTimezoneOffset()` (minutes) so "days since" is computed in
+ * the keeper's local calendar, not a UTC-midnight floor.
+ */
+export async function listAnimalFeedingStatus(
+  tz: number,
+): Promise<AnimalFeedingStatus[]> {
+  const { data } = await apiClient.get<AnimalFeedingStatus[]>(
+    `/animals/feeding-status?tz_offset_minutes=${tz}`,
+  );
+  return data;
+}
+
+export interface BulkFeedPayload {
+  animal_ids: string[];
+  accepted: boolean;
+  food_type?: string | null;
+  food_size?: string | null;
+  quantity?: number | null;
+  notes?: string | null;
+}
+
+export interface BulkFeedResult {
+  created_count: number;
+  created_ids: string[];
+  skipped: unknown[];
+}
+
+/**
+ * Log one feeding for many animals at once. The backend applies the same
+ * food_type / accepted / notes to every id in `animal_ids` and returns
+ * how many rows it created.
+ */
+export async function bulkFeedAnimals(
+  payload: BulkFeedPayload,
+): Promise<BulkFeedResult> {
+  const { data } = await apiClient.post<BulkFeedResult>(
+    '/animals/bulk-feedings',
+    payload,
+  );
+  return data;
+}

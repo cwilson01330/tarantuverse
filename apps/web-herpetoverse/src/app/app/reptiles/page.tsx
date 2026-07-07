@@ -157,12 +157,20 @@ export default function ReptilesPage() {
             Weights, feedings, sheds — per animal.
           </p>
         </div>
-        <Link
-          href="/app/reptiles/add"
-          className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-herp-teal/40 bg-herp-teal/10 text-sm text-herp-teal hover:bg-herp-teal/20 hover:border-herp-teal/60 transition-colors"
-        >
-          <span aria-hidden="true">＋</span> Add reptile
-        </Link>
+        <div className="hidden sm:flex items-center gap-2">
+          <Link
+            href="/app/feeding-day"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-300 hover:text-white hover:border-neutral-700 transition-colors"
+          >
+            <span aria-hidden="true">🍽️</span> Feeding Day
+          </Link>
+          <Link
+            href="/app/reptiles/add"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-herp-teal/40 bg-herp-teal/10 text-sm text-herp-teal hover:bg-herp-teal/20 hover:border-herp-teal/60 transition-colors"
+          >
+            <span aria-hidden="true">＋</span> Add reptile
+          </Link>
+        </div>
       </header>
 
       {error && (

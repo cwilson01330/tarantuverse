@@ -32,6 +32,12 @@ export default function AppHomePage() {
           href="/app/reptiles"
         />
         <DashCard
+          icon="🍽️"
+          title="Feeding Day"
+          body="Log a feeding across your whole collection at once — select animals, tap once, done."
+          href="/app/feeding-day"
+        />
+        <DashCard
           icon="📖"
           title="Species library"
           body="Browse care sheets for geckos, snakes, monitors, and more."

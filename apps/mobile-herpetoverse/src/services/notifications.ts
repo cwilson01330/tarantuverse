@@ -92,6 +92,48 @@ export async function hasNotificationPermissions(): Promise<boolean> {
 }
 
 /**
+ * Get this device's Expo push token so the server can deliver the daily
+ * feeding digest (ADR-009). Without this, HV mobile only ever scheduled
+ * LOCAL reminders and never registered a token — so server-sent pushes
+ * had nowhere to go.
+ *
+ * Push tokens aren't available in Expo Go (SDK 53+), so we no-op there.
+ * The `projectId` is read from THIS app's EAS config — never hardcode the
+ * Tarantuverse id, or getExpoPushTokenAsync throws and no token is saved.
+ * Returns null on any failure so callers can fire-and-forget.
+ */
+export async function getExpoPushToken(): Promise<string | null> {
+  if (isExpoGo) {
+    console.log(
+      '[notifications] push tokens are unavailable in Expo Go — use a dev/prod build.',
+    );
+    return null;
+  }
+
+  try {
+    const granted = await requestNotificationPermissions();
+    if (!granted) return null;
+
+    // Read the HV app's own EAS projectId from app.json
+    // (extra.eas.projectId). Fall back to easConfig for older runtimes.
+    const projectId =
+      (Constants.expoConfig as any)?.extra?.eas?.projectId ??
+      (Constants as any)?.easConfig?.projectId;
+
+    if (!projectId) {
+      console.warn('[notifications] no EAS projectId found — skipping push token.');
+      return null;
+    }
+
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
+    return token.data;
+  } catch (err) {
+    console.warn('[notifications] getExpoPushToken failed:', err);
+    return null;
+  }
+}
+
+/**
  * Shift a target offset forward when it would land inside the keeper's
  * quiet hours, so reminders don't buzz at 3am. Cross-midnight windows
  * (e.g. 22:00 → 08:00) are handled.

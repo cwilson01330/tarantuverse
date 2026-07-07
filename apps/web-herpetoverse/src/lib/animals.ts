@@ -478,6 +478,78 @@ export function setMainPhoto(photoId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Feeding Day — bulk-feeding surface (mirrors TV inverts feeding-status)
+// ---------------------------------------------------------------------------
+
+/**
+ * One row in the Feeding Day list. Mirrors the
+ * GET /api/v1/animals/feeding-status response shape (backend contract).
+ * The list arrives already sorted neediest-first from the server.
+ */
+export interface AnimalFeedingStatus {
+  id: string
+  name: string | null
+  common_name: string | null
+  scientific_name: string | null
+  taxon: AnimalTaxon
+  photo_url: string | null
+  last_feeding_date: string | null
+  days_since_last_feeding: number | null
+  is_feeding_paused: boolean
+  is_overdue: boolean
+  /** Recommended feeding cadence, when known. Rendered as "every ~Nd". */
+  interval_days: number | null
+  feeds_on_cgd: boolean
+}
+
+/**
+ * Fetch every animal with its feeding status for the current keeper.
+ * `tzOffsetMinutes` is `Date.prototype.getTimezoneOffset()` — the server
+ * needs it to compute "days since" as a calendar-day diff in the keeper's
+ * local timezone (not a UTC delta floor).
+ */
+export function listAnimalFeedingStatus(
+  tzOffsetMinutes: number,
+): Promise<AnimalFeedingStatus[]> {
+  return apiFetch<AnimalFeedingStatus[]>(
+    `/api/v1/animals/feeding-status?tz_offset_minutes=${tzOffsetMinutes}`,
+  )
+}
+
+export interface BulkFeedPayload {
+  animal_ids: string[]
+  accepted: boolean
+  food_type?: string
+  food_size?: string
+  quantity?: number
+  notes?: string
+}
+
+export interface BulkFeedSkip {
+  animal_id: string
+  reason: string
+}
+
+export interface BulkFeedResult {
+  created_count: number
+  created_ids: string[]
+  skipped: BulkFeedSkip[]
+}
+
+/**
+ * Log one feeding (or refusal) across many animals in a single call.
+ * Server returns how many were created plus any it skipped (with reason).
+ */
+export function bulkFeedAnimals(
+  payload: BulkFeedPayload,
+): Promise<BulkFeedResult> {
+  return apiFetch<BulkFeedResult>('/api/v1/animals/bulk-feedings', {
+    method: 'POST',
+    json: payload,
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Display helpers
 // ---------------------------------------------------------------------------
 

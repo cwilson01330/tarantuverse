@@ -19,6 +19,7 @@ import {
   TOKEN_KEY,
   USER_KEY,
 } from '../services/api';
+import { getExpoPushToken } from '../services/notifications';
 
 export interface AuthUser {
   id: string;
@@ -70,6 +71,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleAuthExpired]);
+
+  // Register this device's Expo push token whenever we have an auth
+  // session — fresh login OR app relaunch once the stored token hydrates.
+  // Previously HV mobile never registered a token at all, so the
+  // server-sent daily feeding digest could not be delivered (ADR-009).
+  // Fire-and-forget: returns null in Expo Go or if permission is denied,
+  // and never blocks the app.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const pushToken = await getExpoPushToken();
+        if (!cancelled && pushToken) {
+          await apiClient.post('/notification-preferences/push-token', {
+            token: pushToken,
+            tz_offset_minutes: new Date().getTimezoneOffset(),
+          });
+        }
+      } catch {
+        // non-fatal — reminders still schedule locally; digest just won't
+        // reach this device until a later successful registration.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   async function loadStoredAuth() {
     try {

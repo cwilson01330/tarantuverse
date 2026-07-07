@@ -85,6 +85,21 @@ function CollectionScreen() {
   const router = useRouter();
   const { colors, layout } = useTheme();
 
+  // Feeding Day entry — bulk-log feedings across the collection. Rendered
+  // in the header's right slot so it's reachable from the loading, empty,
+  // and populated states without restructuring the list.
+  const feedingDayAction = (
+    <TouchableOpacity
+      onPress={() => router.push('/feeding-day' as never)}
+      hitSlop={8}
+      style={styles.headerAction}
+      accessibilityRole="button"
+      accessibilityLabel="Feeding Day — log feeding for many animals at once"
+    >
+      <MaterialCommunityIcons name="silverware-fork-knife" size={22} color={colors.primary} />
+    </TouchableOpacity>
+  );
+
   const [rows, setRows] = useState<ReptileRow[] | null>(null);
   const [partialError, setPartialError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -266,7 +281,7 @@ function CollectionScreen() {
         edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <AppHeader title="Collection" />
+        <AppHeader title="Collection" rightAction={feedingDayAction} />
         <View style={styles.centerContent}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -281,7 +296,7 @@ function CollectionScreen() {
         edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <AppHeader title="Collection" />
+        <AppHeader title="Collection" rightAction={feedingDayAction} />
         <View style={styles.emptyState}>
           <MaterialCommunityIcons
             name="snake"
@@ -319,7 +334,7 @@ function CollectionScreen() {
       edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <AppHeader title="Collection" />
+      <AppHeader title="Collection" rightAction={feedingDayAction} />
       <FlatList
         data={visibleRows ?? []}
         keyExtractor={(r) => `${r.taxon}:${r.id}`}
@@ -600,6 +615,12 @@ function ReptileCard({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  headerAction: {
+    width: 44,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
   centerContent: {
     flex: 1,
     justifyContent: 'center',

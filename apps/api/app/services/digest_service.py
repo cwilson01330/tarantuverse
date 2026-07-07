@@ -15,15 +15,18 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.notification_preferences import NotificationPreferences
 from app.models.invert_species import InvertSpecies
 from app.models.feeding_log import FeedingLog
+from app.models.animal import Animal
 from app.utils.limits import active_inverts_query
 from app.services.notification_service import create_notification
-# Reuse the overdue engine that powers /inverts/feeding-status (Feeding Day).
+# Reuse the overdue engines that power /inverts/feeding-status +
+# /animals/feeding-status (Feeding Day) so the digest count matches the app.
 from app.routers.inverts import _recommended_feeding_interval, _calendar_day_diff
+from app.routers.animals import _animal_feeding_interval
 
 
 def _overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
@@ -71,6 +74,45 @@ def _overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
     return count
 
 
+def _animal_overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
+    """Overdue reptiles/amphibians (HV) for one user — the `animals` mirror of
+    _overdue_count, using the animal cadence resolver. Never-fed is NOT counted
+    (consistent with /animals/feeding-status + the dashboard)."""
+    animals = (
+        db.query(Animal)
+        .options(selectinload(Animal.herp_species))
+        .filter(Animal.user_id == user_id)
+        .all()
+    )
+    if not animals:
+        return 0
+    ids = [a.id for a in animals]
+    rows = (
+        db.query(FeedingLog.animal_id, func.max(FeedingLog.fed_at))
+        .filter(FeedingLog.animal_id.in_(ids), FeedingLog.accepted.is_(True))
+        .group_by(FeedingLog.animal_id)
+        .all()
+    )
+    last_by = {r[0]: r[1] for r in rows}
+
+    now = datetime.now(timezone.utc)
+    today_local = (now + timedelta(minutes=-(tz_offset or 0))).date()
+
+    count = 0
+    for a in animals:
+        if a.feeding_paused_reason and (
+            a.feeding_paused_until is None or a.feeding_paused_until >= today_local
+        ):
+            continue
+        interval = _animal_feeding_interval(a)
+        if interval is None:
+            continue
+        last = last_by.get(a.id)
+        if last is not None and _calendar_day_diff(now, last, tz_offset) >= interval:
+            count += 1
+    return count
+
+
 def run_feeding_digests(
     db: Session,
     only_user_id: Optional[str] = None,
@@ -111,7 +153,12 @@ def run_feeding_digests(
             prefs.last_digest_sent_on = local.date()
             db.commit()
 
-        overdue = _overdue_count(db, prefs.user_id, tz)
+        # Count both platforms — a shared account may hold inverts (TV) and/or
+        # reptiles (HV); one combined "N due" digest covers whatever they keep.
+        overdue = (
+            _overdue_count(db, prefs.user_id, tz)
+            + _animal_overdue_count(db, prefs.user_id, tz)
+        )
         if overdue > 0:
             create_notification(
                 db,
