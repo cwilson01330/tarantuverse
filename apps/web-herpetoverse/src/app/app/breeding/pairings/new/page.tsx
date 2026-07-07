@@ -24,12 +24,19 @@ import {
   type Taxon,
   createPairing,
 } from '@/lib/breeding'
-// ADR-003: snake/lizard libs collapsed into lib/animals. The taxon picker
-// below still scopes the dropdowns, so we fetch each taxon explicitly.
-import { type Animal, listAnimals } from '@/lib/animals'
+// ADR-011: one collection fetch; the taxon picker is built from the groups
+// the keeper actually owns, in registry order.
+import {
+  type Animal,
+  type AnimalTaxon,
+  ANIMAL_TAXA,
+  ANIMAL_TAXON_ORDER,
+  listAnimals,
+} from '@/lib/animals'
 
 interface ParentOption {
   id: string
+  taxon: AnimalTaxon
   display_name: string
   sex: 'male' | 'female' | 'unknown' | null
   scientific_name: string | null
@@ -42,6 +49,7 @@ interface ParentOption {
 function animalToOption(a: Animal): ParentOption {
   return {
     id: a.id,
+    taxon: a.taxon,
     display_name:
       a.name || a.common_name || a.scientific_name || 'Unnamed reptile',
     sex: a.sex,
@@ -77,8 +85,7 @@ export default function NewPairingPage() {
   const router = useRouter()
 
   const [taxon, setTaxon] = useState<Taxon>('snake')
-  const [snakes, setSnakes] = useState<ParentOption[]>([])
-  const [lizards, setLizards] = useState<ParentOption[]>([])
+  const [all, setAll] = useState<ParentOption[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
 
   // Form state
@@ -94,15 +101,14 @@ export default function NewPairingPage() {
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
-  // Load the keeper's collection on mount. Both taxa fetched up front so
-  // toggling the taxon picker is instant.
+  // Load the keeper's whole collection once; the taxon picker then scopes
+  // the parent dropdowns in-memory (ADR-011 — any group can be paired).
   useEffect(() => {
     let cancelled = false
-    Promise.all([listAnimals('snake'), listAnimals('lizard')])
-      .then(([s, l]) => {
+    listAnimals()
+      .then((rows) => {
         if (cancelled) return
-        setSnakes(s.map(animalToOption))
-        setLizards(l.map(animalToOption))
+        setAll(rows.map(animalToOption))
         setLoadError(null)
       })
       .catch((err) => {
@@ -118,14 +124,31 @@ export default function NewPairingPage() {
     }
   }, [])
 
+  // Taxa the keeper actually owns, in registry order — drives the picker.
+  const ownedTaxa = useMemo(
+    () => ANIMAL_TAXON_ORDER.filter((t) => all.some((o) => o.taxon === t)),
+    [all],
+  )
+
+  // Once the collection loads, default the picker to the first owned taxon
+  // (so a keeper with only tortoises doesn't land on an empty "snakes" tab).
+  useEffect(() => {
+    if (ownedTaxa.length > 0 && !ownedTaxa.includes(taxon)) {
+      setTaxon(ownedTaxa[0])
+    }
+  }, [ownedTaxa, taxon])
+
   // Reset selected parents when the taxon flips so we never end up
-  // submitting with a snake male and a lizard female.
+  // submitting a cross-taxon pair.
   useEffect(() => {
     setMaleId('')
     setFemaleId('')
   }, [taxon])
 
-  const allOfTaxon = taxon === 'snake' ? snakes : lizards
+  const allOfTaxon = useMemo(
+    () => all.filter((o) => o.taxon === taxon),
+    [all, taxon],
+  )
   const baseMales = useMemo(
     () => allOfTaxon.filter((p) => p.sex === 'male' || p.sex === 'unknown'),
     [allOfTaxon],
@@ -249,24 +272,23 @@ export default function NewPairingPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Taxon picker — radio buttons, the data shape diverges between
-            snake and lizard collections so we pick first. */}
-        <Field label="Taxon">
-          <div className="grid grid-cols-2 gap-2">
-            <TaxonChoice
-              active={taxon === 'snake'}
-              onClick={() => setTaxon('snake')}
-              icon="🐍"
-              label="Snakes"
-            />
-            <TaxonChoice
-              active={taxon === 'lizard'}
-              onClick={() => setTaxon('lizard')}
-              icon="🦎"
-              label="Lizards"
-            />
-          </div>
-        </Field>
+        {/* Taxon picker — one choice per group the keeper owns (registry
+            order). Same-taxon parents are enforced below + on the backend. */}
+        {ownedTaxa.length > 0 && (
+          <Field label="Taxon">
+            <div className="grid grid-cols-2 gap-2">
+              {ownedTaxa.map((t) => (
+                <TaxonChoice
+                  key={t}
+                  active={taxon === t}
+                  onClick={() => setTaxon(t)}
+                  icon={ANIMAL_TAXA[t].glyph}
+                  label={ANIMAL_TAXA[t].plural}
+                />
+              ))}
+            </div>
+          </Field>
+        )}
 
         <Field
           label="Male parent"

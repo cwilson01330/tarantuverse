@@ -8,11 +8,13 @@
  * calculator can run combineOffspring without a second round-trip.
  */
 import { apiFetch } from './apiClient'
+import type { AnimalTaxon } from './animals'
 
 // ─── Pairings ──────────────────────────────────────────────────────────
 
-// ADR-003: frogs joined snakes + lizards under the unified animals table.
-export type Taxon = 'snake' | 'lizard' | 'frog'
+// ADR-011: taxon is the flexible animals discriminator — any group can be
+// paired (backend enforces same-taxon parents), so this is just AnimalTaxon.
+export type Taxon = AnimalTaxon
 export type ReptilePairingType =
   | 'natural'
   | 'cohabitation'
