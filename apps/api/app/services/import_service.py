@@ -27,6 +27,8 @@ from sqlalchemy.orm import Session
 
 from app.models.invert import Invert
 from app.models.invert_species import InvertSpecies
+from app.models.animal import Animal, ANIMAL_TAXON_VALUES
+from app.models.reptile_species import ReptileSpecies
 from app.utils.limits import active_inverts_query
 
 # Canonical taxa (keep in lockstep with models/invert.py INVERT_TAXON_VALUES).
@@ -434,6 +436,334 @@ def analyze(
         "columns": columns,
         "fields": IMPORT_FIELDS,
         "taxa": TAXA,
+        "default_taxon": default_taxon,
+        "preview": preview,
+        "summary": {
+            "new": new_count,
+            "duplicate": dup_count,
+            "error_rows": err_count,
+            "species_matched": matched_count,
+            "unmapped_columns": unmapped,
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Herpetoverse (animals) import path — parallel to the invert path above.
+#
+# Reuses the taxon-agnostic primitives (parse_bytes, _clean_header,
+# _parse_date, _parse_decimal, _looks_like_date, _BINOMIAL_RE) but maps to
+# the `animals` table + `herp_species` catalog with reptile/amphibian fields
+# (weight, length, hatch date, feeding schedule). Kept in this module so the
+# two importers share one parser and one confirm-screen shape.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Launch taxa (ADR-011). Keep in lockstep with models/animal.py
+# ANIMAL_TAXON_VALUES + the frontend ANIMAL_TAXA registries.
+ANIMAL_TAXA = list(ANIMAL_TAXON_VALUES)
+
+ANIMAL_IMPORT_FIELDS: List[Dict[str, str]] = [
+    {"field": "name", "label": "Name / nickname", "type": "str"},
+    {"field": "scientific_name", "label": "Scientific name", "type": "str"},
+    {"field": "common_name", "label": "Common name", "type": "str"},
+    {"field": "taxon", "label": "Taxon (group)", "type": "animal_taxon"},
+    {"field": "sex", "label": "Sex", "type": "sex"},
+    {"field": "date_acquired", "label": "Date acquired", "type": "date"},
+    {"field": "hatch_date", "label": "Hatch date", "type": "date"},
+    {"field": "source", "label": "Source", "type": "source"},
+    {"field": "price_paid", "label": "Price paid", "type": "decimal"},
+    {"field": "current_weight_g", "label": "Weight (g)", "type": "decimal"},
+    {"field": "current_length_in", "label": "Length (in)", "type": "decimal"},
+    {"field": "feeding_schedule", "label": "Feeding schedule", "type": "str"},
+    {"field": "notes", "label": "Notes", "type": "str"},
+]
+ANIMAL_FIELD_TYPE = {f["field"]: f["type"] for f in ANIMAL_IMPORT_FIELDS}
+
+ANIMAL_HEADER_SYNONYMS: Dict[str, str] = {
+    "name": "name", "pet name": "name", "nickname": "name", "id": "name", "label": "name",
+    "scientific name": "scientific_name", "species": "scientific_name",
+    "latin name": "scientific_name", "scientific": "scientific_name", "sp": "scientific_name",
+    "common name": "common_name", "common": "common_name",
+    "taxon": "taxon", "type": "taxon", "group": "taxon", "kind": "taxon", "category": "taxon",
+    "sex": "sex", "gender": "sex",
+    "date acquired": "date_acquired", "acquired": "date_acquired",
+    "acquired date": "date_acquired", "purchase date": "date_acquired",
+    "date": "date_acquired", "acquired on": "date_acquired",
+    "hatch date": "hatch_date", "hatched": "hatch_date", "dob": "hatch_date",
+    "birth date": "hatch_date", "hatch": "hatch_date",
+    "source": "source", "origin": "source", "acquired from": "source",
+    "price": "price_paid", "price paid": "price_paid", "cost": "price_paid", "paid": "price_paid",
+    "weight": "current_weight_g", "weight g": "current_weight_g", "grams": "current_weight_g",
+    "mass": "current_weight_g",
+    "length": "current_length_in", "length in": "current_length_in", "size": "current_length_in",
+    "svl": "current_length_in", "total length": "current_length_in",
+    "feeding schedule": "feeding_schedule", "feeding": "feeding_schedule",
+    "feed schedule": "feeding_schedule", "diet": "feeding_schedule",
+    "feeding frequency": "feeding_schedule", "schedule": "feeding_schedule",
+    "notes": "notes", "comments": "notes", "remarks": "notes", "description": "notes",
+}
+
+# Aliases that resolve free-text taxon words onto the seven launch groups.
+_ANIMAL_TAXON_ALIASES = {
+    "snakes": "snake", "serpent": "snake", "colubrid": "snake", "python": "snake",
+    "boa": "snake", "ball python": "snake",
+    "lizards": "lizard", "gecko": "lizard", "geckos": "lizard", "leopard gecko": "lizard",
+    "crested gecko": "lizard", "skink": "lizard", "monitor": "lizard", "bearded dragon": "lizard",
+    "agamid": "lizard", "chameleon": "lizard",
+    "turtles": "turtle", "terrapin": "turtle", "aquatic turtle": "turtle",
+    "tortoises": "tortoise", "tort": "tortoise",
+    "frogs": "frog", "toad": "frog", "toads": "frog", "dart frog": "frog",
+    "tree frog": "frog", "amphibian": "frog", "anuran": "frog",
+    "salamanders": "salamander", "newt": "salamander", "newts": "salamander",
+    "axolotl": "salamander", "caudata": "salamander",
+}
+
+
+def _normalize_animal_taxon(v: Any) -> Optional[str]:
+    s = _clean_header(v)
+    if not s:
+        return None
+    s2 = s.replace(" ", "_")
+    if s2 in ANIMAL_TAXON_VALUES:
+        return s2
+    if s in ANIMAL_TAXON_VALUES:
+        return s
+    return _ANIMAL_TAXON_ALIASES.get(s)
+
+
+def _coerce_animal(field: str, value: Any) -> Any:
+    """Animal-flavored coercion. Shares sex/source/date/decimal logic with the
+    invert path; only the taxon type differs (animal groups, not invert taxa)."""
+    if value in (None, ""):
+        return None
+    t = ANIMAL_FIELD_TYPE.get(field, "str")
+    s = str(value).strip()
+    if t == "sex":
+        low = s.lower()
+        if low in ("m", "male"):
+            return "male"
+        if low in ("f", "female"):
+            return "female"
+        return "unknown"
+    if t == "source":
+        low = s.lower()
+        if "bred" in low or low == "cb":
+            return "bred"
+        if "wild" in low or low == "wc":
+            return "wild_caught"
+        if any(k in low for k in ("bought", "purchase", "store", "buy")):
+            return "bought"
+        return None
+    if t == "animal_taxon":
+        return _normalize_animal_taxon(s)
+    if t == "date":
+        d = _parse_date(value)
+        return d.isoformat() if d else None
+    if t == "decimal":
+        d = _parse_decimal(value)
+        return float(d) if d is not None else None
+    return s
+
+
+def match_herp_species(db: Session, scientific_name: Optional[str]) -> Optional[ReptileSpecies]:
+    if not scientific_name:
+        return None
+    sci = scientific_name.strip().lower()
+    if not sci:
+        return None
+    exact = db.query(ReptileSpecies).filter(
+        ReptileSpecies.scientific_name_lower == sci
+    ).first()
+    if exact:
+        return exact
+    parts = sci.split()
+    if len(parts) >= 2:
+        return db.query(ReptileSpecies).filter(
+            ReptileSpecies.scientific_name_lower.ilike(f"{parts[0]} {parts[1]}%")
+        ).first()
+    return None
+
+
+def _infer_animal_from_values(samples: List[str]) -> Optional[Tuple[str, str]]:
+    vals = [str(v).strip().lower() for v in samples if v not in (None, "")]
+    if not vals:
+        return None
+    n = len(vals)
+
+    def frac(pred) -> float:
+        return sum(1 for v in vals if pred(v)) / n
+
+    if frac(lambda v: v in _SEX_VALUES) >= 0.7:
+        return ("sex", "medium")
+    if frac(lambda v: any(s in v for s in _SOURCE_VALUES)) >= 0.7:
+        return ("source", "medium")
+    if frac(lambda v: _normalize_animal_taxon(v) is not None) >= 0.7:
+        return ("taxon", "medium")
+    if frac(lambda v: bool(_BINOMIAL_RE.match(v))) >= 0.6:
+        return ("scientific_name", "medium")
+    if frac(_looks_like_date) >= 0.6:
+        return ("date_acquired", "low")
+    return None
+
+
+def suggest_animal_mapping(
+    headers: List[str], rows: List[Dict[str, Any]]
+) -> Dict[str, Dict[str, Any]]:
+    taken: set = set()
+    out: Dict[str, Dict[str, Any]] = {}
+
+    def samples_for(h):
+        return [r.get(h) for r in rows[:25] if r.get(h) not in (None, "")][:3]
+
+    def header_field(h):
+        ch = _clean_header(h)
+        if ch in ANIMAL_HEADER_SYNONYMS:
+            return ANIMAL_HEADER_SYNONYMS[ch], "high"
+        for key, fld in ANIMAL_HEADER_SYNONYMS.items():
+            if key in ch or ch in key:
+                return fld, "medium"
+        return None
+
+    pending = []
+    for h in headers:
+        hf = header_field(h)
+        if hf and hf[0] not in taken:
+            out[h] = {"field": hf[0], "confidence": hf[1],
+                      "sample_values": [str(s) for s in samples_for(h)]}
+            taken.add(hf[0])
+        else:
+            pending.append(h)
+
+    for h in pending:
+        inferred = _infer_animal_from_values([r.get(h) for r in rows[:40]])
+        if inferred and inferred[0] not in taken:
+            out[h] = {"field": inferred[0], "confidence": inferred[1],
+                      "sample_values": [str(s) for s in samples_for(h)]}
+            taken.add(inferred[0])
+        else:
+            out[h] = {"field": None, "confidence": "none",
+                      "sample_values": [str(s) for s in samples_for(h)]}
+
+    return out
+
+
+def normalize_animal_row(
+    db: Session,
+    raw: Dict[str, Any],
+    mapping: Dict[str, Optional[str]],
+    default_taxon: str,
+    unmapped_to_notes: bool = True,
+) -> Dict[str, Any]:
+    """Apply mapping to one raw row → an AnimalCreate-shaped payload, resolved
+    taxon (+ source), matched herp species, and any per-row errors."""
+    payload: Dict[str, Any] = {}
+    extra_notes: List[str] = []
+
+    for header, value in raw.items():
+        field = mapping.get(header)
+        if not field:
+            if unmapped_to_notes and value not in (None, ""):
+                extra_notes.append(f"{header}: {value}")
+            continue
+        coerced = _coerce_animal(field, value)
+        if coerced is not None:
+            payload[field] = coerced
+
+    if extra_notes:
+        base = payload.get("notes")
+        payload["notes"] = (base + "\n" if base else "") + "\n".join(extra_notes)
+
+    species = match_herp_species(db, payload.get("scientific_name"))
+    if payload.get("taxon"):
+        taxon, taxon_source = payload["taxon"], "column"
+    elif species is not None and getattr(species, "taxon", None):
+        taxon, taxon_source = species.taxon, "species"
+    else:
+        taxon, taxon_source = default_taxon, "default"
+    payload["taxon"] = taxon
+    if species is not None:
+        payload["herp_species_id"] = str(species.id)
+
+    errors: List[str] = []
+    if not payload.get("name") and not payload.get("scientific_name"):
+        errors.append("needs a name or a scientific name")
+    if taxon not in ANIMAL_TAXON_VALUES:
+        errors.append(f"unknown taxon '{taxon}'")
+
+    display = payload.get("name") or payload.get("scientific_name") or "(unnamed)"
+    return {
+        "payload": payload,
+        "taxon": taxon,
+        "taxon_source": taxon_source,
+        "species_matched": species is not None,
+        "species_name": species.scientific_name if species else None,
+        "display_name": display,
+        "errors": errors,
+    }
+
+
+def analyze_animals(
+    db: Session,
+    user,
+    content: bytes,
+    filename: str,
+    default_taxon: str = "snake",
+    preview_limit: int = 20,
+) -> Dict[str, Any]:
+    headers, rows = parse_bytes(content, filename)
+    mapping_info = suggest_animal_mapping(headers, rows)
+    simple_mapping = {h: mapping_info[h]["field"] for h in headers}
+
+    existing = set()
+    for a in db.query(Animal).filter(Animal.user_id == user.id).all():
+        existing.add((
+            (a.name or "").strip().lower(),
+            (a.scientific_name or "").strip().lower(),
+        ))
+
+    preview: List[Dict[str, Any]] = []
+    new_count = dup_count = err_count = matched_count = 0
+    for i, raw in enumerate(rows):
+        norm = normalize_animal_row(db, raw, simple_mapping, default_taxon)
+        key = (
+            (norm["payload"].get("name") or "").strip().lower(),
+            (norm["payload"].get("scientific_name") or "").strip().lower(),
+        )
+        is_dup = key in existing and key != ("", "")
+        status = "error" if norm["errors"] else ("duplicate" if is_dup else "new")
+        if status == "error":
+            err_count += 1
+        elif status == "duplicate":
+            dup_count += 1
+        else:
+            new_count += 1
+        if norm["species_matched"]:
+            matched_count += 1
+        if i < preview_limit:
+            preview.append({
+                "row": i + 1,
+                "display_name": norm["display_name"],
+                "taxon": norm["taxon"],
+                "taxon_source": norm["taxon_source"],
+                "species_matched": norm["species_matched"],
+                "species_name": norm["species_name"],
+                "status": status,
+                "errors": norm["errors"],
+            })
+
+    columns = [{
+        "header": h,
+        "suggested_field": mapping_info[h]["field"],
+        "confidence": mapping_info[h]["confidence"],
+        "sample_values": mapping_info[h]["sample_values"],
+    } for h in headers]
+
+    unmapped = [h for h in headers if not simple_mapping.get(h)]
+    return {
+        "row_count": len(rows),
+        "columns": columns,
+        "fields": ANIMAL_IMPORT_FIELDS,
+        "taxa": ANIMAL_TAXA,
         "default_taxon": default_taxon,
         "preview": preview,
         "summary": {

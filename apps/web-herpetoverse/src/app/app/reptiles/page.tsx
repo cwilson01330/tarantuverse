@@ -165,6 +165,12 @@ export default function ReptilesPage() {
             <span aria-hidden="true">🍽️</span> Feeding Day
           </Link>
           <Link
+            href="/app/import"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-300 hover:text-white hover:border-neutral-700 transition-colors"
+          >
+            <span aria-hidden="true">📥</span> Import
+          </Link>
+          <Link
             href="/app/reptiles/add"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md border border-herp-teal/40 bg-herp-teal/10 text-sm text-herp-teal hover:bg-herp-teal/20 hover:border-herp-teal/60 transition-colors"
           >

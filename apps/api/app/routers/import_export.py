@@ -24,6 +24,9 @@ from app.services.export_service import ExportService
 from app.services.activity_service import create_activity
 from app.routers.inverts import create_invert_row
 from app.schemas.invert import InvertCreate
+from app.models.animal import Animal
+from app.models.tarantula import Sex, Source
+from app.schemas.animal import AnimalCreate
 from app.utils.limits import active_inverts_query
 
 router = APIRouter(
@@ -85,19 +88,137 @@ async def import_analyze(
     file: UploadFile = File(None),
     sheet_url: str = Form(None),
     default_taxon: str = Form("tarantula"),
+    target: str = Form("invert"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Parse a file or Google Sheet, auto-map columns (header + value inference),
     match species against the catalog, and return a preview for the confirm
-    screen. No writes."""
+    screen. No writes.
+
+    `target` picks the destination surface: "invert" (Tarantuverse `inverts`,
+    default) or "animal" (Herpetoverse `animals`). Each has its own field set,
+    header synonyms, taxa, and species catalog."""
     content, filename = await _read_source(file, sheet_url)
     try:
+        if target == "animal":
+            return import_service.analyze_animals(
+                db, current_user, content, filename, default_taxon or "snake"
+            )
         return import_service.analyze(db, current_user, content, filename, default_taxon or "tarantula")
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Couldn't read that file: {e}")
+
+
+async def _import_commit_animals(
+    db: Session,
+    current_user: User,
+    content: bytes,
+    filename: str,
+    col_map: Dict[str, Optional[str]],
+    default_taxon: str,
+    duplicate_mode: str,
+    unmapped_to_notes: bool,
+) -> Dict[str, Any]:
+    """Create (or update) Herpetoverse animals from the confirmed mapping.
+
+    Mirrors the invert commit path but writes to the `animals` table and matches
+    against `herp_species`. HV launches free — no free-tier cap to enforce."""
+    _headers, rows = import_service.parse_bytes(content, filename)
+
+    existing_by_key: Dict[tuple, Any] = {}
+    for a in db.query(Animal).filter(Animal.user_id == current_user.id).all():
+        key = ((a.name or "").strip().lower(), (a.scientific_name or "").strip().lower())
+        existing_by_key.setdefault(key, a)
+
+    imported = updated = skipped = error_rows = 0
+    errors: List[str] = []
+
+    for i, raw in enumerate(rows):
+        norm = import_service.normalize_animal_row(
+            db, raw, col_map, default_taxon, unmapped_to_notes
+        )
+        if norm["errors"]:
+            error_rows += 1
+            errors.append(f"Row {i + 1} ({norm['display_name']}): {', '.join(norm['errors'])}")
+            continue
+
+        payload = norm["payload"]
+        key = (
+            (payload.get("name") or "").strip().lower(),
+            (payload.get("scientific_name") or "").strip().lower(),
+        )
+        existing = existing_by_key.get(key) if key != ("", "") else None
+
+        if existing is not None:
+            if duplicate_mode == "update":
+                for fld, val in payload.items():
+                    if fld == "taxon":  # taxon is immutable
+                        continue
+                    if fld == "sex" and val:
+                        try:
+                            val = Sex(val)
+                        except ValueError:
+                            continue
+                    if fld == "source" and val:
+                        try:
+                            val = Source(val)
+                        except ValueError:
+                            continue
+                    if hasattr(existing, fld):
+                        setattr(existing, fld, val)
+                db.commit()
+                updated += 1
+            else:
+                skipped += 1
+            continue
+
+        try:
+            create = AnimalCreate(**payload)
+        except Exception as e:
+            error_rows += 1
+            errors.append(f"Row {i + 1} ({norm['display_name']}): {e}")
+            continue
+
+        data = create.model_dump()
+        if data.get("sex"):
+            try:
+                data["sex"] = Sex(data["sex"])
+            except ValueError:
+                data["sex"] = None
+        if data.get("source"):
+            try:
+                data["source"] = Source(data["source"])
+            except ValueError:
+                data["source"] = None
+
+        animal = Animal(user_id=current_user.id, **data)
+        db.add(animal)
+        db.commit()
+        db.refresh(animal)
+        imported += 1
+        existing_by_key[key] = animal
+
+    if imported or updated:
+        await create_activity(
+            db=db,
+            user_id=current_user.id,
+            action_type="import_collection",
+            target_type="collection",
+            target_id=current_user.id,
+            metadata={"imported": imported, "updated": updated},
+        )
+
+    return {
+        "imported": imported,
+        "updated": updated,
+        "skipped_duplicates": skipped,
+        "error_rows": error_rows,
+        "errors": errors[:50],
+        "cap_reached": False,
+    }
 
 
 @router.post("/import/commit", status_code=status.HTTP_200_OK)
@@ -108,17 +229,26 @@ async def import_commit(
     default_taxon: str = Form("tarantula"),
     duplicate_mode: str = Form("skip"),
     unmapped_to_notes: bool = Form(True),
+    target: str = Form("invert"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Create (or update) inverts from the confirmed column mapping. Cap-aware:
     stops at the free-tier limit and reports it. Duplicates (same name +
-    scientific name) are skipped or updated per `duplicate_mode`."""
+    scientific name) are skipped or updated per `duplicate_mode`.
+
+    `target="animal"` routes to the Herpetoverse `animals` table instead."""
     content, filename = await _read_source(file, sheet_url)
     try:
         col_map: Dict[str, Optional[str]] = json.loads(mapping)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid column mapping.")
+
+    if target == "animal":
+        return await _import_commit_animals(
+            db, current_user, content, filename, col_map,
+            default_taxon or "snake", duplicate_mode, unmapped_to_notes,
+        )
 
     _headers, rows = import_service.parse_bytes(content, filename)
 

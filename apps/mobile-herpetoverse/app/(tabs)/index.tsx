@@ -87,12 +87,22 @@ function CollectionScreen() {
   const { colors, layout } = useTheme();
 
   // Header right slot — notification bell (in-app notification center) +
-  // Feeding Day entry (bulk-log feedings across the collection). Rendered
-  // here so both are reachable from the loading, empty, and populated
-  // states without restructuring the list.
+  // Import (bring a collection in from a Sheet/CSV) + Feeding Day entry
+  // (bulk-log feedings across the collection). Rendered here so all three
+  // are reachable from the loading, empty, and populated states without
+  // restructuring the list.
   const feedingDayAction = (
     <View style={styles.headerActions}>
       <NotificationBell color={colors.primary} size={22} />
+      <TouchableOpacity
+        onPress={() => router.push('/import' as never)}
+        hitSlop={8}
+        style={styles.headerAction}
+        accessibilityRole="button"
+        accessibilityLabel="Import collection from a Google Sheet or file"
+      >
+        <MaterialCommunityIcons name="tray-arrow-down" size={22} color={colors.primary} />
+      </TouchableOpacity>
       <TouchableOpacity
         onPress={() => router.push('/feeding-day' as never)}
         hitSlop={8}
