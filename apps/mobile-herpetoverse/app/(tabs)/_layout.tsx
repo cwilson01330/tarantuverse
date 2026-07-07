@@ -1,10 +1,14 @@
 /**
  * Tab skeleton for Herpetoverse mobile v1.
  *
- *   Collection   → /(tabs)/index          (snakes + lizards, Bundle 2)
- *   Species      → /(tabs)/species        (care sheets, Bundle 4)
- *   Breeding     → /(tabs)/breeding       (pairings + clutches, Sprint 5a)
- *   Profile      → /(tabs)/profile        (settings + logout, Bundle 1)
+ *   Home         → /(tabs)/dashboard       (glanceable hub — the app opens here)
+ *   Collection   → /(tabs)/index           (snakes + lizards, Bundle 2)
+ *   Species      → /(tabs)/species          (care sheets, Bundle 4)
+ *   Breeding     → /(tabs)/breeding         (pairings + clutches, Sprint 5a)
+ *   Profile      → /(tabs)/profile          (settings + logout, Bundle 1)
+ *
+ * Home is declared first so it's the default landing tab. Collection
+ * stays as-is (index) in second position.
  *
  * Community tabs (messages, forums, followers) are explicitly out of
  * scope for mobile v1 per the sprint plan.
@@ -41,6 +45,16 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.background },
       }}
     >
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Home',
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="view-dashboard-outline" size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="index"
         options={{

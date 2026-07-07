@@ -16,7 +16,10 @@ export default function Index() {
 
   useEffect(() => {
     if (user) {
-      router.replace('/(tabs)');
+      // Land on the dashboard hub, not the Collection list. `/(tabs)`
+      // alone resolves to the group's `index` route (Collection); the
+      // explicit /dashboard opens the Home tab.
+      router.replace('/(tabs)/dashboard');
     } else {
       router.replace('/login');
     }

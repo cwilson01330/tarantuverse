@@ -52,7 +52,7 @@ export default function LoginScreen() {
     try {
       await login(email.trim(), password);
       captureEvent('login_success', { method: 'email' });
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/dashboard');
     } catch (err: any) {
       captureEvent('login_failed', { method: 'email' });
       setError(err.message || 'Could not sign in.');

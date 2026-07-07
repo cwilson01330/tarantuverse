@@ -57,7 +57,7 @@ export default function RegisterScreen() {
       } else {
         // Auto-sign-in if email verification is off (feature flag).
         await login(email.trim(), password);
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/dashboard');
       }
     } catch (err: any) {
       captureEvent('signup_failed');
