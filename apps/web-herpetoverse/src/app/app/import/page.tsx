@@ -725,6 +725,29 @@ export default function ImportCollectionPage() {
             ))}
           </div>
 
+          {result.cap_reached && (
+            <div
+              role="alert"
+              className="p-4 rounded-lg border border-amber-500/40 bg-amber-500/10"
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-xl" aria-hidden="true">⚠️</span>
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-200 mb-1">
+                    Some rows weren&apos;t imported
+                  </h3>
+                  <p className="text-sm text-amber-100/90">
+                    You hit the free-tier limit of 5 animals, so the import
+                    stopped there.{' '}
+                    <Link href="/pricing" className="underline font-medium">
+                      Learn more
+                    </Link>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {result.errors.length > 0 && (
             <div className="p-4 rounded-lg border border-neutral-800 bg-neutral-900/40">
               <h3 className="text-sm font-semibold text-white mb-2">

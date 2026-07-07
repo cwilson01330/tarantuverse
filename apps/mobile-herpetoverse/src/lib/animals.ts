@@ -340,6 +340,33 @@ export async function deleteAnimal(id: string): Promise<void> {
 }
 
 /**
+ * Free-tier collection cap status for the current keeper.
+ *
+ * `limit` is -1 for premium (any active Appalachian Tarantulas
+ * subscription) = unlimited animals; otherwise it's the free cap (5 as
+ * of this writing). `at_limit` is true when a free keeper has reached
+ * it — the next create returns HTTP 402. Used to surface a subtle
+ * "X / 5" counter on the collection header (hidden when premium).
+ *
+ * Backend: GET /animals/limits. apiClient baseURL already carries
+ * /api/v1 so the path starts at /animals/... (never /api/v1/animals/...).
+ */
+export interface AnimalLimits {
+  /** -1 when premium (unlimited); otherwise the free cap (5). */
+  limit: number;
+  current_count: number;
+  is_premium: boolean;
+  /** null for premium (unlimited); otherwise animals left before the cap. */
+  remaining: number | null;
+  at_limit: boolean;
+}
+
+export async function getAnimalLimits(): Promise<AnimalLimits> {
+  const { data } = await apiClient.get<AnimalLimits>('/animals/limits');
+  return data;
+}
+
+/**
  * Pause feeding reminders for an animal. The backend's
  * `_compute_feeding_status` returns `status='paused'` while this is
  * active. Reason values from the canonical list (hunger_strike,

@@ -32,6 +32,8 @@ from app.models.communal_incident import CommunalIncident
 from app.models.feeder_species import FeederSpecies
 from app.models.feeder_colony import FeederColony
 from app.models.feeder_care_log import FeederCareLog
+# Herpetoverse feeder keeping (ADR-012) — own tables for reptile/aquatic + frozen feeders.
+from app.models.hv_feeder import HvFeederSpecies, HvFeederStock, HvFeederLog
 from app.models.waitlist import WaitlistSignup
 # Herpetoverse — ADR-003 consolidated the per-taxon snake/lizard/frog
 # tables into one `animals` table. ReptileSpecies (DB table renamed to
@@ -110,6 +112,9 @@ __all__ = [
     "FeederSpecies",
     "FeederColony",
     "FeederCareLog",
+    "HvFeederSpecies",
+    "HvFeederStock",
+    "HvFeederLog",
     "WaitlistSignup",
     "ReptileSpecies",
     "Animal",

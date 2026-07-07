@@ -39,6 +39,7 @@ import {
 } from '../../src/components/forms/FormPrimitives';
 import { EnclosurePicker } from '../../src/components/forms/EnclosurePicker';
 import { ReptileSpeciesAutocomplete } from '../../src/components/forms/ReptileSpeciesAutocomplete';
+import UpgradeModal from '../../src/components/UpgradeModal';
 import {
   ANIMAL_TAXA,
   ANIMAL_TAXON_ORDER,
@@ -150,6 +151,16 @@ function AddReptileScreen() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Free-tier cap gate. When the create POST returns HTTP 402 we show the
+  // (informational) UpgradeModal instead of an inline error. `capDetail`
+  // holds the server's structured detail ({ message, current_count,
+  // limit }) so the modal can show the exact numbers.
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [capDetail, setCapDetail] = useState<{
+    message?: string;
+    current_count?: number;
+    limit?: number;
+  } | null>(null);
 
   // Placeholder examples for the currently-selected taxon.
   const ex = exampleFor(taxon);
@@ -212,6 +223,31 @@ function AddReptileScreen() {
       // ADR-003: one detail route for every taxon.
       router.replace(`/reptile/${created.id}` as never);
     } catch (err) {
+      // Free-tier cap: the backend returns HTTP 402 with a structured
+      // detail. Surface the upgrade modal instead of a generic error so
+      // the keeper knows why the save was blocked. Every other error
+      // behaves as before (inline banner).
+      const status = (err as { response?: { status?: number } })?.response
+        ?.status;
+      if (status === 402) {
+        const detail = (
+          err as {
+            response?: {
+              data?: {
+                detail?: {
+                  message?: string;
+                  current_count?: number;
+                  limit?: number;
+                };
+              };
+            };
+          }
+        )?.response?.data?.detail;
+        setCapDetail(detail ?? null);
+        setShowUpgrade(true);
+        setSubmitting(false);
+        return;
+      }
       setError(extractErrorMessage(err, 'Could not save this reptile.'));
       setSubmitting(false);
     }
@@ -350,6 +386,18 @@ function AddReptileScreen() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Free-tier cap gate — informational, no in-app purchase yet. */}
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        message={
+          capDetail?.message ??
+          'The free plan tracks up to 5 animals. Premium keepers get unlimited animals.'
+        }
+        currentCount={capDetail?.current_count ?? null}
+        limit={capDetail?.limit ?? null}
+      />
     </SafeAreaView>
   );
 }

@@ -27,7 +27,7 @@ from app.schemas.invert import InvertCreate
 from app.models.animal import Animal
 from app.models.tarantula import Sex, Source
 from app.schemas.animal import AnimalCreate
-from app.utils.limits import active_inverts_query
+from app.utils.limits import active_inverts_query, enforce_animal_limit
 
 router = APIRouter(
     tags=["import-export"]
@@ -125,7 +125,8 @@ async def _import_commit_animals(
     """Create (or update) Herpetoverse animals from the confirmed mapping.
 
     Mirrors the invert commit path but writes to the `animals` table and matches
-    against `herp_species`. HV launches free — no free-tier cap to enforce."""
+    against `herp_species`. Cap-aware: stops at the HV free-tier animal limit and
+    reports it (premium keepers are uncapped)."""
     _headers, rows = import_service.parse_bytes(content, filename)
 
     existing_by_key: Dict[tuple, Any] = {}
@@ -135,6 +136,7 @@ async def _import_commit_animals(
 
     imported = updated = skipped = error_rows = 0
     errors: List[str] = []
+    cap_reached = False
 
     for i, raw in enumerate(rows):
         norm = import_service.normalize_animal_row(
@@ -182,6 +184,16 @@ async def _import_commit_animals(
             errors.append(f"Row {i + 1} ({norm['display_name']}): {e}")
             continue
 
+        # Free-tier cap: stop importing NEW animals once the keeper is at the
+        # limit (updates to existing animals above are always allowed).
+        try:
+            enforce_animal_limit(db, current_user)
+        except HTTPException as he:
+            if he.status_code == status.HTTP_402_PAYMENT_REQUIRED:
+                cap_reached = True
+                break
+            raise
+
         data = create.model_dump()
         if data.get("sex"):
             try:
@@ -217,7 +229,7 @@ async def _import_commit_animals(
         "skipped_duplicates": skipped,
         "error_rows": error_rows,
         "errors": errors[:50],
-        "cap_reached": False,
+        "cap_reached": cap_reached,
     }
 
 

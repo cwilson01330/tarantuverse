@@ -32,7 +32,9 @@ import {
   ANIMAL_TAXA,
   ANIMAL_TAXON_ORDER,
   type AnimalTaxon,
+  type AnimalLimits,
   createFeeding,
+  getAnimalLimits,
   listAnimals,
 } from '../../src/lib/animals';
 import { AppHeader } from '../../src/components/AppHeader';
@@ -116,6 +118,10 @@ function CollectionScreen() {
   );
 
   const [rows, setRows] = useState<ReptileRow[] | null>(null);
+  // Free-tier cap status, for the subtle "X / 5" header counter. null =
+  // not loaded yet or the call failed (we simply hide the counter then —
+  // it's a nicety, never a blocker). Hidden entirely for premium keepers.
+  const [limits, setLimits] = useState<AnimalLimits | null>(null);
   const [partialError, setPartialError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // Taxon filter — null = "All". Only taxa the keeper actually owns get
@@ -131,7 +137,21 @@ function CollectionScreen() {
     null,
   );
 
+  // Header counter subtitle — "3 / 5 animals" for free keepers who are
+  // approaching or at the cap. Hidden entirely for premium (limit === -1)
+  // and when limits haven't loaded. Undefined = no subtitle rendered.
+  const capSubtitle =
+    limits && !limits.is_premium && limits.limit > 0
+      ? `${limits.current_count} / ${limits.limit} animals`
+      : undefined;
+
   const fetchAll = useCallback(async () => {
+    // Cap status for the header counter — best-effort, never blocks the
+    // collection. A failure just leaves the counter hidden.
+    getAnimalLimits()
+      .then(setLimits)
+      .catch(() => setLimits(null));
+
     // ADR-003: one unified animals endpoint — every taxon in a single
     // call. The `taxon` discriminator rides on each row.
     try {
@@ -296,7 +316,7 @@ function CollectionScreen() {
         edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <AppHeader title="Collection" rightAction={feedingDayAction} />
+        <AppHeader title="Collection" subtitle={capSubtitle} rightAction={feedingDayAction} />
         <View style={styles.centerContent}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -349,7 +369,7 @@ function CollectionScreen() {
       edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <AppHeader title="Collection" rightAction={feedingDayAction} />
+      <AppHeader title="Collection" subtitle={capSubtitle} rightAction={feedingDayAction} />
       <FlatList
         data={visibleRows ?? []}
         keyExtractor={(r) => `${r.taxon}:${r.id}`}

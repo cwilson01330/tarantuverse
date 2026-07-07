@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.models.invert import Invert
 from app.models.colony import Colony
-from app.models.user import User, FREE_TIER_MAX_ANIMALS
+from app.models.animal import Animal
+from app.models.user import User, FREE_TIER_MAX_ANIMALS, HV_FREE_TIER_MAX_ANIMALS
 
 
 def active_colonies_query(db: Session, user_id):
@@ -79,5 +80,47 @@ def enforce_collection_limit(db: Session, user: User) -> None:
                 "current_count": current_count,
                 "limit": max_animals,
                 "is_premium": limits.get("is_premium", False),
+            },
+        )
+
+
+def active_animals_query(db: Session, user_id):
+    """Base query for a user's ACTIVE Herpetoverse animals (reptiles /
+    amphibians). Excludes animals handed off via transfer, so counts and the
+    collection list agree. Mirrors active_inverts_query for the `animals` table.
+    """
+    return db.query(Animal).filter(
+        Animal.user_id == user_id,
+        Animal.transferred_out_at.is_(None),
+    )
+
+
+def enforce_animal_limit(db: Session, user: User) -> None:
+    """Raise HTTP 402 if the user is at or above their Herpetoverse animal cap.
+
+    HV free tier = HV_FREE_TIER_MAX_ANIMALS animals. Premium is APP-SCOPED — only
+    a Herpetoverse (or 'both' bundle) subscription lifts the HV cap; a
+    Tarantuverse-only subscriber stays on the HV free tier. Call BEFORE inserting
+    the new animal. The 402 detail shape matches enforce_collection_limit so the
+    same UpgradeModal handles both apps.
+    """
+    # HV-scoped entitlement (not the global is_premium — HV bills separately).
+    if user.is_premium_for_app("herpetoverse"):
+        return
+
+    cap = HV_FREE_TIER_MAX_ANIMALS
+    current_count = active_animals_query(db, user.id).count()
+
+    if current_count >= cap:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": (
+                    f"You've reached the limit of {cap} animals on the free "
+                    f"plan. Upgrade to premium for unlimited tracking!"
+                ),
+                "current_count": current_count,
+                "limit": cap,
+                "is_premium": False,
             },
         )

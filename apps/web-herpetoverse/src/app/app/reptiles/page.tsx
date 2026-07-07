@@ -23,7 +23,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { ApiError } from '@/lib/apiClient'
+import { ApiError, apiFetch } from '@/lib/apiClient'
 import {
   ANIMAL_TAXA,
   ANIMAL_TAXON_ORDER,
@@ -80,11 +80,36 @@ function detailHref(row: ReptileRow): string {
   return `/app/reptiles/${row.id}`
 }
 
+/** Shape of GET /api/v1/animals/limits. limit = -1 means premium/unlimited. */
+interface AnimalLimits {
+  limit: number
+  current_count: number
+  is_premium: boolean
+}
+
 export default function ReptilesPage() {
   const [rows, setRows] = useState<ReptileRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   // null = "All"; otherwise the active taxon filter.
   const [activeTaxon, setActiveTaxon] = useState<Taxon | null>(null)
+  // Free-tier usage counter (X / N). null until loaded; hidden for premium.
+  const [limits, setLimits] = useState<AnimalLimits | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    // Best-effort — a failed limits fetch just hides the counter, never blocks
+    // the collection grid.
+    apiFetch<AnimalLimits>('/api/v1/animals/limits')
+      .then((data) => {
+        if (!cancelled) setLimits(data)
+      })
+      .catch(() => {
+        if (!cancelled) setLimits(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -156,6 +181,20 @@ export default function ReptilesPage() {
           <p className="text-neutral-400">
             Weights, feedings, sheds — per animal.
           </p>
+          {/* Free-tier usage counter. Hidden for premium/unlimited (limit -1). */}
+          {limits && !limits.is_premium && limits.limit > 0 && (
+            <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-neutral-500">
+              <span className="font-semibold text-neutral-300">
+                {limits.current_count} / {limits.limit}
+              </span>
+              <span>animals on the free plan</span>
+              {limits.current_count >= limits.limit && (
+                <Link href="/pricing" className="text-herp-teal underline ml-1">
+                  Upgrade
+                </Link>
+              )}
+            </p>
+          )}
         </div>
         <div className="hidden sm:flex items-center gap-2">
           <Link

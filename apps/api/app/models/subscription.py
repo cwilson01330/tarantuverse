@@ -25,6 +25,12 @@ class SubscriptionPlan(Base):
     display_name = Column(String(100), nullable=False)
     description = Column(Text)
 
+    # Which Appalachian Tarantulas app this plan entitles: 'tarantuverse',
+    # 'herpetoverse', or 'both' (bundle / add-on). Entitlement is resolved
+    # per-app via User.is_premium_for_app — a TV-scoped plan does NOT grant HV
+    # premium. Legacy rows backfill to 'tarantuverse' (hvs_20260707).
+    app = Column(String(20), nullable=False, default="tarantuverse", server_default="tarantuverse")
+
     # Pricing
     price_monthly = Column(Numeric(10, 2), default=0)
     price_yearly = Column(Numeric(10, 2), default=0)

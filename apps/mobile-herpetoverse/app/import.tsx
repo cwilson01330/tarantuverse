@@ -24,6 +24,7 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -636,10 +637,21 @@ function ImportScreen() {
                   <MaterialCommunityIcons name="alert" size={20} color={colors.warning} />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.capText, { color: colors.warning }]}>
-                      You hit the free collection limit — some rows weren&apos;t imported.
+                      You hit the free plan&apos;s 5-animal limit — the remaining rows weren&apos;t
+                      imported. Premium keepers get unlimited animals.
                     </Text>
-                    <TouchableOpacity onPress={() => router.push('/settings' as never)}>
-                      <Text style={[styles.capLink, { color: colors.warning }]}>Upgrade to import the rest →</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        Linking.openURL('https://herpetoverse.com/pricing').catch(() => {
+                          /* keep the screen up if the browser can't open */
+                        });
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Learn more about premium on the web"
+                    >
+                      <Text style={[styles.capLink, { color: colors.warning }]}>
+                        Learn more about premium →
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>

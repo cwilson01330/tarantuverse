@@ -37,6 +37,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
+import UpgradeModal from '@/components/UpgradeModal'
 import { ApiError } from '@/lib/apiClient'
 import {
   ANIMAL_TAXA,
@@ -189,6 +190,9 @@ function AddReptileForm() {
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Free-tier cap (HTTP 402) surfaces an upgrade modal instead of an inline
+  // error. `capInfo` holds the parsed 402 detail body; null = modal closed.
+  const [capInfo, setCapInfo] = useState<{ message: string | null; limit: number | null } | null>(null)
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -259,7 +263,18 @@ function AddReptileForm() {
       // ADR-003: one taxon-agnostic detail route for every taxon.
       router.push(`/app/reptiles/${animal.id}`)
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status === 402) {
+        // Free-tier cap reached. The 402 body is
+        // { detail: { message, current_count, limit, is_premium } }.
+        // apiClient's extractMessage can't unwrap the object detail, so we
+        // read err.body directly and open the upgrade modal instead of an
+        // inline error.
+        const detail = (err.body as { detail?: { message?: unknown; limit?: unknown } } | null)?.detail
+        setCapInfo({
+          message: typeof detail?.message === 'string' ? detail.message : null,
+          limit: typeof detail?.limit === 'number' ? detail.limit : null,
+        })
+      } else if (err instanceof ApiError) {
         setError(err.message || 'Could not save. Please try again.')
       } else {
         setError('Could not save. Check your connection and try again.')
@@ -568,6 +583,13 @@ function AddReptileForm() {
           </button>
         </div>
       </form>
+
+      <UpgradeModal
+        isOpen={capInfo !== null}
+        onClose={() => setCapInfo(null)}
+        message={capInfo?.message}
+        limit={capInfo?.limit}
+      />
     </div>
   )
 }

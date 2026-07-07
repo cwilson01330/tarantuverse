@@ -21,6 +21,13 @@ from app.database import Base
 FREE_TIER_MAX_ANIMALS = 15
 FREE_TIER_MAX_TARANTULAS = 15
 
+# Herpetoverse free-tier cap, counted against the `animals` table (reptiles /
+# amphibians). Independent of the invert cap above — different tables, so a
+# keeper gets 15 free inverts (TV) AND 5 free animals (HV). Premium is shared:
+# any active subscription (is_premium) lifts BOTH caps. See utils/limits.py::
+# enforce_animal_limit.
+HV_FREE_TIER_MAX_ANIMALS = 5
+
 
 class User(Base):
     __tablename__ = "users"
@@ -142,6 +149,42 @@ class User(Base):
 
         # User is premium if they have any plan other than "free"
         return plan and plan.name != "free"
+
+    def is_premium_for_app(self, app: str) -> bool:
+        """Active premium entitlement scoped to a single app.
+
+        HV and TV bill separately (a keeper who uses only one app pays only for
+        that app), so premium is resolved PER-APP: a subscription grants premium
+        for `app` only when its plan is scoped to that app or to 'both'. Legacy
+        plans with no `app` are treated as 'tarantuverse'. Checks ALL active
+        subscriptions (a user may hold a separate TV and HV sub) and honours
+        lazy expiry. See migration hvs_20260707.
+        """
+        from datetime import datetime, timezone
+        from sqlalchemy.orm import object_session
+        from app.models.subscription import UserSubscription, SubscriptionPlan
+
+        session = object_session(self)
+        if not session:
+            return False
+
+        now = datetime.now(timezone.utc)
+        subs = session.query(UserSubscription).filter(
+            UserSubscription.user_id == self.id,
+            UserSubscription.status == "active",
+        ).all()
+        for sub in subs:
+            if sub.expires_at and sub.expires_at <= now:
+                continue  # lazily expired
+            plan = session.query(SubscriptionPlan).filter(
+                SubscriptionPlan.id == sub.plan_id
+            ).first()
+            if not plan or plan.name == "free":
+                continue
+            plan_app = getattr(plan, "app", None) or "tarantuverse"
+            if plan_app in (app, "both"):
+                return True
+        return False
 
     def get_subscription_limits(self):
         """Get user's current subscription limits"""

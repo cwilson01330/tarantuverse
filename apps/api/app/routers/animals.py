@@ -23,7 +23,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
-from app.models.user import User
+from app.utils.limits import enforce_animal_limit, active_animals_query
+from app.models.user import User, HV_FREE_TIER_MAX_ANIMALS
 from app.models.animal import Animal, ANIMAL_TAXON_VALUES
 from app.models.shed_log import ShedLog
 from app.models.weight_log import WeightLog
@@ -220,6 +221,11 @@ async def create_animal(
 ):
     """Create a new animal for the authenticated user. `taxon` is
     required and immutable once set."""
+    # Free-tier cap (HV_FREE_TIER_MAX_ANIMALS). Raises 402 with an
+    # upgrade-prompt payload when the free keeper is at the limit; premium
+    # (any active subscription) is uncapped.
+    enforce_animal_limit(db, current_user)
+
     animal_dict = _coerce_enums(animal_data.model_dump())
 
     new_animal = Animal(user_id=current_user.id, **animal_dict)
@@ -236,6 +242,26 @@ async def create_animal(
 # NOTE: these static routes MUST stay declared before `/{animal_id}` or the
 # dynamic route swallows "feeding-status" / "bulk-feedings" and 422s on UUID
 # parsing.
+
+@router.get("/limits")
+async def get_animal_limits(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Free-tier animal cap status for the caller — powers the "X / N" counter
+    and proactive upgrade prompt. `limit` is -1 when premium (unlimited).
+    Premium is APP-SCOPED — only an HV (or 'both') subscription counts here."""
+    is_premium = current_user.is_premium_for_app("herpetoverse")
+    current_count = active_animals_query(db, current_user.id).count()
+    limit = -1 if is_premium else HV_FREE_TIER_MAX_ANIMALS
+    return {
+        "limit": limit,
+        "current_count": current_count,
+        "is_premium": is_premium,
+        "remaining": None if is_premium else max(0, limit - current_count),
+        "at_limit": (not is_premium) and current_count >= limit,
+    }
+
 
 @router.get("/feeding-status", response_model=List[AnimalFeedingStatusItem])
 async def list_feeding_status(
