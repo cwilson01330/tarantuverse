@@ -21,11 +21,10 @@ import { useRouter } from 'next/navigation'
 import { apiFetch, ApiError } from '@/lib/apiClient'
 import { clearSession, getToken, setSession } from '@/lib/auth'
 
-// Legal pages currently live on the Tarantuverse web app under the
-// /herpetoverse/ path — herpetoverse.com has no legal routes of its own
-// yet. Revisit relocating these before launch.
-const PRIVACY_URL = 'https://www.tarantuverse.com/herpetoverse/privacy-policy'
-const TERMS_URL = 'https://www.tarantuverse.com/herpetoverse/terms'
+// HV-owned legal pages, served from this same app at herpetoverse.com — so the
+// URLs baked into the mobile build never break if brand hosting changes.
+const PRIVACY_URL = 'https://herpetoverse.com/privacy-policy'
+const TERMS_URL = 'https://herpetoverse.com/terms'
 const SUPPORT_EMAIL = 'support@tarantuverse.com'
 const DELETE_CONFIRM_WORD = 'DELETE'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'

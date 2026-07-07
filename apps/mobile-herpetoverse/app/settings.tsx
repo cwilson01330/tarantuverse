@@ -40,11 +40,10 @@ import { AppHeader } from '../src/components/AppHeader';
 import { HeaderBackButton } from '../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../src/components/ErrorBoundary';
 
-// Legal pages currently live on the Tarantuverse web app under the
-// /herpetoverse/ path — herpetoverse.com has no legal routes of its own
-// yet. Revisit relocating these to herpetoverse.com before launch.
-const PRIVACY_URL = 'https://www.tarantuverse.com/herpetoverse/privacy-policy';
-const TERMS_URL = 'https://www.tarantuverse.com/herpetoverse/terms';
+// HV-owned legal pages, served from the HV web app at herpetoverse.com — a
+// stable URL that won't break this native build if brand hosting changes.
+const PRIVACY_URL = 'https://herpetoverse.com/privacy-policy';
+const TERMS_URL = 'https://herpetoverse.com/terms';
 const SUPPORT_EMAIL = 'support@tarantuverse.com';
 const DELETE_CONFIRM_WORD = 'DELETE';
 // Data export runs on the web for now: native in-app download needs
