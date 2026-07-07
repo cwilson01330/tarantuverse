@@ -42,6 +42,7 @@ import {
   type ReptileSpecies,
   getReptileSpecies,
 } from '../../src/lib/reptile-species';
+import { ANIMAL_TAXA, type AnimalTaxon } from '../../src/lib/animals';
 
 // Seeded herp families bucketed by clade. Drives the taxon inference
 // for the "Add to my collection" CTA — most keepers shouldn't have to
@@ -84,13 +85,37 @@ const FROG_FAMILIES = new Set([
   'Pyxicephalidae',
 ]);
 
-function taxonFromFamily(
-  family: string | null,
-): 'snake' | 'lizard' | 'frog' | null {
+// Chelonian families — turtles (aquatic/semi-aquatic) vs tortoises
+// (terrestrial). Split so the CTA can pre-fill the right taxon.
+const TURTLE_FAMILIES = new Set([
+  'Emydidae',
+  'Geoemydidae',
+  'Kinosternidae',
+  'Chelydridae',
+  'Trionychidae',
+  'Chelidae',
+]);
+const TORTOISE_FAMILIES = new Set(['Testudinidae']);
+
+// Caudate families — salamanders + newts.
+const SALAMANDER_FAMILIES = new Set([
+  'Salamandridae',
+  'Ambystomatidae',
+  'Plethodontidae',
+  'Cryptobranchidae',
+]);
+
+// Returns any registry taxon we can confidently infer from family, else
+// null (the add screen falls back and lets the keeper pick). Return type
+// is the registry union so new taxa slot in without a type break here.
+function taxonFromFamily(family: string | null): AnimalTaxon | null {
   if (!family) return null;
   if (SNAKE_FAMILIES.has(family)) return 'snake';
   if (LIZARD_FAMILIES.has(family)) return 'lizard';
+  if (TURTLE_FAMILIES.has(family)) return 'turtle';
+  if (TORTOISE_FAMILIES.has(family)) return 'tortoise';
   if (FROG_FAMILIES.has(family)) return 'frog';
+  if (SALAMANDER_FAMILIES.has(family)) return 'salamander';
   return null;
 }
 
@@ -623,17 +648,14 @@ function AddToCollectionCTA({
   taxonHint,
 }: {
   onPress: () => void;
-  taxonHint: 'snake' | 'lizard' | 'frog' | null;
+  taxonHint: AnimalTaxon | null;
 }) {
   const { colors, layout } = useTheme();
-  const taxonLabel =
-    taxonHint === 'snake'
-      ? 'Add as snake'
-      : taxonHint === 'lizard'
-        ? 'Add as lizard'
-        : taxonHint === 'frog'
-          ? 'Add as frog'
-          : 'Add to my collection';
+  // Registry-driven label — any inferred taxon reads "Add as <label>";
+  // unknown taxon (null) falls back to the generic CTA.
+  const taxonLabel = taxonHint
+    ? `Add as ${ANIMAL_TAXA[taxonHint].label.toLowerCase()}`
+    : 'Add to my collection';
   const hint =
     taxonHint === null
       ? "You'll pick the type on the next step."

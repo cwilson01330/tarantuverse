@@ -24,13 +24,54 @@ import { apiClient } from '../services/api';
 export type Sex = 'male' | 'female' | 'unknown';
 export type Source = 'bred' | 'bought' | 'wild_caught';
 export type Visibility = 'private' | 'public';
-export type AnimalTaxon = 'snake' | 'lizard' | 'frog';
 
-export const TAXON_LABELS: Record<AnimalTaxon, string> = {
-  snake: 'Snake',
-  lizard: 'Lizard',
-  frog: 'Frog',
+// Taxon registry (ADR-011) — the single source of truth for HV herp groups.
+// Adding a group = one entry here (+ the web mirror) + a species seed; the
+// backend taxon column is a flexible VARCHAR, so no migration. Kept in
+// lockstep with ANIMAL_TAXON_VALUES in apps/api/app/models/animal.py and the
+// web-herpetoverse registry.
+export type AnimalTaxon =
+  | 'snake'
+  | 'lizard'
+  | 'turtle'
+  | 'tortoise'
+  | 'frog'
+  | 'salamander'
+  | 'other';
+
+export interface AnimalTaxonMeta {
+  key: AnimalTaxon;
+  /** Singular label for pickers + detail chrome. */
+  label: string;
+  /** Plural label for collection filters + section headers. */
+  plural: string;
+  /** Emoji glyph for cards / pickers. */
+  glyph: string;
+}
+
+export const ANIMAL_TAXA: Record<AnimalTaxon, AnimalTaxonMeta> = {
+  snake: { key: 'snake', label: 'Snake', plural: 'Snakes', glyph: '🐍' },
+  lizard: { key: 'lizard', label: 'Lizard', plural: 'Lizards', glyph: '🦎' },
+  turtle: { key: 'turtle', label: 'Turtle', plural: 'Turtles', glyph: '🐢' },
+  tortoise: { key: 'tortoise', label: 'Tortoise', plural: 'Tortoises', glyph: '🐢' },
+  frog: { key: 'frog', label: 'Frog', plural: 'Frogs & toads', glyph: '🐸' },
+  salamander: { key: 'salamander', label: 'Salamander', plural: 'Salamanders & newts', glyph: '🐉' },
+  other: { key: 'other', label: 'Other', plural: 'Other herps', glyph: '🦕' },
 };
+
+/** Display order for pickers / filters. */
+export const ANIMAL_TAXON_ORDER: AnimalTaxon[] = [
+  'snake', 'lizard', 'turtle', 'tortoise', 'frog', 'salamander', 'other',
+];
+
+export function isAnimalTaxon(t: string | null | undefined): t is AnimalTaxon {
+  return t != null && t in ANIMAL_TAXA;
+}
+
+/** Back-compat: label lookup derived from the registry. */
+export const TAXON_LABELS: Record<AnimalTaxon, string> = Object.fromEntries(
+  ANIMAL_TAXON_ORDER.map((k) => [k, ANIMAL_TAXA[k].label]),
+) as Record<AnimalTaxon, string>;
 
 export type WeightContext =
   | 'routine'

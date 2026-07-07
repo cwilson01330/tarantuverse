@@ -8,17 +8,25 @@
  *
  * Displays every reptile the keeper owns regardless of taxon. ADR-003
  * collapsed the per-taxon route trees, so every card routes to the one
- * /app/reptiles/[id] detail page; taxon is kept on each row only to
- * render a subtle taxon indicator. Sorting is newest-first by created_at.
+ * /app/reptiles/[id] detail page; taxon is kept on each row to render a
+ * subtle taxon indicator and to drive the taxon filter chips. Sorting is
+ * newest-first by created_at.
+ *
+ * The taxon filter is derived from the registry (ANIMAL_TAXON_ORDER) but
+ * only surfaces the taxa the keeper actually owns — adding a herp group
+ * to lib/animals.ts makes it filterable here automatically once the
+ * keeper has one.
  *
  * Error handling is permissive: if one taxon fetch fails we still show
  * whatever loaded; a banner surfaces the partial failure.
  */
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ApiError } from '@/lib/apiClient'
 import {
+  ANIMAL_TAXA,
+  ANIMAL_TAXON_ORDER,
   type Animal,
   type AnimalTaxon,
   animalTitle,
@@ -29,6 +37,15 @@ import {
 import { lastFedTextClass } from '@/lib/cgd'
 
 type Taxon = AnimalTaxon
+
+/** Taxon indicator (glyph + label) with a graceful fallback for any
+ *  taxon not in the registry (e.g. a legacy row). */
+function taxonMeta(taxon: Taxon): { label: string; glyph: string } {
+  const meta = ANIMAL_TAXA[taxon]
+  return meta
+    ? { label: meta.label, glyph: meta.glyph }
+    : { label: taxon, glyph: '🦕' }
+}
 
 interface ReptileRow {
   taxon: Taxon
@@ -66,6 +83,8 @@ function detailHref(row: ReptileRow): string {
 export default function ReptilesPage() {
   const [rows, setRows] = useState<ReptileRow[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // null = "All"; otherwise the active taxon filter.
+  const [activeTaxon, setActiveTaxon] = useState<Taxon | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -102,6 +121,28 @@ export default function ReptilesPage() {
     }
   }, [])
 
+  // Which taxa the keeper actually owns, in registry order. Only these
+  // get a filter chip — no empty "Turtles (0)" chips for taxa nobody has.
+  const ownedTaxa = useMemo<Taxon[]>(() => {
+    if (!rows) return []
+    const present = new Set(rows.map((r) => r.taxon))
+    return ANIMAL_TAXON_ORDER.filter((t) => present.has(t))
+  }, [rows])
+
+  // If the active filter's taxon disappears (e.g. after a reload with a
+  // now-empty taxon), fall back to "All" so we never show an empty grid
+  // with a stale chip selected.
+  useEffect(() => {
+    if (activeTaxon && rows && !ownedTaxa.includes(activeTaxon)) {
+      setActiveTaxon(null)
+    }
+  }, [activeTaxon, rows, ownedTaxa])
+
+  const visibleRows = useMemo(() => {
+    if (!rows) return rows
+    return activeTaxon ? rows.filter((r) => r.taxon === activeTaxon) : rows
+  }, [rows, activeTaxon])
+
   return (
     <div className="max-w-5xl mx-auto">
       <header className="mb-8 flex items-start justify-between gap-4">
@@ -133,13 +174,49 @@ export default function ReptilesPage() {
         </div>
       )}
 
+      {/* Taxon filter — only shown when the keeper owns more than one
+          taxon (a single-taxon collection needs no filter). Chips are
+          registry-driven; only owned taxa appear. */}
+      {rows !== null && rows.length > 0 && ownedTaxa.length > 1 && (
+        <div
+          className="flex flex-wrap gap-2 mb-6"
+          role="group"
+          aria-label="Filter by taxon"
+        >
+          <TaxonChip
+            label="All"
+            count={rows.length}
+            active={activeTaxon === null}
+            onClick={() => setActiveTaxon(null)}
+          />
+          {ownedTaxa.map((t) => {
+            const meta = ANIMAL_TAXA[t]
+            const count = rows.filter((r) => r.taxon === t).length
+            return (
+              <TaxonChip
+                key={t}
+                label={meta.plural}
+                glyph={meta.glyph}
+                count={count}
+                active={activeTaxon === t}
+                onClick={() => setActiveTaxon(t)}
+              />
+            )
+          })}
+        </div>
+      )}
+
       {rows === null ? (
         <LoadingGrid />
       ) : rows.length === 0 ? (
         <EmptyState />
+      ) : visibleRows && visibleRows.length === 0 ? (
+        <div className="p-8 rounded-lg border border-dashed border-neutral-800 bg-neutral-900/30 text-center text-sm text-neutral-400">
+          No {activeTaxon ? ANIMAL_TAXA[activeTaxon].plural.toLowerCase() : 'animals'} in your collection yet.
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {rows.map((row) => (
+          {(visibleRows ?? []).map((row) => (
             <ReptileCard key={`${row.taxon}:${row.id}`} row={row} />
           ))}
         </div>
@@ -152,14 +229,7 @@ function ReptileCard({ row }: { row: ReptileRow }) {
   const weight = fmtGrams(row.current_weight_g)
   const lastFed = relativeDays(row.last_fed_at)
   const lastFedClass = lastFedTextClass(row.last_fed_at, row.feeds_on_cgd)
-  const taxonLabel =
-    row.taxon === 'snake'
-      ? 'Snake'
-      : row.taxon === 'frog'
-      ? 'Frog'
-      : 'Lizard'
-  const taxonGlyph =
-    row.taxon === 'snake' ? '🐍' : row.taxon === 'frog' ? '🐸' : '🦎'
+  const { label: taxonLabel, glyph: taxonGlyph } = taxonMeta(row.taxon)
 
   return (
     <Link
@@ -208,6 +278,41 @@ function ReptileCard({ row }: { row: ReptileRow }) {
         </div>
       </dl>
     </Link>
+  )
+}
+
+function TaxonChip({
+  label,
+  glyph,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  glyph?: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+        active
+          ? 'border-herp-teal/60 bg-herp-teal/10 text-herp-lime'
+          : 'border-neutral-800 bg-neutral-900/40 text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
+      }`}
+    >
+      {glyph && (
+        <span aria-hidden="true" className="text-sm">
+          {glyph}
+        </span>
+      )}
+      {label}
+      <span className="text-neutral-500">{count}</span>
+    </button>
   )
 }
 

@@ -17,11 +17,15 @@
  * paths here start at the resource, not `/api/v1/<resource>`.
  */
 import { apiClient } from '../services/api';
+import type { AnimalTaxon } from './animals';
 
 // ─── Pairings ──────────────────────────────────────────────────────────
 
-// ADR-003: frogs joined snakes + lizards under the unified animals table.
-export type Taxon = 'snake' | 'lizard' | 'frog';
+// ADR-011: the pairing taxon is the same flexible registry union as the
+// animal taxon. A pairing is taxon-locked to its parents, so this just
+// mirrors whatever herp groups the animals registry supports — no
+// separate breeding taxon list to keep in sync.
+export type Taxon = AnimalTaxon;
 export type ReptilePairingType =
   | 'natural'
   | 'cohabitation'

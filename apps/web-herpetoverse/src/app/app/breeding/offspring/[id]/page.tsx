@@ -38,6 +38,7 @@ import {
 // ADR-003: snake/lizard libs collapsed into lib/animals — one create
 // call + one getter, taxon rides in the payload / on the record.
 import {
+  ANIMAL_TAXA,
   type AnimalTaxon,
   type CreateAnimalPayload,
   createAnimal,
@@ -574,8 +575,11 @@ export default function OffspringDetailPage({
               </h3>
               <p className="text-xs text-neutral-500 mt-1">
                 Creates a live{' '}
-                {holdBackPrefill?.taxon ?? 'reptile'} record and links it
-                back to this offspring entry.
+                {holdBackPrefill?.taxon
+                  ? (ANIMAL_TAXA[holdBackPrefill.taxon]?.label.toLowerCase() ??
+                    holdBackPrefill.taxon)
+                  : 'reptile'}{' '}
+                record and links it back to this offspring entry.
               </p>
             </div>
 
@@ -594,9 +598,9 @@ export default function OffspringDetailPage({
                     <PrefillLine
                       label="Taxon"
                       value={
-                        holdBackPrefill?.taxon === 'lizard'
-                          ? '🦎 Lizard'
-                          : '🐍 Snake'
+                        holdBackPrefill?.taxon && ANIMAL_TAXA[holdBackPrefill.taxon]
+                          ? `${ANIMAL_TAXA[holdBackPrefill.taxon].glyph} ${ANIMAL_TAXA[holdBackPrefill.taxon].label}`
+                          : (holdBackPrefill?.taxon ?? '—')
                       }
                     />
                     <PrefillLine

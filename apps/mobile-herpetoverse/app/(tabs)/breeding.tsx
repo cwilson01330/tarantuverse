@@ -37,6 +37,7 @@ import {
   type ReptilePairingOutcome,
   listPairings,
 } from '../../src/lib/breeding';
+import { ANIMAL_TAXA } from '../../src/lib/animals';
 
 function BreedingTab() {
   const router = useRouter();
@@ -256,11 +257,9 @@ function PairingRow({
             ? ` · separated ${fmtDate(pairing.separated_date)}`
             : ''}
           {' · '}
-          {pairing.taxon === 'snake'
-            ? '🐍 Snake'
-            : pairing.taxon === 'frog'
-            ? '🐸 Frog'
-            : '🦎 Lizard'}
+          {ANIMAL_TAXA[pairing.taxon]
+            ? `${ANIMAL_TAXA[pairing.taxon].glyph} ${ANIMAL_TAXA[pairing.taxon].label}`
+            : pairing.taxon}
         </Text>
       </View>
       <View style={styles.rowChips}>

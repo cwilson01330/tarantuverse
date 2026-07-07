@@ -12,7 +12,7 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -28,7 +28,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { type AnimalTaxon, createFeeding, listAnimals } from '../../src/lib/animals';
+import {
+  ANIMAL_TAXA,
+  ANIMAL_TAXON_ORDER,
+  type AnimalTaxon,
+  createFeeding,
+  listAnimals,
+} from '../../src/lib/animals';
 import { AppHeader } from '../../src/components/AppHeader';
 import { AnimalActionSheet } from '../../src/components/AnimalActionSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -82,6 +88,9 @@ function CollectionScreen() {
   const [rows, setRows] = useState<ReptileRow[] | null>(null);
   const [partialError, setPartialError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Taxon filter — null = "All". Only taxa the keeper actually owns get
+  // a chip (see ownedTaxa below), so the bar never shows empty buckets.
+  const [taxonFilter, setTaxonFilter] = useState<AnimalTaxon | null>(null);
   // Long-press quick-actions sheet. `actionTarget` holds the animal
   // whose sheet is open (null = closed); `actionBusy` gates the rows
   // while a write is in flight, and `actionBusyKey` says which row
@@ -229,6 +238,27 @@ function CollectionScreen() {
     router.push(`/reptile/edit/${animalId}` as never);
   };
 
+  // Taxa the keeper actually owns, in registry display order. Drives the
+  // filter chips so we never render an empty bucket.
+  const ownedTaxa = useMemo<AnimalTaxon[]>(() => {
+    if (!rows) return [];
+    const present = new Set(rows.map((r) => r.taxon));
+    return ANIMAL_TAXON_ORDER.filter((t) => present.has(t));
+  }, [rows]);
+
+  // Rows after the active taxon filter. Null filter = show everything.
+  const visibleRows = useMemo(() => {
+    if (!rows) return rows;
+    if (!taxonFilter) return rows;
+    return rows.filter((r) => r.taxon === taxonFilter);
+  }, [rows, taxonFilter]);
+
+  // If the keeper deletes their last animal of the filtered taxon, drop
+  // back to "All" so we don't get stuck on an empty filtered view.
+  if (taxonFilter && ownedTaxa.length > 0 && !ownedTaxa.includes(taxonFilter)) {
+    setTaxonFilter(null);
+  }
+
   // ---------- Loading skeleton ----------
   if (rows === null) {
     return (
@@ -291,21 +321,33 @@ function CollectionScreen() {
     >
       <AppHeader title="Collection" />
       <FlatList
-        data={rows}
+        data={visibleRows ?? []}
         keyExtractor={(r) => `${r.taxon}:${r.id}`}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          partialError ? (
-            <View
-              style={[
-                styles.errorBanner,
-                { backgroundColor: '#fee2e2', borderColor: '#fecaca' },
-              ]}
-              accessibilityLiveRegion="polite"
-            >
-              <Text style={styles.errorBannerText}>{partialError}</Text>
-            </View>
-          ) : null
+          <View>
+            {partialError ? (
+              <View
+                style={[
+                  styles.errorBanner,
+                  { backgroundColor: '#fee2e2', borderColor: '#fecaca' },
+                ]}
+                accessibilityLiveRegion="polite"
+              >
+                <Text style={styles.errorBannerText}>{partialError}</Text>
+              </View>
+            ) : null}
+            {/* Taxon filter — only when the keeper owns 2+ taxa. Chips are
+                generated from the registry (glyph + plural) for the taxa
+                actually present. */}
+            {ownedTaxa.length > 1 && (
+              <TaxonFilterBar
+                ownedTaxa={ownedTaxa}
+                active={taxonFilter}
+                onChange={setTaxonFilter}
+              />
+            )}
+          </View>
         }
         renderItem={({ item }) => (
           <ReptileCard
@@ -369,6 +411,65 @@ function CollectionScreen() {
 }
 
 // ---------------------------------------------------------------------------
+// Taxon filter bar
+// ---------------------------------------------------------------------------
+
+function TaxonFilterBar({
+  ownedTaxa,
+  active,
+  onChange,
+}: {
+  ownedTaxa: AnimalTaxon[];
+  active: AnimalTaxon | null;
+  onChange: (t: AnimalTaxon | null) => void;
+}) {
+  const { colors, layout } = useTheme();
+
+  const chips: { key: string; taxon: AnimalTaxon | null; label: string }[] = [
+    { key: 'all', taxon: null, label: 'All' },
+    ...ownedTaxa.map((t) => ({
+      key: t,
+      taxon: t as AnimalTaxon | null,
+      label: `${ANIMAL_TAXA[t].glyph} ${ANIMAL_TAXA[t].plural}`,
+    })),
+  ];
+
+  return (
+    <View style={styles.filterBar}>
+      {chips.map((chip) => {
+        const selected = active === chip.taxon;
+        return (
+          <TouchableOpacity
+            key={chip.key}
+            onPress={() => onChange(chip.taxon)}
+            style={[
+              styles.filterChip,
+              {
+                backgroundColor: selected ? colors.primary : colors.surface,
+                borderColor: selected ? colors.primary : colors.border,
+                borderRadius: layout.radius.sm,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}
+            accessibilityLabel={`Filter by ${chip.label}`}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                { color: selected ? '#0B0B0B' : colors.textSecondary },
+              ]}
+            >
+              {chip.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Card
 // ---------------------------------------------------------------------------
 
@@ -384,8 +485,9 @@ function ReptileCard({
   const { colors, layout } = useTheme();
   const lastFed = relativeDays(row.last_fed_at);
   const days = daysSince(row.last_fed_at);
-  const taxonGlyph =
-    row.taxon === 'snake' ? '🐍' : row.taxon === 'frog' ? '🐸' : '🦎';
+  // Glyph sourced from the registry; unknown/legacy taxa fall back to a
+  // generic herp glyph rather than mislabeling as a lizard.
+  const taxonGlyph = ANIMAL_TAXA[row.taxon]?.glyph ?? '🦕';
 
   // Color-coded last-fed indicator. Snake/lizard cadence is the
   // default; CGD-fed rhacodactylids get a tighter ramp (overdue at
@@ -535,6 +637,23 @@ const styles = StyleSheet.create({
 
   // List
   listContent: { padding: 12, paddingBottom: 96 },
+
+  // Taxon filter bar
+  filterBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   errorBanner: {
     padding: 12,
     borderWidth: 1,

@@ -51,6 +51,7 @@ import {
 // ADR-003: snake/lizard libs collapsed into lib/animals — one create
 // call + one getter, taxon rides in the payload / on the record.
 import {
+  ANIMAL_TAXA,
   type AnimalTaxon,
   type CreateAnimalPayload,
   createAnimal,
@@ -886,9 +887,9 @@ function HoldBackModal({
                       <PrefillRow
                         label="Taxon"
                         value={
-                          prefill?.taxon === 'lizard'
-                            ? '🦎 Lizard'
-                            : '🐍 Snake'
+                          prefill?.taxon && ANIMAL_TAXA[prefill.taxon]
+                            ? `${ANIMAL_TAXA[prefill.taxon].glyph} ${ANIMAL_TAXA[prefill.taxon].label}`
+                            : (prefill?.taxon ?? 'Unknown')
                         }
                       />
                       <PrefillRow

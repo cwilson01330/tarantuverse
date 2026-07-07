@@ -29,6 +29,7 @@ import {
   listClutchesForPairing,
   updatePairing,
 } from '@/lib/breeding'
+import { ANIMAL_TAXA } from '@/lib/animals'
 
 interface Params {
   id: string
@@ -131,11 +132,7 @@ export default function PairingDetailPage({
 
       <header>
         <p className="text-xs tracking-[0.2em] uppercase text-herp-lime mb-3 font-medium">
-          {pairing.taxon === 'snake'
-            ? 'Snake pairing'
-            : pairing.taxon === 'frog'
-            ? 'Frog pairing'
-            : 'Lizard pairing'}
+          {`${ANIMAL_TAXA[pairing.taxon]?.label ?? pairing.taxon} pairing`}
         </p>
         <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-wide">
           <span className="text-sky-400">♂</span>{' '}

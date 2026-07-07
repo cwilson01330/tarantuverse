@@ -40,29 +40,48 @@ import {
 import { EnclosurePicker } from '../../src/components/forms/EnclosurePicker';
 import { ReptileSpeciesAutocomplete } from '../../src/components/forms/ReptileSpeciesAutocomplete';
 import {
+  ANIMAL_TAXA,
+  ANIMAL_TAXON_ORDER,
   type AnimalTaxon,
   type CreateAnimalPayload,
   type Sex,
   type Source,
   createAnimal,
+  isAnimalTaxon,
 } from '../../src/lib/animals';
 
-const TAXON_OPTIONS = [
-  { value: 'snake' as const, label: 'Snake' },
-  { value: 'lizard' as const, label: 'Lizard' },
-  { value: 'frog' as const, label: 'Frog' },
-];
+// Taxon chips sourced from the registry (ADR-011) — glyph + label per
+// entry, in display order. Adding a herp group in lib/animals.ts makes
+// it selectable here with no code change.
+const TAXON_OPTIONS = ANIMAL_TAXON_ORDER.map((t) => ({
+  value: t,
+  label: `${ANIMAL_TAXA[t].glyph} ${ANIMAL_TAXA[t].label}`,
+}));
 
 // Per-taxon example values for input placeholders, so the form speaks
-// the keeper's animal instead of always sounding snake-first.
-const TAXON_EXAMPLES: Record<
-  AnimalTaxon,
-  { name: string; common: string; weight: string }
+// the keeper's animal instead of always sounding snake-first. Taxa
+// without a bespoke example fall back to a generic prompt via
+// `exampleFor()` below.
+const TAXON_EXAMPLES: Partial<
+  Record<AnimalTaxon, { name: string; common: string; weight: string }>
 > = {
   snake: { name: 'Hex', common: 'Ball python', weight: '650' },
   lizard: { name: 'Kiwi', common: 'Leopard gecko', weight: '60' },
+  turtle: { name: 'Shelly', common: 'Red-eared slider', weight: '400' },
+  tortoise: { name: 'Tank', common: 'Russian tortoise', weight: '350' },
   frog: { name: 'Bean', common: 'Pacman frog', weight: '90' },
+  salamander: { name: 'Sal', common: 'Tiger salamander', weight: '40' },
 };
+
+const GENERIC_EXAMPLE = { name: 'Rex', common: 'Species name', weight: '100' };
+
+function exampleFor(taxon: AnimalTaxon): {
+  name: string;
+  common: string;
+  weight: string;
+} {
+  return TAXON_EXAMPLES[taxon] ?? GENERIC_EXAMPLE;
+}
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
   { value: 'female', label: 'Female' },
@@ -106,9 +125,7 @@ function AddReptileScreen() {
   }>();
 
   const [taxon, setTaxon] = useState<AnimalTaxon>(
-    params.taxon === 'lizard' || params.taxon === 'frog'
-      ? params.taxon
-      : 'snake',
+    isAnimalTaxon(params.taxon) ? params.taxon : 'snake',
   );
   const [name, setName] = useState('');
   const [scientificName, setScientificName] = useState(
@@ -135,7 +152,7 @@ function AddReptileScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Placeholder examples for the currently-selected taxon.
-  const ex = TAXON_EXAMPLES[taxon];
+  const ex = exampleFor(taxon);
 
   async function handleSubmit() {
     if (submitting) return;
@@ -327,7 +344,7 @@ function AddReptileScreen() {
           {error && <FormErrorBanner message={error} />}
 
           <SubmitButton
-            label={`Save ${taxon}`}
+            label={`Save ${ANIMAL_TAXA[taxon].label.toLowerCase()}`}
             busy={submitting}
             onPress={handleSubmit}
           />

@@ -6,7 +6,8 @@
  * The web entry point for keeper-created reptiles in Herpetoverse (the
  * mobile app has its own create flow at app/reptile/add.tsx).
  * The form is taxon-aware: a segmented toggle at the top switches
- * between snake, lizard, and frog creation. All other fields are
+ * between every herp group in the taxon registry (ANIMAL_TAXON_ORDER —
+ * snake, lizard, turtle, tortoise, frog, salamander, other). All other fields are
  * identical across taxa — ADR-003 collapsed them onto one AnimalBase
  * schema, so the form shape never branches.
  *
@@ -38,26 +39,31 @@ import EnclosurePicker from '@/components/EnclosurePicker'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
 import {
+  ANIMAL_TAXA,
+  ANIMAL_TAXON_ORDER,
+  type AnimalTaxon,
   createAnimal,
   type CreateAnimalPayload,
+  isAnimalTaxon,
   type Sex,
   type Source,
 } from '@/lib/animals'
 
-type Taxon = 'snake' | 'lizard' | 'frog'
+type Taxon = AnimalTaxon
 
 // Per-taxon example values for input placeholders, so the form speaks
-// the keeper's animal instead of always sounding snake-first.
-const TAXON_EXAMPLES: Record<
-  Taxon,
-  {
-    nickname: string
-    scientific: string
-    common: string
-    weight: string
-    length: string
-  }
-> = {
+// the keeper's animal instead of always sounding snake-first. Keyed by
+// every registry taxon (ANIMAL_TAXON_ORDER); new taxa fall back to the
+// generic examples below via `taxonExamples()`.
+interface TaxonExample {
+  nickname: string
+  scientific: string
+  common: string
+  weight: string
+  length: string
+}
+
+const TAXON_EXAMPLES: Partial<Record<Taxon, TaxonExample>> = {
   snake: {
     nickname: 'Samson',
     scientific: 'Python regius',
@@ -72,6 +78,20 @@ const TAXON_EXAMPLES: Record<
     weight: '60',
     length: '8',
   },
+  turtle: {
+    nickname: 'Shelly',
+    scientific: 'Trachemys scripta elegans',
+    common: 'Red-eared slider',
+    weight: '300',
+    length: '6',
+  },
+  tortoise: {
+    nickname: 'Tank',
+    scientific: 'Testudo hermanni',
+    common: "Hermann's tortoise",
+    weight: '800',
+    length: '7',
+  },
   frog: {
     nickname: 'Bean',
     scientific: 'Ceratophrys ornata',
@@ -79,6 +99,26 @@ const TAXON_EXAMPLES: Record<
     weight: '90',
     length: '4',
   },
+  salamander: {
+    nickname: 'Mudi',
+    scientific: 'Ambystoma mexicanum',
+    common: 'Axolotl',
+    weight: '120',
+    length: '9',
+  },
+}
+
+// Generic fallback for taxa without a bespoke example (e.g. 'other').
+const GENERIC_EXAMPLE: TaxonExample = {
+  nickname: 'Nickname',
+  scientific: 'Scientific name',
+  common: 'Common name',
+  weight: '100',
+  length: '6',
+}
+
+function taxonExamples(taxon: Taxon): TaxonExample {
+  return TAXON_EXAMPLES[taxon] ?? GENERIC_EXAMPLE
 }
 
 interface FormState {
@@ -137,8 +177,8 @@ function AddReptileForm() {
   // edit every field afterward without us clobbering their edits.
   const [form, setForm] = useState<FormState>(() => {
     const taxonParam = searchParams.get('taxon')
-    const taxon: Taxon =
-      taxonParam === 'lizard' || taxonParam === 'frog' ? taxonParam : 'snake'
+    // Accept any registry taxon from the query param; default to snake.
+    const taxon: Taxon = isAnimalTaxon(taxonParam) ? taxonParam : 'snake'
     return {
       ...INITIAL,
       taxon,
@@ -229,7 +269,7 @@ function AddReptileForm() {
   }
 
   // Placeholder examples for the currently-selected taxon.
-  const ex = TAXON_EXAMPLES[form.taxon]
+  const ex = taxonExamples(form.taxon)
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -522,7 +562,9 @@ function AddReptileForm() {
             disabled={submitting}
             className="herp-gradient-bg text-herp-dark font-bold px-6 py-2.5 rounded-md tracking-wide disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
           >
-            {submitting ? 'Saving…' : `Save ${form.taxon}`}
+            {submitting
+              ? 'Saving…'
+              : `Save ${ANIMAL_TAXA[form.taxon].label.toLowerCase()}`}
           </button>
         </div>
       </form>
@@ -568,7 +610,10 @@ function Field({
 /**
  * Segmented taxon toggle. Rendered as radio buttons under the hood
  * (group labeled "Animal type") so keyboard + screen reader users get a
- * proper grouped-control experience, not three disconnected buttons.
+ * proper grouped-control experience, not disconnected buttons.
+ *
+ * Options are sourced from the taxon registry (ANIMAL_TAXON_ORDER) — add
+ * a herp group to lib/animals.ts and it appears here automatically.
  */
 function TaxonToggle({
   value,
@@ -577,11 +622,7 @@ function TaxonToggle({
   value: Taxon
   onChange: (next: Taxon) => void
 }) {
-  const options: Array<{ value: Taxon; label: string; glyph: string }> = [
-    { value: 'snake', label: 'Snake', glyph: '🐍' },
-    { value: 'lizard', label: 'Lizard', glyph: '🦎' },
-    { value: 'frog', label: 'Frog', glyph: '🐸' },
-  ]
+  const options = ANIMAL_TAXON_ORDER.map((key) => ANIMAL_TAXA[key])
 
   return (
     <fieldset className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
@@ -589,13 +630,13 @@ function TaxonToggle({
       <div
         role="radiogroup"
         aria-label="Animal type"
-        className="grid grid-cols-3 gap-3"
+        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
       >
         {options.map((opt) => {
-          const active = opt.value === value
+          const active = opt.key === value
           return (
             <label
-              key={opt.value}
+              key={opt.key}
               className={`flex items-center justify-center gap-2 px-4 py-3 rounded-md border cursor-pointer transition-colors ${
                 active
                   ? 'border-herp-teal bg-herp-teal/10 text-herp-teal'
@@ -605,9 +646,9 @@ function TaxonToggle({
               <input
                 type="radio"
                 name="taxon"
-                value={opt.value}
+                value={opt.key}
                 checked={active}
-                onChange={() => onChange(opt.value)}
+                onChange={() => onChange(opt.key)}
                 className="sr-only"
               />
               <span aria-hidden="true" className="text-base">

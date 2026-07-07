@@ -24,6 +24,7 @@ import {
   type ReptilePairing,
   listPairings,
 } from '@/lib/breeding'
+import { ANIMAL_TAXA } from '@/lib/animals'
 
 type Tab = 'pairings' | 'calculator'
 
@@ -194,11 +195,9 @@ function PairingRow({ pairing: p }: { pairing: ReptilePairing }) {
               ? ` · separated ${formatDate(p.separated_date)}`
               : ''}
             {' · '}
-            {p.taxon === 'snake'
-              ? '🐍 Snake'
-              : p.taxon === 'frog'
-              ? '🐸 Frog'
-              : '🦎 Lizard'}
+            {ANIMAL_TAXA[p.taxon]
+              ? `${ANIMAL_TAXA[p.taxon].glyph} ${ANIMAL_TAXA[p.taxon].label}`
+              : p.taxon}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

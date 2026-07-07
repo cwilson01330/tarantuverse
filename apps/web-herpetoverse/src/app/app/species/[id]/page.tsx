@@ -8,8 +8,9 @@
  *
  * Keeper-only chrome added here (not in the shared component): an
  * "add to collection" CTA injected just below the hero via CareSheet's
- * `afterHero` slot. Taxon is inferred from the species family so the
- * keeper lands on the add form with snake / lizard / frog pre-selected.
+ * `afterHero` slot. Taxon is inferred from the species family (any group
+ * in the taxon registry — snake, lizard, turtle, tortoise, frog,
+ * salamander) so the keeper lands on the add form with it pre-selected.
  *
  * Route shape kept as `[id]` on purpose — internal links from the keeper
  * library still navigate by UUID. Public routes are slug-based; see
@@ -19,6 +20,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import CareSheet from '@/components/CareSheet'
 import { fetchReptileSpeciesById } from '@/lib/reptileSpecies'
+import { ANIMAL_TAXA, type AnimalTaxon } from '@/lib/animals'
 
 interface PageProps {
   // Next.js 15: dynamic params are a Promise.
@@ -65,14 +67,35 @@ const FROG_FAMILIES = new Set([
   'Hylidae',
   'Pyxicephalidae',
 ])
+// Chelonian + caudate families for the new taxon groups (ADR-011). Aquatic
+// + semi-aquatic turtles vs. terrestrial tortoises are split so the CTA
+// pre-selects the right taxon; salamanders/newts share Caudata families.
+const TURTLE_FAMILIES = new Set([
+  'Emydidae',
+  'Geoemydidae',
+  'Kinosternidae',
+  'Chelydridae',
+  'Trionychidae',
+])
+const TORTOISE_FAMILIES = new Set(['Testudinidae'])
+const SALAMANDER_FAMILIES = new Set([
+  'Ambystomatidae',
+  'Salamandridae',
+  'Plethodontidae',
+])
 
-function taxonFromFamily(
-  family: string | null,
-): 'snake' | 'lizard' | 'frog' | null {
+// Widened to the full taxon registry (ADR-011). Recognized families map to
+// their taxon; anything unrecognized returns null so the keeper picks it on
+// the add form. Ordered concrete-first (tortoise before turtle is moot since
+// the sets are disjoint) — a family lives in exactly one clade set.
+function taxonFromFamily(family: string | null): AnimalTaxon | null {
   if (!family) return null
   if (SNAKE_FAMILIES.has(family)) return 'snake'
   if (LIZARD_FAMILIES.has(family)) return 'lizard'
+  if (TORTOISE_FAMILIES.has(family)) return 'tortoise'
+  if (TURTLE_FAMILIES.has(family)) return 'turtle'
   if (FROG_FAMILIES.has(family)) return 'frog'
+  if (SALAMANDER_FAMILIES.has(family)) return 'salamander'
   return null
 }
 
@@ -108,7 +131,7 @@ export default async function SpeciesDetailPage({ params }: PageProps) {
     taxon: inferredTaxon ?? 'snake',
   }).toString()}`
   const ctaLabel = inferredTaxon
-    ? `Add as ${inferredTaxon}`
+    ? `Add as ${ANIMAL_TAXA[inferredTaxon].label.toLowerCase()}`
     : 'Add to my collection'
   const ctaHint = inferredTaxon
     ? 'Pre-fills species + scientific name. You can change anything before saving.'

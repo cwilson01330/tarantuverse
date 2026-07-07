@@ -26,6 +26,7 @@ import {
   type PublicReptileProfile,
   getPublicProfile,
 } from '@/lib/qr'
+import { ANIMAL_TAXA } from '@/lib/animals'
 
 interface Props {
   /** ADR-003: one taxon-agnostic id — the profile payload carries `taxon`. */
@@ -136,8 +137,7 @@ export default function ReptilePublicProfile({ animalId }: Props) {
   // Profile loaded
   // ---------------------------------------------------------------------------
   const p = state.profile
-  const taxonGlyph =
-    p.taxon === 'snake' ? '🐍' : p.taxon === 'frog' ? '🐸' : '🦎'
+  const taxonGlyph = ANIMAL_TAXA[p.taxon]?.glyph ?? '🦕'
 
   // Quick-action destinations for the owner. Tarantuverse uses query
   // params (?log=feeding); we keep the same shape so the dashboard pages

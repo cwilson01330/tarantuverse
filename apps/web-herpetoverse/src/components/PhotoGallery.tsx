@@ -39,6 +39,7 @@ import { ApiError } from '@/lib/apiClient'
 // ADR-003: photos route through the unified animals API regardless of
 // taxon — one set of helpers, no per-taxon dispatch.
 import {
+  ANIMAL_TAXA,
   type Photo,
   type AnimalTaxon,
   deletePhoto,
@@ -637,8 +638,7 @@ function EmptyState({
   taxon: PhotoGalleryTaxon
   onPick: () => void
 }) {
-  const glyph =
-    taxon === 'lizard' ? '🦎' : taxon === 'frog' ? '🐸' : '🐍'
+  const glyph = ANIMAL_TAXA[taxon]?.glyph ?? '🦕'
   return (
     <button
       type="button"

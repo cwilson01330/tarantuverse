@@ -41,6 +41,7 @@ import {
   listClutchesForPairing,
   updatePairing,
 } from '../../../src/lib/breeding';
+import { ANIMAL_TAXA } from '../../../src/lib/animals';
 
 const OUTCOME_ORDER: ReptilePairingOutcome[] = [
   'in_progress',
@@ -238,11 +239,9 @@ function PairingDetailScreen() {
                 {pairing.female_display_name ?? 'Female'}
               </Text>
               <Text style={[styles.heroMeta, { color: colors.textSecondary }]}>
-                {pairing.taxon === 'snake'
-                  ? '🐍 Snake pairing'
-                  : pairing.taxon === 'frog'
-                  ? '🐸 Frog pairing'
-                  : '🦎 Lizard pairing'}
+                {ANIMAL_TAXA[pairing.taxon]
+                  ? `${ANIMAL_TAXA[pairing.taxon].glyph} ${ANIMAL_TAXA[pairing.taxon].label} pairing`
+                  : `${pairing.taxon} pairing`}
               </Text>
               <View style={styles.kvGrid}>
                 <KV label="Paired" value={fmtDate(pairing.paired_date)} />

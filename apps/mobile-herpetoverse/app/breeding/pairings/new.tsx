@@ -66,12 +66,21 @@ import {
   type Taxon,
   createPairing,
 } from '../../../src/lib/breeding';
-// ADR-003: snake/lizard libs collapsed into lib/animals. The taxon picker
-// still scopes the dropdowns, so we fetch each taxon explicitly.
-import { type Animal, type Sex, listAnimals } from '../../../src/lib/animals';
+// ADR-003/011: per-taxon libs collapsed into lib/animals. We fetch the
+// whole collection once and scope the parent dropdowns to the selected
+// taxon in-memory, so any herp group in the registry can be paired.
+import {
+  ANIMAL_TAXA,
+  ANIMAL_TAXON_ORDER,
+  type Animal,
+  type AnimalTaxon,
+  type Sex,
+  listAnimals,
+} from '../../../src/lib/animals';
 
 interface ParentOption {
   id: string;
+  taxon: AnimalTaxon;
   display_name: string;
   sex: Sex | null;
   scientific_name: string | null;
@@ -84,6 +93,7 @@ interface ParentOption {
 function animalToOption(a: Animal): ParentOption {
   return {
     id: a.id,
+    taxon: a.taxon,
     display_name:
       a.name || a.common_name || a.scientific_name || 'Unnamed reptile',
     sex: a.sex,
@@ -117,11 +127,6 @@ function speciesMatches(a: ParentOption, b: ParentOption): boolean {
   return true;
 }
 
-const TAXON_OPTIONS = [
-  { value: 'snake' as const, label: '🐍 Snake' },
-  { value: 'lizard' as const, label: '🦎 Lizard' },
-];
-
 const PAIRING_TYPE_OPTIONS = (
   Object.keys(PAIRING_TYPE_LABEL) as ReptilePairingType[]
 ).map((k) => ({ value: k, label: PAIRING_TYPE_LABEL[k] }));
@@ -131,8 +136,9 @@ function NewPairingScreen() {
   const { colors, layout } = useTheme();
 
   const [taxon, setTaxon] = useState<Taxon>('snake');
-  const [snakes, setSnakes] = useState<ParentOption[] | null>(null);
-  const [lizards, setLizards] = useState<ParentOption[] | null>(null);
+  // Whole collection in one bag; the taxon picker + parent lists filter
+  // it in-memory. null until the fetch resolves.
+  const [animals, setAnimals] = useState<ParentOption[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Form state
@@ -161,13 +167,9 @@ function NewPairingScreen() {
       let cancelled = false;
       (async () => {
         try {
-          const [s, l] = await Promise.all([
-            listAnimals('snake'),
-            listAnimals('lizard'),
-          ]);
+          const all = await listAnimals();
           if (cancelled) return;
-          setSnakes(s.map(animalToOption));
-          setLizards(l.map(animalToOption));
+          setAnimals(all.map(animalToOption));
           setLoadError(null);
         } catch (err) {
           if (cancelled) return;
@@ -182,6 +184,25 @@ function NewPairingScreen() {
     }, []),
   );
 
+  // Taxa the keeper owns, in registry order — drives the taxon picker so
+  // it never offers a group with no animals to pair.
+  const taxonOptions = useMemo(() => {
+    const present = new Set((animals ?? []).map((a) => a.taxon));
+    return ANIMAL_TAXON_ORDER.filter((t) => present.has(t)).map((t) => ({
+      value: t,
+      label: `${ANIMAL_TAXA[t].glyph} ${ANIMAL_TAXA[t].label}`,
+    }));
+  }, [animals]);
+
+  // Keep the selected taxon valid: default to the first owned taxon once
+  // the collection loads (or if the current pick isn't owned).
+  useEffect(() => {
+    if (taxonOptions.length === 0) return;
+    if (!taxonOptions.some((o) => o.value === taxon)) {
+      setTaxon(taxonOptions[0].value);
+    }
+  }, [taxonOptions, taxon]);
+
   // Reset parent selections when taxon flips so we never end up
   // submitting a cross-taxon pairing (backend rejects it anyway, but
   // the UI shouldn't even let the keeper try).
@@ -190,10 +211,10 @@ function NewPairingScreen() {
     setFemaleId('');
   }, [taxon]);
 
-  const allOfTaxon = useMemo(() => {
-    if (taxon === 'snake') return snakes ?? [];
-    return lizards ?? [];
-  }, [taxon, snakes, lizards]);
+  const allOfTaxon = useMemo(
+    () => (animals ?? []).filter((a) => a.taxon === taxon),
+    [animals, taxon],
+  );
 
   const males = useMemo(
     () =>
@@ -281,7 +302,7 @@ function NewPairingScreen() {
     }
   }
 
-  const collectionLoaded = snakes !== null && lizards !== null;
+  const collectionLoaded = animals !== null;
 
   return (
     <SafeAreaView
@@ -311,11 +332,18 @@ function NewPairingScreen() {
             </View>
           )}
 
-          {collectionLoaded && (
+          {collectionLoaded && taxonOptions.length === 0 && !loadError && (
+            <Text style={[styles.intro, { color: colors.textSecondary }]}>
+              Add at least two animals of the same taxon to your collection
+              before recording a pairing.
+            </Text>
+          )}
+
+          {collectionLoaded && taxonOptions.length > 0 && (
             <>
               <Field label="Taxon" required>
                 <ChipGroup
-                  options={TAXON_OPTIONS}
+                  options={taxonOptions}
                   value={taxon}
                   onChange={setTaxon}
                 />
