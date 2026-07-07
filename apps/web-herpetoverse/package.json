@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.12.1",
     "@vercel/analytics": "^1.6.0",
     "next": "^15.5.7",
     "posthog-js": "^1.190.0",

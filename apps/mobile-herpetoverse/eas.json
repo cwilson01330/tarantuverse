@@ -6,7 +6,13 @@
   "build": {
     "base": {
       "node": "20.19.4",
-      "channel": "base"
+      "channel": "base",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://tarantuverse-api.onrender.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB": "793166570390-n2f9iva2juljc6mcpdccqguttd5ibb54.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS": "793166570390-l672evlsoecq3qklhor3puuqrc28vj5m.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID": "793166570390-vl0l1h5j9mdrmok6qdrgd59b8b5b7qal.apps.googleusercontent.com"
+      }
     },
     "development": {
       "extends": "base",
