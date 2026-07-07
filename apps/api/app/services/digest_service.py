@@ -62,10 +62,11 @@ def _overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
         )
         if interval is None:
             continue  # detritivore — no live-prey cadence
+        # Never-fed is NOT counted as due — no cadence established yet, so a
+        # push nag would be noise. Consistent with /inverts/feeding-status +
+        # /animals/feeding-status + the dashboard's overdue widget.
         last = last_by.get(inv.id)
-        if last is None:
-            count += 1
-        elif _calendar_day_diff(now, last, tz_offset) >= interval:
+        if last is not None and _calendar_day_diff(now, last, tz_offset) >= interval:
             count += 1
     return count
 

@@ -78,6 +78,28 @@ class AnimalUpdate(AnimalBase):
     last_shed_at: Optional[date] = None
 
 
+class AnimalFeedingStatusItem(BaseModel):
+    """One row of the HV Feeding Day list — an animal's feeding status.
+
+    `interval_days` is the recommended days-between-feedings resolved from the
+    animal's schedule / species (CGD day-4, weight-bracketed snake intervals,
+    or a parsed frequency); None when we can't determine a cadence, in which
+    case the animal is never flagged overdue (honesty over a wrong guess).
+    """
+    id: uuid.UUID
+    name: Optional[str] = None
+    common_name: Optional[str] = None
+    scientific_name: Optional[str] = None
+    taxon: str
+    photo_url: Optional[str] = None
+    last_feeding_date: Optional[datetime] = None
+    days_since_last_feeding: Optional[int] = None
+    is_feeding_paused: bool = False
+    is_overdue: bool = False
+    interval_days: Optional[int] = None
+    feeds_on_cgd: bool = False
+
+
 class AnimalResponse(AnimalBase):
     """Schema for animal response."""
     id: uuid.UUID

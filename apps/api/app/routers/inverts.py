@@ -313,10 +313,15 @@ async def list_feeding_status(
         )
         species = species_by_id.get(inv.species_id) if inv.species_id else None
         interval = _recommended_feeding_interval(inv.life_stage, species)
+        # Never-fed animals are NOT "overdue" — no feeding has established a
+        # cadence yet, so flagging them (esp. in a push digest) is noise. Kept
+        # in lockstep with digest_service and /animals/feeding-status.
         is_overdue = (
             (not paused)
             and interval is not None
-            and (last is None or (days is not None and days >= interval))
+            and last is not None
+            and days is not None
+            and days >= interval
         )
         items.append(
             InvertFeedingStatusItem(

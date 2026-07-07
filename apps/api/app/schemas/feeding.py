@@ -65,6 +65,35 @@ class BulkFeedingResult(BaseModel):
     skipped: List[BulkFeedingSkip] = []
 
 
+# --- Herpetoverse animals (Feeding Day) ---
+
+class AnimalBulkFeedingRequest(BaseModel):
+    """Log one feeding event across many owned animals at once (HV Feeding Day).
+
+    Same fed_at / accepted / food_type / notes applied to every animal in
+    animal_ids. `accepted=False` records a group refusal. Ownership verified
+    per id; unowned ids are skipped, not fatal.
+    """
+    animal_ids: List[uuid.UUID] = Field(..., min_length=1, max_length=500)
+    fed_at: Optional[datetime] = None  # defaults to now (UTC) server-side
+    accepted: bool = True
+    food_type: Optional[str] = None
+    food_size: Optional[str] = None
+    quantity: int = 1
+    notes: Optional[str] = None
+
+
+class AnimalBulkFeedingSkip(BaseModel):
+    animal_id: uuid.UUID
+    reason: str
+
+
+class AnimalBulkFeedingResult(BaseModel):
+    created_count: int
+    created_ids: List[uuid.UUID]
+    skipped: List[AnimalBulkFeedingSkip] = []
+
+
 class FeedingLogResponse(FeedingLogBase):
     """Schema for feeding log response.
 

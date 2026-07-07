@@ -43,6 +43,23 @@ interface FeedingStatus {
   is_feeding_paused?: boolean
 }
 
+// All-taxa feeding status from /inverts/feeding-status — the SINGLE source of
+// truth shared with the Feeding Day screen + the daily digest, so the
+// dashboard's "overdue" count matches the notification (scorpions/centipedes
+// included, species-aware intervals, never-fed excluded).
+interface FeedingStatusItem {
+  id: string
+  name: string | null
+  common_name: string | null
+  scientific_name: string | null
+  taxon: string
+  photo_url: string | null
+  days_since_last_feeding: number | null
+  is_feeding_paused: boolean
+  is_overdue: boolean
+  interval_days: number | null
+}
+
 // Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction.
 // We previously hit the legacy /tarantulas/<id>/premolt-prediction
 // endpoint (probability + confidence_level), but that's a DIFFERENT
@@ -77,6 +94,7 @@ export default function DashboardHub() {
   const { canAddTarantula, isPremium } = useSubscription()
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
+  const [feedingStatusItems, setFeedingStatusItems] = useState<FeedingStatusItem[]>([])
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
   const [enclosures, setEnclosures] = useState<Enclosure[]>([])
   const [colonies, setColonies] = useState<ColonyListItem[]>([])
@@ -129,7 +147,7 @@ export default function DashboardHub() {
       // Send the browser's TZ offset to endpoints that compute
       // calendar-day metrics (days_since_last_feeding on enclosures).
       const tzOffset = new Date().getTimezoneOffset()
-      const [tarantulasRes, enclosuresRes, limitsRes, statsRes, invertsRes, coloniesRes] = await Promise.all([
+      const [tarantulasRes, enclosuresRes, limitsRes, statsRes, invertsRes, coloniesRes, feedingStatusRes] = await Promise.all([
         fetch(`${API_URL}/api/v1/tarantulas/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/enclosures/?purpose=tarantula&tz_offset_minutes=${tzOffset}`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/promo-codes/me/limits`, { headers }).catch(() => null),
@@ -139,6 +157,10 @@ export default function DashboardHub() {
         fetch(`${API_URL}/api/v1/inverts/`, { headers }).catch(() => null),
         // Colony mode (ADR-010) — population entries for the Colonies card.
         fetch(`${API_URL}/api/v1/colonies/`, { headers }).catch(() => null),
+        // All-taxa feeding status — one call, shared with Feeding Day + the
+        // daily digest, so the "Needs Feeding" widget matches the notification
+        // (scorpions included, species-aware, never-fed excluded).
+        fetch(`${API_URL}/api/v1/inverts/feeding-status?tz_offset_minutes=${tzOffset}`, { headers }).catch(() => null),
       ])
 
       // If the primary fetch returned 401, token is expired — redirect to login
@@ -150,8 +172,8 @@ export default function DashboardHub() {
       if (tarantulasRes?.ok) {
         const data = await tarantulasRes.json()
         setTarantulas(data)
-        // Cascade into per-tarantula stats
-        fetchAllFeedingStatuses(authToken, data)
+        // Feeding status now comes from the all-taxa /inverts/feeding-status
+        // call above (single source of truth). Premolt still fans out.
         fetchAllPremoltPredictions(authToken, data)
       }
 
@@ -175,6 +197,11 @@ export default function DashboardHub() {
       if (coloniesRes?.ok) {
         const cols = await coloniesRes.json()
         if (Array.isArray(cols)) setColonies(cols)
+      }
+
+      if (feedingStatusRes?.ok) {
+        const fs = await feedingStatusRes.json()
+        if (Array.isArray(fs)) setFeedingStatusItems(fs)
       }
     } catch {
       // Dashboard data fetch failed
@@ -234,27 +261,14 @@ export default function DashboardHub() {
     setPremoltPredictions(predictionMap)
   }
 
-  // Computed stats. `!= null` excludes both null (spider has no
-  // accepted feedings yet) and undefined (status hasn't loaded) — a
-  // brand-new spider has no overdue cadence yet, so it shouldn't
-  // surface in this list. The old `!== undefined && >= 7` worked by
-  // accident (null >= 7 is false in JS) but read as a bug.
-  // Paused tarantulas (premolt / post-rehouse / etc.) are excluded —
-  // a 7-month premolt sling shouldn't headline the dashboard's
-  // "overdue" widget.
-  const overdueFeedings = tarantulas.filter(t => {
-    const status = feedingStatuses.get(t.id)
-    return (
-      status &&
-      !status.is_feeding_paused &&
-      status.days_since_last_feeding != null &&
-      status.days_since_last_feeding >= 7
-    )
-  }).sort((a, b) => {
-    const daysA = feedingStatuses.get(a.id)?.days_since_last_feeding ?? 0
-    const daysB = feedingStatuses.get(b.id)?.days_since_last_feeding ?? 0
-    return daysB - daysA
-  })
+  // Overdue = the server's all-taxa, species-aware `is_overdue` (from
+  // /inverts/feeding-status) — the SAME definition the Feeding Day screen and
+  // the daily digest use. This replaces the old tarantula-only, flat-7-day
+  // widget so the dashboard count matches the notification (a scorpion past
+  // its interval now shows here; paused + never-fed are excluded server-side).
+  const overdueFeedings = feedingStatusItems
+    .filter(i => i.is_overdue)
+    .sort((a, b) => (b.days_since_last_feeding ?? 0) - (a.days_since_last_feeding ?? 0))
 
   // Source of truth: the canonical `is_premolt_likely` boolean from
   // /premolt/dashboard. Same flag PremoltAlertCard / mobile use, so
@@ -454,7 +468,7 @@ export default function DashboardHub() {
           {/* Needs Feeding */}
           <button
             onClick={() => router.push('/dashboard/tarantulas')}
-            aria-label={`Needs feeding: ${overdueFeedings.length} ${overdueFeedings.length > 0 ? 'overdue 7 or more days' : 'all on schedule'}.`}
+            aria-label={`Needs feeding: ${overdueFeedings.length} ${overdueFeedings.length > 0 ? 'overdue for feeding' : 'all on schedule'}.`}
             className={`rounded-2xl shadow-lg border p-6 hover:shadow-xl transition-all text-left ${
               overdueFeedings.length > 0
                 ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
@@ -475,7 +489,7 @@ export default function DashboardHub() {
               </div>
             </div>
             <p className="mt-3 text-sm text-theme-tertiary">
-              {overdueFeedings.length > 0 ? '7+ days overdue' : 'All on schedule'}
+              {overdueFeedings.length > 0 ? 'Overdue for feeding' : 'All on schedule'}
             </p>
           </button>
 
@@ -554,13 +568,22 @@ export default function DashboardHub() {
               {overdueFeedings.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-3">✅</div>
-                  <p className="text-theme-secondary font-medium">All tarantulas are fed on schedule!</p>
+                  <p className="text-theme-secondary font-medium">All animals are fed on schedule!</p>
                   <p className="text-sm text-theme-tertiary mt-1">Great job keeping up with feedings.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {overdueFeedings.slice(0, 10).map(t => {
-                    const days = feedingStatuses.get(t.id)?.days_since_last_feeding ?? 0
+                    const days = t.days_since_last_feeding ?? 0
+                    const label = t.name || t.common_name || t.scientific_name || 'Unnamed'
+                    const glyph = t.taxon === 'tarantula' ? '🕷️'
+                      : t.taxon === 'scorpion' ? '🦂'
+                      : t.taxon === 'roach' ? '🪳'
+                      : t.taxon === 'mantis' ? '🦗'
+                      : '🐛'
+                    const detailHref = t.taxon === 'tarantula'
+                      ? `/dashboard/tarantulas/${t.id}`
+                      : `/dashboard/inverts/${t.id}`
                     return (
                       <div key={t.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-elevated">
                         <div className="flex items-center gap-3">
@@ -568,15 +591,15 @@ export default function DashboardHub() {
                             {t.photo_url ? (
                               <img
                                 src={getImageUrl(t.photo_url)}
-                                alt={t.common_name}
+                                alt={label}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-lg">🕷️</div>
+                              <div className="w-full h-full flex items-center justify-center text-lg">{glyph}</div>
                             )}
                           </div>
                           <div>
-                            <p className="font-semibold text-theme-primary">{t.common_name}</p>
+                            <p className="font-semibold text-theme-primary">{label}</p>
                             <p className={`text-sm font-medium ${
                               days >= 21 ? 'text-red-600 dark:text-red-400' :
                               days >= 14 ? 'text-orange-600 dark:text-orange-400' :
@@ -587,7 +610,7 @@ export default function DashboardHub() {
                           </div>
                         </div>
                         <button
-                          onClick={() => router.push(`/dashboard/tarantulas/${t.id}`)}
+                          onClick={() => router.push(detailHref)}
                           className="px-4 py-2 bg-gradient-brand text-white rounded-xl text-sm font-semibold hover:brightness-90 transition flex-shrink-0"
                         >
                           Log Feeding

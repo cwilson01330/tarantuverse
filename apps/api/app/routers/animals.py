@@ -13,10 +13,13 @@ Ownership model: every query filters by
 `Animal.user_id == current_user.id`. Anonymous / public reads go
 through `/t/{id}` (qr router).
 """
+import re
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -25,12 +28,135 @@ from app.models.animal import Animal, ANIMAL_TAXON_VALUES
 from app.models.shed_log import ShedLog
 from app.models.weight_log import WeightLog
 from app.models.animal_genotype import AnimalGenotype
+from app.models.feeding_log import FeedingLog
 from app.models.photo import Photo
 from app.models.tarantula import Sex, Source  # shared DB enums
-from app.schemas.animal import AnimalCreate, AnimalUpdate, AnimalResponse
+from app.schemas.animal import (
+    AnimalCreate,
+    AnimalUpdate,
+    AnimalResponse,
+    AnimalFeedingStatusItem,
+)
+from app.schemas.feeding import (
+    AnimalBulkFeedingRequest,
+    AnimalBulkFeedingResult,
+    AnimalBulkFeedingSkip,
+)
+from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Feeding cadence (HV Feeding Day) — reptiles/amphibians feed on wildly
+# different schedules, so the interval is resolved per-animal, degrading to
+# None (never flagged overdue) rather than guessing wrong.
+# ---------------------------------------------------------------------------
+
+def _calendar_day_diff(later: datetime, earlier: datetime, tz_offset_minutes: Optional[int]) -> int:
+    """Calendar-day difference in the keeper's local timezone (flips at local
+    midnight, not UTC). Mirrors tarantulas/inverts._calendar_day_diff."""
+    if tz_offset_minutes is None:
+        return (later - earlier).days
+    local_delta = timedelta(minutes=-tz_offset_minutes)
+    return ((later + local_delta).date() - (earlier + local_delta).date()).days
+
+
+def _parse_reptile_interval(s: Optional[str]) -> Optional[int]:
+    """Days-between-feedings from a free-text schedule/frequency, upper bound.
+
+    Handles word cadences ("weekly", "daily", "every other day", "twice a
+    week", "biweekly", "monthly") BEFORE numeric parsing — critical so
+    "1-2 prey per week" is read as a per-week frequency (7d), not "every 2
+    days". Returns None when it can't confidently parse, so unknown schedules
+    never produce a false "overdue".
+    """
+    if not s:
+        return None
+    t = s.strip().lower()
+    if not t:
+        return None
+    if "every other day" in t or "alternate day" in t or "every 2nd day" in t:
+        return 2
+    if ("twice" in t or "2x" in t or "2 x" in t) and "week" in t:
+        return 4  # ~2×/week → overdue by day 4
+    if "daily" in t or "every day" in t or "each day" in t:
+        return 1
+    if ("biweekly" in t or "bi-weekly" in t or "fortnight" in t
+            or "every two weeks" in t or "every 2 weeks" in t):
+        return 14
+    if "weekly" in t or "per week" in t or "a week" in t or "once a week" in t:
+        return 7
+    if "monthly" in t or "per month" in t or "once a month" in t:
+        return 30
+    # Numeric ranges like "every 5-7 days" / "every 10 days" — only trust the
+    # parser when the string actually contains a digit (its no-match default
+    # would otherwise masquerade as a real "10").
+    if re.search(r"\d", t):
+        _lo, hi = parse_frequency_string(t)
+        return hi
+    return None
+
+
+def _interval_from_life_stage_feeding(brackets, weight_g) -> Optional[int]:
+    """Snake-style weight-bracketed interval: pick the bracket whose
+    weight_g_max covers the animal's current weight (None = open-ended adult),
+    return its interval_days_max. See ReptileSpecies.life_stage_feeding."""
+    if not isinstance(brackets, list) or not brackets:
+        return None
+    try:
+        w = float(weight_g)
+    except (TypeError, ValueError):
+        return None
+
+    def _key(b):
+        m = b.get("weight_g_max") if isinstance(b, dict) else None
+        return (m is None, float(m) if m is not None else 0.0)
+
+    for b in sorted(brackets, key=_key):
+        if not isinstance(b, dict):
+            continue
+        m = b.get("weight_g_max")
+        if m is None or w <= float(m):
+            hi = b.get("interval_days_max")
+            if hi is not None:
+                return int(hi)
+            lo = b.get("interval_days_min")
+            return int(lo) if lo is not None else None
+    return None
+
+
+def _animal_feeding_interval(animal: Animal) -> Optional[int]:
+    """Resolve the recommended feeding interval (days) for one animal.
+
+    Priority: CGD (geckos on a complete diet, refreshed ~every few days →
+    overdue day 4) → weight-bracketed snake schedule → the animal's own
+    free-text schedule → the species' per-stage frequency → None (unknown).
+    Requires herp_species eager-loaded for the CGD + species fallbacks.
+    """
+    species = animal.herp_species
+    if bool(getattr(animal, "feeds_on_cgd", False)):
+        return 4
+    if species is not None and animal.current_weight_g is not None:
+        iv = _interval_from_life_stage_feeding(
+            getattr(species, "life_stage_feeding", None), animal.current_weight_g
+        )
+        if iv is not None:
+            return iv
+    iv = _parse_reptile_interval(animal.feeding_schedule)
+    if iv is not None:
+        return iv
+    if species is not None:
+        for freq in (
+            species.feeding_frequency_adult,
+            species.feeding_frequency_juvenile,
+            species.feeding_frequency_hatchling,
+        ):
+            iv = _parse_reptile_interval(freq)
+            if iv is not None:
+                return iv
+    return None
 
 
 def _coerce_enums(data: dict) -> dict:
@@ -100,6 +226,148 @@ async def create_animal(
     # TODO: emit `new_animal` activity feed entry when feed has herp icons
 
     return new_animal
+
+
+# NOTE: these static routes MUST stay declared before `/{animal_id}` or the
+# dynamic route swallows "feeding-status" / "bulk-feedings" and 422s on UUID
+# parsing.
+
+@router.get("/feeding-status", response_model=List[AnimalFeedingStatusItem])
+async def list_feeding_status(
+    tz_offset_minutes: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Feeding status for every animal the caller owns — powers HV Feeding Day.
+
+    One grouped query for the last ACCEPTED feeding per animal (no N+1),
+    herp_species eager-loaded for the cadence resolver. `is_overdue` is
+    species/schedule-aware and NEVER fires for paused animals or animals whose
+    cadence can't be determined.
+    """
+    animals = (
+        db.query(Animal)
+        .options(selectinload(Animal.herp_species))
+        .filter(Animal.user_id == current_user.id)
+        .all()
+    )
+    if not animals:
+        return []
+
+    ids = [a.id for a in animals]
+    rows = (
+        db.query(FeedingLog.animal_id, func.max(FeedingLog.fed_at))
+        .filter(FeedingLog.animal_id.in_(ids), FeedingLog.accepted.is_(True))
+        .group_by(FeedingLog.animal_id)
+        .all()
+    )
+    last_by_id = {row[0]: row[1] for row in rows}
+
+    now = datetime.now(timezone.utc)
+    today_local = (
+        (now + timedelta(minutes=-(tz_offset_minutes or 0))).date()
+        if tz_offset_minutes is not None
+        else now.date()
+    )
+
+    items: List[AnimalFeedingStatusItem] = []
+    for a in animals:
+        last = last_by_id.get(a.id)
+        days = _calendar_day_diff(now, last, tz_offset_minutes) if last else None
+        paused = bool(
+            a.feeding_paused_reason
+            and (a.feeding_paused_until is None or a.feeding_paused_until >= today_local)
+        )
+        interval = _animal_feeding_interval(a)
+        # Never-fed is NOT overdue (no cadence established yet) — matches
+        # /inverts/feeding-status + the digest so the dashboard, Feeding Day,
+        # and the notification all agree.
+        is_overdue = (
+            (not paused)
+            and interval is not None
+            and last is not None
+            and days is not None
+            and days >= interval
+        )
+        items.append(
+            AnimalFeedingStatusItem(
+                id=a.id,
+                name=a.name,
+                common_name=a.common_name,
+                scientific_name=a.scientific_name,
+                taxon=a.taxon,
+                photo_url=a.photo_url,
+                last_feeding_date=last,
+                days_since_last_feeding=days,
+                is_feeding_paused=paused,
+                is_overdue=is_overdue,
+                interval_days=interval,
+                feeds_on_cgd=bool(getattr(a, "feeds_on_cgd", False)),
+            )
+        )
+
+    # Never-fed first, then longest-since-fed — the neediest float to the top.
+    items.sort(
+        key=lambda x: (0 if x.days_since_last_feeding is None else 1, -(x.days_since_last_feeding or 0))
+    )
+    return items
+
+
+@router.post(
+    "/bulk-feedings",
+    response_model=AnimalBulkFeedingResult,
+    status_code=status.HTTP_201_CREATED,
+)
+async def bulk_create_animal_feedings(
+    payload: AnimalBulkFeedingRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log one feeding event across many owned animals at once (Feeding Day).
+
+    Same fed_at / accepted / food_type / notes applied to each. Unowned ids are
+    skipped (reported), never fatal. On an accepted batch, the denormalized
+    `animals.last_fed_at` is bumped so collection cards + status refresh.
+    """
+    requested = list(dict.fromkeys(payload.animal_ids))
+    owned_ids = {
+        row[0]
+        for row in db.query(Animal.id)
+        .filter(Animal.id.in_(requested), Animal.user_id == current_user.id)
+        .all()
+    }
+    fed_at = payload.fed_at or datetime.now(timezone.utc)
+
+    created_ids = []
+    skipped = []
+    for aid in requested:
+        if aid not in owned_ids:
+            skipped.append(AnimalBulkFeedingSkip(animal_id=aid, reason="Not found or not yours"))
+            continue
+        db.add(
+            FeedingLog(
+                animal_id=aid,
+                fed_at=fed_at,
+                food_type=payload.food_type,
+                food_size=payload.food_size,
+                quantity=payload.quantity,
+                accepted=payload.accepted,
+                notes=payload.notes,
+            )
+        )
+        created_ids.append(aid)
+
+    if payload.accepted and created_ids:
+        db.query(Animal).filter(Animal.id.in_(created_ids)).update(
+            {Animal.last_fed_at: fed_at}, synchronize_session=False
+        )
+
+    db.commit()
+    return AnimalBulkFeedingResult(
+        created_count=len(created_ids),
+        created_ids=created_ids,
+        skipped=skipped,
+    )
 
 
 @router.get("/{animal_id}", response_model=AnimalResponse)
