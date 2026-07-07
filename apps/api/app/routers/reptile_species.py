@@ -40,24 +40,26 @@ router = APIRouter()
 @router.get("/search", response_model=List[ReptileSpeciesSearchResult])
 async def search_reptile_species(
     q: str = Query(..., min_length=2, description="Search query (scientific or common name)"),
+    taxon: Optional[str] = Query(
+        None, pattern="^(snake|lizard|turtle|tortoise|frog|salamander|other)$",
+        description="Restrict to a taxon group (ADR-011).",
+    ),
     limit: int = Query(10, le=50),
     db: Session = Depends(get_db),
 ):
     """Autocomplete search on reptile species. Public."""
     search_term = f"%{q.lower().strip()}%"
-    return (
-        db.query(ReptileSpecies)
-        .filter(
-            or_(
-                ReptileSpecies.scientific_name_lower.ilike(search_term),
-                func.lower(
-                    func.array_to_string(ReptileSpecies.common_names, " ")
-                ).ilike(search_term),
-            )
+    query = db.query(ReptileSpecies).filter(
+        or_(
+            ReptileSpecies.scientific_name_lower.ilike(search_term),
+            func.lower(
+                func.array_to_string(ReptileSpecies.common_names, " ")
+            ).ilike(search_term),
         )
-        .limit(limit)
-        .all()
     )
+    if taxon:
+        query = query.filter(ReptileSpecies.taxon == taxon)
+    return query.limit(limit).all()
 
 
 @router.get("/", response_model=ReptileSpeciesPaginatedResponse)
@@ -74,6 +76,10 @@ async def list_reptile_species(
     diet_type: Optional[str] = Query(
         None, pattern="^(strict_carnivore|insectivore|omnivore|herbivore)$"
     ),
+    taxon: Optional[str] = Query(
+        None, pattern="^(snake|lizard|turtle|tortoise|frog|salamander|other)$",
+        description="Restrict to a taxon group (ADR-011) — powers the by-taxon browser.",
+    ),
     db: Session = Depends(get_db),
 ):
     """Paginated list of reptile species with optional filters. Public."""
@@ -81,6 +87,8 @@ async def list_reptile_species(
 
     if verified_only:
         query = query.filter(ReptileSpecies.is_verified == True)
+    if taxon:
+        query = query.filter(ReptileSpecies.taxon == taxon)
     if care_level:
         query = query.filter(ReptileSpecies.care_level == care_level)
     if enclosure_type:

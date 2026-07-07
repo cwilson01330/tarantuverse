@@ -20,6 +20,7 @@ import {
   FlatList,
   Image,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -32,12 +33,45 @@ import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { ThemedInput } from '../../src/components/forms/FormPrimitives';
 import {
   CARE_LEVEL_LABELS,
-  type ReptileSpeciesSearchResult,
+  type CareLevel,
+  type HerpTaxon,
   listReptileSpecies,
   searchReptileSpecies,
 } from '../../src/lib/reptile-species';
+import { ANIMAL_TAXA, ANIMAL_TAXON_ORDER } from '../../src/lib/animals';
+import {
+  FEEDER_CATEGORIES,
+  FEEDER_CATEGORY_ORDER,
+  type FeederCategory,
+  listFeederSpecies,
+  titleize,
+} from '../../src/lib/feeders';
 
 const DEBOUNCE_MS = 300;
+
+/**
+ * Unified row shape so one renderer handles both the reptile/amphibian
+ * catalog and the feeder catalog. `isFeeder` picks the route + the
+ * care-level label path (feeder care levels are easy|moderate|hard, not
+ * the reptile beginner|intermediate|advanced).
+ */
+interface SpeciesRowData {
+  id: string;
+  scientific_name: string;
+  common_names: string[];
+  care_level: string | null;
+  image_url: string | null;
+  isFeeder: boolean;
+}
+
+/** Human label for a care level, tolerant of both taxonomies. */
+function careLevelLabel(value: string, isFeeder: boolean): string {
+  if (!isFeeder && value in CARE_LEVEL_LABELS) {
+    return CARE_LEVEL_LABELS[value as CareLevel];
+  }
+  // Feeder levels (easy|moderate|hard) or any unknown value → capitalize raw.
+  return titleize(value);
+}
 
 function SpeciesScreen() {
   const router = useRouter();
@@ -45,9 +79,9 @@ function SpeciesScreen() {
 
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
-  const [results, setResults] = useState<ReptileSpeciesSearchResult[] | null>(
-    null,
-  );
+  const [taxon, setTaxon] = useState<HerpTaxon | null>(null);
+  const [feederCat, setFeederCat] = useState<FeederCategory | null>(null);
+  const [results, setResults] = useState<SpeciesRowData[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -59,42 +93,90 @@ function SpeciesScreen() {
     return () => clearTimeout(handle);
   }, [query]);
 
-  const fetchSpecies = useCallback(async (q: string) => {
-    try {
-      if (q.length >= 2) {
-        const items = await searchReptileSpecies(q, 25);
-        setResults(items);
-      } else {
-        const page = await listReptileSpecies({ skip: 0, limit: 100 });
-        setResults(page.items);
+  const fetchSpecies = useCallback(
+    async (q: string, tx: HerpTaxon | null, fc: FeederCategory | null) => {
+      try {
+        let rows: SpeciesRowData[];
+        if (fc) {
+          // Feeder catalog mode.
+          const items = await listFeederSpecies({
+            q: q.length >= 2 ? q : undefined,
+            category: fc,
+          });
+          rows = items.map((s) => ({
+            id: s.id,
+            scientific_name: s.scientific_name,
+            common_names: s.common_names ?? [],
+            care_level: s.care_level,
+            image_url: s.image_url,
+            isFeeder: true,
+          }));
+        } else if (q.length >= 2) {
+          const items = await searchReptileSpecies(q, 25, tx ?? undefined);
+          rows = items.map((s) => ({
+            id: s.id,
+            scientific_name: s.scientific_name,
+            common_names: s.common_names,
+            care_level: s.care_level,
+            image_url: s.image_url,
+            isFeeder: false,
+          }));
+        } else {
+          const page = await listReptileSpecies({
+            skip: 0,
+            limit: 100,
+            ...(tx ? { taxon: tx } : {}),
+          });
+          rows = page.items.map((s) => ({
+            id: s.id,
+            scientific_name: s.scientific_name,
+            common_names: s.common_names,
+            care_level: s.care_level,
+            image_url: s.image_url,
+            isFeeder: false,
+          }));
+        }
+        setResults(rows);
+        setLoadError(null);
+      } catch {
+        setLoadError("Couldn't load species. Pull down to retry.");
+        setResults((prev) => prev ?? []);
       }
-      setLoadError(null);
-    } catch {
-      setLoadError("Couldn't load species. Pull down to retry.");
-      setResults((prev) => prev ?? []);
-    }
-  }, []);
+    },
+    [],
+  );
 
   // Re-fetch on focus (covers tab re-entry after a detail view).
   useFocusEffect(
     useCallback(() => {
-      fetchSpecies(debounced);
-    }, [fetchSpecies, debounced]),
+      fetchSpecies(debounced, taxon, feederCat);
+    }, [fetchSpecies, debounced, taxon, feederCat]),
   );
 
-  // Re-fetch on debounced query change while still on this screen.
+  // Re-fetch on debounced query / taxon / feeder-category change.
   useEffect(() => {
-    fetchSpecies(debounced);
-  }, [debounced, fetchSpecies]);
+    fetchSpecies(debounced, taxon, feederCat);
+  }, [debounced, taxon, feederCat, fetchSpecies]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await fetchSpecies(debounced);
+      await fetchSpecies(debounced, taxon, feederCat);
     } finally {
       setRefreshing(false);
     }
-  }, [debounced, fetchSpecies]);
+  }, [debounced, taxon, feederCat, fetchSpecies]);
+
+  // Mutually exclusive selection: taxon/All chips clear feederCat;
+  // feeder chips clear taxon.
+  const selectTaxon = useCallback((t: HerpTaxon | null) => {
+    setFeederCat(null);
+    setTaxon(t);
+  }, []);
+  const selectFeeder = useCallback((c: FeederCategory) => {
+    setTaxon(null);
+    setFeederCat(c);
+  }, []);
 
   return (
     <SafeAreaView
@@ -139,6 +221,83 @@ function SpeciesScreen() {
         </View>
       </View>
 
+      {/* Taxon filter chips — divide the catalog by taxon (ADR-011) */}
+      <View style={{ paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          {([null, ...ANIMAL_TAXON_ORDER] as (HerpTaxon | null)[]).map((t) => {
+            const active = feederCat === null && taxon === t;
+            const meta = t ? ANIMAL_TAXA[t] : null;
+            return (
+              <TouchableOpacity
+                key={t ?? 'all'}
+                onPress={() => selectTaxon(t)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={meta ? meta.plural : 'All taxa'}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surface,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: active ? '700' : '500',
+                    color: active ? '#0B0B0B' : colors.textSecondary,
+                  }}
+                >
+                  {meta ? `${meta.glyph} ${meta.plural}` : 'All'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          {/* Divider between animal taxa and feeder categories */}
+          <View
+            style={[styles.chipDivider, { backgroundColor: colors.border }]}
+          />
+
+          {/* Feeder category chips — browse the feeder catalog (ADR-012) */}
+          {FEEDER_CATEGORY_ORDER.map((c) => {
+            const active = feederCat === c;
+            const meta = FEEDER_CATEGORIES[c];
+            return (
+              <TouchableOpacity
+                key={`feeder-${c}`}
+                onPress={() => selectFeeder(c)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Feeder ${meta.plural}`}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surface,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: active ? '700' : '500',
+                    color: active ? '#0B0B0B' : colors.textSecondary,
+                  }}
+                >
+                  {`${meta.glyph} ${meta.plural}`}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       {/* List */}
       {results === null ? (
         <View style={styles.center}>
@@ -153,7 +312,11 @@ function SpeciesScreen() {
             style={{ marginBottom: 12 }}
           />
           <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-            {debounced ? 'No matches' : 'No species in catalog yet'}
+            {debounced
+              ? 'No matches'
+              : feederCat
+                ? 'No feeders in this category yet'
+                : 'No species in catalog yet'}
           </Text>
           <Text style={[styles.emptyHint, { color: colors.textTertiary }]}>
             {debounced
@@ -198,7 +361,13 @@ function SpeciesScreen() {
           renderItem={({ item }) => (
             <SpeciesRow
               species={item}
-              onPress={() => router.push(`/species/${item.id}` as never)}
+              onPress={() =>
+                router.push(
+                  (item.isFeeder
+                    ? `/feeder-species/${item.id}`
+                    : `/species/${item.id}`) as never,
+                )
+              }
             />
           )}
         />
@@ -211,7 +380,7 @@ function SpeciesRow({
   species,
   onPress,
 }: {
-  species: ReptileSpeciesSearchResult;
+  species: SpeciesRowData;
   onPress: () => void;
 }) {
   const { colors, layout } = useTheme();
@@ -239,7 +408,7 @@ function SpeciesRow({
             style={[styles.rowImage, { backgroundColor: colors.surfaceRaised }]}
           >
             <MaterialCommunityIcons
-              name="leaf"
+              name={species.isFeeder ? 'food-drumstick' : 'leaf'}
               size={20}
               color={colors.textTertiary}
             />
@@ -269,7 +438,7 @@ function SpeciesRow({
             { color: colors.textSecondary, borderColor: colors.border },
           ]}
         >
-          {CARE_LEVEL_LABELS[species.care_level]}
+          {careLevelLabel(species.care_level, species.isFeeder)}
         </Text>
       )}
       <MaterialCommunityIcons
@@ -328,6 +497,26 @@ const styles = StyleSheet.create({
     right: 10,
     top: 11,
     padding: 2,
+  },
+
+  // Taxon chips
+  chipRow: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+    marginVertical: 4,
+    marginHorizontal: 2,
+    opacity: 0.6,
   },
 
   // List

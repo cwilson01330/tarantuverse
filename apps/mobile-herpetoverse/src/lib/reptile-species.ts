@@ -20,6 +20,10 @@ export const CARE_LEVEL_LABELS: Record<CareLevel, string> = {
   advanced: 'Advanced',
 };
 
+/** HV taxon groups (ADR-011) — the axis the species browser divides on. */
+export type HerpTaxon =
+  | 'snake' | 'lizard' | 'turtle' | 'tortoise' | 'frog' | 'salamander' | 'other';
+
 export interface ReptileSpeciesSearchResult {
   id: string;
   slug: string;
@@ -27,6 +31,7 @@ export interface ReptileSpeciesSearchResult {
   common_names: string[];
   care_level: CareLevel | null;
   image_url: string | null;
+  taxon: HerpTaxon | null;
 }
 
 /**
@@ -37,12 +42,13 @@ export interface ReptileSpeciesSearchResult {
 export async function searchReptileSpecies(
   q: string,
   limit = 10,
+  taxon?: HerpTaxon,
 ): Promise<ReptileSpeciesSearchResult[]> {
   if (q.trim().length < 2) return [];
   const { data } = await apiClient.get<ReptileSpeciesSearchResult[]>(
     '/reptile-species/search',
     {
-      params: { q: q.trim(), limit },
+      params: { q: q.trim(), limit, ...(taxon ? { taxon } : {}) },
     },
   );
   return data;
@@ -67,6 +73,7 @@ export interface ListReptileSpeciesParams {
   care_level?: CareLevel;
   enclosure_type?: 'terrestrial' | 'arboreal' | 'semi_arboreal' | 'fossorial';
   diet_type?: 'strict_carnivore' | 'insectivore' | 'omnivore' | 'herbivore';
+  taxon?: HerpTaxon;
 }
 
 export async function listReptileSpecies(

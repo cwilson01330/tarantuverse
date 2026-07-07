@@ -11,6 +11,8 @@
  * fine default. Admin edits propagate within the revalidation window.
  */
 
+import type { AnimalTaxon } from './animals'
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
 
@@ -69,6 +71,14 @@ export interface LifeStageFeedingBracket {
 
 export interface ReptileSpecies {
   id: string
+  /**
+   * Taxon discriminator (ADR-011). One of the ANIMAL_TAXA keys —
+   * snake | lizard | turtle | tortoise | frog | salamander | other.
+   * The catalog table is a flexible VARCHAR (nullable), so a stray legacy
+   * value or an un-tagged row passes through as a plain string or null; the
+   * browser treats anything outside the registry as "other" when bucketing.
+   */
+  taxon: AnimalTaxon | null
   scientific_name: string
   /**
    * URL slug for the public `/species/{slug}` care-sheet route. Backfilled
@@ -180,13 +190,50 @@ interface PaginatedResponse {
 // state instead of surfacing a Next.js error boundary.
 // ---------------------------------------------------------------------------
 
-export async function fetchReptileSpecies(): Promise<ReptileSpecies[] | null> {
+export async function fetchReptileSpecies(
+  taxon?: AnimalTaxon,
+): Promise<ReptileSpecies[] | null> {
   try {
+    // Trailing slash — matches the router mount. FastAPI redirects slashes
+    // off, so calling without it can 307 and drop headers.
+    const params = new URLSearchParams({
+      verified_only: 'true',
+      limit: '100',
+    })
+    if (taxon) params.set('taxon', taxon)
     const res = await fetch(
-      // Trailing slash — matches the router mount. FastAPI redirects slashes
-      // off, so calling without it can 307 and drop headers.
-      `${API_URL}/api/v1/reptile-species/?verified_only=true&limit=100`,
+      `${API_URL}/api/v1/reptile-species/?${params.toString()}`,
       { next: { revalidate: REVALIDATE_SECONDS } },
+    )
+    if (!res.ok) return null
+    const data = (await res.json()) as PaginatedResponse
+    return data.items
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Browser-safe list fetch used by the interactive species browser. Unlike
+ * `fetchReptileSpecies` (server component, ISR-cached) this runs client-side
+ * on each taxon/search change and skips Next's fetch cache so chip switches
+ * reflect fresh filtering. The endpoint is public — no bearer token needed.
+ *
+ * Returns `null` on failure so the browser can render a degraded state
+ * instead of throwing to an error boundary.
+ */
+export async function browseReptileSpecies(
+  taxon?: AnimalTaxon,
+): Promise<ReptileSpecies[] | null> {
+  try {
+    const params = new URLSearchParams({
+      verified_only: 'true',
+      limit: '100',
+    })
+    if (taxon) params.set('taxon', taxon)
+    const res = await fetch(
+      `${API_URL}/api/v1/reptile-species/?${params.toString()}`,
+      { cache: 'no-store' },
     )
     if (!res.ok) return null
     const data = (await res.json()) as PaginatedResponse
@@ -250,6 +297,7 @@ export interface ReptileSpeciesSearchResult {
   common_names: string[]
   care_level: CareLevel | null
   image_url: string | null
+  taxon: AnimalTaxon
 }
 
 /**
@@ -260,11 +308,12 @@ export interface ReptileSpeciesSearchResult {
 export async function searchReptileSpecies(
   q: string,
   limit = 10,
+  taxon?: AnimalTaxon,
 ): Promise<ReptileSpeciesSearchResult[]> {
   if (q.trim().length < 2) return []
-  const url =
-    `${API_URL}/api/v1/reptile-species/search` +
-    `?q=${encodeURIComponent(q.trim())}&limit=${limit}`
+  const params = new URLSearchParams({ q: q.trim(), limit: String(limit) })
+  if (taxon) params.set('taxon', taxon)
+  const url = `${API_URL}/api/v1/reptile-species/search?${params.toString()}`
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) {
     throw new Error(`Search failed (${res.status})`)

@@ -299,6 +299,8 @@ class ReptileSpeciesResponse(ReptileSpeciesBase):
     cites_appendix: Optional[str] = None
     iucn_status: Optional[str] = None
     morph_complexity: Optional[str] = None
+    # Taxon group (ADR-011) — pattern-free on output for the same reason.
+    taxon: Optional[str] = None
 
     id: uuid.UUID
     # URL slug — always populated on read (DB NOT NULL after migration
@@ -328,6 +330,8 @@ class ReptileSpeciesSearchResult(BaseModel):
     common_names: List[str] = []
     care_level: Optional[str] = None
     image_url: Optional[str] = None
+    # Taxon group (ADR-011) — lets the species browser divide by taxon.
+    taxon: Optional[str] = None
 
     class Config:
         from_attributes = True
