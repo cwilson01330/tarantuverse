@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "793166570390",
+    "project_id": "herpetoverse",
+    "storage_bucket": "herpetoverse.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:793166570390:android:22f03fa70e11cfe79fb3b7",
+        "android_client_info": {
+          "package_name": "com.herpetoverse.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7jU_vJ6ThNnsX0MKmell19Qnguc7Zjgo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

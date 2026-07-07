@@ -22,6 +22,7 @@
     },
     "android": {
       "package": "com.herpetoverse.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0B0B"
