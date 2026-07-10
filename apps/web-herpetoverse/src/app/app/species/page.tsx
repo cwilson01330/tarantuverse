@@ -1,4 +1,4 @@
-import { fetchReptileSpecies, type ReptileSpecies } from '@/lib/reptileSpecies'
+import { fetchReptileSpecies } from '@/lib/reptileSpecies'
 import SpeciesBrowser from '@/components/SpeciesBrowser'
 
 export const metadata = {
@@ -29,10 +29,7 @@ export default async function SpeciesPage() {
       {species === null ? (
         <ApiErrorState />
       ) : (
-        <SpeciesBrowser
-          initialSpecies={species}
-          hrefFor={(s: ReptileSpecies) => `/app/species/${s.id}`}
-        />
+        <SpeciesBrowser initialSpecies={species} linkMode="app" />
       )}
 
       <footer className="mt-12 pt-8 border-t border-neutral-800 text-xs text-neutral-500 leading-relaxed max-w-2xl">

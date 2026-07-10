@@ -14,8 +14,10 @@
  * chip. Chips use HV theme tokens (herp-teal / herp-lime / neutral-*).
  *
  * The two link schemes differ (public → /species/{slug}, in-app →
- * /app/species/{id}), so callers pass `hrefFor`. The card layout otherwise
- * matches the existing SpeciesCard on both pages.
+ * /app/species/{id}), so callers pass a serializable `linkMode` and the href
+ * is built here. (A function prop can't cross the Server→Client boundary —
+ * Next.js can't serialize it, which fails the static export of /species.) The
+ * card layout otherwise matches the existing SpeciesCard on both pages.
  */
 'use client'
 
@@ -50,8 +52,20 @@ import { CareLevelBadge } from '@/components/SpeciesBadges'
 interface SpeciesBrowserProps {
   /** Server-rendered initial (unfiltered) set for fast first paint. */
   initialSpecies: ReptileSpecies[]
-  /** Build the care-sheet link for a species (slug for public, id for in-app). */
-  hrefFor: (species: ReptileSpecies) => string
+  /**
+   * Which care-sheet URL scheme to link to:
+   *   'public' → /species/{slug}   (SEO pages, stable slugs)
+   *   'app'    → /app/species/{id} (keeper-facing)
+   * A plain string keeps this serializable across the Server→Client boundary.
+   */
+  linkMode: 'public' | 'app'
+}
+
+/** Build the care-sheet href for a species under the chosen scheme. */
+function speciesHref(species: ReptileSpecies, linkMode: 'public' | 'app'): string {
+  return linkMode === 'public'
+    ? `/species/${species.slug}`
+    : `/app/species/${species.id}`
 }
 
 type TaxonFilter = AnimalTaxon | 'all'
@@ -72,7 +86,7 @@ function feederHref(feeder: FeederSpecies): string {
 
 export default function SpeciesBrowser({
   initialSpecies,
-  hrefFor,
+  linkMode,
 }: SpeciesBrowserProps) {
   const [selection, setSelection] = useState<Selection>({
     kind: 'taxon',
@@ -313,7 +327,11 @@ export default function SpeciesBrowser({
                   <FeederCard key={f.id} feeder={f} href={feederHref(f)} />
                 ))
               : species.map((s) => (
-                  <SpeciesCard key={s.id} species={s} href={hrefFor(s)} />
+                  <SpeciesCard
+                    key={s.id}
+                    species={s}
+                    href={speciesHref(s, linkMode)}
+                  />
                 ))}
           </div>
         </>

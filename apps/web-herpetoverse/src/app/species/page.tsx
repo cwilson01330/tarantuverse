@@ -15,7 +15,7 @@
  */
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { fetchReptileSpecies, type ReptileSpecies } from '@/lib/reptileSpecies'
+import { fetchReptileSpecies } from '@/lib/reptileSpecies'
 import SpeciesBrowser from '@/components/SpeciesBrowser'
 
 export const metadata: Metadata = {
@@ -63,10 +63,7 @@ export default async function PublicSpeciesListPage() {
         {species === null ? (
           <ApiErrorState />
         ) : (
-          <SpeciesBrowser
-            initialSpecies={species}
-            hrefFor={(s: ReptileSpecies) => `/species/${s.slug}`}
-          />
+          <SpeciesBrowser initialSpecies={species} linkMode="public" />
         )}
 
         <footer className="mt-12 pt-8 border-t border-neutral-800 text-xs text-neutral-500 leading-relaxed max-w-2xl">
