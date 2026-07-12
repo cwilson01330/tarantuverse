@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.tarantuverse.app",
+      "sha256_cert_fingerprints": [
+        "17:96:9B:C6:3D:EB:C9:8D:10:F0:4F:F1:10:28:60:54:CA:5A:5A:14:21:9E:B9:B0:8D:7D:4C:30:FD:B7:DE:9E"
+      ]
+    }
+  }
+]

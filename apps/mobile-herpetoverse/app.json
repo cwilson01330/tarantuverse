@@ -15,6 +15,9 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.herpetoverse.app",
       "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:herpetoverse.com"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Herpetoverse needs access to your photo library so you can attach photos to your reptile profiles — sheds, feedings, and growth over time.",
@@ -27,7 +30,18 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0B0B"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "herpetoverse.com", "pathPrefix": "/a" },
+            { "scheme": "https", "host": "herpetoverse.com", "pathPrefix": "/claim" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro"

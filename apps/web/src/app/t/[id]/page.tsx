@@ -118,6 +118,17 @@ export default function PublicProfilePage() {
   const [following, setFollowing] = useState(false)
   const [followBusy, setFollowBusy] = useState(false)
 
+  // Quick-feed: log a feeding right here on the scan page instead of routing
+  // into the full detail screen. This is the whole point of an enclosure QR —
+  // scan, tap Log Feeding, tap Save, done.
+  const [quickFeedOpen, setQuickFeedOpen] = useState(false)
+  const [feedAccepted, setFeedAccepted] = useState(true)
+  const [feedFoodType, setFeedFoodType] = useState('')
+  const [feedFoodSize, setFeedFoodSize] = useState('')
+  const [feedSaving, setFeedSaving] = useState(false)
+  const [feedError, setFeedError] = useState<string | null>(null)
+  const [feedDone, setFeedDone] = useState(false)
+
   useEffect(() => {
     // Wait for the session to resolve so the owner / follow state is
     // correct on first paint (otherwise we'd fetch as anonymous).
@@ -138,6 +149,55 @@ export default function PublicProfilePage() {
       .catch(() => setError('error'))
       .finally(() => setLoading(false))
   }, [id, token, authLoading])
+
+  function openQuickFeed() {
+    setFeedAccepted(true)
+    setFeedFoodType('')
+    setFeedFoodSize('')
+    setFeedError(null)
+    setFeedDone(false)
+    setQuickFeedOpen(true)
+  }
+
+  async function submitQuickFeed() {
+    if (!profile || feedSaving) return
+    if (!token) { router.push('/login'); return }
+    setFeedSaving(true)
+    setFeedError(null)
+    try {
+      const res = await fetch(`${API}/api/v1/tarantulas/${profile.id}/feedings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          fed_at: new Date().toISOString(),
+          accepted: feedAccepted,
+          food_type: feedFoodType.trim() || undefined,
+          food_size: feedFoodSize || undefined,
+        }),
+      })
+      if (!res.ok) throw new Error()
+      // Reflect it immediately in the "Last Feeding" stat without a refetch.
+      setProfile((p) =>
+        p
+          ? {
+              ...p,
+              last_feeding: {
+                date: new Date().toISOString(),
+                food_type: feedFoodType.trim(),
+                food_size: feedFoodSize,
+                accepted: feedAccepted,
+              },
+            }
+          : p,
+      )
+      setFeedDone(true)
+      setTimeout(() => setQuickFeedOpen(false), 850)
+    } catch {
+      setFeedError('Could not log the feeding. Please try again.')
+    } finally {
+      setFeedSaving(false)
+    }
+  }
 
   async function toggleFollow() {
     if (!profile?.owner_username || followBusy) return
@@ -377,7 +437,7 @@ export default function PublicProfilePage() {
                 Full Detail
               </button>
               <button
-                onClick={() => router.push(`/dashboard/tarantulas/${profile.id}?log=feeding`)}
+                onClick={openQuickFeed}
                 className="flex flex-col items-center gap-1 p-3 bg-green-600 text-white rounded-xl text-xs font-semibold"
               >
                 <span className="text-xl">🍽️</span>
@@ -598,6 +658,117 @@ export default function PublicProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Quick-feed modal — the fast path from an enclosure QR scan. */}
+      {quickFeedOpen && profile.is_owner && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Log feeding"
+          onClick={() => !feedSaving && setQuickFeedOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl shadow-2xl p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {feedDone ? (
+              <div className="py-8 text-center" role="status" aria-live="polite">
+                <div className="text-5xl mb-3">✅</div>
+                <p className="font-semibold text-gray-900 dark:text-white">Feeding logged</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-bold text-lg text-gray-900 dark:text-white">
+                    Log feeding
+                  </h2>
+                  <button
+                    onClick={() => setQuickFeedOpen(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-2xl leading-none"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                  {profile.display_name} · now
+                </p>
+
+                {/* Accepted / refused */}
+                <div className="flex gap-2 mb-4" role="radiogroup" aria-label="Outcome">
+                  <button
+                    onClick={() => setFeedAccepted(true)}
+                    role="radio"
+                    aria-checked={feedAccepted}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                      feedAccepted
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+                    }`}
+                  >
+                    ✅ Accepted
+                  </button>
+                  <button
+                    onClick={() => setFeedAccepted(false)}
+                    role="radio"
+                    aria-checked={!feedAccepted}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors ${
+                      !feedAccepted
+                        ? 'bg-red-600 text-white border-red-600'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+                    }`}
+                  >
+                    ❌ Refused
+                  </button>
+                </div>
+
+                {/* Prey type quick chips (optional) */}
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+                  Prey <span className="font-normal normal-case">(optional)</span>
+                </p>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {['Cricket', 'Dubia', 'Red runner', 'Mealworm', 'Superworm'].map((prey) => (
+                    <button
+                      key={prey}
+                      onClick={() =>
+                        setFeedFoodType((cur) => (cur === prey ? '' : prey))
+                      }
+                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                        feedFoodType === prey
+                          ? 'bg-purple-600 text-white border-purple-600'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-gray-300'
+                      }`}
+                    >
+                      {prey}
+                    </button>
+                  ))}
+                </div>
+
+                {feedError && (
+                  <p role="alert" className="text-sm text-red-600 dark:text-red-400 mb-3">
+                    {feedError}
+                  </p>
+                )}
+
+                <button
+                  onClick={submitQuickFeed}
+                  disabled={feedSaving}
+                  className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-colors disabled:opacity-60"
+                >
+                  {feedSaving ? 'Saving…' : 'Log feeding'}
+                </button>
+                <button
+                  onClick={() => router.push(`/dashboard/tarantulas/${profile.id}?log=feeding`)}
+                  className="w-full mt-2 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-purple-600 transition-colors"
+                >
+                  Add more detail (size, notes) →
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

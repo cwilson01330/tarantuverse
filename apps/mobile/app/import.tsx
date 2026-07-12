@@ -14,12 +14,18 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
 import { AppHeader } from '../src/components/AppHeader';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
 
-// TODO: file picker needs expo-document-picker (native build). Sheet-link only for now.
+/** A file the keeper chose from their device to import (CSV / Excel). */
+interface PickedFile {
+  uri: string;
+  name: string;
+  mimeType: string;
+}
 
 type Step = 'source' | 'confirm' | 'result';
 type Confidence = 'high' | 'medium' | 'low' | 'none';
@@ -110,8 +116,9 @@ export default function ImportScreen() {
 
   const [step, setStep] = useState<Step>('source');
 
-  // Source state
+  // Source state — the keeper imports from EITHER a picked file OR a sheet link.
   const [sheetUrl, setSheetUrl] = useState('');
+  const [pickedFile, setPickedFile] = useState<PickedFile | null>(null);
   const [taxa, setTaxa] = useState<string[]>(['tarantula']);
   const [defaultTaxon, setDefaultTaxon] = useState('tarantula');
   const [taxonPickerOpen, setTaxonPickerOpen] = useState(false);
@@ -151,6 +158,7 @@ export default function ImportScreen() {
   const resetAll = () => {
     setStep('source');
     setSheetUrl('');
+    setPickedFile(null);
     setDefaultTaxon('tarantula');
     setAnalysis(null);
     setMapping({});
@@ -159,16 +167,53 @@ export default function ImportScreen() {
     setError('');
   };
 
+  const pickFile = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: [
+          'text/csv',
+          'text/comma-separated-values',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          // Some Android providers report a generic type; allow-through.
+          'application/octet-stream',
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (res.canceled || !res.assets?.length) return;
+      const a = res.assets[0];
+      setPickedFile({
+        uri: a.uri,
+        name: a.name || 'import.csv',
+        mimeType: a.mimeType || 'text/csv',
+      });
+      setSheetUrl(''); // a file and a sheet link are mutually exclusive
+      setError('');
+    } catch {
+      setError('Could not open the file picker. Please try again.');
+    }
+  };
+
   const buildFormData = () => {
     const fd = new FormData();
-    fd.append('sheet_url', sheetUrl.trim());
+    if (pickedFile) {
+      // React Native FormData file part.
+      fd.append('file', {
+        uri: pickedFile.uri,
+        name: pickedFile.name,
+        type: pickedFile.mimeType,
+      } as any);
+    } else {
+      fd.append('sheet_url', sheetUrl.trim());
+    }
     fd.append('default_taxon', defaultTaxon);
     return fd;
   };
 
   const analyze = async () => {
-    if (!sheetUrl.trim()) {
-      setError('Paste a Google Sheet link to continue.');
+    if (!pickedFile && !sheetUrl.trim()) {
+      setError('Choose a CSV/Excel file or paste a Google Sheet link to continue.');
       return;
     }
     setAnalyzing(true);
@@ -255,18 +300,61 @@ export default function ImportScreen() {
           {/* ---------- STEP 1: SOURCE ---------- */}
           {step === 'source' && (
             <View>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Import a file</Text>
+              {pickedFile ? (
+                <View
+                  style={[
+                    styles.selectRow,
+                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.sm },
+                  ]}
+                >
+                  <MaterialCommunityIcons name="file-check-outline" size={20} color={colors.textPrimary} />
+                  <Text style={[styles.selectValue, { color: colors.textPrimary, flex: 1, marginLeft: 8 }]} numberOfLines={1}>
+                    {pickedFile.name}
+                  </Text>
+                  <TouchableOpacity onPress={() => setPickedFile(null)} accessibilityLabel="Remove file">
+                    <MaterialCommunityIcons name="close" size={20} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={pickFile}
+                  style={[
+                    styles.selectRow,
+                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.sm },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Choose a CSV or Excel file"
+                >
+                  <MaterialCommunityIcons name="file-upload-outline" size={20} color={colors.textPrimary} />
+                  <Text style={[styles.selectValue, { color: colors.textPrimary, flex: 1, marginLeft: 8 }]}>
+                    Choose a CSV or Excel file
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <Text style={[styles.hint, { color: colors.textTertiary }]}>
+                Pick a .csv or .xlsx from your phone or a cloud drive.
+              </Text>
+
+              <View style={styles.orDivider}>
+                <View style={[styles.orLine, { backgroundColor: colors.border }]} />
+                <Text style={[styles.orText, { color: colors.textTertiary }]}>or</Text>
+                <View style={[styles.orLine, { backgroundColor: colors.border }]} />
+              </View>
+
               <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Google Sheet link</Text>
               <TextInput
                 value={sheetUrl}
-                onChangeText={setSheetUrl}
+                onChangeText={(t) => { setSheetUrl(t); if (t) setPickedFile(null); }}
                 placeholder="https://docs.google.com/spreadsheets/..."
                 placeholderTextColor={colors.textTertiary}
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
+                editable={!pickedFile}
                 style={[
                   styles.input,
-                  { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary, borderRadius: layout.radius.sm },
+                  { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary, borderRadius: layout.radius.sm, opacity: pickedFile ? 0.5 : 1 },
                 ]}
               />
               <Text style={[styles.hint, { color: colors.textTertiary }]}>
@@ -290,12 +378,6 @@ export default function ImportScreen() {
                 <MaterialCommunityIcons name="chevron-down" size={22} color={colors.textTertiary} />
               </TouchableOpacity>
 
-              <View style={[styles.fileHint, { borderColor: colors.border, borderRadius: layout.radius.md }]}>
-                <MaterialCommunityIcons name="file-upload-outline" size={20} color={colors.textTertiary} />
-                <Text style={[styles.fileHintText, { color: colors.textTertiary }]}>
-                  File uploads (CSV/Excel) are coming soon. For now, import from a Google Sheet link.
-                </Text>
-              </View>
             </View>
           )}
 
@@ -746,6 +828,9 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   fileHintText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  orDivider: { flexDirection: 'row', alignItems: 'center', marginVertical: 18, gap: 10 },
+  orLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  orText: { fontSize: 12, fontWeight: '600' },
 
   summaryCard: { borderWidth: 1, padding: 16, marginBottom: 8 },
   summaryTitle: { fontSize: 17, fontWeight: '700', marginBottom: 4 },

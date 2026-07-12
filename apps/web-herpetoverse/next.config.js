@@ -27,6 +27,15 @@ const nextConfig = {
   // `/decide`) pass through unchanged — otherwise Next would 308 them.
   //
   skipTrailingSlashRedirect: true,
+  async headers() {
+    return [
+      {
+        // Apple requires the AASA (extension-less) to be served as JSON.
+        source: '/.well-known/apple-app-site-association',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+      },
+    ]
+  },
   async rewrites() {
     return [
       {

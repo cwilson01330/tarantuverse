@@ -20,12 +20,25 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      // Redirect non-www to www for consistent cookies/OAuth
+      // Redirect non-www to www for consistent cookies/OAuth.
+      // EXCLUDE /.well-known/* — the Universal Link / App Link association
+      // files (apple-app-site-association, assetlinks.json) must be served
+      // with a direct 200 on BOTH hosts. A redirect here would break iOS/
+      // Android domain verification, so the negative lookahead skips them.
       {
-        source: '/:path*',
+        source: '/:path((?!\\.well-known).*)',
         has: [{ type: 'host', value: 'tarantuverse.com' }],
-        destination: 'https://www.tarantuverse.com/:path*',
+        destination: 'https://www.tarantuverse.com/:path',
         permanent: true,
+      },
+    ]
+  },
+  async headers() {
+    return [
+      {
+        // Apple requires the AASA (extension-less) to be served as JSON.
+        source: '/.well-known/apple-app-site-association',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
       },
     ]
   },
