@@ -395,32 +395,24 @@ export default function QRModal({
    * thermal label printers (e.g. NIIMBOT) whose app imports an image rather
    * than accepting the browser print pipeline.
    *
-   * We reuse the exact `renderLabelHTML` markup (so the PNG matches the print
-   * output pixel-for-pixel) and rasterize it via an SVG <foreignObject>. The
-   * QR is already inline SVG and there are no cross-origin images, so the
-   * canvas stays untainted and `toDataURL` succeeds. `foreignObject`
-   * rasterization is reliable in Chromium/Safari; if a browser refuses it we
-   * catch and point the user at Print instead.
+   * Two-step, because a nested <svg> (the QR) inside a <foreignObject> does NOT
+   * rasterize when the wrapper SVG is drawn to a canvas — the HTML text renders
+   * but the inner QR vanishes. So we first bake the QR SVG to its own PNG, then
+   * embed that as an <img> in the label markup and rasterize the whole thing.
+   * There are no cross-origin images (QR + text only), so the canvas stays
+   * untainted and toDataURL succeeds.
    */
   const handleDownloadPng = () => {
     setExportError(null)
-    const qrSvg = previewRef.current?.querySelector('svg')?.outerHTML ?? ''
-
-    const labelHTML = renderLabelHTML({
-      tarantulaName,
-      scientificName,
-      sex,
-      molts,
-      size: labelSize,
-      font: labelFont,
-      theme: labelTheme,
-      showSex,
-      showSciName,
-      showMolts,
-      showDomain,
-      profileUrl,
-      qrSvgMarkup: qrSvg,
-    })
+    let qrSvg = previewRef.current?.querySelector('svg')?.outerHTML ?? ''
+    if (!qrSvg) {
+      setExportError('Could not read the QR code. Reopen the label and try again.')
+      return
+    }
+    // Ensure the standalone QR SVG carries its namespace so it loads as an image.
+    if (!/\sxmlns=/.test(qrSvg)) {
+      qrSvg = qrSvg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+    }
 
     const DPI = 300 // comfortably above the B1's ~203 dpi head
     const wIn = parseFloat(labelSize.width)
@@ -432,47 +424,94 @@ export default function QRModal({
     const devW = Math.round(wIn * DPI)
     const devH = Math.round(hIn * DPI)
 
-    const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${devW}" height="${devH}" ` +
-      `viewBox="0 0 ${cssW} ${cssH}">` +
-      `<foreignObject x="0" y="0" width="${cssW}" height="${cssH}">` +
-      `<div xmlns="http://www.w3.org/1999/xhtml">${labelHTML}</div>` +
-      `</foreignObject></svg>`
+    // Step 2 (runs after the QR PNG is ready): rasterize the full label.
+    const renderLabel = (qrPngUrl: string) => {
+      const labelHTML = renderLabelHTML({
+        tarantulaName,
+        scientificName,
+        sex,
+        molts,
+        size: labelSize,
+        font: labelFont,
+        theme: labelTheme,
+        showSex,
+        showSciName,
+        showMolts,
+        showDomain,
+        profileUrl,
+        // Embed the baked QR as an <img> — survives foreignObject rasterization.
+        qrSvgMarkup:
+          `<img src="${qrPngUrl}" width="${labelSize.qrSize}" height="${labelSize.qrSize}" ` +
+          `style="display:block;flex-shrink:0" alt="" />`,
+      })
 
-    const img = new Image()
-    img.onload = () => {
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${devW}" height="${devH}" ` +
+        `viewBox="0 0 ${cssW} ${cssH}">` +
+        `<foreignObject x="0" y="0" width="${cssW}" height="${cssH}">` +
+        `<div xmlns="http://www.w3.org/1999/xhtml">${labelHTML}</div>` +
+        `</foreignObject></svg>`
+
+      const img = new Image()
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = devW
+          canvas.height = devH
+          const ctx = canvas.getContext('2d')
+          if (!ctx) throw new Error('no 2d context')
+          ctx.fillStyle = '#fff'
+          ctx.fillRect(0, 0, devW, devH)
+          ctx.drawImage(img, 0, 0, devW, devH)
+
+          const url = canvas.toDataURL('image/png')
+          const safeName =
+            (tarantulaName || 'label')
+              .replace(/[^a-z0-9]+/gi, '-')
+              .replace(/^-+|-+$/g, '')
+              .toLowerCase() || 'label'
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `${safeName}-${labelSize.id}-label.png`
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+        } catch {
+          setExportError(
+            'Your browser blocked the image export. Try Chrome or Edge, or use Print instead.',
+          )
+        }
+      }
+      img.onerror = () => {
+        setExportError('Could not build the label image. Try Print instead.')
+      }
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+    }
+
+    // Step 1: bake the QR SVG to a crisp standalone PNG (renders reliably on
+    // its own, unlike when nested inside the label's foreignObject).
+    const QR_PX = 320
+    const qrImg = new Image()
+    qrImg.onload = () => {
       try {
-        const canvas = document.createElement('canvas')
-        canvas.width = devW
-        canvas.height = devH
-        const ctx = canvas.getContext('2d')
-        if (!ctx) throw new Error('no 2d context')
-        ctx.fillStyle = '#fff'
-        ctx.fillRect(0, 0, devW, devH)
-        ctx.drawImage(img, 0, 0, devW, devH)
-
-        const url = canvas.toDataURL('image/png')
-        const safeName =
-          (tarantulaName || 'label')
-            .replace(/[^a-z0-9]+/gi, '-')
-            .replace(/^-+|-+$/g, '')
-            .toLowerCase() || 'label'
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${safeName}-${labelSize.id}-label.png`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
+        const qc = document.createElement('canvas')
+        qc.width = QR_PX
+        qc.height = QR_PX
+        const qctx = qc.getContext('2d')
+        if (!qctx) throw new Error('no 2d context')
+        // White backing so the QR always scans, even on a themed label.
+        qctx.fillStyle = '#fff'
+        qctx.fillRect(0, 0, QR_PX, QR_PX)
+        qctx.drawImage(qrImg, 0, 0, QR_PX, QR_PX)
+        renderLabel(qc.toDataURL('image/png'))
       } catch {
-        setExportError(
-          'Your browser blocked the image export. Try Chrome or Edge, or use Print instead.',
-        )
+        setExportError('Could not render the QR code. Try Print instead.')
       }
     }
-    img.onerror = () => {
-      setExportError('Could not build the label image. Try Print instead.')
+    qrImg.onerror = () => {
+      setExportError('Could not render the QR code. Try Print instead.')
     }
-    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+    qrImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(qrSvg)
   }
 
   const handlePrint = () => {
