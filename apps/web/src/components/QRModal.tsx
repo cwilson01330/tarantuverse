@@ -99,7 +99,7 @@ const LABEL_SIZES: LabelSize[] = [
     description: 'Sling / dram cup',
     width: '2in',
     height: '1.25in',
-    qrSize: 60,
+    qrSize: 90,
     previewScale: 1.9,
     fontSize: { name: 9, sci: 7, meta: 6, molt: 5.5 },
   },
@@ -109,7 +109,7 @@ const LABEL_SIZES: LabelSize[] = [
     description: 'Standard enclosure',
     width: '3in',
     height: '1.5in',
-    qrSize: 80,
+    qrSize: 118,
     previewScale: 1.3,
     fontSize: { name: 11, sci: 8, meta: 7, molt: 6.5 },
   },
@@ -119,7 +119,7 @@ const LABEL_SIZES: LabelSize[] = [
     description: 'Display / XL tank',
     width: '4in',
     height: '2in',
-    qrSize: 110,
+    qrSize: 168,
     previewScale: 1.0,
     fontSize: { name: 14, sci: 10, meta: 8, molt: 7.5 },
   },
@@ -158,6 +158,14 @@ interface RenderLabelOptions {
   profileUrl: string
   /** Pre-rendered inline QR SVG markup (from qrcode.react) */
   qrSvgMarkup: string
+  /**
+   * High-contrast mode for 1-bit thermal printers (NIIMBOT etc.). Thermal
+   * heads can't render gray or opacity — they dither it into broken dots — so
+   * we force every text line to solid black and bump the faint small lines to
+   * a heavier weight. Browser print (laser/inkjet) leaves this off and keeps
+   * the styled grays/accents.
+   */
+  highContrast?: boolean
 }
 
 /** Build an HTML string for the print window. All user content is escaped. */
@@ -166,8 +174,20 @@ export function renderLabelHTML(opts: RenderLabelOptions): string {
     tarantulaName, scientificName, sex, molts,
     size, font, theme,
     showSex, showSciName, showMolts, showDomain,
-    qrSvgMarkup,
+    qrSvgMarkup, highContrast = false,
   } = opts
+
+  // Thermal-safe palette: everything solid black, no opacity. On a normal
+  // print we keep the themed grays/accents for a softer look.
+  const nameColor = '#000'
+  const accentColor = highContrast ? '#000' : theme.accent
+  const sciColor = highContrast ? '#000' : '#555'
+  const moltColor = highContrast ? '#000' : '#777'
+  const domainColor = highContrast ? '#000' : theme.accent
+  const domainOpacity = highContrast ? '1' : '0.6'
+  // Heavier weight rescues thin small lines on thermal; normal otherwise.
+  const faintWeight = highContrast ? '600' : '400'
+  const moltBorder = highContrast ? theme.border : `${theme.border}22`
 
   const sexInfo = sex && SEX_LABEL[sex] ? SEX_LABEL[sex] : null
   const recentMolts = [...molts]
@@ -191,34 +211,34 @@ export function renderLabelHTML(opts: RenderLabelOptions): string {
       border-radius: 4px;
       display: flex;
       align-items: center;
-      padding: 6px;
-      gap: 6px;
+      padding: 8px 8px 8px 12px;
+      gap: 12px;
       background: #fff;
       flex-shrink: 0;
       font-family: ${font.stack};
     ">
       ${qrSvgMarkup}
       <div style="flex: 1; overflow: hidden;">
-        <div style="font-size: ${size.fontSize.name}px; font-weight: 700; color: #111; line-height: 1.2;">
+        <div style="font-size: ${size.fontSize.name}px; font-weight: 700; color: ${nameColor}; line-height: 1.2;">
           ${escapeHtml(tarantulaName)}
         </div>
         ${showSex && sexInfo ? `
-          <div style="font-size: ${size.fontSize.sci}px; color: ${theme.accent}; font-weight: 600; line-height: 1.3; letter-spacing: 0.01em;">
+          <div style="font-size: ${size.fontSize.sci}px; color: ${accentColor}; font-weight: 600; line-height: 1.3; letter-spacing: 0.01em;">
             ${escapeHtml(sexInfo.symbol)} ${escapeHtml(sexInfo.text)}
           </div>
         ` : ''}
         ${showSciName && scientificName ? `
-          <div style="font-size: ${size.fontSize.sci}px; font-style: italic; color: #555; line-height: 1.2;">
+          <div style="font-size: ${size.fontSize.sci}px; font-style: italic; color: ${sciColor}; font-weight: ${faintWeight}; line-height: 1.2;">
             ${escapeHtml(scientificName)}
           </div>
         ` : ''}
         ${showMolts && recentMolts.length > 0 ? `
-          <div style="font-size: ${size.fontSize.molt}px; color: #777; margin-top: 2px; line-height: 1.3; border-top: 0.5px solid ${theme.border}22; padding-top: 2px;">
-            <span style="font-weight: 600; color: ${theme.accent};">Molts: </span>${moltsHtml}
+          <div style="font-size: ${size.fontSize.molt}px; color: ${moltColor}; font-weight: ${faintWeight}; margin-top: 2px; line-height: 1.3; border-top: 0.5px solid ${moltBorder}; padding-top: 2px;">
+            <span style="font-weight: 700; color: ${accentColor};">Molts: </span>${moltsHtml}
           </div>
         ` : ''}
         ${showDomain ? `
-          <div style="font-size: ${size.fontSize.meta}px; color: ${theme.accent}; opacity: 0.6; margin-top: 2px;">
+          <div style="font-size: ${size.fontSize.meta}px; color: ${domainColor}; font-weight: ${faintWeight}; opacity: ${domainOpacity}; margin-top: 2px;">
             tarantuverse.com
           </div>
         ` : ''}
@@ -443,6 +463,8 @@ export default function QRModal({
         qrSvgMarkup:
           `<img src="${qrPngUrl}" width="${labelSize.qrSize}" height="${labelSize.qrSize}" ` +
           `style="display:block;flex-shrink:0" alt="" />`,
+        // Thermal printers can't render gray/opacity — force solid black text.
+        highContrast: true,
       })
 
       const svg =
@@ -488,9 +510,16 @@ export default function QRModal({
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
     }
 
-    // Step 1: bake the QR SVG to a crisp standalone PNG (renders reliably on
-    // its own, unlike when nested inside the label's foreignObject).
-    const QR_PX = 320
+    // Step 1: bake the QR SVG to a crisp standalone PNG. Three things matter
+    // for it to scan off a 1-bit thermal print:
+    //  • a QUIET ZONE — qrcode.react renders modules edge-to-edge (no margin),
+    //    and scanners need ~4 modules of blank border, so we pad it here;
+    //  • pure BLACK/WHITE — we threshold every pixel so anti-aliased gray edges
+    //    (and any themed QR color) become solid black, which thermal can print;
+    //  • enough resolution that each module is several device pixels.
+    const QR_MODULES_PX = 360           // the QR itself
+    const QUIET = Math.round(QR_MODULES_PX * 0.16) // ~4-module quiet zone/side
+    const QR_PX = QR_MODULES_PX + QUIET * 2
     const qrImg = new Image()
     qrImg.onload = () => {
       try {
@@ -499,10 +528,20 @@ export default function QRModal({
         qc.height = QR_PX
         const qctx = qc.getContext('2d')
         if (!qctx) throw new Error('no 2d context')
-        // White backing so the QR always scans, even on a themed label.
+        // White field (this is also the quiet zone), QR centered inside it.
         qctx.fillStyle = '#fff'
         qctx.fillRect(0, 0, QR_PX, QR_PX)
-        qctx.drawImage(qrImg, 0, 0, QR_PX, QR_PX)
+        qctx.drawImage(qrImg, QUIET, QUIET, QR_MODULES_PX, QR_MODULES_PX)
+        // Hard threshold to pure black/white — no gray for thermal to dither.
+        const data = qctx.getImageData(0, 0, QR_PX, QR_PX)
+        const px = data.data
+        for (let i = 0; i < px.length; i += 4) {
+          const lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]
+          const v = lum < 160 ? 0 : 255
+          px[i] = px[i + 1] = px[i + 2] = v
+          px[i + 3] = 255
+        }
+        qctx.putImageData(data, 0, 0)
         renderLabel(qc.toDataURL('image/png'))
       } catch {
         setExportError('Could not render the QR code. Try Print instead.')
@@ -576,8 +615,8 @@ export default function QRModal({
     borderRadius: '4px',
     display: 'flex',
     alignItems: 'center',
-    padding: '6px',
-    gap: '6px',
+    padding: '8px 8px 8px 12px',
+    gap: '12px',
     background: '#fff',
     flexShrink: 0,
     fontFamily: labelFont.stack,
