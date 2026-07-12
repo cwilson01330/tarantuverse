@@ -388,6 +388,93 @@ export default function QRModal({
     }
   }
 
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  /**
+   * Download the label as a PNG sized to the physical label at 300 dpi — for
+   * thermal label printers (e.g. NIIMBOT) whose app imports an image rather
+   * than accepting the browser print pipeline.
+   *
+   * We reuse the exact `renderLabelHTML` markup (so the PNG matches the print
+   * output pixel-for-pixel) and rasterize it via an SVG <foreignObject>. The
+   * QR is already inline SVG and there are no cross-origin images, so the
+   * canvas stays untainted and `toDataURL` succeeds. `foreignObject`
+   * rasterization is reliable in Chromium/Safari; if a browser refuses it we
+   * catch and point the user at Print instead.
+   */
+  const handleDownloadPng = () => {
+    setExportError(null)
+    const qrSvg = previewRef.current?.querySelector('svg')?.outerHTML ?? ''
+
+    const labelHTML = renderLabelHTML({
+      tarantulaName,
+      scientificName,
+      sex,
+      molts,
+      size: labelSize,
+      font: labelFont,
+      theme: labelTheme,
+      showSex,
+      showSciName,
+      showMolts,
+      showDomain,
+      profileUrl,
+      qrSvgMarkup: qrSvg,
+    })
+
+    const DPI = 300 // comfortably above the B1's ~203 dpi head
+    const wIn = parseFloat(labelSize.width)
+    const hIn = parseFloat(labelSize.height)
+    // CSS lays foreignObject content out at 96px/in; scale the viewBox up to
+    // the device pixel size so the raster is crisp.
+    const cssW = Math.round(wIn * 96)
+    const cssH = Math.round(hIn * 96)
+    const devW = Math.round(wIn * DPI)
+    const devH = Math.round(hIn * DPI)
+
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${devW}" height="${devH}" ` +
+      `viewBox="0 0 ${cssW} ${cssH}">` +
+      `<foreignObject x="0" y="0" width="${cssW}" height="${cssH}">` +
+      `<div xmlns="http://www.w3.org/1999/xhtml">${labelHTML}</div>` +
+      `</foreignObject></svg>`
+
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = devW
+        canvas.height = devH
+        const ctx = canvas.getContext('2d')
+        if (!ctx) throw new Error('no 2d context')
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, 0, devW, devH)
+        ctx.drawImage(img, 0, 0, devW, devH)
+
+        const url = canvas.toDataURL('image/png')
+        const safeName =
+          (tarantulaName || 'label')
+            .replace(/[^a-z0-9]+/gi, '-')
+            .replace(/^-+|-+$/g, '')
+            .toLowerCase() || 'label'
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${safeName}-${labelSize.id}-label.png`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      } catch {
+        setExportError(
+          'Your browser blocked the image export. Try Chrome or Edge, or use Print instead.',
+        )
+      }
+    }
+    img.onerror = () => {
+      setExportError('Could not build the label image. Try Print instead.')
+    }
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+  }
+
   const handlePrint = () => {
     // Extract the QR SVG from the rendered preview so we don't re-render
     // qrcode.react outside React. Fall back to empty string if not available.
@@ -735,13 +822,32 @@ export default function QRModal({
               QR links permanently to this spider&apos;s profile.
             </p>
 
-            <button
-              onClick={handlePrint}
-              aria-label="Print label"
-              className="w-full py-3 bg-gray-900 dark:bg-white hover:bg-gray-700 dark:hover:bg-gray-100 text-white dark:text-gray-900 font-semibold rounded-xl transition-colors"
-            >
-              🖨️ Print Label
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handlePrint}
+                aria-label="Print label"
+                className="flex-1 py-3 bg-gray-900 dark:bg-white hover:bg-gray-700 dark:hover:bg-gray-100 text-white dark:text-gray-900 font-semibold rounded-xl transition-colors"
+              >
+                🖨️ Print
+              </button>
+              <button
+                onClick={handleDownloadPng}
+                aria-label="Download label as PNG"
+                className="flex-1 py-3 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold rounded-xl transition-colors"
+              >
+                ⬇️ PNG
+              </button>
+            </div>
+
+            {exportError && (
+              <p role="alert" className="text-xs text-red-600 dark:text-red-400 text-center">
+                {exportError}
+              </p>
+            )}
+
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center leading-snug">
+              PNG downloads at 300&nbsp;dpi for thermal label apps (e.g. NIIMBOT).
+            </p>
           </div>
         )}
       </div>
