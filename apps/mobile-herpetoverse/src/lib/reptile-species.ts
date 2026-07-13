@@ -71,7 +71,7 @@ export interface ListReptileSpeciesParams {
   limit?: number;
   verified_only?: boolean;
   care_level?: CareLevel;
-  enclosure_type?: 'terrestrial' | 'arboreal' | 'semi_arboreal' | 'fossorial';
+  enclosure_type?: 'terrestrial' | 'arboreal' | 'semi_arboreal' | 'fossorial' | 'aquatic' | 'semi_aquatic';
   diet_type?: 'strict_carnivore' | 'insectivore' | 'omnivore' | 'herbivore';
   taxon?: HerpTaxon;
 }

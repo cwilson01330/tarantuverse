@@ -32,6 +32,8 @@ export type EnclosureType =
   | 'arboreal'
   | 'semi_arboreal'
   | 'fossorial'
+  | 'aquatic'
+  | 'semi_aquatic'
 export type DietType =
   | 'strict_carnivore'
   | 'insectivore'
@@ -406,6 +408,8 @@ export const ENCLOSURE_LABELS: Record<EnclosureType, string> = {
   arboreal: 'Arboreal',
   semi_arboreal: 'Semi-arboreal',
   fossorial: 'Fossorial (burrowing)',
+  aquatic: 'Aquatic',
+  semi_aquatic: 'Semi-aquatic',
 }
 
 export const DIET_LABELS: Record<DietType, string> = {

@@ -120,7 +120,7 @@ class ReptileSpeciesBase(BaseModel):
 
     # Enclosure
     enclosure_type: Optional[str] = Field(
-        None, pattern="^(terrestrial|arboreal|semi_arboreal|fossorial)$"
+        None, pattern="^(terrestrial|arboreal|semi_arboreal|fossorial|aquatic|semi_aquatic)$"
     )
     enclosure_min_hatchling: Optional[str] = Field(None, max_length=100)
     enclosure_min_juvenile: Optional[str] = Field(None, max_length=100)
