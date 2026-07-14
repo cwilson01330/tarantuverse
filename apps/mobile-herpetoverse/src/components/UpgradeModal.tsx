@@ -2,12 +2,15 @@
  * UpgradeModal — free-tier cap gate for Herpetoverse mobile.
  *
  * Shown when a free keeper hits the collection cap (the create call
- * returns HTTP 402). It explains what premium unlocks and links out to
- * the web pricing page — it is deliberately INFORMATIONAL. Herpetoverse
- * has no in-app purchase flow yet, so there is NO working purchase
- * button here. Being honest matters more than a slick CTA: we never
- * imply a purchase that doesn't exist. When IAP lands this can grow a
- * real "Choose plan" section (mirroring Tarantuverse's UpgradeModal).
+ * returns HTTP 402). It explains what premium unlocks and offers the
+ * real store plans via expo-iap: products are fetched dynamically and
+ * only the ones the store actually returns are shown, so tiers added
+ * after first approval (yearly, lifetime) appear automatically with no
+ * app update. Purchase → validate-receipt → refreshUser().
+ *
+ * Honesty-first fallback: in Expo Go (no native module) or before any
+ * product is live, there's no fake purchase button — it shows the web
+ * "Learn more" link instead. We never imply a charge that can't happen.
  *
  * Theme: dark-first via ThemeContext. HV has no `error` color — status
  * accents use `danger`/`warning`; on-primary text is #0B0B0B (matches
@@ -18,8 +21,10 @@
  * OTA-safe. The pricing page (https://herpetoverse.com/pricing) is being
  * created by the web team.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Linking,
   Modal,
   ScrollView,
@@ -31,6 +36,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  getAvailableProducts,
+  isIAPAvailable,
+  purchaseProduct,
+  restorePurchases,
+  validateReceiptWithBackend,
+  type IapProduct,
+} from '../services/iap';
 
 const PRICING_URL = 'https://herpetoverse.com/pricing';
 
@@ -62,6 +76,65 @@ export default function UpgradeModal({
 }: UpgradeModalProps) {
   const { colors, layout } = useTheme();
   const insets = useSafeAreaInsets();
+  const { token, refreshUser } = useAuth();
+
+  const iapOn = isIAPAvailable();
+  const [products, setProducts] = useState<IapProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+
+  // Fetch live products when the sheet opens (only in a real build).
+  useEffect(() => {
+    let active = true;
+    if (visible && iapOn) {
+      setLoadingProducts(true);
+      getAvailableProducts()
+        .then((p) => { if (active) setProducts(p); })
+        .catch(() => { if (active) setProducts([]); })
+        .finally(() => { if (active) setLoadingProducts(false); });
+    }
+    return () => { active = false; };
+  }, [visible, iapOn]);
+
+  const showStore = iapOn && products.length > 0;
+
+  const handleBuy = async (product: IapProduct) => {
+    if (purchasingId) return;
+    setPurchasingId(product.id);
+    try {
+      const purchase = await purchaseProduct(product.id, product.type);
+      if (!purchase) return; // user cancelled — no-op
+      if (!token) throw new Error('Please sign in again to complete your purchase.');
+      await validateReceiptWithBackend(purchase, token);
+      await refreshUser();
+      Alert.alert("You're all set", 'Premium is now active — thanks for supporting Herpetoverse!');
+      onClose();
+    } catch (e: any) {
+      Alert.alert(
+        'Purchase not completed',
+        e?.message ||
+          'Something went wrong. If you were charged, tap Restore purchases in a minute.',
+      );
+    } finally {
+      setPurchasingId(null);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!token) return;
+    try {
+      const ok = await restorePurchases(token);
+      if (ok) {
+        await refreshUser();
+        Alert.alert('Restored', 'Your previous purchases have been restored.');
+        onClose();
+      } else {
+        Alert.alert('Nothing to restore', 'No previous purchases were found for this account.');
+      }
+    } catch (e: any) {
+      Alert.alert('Restore failed', e?.message || 'Could not restore purchases.');
+    }
+  };
 
   const handleLearnMore = () => {
     // Fire-and-forget: if the browser can't open we simply leave the
@@ -176,25 +249,80 @@ export default function UpgradeModal({
               ))}
             </View>
 
-            {/* Honesty note — no in-app purchase yet */}
-            <Text style={[styles.honestNote, { color: colors.textTertiary }]}>
-              There's no in-app purchase here yet. Learn more on the web and we'll add a
-              way to upgrade soon.
-            </Text>
-
-            {/* Learn more (opens web pricing) */}
-            <TouchableOpacity
-              onPress={handleLearnMore}
-              style={[
-                styles.primaryBtn,
-                { backgroundColor: colors.primary, borderRadius: layout.radius.md },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Learn more about premium on the web"
-            >
-              <MaterialCommunityIcons name="open-in-new" size={18} color="#0B0B0B" />
-              <Text style={styles.primaryBtnText}>Learn more</Text>
-            </TouchableOpacity>
+            {/* Purchase options — real store plans when available; honest web
+                fallback in Expo Go or before any products are live. */}
+            {iapOn && loadingProducts ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={[styles.honestNote, { color: colors.textTertiary, marginBottom: 0 }]}>
+                  Loading plans…
+                </Text>
+              </View>
+            ) : showStore ? (
+              <>
+                {products.map((p) => {
+                  const busy = purchasingId === p.id;
+                  const dim = !!purchasingId && !busy;
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      onPress={() => handleBuy(p)}
+                      disabled={!!purchasingId}
+                      style={[
+                        styles.primaryBtn,
+                        {
+                          backgroundColor: colors.primary,
+                          borderRadius: layout.radius.md,
+                          opacity: dim ? 0.5 : 1,
+                        },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Buy ${p.title || p.id} ${p.displayPrice}`}
+                    >
+                      {busy ? (
+                        <ActivityIndicator color="#0B0B0B" />
+                      ) : (
+                        <Text style={styles.primaryBtnText}>
+                          {(p.title || p.id)}
+                          {p.displayPrice ? `  ·  ${p.displayPrice}` : ''}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  onPress={handleRestore}
+                  disabled={!!purchasingId}
+                  style={styles.dismissBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Restore purchases"
+                >
+                  <Text style={[styles.dismissText, { color: colors.textSecondary }]}>
+                    Restore purchases
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.honestNote, { color: colors.textTertiary }]}>
+                  {iapOn
+                    ? "Plans aren't available right now — you can also manage premium on the web."
+                    : 'The in-app purchase option appears in the installed app. Learn more on the web.'}
+                </Text>
+                <TouchableOpacity
+                  onPress={handleLearnMore}
+                  style={[
+                    styles.primaryBtn,
+                    { backgroundColor: colors.primary, borderRadius: layout.radius.md },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Learn more about premium on the web"
+                >
+                  <MaterialCommunityIcons name="open-in-new" size={18} color="#0B0B0B" />
+                  <Text style={styles.primaryBtnText}>Learn more</Text>
+                </TouchableOpacity>
+              </>
+            )}
 
             {/* Dismiss */}
             <TouchableOpacity
@@ -286,4 +414,12 @@ const styles = StyleSheet.create({
 
   dismissBtn: { paddingVertical: 12, alignItems: 'center' },
   dismissText: { fontSize: 14, fontWeight: '600' },
+
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+  },
 });

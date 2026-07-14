@@ -18,6 +18,7 @@ import {
   initPostHog,
   resetPostHog,
 } from '../src/services/posthog';
+import { initializeIAP, endIAP } from '../src/services/iap';
 
 function PostHogBridge() {
   const { user, isLoading } = useAuth();
@@ -46,6 +47,15 @@ function PostHogBridge() {
 function RootLayoutContent() {
   const { isLoading } = useAuth();
   const { colors } = useTheme();
+
+  // Open the store connection + purchase listeners once at launch (no-op in
+  // Expo Go). Tear down on unmount. Products are fetched lazily by the paywall.
+  useEffect(() => {
+    initializeIAP();
+    return () => {
+      endIAP();
+    };
+  }, []);
 
   // Don't render screens until we've resolved cached auth — prevents a
   // flash of the login screen for keepers who are already signed in.

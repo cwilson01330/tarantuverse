@@ -289,20 +289,46 @@ def validate_receipt(
     # will reject the purchase with a 400 and the user will be charged by
     # Apple without getting premium access.
     product_to_plan_map = {
+        # ---- Tarantuverse ----
         "com.tarantuverse.premium.monthly": "premium",
         "com.tarantuverse.premium.monthly.v2": "premium",   # iOS monthly
         "com.tarantuverse.premium.yearly": "premium",
         "com.tarantuverse.premium.yearly.v2": "premium",    # iOS yearly
         "com.tarantuverse.lifetime": "premium",
+        # ---- Herpetoverse (app-scoped) ----
+        # Premium tier -> herpetoverse_premium (app='herpetoverse').
+        "herpetoverse.premium.monthly": "herpetoverse_premium",
+        "herpetoverse.premium.monthly.v2": "herpetoverse_premium",
+        "herpetoverse.premium.yearly": "herpetoverse_premium",
+        "herpetoverse.premium.yearly.v2": "herpetoverse_premium",
+        "herpetoverse.premium.lifetime": "herpetoverse_premium",
+        # All-Access tier -> bundle_premium (app='both', covers TV + HV).
+        "herpetoverse.allaccess.monthly": "bundle_premium",
+        "herpetoverse.allaccess.monthly.v2": "bundle_premium",
+        "herpetoverse.allaccess.yearly": "bundle_premium",
+        "herpetoverse.allaccess.yearly.v2": "bundle_premium",
+        "herpetoverse.allaccess.lifetime": "bundle_premium",
     }
 
     # Determine billing period for expiry calculation
     product_to_period_map = {
+        # ---- Tarantuverse ----
         "com.tarantuverse.premium.monthly": "monthly",
         "com.tarantuverse.premium.monthly.v2": "monthly",
         "com.tarantuverse.premium.yearly": "yearly",
         "com.tarantuverse.premium.yearly.v2": "yearly",
         "com.tarantuverse.lifetime": "lifetime",
+        # ---- Herpetoverse ----
+        "herpetoverse.premium.monthly": "monthly",
+        "herpetoverse.premium.monthly.v2": "monthly",
+        "herpetoverse.premium.yearly": "yearly",
+        "herpetoverse.premium.yearly.v2": "yearly",
+        "herpetoverse.premium.lifetime": "lifetime",
+        "herpetoverse.allaccess.monthly": "monthly",
+        "herpetoverse.allaccess.monthly.v2": "monthly",
+        "herpetoverse.allaccess.yearly": "yearly",
+        "herpetoverse.allaccess.yearly.v2": "yearly",
+        "herpetoverse.allaccess.lifetime": "lifetime",
     }
 
     plan_name = product_to_plan_map.get(effective_product_id)
@@ -325,18 +351,30 @@ def validate_receipt(
             detail=f"Subscription plan '{plan_name}' not found"
         )
 
-    # Check if user already has an active subscription
-    existing = db.query(UserSubscription).filter(
-        and_(
+    # Supersede existing active subscriptions — but SCOPED BY APP. A keeper can
+    # legitimately hold a Tarantuverse sub AND a Herpetoverse sub at once
+    # (is_premium_for_app checks all active subs), so we must NOT cancel a
+    # different-app sub when a new one is purchased. Rules:
+    #   • a new 'both' (All-Access) plan supersedes everything;
+    #   • otherwise only cancel existing active subs with the SAME app scope
+    #     (e.g. replacing HV monthly with HV yearly), never a different app.
+    new_app = getattr(plan, "app", None) or "tarantuverse"
+    existing_active = (
+        db.query(UserSubscription)
+        .filter(
             UserSubscription.user_id == current_user.id,
-            UserSubscription.status == "active"
+            UserSubscription.status == "active",
         )
-    ).first()
-
-    if existing:
-        # Cancel existing subscription
-        existing.status = "cancelled"
-        existing.cancelled_at = datetime.utcnow()
+        .all()
+    )
+    for ex in existing_active:
+        ex_plan = db.query(SubscriptionPlan).filter(
+            SubscriptionPlan.id == ex.plan_id
+        ).first()
+        ex_app = (getattr(ex_plan, "app", None) or "tarantuverse") if ex_plan else "tarantuverse"
+        if new_app == "both" or ex_app == new_app:
+            ex.status = "cancelled"
+            ex.cancelled_at = datetime.utcnow()
 
     # Create new subscription
     # Expiry: prefer Apple's authoritative expiresDate (ms epoch) when
