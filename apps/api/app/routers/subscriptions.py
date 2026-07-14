@@ -308,6 +308,11 @@ def validate_receipt(
         "herpetoverse.allaccess.yearly": "bundle_premium",
         "herpetoverse.allaccess.yearly.v2": "bundle_premium",
         "herpetoverse.allaccess.lifetime": "bundle_premium",
+        # Android: Play subscriptions report the SUBSCRIPTION-level id on
+        # purchase (base plan monthly/yearly is not in productId), so map the
+        # bare ids too.
+        "herpetoverse.premium": "herpetoverse_premium",
+        "herpetoverse.allaccess": "bundle_premium",
     }
 
     # Determine billing period for expiry calculation
@@ -329,6 +334,11 @@ def validate_receipt(
         "herpetoverse.allaccess.yearly": "yearly",
         "herpetoverse.allaccess.yearly.v2": "yearly",
         "herpetoverse.allaccess.lifetime": "lifetime",
+        # Android bare subscription ids — period unknown from id (base plan not
+        # in productId); default monthly for the fallback expiry heuristic.
+        # Google's real renewal state comes from Play RTDN (future work).
+        "herpetoverse.premium": "monthly",
+        "herpetoverse.allaccess": "monthly",
     }
 
     plan_name = product_to_plan_map.get(effective_product_id)
