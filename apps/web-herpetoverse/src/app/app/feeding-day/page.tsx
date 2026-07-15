@@ -102,7 +102,7 @@ export default function FeedingDayPage() {
   const shownAnimals = useMemo(() => {
     switch (filter) {
       case 'overdue':
-        return animals.filter((a) => a.is_overdue)
+        return animals.filter((a) => a.is_overdue && a.status_mode !== 'daily')
       case 'never_fed':
         return animals.filter((a) => a.days_since_last_feeding === null)
       default:
@@ -113,7 +113,7 @@ export default function FeedingDayPage() {
   const counts = useMemo(
     () => ({
       all: animals.length,
-      overdue: animals.filter((a) => a.is_overdue).length,
+      overdue: animals.filter((a) => a.is_overdue && a.status_mode !== 'daily').length,
       never_fed: animals.filter((a) => a.days_since_last_feeding === null).length,
     }),
     [animals],
@@ -362,7 +362,7 @@ export default function FeedingDayPage() {
                     className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
                       selected
                         ? 'border-herp-teal/60 bg-herp-teal/10'
-                        : a.is_overdue
+                        : a.is_overdue && a.status_mode !== 'daily'
                           ? 'border-orange-500/30 bg-neutral-900/40 hover:bg-neutral-900/60'
                           : 'border-neutral-800 bg-neutral-900/40 hover:bg-neutral-900/60'
                     }`}
@@ -550,12 +550,28 @@ export default function FeedingDayPage() {
   )
 }
 
-/** Status pill: Paused (amber) → Overdue (orange) → Never fed → Nd ago. */
+/**
+ * Status pill: Paused (amber) → daily fed-today check → Overdue (orange) →
+ * Never fed → Nd ago. Frequent feeders (status_mode 'daily', e.g. insectivorous
+ * beardies) get a calm fed-today check instead of a red days-overdue that would
+ * nag every morning.
+ */
 function StatusPill({ animal }: { animal: AnimalFeedingStatus }) {
   if (animal.is_feeding_paused) {
     return (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300">
         Paused
+      </span>
+    )
+  }
+  if (animal.status_mode === 'daily') {
+    return animal.fed_today ? (
+      <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-500/15 text-green-300">
+        Fed today
+      </span>
+    ) : (
+      <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-neutral-800/60 text-neutral-400">
+        Feed today
       </span>
     )
   }

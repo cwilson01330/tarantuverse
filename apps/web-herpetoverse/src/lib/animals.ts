@@ -528,6 +528,9 @@ export interface AnimalFeedingStatus {
   /** Recommended feeding cadence, when known. Rendered as "every ~Nd". */
   interval_days: number | null
   feeds_on_cgd: boolean
+  /** "daily" = frequent feeder (fed-today check); "interval" = days-since model. */
+  status_mode: 'daily' | 'interval'
+  fed_today: boolean
 }
 
 /**

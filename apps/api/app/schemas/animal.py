@@ -98,6 +98,13 @@ class AnimalFeedingStatusItem(BaseModel):
     is_overdue: bool = False
     interval_days: Optional[int] = None
     feeds_on_cgd: bool = False
+    # Cadence-aware presentation. "daily" = a frequent feeder (fed ~daily or
+    # more, e.g. an insectivorous beardie) where "days since" is meaningless and
+    # a red overdue badge would nag every morning — the UI shows a simple
+    # fed-today check instead. "interval" = discrete feeders (snakes, geckos on
+    # a multi-day cadence) that keep the days-since / overdue treatment.
+    status_mode: str = "interval"  # "daily" | "interval"
+    fed_today: bool = False
 
 
 class AnimalResponse(AnimalBase):

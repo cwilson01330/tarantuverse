@@ -113,14 +113,14 @@ function FeedingDayScreen() {
   const counts = useMemo(
     () => ({
       all: items.length,
-      overdue: items.filter((i) => i.is_overdue).length,
+      overdue: items.filter((i) => i.is_overdue && i.status_mode !== 'daily').length,
       never: items.filter((i) => i.days_since_last_feeding === null).length,
     }),
     [items],
   );
 
   const shown = useMemo(() => {
-    if (filter === 'overdue') return items.filter((i) => i.is_overdue);
+    if (filter === 'overdue') return items.filter((i) => i.is_overdue && i.status_mode !== 'daily');
     if (filter === 'never')
       return items.filter((i) => i.days_since_last_feeding === null);
     return items;
@@ -178,6 +178,13 @@ function FeedingDayScreen() {
 
   const statusPill = (a: AnimalFeedingStatus) => {
     if (a.is_feeding_paused) return { label: 'Paused', color: colors.warning };
+    // Frequent/daily feeders (e.g. insectivorous beardies) get a calm fed-today
+    // check — never a red "days overdue" that would nag every morning.
+    if (a.status_mode === 'daily') {
+      return a.fed_today
+        ? { label: 'Fed today', color: colors.success }
+        : { label: 'Feed today', color: colors.textTertiary };
+    }
     if (a.days_since_last_feeding === null)
       return { label: 'Never fed', color: colors.danger };
     if (a.is_overdue)

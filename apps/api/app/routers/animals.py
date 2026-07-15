@@ -323,6 +323,13 @@ async def list_feeding_status(
             and days is not None
             and days >= interval
         )
+        # Cadence-aware presentation: a frequent feeder (fed daily or more —
+        # interval <= 1 day) uses a fed-today check, not a days-since/overdue
+        # badge that would sit red every morning. Everything else keeps the
+        # discrete-feeder treatment.
+        status_mode = "daily" if (interval is not None and interval <= 1) else "interval"
+        fed_today = days == 0
+
         items.append(
             AnimalFeedingStatusItem(
                 id=a.id,
@@ -337,6 +344,8 @@ async def list_feeding_status(
                 is_overdue=is_overdue,
                 interval_days=interval,
                 feeds_on_cgd=bool(getattr(a, "feeds_on_cgd", False)),
+                status_mode=status_mode,
+                fed_today=fed_today,
             )
         )
 

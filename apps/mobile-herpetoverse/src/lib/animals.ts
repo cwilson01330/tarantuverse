@@ -568,6 +568,9 @@ export interface AnimalFeedingStatus {
   is_overdue: boolean;
   interval_days: number | null;
   feeds_on_cgd: boolean;
+  /** "daily" = frequent feeder (fed-today check); "interval" = days-since model. */
+  status_mode: 'daily' | 'interval';
+  fed_today: boolean;
 }
 
 /**
