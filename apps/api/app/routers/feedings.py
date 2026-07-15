@@ -262,7 +262,12 @@ async def quick_feed_animal(
     )
     db.add(new_feeding)
 
-    if animal.last_fed_at is None or now > animal.last_fed_at:
+    # last_fed_at may come back tz-aware from the DB while `now` is naive —
+    # normalize before comparing to avoid a naive/aware TypeError.
+    prev_fed = animal.last_fed_at
+    if prev_fed is not None and prev_fed.tzinfo is not None:
+        prev_fed = prev_fed.replace(tzinfo=None)
+    if prev_fed is None or now > prev_fed:
         animal.last_fed_at = now
 
     db.commit()
