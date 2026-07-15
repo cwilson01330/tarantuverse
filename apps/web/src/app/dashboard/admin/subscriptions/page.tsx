@@ -12,6 +12,8 @@ interface Subscription {
   username: string;
   email: string | null;
   plan: string | null;
+  plan_display_name?: string | null;
+  app?: string | null; // tarantuverse | herpetoverse | both
   status: string;
   is_active: boolean;
   payment_provider: string | null;
@@ -100,6 +102,9 @@ export default function AdminSubscriptionsPage() {
             { label: 'Paying (Apple+Stripe)', value: paying.length, color: 'text-green-600 dark:text-green-400' },
             { label: 'Apple', value: subs.filter((s) => s.payment_provider === 'apple').length, color: 'text-gray-700 dark:text-gray-200' },
             { label: 'Stripe', value: subs.filter((s) => s.payment_provider === 'stripe').length, color: 'text-indigo-600 dark:text-indigo-400' },
+            { label: 'Tarantuverse', value: subs.filter((s) => s.app === 'tarantuverse').length, color: 'text-amber-600 dark:text-amber-400' },
+            { label: 'Herpetoverse', value: subs.filter((s) => s.app === 'herpetoverse').length, color: 'text-green-600 dark:text-green-400' },
+            { label: 'All-Access', value: subs.filter((s) => s.app === 'both').length, color: 'text-purple-600 dark:text-purple-400' },
           ].map((c) => (
             <div key={c.label} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-center">
               <div className={`text-2xl font-bold ${c.color}`}>{loading ? '…' : c.value}</div>
@@ -114,6 +119,7 @@ export default function AdminSubscriptionsPage() {
               <tr>
                 <th className="px-4 py-3">User</th>
                 <th className="px-4 py-3">Provider</th>
+                <th className="px-4 py-3">App</th>
                 <th className="px-4 py-3">Plan</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Started</th>
@@ -124,9 +130,9 @@ export default function AdminSubscriptionsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
               {loading ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">Loading…</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">Loading…</td></tr>
               ) : subs.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No subscriptions found.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">No subscriptions found.</td></tr>
               ) : subs.map((s) => (
                 <tr key={s.id} className="text-gray-900 dark:text-gray-100">
                   <td className="px-4 py-3">
@@ -137,6 +143,19 @@ export default function AdminSubscriptionsPage() {
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PROVIDER_STYLE[s.payment_provider || ''] || 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
                       {s.payment_provider === 'admin_grant' ? 'admin grant' : (s.payment_provider || '—')}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {s.app ? (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        s.app === 'both'
+                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                          : s.app === 'herpetoverse'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                            : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                      }`}>
+                        {s.app === 'both' ? 'All-Access' : s.app === 'herpetoverse' ? 'Herpetoverse' : 'Tarantuverse'}
+                      </span>
+                    ) : '—'}
                   </td>
                   <td className="px-4 py-3 capitalize">{s.plan || '—'}</td>
                   <td className="px-4 py-3">

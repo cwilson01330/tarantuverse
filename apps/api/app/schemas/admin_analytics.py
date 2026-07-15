@@ -24,6 +24,9 @@ class AdminAnalyticsOverview(BaseModel):
 
     # Revenue/Premium
     total_premium_users: int
+    # Distinct paid subscribers by app scope: tarantuverse | herpetoverse | both
+    # (All-Access). Lets the admin distinguish app-specific vs combo subscribers.
+    premium_by_app: dict[str, int] = {}
     mrr: float  # Monthly Recurring Revenue
     subscription_conversion_rate: float  # Percentage of users on premium
 

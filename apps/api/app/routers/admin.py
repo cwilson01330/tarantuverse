@@ -148,11 +148,16 @@ async def list_subscriptions(
         if expires is not None and expires.tzinfo is None:
             expires = expires.replace(tzinfo=timezone.utc)
         is_active = sub.status == "active" and (expires is None or expires > now)
+        # App scope lets the admin distinguish HV-only vs TV-only vs All-Access
+        # ('both') subscribers. Legacy plans with no `app` are Tarantuverse.
+        plan_app = (getattr(plan, "app", None) or "tarantuverse") if plan else None
         out.append({
             "id": str(sub.id),
             "username": user.username,
             "email": user.email,
             "plan": plan.name if plan else None,
+            "plan_display_name": plan.display_name if plan else None,
+            "app": plan_app,  # tarantuverse | herpetoverse | both
             "status": sub.status,
             "is_active": is_active,
             "payment_provider": sub.payment_provider,

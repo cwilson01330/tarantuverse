@@ -144,6 +144,22 @@ async def get_analytics_overview(
         .scalar()
     ) or 0
 
+    # Breakdown of paid subscribers by app scope (HV + TV bill separately).
+    # 'both' = All-Access; legacy null app is treated as tarantuverse.
+    premium_by_app = {"tarantuverse": 0, "herpetoverse": 0, "both": 0}
+    app_rows = (
+        db.query(
+            func.coalesce(SubscriptionPlan.app, "tarantuverse"),
+            func.count(distinct(UserSubscription.user_id)),
+        )
+        .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(active_subscription_clause(), SubscriptionPlan.name != "free")
+        .group_by(func.coalesce(SubscriptionPlan.app, "tarantuverse"))
+        .all()
+    )
+    for app_name, cnt in app_rows:
+        premium_by_app[app_name] = int(cnt or 0)
+
     # MRR: sum monthly price of active, non-expired, auto-renewing PAID subs.
     mrr_result = db.query(func.sum(SubscriptionPlan.price_monthly)).join(
         UserSubscription, UserSubscription.plan_id == SubscriptionPlan.id
@@ -192,6 +208,7 @@ async def get_analytics_overview(
         new_users_30d=new_users_30d,
         user_growth_rate=round(user_growth_rate, 1),
         total_premium_users=total_premium_users,
+        premium_by_app=premium_by_app,
         mrr=round(mrr, 2),
         subscription_conversion_rate=round(subscription_conversion_rate, 1),
         total_tarantulas=total_tarantulas,
