@@ -1,7 +1,7 @@
 """
 Subscription API routes
 """
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -96,8 +96,66 @@ def get_my_subscription(
         db.add(subscription)
         db.commit()
         db.refresh(subscription)
-    
+
     return subscription
+
+
+@router.get("/app-status")
+def get_app_subscription_status(
+    app: str = Query("tarantuverse", pattern="^(tarantuverse|herpetoverse)$"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """App-scoped entitlement for the settings UI.
+
+    Unlike /me (which returns ANY active sub), this resolves premium FOR THE
+    GIVEN APP via is_premium_for_app — so a Tarantuverse-only sub never reads as
+    Herpetoverse premium, and All-Access ('both') satisfies either app. Returns
+    the granting plan + expiry + payment source so settings can show status and
+    route management to the right store.
+    """
+    if expire_stale_subscriptions(db, current_user.id):
+        db.commit()
+
+    subs = (
+        db.query(UserSubscription)
+        .filter(UserSubscription.user_id == current_user.id, active_subscription_clause())
+        .all()
+    )
+    granting_sub = None
+    granting_plan = None
+    granting_app = None
+    for sub in subs:
+        plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == sub.plan_id).first()
+        if not plan or plan.name == "free":
+            continue
+        plan_app = getattr(plan, "app", None) or "tarantuverse"
+        if plan_app in (app, "both"):
+            granting_sub, granting_plan, granting_app = sub, plan, plan_app
+            # Prefer a 'both'/All-Access grant if present, else take the first.
+            if plan_app == "both":
+                break
+
+    if not granting_plan:
+        return {
+            "is_premium": False,
+            "tier": "free",
+            "plan_name": "free",
+            "plan_display_name": "Free",
+            "expires_at": None,
+            "source": None,
+            "app_scope": None,
+        }
+
+    return {
+        "is_premium": True,
+        "tier": "all_access" if granting_app == "both" else "premium",
+        "plan_name": granting_plan.name,
+        "plan_display_name": granting_plan.display_name,
+        "expires_at": granting_sub.expires_at.isoformat() if granting_sub.expires_at else None,
+        "source": granting_sub.payment_provider,  # apple | google | stripe | None
+        "app_scope": granting_app,                # 'herpetoverse' | 'both'
+    }
 
 
 @router.post("/subscribe", response_model=UserSubscriptionWithPlan)

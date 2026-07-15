@@ -12,7 +12,7 @@
  * tied to the keeper. The typed-"DELETE" confirmation mirrors the
  * Tarantuverse mobile delete flow.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,6 +35,9 @@ import Constants from 'expo-constants';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme, type ThemeColors } from '../src/contexts/ThemeContext';
 import { apiClient } from '../src/services/api';
+import { useAuth } from '../src/contexts/AuthContext';
+import { restorePurchases, isIAPAvailable } from '../src/services/iap';
+import UpgradeModal from '../src/components/UpgradeModal';
 import { captureEvent } from '../src/services/posthog';
 import { AppHeader } from '../src/components/AppHeader';
 import { HeaderBackButton } from '../src/components/HeaderBackButton';
@@ -61,6 +64,59 @@ function SettingsScreen() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Subscription (app-scoped for Herpetoverse).
+  const { token, refreshUser } = useAuth();
+  const [sub, setSub] = useState<{
+    is_premium: boolean;
+    tier: string;
+    plan_display_name: string;
+    expires_at: string | null;
+    source: string | null;
+  } | null>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    apiClient
+      .get('/subscriptions/app-status', { params: { app: 'herpetoverse' } })
+      .then((r) => { if (active) setSub(r.data); })
+      .catch(() => { if (active) setSub(null); });
+    return () => { active = false; };
+  }, [token]);
+
+  const handleRestore = async () => {
+    if (!token || restoring) return;
+    setRestoring(true);
+    try {
+      const ok = await restorePurchases(token);
+      await refreshUser();
+      const r = await apiClient
+        .get('/subscriptions/app-status', { params: { app: 'herpetoverse' } })
+        .catch(() => null);
+      if (r) setSub(r.data);
+      Alert.alert(
+        ok ? 'Restored' : 'Nothing to restore',
+        ok
+          ? 'Your previous purchases have been restored.'
+          : 'No previous purchases were found for this account.',
+      );
+    } catch (e: any) {
+      Alert.alert('Restore failed', e?.message || 'Could not restore purchases.');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const sourceLabel =
+    sub?.source === 'apple'
+      ? 'the App Store'
+      : sub?.source === 'google'
+        ? 'Google Play'
+        : sub?.source === 'stripe'
+          ? 'the web'
+          : null;
 
   const appVersion = Constants.expoConfig?.version ?? '0.1.0';
   const canConfirmDelete =
@@ -156,6 +212,77 @@ function SettingsScreen() {
             onPress={() => setDeleteOpen(true)}
             colors={colors}
           />
+        </View>
+
+        <SectionLabel text="Subscription" colors={colors} />
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: layout.radius.lg,
+            },
+          ]}
+        >
+          <View style={{ paddingHorizontal: 16, paddingVertical: 14 }}>
+            {sub?.is_premium ? (
+              <>
+                <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>
+                  {sub.plan_display_name} — active
+                </Text>
+                {sub.tier === 'all_access' && (
+                  <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 4 }}>
+                    Covers Herpetoverse and Tarantuverse.
+                  </Text>
+                )}
+                {sub.expires_at && (
+                  <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 2 }}>
+                    Renews or expires {new Date(sub.expires_at).toLocaleDateString()}.
+                  </Text>
+                )}
+                {sourceLabel && (
+                  <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 2 }}>
+                    Managed through {sourceLabel} — change or cancel there.
+                  </Text>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>
+                  Free plan
+                </Text>
+                <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 4 }}>
+                  Up to 5 animals. Premium unlocks unlimited animals, breeding, feeder
+                  tracking, and detailed analytics.
+                </Text>
+              </>
+            )}
+          </View>
+
+          {!sub?.is_premium && (
+            <>
+              <Divider color={colors.border} />
+              <ActionRow
+                icon="star-four-points-outline"
+                label="View plans"
+                onPress={() => setUpgradeOpen(true)}
+                colors={colors}
+              />
+            </>
+          )}
+
+          {isIAPAvailable() && (
+            <>
+              <Divider color={colors.border} />
+              <ActionRow
+                icon="restore"
+                label={restoring ? 'Restoring…' : 'Restore purchases'}
+                onPress={handleRestore}
+                colors={colors}
+              />
+            </>
+          )}
         </View>
 
         <SectionLabel text="Reminders" colors={colors} />
@@ -267,6 +394,21 @@ function SettingsScreen() {
           Herpetoverse · Appalachian Tarantulas, LLC
         </Text>
       </ScrollView>
+
+      {/* Plans / purchase sheet (reused from the cap gate). */}
+      <UpgradeModal
+        visible={upgradeOpen}
+        onClose={() => {
+          setUpgradeOpen(false);
+          // Refresh status in case a purchase just completed in the sheet.
+          apiClient
+            .get('/subscriptions/app-status', { params: { app: 'herpetoverse' } })
+            .then((r) => setSub(r.data))
+            .catch(() => {});
+        }}
+        title="Herpetoverse Premium"
+        message="Unlimited animals, breeding, feeder tracking, and detailed analytics."
+      />
 
       {/* Delete-account confirmation. Typed-"DELETE" gate so it can't be
           triggered by a stray tap. */}

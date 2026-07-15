@@ -274,6 +274,9 @@ export default function SettingsPage() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* ---------- Subscription ---------- */}
+          <SubscriptionCard />
+
           {/* ---------- Profile ---------- */}
           <form onSubmit={handleSaveProfile} className={`${CARD_CLS} space-y-5`} noValidate>
             <div>
@@ -590,5 +593,96 @@ function SupportLink({
         {external ? '↗' : '→'}
       </span>
     </a>
+  )
+}
+
+interface AppSubStatus {
+  is_premium: boolean
+  tier: 'free' | 'premium' | 'all_access'
+  plan_display_name: string
+  expires_at: string | null
+  source: 'apple' | 'google' | 'stripe' | null
+  app_scope: 'herpetoverse' | 'both' | null
+}
+
+/**
+ * App-scoped subscription status card. Reads /subscriptions/app-status?app=
+ * herpetoverse, so a Tarantuverse-only sub never reads as HV premium and
+ * All-Access shows as covering both apps. No purchase button on web yet — the
+ * buy path is the mobile app (IAP); web shows status + where it's managed.
+ */
+function SubscriptionCard() {
+  const [status, setStatus] = useState<AppSubStatus | null>(null)
+  const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading')
+
+  useEffect(() => {
+    apiFetch<AppSubStatus>('/api/v1/subscriptions/app-status?app=herpetoverse')
+      .then((s) => {
+        setStatus(s)
+        setState('ok')
+      })
+      .catch(() => setState('error'))
+  }, [])
+
+  const sourceLabel = (s: string | null) =>
+    s === 'apple'
+      ? 'the App Store'
+      : s === 'google'
+        ? 'Google Play'
+        : s === 'stripe'
+          ? 'the web'
+          : null
+
+  return (
+    <div className={CARD_CLS}>
+      <h2 className={SECTION_HDR_CLS}>Subscription</h2>
+
+      {state === 'loading' && (
+        <p className="text-sm text-neutral-500 mt-2">Loading…</p>
+      )}
+
+      {state === 'error' && (
+        <p className="text-sm text-neutral-500 mt-2">
+          Couldn&apos;t load your subscription status.
+        </p>
+      )}
+
+      {state === 'ok' && status && status.is_premium && (
+        <div className="mt-2 space-y-1">
+          <p className="text-sm text-neutral-200">
+            <span className="text-herp-lime font-semibold">
+              {status.plan_display_name}
+            </span>{' '}
+            — active
+          </p>
+          {status.tier === 'all_access' && (
+            <p className="text-xs text-neutral-500">
+              Covers Herpetoverse and Tarantuverse.
+            </p>
+          )}
+          {status.expires_at && (
+            <p className="text-xs text-neutral-500">
+              {'Renews or expires '}
+              {new Date(status.expires_at).toLocaleDateString()}.
+            </p>
+          )}
+          {sourceLabel(status.source) && (
+            <p className="text-xs text-neutral-500">
+              Managed through {sourceLabel(status.source)} — change or cancel there.
+            </p>
+          )}
+        </div>
+      )}
+
+      {state === 'ok' && status && !status.is_premium && (
+        <div className="mt-2 space-y-2">
+          <p className="text-sm text-neutral-300">Free plan — up to 5 animals.</p>
+          <p className="text-xs text-neutral-500">
+            Premium unlocks unlimited animals, breeding, feeder tracking, and detailed
+            analytics. Upgrade in the Herpetoverse app on your phone.
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
