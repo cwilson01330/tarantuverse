@@ -35,7 +35,6 @@ import Constants from 'expo-constants';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme, type ThemeColors } from '../src/contexts/ThemeContext';
 import { apiClient } from '../src/services/api';
-import { useAuth } from '../src/contexts/AuthContext';
 import { restorePurchases, isIAPAvailable } from '../src/services/iap';
 import UpgradeModal from '../src/components/UpgradeModal';
 import { captureEvent } from '../src/services/posthog';
@@ -58,15 +57,15 @@ const EXPORT_URL = 'https://herpetoverse.com/app/settings';
 
 function SettingsScreen() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, token, refreshUser } = useAuth();
   const { colors, layout } = useTheme();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  // Subscription (app-scoped for Herpetoverse).
-  const { token, refreshUser } = useAuth();
+  // Subscription (app-scoped for Herpetoverse). token/refreshUser come from the
+  // useAuth() destructure above.
   const [sub, setSub] = useState<{
     is_premium: boolean;
     tier: string;
