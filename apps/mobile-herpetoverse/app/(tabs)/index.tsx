@@ -34,6 +34,7 @@ import {
   type AnimalTaxon,
   type AnimalLimits,
   createFeeding,
+  quickFeedAnimal,
   getAnimalLimits,
   listAnimals,
 } from '../../src/lib/animals';
@@ -221,10 +222,8 @@ function CollectionScreen() {
     setActionBusy(true);
     setActionBusyKey('fed');
     try {
-      await createFeeding(target.id, {
-        fed_at: new Date().toISOString(),
-        accepted: true,
-      });
+      // quickFeedAnimal remembers the animal's last meal server-side.
+      await quickFeedAnimal(target.id);
       await fetchAll();
       setActionTarget(null);
       if (Platform.OS === 'android') {
@@ -243,6 +242,28 @@ function CollectionScreen() {
     } finally {
       setActionBusy(false);
       setActionBusyKey(null);
+    }
+  };
+
+  // Visible one-tap "Fed" straight off the card (no long-press needed) — the
+  // low-friction path for frequent feeders. Reuses the last meal server-side.
+  const [quickFedId, setQuickFedId] = useState<string | null>(null);
+  const handleQuickFeed = async (row: ReptileRow) => {
+    if (quickFedId) return;
+    setQuickFedId(row.id);
+    try {
+      await quickFeedAnimal(row.id);
+      await fetchAll();
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`Fed ${reptileTitle(row)}`, ToastAndroid.SHORT);
+      }
+    } catch {
+      Alert.alert(
+        'Could not log feeding',
+        `Something went wrong logging a feeding for ${reptileTitle(row)}. Please try again.`,
+      );
+    } finally {
+      setQuickFedId(null);
     }
   };
 
@@ -416,6 +437,8 @@ function CollectionScreen() {
               router.push(`/reptile/${item.id}` as never);
             }}
             onLongPress={() => setActionTarget(item)}
+            onFed={() => handleQuickFeed(item)}
+            fedBusy={quickFedId === item.id}
           />
         )}
         refreshControl={
@@ -536,10 +559,14 @@ function ReptileCard({
   row,
   onPress,
   onLongPress,
+  onFed,
+  fedBusy,
 }: {
   row: ReptileRow;
   onPress: () => void;
   onLongPress: () => void;
+  onFed: () => void;
+  fedBusy: boolean;
 }) {
   const { colors, layout } = useTheme();
   const lastFed = relativeDays(row.last_fed_at);
@@ -648,6 +675,23 @@ function ReptileCard({
             <Text style={styles.feedingPillText}>{days}d</Text>
           </View>
         )}
+        {/* One-tap "Fed" — logs a feeding with the remembered meal, no
+            long-press or form needed. Inner touchable captures the tap so
+            it doesn't open the detail screen. */}
+        <TouchableOpacity
+          onPress={onFed}
+          disabled={fedBusy}
+          hitSlop={6}
+          style={[
+            styles.fedChip,
+            { backgroundColor: colors.primary, opacity: fedBusy ? 0.6 : 1 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Log a feeding for ${reptileTitle(row)}`}
+        >
+          <MaterialCommunityIcons name="silverware-fork-knife" size={13} color="#0B0B0B" />
+          <Text style={styles.fedChipText}>{fedBusy ? '…' : 'Fed'}</Text>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -785,6 +829,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 13,
   },
+  fedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginTop: 6,
+  },
+  fedChipText: { color: '#0B0B0B', fontSize: 11, fontWeight: '700' },
 
   // FAB
   fab: {

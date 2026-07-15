@@ -361,6 +361,16 @@ export interface AnimalLimits {
   at_limit: boolean;
 }
 
+/**
+ * One-tap "Fed" — logs an accepted feeding NOW, reusing the animal's last meal
+ * (food type/size) server-side, so the keeper doesn't re-enter anything. Ideal
+ * for frequent feeders (a beardie fed daily). Details can be edited afterward.
+ */
+export async function quickFeedAnimal(animalId: string): Promise<FeedingLog> {
+  const { data } = await apiClient.post<FeedingLog>(`/animals/${animalId}/quick-feed`);
+  return data;
+}
+
 export async function getAnimalLimits(): Promise<AnimalLimits> {
   const { data } = await apiClient.get<AnimalLimits>('/animals/limits');
   return data;

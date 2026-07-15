@@ -222,6 +222,54 @@ async def create_animal_feeding_log(
     return new_feeding
 
 
+@router.post(
+    "/animals/{animal_id}/quick-feed",
+    response_model=FeedingLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def quick_feed_animal(
+    animal_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """One-tap "Fed" — log an accepted feeding NOW, reusing the animal's last
+    meal (food type/size) so the keeper doesn't re-enter anything. This is the
+    low-friction path for frequent feeders (e.g. an insectivorous beardie fed
+    daily); precise details can still be edited on the log afterward.
+    """
+    animal = db.query(Animal).filter(
+        Animal.id == animal_id,
+        Animal.user_id == current_user.id,
+    ).first()
+    if not animal:
+        raise HTTPException(status_code=404, detail="Animal not found")
+
+    # Remember the last meal (most recent feeding of any outcome).
+    last = (
+        db.query(FeedingLog)
+        .filter(FeedingLog.animal_id == animal_id)
+        .order_by(FeedingLog.fed_at.desc())
+        .first()
+    )
+
+    now = datetime.utcnow()
+    new_feeding = FeedingLog(
+        animal_id=animal_id,
+        fed_at=now,
+        accepted=True,
+        food_type=last.food_type if last else None,
+        food_size=last.food_size if last else None,
+    )
+    db.add(new_feeding)
+
+    if animal.last_fed_at is None or now > animal.last_fed_at:
+        animal.last_fed_at = now
+
+    db.commit()
+    db.refresh(new_feeding)
+    return new_feeding
+
+
 @router.get("/scorpions/{scorpion_id}/feedings", response_model=List[FeedingLogResponse])
 async def get_scorpion_feeding_logs(
     scorpion_id: uuid.UUID,
