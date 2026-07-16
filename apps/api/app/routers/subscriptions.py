@@ -42,6 +42,12 @@ class CreateCheckoutSessionRequest(BaseModel):
     price_type: str  # "monthly", "yearly", or "lifetime"
     success_url: str
     cancel_url: str
+    # Plan key selects which product to buy AND which app-scope to grant.
+    # Defaults to TV "premium" for backward compatibility with existing callers.
+    #   "premium"             -> Tarantuverse (app='tarantuverse')
+    #   "herpetoverse_premium"-> Herpetoverse (app='herpetoverse')
+    #   "bundle_premium"      -> All-Access   (app='both')
+    plan: str = "premium"
 
 
 class CreateCheckoutSessionResponse(BaseModel):
@@ -353,6 +359,15 @@ def validate_receipt(
         "com.tarantuverse.premium.yearly": "premium",
         "com.tarantuverse.premium.yearly.v2": "premium",    # iOS yearly
         "com.tarantuverse.lifetime": "premium",
+        # Tarantuverse All-Access -> bundle_premium (app='both', unlocks TV + HV).
+        # Android Play subscription id is the bare "tarantuverse.allaccess"
+        # (monthly/yearly are base plans, not in the productId).
+        "tarantuverse.allaccess": "bundle_premium",
+        "tarantuverse.allaccess.monthly": "bundle_premium",
+        "tarantuverse.allaccess.monthly.v2": "bundle_premium",
+        "tarantuverse.allaccess.yearly": "bundle_premium",
+        "tarantuverse.allaccess.yearly.v2": "bundle_premium",
+        "tarantuverse.allaccess.lifetime": "bundle_premium",
         # ---- Herpetoverse (app-scoped) ----
         # Premium tier -> herpetoverse_premium (app='herpetoverse').
         "herpetoverse.premium.monthly": "herpetoverse_premium",
@@ -381,6 +396,11 @@ def validate_receipt(
         "com.tarantuverse.premium.yearly": "yearly",
         "com.tarantuverse.premium.yearly.v2": "yearly",
         "com.tarantuverse.lifetime": "lifetime",
+        "tarantuverse.allaccess.monthly": "monthly",
+        "tarantuverse.allaccess.monthly.v2": "monthly",
+        "tarantuverse.allaccess.yearly": "yearly",
+        "tarantuverse.allaccess.yearly.v2": "yearly",
+        "tarantuverse.allaccess.lifetime": "lifetime",
         # ---- Herpetoverse ----
         "herpetoverse.premium.monthly": "monthly",
         "herpetoverse.premium.monthly.v2": "monthly",
@@ -397,6 +417,7 @@ def validate_receipt(
         # Google's real renewal state comes from Play RTDN (future work).
         "herpetoverse.premium": "monthly",
         "herpetoverse.allaccess": "monthly",
+        "tarantuverse.allaccess": "monthly",
     }
 
     plan_name = product_to_plan_map.get(effective_product_id)
@@ -502,18 +523,39 @@ def create_checkout_session(
     Create a Stripe Checkout session for subscription purchase.
     Returns a checkout URL to redirect the user to.
     """
-    # Map price type to Stripe price ID
-    price_map = {
-        "monthly": settings.STRIPE_PRICE_MONTHLY,
-        "yearly": settings.STRIPE_PRICE_YEARLY,
-        "lifetime": settings.STRIPE_PRICE_LIFETIME,
+    # Plan key → per-duration Stripe price IDs. The plan key also encodes the
+    # app scope, which the webhook resolves again when granting the row.
+    price_by_plan = {
+        "premium": {
+            "monthly": settings.STRIPE_PRICE_MONTHLY,
+            "yearly": settings.STRIPE_PRICE_YEARLY,
+            "lifetime": settings.STRIPE_PRICE_LIFETIME,
+        },
+        "herpetoverse_premium": {
+            "monthly": settings.STRIPE_PRICE_HV_MONTHLY,
+            "yearly": settings.STRIPE_PRICE_HV_YEARLY,
+            "lifetime": settings.STRIPE_PRICE_HV_LIFETIME,
+        },
+        "bundle_premium": {
+            "monthly": settings.STRIPE_PRICE_BUNDLE_MONTHLY,
+            "yearly": settings.STRIPE_PRICE_BUNDLE_YEARLY,
+            "lifetime": settings.STRIPE_PRICE_BUNDLE_LIFETIME,
+        },
     }
 
-    price_id = price_map.get(request_data.price_type)
+    plan_key = request_data.plan or "premium"
+    plan_prices = price_by_plan.get(plan_key)
+    if not plan_prices:
+        raise HTTPException(status_code=400, detail=f"Invalid plan: {plan_key}")
+
+    price_id = plan_prices.get(request_data.price_type)
     if not price_id:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid price type: {request_data.price_type}"
+            detail=(
+                f"Price type '{request_data.price_type}' is not configured for "
+                f"plan '{plan_key}'."
+            ),
         )
 
     # Determine if this is a subscription or one-time payment
@@ -555,7 +597,8 @@ def create_checkout_session(
             "line_items": [{"price": price_id, "quantity": 1}],
             "metadata": {
                 "user_id": str(current_user.id),
-                "price_type": request_data.price_type
+                "price_type": request_data.price_type,
+                "plan": plan_key,
             },
         }
 
@@ -625,10 +668,23 @@ async def handle_checkout_completed(session: dict, db: Session):
         logger.error("No user_id in checkout session metadata")
         return
 
-    # Idempotency guard: Stripe retries webhooks (and events can be
-    # replayed from the dashboard). If this user already has an active
-    # Stripe subscription for the same customer + price type, this event
-    # was already processed — skip instead of cancelling and recreating.
+    # Resolve the plan from checkout metadata. Older sessions (and the TV web
+    # flow before this change) carry no `plan` key — default to "premium" so
+    # existing Tarantuverse purchases keep working exactly as before.
+    plan_key = session.get("metadata", {}).get("plan") or "premium"
+    plan = db.query(SubscriptionPlan).filter(
+        SubscriptionPlan.name == plan_key
+    ).first()
+
+    if not plan:
+        logger.error(f"Subscription plan '{plan_key}' not found")
+        return
+
+    # Idempotency guard: Stripe retries webhooks (and events can be replayed
+    # from the dashboard). If this user already has an active Stripe sub for the
+    # same customer + price type + PLAN, this event was already processed — skip.
+    # (Plan is part of the key so an HV→bundle upgrade at the same cadence isn't
+    # mistaken for a retry of the earlier purchase.)
     duplicate = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == user_id,
@@ -636,36 +692,36 @@ async def handle_checkout_completed(session: dict, db: Session):
             UserSubscription.payment_provider == "stripe",
             UserSubscription.payment_provider_id == customer_id,
             UserSubscription.subscription_source == price_type,
+            UserSubscription.plan_id == plan.id,
         )
     ).first()
 
     if duplicate:
         logger.info(
             f"Duplicate checkout.session.completed for user {user_id} "
-            f"(customer {customer_id}, {price_type}) — already processed, skipping"
+            f"(customer {customer_id}, {price_type}, {plan_key}) — skipping"
         )
         return
 
-    # Get the premium plan
-    plan = db.query(SubscriptionPlan).filter(
-        SubscriptionPlan.name == "premium"
-    ).first()
-
-    if not plan:
-        logger.error("Premium plan not found")
-        return
-
-    # Cancel any existing active subscription
-    existing = db.query(UserSubscription).filter(
+    # App-scoped supersession: only cancel existing subs that this purchase
+    # actually supersedes. A 'both' (All-Access) purchase supersedes everything;
+    # an app-scoped purchase only supersedes subs for the SAME app. This mirrors
+    # the IAP validate_receipt path so a keeper can hold TV + HV independently.
+    new_app = getattr(plan, "app", None) or "tarantuverse"
+    existing_active = db.query(UserSubscription).filter(
         and_(
             UserSubscription.user_id == user_id,
-            UserSubscription.status == "active"
+            UserSubscription.status == "active",
         )
-    ).first()
-
-    if existing:
-        existing.status = "cancelled"
-        existing.cancelled_at = datetime.utcnow()
+    ).all()
+    for ex in existing_active:
+        ex_plan = db.query(SubscriptionPlan).filter(
+            SubscriptionPlan.id == ex.plan_id
+        ).first()
+        ex_app = (getattr(ex_plan, "app", None) or "tarantuverse") if ex_plan else "tarantuverse"
+        if new_app == "both" or ex_app == new_app:
+            ex.status = "cancelled"
+            ex.cancelled_at = datetime.utcnow()
 
     # Calculate expiry based on price type
     expires_at = None
