@@ -79,6 +79,42 @@ const VENOM_LABELS: Record<string, string> = {
   medically_significant: 'Medically significant',
 }
 
+// Taxon-honest copy for the green "harmless" safety callout. The previous
+// version hardcoded whip-spider text for every harmless taxon (a mantis showed
+// "whip spiders are completely harmless…"). Keyed by taxon with a neutral
+// fallback for anything unlisted.
+const HARMLESS_COPY: Record<string, { title: string; body: string }> = {
+  whip_spider: {
+    title: 'No venom, no sting',
+    body: "Whip spiders (amblypygids) are completely harmless to humans. They're fast and can deliver a harmless pinch with their pedipalps, but have no venom and no sting.",
+  },
+  vinegaroon: {
+    title: 'No venom, no sting',
+    body: 'Vinegaroons are harmless to humans — no venom and no sting. If threatened they can spray a fine acetic-acid mist (it smells like vinegar) and give a firm pinch, but neither is dangerous. Avoid getting the spray in your eyes.',
+  },
+  mantis: {
+    title: 'No venom, no sting',
+    body: 'Mantises are harmless to humans. They have no venom or sting — the worst they can do is grip with their spined forelegs or deliver a startling but harmless nip.',
+  },
+  millipede: {
+    title: 'No venom, no sting',
+    body: "Millipedes don't bite or sting and have no venom. Many do secrete defensive chemicals when stressed, so wash your hands after handling and keep them away from your eyes and mouth.",
+  },
+  roach: {
+    title: 'No venom, no sting',
+    body: 'Pet and feeder roaches are harmless to humans — no venom, no sting, and no meaningful bite. Wash your hands after handling.',
+  },
+  true_spider: {
+    title: 'Not medically significant',
+    body: 'Like all spiders, this species has venom, but it is not considered medically significant to humans. Bites are uncommon and, at worst, comparable to a bee sting for most people. Handle minimally.',
+  },
+}
+
+const DEFAULT_HARMLESS = {
+  title: 'No venom, no sting',
+  body: 'This species is considered harmless to humans, with no medically significant venom or sting. Handle gently and wash your hands afterward.',
+}
+
 const FEEDING_MODE_LABELS: Record<string, string> = {
   predator: 'Predator (live prey)',
   detritivore: 'Detritivore (decaying matter)',
@@ -186,10 +222,11 @@ export default function InvertCareSheetClient({
 
             {/* Safety callout */}
             {harmless ? (
-              <Callout color="green" title="No venom, no sting">
-                Whip spiders are completely harmless to humans. They&apos;re fast
-                and can deliver a harmless pinch with the pedipalps, but have no
-                venom and no sting.
+              <Callout
+                color="green"
+                title={(HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS).title}
+              >
+                {(HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS).body}
               </Callout>
             ) : (
               (species.venom_notes ||
