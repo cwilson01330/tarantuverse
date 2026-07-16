@@ -33,6 +33,8 @@ import {
   restorePurchases,
   isIAPAvailable,
   endIAP,
+  ALL_ACCESS_SKUS,
+  YEARLY_SKUS,
 } from '../src/services/iap';
 
 interface SubscriptionLimits {
@@ -355,6 +357,25 @@ export default function SubscriptionScreen() {
     }
   };
 
+  // ---- Product-aware labels (Premium vs All-Access, monthly vs yearly) ----
+  // Derive everything from the product id so cards are labeled correctly
+  // instead of the old hardcoded "Premium Monthly".
+  const productSku = (p: any): string => p?.id || p?.productId || '';
+  const isAllAccessProduct = (p: any) => ALL_ACCESS_SKUS.includes(productSku(p));
+  const isYearlyProduct = (p: any) => YEARLY_SKUS.includes(productSku(p));
+  const planTitle = (p: any) =>
+    `${isAllAccessProduct(p) ? 'All-Access' : 'Premium'} ${isYearlyProduct(p) ? 'Yearly' : 'Monthly'}`;
+  const planSubtitle = (p: any) =>
+    isAllAccessProduct(p)
+      ? `Tarantuverse + Herpetoverse · billed ${isYearlyProduct(p) ? 'yearly' : 'monthly'}`
+      : `Billed ${isYearlyProduct(p) ? 'yearly' : 'monthly'}`;
+  // Render order: Premium before All-Access, monthly before yearly.
+  const sortedProducts = [...products].sort((a, b) => {
+    const rank = (p: any) =>
+      (isAllAccessProduct(p) ? 2 : 0) + (isYearlyProduct(p) ? 1 : 0);
+    return rank(a) - rank(b);
+  });
+
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -486,6 +507,19 @@ export default function SubscriptionScreen() {
     productPeriod: {
       fontSize: 12,
       color: 'rgba(255,255,255,0.8)',
+    },
+    allAccessBadge: {
+      backgroundColor: 'rgba(255,255,255,0.22)',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 999,
+    },
+    allAccessBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: 'white',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
     },
     purchaseButton: {
       backgroundColor: 'white',
@@ -811,19 +845,26 @@ export default function SubscriptionScreen() {
                     Use promo codes below or build a development version.
                   </Text>
                 </View>
-              ) : products.length > 0 ? (
-                products.map((product) => (
-                  <View key={product.id} style={styles.productCard}>
+              ) : sortedProducts.length > 0 ? (
+                sortedProducts.map((product) => (
+                  <View key={productSku(product)} style={styles.productCard}>
                     <View style={styles.productHeader}>
-                      <View>
-                        <Text style={styles.productName}>Premium Monthly</Text>
-                        <Text style={styles.productPeriod}>Billed monthly</Text>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <Text style={styles.productName}>{planTitle(product)}</Text>
+                          {isAllAccessProduct(product) && (
+                            <View style={styles.allAccessBadge}>
+                              <Text style={styles.allAccessBadgeText}>Both apps</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.productPeriod}>{planSubtitle(product)}</Text>
                       </View>
                       <Text style={styles.productPrice}>{formatPrice(product)}</Text>
                     </View>
                     <TouchableOpacity
                       style={[styles.purchaseButton, purchasing && styles.purchaseButtonDisabled]}
-                      onPress={() => handlePurchase(product.id)}
+                      onPress={() => handlePurchase(productSku(product))}
                       disabled={purchasing || restoring}
                     >
                       {purchasing ? (

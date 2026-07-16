@@ -37,12 +37,37 @@ export const SUBSCRIPTION_SKUS = Platform.select({
   ios: [
     'com.tarantuverse.premium.monthly.v2',
     'com.tarantuverse.premium.yearly.v2',
+    // All-Access (app='both' — unlocks TV + HV). Create these product IDs in
+    // App Store Connect; each is its own per-duration subscription.
+    'tarantuverse.allaccess.monthly.v2',
+    'tarantuverse.allaccess.yearly.v2',
   ],
   android: [
     'com.tarantuverse.premium.monthly',
     'com.tarantuverse.premium.yearly',
+    // All-Access as two separate Play subscriptions (one base plan each),
+    // matching the Premium pattern. Backend maps both to bundle_premium.
+    'tarantuverse.allaccess.monthly',
+    'tarantuverse.allaccess.yearly',
   ],
 }) || [];
+
+// Product IDs that grant All-Access (both apps) rather than TV-only Premium.
+// Used by the paywall to label/group cards correctly.
+export const ALL_ACCESS_SKUS = [
+  'tarantuverse.allaccess.monthly',
+  'tarantuverse.allaccess.yearly',
+  'tarantuverse.allaccess.monthly.v2',
+  'tarantuverse.allaccess.yearly.v2',
+];
+
+// Product IDs billed yearly (vs monthly). Used for period labels.
+export const YEARLY_SKUS = [
+  'com.tarantuverse.premium.yearly',
+  'com.tarantuverse.premium.yearly.v2',
+  'tarantuverse.allaccess.yearly',
+  'tarantuverse.allaccess.yearly.v2',
+];
 
 export const LIFETIME_SKU = Platform.select({
   ios: 'com.tarantuverse.lifetime',
