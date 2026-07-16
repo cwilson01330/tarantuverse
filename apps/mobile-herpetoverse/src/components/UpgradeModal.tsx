@@ -98,6 +98,27 @@ export default function UpgradeModal({
 
   const showStore = iapOn && products.length > 0;
 
+  // Product-aware labels derived from the product id (Premium vs All-Access,
+  // monthly/yearly/lifetime) so buttons read cleanly instead of raw store
+  // titles or ids. All-Access unlocks Herpetoverse + Tarantuverse.
+  const isAllAccess = (id: string) => id.includes('allaccess');
+  const planLabel = (id: string) => {
+    const tier = isAllAccess(id) ? 'All-Access' : 'Premium';
+    const period = id.includes('lifetime')
+      ? 'Lifetime'
+      : id.includes('yearly')
+        ? 'Yearly'
+        : 'Monthly';
+    return `${tier} ${period}`;
+  };
+  // Order: Premium before All-Access, then monthly < yearly < lifetime.
+  const sortedProducts = [...products].sort((a, b) => {
+    const rank = (id: string) =>
+      (isAllAccess(id) ? 100 : 0) +
+      (id.includes('lifetime') ? 2 : id.includes('yearly') ? 1 : 0);
+    return rank(a.id) - rank(b.id);
+  });
+
   const handleBuy = async (product: IapProduct) => {
     if (purchasingId) return;
     setPurchasingId(product.id);
@@ -260,9 +281,10 @@ export default function UpgradeModal({
               </View>
             ) : showStore ? (
               <>
-                {products.map((p) => {
+                {sortedProducts.map((p) => {
                   const busy = purchasingId === p.id;
                   const dim = !!purchasingId && !busy;
+                  const label = planLabel(p.id);
                   return (
                     <TouchableOpacity
                       key={p.id}
@@ -277,13 +299,14 @@ export default function UpgradeModal({
                         },
                       ]}
                       accessibilityRole="button"
-                      accessibilityLabel={`Buy ${p.title || p.id} ${p.displayPrice}`}
+                      accessibilityLabel={`Buy ${label} ${p.displayPrice || ''}`}
                     >
                       {busy ? (
                         <ActivityIndicator color="#0B0B0B" />
                       ) : (
                         <Text style={styles.primaryBtnText}>
-                          {(p.title || p.id)}
+                          {label}
+                          {isAllAccess(p.id) ? ' · both apps' : ''}
                           {p.displayPrice ? `  ·  ${p.displayPrice}` : ''}
                         </Text>
                       )}

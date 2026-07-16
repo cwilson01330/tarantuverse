@@ -59,6 +59,7 @@ export const ALL_ACCESS_SKUS = [
   'tarantuverse.allaccess.yearly',
   'tarantuverse.allaccess.monthly.v2',
   'tarantuverse.allaccess.yearly.v2',
+  'tarantuverse.allaccess.lifetime',
 ];
 
 // Product IDs billed yearly (vs monthly). Used for period labels.
@@ -73,6 +74,14 @@ export const LIFETIME_SKU = Platform.select({
   ios: 'com.tarantuverse.lifetime',
   android: 'com.tarantuverse.lifetime',
 }) || '';
+
+// One-time non-consumables (type 'in-app'): TV Premium Lifetime + All-Access
+// Lifetime. Backend maps com.tarantuverse.lifetime -> premium and
+// tarantuverse.allaccess.lifetime -> bundle_premium.
+export const LIFETIME_SKUS = Platform.select({
+  ios: ['com.tarantuverse.lifetime', 'tarantuverse.allaccess.lifetime'],
+  android: ['com.tarantuverse.lifetime', 'tarantuverse.allaccess.lifetime'],
+}) || [];
 
 // Export whether IAP is available (for UI to show/hide purchase options)
 export const isIAPAvailable = () => !isExpoGo;
@@ -184,10 +193,31 @@ export const getSubscriptionProducts = async (): Promise<any[]> => {
 };
 
 /**
- * Purchase a subscription
+ * Fetch one-time (lifetime) non-consumable products.
+ */
+export const getLifetimeProducts = async (): Promise<any[]> => {
+  const iap = await getIAP();
+  if (!iap || !LIFETIME_SKUS.length) return [];
+  try {
+    // Non-consumables use type 'in-app' (not 'subs').
+    const products = await iap.fetchProducts({
+      skus: LIFETIME_SKUS,
+      type: 'in-app',
+    });
+    return products || [];
+  } catch (error) {
+    console.error('[IAP] Failed to fetch lifetime products:', error);
+    return [];
+  }
+};
+
+/**
+ * Purchase a subscription (type 'subs') or a lifetime non-consumable
+ * (type 'in-app'). Defaults to 'subs' for backward compatibility.
  */
 export const purchaseSubscription = async (
-  productId: string
+  productId: string,
+  productType: 'subs' | 'in-app' = 'subs'
 ): Promise<any | null> => {
   const iap = await getIAP();
   if (!iap) {
@@ -230,7 +260,7 @@ export const purchaseSubscription = async (
         apple: { sku: productId },
         google: { skus: [productId] },
       },
-      type: 'subs', // subscription purchase
+      type: productType, // 'subs' for subscriptions, 'in-app' for lifetime
     })
       .then((result) => {
         console.log('[IAP] requestPurchase returned:', result);

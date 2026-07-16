@@ -28,6 +28,7 @@ import { apiClient } from '../src/services/api';
 import {
   initializeIAP,
   getSubscriptionProducts,
+  getLifetimeProducts,
   purchaseSubscription,
   validateReceiptWithBackend,
   restorePurchases,
@@ -56,6 +57,7 @@ export default function SubscriptionScreen() {
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
+  const [lifetimeProducts, setLifetimeProducts] = useState<any[]>([]);
   const [iapAvailable, setIapAvailable] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [revoking, setRevoking] = useState(false);
@@ -138,6 +140,13 @@ export default function SubscriptionScreen() {
       await initializeIAP();
       const availableProducts = await getSubscriptionProducts();
       setProducts(availableProducts);
+      // Lifetime (one-time) products are fetched separately (type 'in-app').
+      // Non-fatal: subscriptions still render if this fails.
+      try {
+        setLifetimeProducts(await getLifetimeProducts());
+      } catch {
+        setLifetimeProducts([]);
+      }
       setProductsLoaded(true);
       return availableProducts;
     } catch (error: any) {
@@ -147,7 +156,10 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const handlePurchase = async (productId: string) => {
+  const handlePurchase = async (
+    productId: string,
+    productType: 'subs' | 'in-app' = 'subs',
+  ) => {
     if (!token) {
       Alert.alert('Error', 'You must be logged in to purchase');
       return;
@@ -156,7 +168,7 @@ export default function SubscriptionScreen() {
     setPurchasing(true);
 
     try {
-      const purchase = await purchaseSubscription(productId);
+      const purchase = await purchaseSubscription(productId, productType);
 
       if (!purchase) {
         // User cancelled
@@ -520,6 +532,15 @@ export default function SubscriptionScreen() {
       color: 'white',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
+    },
+    lifetimeHeading: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: 'rgba(255,255,255,0.85)',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginTop: 8,
+      marginBottom: 8,
     },
     purchaseButton: {
       backgroundColor: 'white',
@@ -892,6 +913,46 @@ export default function SubscriptionScreen() {
                     Loading subscription options...
                   </Text>
                 </View>
+              )}
+
+              {/* Lifetime (one-time) options — Premium Lifetime + All-Access
+                  Lifetime. Non-consumable 'in-app' products, purchased via the
+                  same flow with type 'in-app'. */}
+              {lifetimeProducts.length > 0 && (
+                <>
+                  <Text style={styles.lifetimeHeading}>One-time purchase</Text>
+                  {lifetimeProducts.map((product) => (
+                    <View key={productSku(product)} style={styles.productCard}>
+                      <View style={styles.productHeader}>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <Text style={styles.productName}>
+                              {isAllAccessProduct(product) ? 'All-Access' : 'Premium'} Lifetime
+                            </Text>
+                            {isAllAccessProduct(product) && (
+                              <View style={styles.allAccessBadge}>
+                                <Text style={styles.allAccessBadgeText}>Both apps</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.productPeriod}>Pay once, yours forever</Text>
+                        </View>
+                        <Text style={styles.productPrice}>{formatPrice(product)}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.purchaseButton, purchasing && styles.purchaseButtonDisabled]}
+                        onPress={() => handlePurchase(productSku(product), 'in-app')}
+                        disabled={purchasing || restoring}
+                      >
+                        {purchasing ? (
+                          <ActivityIndicator color={colors.primary} />
+                        ) : (
+                          <Text style={styles.purchaseButtonText}>Buy Lifetime</Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </>
               )}
 
               {/* Restore Purchases Button - Required by Apple & Google */}
