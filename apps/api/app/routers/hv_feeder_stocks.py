@@ -25,6 +25,7 @@ from app.schemas.hv_feeder import (
     HvFeederStockListItem, HvFeederLogCreate, HvFeederLogResponse,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.limits import enforce_hv_premium
 
 router = APIRouter()
 
@@ -104,9 +105,9 @@ async def create_stock(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # PREMIUM HOOK (ADR-012): when HV subscriptions are live, enforce here:
-    #   from app.utils.limits import enforce_hv_premium
-    #   enforce_hv_premium(current_user)   # 402 → UpgradeModal for free keepers
+    # PREMIUM (ADR-012): feeder tracking is an HV-premium feature. Free keepers
+    # get a 402 → UpgradeModal; premium (HV or bundle) keepers pass through.
+    enforce_hv_premium(current_user, feature="Feeder tracking")
     _validate_species(db, payload.hv_feeder_species_id)
     stock = HvFeederStock(user_id=current_user.id, **payload.model_dump())
     db.add(stock)

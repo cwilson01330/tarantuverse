@@ -124,3 +124,26 @@ def enforce_animal_limit(db: Session, user: User) -> None:
                 "is_premium": False,
             },
         )
+
+
+def enforce_hv_premium(user: User, feature: str = "This") -> None:
+    """Raise HTTP 402 unless the user has an active Herpetoverse entitlement.
+
+    Gates HV-premium *features* (feeder tracking, breeding) as opposed to the
+    per-animal cap. Entitlement is APP-SCOPED — a Herpetoverse or 'both' bundle
+    subscription unlocks it; a Tarantuverse-only subscriber does not. The 402
+    detail shape matches enforce_animal_limit so the same UpgradeModal handles it.
+    """
+    if user.is_premium_for_app("herpetoverse"):
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+        detail={
+            "message": (
+                f"{feature} is a Herpetoverse premium feature. "
+                f"Upgrade to unlock it!"
+            ),
+            "is_premium": False,
+        },
+    )

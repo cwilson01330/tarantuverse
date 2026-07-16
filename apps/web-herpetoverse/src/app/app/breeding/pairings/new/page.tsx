@@ -17,6 +17,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
+import UpgradeModal from '@/components/UpgradeModal'
 import {
   type CreatePairingPayload,
   type ReptilePairingType,
@@ -100,6 +101,8 @@ export default function NewPairingPage() {
 
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  // Breeding is HV-premium (402) → upgrade modal instead of an inline error.
+  const [capInfo, setCapInfo] = useState<{ message: string | null } | null>(null)
 
   // Load the keeper's whole collection once; the taxon picker then scopes
   // the parent dropdowns in-memory (ADR-011 — any group can be paired).
@@ -233,11 +236,16 @@ export default function NewPairingPage() {
       const created = await createPairing(payload)
       router.push(`/app/breeding/pairings/${created.id}`)
     } catch (err) {
-      setSubmitError(
-        err instanceof ApiError
-          ? err.message
-          : "Couldn't save this pairing.",
-      )
+      if (err instanceof ApiError && err.status === 402) {
+        const detail = (err.body as { detail?: { message?: unknown } } | null)?.detail
+        setCapInfo({ message: typeof detail?.message === 'string' ? detail.message : null })
+      } else {
+        setSubmitError(
+          err instanceof ApiError
+            ? err.message
+            : "Couldn't save this pairing.",
+        )
+      }
     } finally {
       setSubmitting(false)
     }
@@ -414,6 +422,12 @@ export default function NewPairingPage() {
           </Link>
         </div>
       </form>
+
+      <UpgradeModal
+        isOpen={capInfo !== null}
+        onClose={() => setCapInfo(null)}
+        message={capInfo?.message}
+      />
     </article>
   )
 }

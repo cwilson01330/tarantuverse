@@ -48,6 +48,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppHeader } from '../../../src/components/AppHeader';
 import { HeaderBackButton } from '../../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
+import UpgradeModal from '../../../src/components/UpgradeModal';
 import {
   ChipGroup,
   Field,
@@ -153,6 +154,9 @@ function NewPairingScreen() {
 
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Breeding is HV-premium: a 402 opens the upgrade modal.
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [capMessage, setCapMessage] = useState<string | null>(null);
 
   // Modal state for parent pickers.
   const [pickerOpen, setPickerOpen] = useState<'male' | 'female' | null>(
@@ -297,6 +301,15 @@ function NewPairingScreen() {
       // than the now-stale empty form.
       router.replace(`/breeding/pairings/${created.id}` as never);
     } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 402) {
+        const detail = (err as { response?: { data?: { detail?: { message?: string } } } })
+          ?.response?.data?.detail;
+        setCapMessage(detail?.message ?? null);
+        setShowUpgrade(true);
+        setSubmitting(false);
+        return;
+      }
       setSubmitError(extractErrorMessage(err, "Couldn't save this pairing."));
       setSubmitting(false);
     }
@@ -559,6 +572,15 @@ function NewPairingScreen() {
           />
         );
       })()}
+
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        message={
+          capMessage ??
+          'Breeding tracking is a Herpetoverse premium feature. Upgrade to unlock it.'
+        }
+      />
     </SafeAreaView>
   );
 }

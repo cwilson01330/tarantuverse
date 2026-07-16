@@ -33,6 +33,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import { HeaderBackButton } from '../../src/components/HeaderBackButton';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
+import UpgradeModal from '../../src/components/UpgradeModal';
 import {
   ChipGroup,
   Field,
@@ -99,6 +100,9 @@ function AddFeederScreen() {
   const [loadingEdit, setLoadingEdit] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Feeder tracking is HV-premium: a 402 opens the upgrade modal.
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [capMessage, setCapMessage] = useState<string | null>(null);
 
   // Species search
   const [speciesQuery, setSpeciesQuery] = useState('');
@@ -297,6 +301,15 @@ function AddFeederScreen() {
       syncLowStockReminder(saved.id, saved.name, saved.is_low_stock);
       router.replace('/feeders' as never);
     } catch (e) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 402) {
+        const detail = (e as { response?: { data?: { detail?: { message?: string } } } })
+          ?.response?.data?.detail;
+        setCapMessage(detail?.message ?? null);
+        setShowUpgrade(true);
+        setSubmitting(false);
+        return;
+      }
       setError(extractErrorMessage(e, 'Could not save this feeder stock.'));
       setSubmitting(false);
     }
@@ -618,6 +631,15 @@ function AddFeederScreen() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        message={
+          capMessage ??
+          'Feeder tracking is a Herpetoverse premium feature. Upgrade to unlock it.'
+        }
+      />
     </SafeAreaView>
   );
 }

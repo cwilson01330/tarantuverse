@@ -25,6 +25,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { ApiError } from '@/lib/apiClient'
+import UpgradeModal from '@/components/UpgradeModal'
 import {
   type CreateFeederStockPayload,
   type FeederForm,
@@ -114,6 +115,8 @@ export default function FeederStockForm({
   const [form, setForm] = useState<FormState>(() => initialFromStock(stock))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // HV-premium gate (HTTP 402) → upgrade modal instead of an inline error.
+  const [capInfo, setCapInfo] = useState<{ message: string | null } | null>(null)
 
   // Catalog for the species picker. Loaded once; lightweight (<=200 rows).
   const [catalog, setCatalog] = useState<FeederSpecies[]>([])
@@ -326,11 +329,18 @@ export default function FeederStockForm({
         router.push(`/app/feeders/${created.id}`)
       }
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message || 'Could not save. Please try again.'
-          : 'Could not save. Check your connection and try again.',
-      )
+      if (err instanceof ApiError && err.status === 402) {
+        // Feeder tracking is HV-premium. The 402 body is
+        // { detail: { message, is_premium } }; open the upgrade modal.
+        const detail = (err.body as { detail?: { message?: unknown } } | null)?.detail
+        setCapInfo({ message: typeof detail?.message === 'string' ? detail.message : null })
+      } else {
+        setError(
+          err instanceof ApiError
+            ? err.message || 'Could not save. Please try again.'
+            : 'Could not save. Check your connection and try again.',
+        )
+      }
       setSubmitting(false)
     }
   }
@@ -624,6 +634,12 @@ export default function FeederStockForm({
           </button>
         </div>
       </form>
+
+      <UpgradeModal
+        isOpen={capInfo !== null}
+        onClose={() => setCapInfo(null)}
+        message={capInfo?.message}
+      />
     </div>
   )
 }

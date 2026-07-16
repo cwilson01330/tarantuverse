@@ -14,8 +14,9 @@
  * the backend owns the arithmetic and floors buckets at 0, so we never
  * do count math on the client.
  *
- * Feeder keeping is planned HV-premium but the backend gate is OFF for
- * now (testable), so there's deliberately no paywall/UpgradeModal here.
+ * Feeder keeping is HV-premium: the backend gates stock creation (402), and
+ * the add-stock form (FeederStockForm) surfaces the UpgradeModal. This
+ * list/quick-log view stays open so premium keepers manage existing stock.
  *
  * Theme: herp-* + neutral-* tokens, matching /app/reptiles and
  * /app/feeding-day.

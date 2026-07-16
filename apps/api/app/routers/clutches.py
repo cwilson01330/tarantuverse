@@ -33,6 +33,7 @@ from app.schemas.reptile_breeding import (
     ParentGenotypeBundle,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.limits import enforce_hv_premium
 
 router = APIRouter()
 
@@ -133,6 +134,7 @@ async def create_clutch(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    enforce_hv_premium(current_user, feature="Breeding tracking")
     pairing = _own_pairing_or_404(payload.pairing_id, current_user.id, db)
     data = payload.model_dump()
     # JSON-serialize candle_log entries — Pydantic gives us model

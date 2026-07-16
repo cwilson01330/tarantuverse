@@ -30,6 +30,7 @@ from app.schemas.reptile_breeding import (
     ReptileOffspringUpdate,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.limits import enforce_hv_premium
 
 router = APIRouter()
 
@@ -113,6 +114,7 @@ async def create_offspring(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    enforce_hv_premium(current_user, feature="Breeding tracking")
     _own_clutch_or_404(payload.clutch_id, current_user.id, db)
     _resolve_link(payload, current_user.id, db)
 

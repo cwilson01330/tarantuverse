@@ -35,6 +35,7 @@ from app.schemas.reptile_breeding import (
     ReptilePairingUpdate,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.limits import enforce_hv_premium
 
 router = APIRouter()
 
@@ -164,6 +165,8 @@ async def create_pairing(
     and match the declared taxon; sex is checked against male/female
     slots (unknown-sex is allowed for both, since not every animal is
     sexed before pairing decisions are made)."""
+    # Breeding is an HV-premium feature — free keepers get a 402 → UpgradeModal.
+    enforce_hv_premium(current_user, feature="Breeding tracking")
     if payload.male_id == payload.female_id:
         raise HTTPException(
             status_code=400,
