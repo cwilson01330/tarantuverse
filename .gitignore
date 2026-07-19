@@ -17,6 +17,15 @@ __pycache__/
 
 # Secrets — private keys must never be committed
 *.p8
+# Android signing keystores (contain the private upload/signing key).
+# Losing OR leaking these is unrecoverable-ish: a leak means requesting another
+# Play upload-key reset. Keep them OUTSIDE the repo + in a password manager.
+*.jks
+*.keystore
+*.p12
+# Exported upload certificates are public, but there's no reason to commit them.
+upload_certificate.pem
+tv_upload_cert.pem
 
 # Environment variables
 .env
