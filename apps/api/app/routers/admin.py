@@ -6,6 +6,8 @@ from app.models.user import User
 from app.models.species import Species
 from app.models.invert_species import InvertSpecies
 from app.models.invert import Invert
+from app.models.animal import Animal
+from app.models.colony import Colony
 from app.models.subscription import UserSubscription, SubscriptionPlan
 from app.models.content_report import ContentReport
 from app.utils.subscription import active_subscription_clause
@@ -94,13 +96,34 @@ async def list_users(
     # Per-user kept-invert counts — one grouped query (no N+1), scoped to this
     # page, excluding transferred-out animals so it reflects what each user is
     # currently keeping.
+    # Counted per surface so an admin can tell a genuinely-empty account from a
+    # keeper who simply keeps a different kind of animal. Counting only inverts
+    # made Herpetoverse-only and colony-only keepers look like empty accounts.
     user_ids = [u.id for u in users]
     counts: dict = {}
+    animal_counts: dict = {}
+    colony_counts: dict = {}
     if user_ids:
         counts = dict(
             db.query(Invert.user_id, func.count(Invert.id))
             .filter(Invert.user_id.in_(user_ids), Invert.transferred_out_at.is_(None))
             .group_by(Invert.user_id)
+            .all()
+        )
+        animal_counts = dict(
+            db.query(Animal.user_id, func.count(Animal.id))
+            .filter(Animal.user_id.in_(user_ids), Animal.transferred_out_at.is_(None))
+            .group_by(Animal.user_id)
+            .all()
+        )
+        colony_counts = dict(
+            db.query(Colony.user_id, func.count(Colony.id))
+            .filter(
+                Colony.user_id.in_(user_ids),
+                Colony.transferred_out_at.is_(None),
+                Colony.is_active.is_(True),
+            )
+            .group_by(Colony.user_id)
             .all()
         )
 
@@ -111,7 +134,14 @@ async def list_users(
         # Check if user has premium subscription
         limits = user.get_subscription_limits()
         user_dict['is_premium'] = limits.get('is_premium', False)
-        user_dict['invert_count'] = counts.get(user.id, 0)
+        invert_n = counts.get(user.id, 0)
+        animal_n = animal_counts.get(user.id, 0)
+        colony_n = colony_counts.get(user.id, 0)
+        user_dict['invert_count'] = invert_n
+        user_dict['animal_count'] = animal_n
+        user_dict['colony_count'] = colony_n
+        # The "is this account actually empty?" number.
+        user_dict['collection_count'] = invert_n + animal_n + colony_n
         result.append(user_dict)
 
     return result

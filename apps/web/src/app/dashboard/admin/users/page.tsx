@@ -31,6 +31,9 @@ interface User {
     is_verified: boolean;
     is_premium?: boolean;
     invert_count?: number;
+    animal_count?: number;      // Herpetoverse
+    colony_count?: number;      // population-tracked colonies
+    collection_count?: number;  // inverts + animals + colonies
     created_at: string;
 }
 
@@ -435,7 +438,9 @@ export default function ManageUsersPage() {
     // Sorted view of the loaded page when the Animals column header is toggled.
     const displayedUsers = animalSort
         ? [...users].sort((a, b) => {
-            const d = (a.invert_count ?? 0) - (b.invert_count ?? 0);
+            const d =
+                (a.collection_count ?? a.invert_count ?? 0) -
+                (b.collection_count ?? b.invert_count ?? 0);
             return animalSort === 'asc' ? d : -d;
         })
         : users;
@@ -647,7 +652,19 @@ export default function ManageUsersPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-sm font-medium tabular-nums">
-                                            <span className="text-gray-700 dark:text-gray-200">{user.invert_count ?? 0}</span>
+                                            {/* Total across ALL surfaces — an HV-only or colony-only
+                                                keeper used to read as 0 here and look like an empty
+                                                account. Cap badge still keys off inverts (TV cap). */}
+                                            <span className="text-gray-700 dark:text-gray-200">
+                                                {user.collection_count ?? user.invert_count ?? 0}
+                                            </span>
+                                            {((user.animal_count ?? 0) > 0 || (user.colony_count ?? 0) > 0) && (
+                                                <span className="ml-2 text-[10px] text-gray-500 dark:text-gray-400">
+                                                    {user.invert_count ?? 0}i
+                                                    {(user.animal_count ?? 0) > 0 ? ` · ${user.animal_count}h` : ''}
+                                                    {(user.colony_count ?? 0) > 0 ? ` · ${user.colony_count}c` : ''}
+                                                </span>
+                                            )}
                                             {!user.is_premium && (user.invert_count ?? 0) >= FREE_ANIMAL_CAP && (
                                                 <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-semibold ${(user.invert_count ?? 0) > FREE_ANIMAL_CAP
                                                     ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
