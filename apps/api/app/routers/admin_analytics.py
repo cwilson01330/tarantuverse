@@ -17,6 +17,9 @@ from typing import Literal
 from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
+from app.models.invert import Invert
+from app.models.animal import Animal
+from app.models.colony import Colony
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.substrate_change import SubstrateChange
@@ -175,8 +178,18 @@ async def get_analytics_overview(
     if total_users > 0:
         subscription_conversion_rate = (total_premium_users / total_users) * 100
 
-    # Platform activity
+    # Platform activity.
+    # Legacy tarantulas-only count, kept for continuity of the historical metric.
     total_tarantulas = db.query(func.count(Tarantula.id)).scalar() or 0
+
+    # Cross-taxon totals. After ADR-005 every Tarantuverse taxon lives in
+    # `inverts` (tarantulas are dual-written there), so total_inverts is the
+    # real TV collection size; `animals` is Herpetoverse; `colonies` are
+    # population-tracked groups that count as one entry each.
+    total_inverts = db.query(func.count(Invert.id)).scalar() or 0
+    total_animals = db.query(func.count(Animal.id)).scalar() or 0
+    total_colonies = db.query(func.count(Colony.id)).scalar() or 0
+    total_collection = total_inverts + total_animals + total_colonies
 
     total_feedings_today = db.query(func.count(FeedingLog.id)).filter(
         FeedingLog.fed_at >= today_start
@@ -212,6 +225,10 @@ async def get_analytics_overview(
         mrr=round(mrr, 2),
         subscription_conversion_rate=round(subscription_conversion_rate, 1),
         total_tarantulas=total_tarantulas,
+        total_inverts=total_inverts,
+        total_animals=total_animals,
+        total_colonies=total_colonies,
+        total_collection=total_collection,
         total_feedings_today=total_feedings_today,
         total_molts_today=total_molts_today,
         total_substrate_changes_today=total_substrate_changes_today,

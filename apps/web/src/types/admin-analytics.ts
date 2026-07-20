@@ -19,7 +19,16 @@ export interface AdminAnalyticsOverview {
   total_premium_users: number;
   mrr: number;
   subscription_conversion_rate: number;
+  /** Legacy `tarantulas` table only — use total_inverts for the real TV count. */
   total_tarantulas: number;
+  /** All Tarantuverse taxa (unified `inverts`, incl. tarantulas). */
+  total_inverts?: number;
+  /** Herpetoverse animals. */
+  total_animals?: number;
+  /** Population-tracked colonies (each counts as one entry). */
+  total_colonies?: number;
+  /** inverts + animals + colonies. */
+  total_collection?: number;
   total_feedings_today: number;
   total_molts_today: number;
   total_substrate_changes_today: number;

@@ -31,7 +31,15 @@ class AdminAnalyticsOverview(BaseModel):
     subscription_conversion_rate: float  # Percentage of users on premium
 
     # Platform activity
+    # NOTE: total_tarantulas counts ONLY the legacy `tarantulas` table. After the
+    # ADR-005 consolidation every TV taxon lives in `inverts` (tarantulas are
+    # dual-written there too), so total_inverts is the real Tarantuverse number.
+    # Defaults keep older clients working if the API ships before the UI.
     total_tarantulas: int
+    total_inverts: int = 0      # all TV taxa (incl. tarantulas)
+    total_animals: int = 0      # Herpetoverse animals
+    total_colonies: int = 0     # population-tracked colonies
+    total_collection: int = 0   # inverts + animals + colonies
     total_feedings_today: int
     total_molts_today: int
     total_substrate_changes_today: int
