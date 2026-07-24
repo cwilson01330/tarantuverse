@@ -1,0 +1,82 @@
+{
+  "project_info": {
+    "project_number": "793166570390",
+    "project_id": "herpetoverse",
+    "storage_bucket": "herpetoverse.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:793166570390:android:22f03fa70e11cfe79fb3b7",
+        "android_client_info": {
+          "package_name": "com.herpetoverse.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "793166570390-n2f9iva2juljc6mcpdccqguttd5ibb54.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7jU_vJ6ThNnsX0MKmell19Qnguc7Zjgo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "793166570390-n2f9iva2juljc6mcpdccqguttd5ibb54.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "793166570390-l672evlsoecq3qklhor3puuqrc28vj5m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.herpetoverse.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:793166570390:android:a14c41c8d3f19cd09fb3b7",
+        "android_client_info": {
+          "package_name": "com.tarantuverse.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "793166570390-n2f9iva2juljc6mcpdccqguttd5ibb54.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7jU_vJ6ThNnsX0MKmell19Qnguc7Zjgo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "793166570390-n2f9iva2juljc6mcpdccqguttd5ibb54.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "793166570390-l672evlsoecq3qklhor3puuqrc28vj5m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.herpetoverse.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
