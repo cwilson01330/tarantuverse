@@ -111,6 +111,14 @@ export const CALCULATOR_SPECIES: CalculatorSpecies[] = [
     common_name: 'Ball python',
     note: 'Most comprehensive catalog — 30+ genes seeded.',
   },
+  {
+    scientific_name: 'Eublepharis macularius',
+    common_name: 'Leopard gecko',
+    note:
+      'Single-locus genes only. The three albino strains (Tremper, Bell, ' +
+      'Rainwater) are separate genes and do not combine. Line-bred traits ' +
+      'like tangerine and hypo are not predictable and are excluded.',
+  },
 ];
 
 // ---------------------------------------------------------------------------
