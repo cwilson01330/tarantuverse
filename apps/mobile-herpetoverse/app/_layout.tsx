@@ -51,9 +51,18 @@ function RootLayoutContent() {
   // Open the store connection + purchase listeners once at launch (no-op in
   // Expo Go). Tear down on unmount. Products are fetched lazily by the paywall.
   useEffect(() => {
-    initializeIAP();
+    // Never let store setup reject into the void: an unhandled rejection during
+    // startup is what expo-updates' ErrorRecovery interprets as a failed bundle
+    // load, and it aborts the process. Purchases are optional; launching isn't.
+    initializeIAP().catch((e) => {
+      console.warn('[HV] IAP init skipped:', e);
+    });
     return () => {
-      endIAP();
+      try {
+        endIAP();
+      } catch {
+        /* teardown must never break unmount */
+      }
     };
   }, []);
 

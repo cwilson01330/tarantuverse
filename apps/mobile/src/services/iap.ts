@@ -16,13 +16,31 @@ console.log('[IAP] Environment check:', {
 // Lazy load expo-iap only when not in Expo Go
 let ExpoIAP: typeof import('expo-iap') | null = null;
 
+// Tracks a failed load so we don't retry (and re-log) on every call.
+let iapLoadFailed = false;
+
 const getIAP = async () => {
   if (isExpoGo) {
     console.log('[IAP] Running in Expo Go - IAP not available');
     return null;
   }
+  if (iapLoadFailed) return null;
   if (!ExpoIAP) {
-    ExpoIAP = await import('expo-iap');
+    try {
+      ExpoIAP = await import('expo-iap');
+    } catch (e) {
+      // expo-iap is NATIVE. An OTA can only swap JS, so this bundle can land on
+      // a binary built before expo-iap was linked, and the import throws. Left
+      // unhandled, expo-updates' ErrorRecovery treats it as a failed bundle load
+      // and SIGABRTs the app at launch. Degrade to "no store" instead.
+      iapLoadFailed = true;
+      console.warn(
+        '[IAP] expo-iap native module unavailable in this binary — ' +
+        'purchases disabled until the app is rebuilt.',
+        e,
+      );
+      return null;
+    }
   }
   return ExpoIAP;
 };

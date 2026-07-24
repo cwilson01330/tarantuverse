@@ -23,9 +23,31 @@ const isExpoGo =
   Constants.appOwnership === 'expo';
 
 let ExpoIAP: typeof import('expo-iap') | null = null;
+// Tracks a failed load so we don't retry (and re-log) on every call.
+let iapLoadFailed = false;
+
 const getIAP = async () => {
-  if (isExpoGo) return null;
-  if (!ExpoIAP) ExpoIAP = await import('expo-iap');
+  if (isExpoGo || iapLoadFailed) return null;
+  if (!ExpoIAP) {
+    try {
+      ExpoIAP = await import('expo-iap');
+    } catch (e) {
+      // CRITICAL: expo-iap is a NATIVE module. An OTA update can only swap JS,
+      // so a JS bundle that imports it can land on a binary that was built
+      // before expo-iap was linked — and this import then throws. Previously
+      // that rejection escaped to the top level, which expo-updates treats as a
+      // failed bundle load: ErrorRecovery exhausts its options and SIGABRTs the
+      // app ~200ms into launch (crash observed on TestFlight 0.1.0(9)).
+      // Degrading to "no store available" keeps the app usable instead.
+      iapLoadFailed = true;
+      console.warn(
+        '[HV IAP] expo-iap native module unavailable — this build predates it. ' +
+        'Purchases disabled until the app is rebuilt.',
+        e,
+      );
+      return null;
+    }
+  }
   return ExpoIAP;
 };
 
