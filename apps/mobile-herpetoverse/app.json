@@ -83,7 +83,7 @@
       }
     },
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "fingerprint"
     },
     "owner": "gwizard202",
     "updates": {
