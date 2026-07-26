@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import GoogleLogo from '../src/components/GoogleLogo';
 import { useAuth } from '../src/contexts/AuthContext';
@@ -254,30 +254,27 @@ export default function LoginScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
-              {/* NOTE: this SHOULD be AppleAuthentication.AppleAuthenticationButton
-                  (Guideline 4.8 / the HIG want the system-rendered control).
-                  It can't be yet: the shipping iOS binary doesn't register the
-                  ExpoAppleAuthentication *view manager*, so rendering it throws
-                  "View config getter callback ... must be a function" and takes
-                  out the screen. OTA updates swap JS only — they cannot add a
-                  native view. Swap this for the native button in the SAME change
-                  that cuts the next native build, not before. */}
-              {appleAvailable && (
-                <TouchableOpacity
+              {/* Apple's NATIVE button — Guideline 4.8 / the HIG require the
+                  system-rendered control, not a lookalike.
+
+                  This renders a native VIEW, so it only works in a binary that
+                  registers the ExpoAppleAuthentication view manager. Build 16
+                  did not, which is why an earlier OTA attempt crashed the
+                  screen. It is being restored HERE, in the same change that
+                  cuts a fresh native build, and runtimeVersion is bumped to
+                  1.1.0 so this JS can never reach build 16. */}
+              {appleAvailable && Platform.OS === 'ios' && (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={
+                    AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+                  }
+                  buttonStyle={
+                    AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  }
+                  cornerRadius={layout.radius.md}
+                  style={styles.appleButton}
                   onPress={() => handleOAuth('apple')}
-                  disabled={submitting}
-                  style={[
-                    styles.socialButton,
-                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue with Apple"
-                >
-                  <MaterialCommunityIcons name="apple" size={20} color={colors.textPrimary} />
-                  <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
-                    Continue with Apple
-                  </Text>
-                </TouchableOpacity>
+                />
               )}
             </View>
           )}

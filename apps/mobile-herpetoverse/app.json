@@ -2,7 +2,7 @@
   "expo": {
     "name": "Herpetoverse",
     "slug": "herpetoverse",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -82,7 +82,7 @@
         "projectId": "8f745ac0-847d-4a69-93b3-a3a31970d616"
       }
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "owner": "gwizard202",
     "updates": {
       "url": "https://u.expo.dev/8f745ac0-847d-4a69-93b3-a3a31970d616"

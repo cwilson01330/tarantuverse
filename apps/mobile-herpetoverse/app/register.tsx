@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -19,6 +20,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import GoogleLogo from '../src/components/GoogleLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -40,6 +42,8 @@ export default function RegisterScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Guideline 1.2 — must be ticked before the account can be created.
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -207,14 +211,65 @@ export default function RegisterScreen() {
                 </View>
               )}
 
+              {/* Explicit agreement before account creation. Apple expects
+                  apps carrying user-submitted content (species submissions,
+                  public keeper profiles) to surface terms and a zero-tolerance
+                  statement at sign-up — Guideline 1.2. Mirrors Tarantuverse,
+                  which links to an in-app /terms screen; HV has no such screen
+                  yet, so these open the hosted pages. */}
+              <TouchableOpacity
+                onPress={() => setAgreedToTerms((v) => !v)}
+                disabled={submitting}
+                style={styles.termsRow}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: agreedToTerms }}
+                accessibilityLabel="Agree to the Terms of Use and Privacy Policy"
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    {
+                      borderColor: agreedToTerms ? colors.primary : colors.border,
+                      backgroundColor: agreedToTerms ? colors.primary : 'transparent',
+                    },
+                  ]}
+                >
+                  {agreedToTerms && (
+                    <MaterialCommunityIcons name="check" size={14} color="#0B0B0B" />
+                  )}
+                </View>
+                <Text style={[styles.termsText, { color: colors.textSecondary }]}>
+                  I agree to the{' '}
+                  <Text
+                    style={[styles.termsLink, { color: colors.primary }]}
+                    onPress={() => Linking.openURL('https://herpetoverse.com/terms')}
+                  >
+                    Terms of Use
+                  </Text>{' '}
+                  and{' '}
+                  <Text
+                    style={[styles.termsLink, { color: colors.primary }]}
+                    onPress={() =>
+                      Linking.openURL('https://herpetoverse.com/privacy-policy')
+                    }
+                  >
+                    Privacy Policy
+                  </Text>
+                  . I understand there is zero tolerance for objectionable content
+                  or abusive behaviour.
+                </Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 onPress={handleSubmit}
-                disabled={submitting || !email || !username || !password}
+                disabled={
+                  submitting || !email || !username || !password || !agreedToTerms
+                }
                 style={[
                   styles.primaryButton,
                   {
                     backgroundColor:
-                      submitting || !email || !username || !password
+                      submitting || !email || !username || !password || !agreedToTerms
                         ? colors.surfaceRaised
                         : colors.primary,
                     borderRadius: layout.radius.md,
@@ -276,25 +331,20 @@ export default function RegisterScreen() {
                       </Text>
                     </TouchableOpacity>
                   )}
-                  {/* See login.tsx: the native Apple button can't ship over
-                      OTA because this binary lacks the ExpoAppleAuthentication
-                      view manager. Restore it alongside the next native build. */}
-                  {appleAvailable && (
-                    <TouchableOpacity
+                  {/* Apple's native control — see login.tsx. Requires the
+                      view manager present from build 17 onward. */}
+                  {appleAvailable && Platform.OS === 'ios' && (
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={
+                        AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                      }
+                      buttonStyle={
+                        AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                      }
+                      cornerRadius={layout.radius.md}
+                      style={styles.appleButton}
                       onPress={() => handleOAuth('apple')}
-                      disabled={submitting}
-                      style={[
-                        styles.socialButton,
-                        { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel="Continue with Apple"
-                    >
-                      <MaterialCommunityIcons name="apple" size={20} color={colors.textPrimary} />
-                      <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
-                        Continue with Apple
-                      </Text>
-                    </TouchableOpacity>
+                    />
                   )}
                 </View>
               )}
@@ -354,6 +404,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  termsText: { flex: 1, fontSize: 12, lineHeight: 18 },
+  termsLink: { fontWeight: '700', textDecorationLine: 'underline' },
   primaryButtonText: {
     color: '#0B0B0B',
     fontSize: 16,
