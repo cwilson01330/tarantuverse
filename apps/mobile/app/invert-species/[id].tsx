@@ -18,6 +18,17 @@ import { getInvertSpecies, FEEDING_MODE_LABELS, type InvertSpecies } from '../..
 const VENOM_LABELS: Record<string, string> = { mild: 'Mild', moderate: 'Moderate', medically_significant: 'Medically significant' };
 const CARE_LABELS: Record<string, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
 
+// Taxon-honest copy for the green "harmless" safety callout (matches web).
+const HARMLESS_COPY: Record<string, { title: string; body: string }> = {
+  whip_spider: { title: 'No venom, no sting', body: "Whip spiders (amblypygids) are completely harmless to humans. They're fast and can deliver a harmless pinch with their pedipalps, but have no venom and no sting." },
+  vinegaroon: { title: 'No venom, no sting', body: 'Vinegaroons are harmless to humans — no venom and no sting. If threatened they can spray a fine acetic-acid mist (it smells like vinegar) and give a firm pinch, but neither is dangerous. Avoid getting the spray in your eyes.' },
+  mantis: { title: 'No venom, no sting', body: 'Mantises are harmless to humans. They have no venom or sting — the worst they can do is grip with their spined forelegs or deliver a startling but harmless nip.' },
+  millipede: { title: 'No venom, no sting', body: "Millipedes don't bite or sting and have no venom. Many do secrete defensive chemicals when stressed, so wash your hands after handling and keep them away from your eyes and mouth." },
+  roach: { title: 'No venom, no sting', body: 'Pet and feeder roaches are harmless to humans — no venom, no sting, and no meaningful bite. Wash your hands after handling.' },
+  true_spider: { title: 'Not medically significant', body: 'Like all spiders, this species has venom, but it is not considered medically significant to humans. Bites are uncommon and, at worst, comparable to a bee sting for most people. Handle minimally.' },
+};
+const DEFAULT_HARMLESS = { title: 'No medically significant venom', body: 'This species is not considered dangerous to humans. Always research individual care before keeping.' };
+
 function InvertSpeciesCareSheetScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -63,8 +74,8 @@ function InvertSpeciesCareSheetScreen() {
 
         {harmless ? (
           <View style={[styles.callout, { backgroundColor: '#dcfce7', borderLeftColor: '#166534' }]}>
-            <Text style={[styles.calloutTitle, { color: '#166534' }]}>No medically significant venom</Text>
-            <Text style={[styles.calloutBody, { color: '#166534' }]}>This species is not considered dangerous to humans. Always research individual care before keeping.</Text>
+            <Text style={[styles.calloutTitle, { color: '#166534' }]}>{(HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS).title}</Text>
+            <Text style={[styles.calloutBody, { color: '#166534' }]}>{(HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS).body}</Text>
           </View>
         ) : (species.venom_notes || species.venom_severity === 'medically_significant') ? (
           <View style={[styles.callout, { backgroundColor: '#fee2e2', borderLeftColor: '#991b1b' }]}>

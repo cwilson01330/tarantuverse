@@ -59,9 +59,17 @@ class Settings(BaseSettings):
     # Stripe Payments
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRICE_MONTHLY: str = ""  # price_xxx from Stripe Dashboard
-    STRIPE_PRICE_YEARLY: str = ""   # price_xxx from Stripe Dashboard
-    STRIPE_PRICE_LIFETIME: str = "" # price_xxx from Stripe Dashboard (one-time)
+    STRIPE_PRICE_MONTHLY: str = ""  # TV premium — price_xxx from Stripe Dashboard
+    STRIPE_PRICE_YEARLY: str = ""   # TV premium — price_xxx from Stripe Dashboard
+    STRIPE_PRICE_LIFETIME: str = "" # TV premium — price_xxx from Stripe Dashboard (one-time)
+    # Herpetoverse premium (app-scoped 'herpetoverse')
+    STRIPE_PRICE_HV_MONTHLY: str = ""
+    STRIPE_PRICE_HV_YEARLY: str = ""
+    STRIPE_PRICE_HV_LIFETIME: str = ""
+    # All-Access bundle (app-scoped 'both' — unlocks TV + HV)
+    STRIPE_PRICE_BUNDLE_MONTHLY: str = ""
+    STRIPE_PRICE_BUNDLE_YEARLY: str = ""
+    STRIPE_PRICE_BUNDLE_LIFETIME: str = ""
 
     # Apple App Store Server Notifications (V2)
     APPLE_BUNDLE_ID: str = "com.tarantuverse.app"
