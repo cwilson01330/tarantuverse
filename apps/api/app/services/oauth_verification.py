@@ -126,37 +126,59 @@ def _decode_with_jwks(
     if key is None:
         raise OAuthVerificationError("Identity token signed with an unknown key")
 
-    last_error: Optional[Exception] = None
-    for audience in audiences:
-        try:
-            return jwt.decode(
-                token,
-                key,
-                algorithms=["RS256"],
-                audience=audience,
-                issuer=issuers[0] if len(issuers) == 1 else None,
-                options={"verify_iss": len(issuers) == 1},
-            )
-        except JWTError as exc:
-            last_error = exc
-            continue
-
-    # Include the token's OWN aud/iss in the error. These are public client
-    # identifiers (they ship inside every app bundle), not secrets — and
-    # without them an "Invalid audience" failure gives no way to tell which
-    # client id is missing from the allowlist short of guessing.
+    # Verify signature + expiry ONCE, with audience checking disabled, then
+    # compare `aud` against the allowlist ourselves.
+    #
+    # The earlier version looped over each configured audience and kept only
+    # the LAST exception. Since the final entry rarely matches, every failure
+    # — expired, bad signature, anything — got reported as "Invalid audience",
+    # which sent us chasing a config problem that didn't exist. Verify once,
+    # report the actual reason.
     try:
-        unverified = jwt.get_unverified_claims(token)
-        token_aud = unverified.get("aud")
-        token_iss = unverified.get("iss")
-    except Exception:
-        token_aud = token_iss = "<unreadable>"
+        claims = jwt.decode(
+            token,
+            key,
+            algorithms=["RS256"],
+            options={
+                "verify_aud": False,
+                "verify_iss": False,
+                # Native Google/Apple SDKs mint an access token alongside the
+                # ID token, so the ID token carries an `at_hash`. python-jose
+                # then DEMANDS the access token to compare against and raises
+                # "No access_token provided to compare against at_hash claim"
+                # — even though the signature is perfectly valid. at_hash only
+                # binds an ID token to a specific access token; we don't use
+                # the access token at all, so the check is meaningless here.
+                # This is why web sign-in worked (GIS credentials carry no
+                # at_hash) while both mobile apps failed.
+                "verify_at_hash": False,
+            },
+        )
+    except JWTError as exc:
+        raise OAuthVerificationError(
+            f"Identity token signature/expiry check failed: {exc}"
+        ) from exc
 
-    raise OAuthVerificationError(
-        f"Identity token failed verification: {last_error}. "
-        f"Token aud={token_aud!r} iss={token_iss!r}; "
-        f"configured audiences={audiences!r}"
-    )
+    # Issuer is checked HERE now that jose's own check is disabled above.
+    # (Google publishes two spellings, which is why jose's single-issuer
+    # option never fit.) Dropping this would let a token from any provider
+    # whose key we happened to fetch through — check it explicitly.
+    token_iss = claims.get("iss")
+    if token_iss not in issuers:
+        raise OAuthVerificationError(
+            f"Unexpected issuer: {token_iss!r} (expected one of {issuers})"
+        )
+
+    # `aud` is normally a string but the spec allows a list.
+    raw_aud = claims.get("aud")
+    token_auds = raw_aud if isinstance(raw_aud, list) else [raw_aud]
+    if not any(a in audiences for a in token_auds):
+        raise OAuthVerificationError(
+            f"Identity token audience not recognised. "
+            f"Token aud={raw_aud!r}; configured audiences={audiences!r}"
+        )
+
+    return claims
 
 
 def verify_google_id_token(id_token: str) -> Dict[str, Any]:
