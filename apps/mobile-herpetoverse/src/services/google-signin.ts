@@ -82,12 +82,16 @@ export async function signInWithGoogle(): Promise<OAuthResult> {
   try {
     await GoogleSignin.hasPlayServices();
     const userInfo = await GoogleSignin.signIn();
+    // Send the RAW signed ID token — the backend verifies it against Google's
+    // JWKS and derives the identity itself. Never send client-asserted
+    // email/id: the endpoint is public, so asserted claims are forgeable.
+    const idToken = userInfo.data?.idToken;
+    if (!idToken) {
+      throw new Error('Google did not return an ID token. Please try again.');
+    }
     return await exchangeWithBackend({
       provider: 'google',
-      email: userInfo.data?.user?.email,
-      name: userInfo.data?.user?.name,
-      picture: userInfo.data?.user?.photo,
-      id: userInfo.data?.user?.id,
+      id_token: idToken,
     });
   } catch (error) {
     try {
@@ -115,12 +119,17 @@ export async function signInWithApple(): Promise<OAuthResult> {
   if (credential.fullName) {
     name = `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim();
   }
+  if (!credential.identityToken) {
+    throw new Error('Apple did not return an identity token. Please try again.');
+  }
   return exchangeWithBackend({
     provider: 'apple',
-    // Apple only sends email on first consent; fall back to the private relay.
-    email: credential.email || `${credential.user}@privaterelay.appleid.com`,
+    // Raw signed token — backend verifies against Apple's JWKS and reads the
+    // `sub`/`email` from the verified claims.
+    identity_token: credential.identityToken,
+    // Cosmetic only. Apple omits the name from the token and sends it just
+    // once, on first consent.
     name: name || 'Apple User',
-    id: credential.user, // stable Apple `sub`
   });
 }
 

@@ -91,12 +91,13 @@ export default function LinkedAccountsScreen() {
     setBusy(key);
     try {
       const identity = key === 'google' ? await getGoogleIdentity() : await getAppleIdentity();
+      // Send the signed token — the server verifies it and derives the
+      // provider identity itself. Sending a bare `id` would let a caller
+      // attach someone else's provider account to their own.
       await apiClient.post('/auth/link-account-direct', {
         provider: identity.provider,
-        id: identity.id,
-        email: identity.email,
+        id_token: identity.idToken,
         name: identity.name,
-        picture: identity.picture,
       });
       await fetchAccounts();
       Alert.alert('Linked', `You can now sign in with ${key === 'google' ? 'Google' : 'Apple'}.`);

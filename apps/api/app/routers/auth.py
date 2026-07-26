@@ -5,8 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFi
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import datetime, timedelta, timezone
+import logging
 import uuid
 import secrets
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models.user import User
@@ -24,6 +27,11 @@ from app.utils.oauth import (
 )
 from app.services.email import EmailService
 from app.services.storage import storage_service
+from app.services.oauth_verification import (
+    OAuthVerificationError,
+    verify_google_id_token,
+    verify_apple_identity_token,
+)
 from app.config import settings
 from app.utils.username_validation import validate_username
 from app.utils.rate_limit import limiter
@@ -557,30 +565,68 @@ async def change_username(
 # ============================================================================
 
 @router.post("/oauth-login", response_model=OAuthLoginResponse)
+@limiter.limit("20/minute")
 async def oauth_login(
+    request: Request,
     oauth_data: dict,
     db: Session = Depends(get_db)
 ):
     """
-    Handle OAuth login from NextAuth (after NextAuth has completed OAuth flow)
-    Accepts user info from Google/Apple after NextAuth exchanges tokens.
+    Sign in with a provider identity token (Google ID token / Apple identity
+    token) obtained by a native SDK or Google Identity Services on web.
+
+    SECURITY — this endpoint used to accept `email` + `id` as plain JSON and
+    trust them. Because it is public and auto-links to any verified account by
+    email, that allowed anyone to mint a session for an arbitrary user. The
+    token is now VERIFIED server-side against the provider's JWKS (signature,
+    issuer, audience, expiry) and only the verified claims are used; anything
+    else in the body is ignored.
 
     Features:
-    - Auto-links OAuth account if email matches existing user
+    - Auto-links OAuth account if email matches an existing VERIFIED user
     - Supports multiple OAuth providers per user account
     """
     try:
-        provider = oauth_data.get("provider")  # 'google' or 'apple'
-        email = oauth_data.get("email")
-        name = oauth_data.get("name")
-        picture = oauth_data.get("picture")
-        provider_id = oauth_data.get("id") or oauth_data.get("sub")
-
-        if not email or not provider:
+        provider = (oauth_data.get("provider") or "").lower()  # 'google' or 'apple'
+        if provider not in ("google", "apple"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email and provider are required"
+                detail="Unsupported provider. Use 'google' or 'apple'.",
             )
+
+        # The raw signed token. Accept a couple of spellings so every client
+        # (GIS web, @react-native-google-signin, expo-apple-authentication)
+        # can send its native field name.
+        raw_token = (
+            oauth_data.get("id_token")
+            or oauth_data.get("identity_token")
+            or oauth_data.get("identityToken")
+            or oauth_data.get("credential")
+        )
+
+        try:
+            if provider == "google":
+                verified = verify_google_id_token(raw_token)
+            else:
+                verified = verify_apple_identity_token(raw_token)
+        except OAuthVerificationError as exc:
+            # Log the real reason; return a generic message so we don't help
+            # an attacker probe which check failed.
+            logger.warning("[oauth-login] %s verification failed: %s", provider, exc)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not verify that sign-in. Please try again.",
+            )
+
+        # ONLY verified claims from here down.
+        email = verified["email"]
+        provider_id = verified["provider_account_id"]
+        picture = verified.get("picture")
+        # Apple never includes a name in the token; it's cosmetic only, so we
+        # allow the client-supplied display name as a fallback.
+        name = verified.get("name") or (
+            oauth_data.get("name") if provider == "apple" else None
+        )
 
         is_new_user = False
         user = None
@@ -1105,14 +1151,17 @@ async def link_account_direct(
     db: Session = Depends(get_db),
 ):
     """
-    Link an OAuth provider to the current user using identity already obtained
+    Link an OAuth provider to the current user using an identity token obtained
     by a native SDK (Google Sign-In / Apple Authentication on mobile).
 
     Unlike /link-account (which exchanges an authorization code server-side),
-    this trusts the SDK-provided identity exactly like /oauth-login already does
-    — the native SDKs verify the provider sign-in on-device. This is what lets a
-    logged-in keeper add a second sign-in method so either provider reaches the
-    same account.
+    the client here already holds a signed identity token. It is VERIFIED
+    against the provider's JWKS before use.
+
+    SECURITY — this previously trusted a client-supplied `id`. That let an
+    authenticated attacker attach a VICTIM's provider account id to their own
+    account; the victim's next provider sign-in would then resolve to the
+    attacker's account. The identity must be provider-attested, not asserted.
     """
     provider = link_data.provider.lower()
     if provider not in ("google", "apple"):
@@ -1121,12 +1170,24 @@ async def link_account_direct(
             detail=f"Unsupported provider: {provider}. Use 'google' or 'apple'",
         )
 
-    provider_id = (link_data.id or "").strip()
-    if not provider_id:
+    raw_token = (
+        getattr(link_data, "id_token", None)
+        or getattr(link_data, "identity_token", None)
+        or getattr(link_data, "credential", None)
+    )
+    try:
+        if provider == "google":
+            verified = verify_google_id_token(raw_token)
+        else:
+            verified = verify_apple_identity_token(raw_token)
+    except OAuthVerificationError as exc:
+        logger.warning("[link-account-direct] %s verification failed: %s", provider, exc)
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Provider account id is required",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not verify that sign-in. Please try again.",
         )
+
+    provider_id = verified["provider_account_id"]
 
     # Already have this provider on the current account?
     existing = db.query(UserOAuthAccount).filter(

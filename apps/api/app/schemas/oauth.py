@@ -58,15 +58,25 @@ class LinkAccountRequest(BaseModel):
 
 
 class LinkAccountDirectRequest(BaseModel):
-    """Link a provider using identity already obtained by a native SDK.
+    """Link a provider using an identity TOKEN obtained by a native SDK.
 
-    Mirrors the trust model of /auth/oauth-login: native Google/Apple SDKs
-    return the verified provider identity directly, so the client sends the
-    identity fields rather than an authorization code to exchange. Used by the
-    mobile "Linked sign-in methods" screen.
+    The client sends the raw signed token rather than an authorization code;
+    the server verifies it against the provider JWKS (see
+    services/oauth_verification.py). Used by the mobile + web "Linked sign-in
+    methods" screens.
+
+    NOTE: `id`/`email`/`picture` are accepted for backwards compatibility with
+    older mobile builds but are IGNORED — the account identity comes solely
+    from the verified token. Only `name` is used, and only cosmetically for
+    Apple (which omits it from the token).
     """
     provider: str  # 'google' or 'apple'
-    id: str  # provider's unique user id (Google sub / Apple sub)
+    id_token: Optional[str] = None       # Google ID token / Apple identity token
+    identity_token: Optional[str] = None  # alias used by expo-apple-authentication
+    credential: Optional[str] = None      # alias used by Google Identity Services (web)
+
+    # Ignored — retained so old clients don't 422 before they see the 401.
+    id: Optional[str] = None
     email: Optional[str] = None
     name: Optional[str] = None
     picture: Optional[str] = None

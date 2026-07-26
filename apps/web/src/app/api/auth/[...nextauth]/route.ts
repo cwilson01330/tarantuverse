@@ -148,22 +148,26 @@ const authOptions: AuthOptions = {
             userName = profile.name as string
           }
 
-          // Get email - Apple might hide it, fall back to user.email from NextAuth
-          const email = profile?.email || user.email
-
-          if (!email) {
+          // The backend verifies this token against the provider's JWKS and
+          // derives the account identity from the VERIFIED claims. We must not
+          // send our own email/sub — /auth/oauth-login is a public endpoint, so
+          // asserted claims are forgeable and were previously a full auth
+          // bypass. NextAuth surfaces the raw OIDC token on `account`.
+          const idToken = account.id_token
+          if (!idToken) {
+            console.error(
+              `[nextauth] ${account.provider} returned no id_token; cannot verify sign-in`
+            )
             return false
           }
 
-          // Send user info to our backend (NextAuth has already completed OAuth)
           const response = await axios.post(
             `${API_URL}/api/v1/auth/oauth-login`,
             {
               provider: account.provider,
-              email: email,
-              name: userName || email.split("@")[0], // Fallback to email prefix
-              picture: (profile as any)?.picture || user.image || null,
-              id: (profile as any)?.sub || (profile as any)?.id,
+              id_token: idToken,
+              // Cosmetic only; Apple omits the name from the token.
+              name: userName || undefined,
             }
           )
 

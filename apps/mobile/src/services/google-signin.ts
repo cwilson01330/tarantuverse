@@ -47,7 +47,11 @@ if (!isExpoGo) {
 
 export type ProviderIdentity = {
   provider: 'google' | 'apple';
-  id: string;
+  /** The raw signed ID / identity token. This is the ONLY field the server
+   *  trusts — it verifies the signature against the provider's JWKS. */
+  idToken: string;
+  /** Display-only echoes of the provider profile. The server ignores these. */
+  id?: string;
   email?: string;
   name?: string;
   picture?: string;
@@ -74,15 +78,18 @@ export const getGoogleIdentity = async (): Promise<ProviderIdentity> => {
   }
   const userInfo = await GoogleSignin.signIn();
   const u = userInfo.data?.user;
-  if (!u?.id) {
+  const idToken = userInfo.data?.idToken;
+  if (!idToken) {
     throw new Error('Could not read your Google account details. Please try again.');
   }
   return {
     provider: 'google',
-    id: u.id,
-    email: u.email ?? undefined,
-    name: u.name ?? undefined,
-    picture: u.photo ?? undefined,
+    // The signed token is what the server trusts; the rest is display-only.
+    idToken,
+    id: u?.id,
+    email: u?.email ?? undefined,
+    name: u?.name ?? undefined,
+    picture: u?.photo ?? undefined,
   };
 };
 
@@ -105,8 +112,12 @@ export const getAppleIdentity = async (): Promise<ProviderIdentity> => {
   if (credential.fullName) {
     name = `${credential.fullName.givenName || ''} ${credential.fullName.familyName || ''}`.trim();
   }
+  if (!credential.identityToken) {
+    throw new Error('Apple did not return an identity token. Please try again.');
+  }
   return {
     provider: 'apple',
+    idToken: credential.identityToken,
     id: credential.user,
     email: credential.email ?? undefined,
     name: name || undefined,
@@ -148,15 +159,17 @@ export const signInWithGoogle = async (): Promise<{
     // Sign in
     const userInfo = await GoogleSignin.signIn();
 
-    console.log('[GoogleSignIn] Sign-in successful, getting server auth code...');
+    console.log('[GoogleSignIn] Sign-in successful, exchanging ID token...');
 
-    // Get server auth code to exchange with backend
-    const tokens = await GoogleSignin.getTokens();
+    // Send the RAW signed ID token. The backend verifies it against Google's
+    // JWKS (signature/issuer/audience/expiry) and takes the identity from the
+    // verified claims. Client-asserted email/id must never be trusted — the
+    // endpoint is public, so they can be forged by anyone.
+    const idToken = userInfo.data?.idToken;
+    if (!idToken) {
+      throw new Error('Google did not return an ID token. Please try again.');
+    }
 
-    console.log('[GoogleSignIn] Got tokens, exchanging with backend...');
-    console.log('[GoogleSignIn] User info:', userInfo.data);
-
-    // Send user info directly to backend (no code exchange needed)
     const response = await fetch(`${API_URL}/api/v1/auth/oauth-login`, {
       method: 'POST',
       headers: {
@@ -164,10 +177,7 @@ export const signInWithGoogle = async (): Promise<{
       },
       body: JSON.stringify({
         provider: 'google',
-        email: userInfo.data?.user?.email,
-        name: userInfo.data?.user?.name,
-        picture: userInfo.data?.user?.photo,
-        id: userInfo.data?.user?.id,
+        id_token: idToken,
       }),
     });
 
@@ -266,9 +276,13 @@ export const signInWithApple = async (): Promise<{
       name = `${firstName} ${lastName}`.trim();
     }
 
-    console.log('[AppleSignIn] User info:', { appleUser, email, name });
+    // Send the RAW signed identity token — the backend verifies it against
+    // Apple's JWKS and reads `sub`/`email` from the verified claims. The name
+    // is cosmetic (Apple sends it only once, outside the token).
+    if (!credential.identityToken) {
+      throw new Error('Apple did not return an identity token. Please try again.');
+    }
 
-    // Send to backend (similar to Google OAuth)
     const response = await fetch(`${API_URL}/api/v1/auth/oauth-login`, {
       method: 'POST',
       headers: {
@@ -276,9 +290,8 @@ export const signInWithApple = async (): Promise<{
       },
       body: JSON.stringify({
         provider: 'apple',
-        email: email || `${appleUser}@privaterelay.appleid.com`, // Apple private relay if email hidden
+        identity_token: credential.identityToken,
         name: name || 'Apple User',
-        id: appleUser, // This is the 'sub' claim - unique Apple user identifier
       }),
     });
 

@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     # Auth email flow
     EMAIL_VERIFICATION_REQUIRED: bool = False
 
+    # OAuth identity-token verification (see services/oauth_verification.py).
+    # Comma-separated lists of EVERY client id that may appear in an identity
+    # token's `aud`, across both apps and all platforms:
+    #   Google -> web + iOS + Android client ids for Tarantuverse AND Herpetoverse
+    #   Apple  -> the app bundle ids (and the Services ID used by web sign-in)
+    # If these are empty the server refuses to verify tokens (fails CLOSED)
+    # rather than accepting a token minted for somebody else's app.
+    GOOGLE_OAUTH_CLIENT_IDS: str = ""
+    APPLE_OAUTH_CLIENT_IDS: str = ""
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
