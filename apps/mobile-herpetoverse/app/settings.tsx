@@ -16,6 +16,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -28,6 +29,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -57,7 +59,53 @@ const EXPORT_URL = 'https://herpetoverse.com/app/settings';
 
 function SettingsScreen() {
   const router = useRouter();
-  const { logout, token, refreshUser } = useAuth();
+  const { user, logout, token, refreshUser } = useAuth();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Avatar picker + upload, mirroring the Tarantuverse profile header.
+  // expo-image-picker is already linked and already exercised by the photo
+  // gallery, and launchImageLibraryAsync is an imperative API rather than a
+  // rendered native view — so this is safe to ship over OTA.
+  const handleAvatarPress = async () => {
+    if (uploadingAvatar) return;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Photo access needed',
+          'Herpetoverse needs photo library access to set your profile picture.',
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      setUploadingAvatar(true);
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        name: asset.fileName || 'avatar.jpg',
+        type: asset.mimeType || 'image/jpeg',
+      } as any);
+      await apiClient.post('/auth/me/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      await refreshUser();
+    } catch (e: any) {
+      Alert.alert(
+        'Could not update photo',
+        e?.response?.data?.detail || e?.message || 'Please try again.',
+      );
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
   const { colors, layout } = useTheme();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -179,6 +227,55 @@ function SettingsScreen() {
     >
       <AppHeader title="Settings" leftAction={<HeaderBackButton />} />
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Profile header — mirrors the Tarantuverse profile tab: tappable
+            avatar with an edit badge, display name, @username. Gives the
+            screen an identity anchor instead of opening on a bare list. */}
+        <View style={styles.profileHeader}>
+          <TouchableOpacity
+            onPress={handleAvatarPress}
+            disabled={uploadingAvatar}
+            accessibilityRole="button"
+            accessibilityLabel={
+              uploadingAvatar ? 'Uploading profile picture' : 'Change profile picture'
+            }
+            accessibilityState={{ disabled: uploadingAvatar, busy: uploadingAvatar }}
+            style={styles.avatarWrap}
+          >
+            {uploadingAvatar ? (
+              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : user?.avatar_url ? (
+              <Image
+                source={{ uri: user.avatar_url }}
+                style={styles.avatar}
+                accessibilityIgnoresInvertColors
+              />
+            ) : (
+              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <MaterialCommunityIcons name="camera-plus-outline" size={28} color={colors.primary} />
+              </View>
+            )}
+            {!uploadingAvatar && (
+              <View
+                style={[styles.avatarBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              >
+                <MaterialCommunityIcons name="pencil" size={12} color="#0B0B0B" />
+              </View>
+            )}
+          </TouchableOpacity>
+          <Text style={[styles.profileName, { color: colors.textPrimary }]} accessibilityRole="header">
+            {user?.display_name || user?.username || 'Keeper'}
+          </Text>
+          {!!user?.username && (
+            <Text style={[styles.profileHandle, { color: colors.textTertiary }]}>
+              @{user.username}
+            </Text>
+          )}
+        </View>
+
         <SectionLabel text="Account" colors={colors} />
         <View
           style={[
@@ -579,6 +676,31 @@ function Divider({ color }: { color: string }) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   content: { padding: 16, paddingBottom: 40 },
+  // Profile header (matches the Tarantuverse profile tab proportions).
+  profileHeader: { alignItems: 'center', paddingTop: 8, paddingBottom: 4 },
+  avatarWrap: { marginBottom: 12 },
+  avatar: { width: 88, height: 88, borderRadius: 44 },
+  avatarPlaceholder: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileName: { fontSize: 20, fontWeight: '800' },
+  profileHandle: { fontSize: 13, marginTop: 2 },
   sectionLabel: {
     fontSize: 12,
     fontWeight: '700',
