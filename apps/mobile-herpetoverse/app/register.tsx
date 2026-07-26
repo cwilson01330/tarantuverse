@@ -19,7 +19,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import GoogleLogo from '../src/components/GoogleLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
@@ -269,28 +270,26 @@ export default function RegisterScreen() {
                       accessibilityRole="button"
                       accessibilityLabel="Continue with Google"
                     >
-                      <MaterialCommunityIcons name="google" size={18} color={colors.textPrimary} />
+                      <GoogleLogo size={20} />
                       <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
                         Continue with Google
                       </Text>
                     </TouchableOpacity>
                   )}
-                  {appleAvailable && (
-                    <TouchableOpacity
+                  {/* Apple's native control — see login.tsx for why a
+                      lookalike button is a Guideline 4.8 risk. */}
+                  {appleAvailable && Platform.OS === 'ios' && (
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={
+                        AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                      }
+                      buttonStyle={
+                        AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                      }
+                      cornerRadius={layout.radius.md}
+                      style={styles.appleButton}
                       onPress={() => handleOAuth('apple')}
-                      disabled={submitting}
-                      style={[
-                        styles.socialButton,
-                        { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel="Continue with Apple"
-                    >
-                      <MaterialCommunityIcons name="apple" size={20} color={colors.textPrimary} />
-                      <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
-                        Continue with Apple
-                      </Text>
-                    </TouchableOpacity>
+                    />
                   )}
                 </View>
               )}
@@ -368,6 +367,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   socialButtonText: { fontSize: 15, fontWeight: '600' },
+  // Apple renders this control itself; only size is ours to set.
+  appleButton: { height: 46, width: '100%' },
   verifyBox: {
     padding: 20,
     borderWidth: 1,

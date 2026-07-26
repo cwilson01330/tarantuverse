@@ -18,8 +18,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import GoogleLogo from '../src/components/GoogleLogo';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { captureEvent } from '../src/services/posthog';
@@ -234,6 +235,8 @@ export default function LoginScreen() {
                 <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
                 <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
               </View>
+              {/* Google's official four-colour mark — branding terms don't
+                  allow a generic icon-font glyph here. */}
               {isGoogleSignInAvailable && (
                 <TouchableOpacity
                   onPress={() => handleOAuth('google')}
@@ -245,28 +248,28 @@ export default function LoginScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Continue with Google"
                 >
-                  <MaterialCommunityIcons name="google" size={18} color={colors.textPrimary} />
+                  <GoogleLogo size={20} />
                   <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
                     Continue with Google
                   </Text>
                 </TouchableOpacity>
               )}
-              {appleAvailable && (
-                <TouchableOpacity
+              {/* Apple's NATIVE button. Guideline 4.8 / the HIG require the
+                  system-rendered control, not a lookalike — a custom button
+                  with an icon-font apple glyph is a review-rejection risk.
+                  WHITE on dark backgrounds, BLACK on light, per the HIG. */}
+              {appleAvailable && Platform.OS === 'ios' && (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={
+                    AppleAuthentication.AppleAuthenticationButtonType.CONTINUE
+                  }
+                  buttonStyle={
+                    AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  }
+                  cornerRadius={layout.radius.md}
+                  style={styles.appleButton}
                   onPress={() => handleOAuth('apple')}
-                  disabled={submitting}
-                  style={[
-                    styles.socialButton,
-                    { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue with Apple"
-                >
-                  <MaterialCommunityIcons name="apple" size={20} color={colors.textPrimary} />
-                  <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
-                    Continue with Apple
-                  </Text>
-                </TouchableOpacity>
+                />
               )}
             </View>
           )}
@@ -334,6 +337,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   socialButtonText: { fontSize: 15, fontWeight: '600' },
+  // Apple renders this control itself; only size is ours to set. Height must
+  // be >= 44 for the HIG minimum touch target, and matches socialButton's
+  // effective height so the two stack evenly.
+  appleButton: { height: 46, width: '100%' },
   footer: {
     marginTop: 32,
     flexDirection: 'row',

@@ -75,14 +75,27 @@ export default function GoogleSignInButton({
 
   return (
     <GoogleOAuthProvider clientId={CLIENT_ID}>
-      <div className="flex justify-center">
+      {/* Google renders this button itself (inside an iframe), so it's the
+          official control and its interior can't be restyled — that's the
+          point, and it's what keeps us inside Google's branding terms.
+          `width` only takes a px string, so the wrapper caps it to the form
+          width (max-w-md = 28rem = 448px) instead of the old fixed 320px,
+          which left it visibly narrower than the fields above it. */}
+      <div
+        className={`flex justify-center [&>div]:!w-full ${
+          busy ? 'pointer-events-none opacity-60' : ''
+        }`}
+        aria-busy={busy}
+      >
         <GoogleLogin
           onSuccess={handleCredential}
           onError={() => onError?.('Google sign-in was cancelled or failed.')}
           theme="filled_black"
           text="continue_with"
           shape="rectangular"
-          width="320"
+          size="large"
+          logo_alignment="center"
+          width="448"
         />
       </div>
     </GoogleOAuthProvider>
