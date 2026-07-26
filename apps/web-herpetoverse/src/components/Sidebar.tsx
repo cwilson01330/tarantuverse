@@ -117,7 +117,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Footer */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-neutral-800">
           <p className="text-[10px] uppercase tracking-widest text-neutral-500">
-            Preview build · v0.1
+            Herpetoverse
           </p>
           <Link
             href="/"

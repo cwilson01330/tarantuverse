@@ -17,7 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState } from 'react'
 import { apiFetch, ApiError } from '@/lib/apiClient'
 import { AuthUser, getToken, setSession } from '@/lib/auth'
-import GoogleSignInButton from '@/components/GoogleSignInButton'
+import GoogleSignInButton, { googleSignInEnabled } from '@/components/GoogleSignInButton'
 
 interface LoginResponse {
   access_token: string
@@ -157,11 +157,13 @@ function LoginForm() {
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
 
-          <div className="flex items-center gap-3 py-1">
-            <div className="h-px flex-1 bg-neutral-800" />
-            <span className="text-xs text-neutral-500">or</span>
-            <div className="h-px flex-1 bg-neutral-800" />
-          </div>
+          {googleSignInEnabled && (
+            <div className="flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-neutral-800" />
+              <span className="text-xs text-neutral-500">or</span>
+              <div className="h-px flex-1 bg-neutral-800" />
+            </div>
+          )}
           <GoogleSignInButton next={next} onError={setError} />
 
           <p className="text-center text-xs text-neutral-500 pt-2">

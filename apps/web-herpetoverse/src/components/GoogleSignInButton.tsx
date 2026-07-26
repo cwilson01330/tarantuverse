@@ -20,6 +20,16 @@ import { type AuthUser, setSession } from '@/lib/auth'
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
 
+/**
+ * Whether the Google button will actually render. Exported so callers can hide
+ * their "or" divider too — otherwise an unset client id leaves a separator
+ * floating above nothing.
+ *
+ * NOTE: this is inlined at BUILD time (NEXT_PUBLIC_*), so adding the env var
+ * in Vercel does nothing until the app is redeployed.
+ */
+export const googleSignInEnabled = Boolean(CLIENT_ID)
+
 interface OAuthLoginResponse {
   access_token: string
   user: AuthUser

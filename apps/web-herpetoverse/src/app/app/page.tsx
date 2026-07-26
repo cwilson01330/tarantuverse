@@ -3,14 +3,6 @@ import Link from 'next/link'
 export default function AppHomePage() {
   return (
     <div className="max-w-5xl mx-auto">
-      {/* Preview banner */}
-      <div className="mb-8 p-4 rounded-md border border-herp-teal/30 bg-herp-teal/5 text-sm text-herp-teal/90">
-        <span className="font-semibold">Preview build.</span>{' '}
-        <span className="text-neutral-300">
-          This is scaffolding. Pages will light up as we build them out.
-        </span>
-      </div>
-
       <header className="mb-10">
         <p className="text-xs tracking-[0.2em] uppercase text-herp-lime mb-3 font-medium">
           Dashboard
@@ -52,7 +44,7 @@ export default function AppHomePage() {
         <DashCard
           icon="🧬"
           title="Genetics & morphs"
-          body="Punnett-square morph predictor for ball pythons. More species coming."
+          body="Punnett-square morph predictor for ball pythons and leopard geckos, including het and possible-het odds."
           href="/app/breeding"
         />
         <DashCard
@@ -70,8 +62,8 @@ export default function AppHomePage() {
         <DashCard
           icon="🥚"
           title="Breeding records"
-          body="Pair logs, clutches, hatch dates, and offspring lineage. In design now."
-          soon
+          body="Pair logs, clutches, hatch dates, and offspring lineage. Included with Premium."
+          href="/app/breeding"
         />
         <DashCard
           icon="🌐"
