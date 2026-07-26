@@ -122,8 +122,19 @@ function MorphCalculatorScreen() {
       try {
         const list = await fetchGenesForSpecies(species.scientific_name);
         if (cancelled) return;
-        setGenes(list ?? []);
-        setLoadError(null);
+        // fetchGenesForSpecies swallows errors and returns null. Collapsing
+        // null into [] made a failed request look identical to an empty
+        // catalog — the user just saw "no genes" with no way to tell why.
+        // Keep them distinct.
+        if (list === null) {
+          setGenes([]);
+          setLoadError(
+            `Couldn't load the ${species.common_name} gene catalog. Check your connection and try again.`,
+          );
+        } else {
+          setGenes(list);
+          setLoadError(null);
+        }
         // Genes are species-specific, so any picked parents from the previous
         // species are meaningless now — clear them rather than silently
         // computing odds against genes the new species doesn't have.
@@ -584,8 +595,21 @@ function PickGeneModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+      {/* Backdrop is an absolutely-positioned SIBLING behind the card, not a
+          parent of it. Previously the card was a <Pressable> nested inside the
+          backdrop <Pressable> (with stopPropagation), which on Android
+          swallows the pan gesture of any ScrollView beneath it — the gene
+          detail panel simply would not scroll, so the state buttons under a
+          long description were unreachable. Short entries hid the bug because
+          they fit without scrolling. Keep the card free of Pressable
+          ancestors. */}
+      <View style={styles.modalBackdrop}>
         <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Close"
+        />
+        <View
           style={[
             styles.modalCard,
             {
@@ -595,7 +619,6 @@ function PickGeneModal({
               borderTopRightRadius: layout.radius.lg,
             },
           ]}
-          onPress={(e) => e.stopPropagation()}
         >
           <SafeAreaView edges={['bottom']}>
             <View style={styles.modalHeader}>
@@ -787,8 +810,8 @@ function PickGeneModal({
               </ScrollView>
             )}
           </SafeAreaView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
