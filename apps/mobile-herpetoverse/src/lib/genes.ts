@@ -195,12 +195,26 @@ export async function deleteAnimalGenotype(
 // Calculator domain model — see web genes.ts for full discussion.
 // ---------------------------------------------------------------------------
 
-export type AlleleState = 'absent' | 'het' | 'visual' | 'super';
+export type AlleleState = 'absent' | 'het' | 'poss_het' | 'visual' | 'super';
 
-/** Allele states a parent can meaningfully hold for a given inheritance mode. */
+/**
+ * Allele states a parent can meaningfully hold for a given inheritance mode.
+ *
+ * 'poss_het' ("possible het", e.g. "66% het Albino") is RECESSIVE-only: for
+ * dominant / co-dominant genes one copy is visible, so a carrier is never
+ * hidden and "possible het" has no meaning.
+ */
 export function validStatesForGene(geneType: GeneType): AlleleState[] {
   switch (geneType) {
     case 'recessive':
+      // NOTE: 'poss_het' is intentionally NOT offered here yet, even though
+      // the math below fully supports it. app/morph-calculator.tsx does not
+      // pass parentAPossHet/parentBPossHet through to combineOffspring, so a
+      // possible het would be silently treated as a CERTAIN het — which
+      // overstates the odds of visual offspring. Wrong numbers in a breeding
+      // tool are worse than a missing option. Add 'poss_het' back the moment
+      // the screen threads the percentage through. Web already does.
+      return ['absent', 'het', 'visual'];
     case 'dominant':
       return ['absent', 'het', 'visual'];
     case 'codominant':
@@ -216,10 +230,30 @@ export function stateToCount(
 ): 0 | 1 | 2 {
   if (state === 'absent') return 0;
   if (state === 'super') return 2;
-  if (state === 'het') return 1;
+  // poss_het's count is a display best-guess only; the offspring math uses
+  // allelePassProbability() because a poss het is a distribution, not a
+  // fixed genotype.
+  if (state === 'het' || state === 'poss_het') return 1;
   // 'visual'
   if (geneType === 'recessive' || geneType === 'dominant') return 2;
   return 1; // codominant / incomplete_dominant visual = 1 copy
+}
+
+/**
+ * Probability a parent passes the morph allele to a given offspring.
+ * absent→0, het→0.5, visual recessive→1, co-dom visual→0.5, super→1,
+ * and a 66% poss het → 0.66 × 0.5 = 0.33.
+ */
+export function allelePassProbability(
+  state: AlleleState,
+  geneType: GeneType,
+  possHetPercent?: number | null,
+): number {
+  if (state === 'poss_het') {
+    const pct = Math.min(100, Math.max(0, possHetPercent ?? 0)) / 100;
+    return pct * 0.5;
+  }
+  return stateToCount(state, geneType) / 2;
 }
 
 /** Map an allele count back to a displayable state given the gene's mode. */
@@ -241,6 +275,7 @@ export function countToState(
 export function stateLabel(state: AlleleState, geneType: GeneType): string {
   if (state === 'absent') return 'none';
   if (state === 'het') return 'het';
+  if (state === 'poss_het') return 'poss. het';
   if (state === 'super') return 'super';
   // visual
   if (geneType === 'recessive' || geneType === 'dominant') {
@@ -259,9 +294,31 @@ export function zygosityToCount(
   if (z === 'visual') {
     return geneType === 'recessive' || geneType === 'dominant' ? 2 : 1;
   }
-  // poss_het — for calculator math, treat as het (count=1). The percentage
-  // is informational; UI surfaces it separately.
+  // poss_het — count is a display best-guess only. Do NOT feed this into the
+  // offspring math: treating a 66% het as a certain het overstates the odds.
+  // Use zygosityToPassProbability() instead.
   return 1;
+}
+
+/**
+ * Allele-pass probability for a stored animal genotype. This is the correct
+ * bridge from an AnimalGenotype row into the calculator, because it honours
+ * poss_het_percentage instead of rounding a possible het up to a certain one.
+ *
+ * A proven het is a certainty regardless of any recorded percentage — that's
+ * what `proven` means — so it passes at 0.5.
+ */
+export function zygosityToPassProbability(
+  z: Zygosity,
+  geneType: GeneType,
+  possHetPercentage?: number | null,
+  proven?: boolean,
+): number {
+  if (z === 'poss_het' && !proven) {
+    const pct = Math.min(100, Math.max(0, possHetPercentage ?? 0)) / 100;
+    return pct * 0.5;
+  }
+  return zygosityToCount(z, geneType) / 2;
 }
 
 /** Display string for a zygosity. */
@@ -291,8 +348,18 @@ export function punnett(
   parentA: 0 | 1 | 2,
   parentB: 0 | 1 | 2,
 ): CountDistribution {
-  const pA = parentA / 2;
-  const pB = parentB / 2;
+  return punnettFromPass(parentA / 2, parentB / 2);
+}
+
+/**
+ * General form: combine two arbitrary allele-pass probabilities. punnett()
+ * is the special case of definite genotypes (0, 0.5 or 1); possible-het
+ * parents produce intermediate values (66% het passes with p = 0.33).
+ */
+export function punnettFromPass(
+  pA: number,
+  pB: number,
+): CountDistribution {
   const qA = 1 - pA;
   const qB = 1 - pB;
   return {
@@ -300,6 +367,27 @@ export function punnett(
     1: pA * qB + qA * pB,
     2: pA * pB,
   };
+}
+
+/**
+ * The hobby's "66% het" number, for a RECESSIVE gene: given an offspring
+ * that does NOT visually show the trait, the chance it's a carrier.
+ *
+ *     P(het | not visual) = P(1 copy) / (P(0) + P(1))
+ *
+ *   het × het       → 0.50 / 0.75 = 66.7%  ("66% het")
+ *   visual × normal → 1.00 / 1.00 = 100%
+ *   het × normal    → 0.50 / 1.00 = 50%
+ *
+ * Returns null when every offspring is visual, so callers can omit the row
+ * rather than print a misleading 0.
+ */
+export function possHetPercentage(
+  dist: CountDistribution,
+): number | null {
+  const nonVisual = dist[0] + dist[1];
+  if (nonVisual <= 0) return null;
+  return (dist[1] / nonVisual) * 100;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +398,15 @@ export interface GeneInput {
   gene: Gene;
   parentA: 0 | 1 | 2;
   parentB: 0 | 1 | 2;
+  /**
+   * Optional "possible het" percentages (0–100) per parent. When set, that
+   * parent is treated as probably carrying one copy rather than definitely
+   * holding parentA/parentB copies — 66 means it passes the morph allele with
+   * probability 0.66 × 0.5 = 0.33. Recessive genes only. Leaving these
+   * undefined preserves the original behaviour for existing callers.
+   */
+  parentAPossHet?: number | null;
+  parentBPossHet?: number | null;
 }
 
 export interface OffspringOutcome {
@@ -322,9 +419,14 @@ export interface OffspringOutcome {
 export function combineOffspring(inputs: GeneInput[]): OffspringOutcome[] {
   if (inputs.length === 0) return [];
 
+  // A poss-het parent contributes an intermediate pass probability
+  // (pct × 0.5); otherwise it's the definite count / 2.
   const perGene = inputs.map((g) => ({
     gene: g.gene,
-    dist: punnett(g.parentA, g.parentB),
+    dist: punnettFromPass(
+      g.parentAPossHet != null ? (g.parentAPossHet / 100) * 0.5 : g.parentA / 2,
+      g.parentBPossHet != null ? (g.parentBPossHet / 100) * 0.5 : g.parentB / 2,
+    ),
   }));
 
   const outcomes: OffspringOutcome[] = [];

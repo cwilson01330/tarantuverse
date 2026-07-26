@@ -30,6 +30,7 @@ import {
   CitationSourceType,
   combineOffspring,
   countToState,
+  possHetPercentage,
   fetchGenesForSpecies,
   formatProbability,
   Gene,
@@ -115,6 +116,11 @@ export default function MorphCalculator() {
   const [loadError, setLoadError] = useState(false)
   const [parentA, setParentA] = useState<Record<string, AlleleState>>({})
   const [parentB, setParentB] = useState<Record<string, AlleleState>>({})
+  // Possible-het percentages, only consulted when the matching state is
+  // 'poss_het'. 66 is the default because it's what a het × het pairing
+  // produces, and it's by far the most commonly traded poss-het figure.
+  const [parentAPct, setParentAPct] = useState<Record<string, number>>({})
+  const [parentBPct, setParentBPct] = useState<Record<string, number>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [detailsExpanded, setDetailsExpanded] = useState<
     Record<string, boolean>
@@ -129,6 +135,8 @@ export default function MorphCalculator() {
     setGenes(null)
     setParentA({})
     setParentB({})
+    setParentAPct({})
+    setParentBPct({})
     setExpanded({})
     setDetailsExpanded({})
 
@@ -158,10 +166,28 @@ export default function MorphCalculator() {
         const bState = parentB[gene.id] ?? 'absent'
         const aCount = stateToCount(aState, gene.gene_type)
         const bCount = stateToCount(bState, gene.gene_type)
-        return { gene, parentA: aCount, parentB: bCount }
+        return {
+          gene,
+          parentA: aCount,
+          parentB: bCount,
+          // Only pass a percentage when that parent is actually marked as a
+          // possible het — otherwise leave undefined so the math uses the
+          // definite allele count.
+          parentAPossHet:
+            aState === 'poss_het' ? (parentAPct[gene.id] ?? 66) : null,
+          parentBPossHet:
+            bState === 'poss_het' ? (parentBPct[gene.id] ?? 66) : null,
+        }
       })
-      .filter((g) => g.parentA !== 0 || g.parentB !== 0)
-  }, [genes, parentA, parentB])
+      // A poss-het parent still counts as "active" even though its best-guess
+      // allele count is 1 — the filter below already keeps it, but a 0% poss
+      // het contributes nothing, so drop it.
+      .filter(
+        (g) =>
+          (g.parentA !== 0 || g.parentB !== 0) &&
+          !(g.parentAPossHet === 0 && g.parentBPossHet === 0),
+      )
+  }, [genes, parentA, parentB, parentAPct, parentBPct])
 
   const outcomes = useMemo(() => combineOffspring(activeInputs), [activeInputs])
 
@@ -190,6 +216,8 @@ export default function MorphCalculator() {
   const resetAll = () => {
     setParentA({})
     setParentB({})
+    setParentAPct({})
+    setParentBPct({})
     setExpanded({})
     setDetailsExpanded({})
   }
@@ -308,6 +336,14 @@ export default function MorphCalculator() {
                       onBChange={(s) =>
                         setParentB((prev) => ({ ...prev, [gene.id]: s }))
                       }
+                      aPct={parentAPct[gene.id] ?? 66}
+                      bPct={parentBPct[gene.id] ?? 66}
+                      onAPctChange={(n) =>
+                        setParentAPct((prev) => ({ ...prev, [gene.id]: n }))
+                      }
+                      onBPctChange={(n) =>
+                        setParentBPct((prev) => ({ ...prev, [gene.id]: n }))
+                      }
                       onToggleGrid={() =>
                         setExpanded((prev) => ({
                           ...prev,
@@ -389,6 +425,11 @@ interface GeneRowProps {
   isDetailsExpanded: boolean
   onAChange: (s: AlleleState) => void
   onBChange: (s: AlleleState) => void
+  /** Possible-het percentages; only used when the state is 'poss_het'. */
+  aPct: number
+  bPct: number
+  onAPctChange: (n: number) => void
+  onBPctChange: (n: number) => void
   onToggleGrid: () => void
   onToggleDetails: () => void
 }
@@ -402,6 +443,10 @@ function GeneRow({
   isDetailsExpanded,
   onAChange,
   onBChange,
+  aPct,
+  bPct,
+  onAPctChange,
+  onBPctChange,
   onToggleGrid,
   onToggleDetails,
 }: GeneRowProps) {
@@ -485,6 +530,8 @@ function GeneRow({
             onChange={onAChange}
             validStates={validStates}
             geneType={gene.gene_type}
+            possHetPercent={aPct}
+            onPossHetPercentChange={onAPctChange}
           />
           <ParentPicker
             id={`${gene.id}-b`}
@@ -493,6 +540,8 @@ function GeneRow({
             onChange={onBChange}
             validStates={validStates}
             geneType={gene.gene_type}
+            possHetPercent={bPct}
+            onPossHetPercentChange={onBPctChange}
           />
         </div>
 
@@ -656,6 +705,8 @@ interface ParentPickerProps {
   onChange: (s: AlleleState) => void
   validStates: AlleleState[]
   geneType: GeneType
+  possHetPercent: number
+  onPossHetPercentChange: (n: number) => void
 }
 
 function ParentPicker({
@@ -665,6 +716,8 @@ function ParentPicker({
   onChange,
   validStates,
   geneType,
+  possHetPercent,
+  onPossHetPercentChange,
 }: ParentPickerProps) {
   return (
     <div>
@@ -686,6 +739,27 @@ function ParentPicker({
           </option>
         ))}
       </select>
+
+      {/* Possible-het percentage. Only meaningful for recessives, and only
+          shown once the keeper has actually picked "poss. het" — otherwise it
+          is noise on every row. 66% and 50% cover almost all real listings. */}
+      {value === 'poss_het' && (
+        <div className="mt-2 flex items-center gap-2">
+          <select
+            aria-label={`${label} possible het percentage`}
+            value={possHetPercent}
+            onChange={(e) =>
+              onPossHetPercentChange(Number(e.target.value))
+            }
+            className="flex-1 bg-neutral-950 border border-neutral-800 text-white px-2 py-1.5 rounded-md text-xs focus:outline-none focus:border-herp-teal/50"
+          >
+            <option value={66}>66% het</option>
+            <option value={50}>50% het</option>
+            <option value={25}>25% het</option>
+            <option value={100}>100% het (proven)</option>
+          </select>
+        </div>
+      )}
     </div>
   )
 }
@@ -775,6 +849,29 @@ function PunnettGridView({ gene, aState, bState }: PunnettGridViewProps) {
         <DistBar label="1 copy" count={1} prob={dist[1]} geneType={gene.gene_type} />
         <DistBar label="2 copies" count={2} prob={dist[2]} geneType={gene.gene_type} />
       </div>
+
+      {/* The hobby's "66% het" figure. RECESSIVE ONLY — for a dominant or
+          co-dominant gene a single copy is visible, so there is no hidden
+          carrier to quote odds on and this line would be meaningless. */}
+      {gene.gene_type === 'recessive' &&
+        (() => {
+          const pct = possHetPercentage(dist)
+          if (pct === null || pct <= 0) return null
+          return (
+            <p className="mt-3 text-xs text-neutral-400 border-t border-neutral-800 pt-3">
+              Of the hatchlings that don&rsquo;t visually show{' '}
+              <span className="text-neutral-200">{gene.common_name}</span>,{' '}
+              <span className="text-herp-lime font-semibold">
+                {pct.toFixed(0)}%
+              </span>{' '}
+              carry it — normally written{' '}
+              <span className="text-neutral-200">
+                {pct.toFixed(0)}% het {gene.common_name}
+              </span>
+              .
+            </p>
+          )
+        })()}
     </div>
   )
 }

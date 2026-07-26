@@ -144,15 +144,21 @@ export const CALCULATOR_SPECIES: CalculatorSpecies[] = [
 // We normalize to allele counts (0/1/2) internally for Punnett math.
 // ---------------------------------------------------------------------------
 
-export type AlleleState = 'absent' | 'het' | 'visual' | 'super'
+export type AlleleState = 'absent' | 'het' | 'poss_het' | 'visual' | 'super'
 
 /**
  * The allele states a parent can meaningfully hold, given the gene's
  * inheritance mode. UI uses this to render only the sensible picker options.
+ *
+ * 'poss_het' ("possible het", e.g. "66% het Albino") is offered for RECESSIVE
+ * genes only. For dominant / co-dominant / incomplete-dominant genes a single
+ * copy is visible, so a carrier is never hidden and "possible het" is
+ * meaningless — you can always see whether the animal has the gene.
  */
 export function validStatesForGene(geneType: GeneType): AlleleState[] {
   switch (geneType) {
     case 'recessive':
+      return ['absent', 'poss_het', 'het', 'visual']
     case 'dominant':
       // Dominants don't have a super form in hobby parlance — two copies
       // looks identical to one. Keep the picker to 0/1/2 with 'visual' = 2.
@@ -174,10 +180,44 @@ export function stateToCount(
 ): 0 | 1 | 2 {
   if (state === 'absent') return 0
   if (state === 'super') return 2
-  if (state === 'het') return 1
+  // A possible het is *probably* carrying one copy. This best-guess count is
+  // for display only — the offspring math never uses it, because a poss-het
+  // parent is a probability distribution, not a fixed genotype. See
+  // allelePassProbability().
+  if (state === 'het' || state === 'poss_het') return 1
   // 'visual'
   if (geneType === 'recessive' || geneType === 'dominant') return 2
   return 1 // codominant / incomplete_dominant visual = 1 copy
+}
+
+/**
+ * Probability that a parent passes the morph allele to any given offspring.
+ *
+ * This is the single value the offspring math needs from a parent, and it is
+ * what makes "possible het" parents work:
+ *
+ *   - absent (0 copies)      → 0     (never passes)
+ *   - het (1 copy)           → 0.5
+ *   - visual recessive (2)   → 1     (always passes)
+ *   - co-dom visual (1 copy) → 0.5
+ *   - super (2 copies)       → 1
+ *   - 66% poss het           → 0.66 × 0.5 = 0.33
+ *
+ * The poss-het case blends two different uncertainties: whether the parent
+ * carries the gene at all, and Mendelian chance given that it does. Callers
+ * displaying results should be careful not to present the combined number as
+ * pure Mendelian odds.
+ */
+export function allelePassProbability(
+  state: AlleleState,
+  geneType: GeneType,
+  possHetPercent?: number | null,
+): number {
+  if (state === 'poss_het') {
+    const pct = Math.min(100, Math.max(0, possHetPercent ?? 0)) / 100
+    return pct * 0.5
+  }
+  return stateToCount(state, geneType) / 2
 }
 
 /**
@@ -206,6 +246,7 @@ export function countToState(
 export function stateLabel(state: AlleleState, geneType: GeneType): string {
   if (state === 'absent') return 'none'
   if (state === 'het') return 'het'
+  if (state === 'poss_het') return 'poss. het'
   if (state === 'super') return 'super'
   // visual
   if (geneType === 'recessive' || geneType === 'dominant') {
@@ -242,8 +283,21 @@ export function punnett(
   parentA: 0 | 1 | 2,
   parentB: 0 | 1 | 2,
 ): CountDistribution {
-  const pA = parentA / 2 // probability A passes morph allele
-  const pB = parentB / 2
+  return punnettFromPass(parentA / 2, parentB / 2)
+}
+
+/**
+ * The general form: combine two arbitrary allele-pass probabilities.
+ *
+ * `punnett()` above is the special case where each parent has a known,
+ * definite genotype (pass probability is exactly 0, 0.5 or 1). Possible-het
+ * parents produce intermediate values (a 66% het passes with p = 0.33), which
+ * is why the math is expressed over probabilities rather than allele counts.
+ */
+export function punnettFromPass(
+  pA: number,
+  pB: number,
+): CountDistribution {
   const qA = 1 - pA
   const qB = 1 - pB
   return {
@@ -251,6 +305,32 @@ export function punnett(
     1: pA * qB + qA * pB,
     2: pA * pB,
   }
+}
+
+/**
+ * The hobby's "66% het" number, for a RECESSIVE gene.
+ *
+ * Given an offspring distribution, this answers: "for a baby that does not
+ * visually show the trait, what's the chance it's a carrier?" That's a
+ * conditional probability — we exclude the visual (2-copy) offspring, because
+ * a visual animal is not a het:
+ *
+ *     P(het | not visual) = P(1 copy) / (P(0 copies) + P(1 copy))
+ *
+ * Worked examples, which are the numbers keepers actually quote:
+ *   het × het        → 0.50 / 0.75 = 66.7%  →  "66% het"
+ *   visual × normal  → 1.00 / 1.00 = 100%   →  "100% het"
+ *   het × normal     → 0.50 / 1.00 = 50%    →  "50% het"
+ *
+ * Returns null when every offspring is visual (nothing left to be "possibly"
+ * het), so callers can omit the row entirely rather than print a misleading 0.
+ */
+export function possHetPercentage(
+  dist: CountDistribution,
+): number | null {
+  const nonVisual = dist[0] + dist[1]
+  if (nonVisual <= 0) return null
+  return (dist[1] / nonVisual) * 100
 }
 
 /**
@@ -303,6 +383,18 @@ export interface GeneInput {
   gene: Gene
   parentA: 0 | 1 | 2
   parentB: 0 | 1 | 2
+  /**
+   * Optional "possible het" percentages (0–100) per parent. When set, that
+   * parent is treated as *probably* carrying one copy rather than definitely
+   * holding `parentA`/`parentB` copies — a 66 here means the parent passes the
+   * morph allele with probability 0.66 × 0.5 = 0.33.
+   *
+   * Only meaningful for recessive genes (see validStatesForGene). Leaving
+   * these undefined preserves the original definite-genotype behaviour, so
+   * existing callers are unaffected.
+   */
+  parentAPossHet?: number | null
+  parentBPossHet?: number | null
 }
 
 export interface OffspringOutcome {
@@ -323,10 +415,14 @@ export function combineOffspring(
 ): OffspringOutcome[] {
   if (inputs.length === 0) return []
 
-  // Per-gene distributions.
+  // Per-gene distributions. A poss-het parent contributes an intermediate
+  // pass probability (pct × 0.5); otherwise it's the definite count / 2.
   const perGene = inputs.map((g) => ({
     gene: g.gene,
-    dist: punnett(g.parentA, g.parentB),
+    dist: punnettFromPass(
+      g.parentAPossHet != null ? (g.parentAPossHet / 100) * 0.5 : g.parentA / 2,
+      g.parentBPossHet != null ? (g.parentBPossHet / 100) * 0.5 : g.parentB / 2,
+    ),
   }))
 
   // Cartesian product — each combination is one genotype vector.
