@@ -103,7 +103,11 @@ function MorphCalculatorScreen() {
   const { colors, layout } = useTheme();
   const { snakeId } = useLocalSearchParams<{ snakeId?: string }>();
 
-  const species = CALCULATOR_SPECIES[0]; // Ball python only for now
+  // Species is selectable once more than one catalog is seeded. Arriving with
+  // ?snakeId= still lands on the first species, which is the ball python —
+  // that pre-fill path only exists for ball python genotypes today.
+  const [speciesIdx, setSpeciesIdx] = useState(0);
+  const species = CALCULATOR_SPECIES[speciesIdx] ?? CALCULATOR_SPECIES[0];
 
   const [genes, setGenes] = useState<Gene[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -120,6 +124,12 @@ function MorphCalculatorScreen() {
         if (cancelled) return;
         setGenes(list ?? []);
         setLoadError(null);
+        // Genes are species-specific, so any picked parents from the previous
+        // species are meaningless now — clear them rather than silently
+        // computing odds against genes the new species doesn't have.
+        setParentA([]);
+        setParentB([]);
+        setActiveParent(null);
       } catch {
         if (!cancelled) setLoadError("Couldn't load the gene catalog.");
       }
@@ -243,6 +253,41 @@ function MorphCalculatorScreen() {
         leftAction={<HeaderBackButton />}
       />
       <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Species selector — only rendered once more than one gene catalog
+            exists, so it stays invisible until it earns its space. */}
+        {CALCULATOR_SPECIES.length > 1 && (
+          <View style={styles.speciesRow}>
+            {CALCULATOR_SPECIES.map((s, i) => {
+              const active = i === speciesIdx;
+              return (
+                <TouchableOpacity
+                  key={s.scientific_name}
+                  onPress={() => setSpeciesIdx(i)}
+                  style={[
+                    styles.speciesChip,
+                    {
+                      backgroundColor: active ? colors.primary : colors.surface,
+                      borderRadius: layout.radius.md,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`Calculate for ${s.common_name}`}
+                >
+                  <Text
+                    style={[
+                      styles.speciesChipText,
+                      { color: active ? '#0B0B0B' : colors.textSecondary },
+                    ]}
+                  >
+                    {s.common_name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         {loadError ? (
           <Text style={{ color: colors.danger }}>{loadError}</Text>
         ) : !genes ? (
@@ -968,6 +1013,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { padding: 16, gap: 12, paddingBottom: 48 },
   center: { paddingVertical: 40, alignItems: 'center' },
+  speciesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  speciesChip: { paddingHorizontal: 14, paddingVertical: 8 },
+  speciesChipText: { fontSize: 13, fontWeight: '700' },
   note: { fontSize: 13, lineHeight: 19 },
   disclaimer: {
     fontSize: 11,
