@@ -141,8 +141,21 @@ def _decode_with_jwks(
             last_error = exc
             continue
 
+    # Include the token's OWN aud/iss in the error. These are public client
+    # identifiers (they ship inside every app bundle), not secrets — and
+    # without them an "Invalid audience" failure gives no way to tell which
+    # client id is missing from the allowlist short of guessing.
+    try:
+        unverified = jwt.get_unverified_claims(token)
+        token_aud = unverified.get("aud")
+        token_iss = unverified.get("iss")
+    except Exception:
+        token_aud = token_iss = "<unreadable>"
+
     raise OAuthVerificationError(
-        f"Identity token failed verification (audience/signature): {last_error}"
+        f"Identity token failed verification: {last_error}. "
+        f"Token aud={token_aud!r} iss={token_iss!r}; "
+        f"configured audiences={audiences!r}"
     )
 
 
