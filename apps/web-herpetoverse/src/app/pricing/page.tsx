@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import type { Metadata } from 'next'
 import PricingPlans from './PricingPlans'
+import SiteNav from '@/components/SiteNav'
 
 /**
  * Herpetoverse pricing page. Self-serve Stripe Checkout for Premium
@@ -21,23 +21,9 @@ export const metadata: Metadata = {
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-herp-dark text-neutral-100">
-      {/* Nav */}
-      <nav className="border-b border-neutral-900 sticky top-0 z-40 bg-herp-dark/90 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl" aria-hidden="true">🦎</span>
-            <span className="text-xl font-bold tracking-wide bg-gradient-to-r from-herp-green to-herp-teal bg-clip-text text-transparent">
-              Herpetoverse
-            </span>
-          </Link>
-          <Link
-            href="/app/reptiles"
-            className="text-sm text-neutral-400 hover:text-white transition-colors"
-          >
-            Open app
-          </Link>
-        </div>
-      </nav>
+      {/* Auth-aware nav — signed-out visitors get Sign in / Create account
+          rather than an "Open app" link that bounces them back here. */}
+      <SiteNav hidePricing />
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-14">
         {/* Header */}

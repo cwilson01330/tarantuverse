@@ -32,6 +32,7 @@ import {
   animalTitle,
   fmtGrams,
   listAnimals,
+  quickFeedAnimal,
   relativeDays,
 } from '@/lib/animals'
 import { lastFedTextClass } from '@/lib/cgd'
@@ -291,16 +292,44 @@ export default function ReptilesPage() {
 }
 
 function ReptileCard({ row }: { row: ReptileRow }) {
+  // Optimistic local override so the card updates the instant the chip is
+  // tapped, without refetching the whole collection.
+  const [fedAt, setFedAt] = useState<string | null>(row.last_fed_at)
+  const [feeding, setFeeding] = useState(false)
+  const [fedError, setFedError] = useState<string | null>(null)
+
   const weight = fmtGrams(row.current_weight_g)
-  const lastFed = relativeDays(row.last_fed_at)
-  const lastFedClass = lastFedTextClass(row.last_fed_at, row.feeds_on_cgd)
+  const lastFed = relativeDays(fedAt)
+  const lastFedClass = lastFedTextClass(fedAt, row.feeds_on_cgd)
   const { label: taxonLabel, glyph: taxonGlyph } = taxonMeta(row.taxon)
 
+  // The card is a Link, so the chip must swallow the navigation.
+  async function handleQuickFeed(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (feeding) return
+    setFeeding(true)
+    setFedError(null)
+    const previous = fedAt
+    setFedAt(new Date().toISOString()) // optimistic
+    try {
+      const log = await quickFeedAnimal(row.id)
+      setFedAt(log.fed_at ?? new Date().toISOString())
+    } catch (err) {
+      setFedAt(previous) // roll back
+      setFedError(
+        err instanceof ApiError ? err.message : 'Could not log that feeding.',
+      )
+    } finally {
+      setFeeding(false)
+    }
+  }
+
   return (
-    <Link
-      href={detailHref(row)}
-      className="group p-5 rounded-lg border border-neutral-800 bg-neutral-900/40 hover:border-herp-teal/40 hover:bg-neutral-900/60 transition-colors block"
-    >
+    // The Fed chip is a SIBLING of the link, not a child — a <button> nested
+    // inside an <a> is invalid HTML and breaks keyboard/AT navigation.
+    <div className="group rounded-lg border border-neutral-800 bg-neutral-900/40 hover:border-herp-teal/40 hover:bg-neutral-900/60 transition-colors">
+      <Link href={detailHref(row)} className="block p-5 pb-3">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
@@ -342,7 +371,26 @@ function ReptileCard({ row }: { row: ReptileRow }) {
           <dd className={lastFedClass}>{lastFed || '—'}</dd>
         </div>
       </dl>
-    </Link>
+      </Link>
+
+      {/* One-tap Fed — parity with the mobile collection. Reuses the animal's
+          last meal server-side, so no form is needed for routine feedings. */}
+      <div className="mx-5 mb-4 pt-3 border-t border-neutral-800/70 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleQuickFeed}
+          disabled={feeding}
+          aria-label={`Log a feeding for ${row.title}`}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-neutral-700 text-[11px] font-medium text-neutral-300 hover:border-herp-teal/60 hover:text-white disabled:opacity-50 disabled:cursor-wait transition-colors"
+        >
+          <span aria-hidden="true">🍽️</span>
+          {feeding ? 'Logging…' : 'Fed'}
+        </button>
+        {fedError && (
+          <span className="text-[11px] text-red-400 truncate">{fedError}</span>
+        )}
+      </div>
+    </div>
   )
 }
 

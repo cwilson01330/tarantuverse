@@ -396,6 +396,20 @@ export function createFeeding(
   )
 }
 
+/**
+ * One-tap "Fed" — logs an accepted feeding NOW, reusing the animal's last meal
+ * (food type/size) server-side, so the keeper doesn't re-enter anything. Ideal
+ * for frequent feeders (a beardie fed daily). Details can be edited afterward.
+ *
+ * Mirrors quickFeedAnimal() in the mobile app so both surfaces behave the same.
+ */
+export function quickFeedAnimal(animalId: string): Promise<FeedingLog> {
+  return apiFetch<FeedingLog>(
+    `/api/v1/animals/${encodeURIComponent(animalId)}/quick-feed`,
+    { method: 'POST' },
+  )
+}
+
 export function deleteFeeding(id: string): Promise<void> {
   return apiFetch<void>(`/api/v1/feedings/${encodeURIComponent(id)}`, {
     method: 'DELETE',

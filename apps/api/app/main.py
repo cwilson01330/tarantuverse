@@ -138,9 +138,23 @@ async def maintenance_middleware(request: Request, call_next):
     # Only check write methods
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         # Allow the system-status and health endpoints through always
-        path = request.url.path
-        safe_paths = ("/", "/health", "/api/v1/system/status", "/api/v1/auth/login")
-        if not any(path.startswith(sp) for sp in safe_paths):
+        path = request.url.path.rstrip("/") or "/"
+        # NOTE: these are matched EXACTLY, not by prefix. The original code used
+        # `startswith`, and because "/" was in the list every single path matched,
+        # so maintenance mode silently never blocked anything.
+        safe_paths = {
+            "/",
+            "/health",
+            "/api/v1/system/status",
+            "/api/v1/auth/login",
+            "/api/v1/auth/logout",
+            "/api/v1/auth/refresh",
+            # Payment webhooks must never be 503'd — providers retry with backoff
+            # and we'd risk dropping entitlement events.
+            "/api/v1/subscriptions/webhook",
+            "/api/v1/subscriptions/apple-notifications",
+        }
+        if path not in safe_paths:
             try:
                 from app.services import settings_service
                 from app.database import SessionLocal
