@@ -27,6 +27,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -97,6 +98,23 @@ export default function UpgradeModal({
   }, [visible, iapOn]);
 
   const showStore = iapOn && products.length > 0;
+
+  // ---------------------------------------------------------------------
+  // App Store Guideline 3.1.1 — never point iOS users at a web checkout.
+  //
+  // NOTE: this is deliberately STRICTER than Tarantuverse's equivalent gate
+  // (apps/mobile/app/subscription.tsx). TV also reveals the web link when the
+  // store returns zero products, which is safe there only because TV's
+  // products exist — that branch never fires in review. Herpetoverse has no
+  // App Store products yet, so on iOS that fallback is the DEFAULT state and
+  // would show a reviewer a Stripe checkout link. That's the textbook 3.1.1
+  // rejection.
+  //
+  // Rule here: on iOS the ONLY purchase path is native IAP. If there are no
+  // products, we show no purchase path at all rather than an external one.
+  // Android may link out (Google permits it), as may Expo Go for dev testing.
+  const canLinkToWebCheckout = Platform.OS !== 'ios' || !iapOn;
+  // ---------------------------------------------------------------------
 
   // Product-aware labels derived from the product id (Premium vs All-Access,
   // monthly/yearly/lifetime) so buttons read cleanly instead of raw store
@@ -325,7 +343,7 @@ export default function UpgradeModal({
                   </Text>
                 </TouchableOpacity>
               </>
-            ) : (
+            ) : canLinkToWebCheckout ? (
               <>
                 <Text style={[styles.honestNote, { color: colors.textTertiary }]}>
                   {iapOn
@@ -345,6 +363,61 @@ export default function UpgradeModal({
                   <Text style={styles.primaryBtnText}>Learn more</Text>
                 </TouchableOpacity>
               </>
+            ) : (
+              // iOS with no store products: say so plainly. No external link
+              // (3.1.1), and no fake "coming soon" that implies a path exists.
+              <Text style={[styles.honestNote, { color: colors.textTertiary }]}>
+                Premium isn&apos;t available for purchase in the app just yet.
+                Everything you&apos;re already tracking stays exactly as it is.
+              </Text>
+            )}
+
+            {/* Guideline 3.1.2 — auto-renew terms plus Terms/Privacy must be
+                visible wherever a subscription can actually be bought. Only
+                rendered alongside a real purchase path; showing renewal terms
+                with nothing to buy would just be noise. */}
+            {showStore && (
+              <View style={styles.legalWrap}>
+                <Text style={[styles.legalText, { color: colors.textTertiary }]}>
+                  {Platform.OS === 'ios'
+                    ? 'Payment will be charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings. Lifetime is a one-time purchase and does not renew.'
+                    : 'Payment will be charged to your Google Play account at confirmation of purchase. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel in your Google Play account settings. Lifetime is a one-time purchase and does not renew.'}
+                </Text>
+                <View style={styles.legalLinks}>
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL('https://herpetoverse.com/terms')}
+                    accessibilityRole="link"
+                  >
+                    <Text style={[styles.legalLinkText, { color: colors.textSecondary }]}>
+                      Terms of Use
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.legalText, { color: colors.textTertiary }]}> • </Text>
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL('https://herpetoverse.com/privacy-policy')}
+                    accessibilityRole="link"
+                  >
+                    <Text style={[styles.legalLinkText, { color: colors.textSecondary }]}>
+                      Privacy Policy
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.legalText, { color: colors.textTertiary }]}> • </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      Linking.openURL(
+                        Platform.OS === 'ios'
+                          ? 'https://apps.apple.com/account/subscriptions'
+                          : 'https://play.google.com/store/account/subscriptions',
+                      )
+                    }
+                    accessibilityRole="link"
+                  >
+                    <Text style={[styles.legalLinkText, { color: colors.textSecondary }]}>
+                      Manage subscription
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
 
             {/* Dismiss */}
@@ -437,6 +510,22 @@ const styles = StyleSheet.create({
 
   dismissBtn: { paddingVertical: 12, alignItems: 'center' },
   dismissText: { fontSize: 14, fontWeight: '600' },
+  // Guideline 3.1.2 disclosure block — deliberately small and low-contrast;
+  // it's required legal text, not something to compete with the buy buttons.
+  legalWrap: { marginTop: 16, gap: 8 },
+  legalText: { fontSize: 11, lineHeight: 16, textAlign: 'center' },
+  legalLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  legalLinkText: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
 
   loadingRow: {
     flexDirection: 'row',

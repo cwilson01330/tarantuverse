@@ -640,19 +640,23 @@ function ImportScreen() {
                       You hit the free plan&apos;s 5-animal limit — the remaining rows weren&apos;t
                       imported. Premium keepers get unlimited animals.
                     </Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        Linking.openURL('https://herpetoverse.com/pricing').catch(() => {
-                          /* keep the screen up if the browser can't open */
-                        });
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel="Learn more about premium on the web"
-                    >
-                      <Text style={[styles.capLink, { color: colors.warning }]}>
-                        Learn more about premium →
-                      </Text>
-                    </TouchableOpacity>
+                    {/* Guideline 3.1.1: iOS must never be pointed at a web
+                        checkout for digital goods. Android may link out. */}
+                    {Platform.OS !== 'ios' && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          Linking.openURL('https://herpetoverse.com/pricing').catch(() => {
+                            /* keep the screen up if the browser can't open */
+                          });
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Learn more about premium on the web"
+                      >
+                        <Text style={[styles.capLink, { color: colors.warning }]}>
+                          Learn more about premium →
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}
