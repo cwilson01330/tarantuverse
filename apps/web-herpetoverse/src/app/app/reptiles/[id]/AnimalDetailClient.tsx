@@ -60,6 +60,9 @@ import {
   deleteFeeding,
   deleteShed,
   deleteWeightLog,
+  updateFeeding,
+  updateShed,
+  updateWeightLog,
   fmtDate,
   fmtDecimal,
   fmtGrams,
@@ -99,6 +102,13 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   // Shed slice
   const [sheds, setSheds] = useState<ShedLog[]>([])
   const [shedError, setShedError] = useState<string | null>(null)
+
+  // Which log row (if any) each inline form is currently editing. Held here
+  // rather than inside the forms because the Edit affordance lives on the
+  // list, which is a sibling of the form.
+  const [editingWeight, setEditingWeight] = useState<WeightLog | null>(null)
+  const [editingFeeding, setEditingFeeding] = useState<FeedingLog | null>(null)
+  const [editingShed, setEditingShed] = useState<ShedLog | null>(null)
 
   // Loading flags, coarse
   const [loading, setLoading] = useState(true)
@@ -285,8 +295,17 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
         {trend && <WeightLossBanner trend={trend} />}
         <WeightChart logs={weightLogs} />
         <WeightStats animal={animal} logs={weightLogs} trend={trend} />
-        <LogWeightForm animalId={animal.id} onCreated={refetchWeights} />
-        <WeightLogList logs={weightLogs} onDelete={refetchWeights} />
+        <LogWeightForm
+          animalId={animal.id}
+          onCreated={refetchWeights}
+          editing={editingWeight}
+          onEditDone={() => setEditingWeight(null)}
+        />
+        <WeightLogList
+          logs={weightLogs}
+          onDelete={refetchWeights}
+          onEdit={setEditingWeight}
+        />
       </Section>
 
       <Section title="Feeding intelligence">
@@ -308,18 +327,26 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           suggestion={preySuggestion}
           onCreated={refetchFeedings}
           onPauseChanged={refetchAll}
+          editing={editingFeeding}
+          onEditDone={() => setEditingFeeding(null)}
         />
         <FeedingList
           feedings={feedings}
           animalWeightG={animal.current_weight_g}
           onDelete={refetchFeedings}
+          onEdit={setEditingFeeding}
         />
       </Section>
 
       <Section title="Sheds">
         {shedError && <InlineError message={shedError} />}
-        <LogShedForm animalId={animal.id} onCreated={refetchSheds} />
-        <ShedList sheds={sheds} onDelete={refetchSheds} />
+        <LogShedForm
+          animalId={animal.id}
+          onCreated={refetchSheds}
+          editing={editingShed}
+          onEditDone={() => setEditingShed(null)}
+        />
+        <ShedList sheds={sheds} onDelete={refetchSheds} onEdit={setEditingShed} />
       </Section>
 
       {/* Provenance — only when the animal arrived via a claimed transfer.
@@ -832,9 +859,14 @@ function WeightStats({
 function LogWeightForm({
   animalId,
   onCreated,
+  editing,
+  onEditDone,
 }: {
   animalId: string
   onCreated: () => void
+  /** Non-null puts the form in edit mode, prefilled from this log. */
+  editing?: WeightLog | null
+  onEditDone?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [date, setDate] = useState(() => todayISO())
@@ -852,6 +884,23 @@ function LogWeightForm({
     setError(null)
   }
 
+  // Entering edit mode opens the form prefilled from the chosen row.
+  useEffect(() => {
+    if (!editing) return
+    setDate(isoToDateInput(editing.weighed_at))
+    setGrams(editing.weight_g == null ? '' : String(editing.weight_g))
+    setContext(editing.context)
+    setNotes(editing.notes ?? '')
+    setError(null)
+    setOpen(true)
+  }, [editing])
+
+  const closeForm = () => {
+    reset()
+    setOpen(false)
+    onEditDone?.()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
@@ -863,15 +912,25 @@ function LogWeightForm({
     setError(null)
     setSubmitting(true)
     try {
+      // Preserve the original timestamp (incl. time of day) when the keeper
+      // didn't touch the date — otherwise editing a note would silently
+      // re-stamp the log to midnight and could shift it a day.
+      const dateUnchanged =
+        editing != null && date === isoToDateInput(editing.weighed_at)
       const payload: CreateWeightLogPayload = {
-        weighed_at: new Date(date).toISOString(),
+        weighed_at: dateUnchanged
+          ? editing!.weighed_at
+          : new Date(date).toISOString(),
         weight_g: g,
         context,
         notes: notes.trim() || null,
       }
-      await createWeightLog(animalId, payload)
-      reset()
-      setOpen(false)
+      if (editing) {
+        await updateWeightLog(editing.id, payload)
+      } else {
+        await createWeightLog(animalId, payload)
+      }
+      closeForm()
       onCreated()
     } catch (err) {
       setError(errMsg(err, 'Could not save weight.'))
@@ -951,14 +1010,11 @@ function LogWeightForm({
           disabled={submitting}
           className="herp-gradient-bg text-herp-dark font-semibold text-sm px-4 py-2 rounded-md disabled:opacity-50"
         >
-          {submitting ? 'Saving…' : 'Save weight'}
+          {submitting ? 'Saving…' : editing ? 'Save changes' : 'Save weight'}
         </button>
         <button
           type="button"
-          onClick={() => {
-            reset()
-            setOpen(false)
-          }}
+          onClick={closeForm}
           className="text-sm text-neutral-400 hover:text-neutral-200 px-3 py-2"
         >
           Cancel
@@ -971,9 +1027,11 @@ function LogWeightForm({
 function WeightLogList({
   logs,
   onDelete,
+  onEdit,
 }: {
   logs: WeightLog[]
   onDelete: () => void
+  onEdit?: (log: WeightLog) => void
 }) {
   const sorted = useMemo(
     () =>
@@ -1013,6 +1071,7 @@ function WeightLogList({
             <span className="text-neutral-400 text-xs truncate flex-1">
               {l.notes}
             </span>
+            {onEdit && <EditRowButton label="weight" onEdit={() => onEdit(l)} />}
             <DeleteRowButton
               label="weight"
               onDelete={() => deleteWeightLog(l.id).then(onDelete)}
@@ -1239,11 +1298,17 @@ function InfoBlock({
 // Feeding log section
 // ---------------------------------------------------------------------------
 
+/** Marker the feeding form prepends to a regurgitation's notes. Kept as a
+ *  constant so the write path and the edit-prefill unwrap can't drift. */
+const REGURG_PREFIX = 'Regurgitation.'
+
 function LogFeedingForm({
   animal,
   suggestion,
   onCreated,
   onPauseChanged,
+  editing,
+  onEditDone,
 }: {
   animal: Animal
   suggestion: PreySuggestion | null
@@ -1251,6 +1316,9 @@ function LogFeedingForm({
   /** Called after pausing/resuming so the parent refetches the animal
    *  (and the FeedingIntelligence/banner reflect the new state). */
   onPauseChanged: () => void
+  /** Non-null puts the form in edit mode, prefilled from this log. */
+  editing?: FeedingLog | null
+  onEditDone?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [date, setDate] = useState(() => todayISO())
@@ -1309,25 +1377,59 @@ function LogFeedingForm({
     setError(null)
   }
 
+  useEffect(() => {
+    if (!editing) return
+    setDate(isoToDateInput(editing.fed_at))
+    setFoodType(editing.food_type ?? '')
+    setPreyWeight(
+      editing.prey_weight_g == null ? '' : String(editing.prey_weight_g),
+    )
+    // A regurgitation is stored as accepted=false with the notes prefixed.
+    // Unwrap it so re-saving doesn't stack a second "Regurgitation." prefix.
+    const rawNotes = editing.notes ?? ''
+    if (!editing.accepted && rawNotes.startsWith(REGURG_PREFIX)) {
+      setAccepted('regurg')
+      setNotes(rawNotes.slice(REGURG_PREFIX.length).trim())
+    } else {
+      setAccepted(editing.accepted ? 'yes' : 'no')
+      setNotes(rawNotes)
+    }
+    setError(null)
+    setOpen(true)
+  }, [editing])
+
+  const closeForm = () => {
+    reset()
+    setOpen(false)
+    onEditDone?.()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
     setError(null)
     setSubmitting(true)
     try {
+      // See LogWeightForm: preserve the original timestamp when the keeper
+      // didn't change the date.
+      const dateUnchanged =
+        editing != null && date === isoToDateInput(editing.fed_at)
       const payload: CreateFeedingPayload = {
-        fed_at: new Date(date).toISOString(),
+        fed_at: dateUnchanged ? editing!.fed_at : new Date(date).toISOString(),
         food_type: foodType.trim() || null,
         accepted: accepted === 'yes',
         prey_weight_g: preyWeight ? Number(preyWeight) : null,
         notes:
           accepted === 'regurg'
-            ? `Regurgitation. ${notes.trim()}`.trim()
+            ? `${REGURG_PREFIX} ${notes.trim()}`.trim()
             : notes.trim() || null,
       }
-      await createFeeding(animal.id, payload)
-      reset()
-      setOpen(false)
+      if (editing) {
+        await updateFeeding(editing.id, payload)
+      } else {
+        await createFeeding(animal.id, payload)
+      }
+      closeForm()
       onCreated()
     } catch (err) {
       setError(errMsg(err, 'Could not save feeding.'))
@@ -1600,14 +1702,11 @@ function LogFeedingForm({
           disabled={submitting}
           className="herp-gradient-bg text-herp-dark font-semibold text-sm px-4 py-2 rounded-md disabled:opacity-50"
         >
-          {submitting ? 'Saving…' : 'Save feeding'}
+          {submitting ? 'Saving…' : editing ? 'Save changes' : 'Save feeding'}
         </button>
         <button
           type="button"
-          onClick={() => {
-            reset()
-            setOpen(false)
-          }}
+          onClick={closeForm}
           className="text-sm text-neutral-400 hover:text-neutral-200 px-3 py-2"
         >
           Cancel
@@ -1631,10 +1730,12 @@ function FeedingList({
   feedings,
   animalWeightG,
   onDelete,
+  onEdit,
 }: {
   feedings: FeedingLog[]
   animalWeightG: string | null
   onDelete: () => void
+  onEdit?: (log: FeedingLog) => void
 }) {
   const sorted = useMemo(
     () =>
@@ -1697,6 +1798,9 @@ function FeedingList({
               <span className="text-neutral-400 text-xs truncate flex-1 min-w-0">
                 {f.notes}
               </span>
+              {onEdit && (
+                <EditRowButton label="feeding" onEdit={() => onEdit(f)} />
+              )}
               <DeleteRowButton
                 label="feeding"
                 onDelete={() => deleteFeeding(f.id).then(onDelete)}
@@ -1727,9 +1831,14 @@ function FeedingList({
 function LogShedForm({
   animalId,
   onCreated,
+  editing,
+  onEditDone,
 }: {
   animalId: string
   onCreated: () => void
+  /** Non-null puts the form in edit mode, prefilled from this log. */
+  editing?: ShedLog | null
+  onEditDone?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [date, setDate] = useState(() => todayISO())
@@ -1747,21 +1856,46 @@ function LogShedForm({
     setError(null)
   }
 
+  useEffect(() => {
+    if (!editing) return
+    setDate(isoToDateInput(editing.shed_at))
+    setComplete(editing.is_complete_shed ?? true)
+    setRetained(editing.has_retained_shed ?? false)
+    setNotes(editing.notes ?? '')
+    setError(null)
+    setOpen(true)
+  }, [editing])
+
+  const closeForm = () => {
+    reset()
+    setOpen(false)
+    onEditDone?.()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return
     setError(null)
     setSubmitting(true)
     try {
+      // See LogWeightForm: keep the original timestamp when the date wasn't
+      // touched, so editing a note doesn't re-stamp the log.
+      const dateUnchanged =
+        editing != null && date === isoToDateInput(editing.shed_at)
       const payload: CreateShedPayload = {
-        shed_at: new Date(date).toISOString(),
+        shed_at: dateUnchanged
+          ? editing!.shed_at
+          : new Date(date).toISOString(),
         is_complete_shed: complete,
         has_retained_shed: retained,
         notes: notes.trim() || null,
       }
-      await createShed(animalId, payload)
-      reset()
-      setOpen(false)
+      if (editing) {
+        await updateShed(editing.id, payload)
+      } else {
+        await createShed(animalId, payload)
+      }
+      closeForm()
       onCreated()
     } catch (err) {
       setError(errMsg(err, 'Could not save shed.'))
@@ -1833,14 +1967,11 @@ function LogShedForm({
           disabled={submitting}
           className="herp-gradient-bg text-herp-dark font-semibold text-sm px-4 py-2 rounded-md disabled:opacity-50"
         >
-          {submitting ? 'Saving…' : 'Save shed'}
+          {submitting ? 'Saving…' : editing ? 'Save changes' : 'Save shed'}
         </button>
         <button
           type="button"
-          onClick={() => {
-            reset()
-            setOpen(false)
-          }}
+          onClick={closeForm}
           className="text-sm text-neutral-400 hover:text-neutral-200 px-3 py-2"
         >
           Cancel
@@ -1853,9 +1984,11 @@ function LogShedForm({
 function ShedList({
   sheds,
   onDelete,
+  onEdit,
 }: {
   sheds: ShedLog[]
   onDelete: () => void
+  onEdit?: (log: ShedLog) => void
 }) {
   const sorted = useMemo(
     () =>
@@ -1904,6 +2037,7 @@ function ShedList({
             <span className="text-neutral-400 text-xs truncate flex-1 min-w-0">
               {s.notes}
             </span>
+            {onEdit && <EditRowButton label="shed" onEdit={() => onEdit(s)} />}
             <DeleteRowButton
               label="shed"
               onDelete={() => deleteShed(s.id).then(onDelete)}
@@ -1978,6 +2112,28 @@ function InlineError({ message }: { message: string }) {
   )
 }
 
+/** Pencil affordance on a log row — puts the section's inline form into edit
+ *  mode. Paired with DeleteRowButton so every row reads edit-then-delete. */
+function EditRowButton({
+  label,
+  onEdit,
+}: {
+  label: string
+  onEdit: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      aria-label={`Edit this ${label}`}
+      title={`Edit this ${label}`}
+      className="flex-shrink-0 text-neutral-500 hover:text-herp-teal transition-colors px-1.5 py-0.5 text-xs"
+    >
+      ✎
+    </button>
+  )
+}
+
 function DeleteRowButton({
   label,
   onDelete,
@@ -2038,6 +2194,26 @@ function LoadingShell() {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Stored timestamp → the YYYY-MM-DD an <input type="date"> expects, in LOCAL
+ * time so it matches what todayISO() produces and what the keeper sees
+ * elsewhere on the page.
+ *
+ * Note the create path writes `new Date("YYYY-MM-DD").toISOString()`, i.e. UTC
+ * midnight. Round-tripping that through local time can shift the displayed day
+ * for keepers behind UTC, so the edit forms only rewrite the timestamp when the
+ * keeper actually changes the date field — see `dateUnchanged` at each call
+ * site. That keeps an untouched date byte-identical instead of drifting.
+ */
+function isoToDateInput(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return todayISO()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 function todayISO(): string {
   // YYYY-MM-DD in local time (HTML date input wants local).

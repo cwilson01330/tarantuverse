@@ -45,6 +45,7 @@ import {
   todayISO,
 } from '../../../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../../../src/contexts/ThemeContext';
+import UpgradeModal from '../../../../../src/components/UpgradeModal';
 import {
   type CreateClutchPayload,
   createClutch,
@@ -102,6 +103,9 @@ function NewClutchScreen() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Breeding is HV-premium: a 402 opens the upgrade modal.
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [capMessage, setCapMessage] = useState<string | null>(null);
 
   async function handleSubmit() {
     if (submitting) return;
@@ -212,6 +216,17 @@ function NewClutchScreen() {
       const created = await createClutch(payload);
       router.replace(`/breeding/clutches/${created.id}` as never);
     } catch (err) {
+      // Breeding is HV-premium. Reachable if a subscription lapsed after the
+      // pairing was created — offer the upgrade path, not a raw error.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 402) {
+        const detail = (err as { response?: { data?: { detail?: { message?: string } } } })
+          ?.response?.data?.detail;
+        setCapMessage(detail?.message ?? null);
+        setShowUpgrade(true);
+        setSubmitting(false);
+        return;
+      }
       setError(extractErrorMessage(err, "Couldn't save the clutch."));
       setSubmitting(false);
     }
@@ -449,6 +464,15 @@ function NewClutchScreen() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        message={
+          capMessage ??
+          'Breeding tracking is a Herpetoverse premium feature. Upgrade to unlock it.'
+        }
+      />
     </SafeAreaView>
   );
 }

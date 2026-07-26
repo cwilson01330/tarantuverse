@@ -41,6 +41,7 @@ import {
   todayISO,
 } from '../../../../../src/components/forms/FormPrimitives';
 import { useTheme } from '../../../../../src/contexts/ThemeContext';
+import UpgradeModal from '../../../../../src/components/UpgradeModal';
 import {
   OFFSPRING_STATUS_LABEL,
   type CreateOffspringPayload,
@@ -84,6 +85,9 @@ function NewOffspringScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Breeding is HV-premium: a 402 opens the upgrade modal.
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [capMessage, setCapMessage] = useState<string | null>(null);
 
   async function handleSubmit() {
     if (submitting) return;
@@ -134,6 +138,17 @@ function NewOffspringScreen() {
       const created = await createOffspring(payload);
       router.replace(`/breeding/offspring/${created.id}` as never);
     } catch (err) {
+      // Breeding is HV-premium. Reachable if a subscription lapsed after the
+      // clutch was created — offer the upgrade path, not a raw error.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 402) {
+        const detail = (err as { response?: { data?: { detail?: { message?: string } } } })
+          ?.response?.data?.detail;
+        setCapMessage(detail?.message ?? null);
+        setShowUpgrade(true);
+        setSubmitting(false);
+        return;
+      }
       setError(extractErrorMessage(err, "Couldn't save this offspring."));
       setSubmitting(false);
     }
@@ -236,6 +251,15 @@ function NewOffspringScreen() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <UpgradeModal
+        visible={showUpgrade}
+        onClose={() => setShowUpgrade(false)}
+        message={
+          capMessage ??
+          'Breeding tracking is a Herpetoverse premium feature. Upgrade to unlock it.'
+        }
+      />
     </SafeAreaView>
   );
 }

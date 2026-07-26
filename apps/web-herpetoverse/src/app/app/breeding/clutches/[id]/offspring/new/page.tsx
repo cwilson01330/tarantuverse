@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { use, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
+import UpgradeModal from '@/components/UpgradeModal'
 import {
   type CreateOffspringPayload,
   type OffspringStatus,
@@ -42,6 +43,10 @@ export default function NewOffspringPage({
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Breeding is HV-premium (402). Reachable here if a keeper's subscription
+  // lapsed after the clutch was created — show the upgrade path, not a raw
+  // "Payment Required" error.
+  const [capInfo, setCapInfo] = useState<{ message: string | null } | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -61,11 +66,16 @@ export default function NewOffspringPage({
       const created = await createOffspring(payload)
       router.push(`/app/breeding/offspring/${created.id}`)
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Couldn't save this offspring.",
-      )
+      if (err instanceof ApiError && err.status === 402) {
+        const detail = (err.body as { detail?: { message?: unknown } } | null)?.detail
+        setCapInfo({ message: typeof detail?.message === 'string' ? detail.message : null })
+      } else {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Couldn't save this offspring.",
+        )
+      }
     } finally {
       setSubmitting(false)
     }
@@ -188,6 +198,12 @@ export default function NewOffspringPage({
           </Link>
         </div>
       </form>
+
+      <UpgradeModal
+        isOpen={capInfo !== null}
+        onClose={() => setCapInfo(null)}
+        message={capInfo?.message}
+      />
     </article>
   )
 }

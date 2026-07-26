@@ -364,6 +364,17 @@ export function createWeightLog(
   )
 }
 
+/** Edit an existing weight log. Mirrors mobile's updateWeightLog (PUT). */
+export function updateWeightLog(
+  id: string,
+  payload: Partial<CreateWeightLogPayload>,
+): Promise<WeightLog> {
+  return apiFetch<WeightLog>(`/api/v1/weight-logs/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    json: payload,
+  })
+}
+
 export function deleteWeightLog(id: string): Promise<void> {
   return apiFetch<void>(`/api/v1/weight-logs/${encodeURIComponent(id)}`, {
     method: 'DELETE',
@@ -410,6 +421,17 @@ export function quickFeedAnimal(animalId: string): Promise<FeedingLog> {
   )
 }
 
+/** Edit an existing feeding log. Mirrors mobile's updateFeeding (PUT). */
+export function updateFeeding(
+  id: string,
+  payload: Partial<CreateFeedingPayload>,
+): Promise<FeedingLog> {
+  return apiFetch<FeedingLog>(`/api/v1/feedings/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    json: payload,
+  })
+}
+
 export function deleteFeeding(id: string): Promise<void> {
   return apiFetch<void>(`/api/v1/feedings/${encodeURIComponent(id)}`, {
     method: 'DELETE',
@@ -439,6 +461,17 @@ export function createShed(
     `/api/v1/animals/${encodeURIComponent(animalId)}/sheds`,
     { method: 'POST', json: payload },
   )
+}
+
+/** Edit an existing shed log. Mirrors mobile's updateShed (PUT). */
+export function updateShed(
+  id: string,
+  payload: Partial<CreateShedPayload>,
+): Promise<ShedLog> {
+  return apiFetch<ShedLog>(`/api/v1/sheds/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    json: payload,
+  })
 }
 
 export function deleteShed(id: string): Promise<void> {
