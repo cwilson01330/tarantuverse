@@ -19,7 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import GoogleLogo from '../src/components/GoogleLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/contexts/AuthContext';
@@ -276,20 +276,25 @@ export default function RegisterScreen() {
                       </Text>
                     </TouchableOpacity>
                   )}
-                  {/* Apple's native control — see login.tsx for why a
-                      lookalike button is a Guideline 4.8 risk. */}
-                  {appleAvailable && Platform.OS === 'ios' && (
-                    <AppleAuthentication.AppleAuthenticationButton
-                      buttonType={
-                        AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
-                      }
-                      buttonStyle={
-                        AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                      }
-                      cornerRadius={layout.radius.md}
-                      style={styles.appleButton}
+                  {/* See login.tsx: the native Apple button can't ship over
+                      OTA because this binary lacks the ExpoAppleAuthentication
+                      view manager. Restore it alongside the next native build. */}
+                  {appleAvailable && (
+                    <TouchableOpacity
                       onPress={() => handleOAuth('apple')}
-                    />
+                      disabled={submitting}
+                      style={[
+                        styles.socialButton,
+                        { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Continue with Apple"
+                    >
+                      <MaterialCommunityIcons name="apple" size={20} color={colors.textPrimary} />
+                      <Text style={[styles.socialButtonText, { color: colors.textPrimary }]}>
+                        Continue with Apple
+                      </Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               )}
