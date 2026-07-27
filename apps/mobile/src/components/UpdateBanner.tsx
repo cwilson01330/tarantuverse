@@ -77,6 +77,13 @@ export function UpdateBanner() {
         borderWidth: 1,
         borderColor: colors.primary,
         borderRadius: layout.radius.lg,
+        // `elevation` is Android-only. Without an explicit zIndex the banner
+        // paints in mount order on iOS — and since <UpdateBanner /> sits BEFORE
+        // <Stack> in the root layout, the navigator covered it completely. The
+        // banner was firing correctly and simply rendering underneath the app.
+        // (Herpetoverse already had this; Tarantuverse didn't — which is why
+        // the update prompt only ever appeared on Android here.)
+        zIndex: 1000,
         elevation: 6,
       }}
     >
