@@ -121,6 +121,67 @@ function DashboardHubWrapper() {
   );
 }
 
+/**
+ * One card in the Home stat strip (design handoff screen 1, step 4).
+ *
+ * Renders as a plain View when there's nowhere to go — a pressable that does
+ * nothing reads as broken, and "Molts" has no destination today.
+ *
+ * `styles`/`colors` are passed in because the stylesheet is built inside the
+ * screen from the active theme rather than at module scope.
+ */
+function StatChip({
+  icon,
+  tint,
+  label,
+  value,
+  footer,
+  onPress,
+  styles,
+  colors,
+}: {
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+  tint: string;
+  label: string;
+  value: number | string;
+  footer: string;
+  onPress?: () => void;
+  styles: any;
+  colors: any;
+}) {
+  const body = (
+    <>
+      <View style={styles.statChipLabelRow}>
+        <MaterialCommunityIcons name={icon} size={14} color={tint} />
+        <Text style={styles.statChipLabel}>{label}</Text>
+      </View>
+      <Text style={styles.statChipValue}>{value}</Text>
+      <Text style={styles.statChipFooter} numberOfLines={1}>
+        {footer}
+      </Text>
+    </>
+  );
+
+  if (!onPress) {
+    return (
+      <View style={styles.statChip} accessibilityLabel={`${label}: ${value}. ${footer}.`}>
+        {body}
+      </View>
+    );
+  }
+  return (
+    <TouchableOpacity
+      style={styles.statChip}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}. ${footer}.`}
+    >
+      {body}
+    </TouchableOpacity>
+  );
+}
+
 function DashboardHubScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -143,6 +204,8 @@ function DashboardHubScreen() {
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
   const [enclosures, setEnclosures] = useState<Enclosure[]>([]);
   const [colonies, setColonies] = useState<ColonyListItem[]>([]);
+  // null = not loaded / request failed → the chip renders '—', never a fake 0.
+  const [feederStockTotal, setFeederStockTotal] = useState<number | null>(null);
   const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   // Cross-taxon collection total (from /inverts/). null until loaded;
   // falls back to tarantulas.length if the call fails.
@@ -202,7 +265,7 @@ function DashboardHubScreen() {
       // calendar-day metrics (days_since_last_feeding). Cheap to send
       // even to endpoints that ignore it.
       const tzOffset = new Date().getTimezoneOffset();
-      const [tarantulasRes, enclosuresRes, statsRes, invertsRes, coloniesRes] = await Promise.all([
+      const [tarantulasRes, enclosuresRes, statsRes, invertsRes, coloniesRes, feedersRes] = await Promise.all([
         apiClient.get('/tarantulas/').catch(() => null),
         apiClient.get('/enclosures/', { params: { tz_offset_minutes: tzOffset } }).catch(() => null),
         apiClient.get('/analytics/collection').catch(() => null),
@@ -212,6 +275,9 @@ function DashboardHubScreen() {
         apiClient.get('/inverts/').catch(() => null),
         // Colony mode (ADR-010) — population entries for the Colonies card.
         listColonies().catch(() => [] as ColonyListItem[]),
+        // Feeder stock for the stat strip. No dedicated total endpoint —
+        // the handoff calls for summing the existing list client-side.
+        apiClient.get('/feeder-colonies/').catch(() => null),
       ]);
 
       if (tarantulasRes?.data) {
@@ -236,6 +302,18 @@ function DashboardHubScreen() {
 
       if (Array.isArray(coloniesRes)) {
         setColonies(coloniesRes);
+      }
+
+      // Sum every ACTIVE feeder colony's population. `total_count` is null
+      // for life-stage colonies that haven't been counted, so those simply
+      // don't contribute. Left null on request failure so the chip shows '—'
+      // rather than a confident 0 we haven't actually verified.
+      if (Array.isArray(feedersRes?.data)) {
+        setFeederStockTotal(
+          feedersRes.data
+            .filter((c: any) => c?.is_active !== false)
+            .reduce((sum: number, c: any) => sum + (c?.total_count ?? 0), 0),
+        );
       }
     } catch {
       // Dashboard data fetch failed
@@ -406,60 +484,6 @@ function DashboardHubScreen() {
       marginBottom: 16,
     },
     // Stats row
-    statsRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 12,
-      marginBottom: 20,
-    },
-    statCard: {
-      flex: 1,
-      minWidth: '45%',
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.08,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    statCardPremolt: {
-      borderColor: '#c4b5fd',
-    },
-    statIconRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 4,
-    },
-    statIconBox: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-      overflow: 'hidden',
-    },
-    statLabel: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      fontWeight: '500',
-    },
-    statValue: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      marginLeft: 50,
-    },
-    statFooter: {
-      fontSize: 12,
-      color: colors.textTertiary,
-      marginTop: 4,
-      marginLeft: 50,
-    },
     // Section cards
     sectionCard: {
       backgroundColor: colors.surface,
@@ -485,29 +509,28 @@ function DashboardHubScreen() {
       fontWeight: '700',
       color: colors.textPrimary,
     },
-    feedingDayCta: {
-      paddingVertical: 16,
-      alignItems: 'center',
-    },
-    feedingDayCtaText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: '700',
-    },
-    topGreeting: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      paddingHorizontal: 16,
-      marginTop: 8,
-      marginBottom: 8,
-    },
     sectionLink: {
       fontSize: 14,
       fontWeight: '600',
       color: colors.primary,
     },
     // Feeding alert row
+    // --- Stat strip (design handoff screen 1, step 4) ---
+    statStrip: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+    statChip: {
+      flex: 1,
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    statChipLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    statChipLabel: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
+    statChipValue: { fontSize: 22, fontWeight: '700', color: colors.textPrimary, marginTop: 2 },
+    statChipFooter: { fontSize: 11, fontWeight: '400', color: colors.textTertiary },
+
     // --- Feeding hero (design handoff screen 1, step 3) ---
     heroHead: {
       flexDirection: 'row',
@@ -853,109 +876,56 @@ function DashboardHubScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        {/* Greeting (notifications bell lives in the tab header) */}
-        <Text style={styles.topGreeting} numberOfLines={1}>
-          {user?.display_name ? `Hi, ${user.display_name}` : 'Home'}
-        </Text>
-
         {/* Announcement Banner */}
         <AnnouncementBanner />
 
-        {/* Quick Stats Row */}
+        {/* Stat strip — handoff screen 1, step 4. Three equal cards, compact.
+            Collection moved out (it's the header subtitle now) and Needs
+            Feeding moved out (the hero owns it), leaving the three numbers
+            that aren't surfaced anywhere else on this screen.
+
+            The standalone "Feeding Day" gradient CTA that used to sit here is
+            gone too: with the hero's Start button directly below it, the same
+            count and the same destination appeared twice in a row. */}
         <CopilotStep
-          text="These cards show your collection at a glance — total count, feeding alerts, molt tracking, and premolt predictions."
+          text="Molt tracking, premolt predictions and feeder stock at a glance."
           order={1}
           name="Your Dashboard"
         >
-        <WalkthroughableView style={styles.statsRow}>
-          {/* My Collection */}
-          <TouchableOpacity
-            style={styles.statCard}
+        <WalkthroughableView style={styles.statStrip}>
+          <StatChip
+            icon="butterfly-outline"
+            tint="#8b5cf6"
+            label="Premolt"
+            value={premoltAlerts.length}
+            footer={premoltAlerts.length > 0 ? 'Medium+ confidence' : 'No alerts'}
             onPress={() => router.push('/(tabs)/collection')}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={`My Collection: ${animalCount} animals. View all.`}
-          >
-            <View style={styles.statIconRow}>
-              <PrimaryButton iconBox size={40} style={styles.statIconBox}>
-                <Text style={{ fontSize: 20 }}>🕷️</Text>
-              </PrimaryButton>
-              <Text style={styles.statLabel}>My Collection</Text>
-            </View>
-            <Text style={styles.statValue}>{animalCount}</Text>
-            <Text style={styles.statFooter}>View all →</Text>
-          </TouchableOpacity>
-
-          {/* "Needs Feeding" stat tile intentionally removed — the feeding
-              hero below owns this number now, and rendering it in both places
-              meant the same /inverts/feeding-status data appeared three times
-              on one screen (tile, alerts section, Feeding Day button). */}
-
-          {/* Total Molts —
-              Reads the real count from /analytics/collection.total_molts.
-              Falls back to '—' when stats haven't loaded yet (vs. '0' which
-              would imply "you've logged zero molts" and look broken on
-              first paint). */}
-          <View
-            style={styles.statCard}
-            accessibilityLabel={`Total molts logged across your collection: ${collectionStats?.total_molts ?? 0}.`}
-          >
-            <View style={styles.statIconRow}>
-              <PrimaryButton iconBox size={40} style={styles.statIconBox}>
-                <Text style={{ fontSize: 20 }}>🦋</Text>
-              </PrimaryButton>
-              <Text style={styles.statLabel}>Total Molts</Text>
-            </View>
-            <Text style={styles.statValue}>
-              {collectionStats ? collectionStats.total_molts : '—'}
-            </Text>
-            <Text style={styles.statFooter}>Logged across collection</Text>
-          </View>
-
-          {/* Premolt Alerts */}
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              premoltAlerts.length > 0 && styles.statCardPremolt,
-            ]}
-            onPress={() => router.push('/(tabs)/collection')}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={`Premolt Alerts: ${premoltAlerts.length}. ${premoltAlerts.length > 0 ? 'Medium or higher confidence.' : 'No alerts.'}`}
-          >
-            <View style={styles.statIconRow}>
-              <View style={[
-                styles.statIconBox,
-                { backgroundColor: premoltAlerts.length > 0 ? '#8b5cf6' : colors.primary },
-              ]}>
-                <Text style={{ fontSize: 20 }}>🔮</Text>
-              </View>
-              <Text style={styles.statLabel}>Premolt Alerts</Text>
-            </View>
-            <Text style={styles.statValue}>{premoltAlerts.length}</Text>
-            <Text style={styles.statFooter}>
-              {premoltAlerts.length > 0 ? 'Medium+ confidence' : 'No alerts'}
-            </Text>
-          </TouchableOpacity>
+            styles={styles}
+            colors={colors}
+          />
+          <StatChip
+            icon="arrow-expand-vertical"
+            tint={colors.accent}
+            label="Molts"
+            // '—' rather than 0 until stats land, so first paint doesn't
+            // read as "you've logged zero molts".
+            value={collectionStats ? collectionStats.total_molts : '—'}
+            footer="Logged all-time"
+            styles={styles}
+            colors={colors}
+          />
+          <StatChip
+            icon="fridge-outline"
+            tint="#22c55e"
+            label="Feeders"
+            value={feederStockTotal ?? '—'}
+            footer="In stock"
+            onPress={() => router.push('/feeders')}
+            styles={styles}
+            colors={colors}
+          />
         </WalkthroughableView>
         </CopilotStep>
-
-        {/* Feeding Day — prominent bulk-feeding CTA */}
-        <PrimaryButton
-          onPress={() => router.push('/feeding-day')}
-          style={styles.feedingDayCta}
-          outerStyle={{ borderRadius: layout.radius.lg, marginBottom: 16 }}
-          accessibilityLabel={
-            overdueFeedings.length > 0
-              ? `Feeding Day: ${overdueFeedings.length} due. Log feedings in bulk.`
-              : 'Feeding Day. Log feedings in bulk.'
-          }
-        >
-          <Text style={styles.feedingDayCtaText}>
-            🍽️  Feeding Day
-            {overdueFeedings.length > 0 ? `  ·  ${overdueFeedings.length} due` : ''}
-          </Text>
-        </PrimaryButton>
 
         {/* Feeding hero — design handoff screen 1, step 3.
             Replaces BOTH the "Needs Feeding" stat tile and the old "Feeding
