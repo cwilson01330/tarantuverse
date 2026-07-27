@@ -770,16 +770,23 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
       backgroundColor: colors.surface,
       overflow: 'hidden',
     },
-    // alignSelf:'stretch' (not height:'auto') so the image column matches the
-    // row's height whatever the text wraps to.
+    // alignSelf:'stretch' so the image column matches whatever height the text
+    // wraps to. The container itself must stay height-less, which is why the
+    // image is absolutely positioned below rather than sized '100%'.
     rowThumb: {
       width: 88,
       alignSelf: 'stretch',
       minHeight: 88,
       backgroundColor: colors.surfaceElevated,
+      overflow: 'hidden',
     },
     thumbFallback: { alignItems: 'center', justifyContent: 'center' },
-    thumbImage: { width: '100%', height: '100%' },
+    // absoluteFill, NOT width/height '100%'. In a container with no definite
+    // height, '100%' resolves to nothing and React Native falls back to the
+    // image's INTRINSIC size — which stretched a row to ~700pt tall for one
+    // large photo. Absolute positioning takes the image out of layout flow so
+    // it can never drive the row's height.
+    thumbImage: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined },
     rowBody: { flex: 1, paddingVertical: 11, paddingLeft: 13, paddingRight: 12, gap: 3 },
     rowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     rowName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
