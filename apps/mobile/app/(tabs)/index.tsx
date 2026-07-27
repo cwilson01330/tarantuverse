@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   View,
   Text,
   ScrollView,
@@ -312,6 +314,55 @@ function DashboardHubScreen() {
     return '#eab308';
   };
 
+  // Detail route for a feeding-status row. Tarantulas keep their bespoke
+  // screen; every other taxon renders through the generic invert detail.
+  const detailHref = (item: FeedingStatusItem) =>
+    item.taxon === 'tarantula' ? `/tarantula/${item.id}` : `/invert/${item.id}`;
+
+  // Sub-line under the hero count, e.g. "5 tarantulas · 2 scorpions".
+  // Built from the same rows, so it can never disagree with the number.
+  const overdueTaxaBreakdown = (() => {
+    const counts = new Map<string, number>();
+    for (const i of overdueFeedings) {
+      counts.set(i.taxon, (counts.get(i.taxon) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([taxon, n]) => `${n} ${n === 1 ? taxon : `${taxon}s`}`)
+      .join(' · ');
+  })();
+
+  // One-tap "fed" from the hero card.
+  //
+  // NOTE: collection.tsx has a `handleMarkFed`, but it is tarantula-only
+  // (`/tarantulas/{id}/feedings`) and bound to the action-sheet target.
+  // /inverts/feeding-status returns EVERY taxon, so the hero needs the
+  // taxon-aware path — same branch the row's detail link already uses.
+  const [heroFedBusy, setHeroFedBusy] = useState<string | null>(null);
+
+  const markFedFromHero = async (item: FeedingStatusItem) => {
+    if (heroFedBusy) return;
+    setHeroFedBusy(item.id);
+    // Optimistic: drop the row immediately so the count and list agree.
+    const previous = feedingStatusItems;
+    setFeedingStatusItems((rows) => rows.filter((r) => r.id !== item.id));
+    try {
+      const base = item.taxon === 'tarantula' ? 'tarantulas' : 'inverts';
+      await apiClient.post(`/${base}/${item.id}/feedings`, {
+        fed_at: new Date().toISOString(),
+        accepted: true,
+      });
+    } catch {
+      setFeedingStatusItems(previous); // roll back
+      Alert.alert(
+        'Could not log feeding',
+        'Something went wrong logging that feeding. Please try again.',
+      );
+    } finally {
+      setHeroFedBusy(null);
+    }
+  };
+
   // Maps the new 'high' | 'medium' | 'low' | 'none' confidence to the
   // existing badge palette. We stopped using 'very_high' when we
   // switched to /premolt/dashboard; treat 'high' as the most urgent.
@@ -374,9 +425,6 @@ function DashboardHubScreen() {
       shadowOpacity: 0.08,
       shadowRadius: 4,
       elevation: 3,
-    },
-    statCardAlert: {
-      borderColor: '#fca5a5',
     },
     statCardPremolt: {
       borderColor: '#c4b5fd',
@@ -460,6 +508,46 @@ function DashboardHubScreen() {
       color: colors.primary,
     },
     // Feeding alert row
+    // --- Feeding hero (design handoff screen 1, step 3) ---
+    heroHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingBottom: 14,
+      marginBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    heroIconWell: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      // Tinted well rather than a solid fill — the count is the loud element.
+      backgroundColor: 'rgba(239,68,68,0.14)',
+    },
+    heroCount: { fontSize: 28, fontWeight: '700', color: colors.textPrimary },
+    heroCountSuffix: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
+    heroBreakdown: { fontSize: 13, fontWeight: '400', color: colors.textTertiary, marginTop: 2 },
+    heroStartButton: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 12 },
+    heroStartText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+    heroCheckButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    heroSeeAll: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.accent,
+      paddingVertical: 8,
+      textAlign: 'center',
+    },
     alertRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -671,10 +759,6 @@ function DashboardHubScreen() {
       alignItems: 'center',
       paddingVertical: 24,
     },
-    allFedEmoji: {
-      fontSize: 40,
-      marginBottom: 8,
-    },
     allFedTitle: {
       fontSize: 16,
       fontWeight: '600',
@@ -802,33 +886,10 @@ function DashboardHubScreen() {
             <Text style={styles.statFooter}>View all →</Text>
           </TouchableOpacity>
 
-          {/* Needs Feeding */}
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              overdueFeedings.length > 0 && styles.statCardAlert,
-            ]}
-            onPress={() => router.push('/feeding-day')}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={`Needs Feeding: ${overdueFeedings.length} animals overdue. ${overdueFeedings.length > 0 ? 'Overdue for feeding.' : 'All on schedule.'} Opens Feeding Day to log feedings in bulk.`}
-          >
-            <View style={styles.statIconRow}>
-              <View style={[
-                styles.statIconBox,
-                { backgroundColor: overdueFeedings.length > 0 ? '#ef4444' : colors.primary },
-              ]}>
-                <Text style={{ fontSize: 20 }}>
-                  {overdueFeedings.length > 0 ? '⚠️' : '✅'}
-                </Text>
-              </View>
-              <Text style={styles.statLabel}>Needs Feeding</Text>
-            </View>
-            <Text style={styles.statValue}>{overdueFeedings.length}</Text>
-            <Text style={styles.statFooter}>
-              {overdueFeedings.length > 0 ? 'Overdue for feeding' : 'All on schedule'}
-            </Text>
-          </TouchableOpacity>
+          {/* "Needs Feeding" stat tile intentionally removed — the feeding
+              hero below owns this number now, and rendering it in both places
+              meant the same /inverts/feeding-status data appeared three times
+              on one screen (tile, alerts section, Feeding Day button). */}
 
           {/* Total Molts —
               Reads the real count from /analytics/collection.total_molts.
@@ -896,32 +957,56 @@ function DashboardHubScreen() {
           </Text>
         </PrimaryButton>
 
-        {/* Feeding Alerts Section */}
+        {/* Feeding hero — design handoff screen 1, step 3.
+            Replaces BOTH the "Needs Feeding" stat tile and the old "Feeding
+            Alerts" section: they rendered the same /inverts/feeding-status
+            data twice. Head row = count + taxa breakdown + Start; then up to
+            three rows with one-tap mark-fed; then "See all". */}
         <CopilotStep
-          text="Tarantulas overdue for feeding show up here, sorted by urgency. Tap any row to log a feeding."
+          text="Animals overdue for feeding show up here, most urgent first. Tap the check to log a feeding, or Start to work through them all."
           order={2}
           name="Feeding Alerts"
         >
         <WalkthroughableView style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>🍽️ Feeding Alerts</Text>
+          <Text style={styles.sectionTitle}>
+            <MaterialCommunityIcons name="silverware-fork-knife" size={18} color={colors.textPrimary} />
+            {'  '}Feeding
+          </Text>
           {overdueFeedings.length === 0 ? (
             <View style={styles.allFedContainer}>
-              <Text style={styles.allFedEmoji}>✅</Text>
+              <MaterialCommunityIcons name="check-circle-outline" size={32} color={colors.success} />
               <Text style={styles.allFedTitle}>All animals are fed on schedule!</Text>
               <Text style={styles.allFedSubtitle}>Great job keeping up with feedings.</Text>
             </View>
           ) : (
             <>
-              {overdueFeedings.slice(0, 10).map(item => {
+              {/* Head row: count, taxa breakdown, Start */}
+              <View style={styles.heroHead}>
+                <View style={styles.heroIconWell}>
+                  <MaterialCommunityIcons name="silverware-fork-knife" size={24} color="#ef4444" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.heroCount}>
+                    {overdueFeedings.length}
+                    <Text style={styles.heroCountSuffix}> due today</Text>
+                  </Text>
+                  <Text style={styles.heroBreakdown}>{overdueTaxaBreakdown}</Text>
+                </View>
+                <PrimaryButton
+                  onPress={() => router.push('/feeding-day')}
+                  style={styles.heroStartButton}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Start Feeding Day. ${overdueFeedings.length} animals due.`}
+                >
+                  <Text style={styles.heroStartText}>Start</Text>
+                </PrimaryButton>
+              </View>
+
+              {overdueFeedings.slice(0, 3).map(item => {
                 const days = item.days_since_last_feeding ?? 0;
                 const label = item.common_name || item.name || item.scientific_name || 'Unnamed';
-                // Taxon-aware detail route: tarantulas keep their bespoke
-                // screen; every other taxon renders through the generic
-                // invert detail. Mirrors the web dashboard's link logic.
-                const href =
-                  item.taxon === 'tarantula'
-                    ? `/tarantula/${item.id}`
-                    : `/invert/${item.id}`;
+                const href = detailHref(item);
+                const busy = heroFedBusy === item.id;
                 return (
                   <TouchableOpacity
                     key={item.id}
@@ -946,21 +1031,36 @@ function DashboardHubScreen() {
                         {days} days since last feeding
                       </Text>
                     </View>
-                    <PrimaryButton
-                      onPress={() => router.push(href as any)}
-                      style={styles.alertButton}
-                      accessibilityLabel={`Log feeding for ${label}`}
+                    {/* One-tap mark-fed. stopPropagation via a separate
+                        Touchable so the row tap still opens the detail. */}
+                    <TouchableOpacity
+                      onPress={() => markFedFromHero(item)}
+                      disabled={busy}
+                      style={styles.heroCheckButton}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       accessibilityRole="button"
+                      accessibilityLabel={`Mark ${label} as fed today`}
+                      accessibilityState={{ disabled: busy, busy }}
                     >
-                      <Text style={styles.alertButtonText}>Log</Text>
-                    </PrimaryButton>
+                      {busy ? (
+                        <ActivityIndicator size="small" color={colors.accent} />
+                      ) : (
+                        <MaterialCommunityIcons name="check" size={18} color={colors.accent} />
+                      )}
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 );
               })}
-              {overdueFeedings.length > 10 && (
-                <Text style={styles.moreText}>
-                  + {overdueFeedings.length - 10} more overdue
-                </Text>
+              {overdueFeedings.length > 3 && (
+                <TouchableOpacity
+                  onPress={() => router.push('/feeding-day')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`See all ${overdueFeedings.length} animals due for feeding`}
+                >
+                  <Text style={styles.heroSeeAll}>
+                    See all {overdueFeedings.length} →
+                  </Text>
+                </TouchableOpacity>
               )}
             </>
           )}

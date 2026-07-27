@@ -836,7 +836,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 999,
-    marginTop: 6,
+    // No marginTop: this sits inside a `cardIndicators` row that already
+    // centres its children, so the offset just pushed the Fed chip low
+    // against the sex chip and day pill beside it.
   },
   fedChipText: { color: '#0B0B0B', fontSize: 11, fontWeight: '700' },
 
