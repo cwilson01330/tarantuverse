@@ -133,16 +133,20 @@ export function CentipedeSpeciesPicker({
                         </Text>
                       )}
                     </View>
-                    <View
-                      style={[
-                        styles.venomPill,
-                        { backgroundColor: venom.bg },
-                      ]}
-                    >
-                      <Text style={[styles.venomPillText, { color: venom.fg }]}>
-                        {VENOM_SEVERITY_LABELS[item.venom_severity]}
-                      </Text>
-                    </View>
+                    {/* No severity on file → no pill. An empty coloured pill
+                        implies "harmless", which we can't claim. */}
+                    {item.venom_severity && (
+                      <View
+                        style={[
+                          styles.venomPill,
+                          { backgroundColor: venom.bg },
+                        ]}
+                      >
+                        <Text style={[styles.venomPillText, { color: venom.fg }]}>
+                          {VENOM_SEVERITY_LABELS[item.venom_severity]}
+                        </Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               }}

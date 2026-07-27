@@ -123,11 +123,16 @@ function CentipedeSpeciesCareSheetScreen() {
               </Text>
             </View>
           )}
-          <View style={[styles.tag, { backgroundColor: venom.bg }]}>
-            <Text style={[styles.tagText, { color: venom.fg }]}>
-              Venom: {VENOM_SEVERITY_LABELS[species.venom_severity]}
-            </Text>
-          </View>
+          {/* Only claim a venom severity when we actually have one. An empty
+              coloured pill reads as "no venom", which is a worse lie than
+              saying nothing — same guard the care-level tag above uses. */}
+          {species.venom_severity && (
+            <View style={[styles.tag, { backgroundColor: venom.bg }]}>
+              <Text style={[styles.tagText, { color: venom.fg }]}>
+                Venom: {VENOM_SEVERITY_LABELS[species.venom_severity]}
+              </Text>
+            </View>
+          )}
           {species.communal_suitable && (
             <View style={[styles.tag, { backgroundColor: '#dbeafe' }]}>
               <Text style={[styles.tagText, { color: '#1e40af' }]}>
