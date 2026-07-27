@@ -485,13 +485,19 @@ export function taxonMdiIcon(taxon: string): string {
       return 'zodiac-scorpio';
     case 'whip_spider':
       return 'spider-web';
+    // NOTE: the bundled @expo/vector-icons MDI set is missing several names
+    // that the docs list. Confirmed on-device: 'spider' and 'ladybug-outline'
+    // render as blank / "?" while 'bug', 'spider-web' and 'zodiac-scorpio'
+    // draw fine. The '-outline' variants are the unreliable ones, so these
+    // deliberately use base names even though they differentiate less well.
+    // Worth a proper glyph audit against the installed font before making
+    // these prettier.
     case 'centipede':
     case 'millipede':
-      return 'bug-outline';
     case 'mantis':
     case 'roach':
-      return 'ladybug-outline';
+      return 'bug';
     default:
-      return 'paw-outline';
+      return 'paw';
   }
 }

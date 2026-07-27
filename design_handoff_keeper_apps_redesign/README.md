@@ -2,7 +2,7 @@
 
 ## Overview
 
-A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the six highest-traffic screens:
+A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the eight highest-traffic screens:
 
 | App | Screen | Source file today |
 |---|---|---|
@@ -12,6 +12,8 @@ A design review of the two React Native (Expo) keeper apps in the `tarantuverse`
 | Herpetoverse | Collection | `apps/mobile-herpetoverse/app/(tabs)/index.tsx` |
 | Tarantuverse | Species browser | `apps/mobile/app/(tabs)/species.tsx` |
 | Tarantuverse | Species care sheet | `apps/mobile/app/species/[id].tsx` |
+| Tarantuverse | Add flow | `src/components/AddPickerSheet.tsx` + `app/tarantula/add.tsx` |
+| Tarantuverse | Colonies | `app/colony/[id].tsx`, `app/colony/add.tsx`, colony card in `(tabs)/collection.tsx` |
 
 The brief was **flow, consistency, and discoverability** — not a repaint. The Tarantuverse gradient identity stays. The changes are hierarchy, navigation, and card structure.
 
@@ -192,6 +194,90 @@ Most catalog entries have no photo, so the current 160px image area renders a bl
 
 ---
 
+## Screen 7 — Adding an animal
+
+**Purpose:** get a new animal into the collection with the least possible ceremony.
+
+### The problem
+
+Today: tap FAB → pick one of eleven taxa in a bottom sheet → land in one of three different forms (`/tarantula/add`, `/invert/add?taxon=`, `/colony/add`) → choose between two form modes → fill up to 22 fields. **Four decisions before the keeper types anything**, none of which they are thinking about.
+
+### Specific defects
+
+- **Two picker rows are visually identical.** `AddPickerSheet` ROWS gives Scorpion and Vinegaroon the same `🦂` glyph, and Tarantula and True spider the same `🕷`. The source comments on running out of emoji.
+- **The sheet has no `ScrollView`.** Eleven rows × ~64px + title + cancel exceeds the sheet height on a 375×812 device — the last rows, **including Colony**, are unreachable.
+- **22 fields for one animal**, all optional: species lookup, common name, scientific name, nickname, sex, life stage, date acquired, last fed, source, enclosure type, enclosure size, substrate type, substrate depth, last substrate change, temp min/max, humidity min/max, misting schedule, notes.
+- **Species lookup already fills common + scientific name**, yet both remain as separate editable inputs directly beneath it.
+- **A mode toggle in the header** (`Guided` / `All fields`, `quickMode` state) exists because the form is too long either way. Switching modes also resets `currentStep` to 0.
+- **Save is hard to reach**: the wizard's primary button reads `Next →` and only becomes Save on step 3; the header Save renders only in quick mode.
+- The step indicator costs a permanent ~60px band (28px circles, 10px labels).
+
+### Proposed layout — one screen
+
+1. **Header** — gradient band. `close` left, `Add to collection` centred `17/700`, `tray-arrow-down` (Import) right.
+2. **"What is it?"** — section label `12/600` uppercase `letterSpacing: .1em` `textTertiary`.
+   - Species search field, `borderRadius: 13`, focused border `colors.primary`, `magnify` 21px, input `16px`.
+   - Results list `borderRadius: 13`: 40px thumb, common name `14.5/600`, scientific `12/400 italic`, care-level pill right. Selected row tinted `colors.primary + '14'`.
+   - Last row: `pencil-outline` + "Not listed — enter manually" (reveals the free-text name fields).
+   - Helper line: "Taxon is set from the species — no picker needed." **This retires `AddPickerSheet` entirely**; the species record's taxon selects the create endpoint.
+3. **"What do you call it?"** — nickname input, then two segmented rows (sex, life stage), button `padding: 11 0`, `borderRadius: 11`, `13/600`.
+4. **Care-sheet prefill card** — `borderRadius: 14`, `padding: 13 14`, `auto-fix` 20px `accent`; title `13.5/700`; summary line `12.5/400` listing the values pulled; trailing toggle, on by default.
+   - **This is the highest-value change in the flow.** The species record already carries `type`, `enclosure_size_*`, `substrate_type`, `substrate_depth`, `temperature_min/max`, `humidity_min/max`. The form currently asks the keeper to retype all of it.
+5. **Three collapsed rows**, `borderRadius: 13`, `padding: 13 14`, title `14.5/600` + 18px icon, right-side preview `12/400 textTertiary`:
+   - Provenance → "Acquired today"
+   - Enclosure & environment → "Prefilled" (in `accent`)
+   - Photo & notes
+6. **Pinned action bar** — `padding: 12 16 26`, top border. Primary `flex: 1`, `borderRadius: 13`, gradient, label names the animal: `Add Mexican Red Knee`. Secondary 52px `plus-box-multiple-outline` = save and add another (for keepers unboxing a shipment of slings).
+
+Delete the wizard, the step indicator, the mode toggle and `quickMode` state.
+
+---
+
+## Screen 8 — Colonies
+
+**Purpose:** a colony is a *population*, not an animal. The screens currently treat it as one.
+
+### Colony card in the collection
+
+Today `renderColony` reuses `styles.card` — the same photo card as a tarantula — with three overlays on a 150px image: a "Colony" tag top-right (`rgba(139,92,246,.9)`), the count top-left, and `taxonGlyph` bottom-left that **duplicates the placeholder emoji rendered directly behind it**.
+
+**Proposed:** colonies break out of the 2-up grid into full-width rows, pinned above the animal cards under a "Colonies" label.
+
+- Row `borderRadius: 16`, `padding: 13 14`, `gap: 10`.
+- 40px `borderRadius: 11` taxon tile (icon, not photo); name `15/600`; species `12/400 italic`.
+- Right: headcount `18/700`, below it 30-day delta `11.5/700` with `trending-up`/`trending-down` in `success`/`error`.
+- Full-width 7px stage proportion bar + a legend line `11/400` ("660 nymphs · 180 adults").
+- No overlays, no photo.
+
+### Colony detail
+
+1. **Header** — gradient band, back arrow, name `19/700`, subtitle `"{species} · colony"`, `dots-horizontal` right.
+2. **Population card** (replaces the hero photo as the first element) — `borderRadius: 18`, `padding: 16`, `gap: 13`.
+   - Count `34/700` + `est.` when `count_is_estimated`; caption "population today".
+   - Right-aligned trend: `trending-up` + `+106` `16/700` in `success`, caption "last 30 days".
+   - **12-bar weekly series**, height 44, bar `borderRadius: 2`, gap 3, most recent bars in `colors.primary` fading back to a muted tint.
+   - Stage rows: 60px label `11.5/400`, 7px `borderRadius: 4` track, value `12/700` right — proportion, not two boxes.
+   - **All derivable from existing data**: `colony_events.count_delta` + `occurred_at` reduced over time, plus `stage_counts`.
+3. **Four quick-log buttons**, `gap: 8`, tile `borderRadius: 13`, `padding: 11 0`: Births (`egg-outline`, success), Deaths (`skull-outline`, error), Removed (`export`, `#f97316`), Recount (`counter`, accent). Each opens a small sheet asking only stage + count.
+   - Today all eleven `ColonyEventType`s render as equal emoji chips inside a disclosure panel that only appears after tapping "+ Add event" — and sits at the bottom of the scroll. The remaining seven types move behind "More" in that sheet.
+4. **Recent activity** — three rows, `borderRadius: 13`, `padding: 11 13`. 34px tinted icon tile; **event phrased as a sentence** ("120 nymphs hatched") `14/600` with relative time `12/400` below; signed delta right-aligned `14/700` in the event's colour. Trailing "All events" link.
+   - Today rows read "Birth / +120 nymphs · Jul 14" with an inline delete `✕` on every row — move destructive actions to swipe or long-press.
+5. **Collapsed rows** for Husbandry (preview: "85–95°F · egg flats") and Care sheet.
+
+### Photo
+
+Nobody opens a colony to look at it. Demote the 150px hero to a thumbnail beside the title, or drop it.
+
+### Colony creation
+
+`colony/add.tsx` is a reasonable form, but the concept is discovered badly: "Colony" is row 11 of the taxon picker (below the fold, no scroll) with the hint "Track a communal/colony population" — which explains the concept to someone who must already understand it to find the row. **Make it a toggle on the unified add screen** — "one animal" vs "a population" — shown after the species is chosen, when the choice is concrete. The stage-bucket editor then replaces the sex/life-stage segments.
+
+### Feature to consider
+
+Most invert keepers run a roach or isopod colony **as a feeder source**, and the app already has a Feeders inventory. A "Removed" event that optionally credits feeder stock joins two features that currently don't know about each other.
+
+---
+
 ## Interactions & behavior
 
 - **Feeding hero check button** → `POST` a feeding via the existing quick-feed path (`quickFeedAnimal` in HV, `handleMarkFed` in TV), then optimistically remove the row and decrement the count. Refetch on settle.
@@ -204,6 +290,10 @@ Most catalog entries have no photo, so the current 160px image area renders a bl
 - **Pull to refresh** → unchanged on all four screens.
 - **Species chip row** → local filter, no refetch. **`tune-variant`** → sheet holding care level + sort.
 - **Species row tap** → care sheet. **`Add to collection`** → add form with `?species_id=` prefilled. **`bookmark-outline`** → local shortlist.
+- **Species search in the add flow** → same endpoints `SpeciesAutocomplete` already uses; selecting a row sets `species_id`, `scientific_name`, `common_name`, `taxon`, and seeds the husbandry fields.
+- **Prefill toggle off** → clears the seeded husbandry values but keeps the species link.
+- **Save and add another** → POST, toast, reset the form but keep the species selected.
+- **Colony quick-log** → `POST /colonies/{id}/events` with `event_type` + `stage` + `count_delta`; the population card and stage bars update optimistically.
 - Loading skeletons unchanged. Empty states: keep the existing copy, swap the emoji for the mapped MDI icon.
 
 ## State
@@ -216,6 +306,8 @@ No new endpoints. Everything on the proposed Home comes from calls the screens a
 - `/animals/limits` (HV) — cap subtitle + upgrade row
 - Feeder stock stat needs the existing feeders list endpoint summed client-side
 - Species browser: `/species`, `/scorpion-species/`, `/invert-species/?taxon=` — unchanged. The beginners shelf and the chip counts are derived client-side from the rows already loaded.
+- Add flow: no new endpoints. The species record supplies the taxon (choosing the create endpoint) and the husbandry defaults. `quickMode` / `currentStep` state is deleted.
+- Colonies: `GET /colonies/`, `GET /colonies/{id}`, `GET /colonies/{id}/events`, `POST /colonies/{id}/events` — all exist. The trend series and 30-day delta are a client-side reduce over `count_delta` + `occurred_at`; no backend change needed.
 
 ## Design tokens
 
@@ -288,6 +380,9 @@ No new assets. Replace every emoji used as UI with `MaterialCommunityIcons` (the
 | 📏 / 📈 / 🌡️ / 💧 | `arrow-expand-horizontal` / `trending-up` / `thermometer` / `water-percent` |
 | ✓ ⚠ ⚡ ? (care level) | render the **word**, not a glyph |
 | 📚 / ⭐ | `book-open-page-variant` / `star` |
+| 🐣 / 💀 (colony events) | `egg-outline` / `skull-outline` |
+| 🪳 / 🦗 / 🪱 / 🐜 | `dots-hexagon` / `grass` / `slash-forward` (or a taxon tile, not a glyph) |
+| Picker glyph collisions | Scorpion `zodiac-scorpio` vs Vinegaroon `spider-thread`; Tarantula `spider` vs True spider `spider-web` — verify each resolves |
 
 Emoji may stay in the taxon registry glyphs on the add-picker, where the playfulness is intentional.
 
@@ -302,12 +397,14 @@ Herpetoverse's `ThemeContext` exports a single frozen `darkTheme`. Tarantuverse'
 3. Card rework in both Collections — also kills the `nulld ago` bug.
 4. `Add to collection` on the care sheet + Enclosure expanded by default — two small changes, large payoff.
 5. Species browser rows + word-based care level.
-6. Emoji sweep + shared tokens package.
-7. Port `ThemeContext` to Herpetoverse.
+6. Unified add screen + care-sheet prefill — retires `AddPickerSheet` and the wizard.
+7. Colony population card, quick-log buttons, and the full-width colony row.
+8. Emoji sweep + shared tokens package.
+9. Port `ThemeContext` to Herpetoverse.
 
 ## Files
 
-- `Design Review.dc.html` — the full review: six Today/Proposed screen pairs, findings, and the cross-app system section. Open in any browser.
+- `Design Review.dc.html` — the full review: eight Today/Proposed screen sets, findings, and the cross-app system section. Open in any browser.
 
 ## Not covered in this pass
 

@@ -49,7 +49,23 @@ const DEFAULT_HARMLESS = { title: 'No medically significant venom', body: 'This 
 
 function InvertSpeciesCareSheetScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{
+    id: string;
+    pName?: string; pSci?: string; pCare?: string; pImg?: string;
+    pType?: string; pVerified?: string; pHot?: string;
+  }>();
+  const { id } = params;
+  /** Optimistic header data from the browser row — lets the header paint on
+   *  the first frame instead of showing a bare spinner mid-transition. */
+  const preview = {
+    name: params.pName ?? '',
+    sci: params.pSci ?? '',
+    care: params.pCare ?? '',
+    img: params.pImg ?? '',
+    type: params.pType ?? '',
+    verified: params.pVerified === '1',
+    hot: params.pHot === '1',
+  };
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -73,7 +89,40 @@ function InvertSpeciesCareSheetScreen() {
   useEffect(() => { fetch(); }, [fetch]);
 
   const styles = makeStyles(colors);
-  if (loading) return <View style={[styles.flex, styles.center]}><ActivityIndicator color={colors.primary} size="large" /></View>;
+  if (loading) {
+    // With preview params, paint the real header immediately; without them
+    // (deep link / search) fall back to a plain spinner.
+    if (!preview.sci) {
+      return (
+        <View style={[styles.flex, styles.center]}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      );
+    }
+    const previewCare = careLevelMeta(preview.care, colors.textSecondary);
+    return (
+      <View style={styles.flex}>
+        <CareSheetHero
+          imageUrl={preview.img || null}
+          commonName={preview.name || undefined}
+          scientificName={preview.sci}
+          isVerified={preview.verified}
+          badges={[
+            ...(preview.care ? [{ label: previewCare.text, color: previewCare.color }] : []),
+            ...(preview.hot ? [{ label: 'Hot venom', color: '#ef4444' }] : []),
+            ...(preview.type ? [{ label: preview.type }] : []),
+          ]}
+          topInset={insets.top}
+          onBack={() => router.back()}
+          onShare={() => {}}
+          colors={colors}
+        />
+        <View style={{ paddingTop: 40, alignItems: 'center' }}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      </View>
+    );
+  }
   if (error || !species) {
     return (<View style={[styles.flex, styles.center]}><Text style={styles.errorText}>{error || 'Not found.'}</Text><TouchableOpacity style={styles.retryButton} onPress={fetch}><Text style={styles.retryText}>Retry</Text></TouchableOpacity></View>);
   }

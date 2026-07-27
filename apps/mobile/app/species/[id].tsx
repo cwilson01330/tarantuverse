@@ -74,7 +74,24 @@ interface Species {
 export default function SpeciesDetailScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams<{
+    id?: string;
+    pName?: string; pSci?: string; pCare?: string; pImg?: string;
+    pType?: string; pVerified?: string; pHot?: string;
+  }>();
+  const { id } = params;
+  /** Optimistic header data handed over by the browser row. Empty when the
+   *  sheet is reached by deep link or search, which falls back to the plain
+   *  loading state below. */
+  const preview = {
+    name: params.pName ?? '',
+    sci: params.pSci ?? '',
+    care: params.pCare ?? '',
+    img: params.pImg ?? '',
+    type: params.pType ?? '',
+    verified: params.pVerified === '1',
+    hot: params.pHot === '1',
+  };
   const [species, setSpecies] = useState<Species | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -118,6 +135,37 @@ export default function SpeciesDetailScreen() {
       [section]: !prev[section]
     }));
   };
+
+  // Paint the header from the params the browser handed over, so the screen
+  // looks correct on the first frame of the slide instead of being a blank
+  // box with a spinner until the fetch lands.
+  if (loading && preview.sci) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <CareSheetHero
+          imageUrl={preview.img || null}
+          commonName={preview.name || undefined}
+          scientificName={preview.sci}
+          isVerified={preview.verified}
+          badges={[
+            ...(preview.care
+              ? [{ label: careLevelMeta(preview.care, colors.textSecondary).text,
+                   color: careLevelMeta(preview.care, colors.textSecondary).color }]
+              : []),
+            ...(preview.hot ? [{ label: 'Hot venom', color: '#ef4444' }] : []),
+            ...(preview.type ? [{ label: preview.type }] : []),
+          ]}
+          topInset={insets.top}
+          onBack={() => router.back()}
+          onShare={() => {}}
+          colors={colors}
+        />
+        <View style={{ paddingTop: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </View>
+    );
+  }
 
   if (loading) {
     return (

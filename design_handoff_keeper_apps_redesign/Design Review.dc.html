@@ -792,6 +792,361 @@
       </div>
     </div>
 
+    <!-- ══════════ TV ADD FLOW ══════════ -->
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;align-items:baseline;gap:16px;border-top:1px solid #22222f;padding-top:28px">
+        <span style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#0066FF">Tarantuverse</span>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;margin:0;letter-spacing:-.01em">Adding an animal</h2>
+      </div>
+
+      <p style="margin:0;max-width:820px;font-size:15px;line-height:1.65;color:#9b9bab;text-wrap:pretty">Today the flow is: tap FAB → pick one of eleven taxa in a bottom sheet → land in one of three different forms → choose between two form modes → fill up to 22 fields. Every one of those is a decision made <em>before</em> the keeper can type the only two things they actually know: what species it is and what they call it.</p>
+
+      <div style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+
+        <!-- ─── TODAY: PICKER ─── -->
+        <div style="display:flex;flex-direction:column;gap:14px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:4px;background:#5b5b6e"></span><span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#8b8b9b">Today · Step 1, taxon picker</span></div>
+          <div style="width:375px;height:812px;border-radius:38px;overflow:hidden;background:#0a0a0f;border:1px solid #2a2a3a;box-shadow:0 30px 60px -20px rgba(0,0,0,.8);display:flex;flex-direction:column;position:relative">
+            <div style="position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:2"></div>
+            <div style="background:linear-gradient(135deg,#0066FF,#FF0099);padding:14px 18px 12px;flex:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#fff"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;font-size:12px"><i class="mdi mdi-signal-cellular-3"></i><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+              <div style="text-align:center;font-size:17px;font-weight:700;color:#fff;margin-top:10px">My Collection</div>
+            </div>
+            <div style="flex:1;background:#0a0a0f"></div>
+            <div style="position:absolute;left:0;right:0;bottom:0;z-index:3;background:#1a1a24;border-top-left-radius:20px;border-top-right-radius:20px;padding:8px 16px 32px;display:flex;flex-direction:column">
+              <span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#2a2a3a;margin-bottom:12px"></span>
+              <div style="font-size:18px;font-weight:700;color:#e5e7eb">Add to collection</div>
+              <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;margin-top:2px;margin-bottom:4px">What are you adding?</div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🕷</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">Tarantula</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;font-size:20px"></i></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🦂</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">Scorpion</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;font-size:20px"></i></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🐛</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">Centipede</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;font-size:20px"></i></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🕸️</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">Whip spider</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;font-size:20px"></i></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a;position:relative"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🦂</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">Vinegaroon</span><span style="font-size:10px;font-weight:700;color:#ef4444;letter-spacing:.04em">← same glyph</span></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🕷</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">True spider</span><span style="font-size:10px;font-weight:700;color:#ef4444;letter-spacing:.04em">← same glyph</span></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🪱</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">Millipede</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;font-size:20px"></i></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🦗</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">Mantis</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;font-size:20px"></i></div>
+              <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid #2a2a3a"><span style="width:40px;height:40px;border-radius:20px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:22px">🪳</span><span style="flex:1;font-size:16px;font-weight:600;color:#e5e7eb">Roach</span><i class="mdi mdi-chevron-right" style="color:#9ca3af;font-size:20px"></i></div>
+              <div style="font-size:11px;color:#6b7280;text-align:center;padding-top:10px;font-style:italic">+ Other invertebrate, + Colony — below the sheet, no scroll view</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── TODAY: FORM ─── -->
+        <div style="display:flex;flex-direction:column;gap:14px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:4px;background:#5b5b6e"></span><span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#8b8b9b">Today · Step 2, guided form</span></div>
+          <div style="width:375px;height:812px;border-radius:38px;overflow:hidden;background:#0a0a0f;border:1px solid #2a2a3a;box-shadow:0 30px 60px -20px rgba(0,0,0,.8);display:flex;flex-direction:column">
+            <div style="background:#1a1a24;border-bottom:1px solid #2a2a3a;padding:14px 12px 12px;flex:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#e5e7eb"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;font-size:12px"><i class="mdi mdi-signal-cellular-3"></i><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+              <div style="display:flex;align-items:center;margin-top:10px"><i class="mdi mdi-close" style="font-size:26px;color:#e5e7eb;min-width:44px"></i><div style="flex:1;text-align:center;font-size:18px;font-weight:700;color:#e5e7eb">Add Tarantula</div><span style="display:flex;align-items:center;gap:4px;color:#e5e7eb"><i class="mdi mdi-view-sequential" style="font-size:16px"></i><span style="font-size:13px;font-weight:500">All fields</span></span></div>
+            </div>
+            <div style="background:#1a1a24;border-bottom:1px solid #2a2a3a;padding:16px 20px;display:flex;align-items:center;flex:none">
+              <div style="display:flex;flex-direction:column;align-items:center"><span style="width:28px;height:28px;border-radius:14px;border:2px solid #0066FF;background:#0066FF;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">1</span><span style="font-size:10px;color:#0066FF;font-weight:600;margin-top:2px">Basics</span></div>
+              <span style="flex:1;height:2px;background:#2a2a3a;margin:0 4px"></span>
+              <div style="display:flex;flex-direction:column;align-items:center"><span style="width:28px;height:28px;border-radius:14px;border:2px solid #2a2a3a;background:#0a0a0f;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9ca3af">2</span><span style="font-size:10px;color:#9ca3af;margin-top:2px">Enclosure</span></div>
+              <span style="flex:1;height:2px;background:#2a2a3a;margin:0 4px"></span>
+              <div style="display:flex;flex-direction:column;align-items:center"><span style="width:28px;height:28px;border-radius:14px;border:2px solid #2a2a3a;background:#0a0a0f;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9ca3af">3</span><span style="font-size:10px;color:#9ca3af;margin-top:2px">Environment</span></div>
+            </div>
+            <div style="flex:1;overflow:hidden;display:grid;grid-auto-rows:max-content;align-content:start">
+              <div style="padding:20px 20px 0"><div style="font-size:22px;font-weight:700;color:#e5e7eb">Basic Information</div><div style="font-size:14px;color:#d1d5db;margin-top:2px">Species, name and provenance</div></div>
+              <div style="padding:16px;display:flex;flex-direction:column;gap:16px">
+                <div><div style="font-size:14px;font-weight:500;color:#d1d5db;margin-bottom:6px">Species Lookup</div><div style="border:1px solid #2a2a3a;border-radius:8px;padding:12px;background:#1a1a24;font-size:16px;color:#9ca3af">Search species by name...</div></div>
+                <div><div style="font-size:14px;font-weight:500;color:#d1d5db;margin-bottom:6px">Common Name</div><div style="border:1px solid #2a2a3a;border-radius:8px;padding:12px;background:#1a1a24;font-size:16px;color:#9ca3af">e.g., Mexican Redknee</div></div>
+                <div><div style="font-size:14px;font-weight:500;color:#d1d5db;margin-bottom:6px">Scientific Name</div><div style="border:1px solid #2a2a3a;border-radius:8px;padding:12px;background:#1a1a24;font-size:16px;color:#9ca3af">e.g., Brachypelma hamorii</div></div>
+                <div><div style="font-size:14px;font-weight:500;color:#d1d5db;margin-bottom:6px">Nickname</div><div style="border:1px solid #2a2a3a;border-radius:8px;padding:12px;background:#1a1a24;font-size:16px;color:#9ca3af">e.g., Rosie (optional)</div></div>
+                <div><div style="font-size:14px;font-weight:500;color:#d1d5db;margin-bottom:6px">Sex</div><div style="display:flex;gap:8px"><span style="flex:1;padding:12px 0;border:1px solid #0066FF;background:#0066FF;border-radius:8px;text-align:center;font-size:13px;font-weight:500;color:#fff">Unknown</span><span style="flex:1;padding:12px 0;border:1px solid #2a2a3a;border-radius:8px;text-align:center;font-size:13px;font-weight:500;color:#d1d5db">Male</span><span style="flex:1;padding:12px 0;border:1px solid #2a2a3a;border-radius:8px;text-align:center;font-size:13px;font-weight:500;color:#d1d5db">Female</span></div></div>
+                <div><div style="font-size:14px;font-weight:500;color:#d1d5db;margin-bottom:6px">Life stage</div><div style="display:flex;gap:8px"><span style="flex:1;padding:12px 0;border:1px solid #2a2a3a;border-radius:8px;text-align:center;font-size:13px;font-weight:500;color:#d1d5db">Sling</span><span style="flex:1;padding:12px 0;border:1px solid #2a2a3a;border-radius:8px;text-align:center;font-size:13px;font-weight:500;color:#d1d5db">Juvenile</span><span style="flex:1;padding:12px 0;border:1px solid #2a2a3a;border-radius:8px;text-align:center;font-size:13px;font-weight:500;color:#d1d5db">Adult</span></div></div>
+                <div style="font-size:11px;color:#4b4b5c;font-style:italic;text-align:center">Date Acquired · Last Fed · Source · then 14 more fields across steps 2–3</div>
+              </div>
+            </div>
+            <div style="flex:none;background:#1a1a24;border-top:1px solid #2a2a3a;padding:16px;display:flex;gap:12px"><span style="flex:2;padding:14px 0;background:#0066FF;border-radius:10px;text-align:center;font-size:16px;font-weight:600;color:#fff">Next →</span></div>
+          </div>
+        </div>
+
+        <!-- ─── PROPOSED ─── -->
+        <div style="display:flex;flex-direction:column;gap:14px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:4px;background:linear-gradient(135deg,#0066FF,#FF0099)"></span><span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#e9e9f0">Proposed · One screen</span></div>
+          <div style="width:375px;height:812px;border-radius:38px;overflow:hidden;background:#0a0a0f;border:1px solid #2a2a3a;box-shadow:0 30px 60px -20px rgba(0,0,0,.8);display:flex;flex-direction:column">
+            <div style="background:linear-gradient(135deg,#0066FF,#FF0099);padding:14px 18px 14px;display:flex;flex-direction:column;gap:12px;flex:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#fff"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;font-size:12px"><i class="mdi mdi-signal-cellular-3"></i><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <i class="mdi mdi-close" style="font-size:24px;color:#fff"></i>
+                <span style="font-size:17px;font-weight:700;color:#fff">Add to collection</span>
+                <i class="mdi mdi-tray-arrow-down" style="font-size:22px;color:#fff"></i>
+              </div>
+            </div>
+            <div style="flex:1;overflow:hidden;padding:16px;display:grid;grid-auto-rows:max-content;align-content:start;gap:14px">
+
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <span style="font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6b7280">What is it?</span>
+                <div style="border:1px solid #0066FF;border-radius:13px;background:#1a1a24;padding:12px 14px;display:flex;align-items:center;gap:10px"><i class="mdi mdi-magnify" style="font-size:21px;color:#3385FF"></i><span style="flex:1;font-size:16px;color:#e5e7eb">Brachypelma ham</span><i class="mdi mdi-close-circle" style="font-size:18px;color:#6b7280"></i></div>
+                <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;overflow:hidden">
+                  <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;background:rgba(0,102,255,.08)">
+                    <span style="width:40px;height:40px;border-radius:10px;background:linear-gradient(150deg,#3a2a26,#241a18);display:flex;align-items:center;justify-content:center;color:#5c4038;font-size:21px"><i class="mdi mdi-spider"></i></span>
+                    <span style="flex:1;min-width:0"><span style="display:block;font-size:14.5px;font-weight:600;color:#e5e7eb">Mexican Red Knee</span><span style="display:block;font-size:12px;font-style:italic;color:#9ca3af;margin-top:1px">Brachypelma hamorii</span></span>
+                    <span style="padding:3px 8px;border-radius:7px;background:rgba(34,197,94,.15);color:#22c55e;font-size:10.5px;font-weight:700">Beginner</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border-top:1px solid #22222e">
+                    <span style="width:40px;height:40px;border-radius:10px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:21px"><i class="mdi mdi-spider"></i></span>
+                    <span style="flex:1;min-width:0"><span style="display:block;font-size:14.5px;font-weight:600;color:#e5e7eb">Mexican Red Leg</span><span style="display:block;font-size:12px;font-style:italic;color:#9ca3af;margin-top:1px">Brachypelma emilia</span></span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px;padding:11px 13px;border-top:1px solid #22222e"><i class="mdi mdi-pencil-outline" style="font-size:19px;color:#6b7280"></i><span style="font-size:13.5px;color:#9ca3af">Not listed — enter manually</span></div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280"><i class="mdi mdi-information-outline" style="font-size:14px"></i>Taxon is set from the species — no picker needed.</div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <span style="font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6b7280">What do you call it?</span>
+                <div style="border:1px solid #2a2a3a;border-radius:13px;background:#1a1a24;padding:13px 14px;font-size:16px;color:#9ca3af">Nickname — optional</div>
+                <div style="display:flex;gap:8px">
+                  <span style="flex:1;padding:11px 0;border:1px solid #0066FF;background:#0066FF;border-radius:11px;text-align:center;font-size:13px;font-weight:600;color:#fff">Unsexed</span>
+                  <span style="flex:1;padding:11px 0;border:1px solid #2a2a3a;border-radius:11px;text-align:center;font-size:13px;font-weight:600;color:#d1d5db">Male</span>
+                  <span style="flex:1;padding:11px 0;border:1px solid #2a2a3a;border-radius:11px;text-align:center;font-size:13px;font-weight:600;color:#d1d5db">Female</span>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <span style="flex:1;padding:11px 0;border:1px solid #2a2a3a;border-radius:11px;text-align:center;font-size:13px;font-weight:600;color:#d1d5db">Sling</span>
+                  <span style="flex:1;padding:11px 0;border:1px solid #2a2a3a;border-radius:11px;text-align:center;font-size:13px;font-weight:600;color:#d1d5db">Juvenile</span>
+                  <span style="flex:1;padding:11px 0;border:1px solid #0066FF;background:#0066FF;border-radius:11px;text-align:center;font-size:13px;font-weight:600;color:#fff">Adult</span>
+                </div>
+              </div>
+
+              <div style="background:#1a1a24;border:1px solid #2a3040;border-radius:14px;padding:13px 14px;display:flex;gap:11px;align-items:flex-start">
+                <i class="mdi mdi-auto-fix" style="font-size:20px;color:#3385FF;margin-top:1px"></i>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13.5px;font-weight:700;color:#e5e7eb">Husbandry prefilled from the care sheet</div>
+                  <div style="font-size:12.5px;color:#9ca3af;margin-top:3px;line-height:1.5">Terrestrial · 10×10×10" · coco fibre 3" · 75–82°F · 65–70%</div>
+                </div>
+                <span style="width:44px;height:26px;border-radius:13px;background:#0066FF;display:flex;align-items:center;justify-content:flex-end;padding:3px;flex:none"><span style="width:20px;height:20px;border-radius:10px;background:#fff"></span></span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-tag-outline" style="font-size:18px;color:#6b7280"></i>Provenance</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:#6b7280">Acquired today</span><i class="mdi mdi-chevron-down" style="font-size:20px;color:#6b7280"></i></span></div>
+                <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-home-variant-outline" style="font-size:18px;color:#6b7280"></i>Enclosure &amp; environment</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:#3385FF;font-weight:600">Prefilled</span><i class="mdi mdi-chevron-down" style="font-size:20px;color:#6b7280"></i></span></div>
+                <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-camera-outline" style="font-size:18px;color:#6b7280"></i>Photo &amp; notes</span><i class="mdi mdi-chevron-down" style="font-size:20px;color:#6b7280"></i></div>
+              </div>
+
+            </div>
+            <div style="flex:none;padding:12px 16px 26px;background:#0f0f16;border-top:1px solid #22222e;display:flex;gap:10px">
+              <span style="flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:14px 0;border-radius:13px;background:linear-gradient(135deg,#0066FF,#FF0099);color:#fff;font-size:15px;font-weight:700">Add Mexican Red Knee</span>
+              <span style="width:52px;display:flex;align-items:center;justify-content:center;border-radius:13px;border:1px solid #2a2a3a;color:#9ca3af;font-size:20px"><i class="mdi mdi-plus-box-multiple-outline"></i></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px 40px">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Four decisions before one keystroke</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Taxon → route → form mode → step. None of them are things the keeper is thinking about; they're thinking "I just got a Red Knee." Search for the species first and every one of those resolves itself: the species record carries the taxon, which picks the route, and there is only one form.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Two rows in the picker are indistinguishable</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Scorpion and Vinegaroon both render 🦂; Tarantula and True spider both render 🕷 — the source even comments on running out of glyphs. The sheet also has no <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">ScrollView</code>, so on a 375×812 phone the last two of eleven rows (including Colony) fall off the bottom.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">22 fields to log one spider</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Species lookup, common name, scientific name, nickname, sex, life stage, date acquired, last fed, source, enclosure type, enclosure size, substrate type, substrate depth, last substrate change, temp min/max, humidity min/max, misting, notes. Every one optional. Two of them matter.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Prefill husbandry from the care sheet</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">This is the change I'd make first. The species record already holds enclosure size per life stage, substrate type and depth, temperature and humidity ranges — the form asks the keeper to retype what the database already knows. Pick a species, get sensible defaults, override anything. It also makes the 312 care sheets pay for themselves.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">The mode toggle is a symptom</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">"Guided" vs "All fields" exists because the form is too long either way — a three-step wizard for optional data, or one endless scroll. Progressive disclosure removes the choice: required fields visible, everything else in three collapsed rows that preview their own contents.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Save is never far away</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Today the primary button says "Next →" and Save only appears on step 3 (or in the header, but only in quick mode). Proposed: a pinned bar naming what you're about to add, live the moment a species is chosen, plus an "add another" affordance for keepers unboxing a shipment of slings — and Import in the header for the ones arriving with a spreadsheet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ TV COLONIES ══════════ -->
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;align-items:baseline;gap:16px;border-top:1px solid #22222f;padding-top:28px">
+        <span style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#0066FF">Tarantuverse</span>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;margin:0;letter-spacing:-.01em">Colonies</h2>
+      </div>
+
+      <p style="margin:0;max-width:820px;font-size:15px;line-height:1.65;color:#9b9bab;text-wrap:pretty">A colony is a population, not an animal — yet it renders as a photo card in the same grid as individual spiders, and its detail screen presents the headcount as one of five equal grey panels. Colony keeping is fundamentally about <strong style="color:#e9e9f0">whether the population is growing</strong>, and nothing on either screen answers that. The event stream already holds every delta needed to.</p>
+
+      <div style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+
+        <div style="display:flex;flex-direction:column;gap:14px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:4px;background:#5b5b6e"></span><span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#8b8b9b">Today · Colony detail</span></div>
+          <div style="width:375px;height:812px;border-radius:38px;overflow:hidden;background:#0a0a0f;border:1px solid #2a2a3a;box-shadow:0 30px 60px -20px rgba(0,0,0,.8);display:flex;flex-direction:column">
+            <div style="background:#1a1a24;border-bottom:1px solid #2a2a3a;padding:14px 12px 12px;flex:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#e5e7eb"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;font-size:12px"><i class="mdi mdi-signal-cellular-3"></i><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+              <div style="display:flex;align-items:center;margin-top:10px"><i class="mdi mdi-arrow-left" style="font-size:24px;color:#e5e7eb;min-width:44px"></i><div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:#e5e7eb">Dubia breeding bin</div><div style="font-size:12px;color:#d1d5db;margin-top:2px">Roach colony</div></div><span style="min-width:44px"></span></div>
+            </div>
+            <div style="flex:1;overflow:hidden;padding:16px;display:grid;grid-auto-rows:max-content;align-content:start;gap:12px">
+              <div style="height:150px;border-radius:12px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:56px">🪳</div>
+              <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px">
+                <div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9ca3af">SPECIES</div><div style="font-size:15px;color:#e5e7eb;margin-top:4px">Blaptica dubia</div><div style="font-size:13px;color:#0066FF;margin-top:4px">View full care sheet →</div></div>
+                <i class="mdi mdi-book-open-variant" style="font-size:26px;color:#0066FF"></i>
+              </div>
+              <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:16px;padding:16px">
+                <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9ca3af;margin-bottom:8px">POPULATION</div>
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:30px;font-weight:700;color:#e5e7eb">~840</span><span style="font-size:12px;color:#9ca3af">estimated total</span></div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+                  <div style="flex:1;min-width:28%;background:#0a0a0f;border:1px solid #2a2a3a;border-radius:12px;padding:10px"><div style="font-size:11px;color:#9ca3af;text-transform:capitalize">adults</div><div style="font-size:16px;font-weight:700;color:#e5e7eb">180</div></div>
+                  <div style="flex:1;min-width:28%;background:#0a0a0f;border:1px solid #2a2a3a;border-radius:12px;padding:10px"><div style="font-size:11px;color:#9ca3af;text-transform:capitalize">nymphs</div><div style="font-size:16px;font-weight:700;color:#e5e7eb">660</div></div>
+                </div>
+                <div style="font-size:12px;color:#9ca3af;margin-top:10px;font-style:italic">This colony's headcount is an estimate.</div>
+              </div>
+              <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:16px;padding:16px">
+                <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9ca3af;margin-bottom:12px">HUSBANDRY</div>
+                <div style="display:flex;flex-wrap:wrap;gap:12px">
+                  <div style="flex:1;min-width:44%;display:flex;gap:8px;align-items:flex-start"><i class="mdi mdi-layers" style="font-size:17px;color:#9ca3af"></i><div><div style="font-size:11px;color:#9ca3af">Substrate</div><div style="font-size:13px;color:#e5e7eb">Egg flats</div></div></div>
+                  <div style="flex:1;min-width:44%;display:flex;gap:8px;align-items:flex-start"><i class="mdi mdi-thermometer" style="font-size:17px;color:#9ca3af"></i><div><div style="font-size:11px;color:#9ca3af">Temperature</div><div style="font-size:13px;color:#e5e7eb">85–95°F</div></div></div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding-top:2px"><span style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#9ca3af">EVENTS</span><span style="font-size:13px;color:#0066FF;font-weight:600">+ Add event</span></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:12px"><span style="font-size:20px">🐣</span><div style="flex:1"><div style="font-size:14px;font-weight:600;color:#e5e7eb">Birth</div><div style="font-size:12px;color:#9ca3af">+120 nymphs · Jul 14</div></div><i class="mdi mdi-close" style="font-size:16px;color:#6b7280"></i></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:12px"><span style="font-size:20px">💀</span><div style="flex:1"><div style="font-size:14px;font-weight:600;color:#e5e7eb">Death</div><div style="font-size:12px;color:#9ca3af">−14 adults · Jul 9</div></div><i class="mdi mdi-close" style="font-size:16px;color:#6b7280"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:14px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:4px;background:linear-gradient(135deg,#0066FF,#FF0099)"></span><span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#e9e9f0">Proposed · Colony detail</span></div>
+          <div style="width:375px;height:812px;border-radius:38px;overflow:hidden;background:#0a0a0f;border:1px solid #2a2a3a;box-shadow:0 30px 60px -20px rgba(0,0,0,.8);display:flex;flex-direction:column">
+            <div style="background:linear-gradient(135deg,#0066FF,#FF0099);padding:14px 18px 14px;display:flex;flex-direction:column;gap:12px;flex:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#fff"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;font-size:12px"><i class="mdi mdi-signal-cellular-3"></i><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:12px;min-width:0"><i class="mdi mdi-arrow-left" style="font-size:24px;color:#fff"></i><div style="min-width:0"><div style="font-size:19px;font-weight:700;color:#fff;letter-spacing:-.01em">Dubia breeding bin</div><div style="font-size:12px;color:rgba(255,255,255,.72);margin-top:1px">Blaptica dubia · colony</div></div></div>
+                <i class="mdi mdi-dots-horizontal" style="font-size:22px;color:#fff"></i>
+              </div>
+            </div>
+            <div style="flex:1;overflow:hidden;padding:16px;display:grid;grid-auto-rows:max-content;align-content:start;gap:14px">
+
+              <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:13px">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                  <div>
+                    <div style="display:flex;align-items:baseline;gap:7px"><span style="font-size:34px;font-weight:700;color:#e5e7eb;line-height:1">840</span><span style="font-size:13px;color:#6b7280">est.</span></div>
+                    <div style="font-size:12px;color:#9ca3af;margin-top:3px">population today</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="display:flex;align-items:center;gap:5px;justify-content:flex-end;color:#22c55e;font-size:16px;font-weight:700"><i class="mdi mdi-trending-up" style="font-size:18px"></i>+106</div>
+                    <div style="font-size:11.5px;color:#6b7280;margin-top:2px">last 30 days</div>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:flex-end;gap:3px;height:44px">
+                  <span style="flex:1;height:44%;background:#243044;border-radius:2px"></span><span style="flex:1;height:47%;background:#243044;border-radius:2px"></span><span style="flex:1;height:45%;background:#243044;border-radius:2px"></span><span style="flex:1;height:52%;background:#28405e;border-radius:2px"></span><span style="flex:1;height:58%;background:#28405e;border-radius:2px"></span><span style="flex:1;height:55%;background:#28405e;border-radius:2px"></span><span style="flex:1;height:63%;background:#2d5480;border-radius:2px"></span><span style="flex:1;height:70%;background:#2d5480;border-radius:2px"></span><span style="flex:1;height:66%;background:#2d5480;border-radius:2px"></span><span style="flex:1;height:78%;background:#0066FF;border-radius:2px"></span><span style="flex:1;height:88%;background:#0066FF;border-radius:2px"></span><span style="flex:1;height:100%;background:#0066FF;border-radius:2px"></span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;padding-top:2px;border-top:1px solid #22222e">
+                  <div style="display:flex;align-items:center;gap:10px"><span style="width:60px;font-size:11.5px;color:#9ca3af">Nymphs</span><span style="flex:1;height:7px;border-radius:4px;background:#22222e;overflow:hidden;display:flex"><span style="width:79%;background:#3385FF"></span></span><span style="width:38px;text-align:right;font-size:12px;font-weight:700;color:#e5e7eb">660</span></div>
+                  <div style="display:flex;align-items:center;gap:10px"><span style="width:60px;font-size:11.5px;color:#9ca3af">Adults</span><span style="flex:1;height:7px;border-radius:4px;background:#22222e;overflow:hidden;display:flex"><span style="width:21%;background:#FF0099"></span></span><span style="width:38px;text-align:right;font-size:12px;font-weight:700;color:#e5e7eb">180</span></div>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:8px">
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 0;border-radius:13px;background:#1a1a24;border:1px solid #2a2a3a"><i class="mdi mdi-egg-outline" style="font-size:20px;color:#22c55e"></i><span style="font-size:11.5px;font-weight:600;color:#e5e7eb">Births</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 0;border-radius:13px;background:#1a1a24;border:1px solid #2a2a3a"><i class="mdi mdi-skull-outline" style="font-size:20px;color:#ef4444"></i><span style="font-size:11.5px;font-weight:600;color:#e5e7eb">Deaths</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 0;border-radius:13px;background:#1a1a24;border:1px solid #2a2a3a"><i class="mdi mdi-export" style="font-size:20px;color:#f97316"></i><span style="font-size:11.5px;font-weight:600;color:#e5e7eb">Removed</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:11px 0;border-radius:13px;background:#1a1a24;border:1px solid #2a2a3a"><i class="mdi mdi-counter" style="font-size:20px;color:#3385FF"></i><span style="font-size:11.5px;font-weight:600;color:#e5e7eb">Recount</span></span>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6b7280">Recent activity</span><span style="font-size:12px;font-weight:600;color:#3385FF">All events</span></div>
+                <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px">
+                  <span style="width:34px;height:34px;border-radius:10px;background:rgba(34,197,94,.13);display:flex;align-items:center;justify-content:center;color:#22c55e;font-size:18px"><i class="mdi mdi-egg-outline"></i></span>
+                  <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#e5e7eb">120 nymphs hatched</span><span style="display:block;font-size:12px;color:#6b7280;margin-top:1px">13 days ago</span></span>
+                  <span style="font-size:14px;font-weight:700;color:#22c55e">+120</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px">
+                  <span style="width:34px;height:34px;border-radius:10px;background:rgba(239,68,68,.13);display:flex;align-items:center;justify-content:center;color:#ef4444;font-size:18px"><i class="mdi mdi-skull-outline"></i></span>
+                  <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#e5e7eb">14 adults died</span><span style="display:block;font-size:12px;color:#6b7280;margin-top:1px">18 days ago</span></span>
+                  <span style="font-size:14px;font-weight:700;color:#ef4444">−14</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:11px 13px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px">
+                  <span style="width:34px;height:34px;border-radius:10px;background:rgba(249,115,22,.13);display:flex;align-items:center;justify-content:center;color:#f97316;font-size:18px"><i class="mdi mdi-export"></i></span>
+                  <span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;color:#e5e7eb">Fed out to collection</span><span style="display:block;font-size:12px;color:#6b7280;margin-top:1px">24 days ago</span></span>
+                  <span style="font-size:14px;font-weight:700;color:#f97316">−60</span>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-home-variant-outline" style="font-size:18px;color:#6b7280"></i>Husbandry</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:#6b7280">85–95°F · egg flats</span><i class="mdi mdi-chevron-down" style="font-size:20px;color:#6b7280"></i></span></div>
+                <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14.5px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-book-open-variant" style="font-size:18px;color:#6b7280"></i>Care sheet</span><i class="mdi mdi-chevron-right" style="font-size:20px;color:#6b7280"></i></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:20px;padding-top:34px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Show the trend, not just the number</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">"~840" answers nothing on its own — a roach keeper needs to know if the bin is producing. The events table already stores <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">count_delta</code> with <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">occurred_at</code>, so a 12-week bar series and a "+106 last 30 days" figure are a reduce over data you have. This becomes the reason to open the screen.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Stage buckets as proportion bars</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Two boxes reading 180 and 660 don't communicate that the colony is 79% nymphs — which is the health signal. Same data, horizontal bars, and it stays legible as keepers add custom buckets.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Eleven event types, four of them frequent</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">The add-event panel offers birth, death, added, removed, cannibalism, aggression, molt found, split, merge, observation and count correction as equal emoji chips — and only after tapping "+ Add event" and scrolling to it. Promote the four common ones to buttons at the top; the rest live behind "More" in the sheet.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Events should read as sentences</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">"Birth / +120 nymphs · Jul 14" is a database row. "120 nymphs hatched · 13 days ago" with the delta right-aligned and colour-coded is a log entry. Also: the delete ✕ sits inline on every row today — move destructive actions to a swipe or long press.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">A 150px photo of a roach bin</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Unlike an individual animal, nobody opens a colony to look at it. Demote the photo to a thumbnail beside the title (or drop it) and give that space to the population card.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Feed-out closes the loop</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Most invert keepers run a roach or isopod colony <em>as a feeder source</em>, and the app already has a Feeders inventory. A "Removed" event that also credits feeder stock would join two features that currently don't know about each other.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Colony card treatment -->
+      <div style="background:#141420;border:1px solid #22222f;border-radius:18px;padding:26px;display:flex;gap:36px;flex-wrap:wrap;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:12px;flex:none">
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#8b8b9b">In the collection · today</span>
+          <div style="width:180px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:12px;overflow:hidden">
+            <div style="position:relative;height:150px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;font-size:40px">🪳
+              <span style="position:absolute;top:8px;right:8px;padding:4px 8px;border-radius:10px;background:rgba(139,92,246,.9);color:#fff;font-size:10px;font-weight:700;letter-spacing:.3px">Colony</span>
+              <span style="position:absolute;top:8px;left:8px;padding:6px 10px;border-radius:12px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-weight:700">~840</span>
+              <span style="position:absolute;bottom:8px;left:8px;width:26px;height:26px;border-radius:13px;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:14px">🪳</span>
+            </div>
+            <div style="padding:12px"><div style="font-size:16px;font-weight:600;color:#e5e7eb;margin-bottom:4px">Dubia breeding bin</div><div style="font-size:13px;font-style:italic;color:#9ca3af">Blaptica dubia</div></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;flex:none">
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#e9e9f0">Proposed</span>
+          <div style="width:372px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:16px;padding:13px 14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="width:40px;height:40px;border-radius:11px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:21px;flex:none"><i class="mdi mdi-dots-hexagon"></i></span>
+              <span style="flex:1;min-width:0"><span style="display:block;font-size:15px;font-weight:600;color:#e5e7eb">Dubia breeding bin</span><span style="display:block;font-size:12px;font-style:italic;color:#9ca3af;margin-top:1px">Blaptica dubia</span></span>
+              <span style="text-align:right;flex:none"><span style="display:block;font-size:18px;font-weight:700;color:#e5e7eb;line-height:1.1">840</span><span style="display:flex;align-items:center;gap:3px;justify-content:flex-end;font-size:11.5px;font-weight:700;color:#22c55e"><i class="mdi mdi-trending-up" style="font-size:13px"></i>+106</span></span>
+            </div>
+            <div style="display:flex;height:7px;border-radius:4px;overflow:hidden;background:#22222e"><span style="width:79%;background:#3385FF"></span><span style="width:21%;background:#FF0099"></span></div>
+            <div style="display:flex;gap:14px;font-size:11px;color:#9ca3af"><span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:4px;background:#3385FF"></span>660 nymphs</span><span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:4px;background:#FF0099"></span>180 adults</span></div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px;padding-top:30px">
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Stop pretending a colony is an animal</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Today the colony card is the same photo card as a tarantula, with three overlays fighting for the image — a "Colony" tag top-right, the count top-left, and a taxon glyph bottom-left that duplicates the placeholder emoji directly behind it. A keeper scanning the grid sees one more spider.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Give it a full-width row</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Colonies are few and structurally different, so they break the 2-up grid rather than sit inside it — pinned above the animal cards under a "Colonies" label. The row carries what actually matters: headcount, 30-day trend, and the stage split as one proportion bar. No overlays, no photo competing with data.</p>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">One "Colony" concept, two entry points</div>
+            <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Colony lives as row 11 of the taxon picker (below the fold, no scroll) with the hint "Track a communal/colony population" — explaining the concept to someone who has to already understand it to find it. In the proposed add flow it becomes a toggle on the add screen: "one animal" vs "a population", set after the species is chosen, when the choice is concrete.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════ HV DASHBOARD ══════════ -->
     <div style="display:flex;flex-direction:column;gap:28px">
       <div style="display:flex;align-items:baseline;gap:16px;border-top:1px solid #22222f;padding-top:28px">

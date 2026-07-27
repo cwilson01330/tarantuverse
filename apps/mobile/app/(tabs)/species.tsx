@@ -257,7 +257,23 @@ function SpeciesBrowserScreen() {
   const openSheet = (r: SpeciesRow) => {
     // Tarantulas keep their dedicated care sheet; the rest render through the
     // generic one (ADR-007).
-    router.push((r.taxon === 'tarantula' ? `/species/${r.id}` : `/invert-species/${r.id}`) as any);
+    //
+    // The row's own data rides along as params so the care sheet can paint its
+    // header on the FIRST frame. Without this the sheet mounts, shows a
+    // full-screen spinner while it fetches, and only then pops in content —
+    // which reads as a janky transition even though the slide itself is fine.
+    router.push({
+      pathname: r.taxon === 'tarantula' ? `/species/${r.id}` : `/invert-species/${r.id}`,
+      params: {
+        pName: r.common_names?.[0] ?? '',
+        pSci: r.scientific_name,
+        pCare: r.care_level ?? '',
+        pImg: r.image_url ?? '',
+        pType: r.type ?? '',
+        pVerified: r.is_verified ? '1' : '',
+        pHot: r.hotVenom ? '1' : '',
+      },
+    } as any);
   };
 
   const styles = makeStyles(colors);
