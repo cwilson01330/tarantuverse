@@ -1,22 +1,43 @@
 /**
- * Unified species browser — taxon-switchable catalog.
+ * Species browser — cross-taxon care-sheet catalog.
  *
- * Top-of-screen segment toggles between the tarantula catalog
- * (`/species`) and the scorpion catalog (`/scorpion-species/` via the
- * scorpions lib). Tapping a row routes to the appropriate care sheet
- * — `/species/[id]` for tarantulas, `/scorpion-species/[id]` for
- * scorpions. The reptile catalog lives in Herpetoverse so it stays
- * out of this surface.
+ * REWRITTEN (design handoff, screen 5). What changed and why:
  *
- * The route is hidden from the tab bar (`href: null` in
- * `(tabs)/_layout.tsx`); entry points are header icons on the
- * Tarantulas and Scorpions tabs, plus deep-links from forms that
- * accept `?taxon=` to preselect.
+ * 1. CROSS-TAXON BY DEFAULT. This used to load one taxon at a time behind a
+ *    segment control that showed 3 of 10 options with no scroll affordance —
+ *    a keeper looking for a mantis care sheet had no reason to believe one
+ *    existed. Now the whole catalog loads once and the taxon becomes a
+ *    narrowing chip carrying a real count, led by "All".
+ *
+ * 2. TWO SOURCES, DELIBERATELY. Tarantulas come from /species and everything
+ *    else from /invert-species/. It would be tidier to read the unified
+ *    invert_species catalog for all ten taxa — except all 197 mirrored
+ *    tarantula rows have `venom_severity = NULL`. Tarantula danger lives in
+ *    `species.medically_significant_venom`, which invert_species doesn't
+ *    carry. Reading one source would silently drop "Hot venom" from
+ *    Poecilotheria, Stromatopelma and Heteroscodra in the list. Merge the two
+ *    until that data gap is backfilled.
+ *
+ * 3. ROWS, NOT A 2-UP GRID. 206 of 401 catalog entries have no photo, so the
+ *    grid spent a 160pt image block on an empty frame for half the catalog.
+ *    Rows fit more information in less height and give care level and venom
+ *    tier room to be words.
+ *
+ * 4. CARE LEVEL IS A WORD. It was a coloured circle containing ✓ / ⚠ / ⚡ / ?
+ *    with the word rendered nowhere. Nothing taught that mapping and colour
+ *    alone fails for colour-blind keepers.
+ *
+ * 5. NO VANITY METRICS. The design called for "Kept by N keepers" on every
+ *    row. 325 of 401 species have times_kept = 0 and the maximum is 15, so
+ *    that line would read "Kept by 0 keepers" four times out of five and make
+ *    a healthy catalog look abandoned. Gated at MIN_KEEPERS_TO_SHOW.
  */
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Dimensions,
+  ActivityIndicator,
   FlatList,
   Image,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -25,847 +46,793 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect, useState } from 'react';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useTheme } from '../../src/contexts/ThemeContext';
 import { apiClient } from '../../src/services/api';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
-import {
-  listScorpionSpecies,
-  type ScorpionSpecies,
-  venomSeverityColor,
-} from '../../src/lib/scorpions';
-import {
-  listCentipedeSpecies,
-  type CentipedeSpecies,
-} from '../../src/lib/centipedes';
-import {
-  listWhipSpiderSpecies,
-} from '../../src/lib/whip-spiders';
-import {
-  listInvertSpecies,
-  INVERT_TAXA,
-  type InvertTaxon,
-} from '../../src/lib/inverts';
-import { Chip, Badge } from '../../src/components/ui';
+import { INVERT_TAXA, taxonMdiIcon } from '../../src/lib/inverts';
+import { careLevelMeta } from '../../src/components/caresheet';
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2;
+/** Below this, a keeper count is noise rather than social proof. */
+const MIN_KEEPERS_TO_SHOW = 5;
 
-// ---------------------------------------------------------------------------
-// Taxon-agnostic row type. The browser holds a discriminated union so
-// the renderer can dispatch on `taxon` to show taxon-appropriate badges.
-// ---------------------------------------------------------------------------
+/** One shape for every taxon. Both fetches normalise into this. */
+interface SpeciesRow {
+  id: string;
+  taxon: string;
+  scientific_name: string;
+  common_names: string[];
+  care_level: string | null;
+  /** terrestrial / arboreal / fossorial */
+  type: string | null;
+  adult_size: string | null;
+  native_region: string | null;
+  image_url: string | null;
+  is_verified: boolean;
+  times_kept: number;
+  hotVenom: boolean;
+  mildVenom: boolean;
+  communal: boolean;
+}
 
-// The four "established" taxa keep their plural keys + dedicated libs.
-// The ADR-006 expansion taxa use their singular `InvertTaxon` keys and
-// all flow through the generic `/invert-species/?taxon=` endpoint, so
-// adding another is a one-line edit to GENERIC_TAXA + the seed.
-type GenericTaxon = 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'roach' | 'other';
-type Taxon = 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | GenericTaxon;
+type SortKey = 'az' | 'popular' | 'easiest';
 
-const GENERIC_TAXA: GenericTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'roach', 'other'];
-const isGenericTaxon = (t: Taxon): t is GenericTaxon =>
-  (GENERIC_TAXA as string[]).includes(t);
-
-// Per-taxon display metadata. `tab` is the segment label (glyph + name),
-// `noun` is the singular used in "{n} {noun} species" + search hints,
-// `glyph` is the large loading/empty emoji. Established taxa keep their
-// curated labels; the five expansion taxa pull glyph from the registry.
-const TAXON_ORDER: Taxon[] = [
-  'tarantulas', 'scorpions', 'centipedes', 'whip_spiders',
-  'vinegaroon', 'true_spider', 'millipede', 'mantis', 'roach', 'other',
-];
-const TAXON_META: Record<Taxon, { tab: string; noun: string; glyph: string }> = {
-  tarantulas: { tab: '🕷  Tarantulas', noun: 'tarantula', glyph: '🕷️' },
-  scorpions: { tab: '🦂  Scorpions', noun: 'scorpion', glyph: '🦂' },
-  centipedes: { tab: '🐛  Centipedes', noun: 'centipede', glyph: '🐛' },
-  whip_spiders: { tab: '🕸️  Whip spiders', noun: 'whip spider', glyph: '🕸️' },
-  vinegaroon: { tab: `${INVERT_TAXA.vinegaroon.glyph}  Vinegaroons`, noun: 'vinegaroon', glyph: INVERT_TAXA.vinegaroon.glyph },
-  true_spider: { tab: `${INVERT_TAXA.true_spider.glyph}  True spiders`, noun: 'true spider', glyph: INVERT_TAXA.true_spider.glyph },
-  millipede: { tab: `${INVERT_TAXA.millipede.glyph}  Millipedes`, noun: 'millipede', glyph: INVERT_TAXA.millipede.glyph },
-  mantis: { tab: `${INVERT_TAXA.mantis.glyph}  Mantises`, noun: 'mantis', glyph: INVERT_TAXA.mantis.glyph },
-  roach: { tab: `${INVERT_TAXA.roach.glyph}  Roaches`, noun: 'roach', glyph: INVERT_TAXA.roach.glyph },
-  other: { tab: `${INVERT_TAXA.other.glyph}  Other`, noun: 'other invertebrate', glyph: INVERT_TAXA.other.glyph },
+const SORT_LABELS: Record<SortKey, string> = {
+  az: 'A–Z',
+  popular: 'Most kept',
+  easiest: 'Easiest first',
 };
 
-interface TarantulaRow {
-  taxon: 'tarantulas';
-  id: string;
-  scientific_name: string;
-  common_names: string[];
-  type: string | null;
-  care_level: string | null;
-  adult_size: string | null;
-  is_verified: boolean;
-  image_url: string | null;
-  urticating_hairs?: boolean;
-  medically_significant_venom?: boolean;
+const CARE_ORDER: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 };
+
+/** Display label per taxon. INVERT_TAXA covers nine; tarantula is separate. */
+function taxonLabel(taxon: string): string {
+  if (taxon === 'tarantula') return 'Tarantulas';
+  const meta = (INVERT_TAXA as any)[taxon];
+  if (!meta) return taxon;
+  // Registry labels are singular ("Whip spider"); the chips read as counts of
+  // a group, so pluralise.
+  return meta.label.endsWith('s') ? meta.label : `${meta.label}s`;
 }
 
-interface ScorpionRow {
-  taxon: 'scorpions';
-  id: string;
-  scientific_name: string;
-  common_names: string[];
-  type: string | null;
-  care_level: string | null;
-  adult_size: string | null;
-  is_verified: boolean;
-  image_url: string | null;
-  venom_severity: ScorpionSpecies['venom_severity'];
-  communal_suitable: boolean;
+function titleCase(s?: string | null): string | null {
+  if (!s) return null;
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-interface CentipedeRow {
-  taxon: 'centipedes';
-  id: string;
-  scientific_name: string;
-  common_names: string[];
-  type: string | null;
-  care_level: string | null;
-  adult_size: string | null;
-  is_verified: boolean;
-  image_url: string | null;
-  /** Centipedes share the scorpion venom tier shape — used to render
-   * the same "Hot" pill on the card. */
-  venom_severity: CentipedeSpecies['venom_severity'];
-  /** Drives the small "anamorphic"/"epimorphic" hint on the card. */
-  developmental_class: CentipedeSpecies['developmental_class'];
+/** "Terrestrial · 5–6" · South America" — only the parts we actually have. */
+function factsLine(r: SpeciesRow): string | null {
+  const parts = [titleCase(r.type), r.adult_size, r.native_region].filter(
+    (p) => !!p && `${p}`.trim() !== '',
+  );
+  return parts.length ? parts.join(' · ') : null;
 }
 
-interface WhipSpiderRow {
-  taxon: 'whip_spiders';
-  id: string;
-  scientific_name: string;
-  common_names: string[];
-  type: string | null;
-  care_level: string | null;
-  adult_size: string | null;
-  is_verified: boolean;
-  image_url: string | null;
-  /** Whip spiders are harmless (no venom). communal_suitable drives a
-   * "group-keepable" badge instead of a venom pill. */
-  communal_suitable: boolean;
-}
-
-interface GenericInvertRow {
-  taxon: GenericTaxon;
-  id: string;
-  scientific_name: string;
-  common_names: string[];
-  type: string | null;
-  care_level: string | null;
-  adult_size: string | null;
-  is_verified: boolean;
-  image_url: string | null;
-  /** Generic venom tier string ('mild'|'moderate'|'medically_significant'|null).
-   * Most expansion taxa are harmless (null). */
-  venom_severity: string | null;
-  communal_suitable: boolean;
-  /** Drives a leaf glyph for detritivores (millipedes) on the card. */
-  feeding_mode: string | null;
-}
-
-type Row = TarantulaRow | ScorpionRow | CentipedeRow | WhipSpiderRow | GenericInvertRow;
-
-export default function UnifiedSpeciesScreen() {
+function SpeciesBrowserScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  // Allow deep-linking with `?taxon=scorpions` so the entry icons on
-  // each collection tab preselect the right segment.
-  const { taxon: taxonParam } = useLocalSearchParams<{ taxon?: string }>();
-  const initialTaxon: Taxon =
-    taxonParam === 'scorpions'
-      ? 'scorpions'
-      : taxonParam === 'centipedes'
-        ? 'centipedes'
-        : taxonParam === 'whip_spiders'
-          ? 'whip_spiders'
-          : taxonParam && (GENERIC_TAXA as string[]).includes(taxonParam)
-            ? (taxonParam as GenericTaxon)
-            : 'tarantulas';
 
-  const [taxon, setTaxon] = useState<Taxon>(initialTaxon);
-  const [rows, setRows] = useState<Row[]>([]);
+  // Deep links historically used plural keys (`?taxon=scorpions`). Accept both
+  // so `/scorpion-species` and any saved links keep working.
+  const { taxon: taxonParam } = useLocalSearchParams<{ taxon?: string }>();
+  const initialTaxon = useMemo(() => {
+    if (!taxonParam) return 'all';
+    const singular = taxonParam.replace(/s$/, '');
+    if (taxonParam === 'tarantulas' || singular === 'tarantula') return 'tarantula';
+    if ((INVERT_TAXA as any)[taxonParam]) return taxonParam;
+    if ((INVERT_TAXA as any)[singular]) return singular;
+    return 'all';
+  }, [taxonParam]);
+
+  const [rows, setRows] = useState<SpeciesRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [careFilter, setCareFilter] = useState<
-    'all' | 'beginner' | 'intermediate' | 'advanced'
-  >('all');
+  const [error, setError] = useState<string | null>(null);
 
-  // Reset filters when switching taxon — care_level values match across
-  // catalogs, but search results don't carry meaning between taxa.
-  useEffect(() => {
-    setSearchTerm('');
-    setCareFilter('all');
-    fetchRows(taxon);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taxon]);
+  const [taxon, setTaxon] = useState<string>(initialTaxon);
+  const [search, setSearch] = useState('');
+  const [careFilter, setCareFilter] = useState<string>('all');
+  const [sort, setSort] = useState<SortKey>('az');
+  const [filterSheet, setFilterSheet] = useState(false);
+  const [taxonSheet, setTaxonSheet] = useState(false);
 
-  const fetchRows = async (which: Taxon) => {
-    setLoading(true);
+  const load = useCallback(async () => {
+    setError(null);
     try {
-      if (which === 'tarantulas') {
-        // Use apiClient (not raw fetch) for parity with the scorpion
-        // path. apiClient's baseURL already includes /api/v1 and has a
-        // fallback to the prod host, so the request works even when
-        // EXPO_PUBLIC_API_URL isn't injected at runtime.
-        //
-        // Species router limit cap raised to le=1000 (2026-07-01) so the full
-        // tarantula catalog loads (was capped at 100, showing only 100 of 166+).
-        // Bump both this and the router's `le=` if the catalog ever nears 1000.
-        const { data } = await apiClient.get<any>('/species', {
-          params: { limit: 1000 },
-        });
-        // API has historically returned either a bare array or a
-        // {items, total} envelope — handle both defensively.
-        const items: any[] = Array.isArray(data) ? data : data?.items ?? [];
-        setRows(
-          items.map((s) => ({
-            taxon: 'tarantulas' as const,
-            id: s.id,
-            scientific_name: s.scientific_name,
-            common_names: s.common_names ?? [],
-            type: s.type ?? null,
-            care_level: s.care_level ?? null,
-            adult_size: s.adult_size ?? null,
-            is_verified: !!s.is_verified,
-            image_url: s.image_url ?? null,
-            urticating_hairs: s.urticating_hairs,
-            medically_significant_venom: s.medically_significant_venom,
-          })),
-        );
-      } else if (which === 'scorpions') {
-        const items = await listScorpionSpecies({ limit: 200 });
-        setRows(
-          items.map((s) => ({
-            taxon: 'scorpions' as const,
-            id: s.id,
-            scientific_name: s.scientific_name,
-            common_names: s.common_names ?? [],
-            type: s.type,
-            care_level: s.care_level,
-            adult_size: s.adult_size,
-            is_verified: s.is_verified,
-            image_url: s.image_url,
-            venom_severity: s.venom_severity,
-            communal_suitable: s.communal_suitable,
-          })),
-        );
-      } else if (which === 'centipedes') {
-        const items = await listCentipedeSpecies({ limit: 200 });
-        setRows(
-          items.map((c) => ({
-            taxon: 'centipedes' as const,
-            id: c.id,
-            scientific_name: c.scientific_name,
-            common_names: c.common_names ?? [],
-            type: c.type,
-            care_level: c.care_level,
-            adult_size: c.adult_size,
-            is_verified: c.is_verified,
-            image_url: c.image_url,
-            venom_severity: c.venom_severity,
-            developmental_class: c.developmental_class,
-          })),
-        );
-      } else if (which === 'whip_spiders') {
-        const items = await listWhipSpiderSpecies({ limit: 200 });
-        setRows(
-          items.map((w) => ({
-            taxon: 'whip_spiders' as const,
-            id: w.id,
-            scientific_name: w.scientific_name,
-            common_names: w.common_names ?? [],
-            type: w.type,
-            care_level: w.care_level,
-            adult_size: w.adult_size,
-            is_verified: w.is_verified,
-            image_url: w.image_url,
-            communal_suitable: w.communal_suitable,
-          })),
-        );
+      // Parallel, and each failure is isolated: if the invert catalog is down
+      // we still show tarantulas rather than an empty screen.
+      const [tRes, iRes] = await Promise.all([
+        apiClient.get<any>('/species', { params: { limit: 1000 } }).catch(() => null),
+        apiClient.get<any>('/invert-species/', { params: { limit: 1000 } }).catch(() => null),
+      ]);
+
+      const tItems: any[] = Array.isArray(tRes?.data) ? tRes.data : tRes?.data?.items ?? [];
+      const tarantulas: SpeciesRow[] = tItems.map((s) => ({
+        id: s.id,
+        taxon: 'tarantula',
+        scientific_name: s.scientific_name,
+        common_names: s.common_names ?? [],
+        care_level: s.care_level ?? null,
+        type: s.type ?? null,
+        adult_size: s.adult_size ?? null,
+        native_region: s.native_region ?? null,
+        image_url: s.image_url ?? null,
+        is_verified: !!s.is_verified,
+        times_kept: s.times_kept ?? 0,
+        // Only /species carries these two.
+        hotVenom: !!s.medically_significant_venom,
+        mildVenom: false,
+        communal: false,
+      }));
+
+      const iItems: any[] = Array.isArray(iRes?.data) ? iRes.data : iRes?.data?.items ?? [];
+      const inverts: SpeciesRow[] = iItems
+        // Drop mirrored tarantulas — they're already in the list above WITH
+        // their venom flags, which the mirror lacks.
+        .filter((s) => s.taxon !== 'tarantula')
+        .map((s) => ({
+          id: s.id,
+          taxon: s.taxon,
+          scientific_name: s.scientific_name,
+          common_names: s.common_names ?? [],
+          care_level: s.care_level ?? null,
+          type: s.type ?? null,
+          adult_size: s.adult_size ?? null,
+          native_region: s.native_region ?? null,
+          image_url: s.image_url ?? null,
+          is_verified: !!s.is_verified,
+          times_kept: s.times_kept ?? 0,
+          hotVenom: s.venom_severity === 'medically_significant',
+          mildVenom: s.venom_severity === 'mild' || s.venom_severity === 'moderate',
+          communal: !!s.communal_suitable,
+        }));
+
+      if (!tRes && !iRes) {
+        setError("Couldn't load the species catalog.");
+        setRows([]);
       } else {
-        // ADR-006 expansion taxa — all go through the generic species
-        // endpoint. `which` IS the InvertTaxon key here.
-        const items = await listInvertSpecies(which as InvertTaxon, 200);
-        setRows(
-          items.map((s) => ({
-            taxon: which as GenericTaxon,
-            id: s.id,
-            scientific_name: s.scientific_name,
-            common_names: s.common_names ?? [],
-            type: s.type,
-            care_level: s.care_level,
-            adult_size: s.adult_size,
-            is_verified: s.is_verified,
-            image_url: s.image_url,
-            venom_severity: s.venom_severity,
-            communal_suitable: s.communal_suitable,
-            feeding_mode: s.feeding_mode,
-          })),
-        );
+        setRows([...tarantulas, ...inverts]);
       }
-    } catch (err) {
-      // Surface the failure so it's visible in `eas update:view` logs
-      // and Expo dev tools rather than silently rendering an empty
-      // grid the keeper can't diagnose.
-      console.warn('[species] Failed to load', which, err);
-      setRows([]);
+    } catch {
+      setError("Couldn't load the species catalog.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchRows(taxon);
-  };
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  // Client-side filter — both catalogs are small enough (≤200 rows
-  // each) that a server round trip per keystroke is wasteful.
-  const filtered = rows.filter((r) => {
-    if (careFilter !== 'all' && r.care_level !== careFilter) return false;
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      const hit =
-        r.scientific_name.toLowerCase().includes(q)
-        || r.common_names.some((n) => n.toLowerCase().includes(q));
-      if (!hit) return false;
-    }
-    return true;
-  });
+  // Per-taxon counts, computed once, driving the chips.
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) m.set(r.taxon, (m.get(r.taxon) ?? 0) + 1);
+    return m;
+  }, [rows]);
 
-  const getCareLevel = (level: string | null) => {
-    switch (level) {
-      case 'beginner':
-        return { color: '#22c55e', text: 'Beginner', icon: '✓' };
-      case 'intermediate':
-        return { color: '#eab308', text: 'Intermediate', icon: '⚠' };
-      case 'advanced':
-        return { color: '#f97316', text: 'Advanced', icon: '⚡' };
-      default:
-        return { color: colors.textSecondary, text: 'Unknown', icon: '?' };
-    }
-  };
+  const taxaByCount = useMemo(
+    () => [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t),
+    [counts],
+  );
 
-  // Type-icon dispatcher — emoji glyphs that visually distinguish
-  // body plan + biome at a glance on the card.
-  const getTypeIcon = (which: Taxon, type: string | null) => {
-    if (isGenericTaxon(which)) {
-      // Body-plan biome glyphs where meaningful, else the taxon's
-      // registry glyph (🦂/🕷/🪱/🦗/🐾).
-      switch (type) {
-        case 'arboreal': return '🌳';
-        case 'terrestrial': return '🏜️';
-        case 'fossorial': return '⛰️';
-        default: return INVERT_TAXA[which].glyph;
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let out = rows.filter((r) => {
+      if (taxon !== 'all' && r.taxon !== taxon) return false;
+      if (careFilter !== 'all' && r.care_level !== careFilter) return false;
+      if (!q) return true;
+      return (
+        r.scientific_name.toLowerCase().includes(q) ||
+        r.common_names.some((c) => c.toLowerCase().includes(q))
+      );
+    });
+    out = [...out].sort((a, b) => {
+      if (sort === 'popular') return b.times_kept - a.times_kept;
+      if (sort === 'easiest') {
+        const d = (CARE_ORDER[a.care_level ?? ''] ?? 9) - (CARE_ORDER[b.care_level ?? ''] ?? 9);
+        if (d !== 0) return d;
       }
-    }
-    if (which === 'scorpions') {
-      switch (type) {
-        case 'terrestrial': return '🏜️';
-        case 'scansorial': return '🌳';
-        case 'fossorial': return '⛰️';
-        case 'psammophile': return '🏖️';
-        default: return '🦂';
-      }
-    }
-    if (which === 'centipedes') {
-      // Centipede `type` reuses the tarantula vocabulary
-      // (terrestrial / fossorial). Most pet trade species are
-      // fossorial, so that branch gets the mountain glyph.
-      switch (type) {
-        case 'terrestrial': return '🏜️';
-        case 'fossorial': return '⛰️';
-        default: return '🐛';
-      }
-    }
-    if (which === 'whip_spiders') {
-      // Whip spiders are arboreal vertical-surface dwellers.
-      switch (type) {
-        case 'arboreal': return '🌳';
-        case 'terrestrial': return '🏜️';
-        default: return '🕸️';
-      }
-    }
-    switch (type) {
-      case 'terrestrial': return '🏜️';
-      case 'arboreal': return '🌳';
-      case 'fossorial': return '⛰️';
-      default: return '🕷️';
-    }
+      return a.scientific_name.localeCompare(b.scientific_name);
+    });
+    return out;
+  }, [rows, taxon, careFilter, search, sort]);
+
+  /** Beginner-friendly shelf. Only on the unfiltered view — it's a browse
+   *  affordance, not a search result. Ordered by how many keepers have one. */
+  const beginners = useMemo(() => {
+    if (taxon !== 'all' || careFilter !== 'all' || search.trim()) return [];
+    return rows
+      .filter((r) => r.care_level === 'beginner' && !r.hotVenom)
+      .sort((a, b) => b.times_kept - a.times_kept)
+      .slice(0, 12);
+  }, [rows, taxon, careFilter, search]);
+
+  const openSheet = (r: SpeciesRow) => {
+    // Tarantulas keep their dedicated care sheet; the rest render through the
+    // generic one (ADR-007).
+    router.push((r.taxon === 'tarantula' ? `/species/${r.id}` : `/invert-species/${r.id}`) as any);
   };
 
-  const handleOpen = (row: Row) => {
-    // Tarantulas keep their dedicated care sheet; all other taxa render
-    // through the generic invert care sheet (ADR-007).
-    const path =
-      row.taxon === 'tarantulas'
-        ? `/species/${row.id}`
-        : `/invert-species/${row.id}`;
-    router.push(path as any);
-  };
+  const styles = makeStyles(colors);
+  const activeFilterCount = (careFilter !== 'all' ? 1 : 0) + (sort !== 'az' ? 1 : 0);
 
-  // Row-level guard (narrows `item` to GenericInvertRow, unlike
-  // isGenericTaxon which only narrows the taxon string).
-  const isGenericRow = (r: Row): r is GenericInvertRow =>
-    (GENERIC_TAXA as string[]).includes(r.taxon);
-
-  const renderCard = ({ item, index }: { item: Row; index: number }) => {
-    const careLevel = getCareLevel(item.care_level);
-    const typeIcon = getTypeIcon(item.taxon, item.type);
-    // Scorpions + centipedes share the same venom-tier shape; render
-    // the same pill so a keeper scans the whole catalog for hot
-    // species the same way.
-    const venom =
-      item.taxon === 'scorpions' || item.taxon === 'centipedes'
-        ? venomSeverityColor(item.venom_severity)
-        : isGenericRow(item) && item.venom_severity
-          ? venomSeverityColor(item.venom_severity as any)
-          : null;
-    const isHot =
-      item.taxon === 'tarantulas'
-        ? !!item.medically_significant_venom
-        : item.taxon === 'scorpions' || item.taxon === 'centipedes'
-          ? item.venom_severity === 'medically_significant'
-          : isGenericRow(item)
-            ? item.venom_severity === 'medically_significant'
-            : false; // whip spiders are harmless
-
+  const renderRow = ({ item }: { item: SpeciesRow }) => {
+    const care = careLevelMeta(item.care_level, colors.textSecondary);
+    const facts = factsLine(item);
     return (
-      <TouchableOpacity
-        onPress={() => handleOpen(item)}
-        style={[
-          styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-          index % 2 === 0 ? { marginRight: 8 } : { marginLeft: 8 },
-        ]}
-        activeOpacity={0.8}
-      >
-        <View style={styles.imageContainer}>
-          {item.image_url ? (
-            // getImageUrl handles both absolute R2 URLs and legacy
-            // server-relative paths (`/uploads/photos/...`). Without
-            // it, relative paths render as broken images. See
-            // src/utils/image-url.ts.
-            <Image
-              source={{ uri: getImageUrl(item.image_url) }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={[styles.placeholderImage, { backgroundColor: colors.surfaceElevated }]}>
-              <Text style={styles.placeholderEmoji}>{typeIcon}</Text>
-            </View>
-          )}
-
-          <View style={styles.imageGradient} />
-
-          <View style={styles.topBadges}>
+      <TouchableOpacity style={styles.row} activeOpacity={0.8} onPress={() => openSheet(item)}>
+        <SpeciesThumb row={item} colors={colors} styles={styles} />
+        <View style={styles.rowBody}>
+          <View style={styles.rowNameLine}>
+            <Text style={styles.rowName} numberOfLines={1}>
+              {item.common_names?.[0] || item.scientific_name}
+            </Text>
             {item.is_verified && (
-              <View style={styles.verifiedBadge}>
-                <Ionicons name="checkmark-circle" size={14} color="#ffffff" />
-              </View>
-            )}
-            {isHot && (
-              <View style={[styles.warningBadge, { backgroundColor: '#ef4444' }]}>
-                <MaterialCommunityIcons name="alert" size={14} color="#ffffff" />
-              </View>
-            )}
-            {(item.taxon === 'scorpions' || item.taxon === 'whip_spiders' || isGenericRow(item)) && item.communal_suitable && (
-              <View style={[styles.warningBadge, { backgroundColor: '#3b82f6' }]}>
-                <MaterialCommunityIcons name="account-group" size={14} color="#ffffff" />
-              </View>
+              <MaterialCommunityIcons name="check-decagram" size={15} color="#22c55e" />
             )}
           </View>
-
-          <View style={[styles.careLevelBadge, { backgroundColor: careLevel.color }]}>
-            <Text style={styles.careLevelText}>{careLevel.icon}</Text>
-          </View>
-        </View>
-
-        <View style={styles.cardContent}>
-          <Text style={[styles.commonName, { color: colors.textPrimary }]} numberOfLines={1}>
-            {item.common_names?.[0] || item.scientific_name.split(' ')[1] || item.scientific_name}
-          </Text>
-          <Text style={[styles.scientificName, { color: colors.textSecondary }]} numberOfLines={1}>
+          <Text style={styles.rowSci} numberOfLines={1}>
             {item.scientific_name}
           </Text>
 
-          <View style={styles.quickInfo}>
-            <Chip>{typeIcon}</Chip>
-            {item.adult_size && <Chip>{item.adult_size}</Chip>}
-            {venom && <Badge label={venom.label} bg={venom.bg} fg={venom.fg} />}
+          <View style={styles.pillRow}>
+            {!!item.care_level && (
+              <View style={[styles.pill, { backgroundColor: care.color + '24' }]}>
+                <Text style={[styles.pillText, { color: care.color }]}>{care.text}</Text>
+              </View>
+            )}
+            {item.hotVenom && (
+              <View style={[styles.pill, { backgroundColor: '#ef444424' }]}>
+                <MaterialCommunityIcons name="alert" size={11} color="#ef4444" />
+                <Text style={[styles.pillText, { color: '#ef4444' }]}>Hot venom</Text>
+              </View>
+            )}
+            {!item.hotVenom && item.communal && (
+              <View style={[styles.pill, { backgroundColor: '#3b82f624' }]}>
+                <MaterialCommunityIcons name="account-multiple" size={11} color="#3b82f6" />
+                <Text style={[styles.pillText, { color: '#3b82f6' }]}>Communal</Text>
+              </View>
+            )}
           </View>
+
+          {!!facts && (
+            <Text style={styles.rowFacts} numberOfLines={1}>
+              {facts}
+            </Text>
+          )}
+          {/* Social proof only where it's actually proof. */}
+          {item.times_kept >= MIN_KEEPERS_TO_SHOW && (
+            <Text style={styles.rowKeepers}>Kept by {item.times_kept} keepers</Text>
+          )}
         </View>
       </TouchableOpacity>
     );
   };
 
-  // NB: do not define these as React components inside the parent
-  // (`const Foo = () => ...`). React treats each render's function as
-  // a NEW component type, which unmounts/remounts on every state change.
-  // For the FlatList header that's why the search TextInput kept losing
-  // focus after one keystroke. Inlining the JSX directly keeps the
-  // same element identity across renders.
-  // Nine taxa no longer fit a fixed equal-width row, so the segment
-  // control scrolls horizontally and each pill sizes to its label.
-  const TaxonSegment = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={[styles.segmentWrap, { backgroundColor: colors.surfaceElevated }]}
-    >
-      {TAXON_ORDER.map((t) => {
-        const active = t === taxon;
-        return (
-          <TouchableOpacity
-            key={t}
-            onPress={() => setTaxon(t)}
-            style={[
-              styles.segmentButton,
-              { borderColor: active ? colors.primary : colors.border },
-              active && { backgroundColor: colors.primary },
-            ]}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                { color: active ? '#fff' : colors.textPrimary },
-              ]}
-              numberOfLines={1}
-            >
-              {TAXON_META[t].tab}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
-  );
-
-  const FilterChip = ({
-    label,
-    isActive,
-    onPress,
-  }: {
-    label: string;
-    isActive: boolean;
-    onPress: () => void;
-  }) => (
-    <TouchableOpacity
-      onPress={onPress}
-      style={[
-        styles.filterChip,
-        {
-          backgroundColor: isActive ? colors.primary : colors.surfaceElevated,
-          borderColor: isActive ? colors.primary : colors.border,
-        },
-      ]}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.filterChipText, { color: isActive ? '#fff' : colors.textPrimary }]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  // Header content rendered inline below — NOT as a FlatList
-  // ListHeaderComponent function, because that path causes the
-  // TextInput inside to unmount on every keystroke. As a side
-  // benefit, hoisting it outside means the search + filters stay
-  // visible while scrolling the result grid.
-  const HeaderContent = (
-    <>
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+  return (
+    <View style={styles.flex}>
+      <LinearGradient
+        colors={[colors.primary, colors.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.header, { paddingTop: insets.top + 12 }]}
+      >
+        <View style={styles.headerTop}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>Species Database</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {rows.length} {TAXON_META[taxon].noun} species
+            <Text style={styles.headerTitle}>Species</Text>
+            <Text style={styles.headerSubtitle}>
+              {loading
+                ? 'Loading catalog…'
+                : `${rows.length} care sheets · ${counts.size} ${counts.size === 1 ? 'taxon' : 'taxa'}`}
             </Text>
           </View>
-          {/* Entry point to the saved-species list. */}
+          <TouchableOpacity
+            onPress={() => setFilterSheet(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Filter and sort"
+            style={styles.headerIcon}
+          >
+            <MaterialCommunityIcons name="tune-variant" size={22} color="#fff" />
+            {activeFilterCount > 0 && <View style={styles.headerIconDot} />}
+          </TouchableOpacity>
           <TouchableOpacity
             onPress={() => router.push('/shortlist' as any)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
             accessibilityLabel="Your shortlist"
-            style={{ paddingTop: 6 }}
+            style={styles.headerIcon}
           >
-            <MaterialCommunityIcons name="bookmark-outline" size={24} color={colors.textPrimary} />
+            <MaterialCommunityIcons name="bookmark-outline" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
-      </View>
 
-      <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-        <Text
-          style={[
-            styles.subtitle,
-            {
-              color: colors.textTertiary,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              fontWeight: '700',
-              marginBottom: 6,
-            },
-          ]}
-        >
-          Browse by animal type
-        </Text>
-        <TaxonSegment />
-      </View>
+        <View style={styles.searchBox}>
+          <MaterialCommunityIcons name="magnify" size={19} color="rgba(255,255,255,0.75)" />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search all species…"
+            placeholderTextColor="rgba(255,255,255,0.75)"
+            style={styles.searchInput}
+            autoCorrect={false}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+          {!!search && (
+            <TouchableOpacity onPress={() => setSearch('')} accessibilityLabel="Clear search">
+              <MaterialCommunityIcons name="close-circle" size={17} color="rgba(255,255,255,0.75)" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </LinearGradient>
 
-      <View style={[styles.searchContainer, { backgroundColor: colors.surfaceElevated }]}>
-        <Ionicons name="search" size={20} color={colors.textSecondary} style={styles.searchIcon} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.textPrimary }]}
-          placeholder={`Search ${TAXON_META[taxon].noun} species…`}
-          placeholderTextColor={colors.textTertiary}
-          value={searchTerm}
-          onChangeText={setSearchTerm}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {searchTerm.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchTerm('')}>
-            <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+      {/* Taxon chips with real counts, led by All. The trailing "···" opens a
+          sheet listing every taxon — the scroller alone hid seven of ten
+          options with no affordance that they existed. */}
+      {!loading && rows.length > 0 && (
+        <View style={styles.chipStrip}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Chip
+              label={`All ${rows.length}`}
+              active={taxon === 'all'}
+              onPress={() => setTaxon('all')}
+              colors={colors}
+              styles={styles}
+            />
+            {taxaByCount.map((t) => (
+              <Chip
+                key={t}
+                icon={taxonMdiIcon(t)}
+                label={`${taxonLabel(t)} ${counts.get(t)}`}
+                active={taxon === t}
+                onPress={() => setTaxon(t)}
+                colors={colors}
+                styles={styles}
+              />
+            ))}
+          </ScrollView>
+          <TouchableOpacity
+            onPress={() => setTaxonSheet(true)}
+            style={styles.chipMore}
+            accessibilityRole="button"
+            accessibilityLabel="See all animal types"
+          >
+            <MaterialCommunityIcons name="dots-horizontal" size={18} color={colors.textPrimary} />
           </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.filterContainer}>
-        <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Care level</Text>
-        <View style={styles.filterChips}>
-          <FilterChip
-            label="All"
-            isActive={careFilter === 'all'}
-            onPress={() => setCareFilter('all')}
-          />
-          <FilterChip
-            label="Beginner"
-            isActive={careFilter === 'beginner'}
-            onPress={() => setCareFilter('beginner')}
-          />
-          <FilterChip
-            label="Intermediate"
-            isActive={careFilter === 'intermediate'}
-            onPress={() => setCareFilter('intermediate')}
-          />
-          <FilterChip
-            label="Advanced"
-            isActive={careFilter === 'advanced'}
-            onPress={() => setCareFilter('advanced')}
-          />
         </View>
-      </View>
+      )}
 
-      <Text style={[styles.resultCount, { color: colors.textSecondary }]}>
-        {filtered.length} species found
-      </Text>
-    </>
-  );
-
-  if (loading && rows.length === 0) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-        <Stack.Screen options={{ headerShown: false }} />
-        {HeaderContent}
-        <View style={styles.loadingContainer}>
-          <Text style={{ fontSize: 60, marginBottom: 16 }}>
-            {TAXON_META[taxon].glyph}
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Loading species…
-          </Text>
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <Stack.Screen options={{ headerShown: false }} />
-      {HeaderContent}
-      {filtered.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyEmoji}>🔍</Text>
-          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
-            No species found
-          </Text>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Try adjusting your search or filters
-          </Text>
+      ) : error ? (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={load}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={filtered}
-          renderItem={renderCard}
-          keyExtractor={(item) => `${item.taxon}-${item.id}`}
-          numColumns={2}
-          // Bottom inset for the tab bar. This screen used to be a pushed
-          // route with nothing below it; promoting it to a tab put a ~56pt
-          // bar over the last row, so the grid has to clear it explicitly.
-          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 72 }]}
+          keyExtractor={(r) => `${r.taxon}-${r.id}`}
+          renderItem={renderRow}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+            paddingTop: 4,
+            paddingBottom: insets.bottom + 72,
+            gap: 10,
+          }}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={onRefresh}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
               tintColor={colors.primary}
             />
           }
-          columnWrapperStyle={styles.row}
-          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            beginners.length > 0 ? (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={styles.shelfLabel}>GOOD FOR BEGINNERS</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 10, paddingRight: 8 }}
+                >
+                  {beginners.map((r) => (
+                    <TouchableOpacity
+                      key={`shelf-${r.id}`}
+                      style={styles.shelfTile}
+                      activeOpacity={0.8}
+                      onPress={() => openSheet(r)}
+                    >
+                      <SpeciesThumb row={r} colors={colors} styles={styles} shelf />
+                      <Text style={styles.shelfName} numberOfLines={1}>
+                        {r.common_names?.[0] || r.scientific_name}
+                      </Text>
+                      <Text style={styles.shelfSci} numberOfLines={1}>
+                        {r.scientific_name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <Text style={[styles.shelfLabel, { marginTop: 16 }]}>
+                  ALL SPECIES{sort === 'az' ? ' · A–Z' : ` · ${SORT_LABELS[sort].toUpperCase()}`}
+                </Text>
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <MaterialCommunityIcons name="magnify" size={44} color={colors.textTertiary} />
+              <Text style={styles.emptyTitle}>No species found</Text>
+              <Text style={styles.emptyBody}>Try a different search or clear your filters.</Text>
+              {(taxon !== 'all' || careFilter !== 'all' || !!search) && (
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => {
+                    setTaxon('all');
+                    setCareFilter('all');
+                    setSearch('');
+                  }}
+                >
+                  <Text style={styles.retryText}>Clear filters</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          }
         />
       )}
-    </SafeAreaView>
+
+      {/* Filter + sort sheet — care level moved off the main screen, which is
+          what freed ~260pt of chrome above the first result. */}
+      <Sheet visible={filterSheet} onClose={() => setFilterSheet(false)} title="Filter & sort" styles={styles}>
+        <Text style={styles.sheetLabel}>CARE LEVEL</Text>
+        <View style={styles.sheetOptions}>
+          {['all', 'beginner', 'intermediate', 'advanced'].map((lvl) => (
+            <Chip
+              key={lvl}
+              label={lvl === 'all' ? 'All' : careLevelMeta(lvl).text}
+              active={careFilter === lvl}
+              onPress={() => setCareFilter(lvl)}
+              colors={colors}
+              styles={styles}
+            />
+          ))}
+        </View>
+        <Text style={[styles.sheetLabel, { marginTop: 18 }]}>SORT</Text>
+        <View style={styles.sheetOptions}>
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+            <Chip
+              key={k}
+              label={SORT_LABELS[k]}
+              active={sort === k}
+              onPress={() => setSort(k)}
+              colors={colors}
+              styles={styles}
+            />
+          ))}
+        </View>
+      </Sheet>
+
+      <Sheet visible={taxonSheet} onClose={() => setTaxonSheet(false)} title="Animal type" styles={styles}>
+        <TouchableOpacity
+          style={styles.sheetRow}
+          onPress={() => {
+            setTaxon('all');
+            setTaxonSheet(false);
+          }}
+        >
+          <MaterialCommunityIcons name="paw-outline" size={20} color={colors.primary} />
+          <Text style={styles.sheetRowText}>All species</Text>
+          <Text style={styles.sheetRowCount}>{rows.length}</Text>
+        </TouchableOpacity>
+        {taxaByCount.map((t) => (
+          <TouchableOpacity
+            key={`sheet-${t}`}
+            style={styles.sheetRow}
+            onPress={() => {
+              setTaxon(t);
+              setTaxonSheet(false);
+            }}
+          >
+            <MaterialCommunityIcons
+              name={taxonMdiIcon(t) as any}
+              size={20}
+              color={colors.primary}
+            />
+            <Text style={styles.sheetRowText}>{taxonLabel(t)}</Text>
+            <Text style={styles.sheetRowCount}>{counts.get(t)}</Text>
+          </TouchableOpacity>
+        ))}
+      </Sheet>
+    </View>
   );
 }
 
-// Styles preserved from the prior tarantula-only browser plus a
-// segment-control block for the taxon switcher.
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: { padding: 16, borderBottomWidth: 1 },
-  title: { fontSize: 28, fontWeight: '700', marginBottom: 4 },
-  subtitle: { fontSize: 14 },
+/**
+ * Row/shelf thumbnail.
+ *
+ * Falls back to the taxon glyph both when there's no photo AND when one fails
+ * to load — 12 catalog entries hotlink upload.wikimedia.org, which 403s
+ * clients that don't send a browser User-Agent, so without onError those
+ * render as blank frames.
+ */
+function SpeciesThumb({
+  row,
+  colors,
+  styles,
+  shelf,
+}: {
+  row: SpeciesRow;
+  colors: any;
+  styles: any;
+  shelf?: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const box = shelf ? styles.shelfThumb : styles.rowThumb;
+  if (!row.image_url || failed) {
+    return (
+      <View style={[box, styles.thumbFallback]}>
+        <MaterialCommunityIcons
+          name={taxonMdiIcon(row.taxon) as any}
+          size={shelf ? 26 : 28}
+          color={colors.textTertiary}
+        />
+      </View>
+    );
+  }
+  return (
+    <View style={box}>
+      <Image
+        source={{ uri: getImageUrl(row.image_url) }}
+        style={styles.thumbImage}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+      />
+    </View>
+  );
+}
 
-  segmentWrap: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    padding: 4,
-    gap: 4,
-  },
-  segmentButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  segmentText: { fontSize: 14, fontWeight: '600' },
+function Chip({
+  label,
+  icon,
+  active,
+  onPress,
+  colors,
+  styles,
+}: {
+  label: string;
+  icon?: string;
+  active: boolean;
+  onPress: () => void;
+  colors: any;
+  styles: any;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.chip,
+        active
+          ? { backgroundColor: colors.primary, borderColor: colors.primary }
+          : { backgroundColor: colors.surface, borderColor: colors.border },
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      {!!icon && (
+        <MaterialCommunityIcons
+          name={icon as any}
+          size={13}
+          color={active ? '#fff' : colors.textSecondary}
+        />
+      )}
+      <Text style={[styles.chipText, { color: active ? '#fff' : colors.textPrimary }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 2,
-  },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 15 },
+function Sheet({
+  visible,
+  onClose,
+  title,
+  styles,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  styles: any;
+  children: React.ReactNode;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.sheetBackdrop} activeOpacity={1} onPress={onClose}>
+        <TouchableOpacity activeOpacity={1} style={styles.sheet} onPress={() => {}}>
+          <View style={styles.sheetGrabber} />
+          <Text style={styles.sheetTitle}>{title}</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>{children}</ScrollView>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
 
-  filterContainer: { marginHorizontal: 16, marginTop: 16 },
-  filterLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  filterChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  filterChipText: { fontSize: 13, fontWeight: '600' },
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+  StyleSheet.create({
+    flex: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8 },
+    errorText: { color: colors.textPrimary, marginBottom: 10 },
+    retryButton: {
+      marginTop: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+    },
+    retryText: { color: '#fff', fontWeight: '700' },
+    emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginTop: 4 },
+    emptyBody: { fontSize: 13, color: colors.textTertiary, textAlign: 'center' },
 
-  resultCount: {
-    paddingHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 12,
-    fontSize: 13,
-  },
-  listContent: { paddingHorizontal: 8, paddingBottom: 24 },
-  row: { justifyContent: 'flex-start' },
+    header: { paddingHorizontal: 16, paddingBottom: 14 },
+    headerTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
+    headerSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.72)', marginTop: 2 },
+    headerIcon: { padding: 6, position: 'relative' },
+    headerIconDot: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#fbbf24',
+    },
+    searchBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: 'rgba(255,255,255,0.16)',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      marginTop: 12,
+    },
+    searchInput: { flex: 1, fontSize: 15, color: '#fff', padding: 0 },
 
-  card: {
-    width: CARD_WIDTH,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  imageContainer: { height: 160, position: 'relative' },
-  image: { width: '100%', height: '100%' },
-  placeholderImage: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderEmoji: { fontSize: 48 },
-  imageGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '30%',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  topBadges: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    flexDirection: 'row',
-    gap: 6,
-  },
-  verifiedBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#22c55e',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  warningBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  careLevelBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  careLevelText: { fontSize: 14, color: '#ffffff' },
+    chipStrip: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
+    chipRow: { gap: 7, paddingHorizontal: 16 },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 13,
+      paddingVertical: 7,
+      borderRadius: 10,
+      borderWidth: 1,
+    },
+    chipText: { fontSize: 12.5, fontWeight: '600' },
+    chipMore: {
+      marginHorizontal: 10,
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  cardContent: { padding: 12 },
-  commonName: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
-  scientificName: { fontSize: 12, fontStyle: 'italic', marginBottom: 8 },
-  quickInfo: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+    shelfLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 1.1,
+      color: colors.textTertiary,
+      marginBottom: 8,
+    },
+    shelfTile: { width: 104 },
+    shelfThumb: {
+      width: 104,
+      height: 74,
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceElevated,
+    },
+    shelfName: { fontSize: 12, fontWeight: '600', color: colors.textPrimary, marginTop: 6 },
+    shelfSci: { fontSize: 10.5, fontStyle: 'italic', color: colors.textTertiary },
 
-  emptyContainer: { padding: 48, alignItems: 'center' },
-  emptyEmoji: { fontSize: 64, marginBottom: 16 },
-  emptyTitle: { fontSize: 20, fontWeight: '600', marginBottom: 8 },
-  emptyText: { fontSize: 14, textAlign: 'center' },
-});
+    row: {
+      flexDirection: 'row',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      overflow: 'hidden',
+    },
+    // alignSelf:'stretch' (not height:'auto') so the image column matches the
+    // row's height whatever the text wraps to.
+    rowThumb: {
+      width: 88,
+      alignSelf: 'stretch',
+      minHeight: 88,
+      backgroundColor: colors.surfaceElevated,
+    },
+    thumbFallback: { alignItems: 'center', justifyContent: 'center' },
+    thumbImage: { width: '100%', height: '100%' },
+    rowBody: { flex: 1, paddingVertical: 11, paddingLeft: 13, paddingRight: 12, gap: 3 },
+    rowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    rowName: { fontSize: 15, fontWeight: '600', color: colors.textPrimary, flexShrink: 1 },
+    rowSci: { fontSize: 12, fontStyle: 'italic', color: colors.textTertiary },
+    pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 7,
+    },
+    pillText: { fontSize: 11, fontWeight: '700' },
+    rowFacts: { fontSize: 11.5, color: colors.textTertiary, marginTop: 3 },
+    rowKeepers: { fontSize: 11.5, color: colors.textSecondary, marginTop: 1 },
+
+    sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      padding: 20,
+      paddingBottom: 34,
+      maxHeight: '75%',
+    },
+    sheetGrabber: {
+      alignSelf: 'center',
+      width: 38,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      marginBottom: 14,
+    },
+    sheetTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: 14 },
+    sheetLabel: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      letterSpacing: 1,
+      color: colors.textTertiary,
+      marginBottom: 8,
+    },
+    sheetOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    sheetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 13,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    sheetRowText: { flex: 1, fontSize: 15, color: colors.textPrimary },
+    sheetRowCount: { fontSize: 13, fontWeight: '600', color: colors.textTertiary },
+  });
+
+export default withErrorBoundary(SpeciesBrowserScreen, 'species');

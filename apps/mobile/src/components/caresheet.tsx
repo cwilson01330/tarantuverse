@@ -109,6 +109,7 @@ export function CareSheetHero({
   colors: Colors;
 }) {
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
 
   const action = (
     key: string,
@@ -178,15 +179,24 @@ export function CareSheetHero({
           </View>
         </View>
 
-        {/* Thumbnail only when there IS a photo — no empty frame otherwise. */}
-        {!!imageUrl && (
+        {/* Thumbnail only when there IS a photo — no empty frame otherwise.
+            `imageFailed` covers the case where a URL exists but can't load:
+            ~12 catalog entries hotlink upload.wikimedia.org, which returns 403
+            to clients that don't send a browser User-Agent (React Native's
+            Image doesn't). Without this they render as a blank box. */}
+        {!!imageUrl && !imageFailed && (
           <TouchableOpacity
             onPress={() => setPhotoOpen(true)}
             accessibilityRole="imagebutton"
             accessibilityLabel={`View photo of ${scientificName}`}
             style={[styles.headerThumb, { borderColor: colors.border }]}
           >
-            <Image source={{ uri: imageUrl }} style={styles.headerThumbImage} resizeMode="cover" />
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.headerThumbImage}
+              resizeMode="cover"
+              onError={() => setImageFailed(true)}
+            />
           </TouchableOpacity>
         )}
       </View>

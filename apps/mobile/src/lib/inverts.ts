@@ -473,7 +473,13 @@ export function taxonMdiIcon(taxon: string): string {
   switch (taxon) {
     case 'tarantula':
     case 'true_spider':
-      return 'spider';
+      // 'spider' SHOULD exist in MDI 7.x, but it renders as an empty box in
+      // the bundled @expo/vector-icons glyph map — confirmed on-device: the
+      // dashboard's tarantula rows were blank while 'zodiac-scorpio' beside
+      // them drew fine. 'bug' is present in every MDI version. If a future
+      // vector-icons bump makes 'spider' render, switch back — it's the
+      // better glyph, it just isn't currently drawable.
+      return 'bug';
     case 'scorpion':
     case 'vinegaroon':      // whip scorpion — closest real glyph
       return 'zodiac-scorpio';
