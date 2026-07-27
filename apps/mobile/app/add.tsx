@@ -62,10 +62,13 @@ type LifeStage = 'sling' | 'juvenile' | 'adult';
 type Mode = 'individual' | 'colony';
 
 /**
- * Taxon glyph. Deliberately EMOJI, not MaterialCommunityIcons: the bundled
- * MDI set is missing several names the docs list ('spider' and
- * 'ladybug-outline' render blank / "?" on device). Emoji always draw. Revisit
- * once the icon font has been audited.
+ * Taxon glyph — emoji here on purpose, not MDI.
+ *
+ * Not a workaround: this screen's search results and the picked-species card
+ * are the one place the playful registry glyph reads better than a monochrome
+ * line icon, and INVERT_TAXA already owns that vocabulary. Functional icons
+ * elsewhere (rows, chips, placeholders) use `taxonMdiIcon`, whose names are
+ * verified against the bundled glyph map.
  */
 function taxonEmoji(taxon: string): string {
   if (taxon === 'tarantula') return '🕷️';

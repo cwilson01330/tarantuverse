@@ -2,7 +2,7 @@
 
 ## Overview
 
-A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the eight highest-traffic screens:
+A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the eleven highest-traffic screens:
 
 | App | Screen | Source file today |
 |---|---|---|
@@ -14,6 +14,9 @@ A design review of the two React Native (Expo) keeper apps in the `tarantuverse`
 | Tarantuverse | Species care sheet | `apps/mobile/app/species/[id].tsx` |
 | Tarantuverse | Add flow | `src/components/AddPickerSheet.tsx` + `app/tarantula/add.tsx` |
 | Tarantuverse | Colonies | `app/colony/[id].tsx`, `app/colony/add.tsx`, colony card in `(tabs)/collection.tsx` |
+| Herpetoverse | Animal detail | `src/screens/AnimalDetailScreen.tsx` + `src/components/reptile-detail/ReptileDetailShared.tsx` |
+| Herpetoverse | Add reptile | `app/reptile/add.tsx` |
+| Herpetoverse | Breeding | `app/(tabs)/breeding.tsx` |
 
 The brief was **flow, consistency, and discoverability** — not a repaint. The Tarantuverse gradient identity stays. The changes are hierarchy, navigation, and card structure.
 
@@ -278,6 +281,75 @@ Most invert keepers run a roach or isopod colony **as a feeder source**, and the
 
 ---
 
+## Screen 9 — Herpetoverse Animal detail
+
+Files: `src/screens/AnimalDetailScreen.tsx`, `src/components/reptile-detail/ReptileDetailShared.tsx`
+
+**Herpetoverse is pre-launch — this is the cheapest moment to move these.**
+
+### Specific defects
+
+- **The name renders twice within ~100px.** `AppHeader title={animalTitle(animal)}` and `ReptileHero title={animalTitle(animal)}` both print it.
+- **Three cards answer one question.** `FeedingStatusBanner`, `FeedingIntelligence` and `CgdRefreshSection` stack in sequence before the log buttons.
+- **Three lists of identical shape.** `Recent weigh-ins`, `Recent feedings`, `Recent sheds` — each sorted independently.
+- **`sectionTitle` is 11px/700 with `letterSpacing: 1.5`** — below the app's own 12px caption floor, and five in a row give the screen no hierarchy.
+- **Log actions are outlined secondary buttons** mid-scroll, and each opens a full form.
+- Hero photo is 88×88 on a screen about an animal.
+
+### Proposed layout
+
+1. **Full-bleed hero**, `height: 214`, scrim `linear-gradient(transparent, rgba(0,0,0,.82))`. Floating 38px circular back / share / overflow buttons. Name `24/700` + sex glyph 17px inline; subtitle `13/400` — `<i>{scientific_name}</i> · {morph}`. **Same treatment as the species care sheet**, so detail screens rhyme across both apps. Remove the `AppHeader`.
+2. **One feeding card**, `borderRadius: 18`. Head: 42px `borderRadius: 13` tinted icon well; verdict as a sentence `15.5/700` ("Feed now — 4 days overdue"); reasoning `12.5/400` ("Every 7d · prey 141–212 g (10–15% BW)"). Action row: primary `Fed — small rat` (reuses `quickFeedAnimal` with the remembered meal), plus 44px `tune-variant` (full form) and `pause` buttons. When `feeds_on_cgd`, the primary relabels to `Refresh CGD` — that retires `CgdRefreshSection`.
+3. **Stat strip**, three cards, `borderRadius: 14`, `padding: 11 12`: Weight (value `17/800` + `+38 · 28d` delta `11/700` in `success`), Last shed, **Accepted %**.
+   - Acceptance rate is new but free: feedings already carry an `accepted` flag, and refusal streaks are the earliest sign something is wrong. `92% · 24 of 26`.
+4. **Photos** — 4-up `aspectRatio: 1` row, `borderRadius: 11`, last tile is a `+15` overflow chip.
+5. **One timeline** replacing the three lists. Filter chips (All / Feed / Weight / Shed), then rows `borderRadius: 13`, `padding: 10 12`: 32px tinted type icon, sentence `13.5/600` ("Weighed 1,410 g", "Ate a small rat", "Shed complete"), relative date `11.5/400`, right-aligned delta or outcome.
+6. **Collapsed Genetics row** with a preview ("Pastel · het Clown").
+7. **Pinned log bar** — four equal columns (Feeding / Weight / Shed / Photo), icon 20px + label `10.5/600`.
+
+---
+
+## Screen 10 — Herpetoverse Add reptile
+
+File: `app/reptile/add.tsx`
+
+This form is already better than Tarantuverse's — one screen, sensible fields, taxon-aware placeholders via `TAXON_EXAMPLES`. Three changes:
+
+1. **Invert the order.** It opens with a required taxon chip row, then Name, then Species, then Common name. Species search goes first; `taxon`, `common_name` and `feeds_on_cgd` all derive from the species record. Same layout as Screen 7 — the two apps should share this screen's structure exactly.
+2. **Add a genetics field for snakes.** For a ball python keeper the morph *is* the animal, but there is no genotype input — every new snake must be saved, reopened, and edited through the detail screen's Genetics section. Put the gene chip picker on the add screen, gated to `taxon === 'snake'` like the detail screen already does. Chips `padding: 5 10`, `borderRadius: 9`, `12/700`, tinted per gene, with a dashed `+ Add gene` chip.
+3. **Care defaults card** — same `auto-fix` prefill pattern, emerald: "Feed every 7d · 88–92°F hot side · 55–65%", toggle on by default.
+
+Also: **"Feeds on CGD" is a bare toggle with no hint**, shown to keepers before they know the app changes feeding cadence based on it. Resolve it from the species (crested geckos already resolve server-side) and only surface the override when ambiguous.
+
+Remaining fields (weight, hatch date, source, enclosure, notes) collapse into two disclosure rows. Pinned bar: `Add ball python` + `plus-box-multiple-outline` for save-and-add-another.
+
+---
+
+## Screen 11 — Herpetoverse Breeding
+
+File: `app/(tabs)/breeding.tsx`
+
+### Specific defects
+
+- **~110px of permanent onboarding copy.** A `PAIRINGS` kicker, a "Breeding records" title that repeats the header, and a three-line paragraph about privacy defaults render on every visit forever. Move both to the empty state and the new-pairing form.
+- **Rows show dates, not status.** `PairingRow` prints "♂ Loki × ♀ Kaa" and "Paired Mar 3 · separated Mar 9 · 🐍 Snake". Breeding season is a milestone sequence — pairing → ovulation → prelay shed → lay → hatch — and the keeper's question is always *what's next and when*.
+- **The copy promises clutches and offspring the tab doesn't show.**
+- **The morph calculator is never mentioned.** It exists at `/morph-calculator` and accepts `?snakeId=`, and a pairing is literally two parents with known genotypes.
+- Empty state leads with a 🥚 emoji.
+
+### Proposed layout
+
+1. **Header** — emerald gradient. Title `Breeding` `20/700`, subtitle `"2026 season · 2 pairings, 1 clutch"`. Right: `calculator-variant-outline`, `plus`.
+2. **Next-milestone hero**, `borderRadius: 18`, `padding: 15 16`: 44px `egg-outline` well; "Nova's clutch hatches in 18 days" `15.5/700`; "7 eggs · day 42 of 60 · 89°F" `12.5/400`.
+3. **Season stat strip** — Pairings active / Eggs incubating / Hatched this season.
+4. **Pairing cards**, `borderRadius: 16`, `padding: 13 14`, `gap: 11`:
+   - Title row: `♂ Name × ♀ Name` `15/600` with sex glyphs in `#3b82f6` / `#ec4899`; right-aligned **stage pill** `padding: 4 9`, `borderRadius: 8`, `11/700`, tinted (Incubating → `success`, Prelay shed → `warning`).
+   - **Four-stop progress track**: 9px dots joined by 2px connectors — Paired · Ovulation · Laid · Hatch. Completed `primary`, current `warning`, future `#2c2c2c`. Labels `9.5/400`.
+   - Footer above a hairline: facts left (`7 eggs · laid Jun 15`), countdown or next action right (`18 days to hatch` / `Log next milestone`).
+5. **Morph projection card** — dashed border, `calculator-variant-outline`, "Project this pairing's morphs" with the two parents' genotypes as the subtitle, routing into `/morph-calculator` prefilled from the pairing.
+
+---
+
 ## Interactions & behavior
 
 - **Feeding hero check button** → `POST` a feeding via the existing quick-feed path (`quickFeedAnimal` in HV, `handleMarkFed` in TV), then optimistically remove the row and decrement the count. Refetch on settle.
@@ -294,6 +366,8 @@ Most invert keepers run a roach or isopod colony **as a feeder source**, and the
 - **Prefill toggle off** → clears the seeded husbandry values but keeps the species link.
 - **Save and add another** → POST, toast, reset the form but keep the species selected.
 - **Colony quick-log** → `POST /colonies/{id}/events` with `event_type` + `stage` + `count_delta`; the population card and stage bars update optimistically.
+- **HV detail timeline** → merge `weights`, `feedings` and `sheds` into one array sorted by date desc, tagged by type; the filter chips narrow client-side. No new endpoints.
+- **HV pairing progress track** → derived from the milestone dates already on the pairing/clutch records; the current stage is the latest one with a date.
 - Loading skeletons unchanged. Empty states: keep the existing copy, swap the emoji for the mapped MDI icon.
 
 ## State
@@ -358,33 +432,90 @@ The two dashboards are ports of each other and have slid apart. Pick one and sha
 
 Move both apps onto `tokens.ts` and promote it into `packages/shared` so this stops recurring.
 
-## Assets & icons
+## Assets & icons — READ THIS FIRST
 
-No new assets. Replace every emoji used as UI with `MaterialCommunityIcons` (the apps already import it):
+**No new assets.** Every icon is `MaterialCommunityIcons` from `@expo/vector-icons`, which both apps already import.
 
-| Emoji | MDI name |
+### How to read the icons in `Design Review.dc.html`
+
+The HTML prototype renders icons with the **MDI webfont**, so the markup looks like:
+
+```html
+<i class="mdi mdi-silverware-fork-knife"></i>
+```
+
+In the app that is:
+
+```tsx
+<MaterialCommunityIcons name="silverware-fork-knife" size={20} color={colors.primary} />
+```
+
+**Strip the `mdi-` prefix; the remainder is the `name` prop verbatim.** MaterialCommunityIcons *is* the MDI set, so the names are identical. Do not go looking for an icon library to install.
+
+### Verified against your repo
+
+Every name below was checked against the glyph map already present in this repo:
+
+```
+apps/mobile/node_modules/@expo/vector-icons/build/vendor/
+  react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json
+```
+
+(`@expo/vector-icons ^15.0.2`, Expo ~54.) All of them resolve. To check any other name yourself:
+
+```bash
+node -e "const m=require('@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json');console.log('turtle' in m)"
+```
+
+> ⚠️ **`lizard` does not exist in MDI.** Use `turtle` for a generic non-snake herp, or `snake` as the taxon fallback. An unknown `name` renders an empty box **silently** — it does not throw, so a typo ships.
+
+### Emoji → icon replacements
+
+| Emoji | `name` |
 |---|---|
 | 🕷️ | `spider` |
-| 🦂 | `zodiac-scorpio` |
+| 🕸️ | `spider-web` |
+| 🦂 (scorpion) | `zodiac-scorpio` |
+| 🦂 (vinegaroon) | `spider-thread` — resolves the picker's duplicate-glyph collision |
+| 🕷 (true spider) | `spider-web` |
+| 🐛 | `bug-outline` |
+| 🪱 | `slash-forward` |
+| 🦗 | `grass` |
+| 🪳 / 🐜 | `dots-hexagon` |
+| 🐾 | `paw` / `paw-outline` |
+| 🐍 | `snake` |
+| 🦎 | `turtle` (no lizard glyph exists) |
 | 🦋 | `butterfly-outline` |
 | 🔮 | `clock-alert-outline` |
 | 🍽️ | `silverware-fork-knife` |
 | 📊 | `chart-line` |
 | 👥 | `account-multiple` |
-| ✅ | `check-circle-outline` |
+| ✅ | `check-circle` |
 | ⚠️ | `alert` |
-| 🐍 | `snake` |
-| 🦎 | `turtle` — **note: there is no `lizard` glyph in MDI**; `turtle` is the closest real herp icon. Verify before use. |
-| 🐛 / 🪱 | `bug-outline` / `dots-horizontal` |
-| 🏜️ / 🌳 / ⛰️ / 🏖️ | `weather-sunny` / `tree-outline` / `image-filter-hdr` / `beach` |
-| 📏 / 📈 / 🌡️ / 💧 | `arrow-expand-horizontal` / `trending-up` / `thermometer` / `water-percent` |
+| 🥚 | `egg-outline` |
+| 💀 | `skull-outline` |
+| 🏜️ | `beach` |
+| 🌳 | `tree-outline` |
+| ⛰️ | `image-filter-hdr` |
+| 📏 | `arrow-expand-horizontal` |
+| 📈 | `trending-up` |
+| 🌡️ | `thermometer` |
+| 💧 | `water-percent` |
+| 📚 | `book-open-page-variant` |
+| ⭐ | `star` |
 | ✓ ⚠ ⚡ ? (care level) | render the **word**, not a glyph |
-| 📚 / ⭐ | `book-open-page-variant` / `star` |
-| 🐣 / 💀 (colony events) | `egg-outline` / `skull-outline` |
-| 🪳 / 🦗 / 🪱 / 🐜 | `dots-hexagon` / `grass` / `slash-forward` (or a taxon tile, not a glyph) |
-| Picker glyph collisions | Scorpion `zodiac-scorpio` vs Vinegaroon `spider-thread`; Tarantula `spider` vs True spider `spider-web` — verify each resolves |
 
-Emoji may stay in the taxon registry glyphs on the add-picker, where the playfulness is intentional.
+### Full verified list used across the proposals
+
+`spider`, `spider-web`, `spider-thread`, `zodiac-scorpio`, `bug-outline`, `dots-hexagon`, `slash-forward`, `grass`, `butterfly-outline`, `paw`, `paw-outline`, `snake`, `turtle`,
+`silverware-fork-knife`, `food-drumstick`, `scale-bathroom`, `weather-windy`, `fridge-outline`, `snowflake`, `cup`, `pause`, `camera-outline`, `qrcode-scan`,
+`arrow-expand-horizontal`, `arrow-expand-vertical`, `thermometer`, `water-percent`, `trending-up`, `tree-outline`, `image-filter-hdr`, `beach`, `check-decagram`, `clock-alert-outline`,
+`egg-outline`, `skull-outline`, `export`, `counter`, `dna`, `calculator-variant`, `calculator-variant-outline`, `heart-multiple`, `heart-multiple-outline`, `timeline-outline`,
+`view-dashboard`, `view-dashboard-outline`, `book-open-variant`, `book-open-page-variant`, `account-group`, `account-group-outline`, `account-multiple`, `account-multiple-outline`, `account-circle-outline`, `forum-outline`, `chart-line`, `chart-timeline-variant`,
+`tune-variant`, `view-grid-outline`, `view-list`, `bookmark-outline`, `share-variant-outline`, `tray-arrow-down`, `home-variant-outline`, `magnify`, `history`,
+`auto-fix`, `plus-box-multiple-outline`, `compare`, `tag-outline`, `pencil-outline`, `information-outline`, `alert`, `alert-circle`, `arrow-up-circle-outline`, `gender-male`, `gender-female`, `help-circle-outline`, `check`, `check-circle`, `close`, `close-circle`, `plus`, `plus-circle`, `plus-circle-outline`, `chevron-up`, `chevron-down`, `chevron-right`, `arrow-left`, `dots-horizontal`, `bell-outline`, `message-outline`, `cog`, `layers`, `ruler`, `star`, `cash`, `map-marker-outline`, `calendar-blank-outline`, `weight-gram`, `clipboard-text-outline`
+
+Emoji may stay in the taxon-registry glyphs used by the add-picker rows, where the playfulness is intentional — but the proposal retires that picker anyway.
 
 ## Light mode
 
@@ -399,13 +530,15 @@ Herpetoverse's `ThemeContext` exports a single frozen `darkTheme`. Tarantuverse'
 5. Species browser rows + word-based care level.
 6. Unified add screen + care-sheet prefill — retires `AddPickerSheet` and the wizard.
 7. Colony population card, quick-log buttons, and the full-width colony row.
-8. Emoji sweep + shared tokens package.
-9. Port `ThemeContext` to Herpetoverse.
+8. HV detail: one feeding card + one timeline + pinned log bar.
+9. HV breeding: season overview, stage pills, progress track, morph-calculator link.
+10. Emoji sweep + shared tokens package.
+11. Port `ThemeContext` to Herpetoverse.
 
 ## Files
 
-- `Design Review.dc.html` — the full review: eight Today/Proposed screen sets, findings, and the cross-app system section. Open in any browser.
+- `Design Review.dc.html` — the full review: eleven Today/Proposed screen sets, the findings summary, the cross-app system section, and a verified icon appendix. Open in any browser.
 
 ## Not covered in this pass
 
-Animal detail, Breeding, Settings/Profile, and onboarding were reviewed at a source level but not redesigned. The Herpetoverse species browser (`apps/mobile-herpetoverse/app/(tabs)/species.tsx`) should inherit the Tarantuverse browser changes once they land.
+Settings/Profile, onboarding, Community/Forums, Analytics and Feeders were reviewed at a source level but not redesigned. The Herpetoverse species browser (`apps/mobile-herpetoverse/app/(tabs)/species.tsx`) should inherit the Tarantuverse browser changes once they land.

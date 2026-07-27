@@ -469,34 +469,39 @@ export function invertDisplayName(i: Invert): string {
  * Takes a plain string because feeding-status rows carry `taxon: string`, and
  * 'tarantula' is not in InvertTaxon (the registry excludes it by design).
  */
+/**
+ * Every name below was verified present in the bundled glyph map:
+ *
+ *   node -e "const m=require('@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json');console.log('spider' in m)"
+ *
+ * `ladybug-outline` is NOT present and must not be used — an unknown name
+ * renders an empty box silently rather than throwing, so a typo ships.
+ *
+ * Tarantula and true spider deliberately share `spider`: they're both
+ * Araneae, and MDI has exactly three spider glyphs for four arachnid taxa.
+ * Sharing where the animals genuinely are alike beats inventing a difference.
+ */
 export function taxonMdiIcon(taxon: string): string {
   switch (taxon) {
     case 'tarantula':
     case 'true_spider':
-      // 'spider' SHOULD exist in MDI 7.x, but it renders as an empty box in
-      // the bundled @expo/vector-icons glyph map — confirmed on-device: the
-      // dashboard's tarantula rows were blank while 'zodiac-scorpio' beside
-      // them drew fine. 'bug' is present in every MDI version. If a future
-      // vector-icons bump makes 'spider' render, switch back — it's the
-      // better glyph, it just isn't currently drawable.
-      return 'bug';
+      return 'spider';
     case 'scorpion':
-    case 'vinegaroon':      // whip scorpion — closest real glyph
       return 'zodiac-scorpio';
+    case 'vinegaroon':
+      // Distinct from scorpion — resolves the duplicate-glyph collision the
+      // emoji registry has (both were 🦂).
+      return 'spider-thread';
     case 'whip_spider':
       return 'spider-web';
-    // NOTE: the bundled @expo/vector-icons MDI set is missing several names
-    // that the docs list. Confirmed on-device: 'spider' and 'ladybug-outline'
-    // render as blank / "?" while 'bug', 'spider-web' and 'zodiac-scorpio'
-    // draw fine. The '-outline' variants are the unreliable ones, so these
-    // deliberately use base names even though they differentiate less well.
-    // Worth a proper glyph audit against the installed font before making
-    // these prettier.
     case 'centipede':
+      return 'bug-outline';
     case 'millipede':
+      return 'slash-forward';
     case 'mantis':
+      return 'grass';
     case 'roach':
-      return 'bug';
+      return 'dots-hexagon';
     default:
       return 'paw';
   }
