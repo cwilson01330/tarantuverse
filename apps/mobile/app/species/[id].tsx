@@ -473,13 +473,12 @@ export default function SpeciesDetailScreen() {
           accessibilityRole="button"
           accessibilityLabel={`Add ${species.scientific_name} to your collection`}
           onPress={() =>
+            // Unified add screen (handoff screen 7). It resolves the taxon
+            // and the husbandry prefill from the species id itself, so only
+            // the id needs passing.
             router.push({
-              pathname: '/tarantula/add',
-              params: {
-                speciesId: species.id,
-                scientificName: species.scientific_name,
-                commonName: species.common_names?.[0] ?? '',
-              },
+              pathname: '/add',
+              params: { speciesId: species.id },
             } as any)
           }
         >

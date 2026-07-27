@@ -342,30 +342,17 @@ function InvertSpeciesCareSheetScreen() {
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel={`Add ${species.scientific_name} to your collection`}
-          onPress={() => {
-            // `invert_species` carries mirrored tarantula rows from the
-            // ADR-005 backfill, and INVERT_TAXA deliberately excludes
-            // tarantula — so `/invert/add?taxon=tarantula` would fail
-            // isInvertTaxon and silently fall back to creating a SCORPION.
-            // The browser routes tarantulas to /species/[id], but a deep
-            // link can still land one here, so route on the taxon rather
-            // than assuming.
-            // Cast because `InvertSpecies.taxon` is typed as InvertTaxon,
-            // which excludes tarantula — but the TYPE IS NARROWER THAN THE
-            // DATA: `invert_species` really does hold tarantula rows, so the
-            // API can hand one back and tsc would otherwise call this check
-            // dead code.
-            const isTarantula = (species.taxon as string) === 'tarantula';
+          onPress={() =>
+            // Unified add screen (handoff screen 7). The taxon-mismatch guard
+            // this used to carry is gone: /add looks the species up in the
+            // catalog and takes the taxon from the record, so a mirrored
+            // tarantula reached here by deep link can no longer end up
+            // creating a scorpion.
             router.push({
-              pathname: isTarantula ? '/tarantula/add' : '/invert/add',
-              params: {
-                ...(isTarantula ? {} : { taxon: species.taxon }),
-                speciesId: species.id,
-                scientificName: species.scientific_name,
-                commonName: species.common_names?.[0] ?? '',
-              },
-            } as any);
-          }}
+              pathname: '/add',
+              params: { speciesId: species.id },
+            } as any)
+          }
         >
           <MaterialCommunityIcons name="plus" size={18} color="#fff" />
           <Text style={styles.actionPrimaryText}>Add to collection</Text>

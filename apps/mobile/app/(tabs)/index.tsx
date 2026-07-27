@@ -888,12 +888,11 @@ function DashboardHubScreen() {
   // /inverts/ count failed to load.
   const animalCount = totalAnimals ?? tarantulas.length;
 
-  // Route an add-picker choice to the right per-taxon add screen.
+  // Retained only to satisfy the AddPickerSheet prop; the sheet is no longer
+  // opened from this screen (see setAddPickerOpen callers → '/add').
   const handleAddPick = (taxon: AddPickerTaxon) => {
     setAddPickerOpen(false);
     if (taxon === 'tarantula') router.push('/tarantula/add');
-    // All non-tarantula taxa go through the generic invert add screen
-    // (ADR-007) — matches the collection tab's picker.
     else router.push(`/invert/add?taxon=${taxon}` as any);
   };
 
@@ -910,7 +909,7 @@ function DashboardHubScreen() {
         </Text>
         <View style={styles.emptyButtons}>
           <PrimaryButton
-            onPress={() => setAddPickerOpen(true)}
+            onPress={() => router.push('/add' as any)}
             style={styles.emptyButton}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
@@ -1283,7 +1282,7 @@ function DashboardHubScreen() {
                 onPress={() =>
                   'route' in item
                     ? router.push(item.route as any)
-                    : setAddPickerOpen(true)
+                    : router.push('/add' as any)
                 }
                 activeOpacity={0.7}
                 accessibilityRole="button"

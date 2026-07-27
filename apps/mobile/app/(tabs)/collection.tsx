@@ -1943,8 +1943,12 @@ function CollectionScreen() {
   // with three taxa + a leading emoji glyph, that read awkwardly. The
   // dedicated AddPickerSheet renders rows left-aligned matching the
   // existing TarantulaActionSheet shape.
+  // The taxon picker is retired (design handoff, screen 7). Species selection
+  // now sets the taxon, so there's nothing to pick up front — and Colony,
+  // which was row 11 of a sheet with no ScrollView, is a toggle on the add
+  // screen instead of a row people couldn't reach.
   const openAddPicker = () => {
-    setAddPickerOpen(true);
+    router.push('/add' as any);
   };
 
   const handleAddPick = (taxon: AddPickerTaxon) => {
