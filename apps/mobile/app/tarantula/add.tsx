@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateInput from '../../src/components/DateInput';
 import SpeciesAutocomplete from '../../src/components/SpeciesAutocomplete';
@@ -62,10 +62,24 @@ export default function AddTarantulaScreen() {
   const [quickMode, setQuickMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
+  // Prefill from a care sheet's "Add to collection" button. Without this the
+  // keeper had to back out of the sheet, find Collection, tap the FAB, choose
+  // a taxon and retype the species name they were just reading.
+  const {
+    speciesId: speciesIdParam,
+    scientificName: scientificNameParam,
+    commonName: commonNameParam,
+  } = useLocalSearchParams<{
+    speciesId?: string;
+    scientificName?: string;
+    commonName?: string;
+  }>();
+
   const [formData, setFormData] = useState<TarantulaData>({
     name: '',
-    common_name: '',
-    scientific_name: '',
+    common_name: commonNameParam ?? '',
+    scientific_name: scientificNameParam ?? '',
+    species_id: speciesIdParam,
     sex: undefined,
     life_stage: undefined,
     date_acquired: undefined,
@@ -266,6 +280,9 @@ export default function AddTarantulaScreen() {
       <View style={styles.inputGroup}>
         <Text style={styles.label}>Species Lookup</Text>
         <SpeciesAutocomplete
+          // Shows the prefilled species in the lookup box rather than leaving
+          // it blank while the name fields below are already populated.
+          initialValue={scientificNameParam ?? ''}
           onSelect={(species) =>
             setFormData({
               ...formData,

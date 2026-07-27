@@ -1,9 +1,19 @@
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  CareSheetHero,
+  QuickStatsRow,
+  SafetyLine,
+  CareAccordion,
+  CareFact,
+  careLevelMeta,
+  previewOf,
+  shareSpecies,
+} from '../../src/components/caresheet';
 
 interface Species {
   id: string;
@@ -68,7 +78,10 @@ export default function SpeciesDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
-    overview: true, // Start with overview expanded
+    // Enclosure, not overview — it's the section people actually open a care
+    // sheet for. The taxonomy/temperament content in Overview is already
+    // summarised by the hero and badges above.
+    enclosure: true,
   });
 
   useEffect(() => {
@@ -99,33 +112,11 @@ export default function SpeciesDetailScreen() {
     }));
   };
 
-  const getCareLevel = (level?: string) => {
-    switch (level) {
-      case 'beginner':
-        return { color: '#22c55e', text: 'Beginner', icon: '✓', badge: 'Friendly' };
-      case 'intermediate':
-        return { color: '#eab308', text: 'Intermediate', icon: '⚠', badge: 'Moderate' };
-      case 'advanced':
-        return { color: '#f97316', text: 'Advanced', icon: '⚡', badge: 'Challenging' };
-      default:
-        return { color: colors.textSecondary, text: 'Unknown', icon: '?', badge: 'Unknown' };
-    }
-  };
-
-  const getTypeIcon = (type?: string) => {
-    switch (type) {
-      case 'terrestrial': return { emoji: '🏜️', label: 'Ground Dweller' };
-      case 'arboreal': return { emoji: '🌳', label: 'Tree Dweller' };
-      case 'fossorial': return { emoji: '⛰️', label: 'Burrower' };
-      default: return { emoji: '🕷️', label: 'Tarantula' };
-    }
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.loadingContainer}>
-          <Text style={{ fontSize: 60, marginBottom: 16 }}>🕷️</Text>
+          <MaterialCommunityIcons name="spider-web" size={52} color={colors.textTertiary} style={{ marginBottom: 16 }} />
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             Loading species...
@@ -154,52 +145,31 @@ export default function SpeciesDetailScreen() {
     );
   }
 
-  const careLevel = getCareLevel(species.care_level);
-  const typeInfo = getTypeIcon(species.type);
+  const careLevel = careLevelMeta(species.care_level, colors.textSecondary);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView>
-        {/* Hero Section */}
-        <View style={styles.heroContainer}>
-          {species.image_url && (
-            <Image source={{ uri: species.image_url }} style={styles.heroImage} resizeMode="cover" />
-          )}
-          <View style={styles.heroGradient} />
-
-          {/* Floating Back Button */}
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={[styles.floatingBackButton, { top: insets.top + 8 }]}
-          >
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
-          </TouchableOpacity>
-
-          {/* Hero Content */}
-          <View style={styles.heroContent}>
-            <Text style={styles.speciesName}>{species.scientific_name}</Text>
-            {species.common_names && species.common_names.length > 0 && (
-              <Text style={styles.commonNames}>{species.common_names.join(', ')}</Text>
-            )}
-
-            {/* Badges */}
-            <View style={styles.badgeContainer}>
-              <View style={[styles.badge, { backgroundColor: careLevel.color }]}>
-                <Text style={styles.badgeText}>{careLevel.icon} {careLevel.text}</Text>
-              </View>
-              {species.type && (
-                <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.badgeText}>{typeInfo.emoji} {species.type}</Text>
-                </View>
-              )}
-              {species.is_verified && (
-                <View style={[styles.badge, { backgroundColor: '#8b5cf6' }]}>
-                  <Text style={styles.badgeText}>✓ Verified</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
+        <CareSheetHero
+          imageUrl={species.image_url}
+          commonName={species.common_names?.[0]}
+          scientificName={species.scientific_name}
+          isVerified={species.is_verified}
+          fallbackIcon="spider"
+          badges={[
+            { label: careLevel.text, color: careLevel.color },
+            ...(species.medically_significant_venom
+              ? [{ label: 'Hot venom', color: '#ef4444' }]
+              : []),
+            ...(species.type ? [{ label: species.type }] : []),
+          ]}
+          topInset={insets.top}
+          onBack={() => router.back()}
+          onShare={() =>
+            shareSpecies(species.scientific_name, species.common_names?.[0], species.id)
+          }
+          colors={colors}
+        />
 
         {/*
           Photo credit — satisfies CC-BY attribution for Wikimedia-sourced
@@ -232,187 +202,179 @@ export default function SpeciesDetailScreen() {
         {/* Content */}
         <View style={{ padding: 16 }}>
 
-          {/* Safety Warnings (if applicable) */}
-          {(species.urticating_hairs || species.medically_significant_venom) && (
-            <View style={{ marginBottom: 20 }}>
-              {species.medically_significant_venom && (
-                <View style={[styles.dangerWarning, { backgroundColor: colors.error + '20', borderColor: colors.error }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <MaterialCommunityIcons name="alert" size={28} color={colors.error} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.warningTitle, { color: colors.error }]}>
-                        ⚠️ MEDICALLY SIGNIFICANT VENOM
-                      </Text>
-                      <Text style={[styles.warningText, { color: colors.textPrimary }]}>
-                        This species has potent venom. For experienced keepers only.
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-              {species.urticating_hairs && (
-                <View style={[styles.cautionWarning, { backgroundColor: '#f97316' + '20', borderColor: '#f97316', marginTop: 12 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <MaterialCommunityIcons name="alert-circle" size={24} color="#f97316" />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.warningTitle, { color: '#f97316' }]}>
-                        Urticating Hairs
-                      </Text>
-                      <Text style={[styles.warningText, { color: colors.textSecondary }]}>
-                        Can cause skin/eye irritation
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
+          {/* Quick stats — four across, always four slots so the row doesn't
+              reflow between species. A missing value shows "—" rather than
+              collapsing the column. */}
+          <QuickStatsRow
+            colors={colors}
+            stats={[
+              { icon: 'arrow-expand-horizontal', value: species.adult_size, label: 'Size' },
+              {
+                icon: 'thermometer',
+                value:
+                  species.temperature_min && species.temperature_max
+                    ? `${species.temperature_min}–${species.temperature_max}°F`
+                    : null,
+                label: 'Temp',
+              },
+              {
+                icon: 'water-percent',
+                value:
+                  species.humidity_min && species.humidity_max
+                    ? `${species.humidity_min}–${species.humidity_max}%`
+                    : null,
+                label: 'Humidity',
+              },
+              { icon: 'trending-up', value: species.growth_rate, label: 'Growth' },
+            ]}
+          />
 
-          {/* Quick Stats Card */}
-          <View style={[styles.quickStatsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Quick Stats</Text>
-            <View style={styles.statsGrid}>
-              {species.adult_size && (
-                <View style={styles.statItem}>
-                  <Text style={styles.statIcon}>📏</Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Adult Size</Text>
-                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.adult_size}</Text>
-                </View>
-              )}
-              {species.growth_rate && (
-                <View style={styles.statItem}>
-                  <Text style={styles.statIcon}>📈</Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Growth</Text>
-                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.growth_rate}</Text>
-                </View>
-              )}
-              {(species.temperature_min && species.temperature_max) && (
-                <View style={styles.statItem}>
-                  <Text style={styles.statIcon}>🌡️</Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Temp</Text>
-                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.temperature_min}-{species.temperature_max}°F</Text>
-                </View>
-              )}
-              {(species.humidity_min && species.humidity_max) && (
-                <View style={styles.statItem}>
-                  <Text style={styles.statIcon}>💧</Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Humidity</Text>
-                  <Text style={[styles.statValue, { color: colors.textPrimary }]}>{species.humidity_min}-{species.humidity_max}%</Text>
-                </View>
-              )}
-            </View>
-          </View>
+          {/* Safety — ONE line combining both hazards. This was two stacked
+              warning blocks (~150px) repeating what the hero badges and the
+              Behavior section already say. */}
+          {(species.urticating_hairs || species.medically_significant_venom) && (
+            <SafetyLine
+              accent={species.medically_significant_venom ? '#ef4444' : '#f97316'}
+              title={
+                species.medically_significant_venom && species.urticating_hairs
+                  ? 'Medically significant venom · Urticating hairs'
+                  : species.medically_significant_venom
+                  ? 'Medically significant venom'
+                  : 'Urticating hairs'
+              }
+              body={
+                species.medically_significant_venom
+                  ? 'A bite from this species can require medical attention. Experienced keepers only — check local legality and have a protocol before you buy.'
+                  : 'Flicked hairs can cause skin and eye irritation. Wash your hands after working in the enclosure and keep your face clear of it.'
+              }
+              colors={colors}
+            />
+          )}
 
           {/* Accordion Sections */}
 
           {/* Overview */}
-          <AccordionSection
+          <CareAccordion
             title="Overview"
             icon="information-circle"
             isExpanded={expandedSections.overview}
             onToggle={() => toggleSection('overview')}
             colors={colors}
+            preview={previewOf(species.native_region, species.temperament)}
           >
             {species.temperament && (
-              <InfoRow label="Temperament" value={species.temperament} colors={colors} />
+              <CareFact label="Temperament" value={species.temperament} colors={colors} />
             )}
             {species.native_region && (
-              <InfoRow label="Native Region" value={species.native_region} colors={colors} />
+              <CareFact label="Native Region" value={species.native_region} colors={colors} />
             )}
             {species.genus && (
-              <InfoRow label="Genus" value={species.genus} colors={colors} italic />
+              <CareFact label="Genus" value={species.genus} colors={colors} italic />
             )}
             {species.family && (
-              <InfoRow label="Family" value={species.family} colors={colors} />
+              <CareFact label="Family" value={species.family} colors={colors} />
             )}
-          </AccordionSection>
+          </CareAccordion>
 
           {/* Enclosure Setup */}
-          <AccordionSection
+          <CareAccordion
             title="Enclosure Setup"
             icon="home"
             isExpanded={expandedSections.enclosure}
             onToggle={() => toggleSection('enclosure')}
             colors={colors}
+            preview={previewOf(species.enclosure_size_adult, species.substrate_depth)}
           >
             {species.type && (
-              <InfoRow label="Type" value={species.type} colors={colors} />
+              <CareFact label="Type" value={species.type} colors={colors} />
             )}
             {species.enclosure_size_sling && (
-              <InfoRow label="Sling Enclosure" value={species.enclosure_size_sling} colors={colors} />
+              <CareFact label="Sling Enclosure" value={species.enclosure_size_sling} colors={colors} />
             )}
             {species.enclosure_size_juvenile && (
-              <InfoRow label="Juvenile Enclosure" value={species.enclosure_size_juvenile} colors={colors} />
+              <CareFact label="Juvenile Enclosure" value={species.enclosure_size_juvenile} colors={colors} />
             )}
             {species.enclosure_size_adult && (
-              <InfoRow label="Adult Enclosure" value={species.enclosure_size_adult} colors={colors} />
+              <CareFact label="Adult Enclosure" value={species.enclosure_size_adult} colors={colors} />
             )}
             {species.substrate_type && (
-              <InfoRow label="Substrate" value={species.substrate_type} colors={colors} />
+              <CareFact label="Substrate" value={species.substrate_type} colors={colors} />
             )}
             {species.substrate_depth && (
-              <InfoRow label="Substrate Depth" value={species.substrate_depth} colors={colors} />
+              <CareFact label="Substrate Depth" value={species.substrate_depth} colors={colors} />
             )}
             {species.water_dish_required !== undefined && (
-              <InfoRow label="Water Dish" value={species.water_dish_required ? 'Required' : 'Optional'} colors={colors} />
+              <CareFact label="Water Dish" value={species.water_dish_required ? 'Required' : 'Optional'} colors={colors} />
             )}
             {species.webbing_amount && (
-              <InfoRow label="Webbing Amount" value={species.webbing_amount} colors={colors} />
+              <CareFact label="Webbing Amount" value={species.webbing_amount} colors={colors} />
             )}
             {species.burrowing !== undefined && (
-              <InfoRow label="Burrowing" value={species.burrowing ? 'Yes' : 'No'} colors={colors} />
+              <CareFact label="Burrowing" value={species.burrowing ? 'Yes' : 'No'} colors={colors} />
             )}
-          </AccordionSection>
+          </CareAccordion>
 
           {/* Feeding */}
-          <AccordionSection
+          <CareAccordion
             title="Feeding"
             icon="restaurant"
             isExpanded={expandedSections.feeding}
             onToggle={() => toggleSection('feeding')}
             colors={colors}
+            preview={previewOf(
+              species.feeding_frequency_adult ? `Adult ${species.feeding_frequency_adult}` : null,
+              species.prey_size,
+            )}
           >
             {species.prey_size && (
-              <InfoRow label="Prey Size" value={species.prey_size} colors={colors} />
+              <CareFact label="Prey Size" value={species.prey_size} colors={colors} />
             )}
             {species.feeding_frequency_sling && (
-              <InfoRow label="Sling Frequency" value={species.feeding_frequency_sling} colors={colors} />
+              <CareFact label="Sling Frequency" value={species.feeding_frequency_sling} colors={colors} />
             )}
             {species.feeding_frequency_juvenile && (
-              <InfoRow label="Juvenile Frequency" value={species.feeding_frequency_juvenile} colors={colors} />
+              <CareFact label="Juvenile Frequency" value={species.feeding_frequency_juvenile} colors={colors} />
             )}
             {species.feeding_frequency_adult && (
-              <InfoRow label="Adult Frequency" value={species.feeding_frequency_adult} colors={colors} />
+              <CareFact label="Adult Frequency" value={species.feeding_frequency_adult} colors={colors} />
             )}
-          </AccordionSection>
+          </CareAccordion>
 
           {/* Behavior */}
-          <AccordionSection
+          <CareAccordion
             title="Behavior & Safety"
             icon="shield-checkmark"
             isExpanded={expandedSections.behavior}
             onToggle={() => toggleSection('behavior')}
             colors={colors}
+            preview={previewOf(
+              species.webbing_amount ? `${species.webbing_amount} webbing` : null,
+              species.burrowing ? 'Burrows' : null,
+            )}
           >
-            <InfoRow
+            <CareFact
               label="Urticating Hairs"
               value={species.urticating_hairs ? 'Yes (New World)' : 'No (Old World)'}
               colors={colors}
             />
-            <InfoRow
+            <CareFact
               label="Venom"
-              value={species.medically_significant_venom ? 'Medically Significant ⚠️' : 'Not significant'}
+              value={species.medically_significant_venom ? 'Medically significant' : 'Not significant'}
               colors={colors}
             />
-          </AccordionSection>
+          </CareAccordion>
 
           {/* Community Stats */}
-          <AccordionSection
+          <CareAccordion
             title="Community"
             icon="people"
             isExpanded={expandedSections.community}
             onToggle={() => toggleSection('community')}
             colors={colors}
+            preview={previewOf(
+              species.times_kept ? `${species.times_kept} keepers` : null,
+              species.community_rating ? `${species.community_rating.toFixed(1)} rating` : null,
+            )}
           >
             <View style={{ flexDirection: 'row', gap: 12 }}>
               {species.times_kept !== undefined && (
@@ -423,17 +385,23 @@ export default function SpeciesDetailScreen() {
               )}
               {species.community_rating !== undefined && (
                 <View style={[styles.communityStatCard, { backgroundColor: colors.surfaceElevated, flex: 1 }]}>
-                  <Text style={[styles.communityStatValue, { color: '#eab308' }]}>⭐ {species.community_rating.toFixed(1)}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <MaterialCommunityIcons name="star" size={15} color="#eab308" />
+                    <Text style={[styles.communityStatValue, { color: '#eab308' }]}>{species.community_rating.toFixed(1)}</Text>
+                  </View>
                   <Text style={[styles.communityStatLabel, { color: colors.textSecondary }]}>Rating</Text>
                 </View>
               )}
             </View>
-          </AccordionSection>
+          </CareAccordion>
 
           {/* Source Attribution */}
           {species.source_url && (
             <View style={[styles.sourceCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[styles.sourceLabel, { color: colors.textSecondary }]}>📚 Source</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <MaterialCommunityIcons name="book-open-page-variant" size={14} color={colors.textSecondary} />
+                <Text style={[styles.sourceLabel, { color: colors.textSecondary }]}>Source</Text>
+              </View>
               <Text
                 style={[styles.sourceLink, { color: colors.primary }]}
                 onPress={() => {
@@ -445,82 +413,75 @@ export default function SpeciesDetailScreen() {
             </View>
           )}
 
-          {/* Bottom Spacing */}
-          <View style={{ height: 40 }} />
+          {/* Bottom Spacing — clears the pinned action bar below. */}
+          <View style={{ height: 96 }} />
         </View>
       </ScrollView>
-    </View>
-  );
-}
 
-// Accordion Section Component
-function AccordionSection({
-  title,
-  icon,
-  isExpanded,
-  onToggle,
-  colors,
-  children
-}: {
-  title: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  isExpanded: boolean;
-  onToggle: () => void;
-  colors: any;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={[styles.accordionContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <TouchableOpacity
-        onPress={onToggle}
-        style={styles.accordionHeader}
-        activeOpacity={0.7}
+      {/* Pinned action bar. The care sheet had no call to action: a keeper who
+          decided to buy this species had to back out, find Collection, tap the
+          FAB, choose a taxon and retype the name they were just reading. This
+          hands the species straight to the add form. */}
+      <View
+        style={[
+          styles.actionBar,
+          {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            paddingBottom: insets.bottom + 12,
+          },
+        ]}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Ionicons name={icon} size={24} color={colors.primary} />
-          <Text style={[styles.accordionTitle, { color: colors.textPrimary }]}>{title}</Text>
-        </View>
-        <Ionicons
-          name={isExpanded ? "chevron-up" : "chevron-down"}
-          size={24}
-          color={colors.textSecondary}
-        />
-      </TouchableOpacity>
-
-      {isExpanded && (
-        <View style={styles.accordionContent}>
-          {children}
-        </View>
-      )}
+        <TouchableOpacity
+          style={[styles.actionPrimary, { backgroundColor: colors.primary }]}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${species.scientific_name} to your collection`}
+          onPress={() =>
+            router.push({
+              pathname: '/tarantula/add',
+              params: {
+                speciesId: species.id,
+                scientificName: species.scientific_name,
+                commonName: species.common_names?.[0] ?? '',
+              },
+            } as any)
+          }
+        >
+          <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+          <Text style={styles.actionPrimaryText}>Add to collection</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
-// Info Row Component
-function InfoRow({
-  label,
-  value,
-  colors,
-  italic = false
-}: {
-  label: string;
-  value: string;
-  colors: any;
-  italic?: boolean;
-}) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[styles.infoValue, { color: colors.textPrimary, fontStyle: italic ? 'italic' : 'normal' }]}>
-        {value}
-      </Text>
-    </View>
-  );
-}
+// The presentational pieces this screen used to define locally —
+// QuickStat, AccordionSection, InfoRow, previewOf — now live in
+// src/components/caresheet and are shared with the invert care sheet.
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  // Pinned "Add to collection" bar
+  actionBar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  actionPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 13,
+    borderRadius: 13,
+  },
+  actionPrimaryText: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#fff',
   },
   loadingContainer: {
     flex: 1,
@@ -561,171 +522,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   // Hero Section
-  heroContainer: {
-    position: 'relative',
-    height: 300,
-    backgroundColor: '#1e293b', // Intentional dark hero bg for image overlay
-  },
-  heroImage: {
-    width: '100%',
-    height: '100%',
-  },
-  heroGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '70%',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  floatingBackButton: {
-    position: 'absolute',
-    left: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  heroContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-  },
-  speciesName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 6,
-    fontStyle: 'italic',
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  commonNames: {
-    fontSize: 16,
-    color: '#ffffff',
-    marginBottom: 12,
-    opacity: 0.95,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  badgeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
+  // Quick stats — four across, directly under the hero
+  // Consolidated safety line
   // Warnings
-  dangerWarning: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-  },
-  cautionWarning: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  warningTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  warningText: {
-    fontSize: 13,
-  },
   // Quick Stats Card
-  quickStatsCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  statItem: {
-    alignItems: 'center',
-    minWidth: '40%',
-  },
-  statIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
   // Accordion
-  accordionContainer: {
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-    overflow: 'hidden',
-  },
-  accordionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  accordionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  accordionContent: {
-    padding: 16,
-    paddingTop: 0,
-  },
   // Info Row
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(128, 128, 128, 0.1)',
-  },
-  infoLabel: {
-    fontSize: 14,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'right',
-    flex: 1,
-    marginLeft: 16,
-  },
   // Community Stats
   communityStatCard: {
     padding: 16,

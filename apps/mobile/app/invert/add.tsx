@@ -49,15 +49,29 @@ export default function AddInvertScreen() {
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
-  const { taxon: taxonParam } = useLocalSearchParams<{ taxon?: string }>();
+  // `speciesId` / `scientificName` / `commonName` arrive prefilled when the
+  // keeper taps "Add to collection" on a care sheet. Without them the flow was:
+  // back out of the sheet → Collection → FAB → pick the taxon → retype the
+  // name they were just reading.
+  const {
+    taxon: taxonParam,
+    speciesId: speciesIdParam,
+    scientificName: scientificNameParam,
+    commonName: commonNameParam,
+  } = useLocalSearchParams<{
+    taxon?: string;
+    speciesId?: string;
+    scientificName?: string;
+    commonName?: string;
+  }>();
   const taxon: InvertTaxon = isInvertTaxon(taxonParam) ? taxonParam : 'scorpion';
   const meta = INVERT_TAXA[taxon];
 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [name, setName] = useState('');
-  const [speciesId, setSpeciesId] = useState<string | null>(null);
-  const [commonName, setCommonName] = useState('');
-  const [scientificName, setScientificName] = useState('');
+  const [speciesId, setSpeciesId] = useState<string | null>(speciesIdParam ?? null);
+  const [commonName, setCommonName] = useState(commonNameParam ?? '');
+  const [scientificName, setScientificName] = useState(scientificNameParam ?? '');
   const [sex, setSex] = useState<Sex>('unknown');
   const [molts, setMolts] = useState('');
   const [sizeMm, setSizeMm] = useState('');

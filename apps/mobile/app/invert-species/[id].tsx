@@ -9,14 +9,31 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
-import { getInvertSpecies, FEEDING_MODE_LABELS, type InvertSpecies } from '../../src/lib/inverts';
+import {
+  getInvertSpecies,
+  FEEDING_MODE_LABELS,
+  INVERT_TAXA,
+  taxonMdiIcon,
+  type InvertSpecies,
+} from '../../src/lib/inverts';
+import {
+  CareSheetHero,
+  QuickStatsRow,
+  SafetyLine,
+  CareAccordion,
+  CareFact,
+  careLevelMeta,
+  previewOf,
+  shareSpecies,
+} from '../../src/components/caresheet';
 
 const VENOM_LABELS: Record<string, string> = { mild: 'Mild', moderate: 'Moderate', medically_significant: 'Medically significant' };
-const CARE_LABELS: Record<string, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+// Care-level labels now come from careLevelMeta() in components/caresheet,
+// shared with the tarantula sheet so the wording can't drift.
 
 // Taxon-honest copy for the green "harmless" safety callout (matches web).
 const HARMLESS_COPY: Record<string, { title: string; body: string }> = {
@@ -32,12 +49,17 @@ const DEFAULT_HARMLESS = { title: 'No medically significant venom', body: 'This 
 function InvertSpeciesCareSheetScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors, layout } = useTheme();
-  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [species, setSpecies] = useState<InvertSpecies | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Enclosure open by default — the reason people open a care sheet. The
+  // rest collapse, with a preview line so a closed sheet still says what's
+  // inside.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({ enclosure: true });
+  const toggle = (k: string) => setExpanded((p) => ({ ...p, [k]: !p[k] }));
 
   const fetch = useCallback(async () => {
     if (!id) return;
@@ -56,109 +78,280 @@ function InvertSpeciesCareSheetScreen() {
 
   const harmless = !species.venom_severity;
 
+  const care = careLevelMeta(species.care_level, colors.textSecondary);
+  const harmlessCopy = HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS;
+  // Per-taxon labelling: "Leg span" for whip spiders, "Length" for the rest.
+  const meta = INVERT_TAXA[species.taxon];
+
   return (
     <View style={styles.flex}>
-      <AppHeader title={species.common_names?.[0] || species.scientific_name} subtitle={species.scientific_name}
-        leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.tagRow}>
-          {species.care_level && <View style={[styles.tag, { backgroundColor: colors.surface }]}><Text style={[styles.tagText, { color: colors.textPrimary }]}>{CARE_LABELS[species.care_level] ?? species.care_level}</Text></View>}
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <CareSheetHero
+          imageUrl={species.image_url}
+          commonName={species.common_names?.[0]}
+          scientificName={species.scientific_name}
+          isVerified={species.is_verified}
+          fallbackIcon={taxonMdiIcon(species.taxon)}
+          badges={[
+            ...(species.care_level ? [{ label: care.text, color: care.color }] : []),
+            ...(harmless
+              ? []
+              : [{
+                  label:
+                    species.venom_severity === 'medically_significant'
+                      ? 'Hot venom'
+                      : `${VENOM_LABELS[species.venom_severity!] ?? species.venom_severity} venom`,
+                  color: species.venom_severity === 'medically_significant' ? '#ef4444' : '#f97316',
+                }]),
+            ...(species.communal_suitable ? [{ label: 'Communal' }] : []),
+            ...(species.type ? [{ label: species.type }] : []),
+          ]}
+          topInset={insets.top}
+          onBack={() => router.back()}
+          onShare={() =>
+            shareSpecies(species.scientific_name, species.common_names?.[0], species.id)
+          }
+          colors={colors}
+        />
+
+        <View style={styles.body}>
+          <QuickStatsRow
+            colors={colors}
+            stats={[
+              { icon: 'arrow-expand-horizontal', value: species.adult_size, label: meta.sizeLabel },
+              {
+                icon: 'thermometer',
+                value:
+                  species.temperature_min || species.temperature_max
+                    ? `${species.temperature_min ?? '?'}–${species.temperature_max ?? '?'}°F`
+                    : null,
+                label: 'Temp',
+              },
+              {
+                icon: 'water-percent',
+                value:
+                  species.humidity_min || species.humidity_max
+                    ? `${species.humidity_min ?? '?'}–${species.humidity_max ?? '?'}%`
+                    : null,
+                label: 'Humidity',
+              },
+              { icon: 'trending-up', value: species.growth_rate, label: 'Growth' },
+            ]}
+          />
+
+          {/* Safety. The honest per-taxon "harmless" copy is kept — it's the
+              most-read text on these sheets for the non-venomous taxa. */}
           {harmless ? (
-            <View style={[styles.tag, { backgroundColor: '#dcfce7' }]}><Text style={[styles.tagText, { color: '#166534' }]}>Harmless</Text></View>
+            <SafetyLine
+              accent="#22c55e"
+              icon="shield-check"
+              title={harmlessCopy.title}
+              body={harmlessCopy.body}
+              colors={colors}
+            />
           ) : (
-            <View style={[styles.tag, { backgroundColor: '#fee2e2' }]}><Text style={[styles.tagText, { color: '#991b1b' }]}>Venom: {VENOM_LABELS[species.venom_severity!] ?? species.venom_severity}</Text></View>
+            <SafetyLine
+              accent={species.venom_severity === 'medically_significant' ? '#ef4444' : '#f97316'}
+              title={
+                species.venom_severity === 'medically_significant'
+                  ? 'Medically significant venom'
+                  : `${VENOM_LABELS[species.venom_severity!] ?? species.venom_severity} venom`
+              }
+              body={
+                species.venom_notes ||
+                (species.venom_severity === 'medically_significant'
+                  ? 'A bite can require medical attention. Experienced keepers only — check local legality and have a protocol before you buy.'
+                  : 'Venom is not considered medically significant to humans, but handle minimally.')
+              }
+              colors={colors}
+            />
           )}
-          {species.communal_suitable && <View style={[styles.tag, { backgroundColor: '#dbeafe' }]}><Text style={[styles.tagText, { color: '#1e40af' }]}>Communal OK</Text></View>}
-          {!species.is_verified && <View style={[styles.tag, { backgroundColor: '#fef3c7' }]}><Text style={[styles.tagText, { color: '#92400e' }]}>Unverified</Text></View>}
+
+          {!!species.care_guide && (
+            <CareAccordion
+              title="About"
+              icon="document-text"
+              isExpanded={!!expanded.about}
+              onToggle={() => toggle('about')}
+              preview={previewOf(species.native_region, species.temperament)}
+              colors={colors}
+            >
+              <Text style={[styles.prose, { color: colors.textSecondary }]}>
+                {species.care_guide.replace(/\*\*(.*?)\*\*/g, '$1')}
+              </Text>
+            </CareAccordion>
+          )}
+
+          {/* Enclosure first and open by default — it's what people open a
+              care sheet to find out. */}
+          <CareAccordion
+            title="Enclosure"
+            icon="home"
+            isExpanded={!!expanded.enclosure}
+            onToggle={() => toggle('enclosure')}
+            preview={previewOf(species.enclosure_size_adult, species.substrate_depth)}
+            colors={colors}
+          >
+            <CareFact label="Sling size" value={species.enclosure_size_sling} colors={colors} />
+            <CareFact label="Juvenile size" value={species.enclosure_size_juvenile} colors={colors} />
+            <CareFact label="Adult size" value={species.enclosure_size_adult} colors={colors} />
+            <CareFact label="Substrate" value={species.substrate_type} colors={colors} />
+            <CareFact label="Substrate depth" value={species.substrate_depth} colors={colors} />
+            <CareFact
+              label="Water dish"
+              value={species.water_dish_required ? 'Required' : 'Optional'}
+              colors={colors}
+            />
+          </CareAccordion>
+
+          <CareAccordion
+            title="Feeding"
+            icon="restaurant"
+            isExpanded={!!expanded.feeding}
+            onToggle={() => toggle('feeding')}
+            preview={previewOf(
+              species.feeding_frequency_adult ? `Adult ${species.feeding_frequency_adult}` : null,
+              species.feeding_mode ? FEEDING_MODE_LABELS[species.feeding_mode] : null,
+            )}
+            colors={colors}
+          >
+            <CareFact
+              label="Feeding mode"
+              value={species.feeding_mode ? FEEDING_MODE_LABELS[species.feeding_mode] : null}
+              colors={colors}
+            />
+            <CareFact label="Prey size" value={species.prey_size} colors={colors} />
+            <CareFact label="Sling cadence" value={species.feeding_frequency_sling} colors={colors} />
+            <CareFact label="Juvenile cadence" value={species.feeding_frequency_juvenile} colors={colors} />
+            <CareFact label="Adult cadence" value={species.feeding_frequency_adult} colors={colors} />
+          </CareAccordion>
+
+          <CareAccordion
+            title="Size & growth"
+            icon="resize"
+            isExpanded={!!expanded.size}
+            onToggle={() => toggle('size')}
+            preview={previewOf(species.adult_size, species.growth_rate)}
+            colors={colors}
+          >
+            <CareFact label={meta.sizeLabel} value={species.adult_size} colors={colors} />
+            {(species.adult_length_min_mm || species.adult_length_max_mm) && (
+              <CareFact
+                label="Length"
+                value={`${species.adult_length_min_mm ?? '?'}–${species.adult_length_max_mm ?? '?'} mm`}
+                colors={colors}
+              />
+            )}
+            <CareFact label="Growth rate" value={species.growth_rate} colors={colors} />
+          </CareAccordion>
+
+          <CareAccordion
+            title="Taxonomy"
+            icon="information-circle"
+            isExpanded={!!expanded.taxonomy}
+            onToggle={() => toggle('taxonomy')}
+            preview={previewOf(species.family, species.native_region)}
+            colors={colors}
+          >
+            <CareFact label="Family" value={species.family} colors={colors} />
+            <CareFact label="Genus" value={species.genus} colors={colors} italic />
+            <CareFact label="Native region" value={species.native_region} colors={colors} />
+            <CareFact label="Type" value={cap(species.type)} colors={colors} />
+            <CareFact label="Temperament" value={species.temperament} colors={colors} />
+          </CareAccordion>
+
+          <CareAccordion
+            title="Community"
+            icon="people"
+            isExpanded={!!expanded.community}
+            onToggle={() => toggle('community')}
+            preview={previewOf(species.times_kept ? `${species.times_kept} keepers` : null)}
+            colors={colors}
+          >
+            <CareFact label="Times kept" value={species.times_kept} colors={colors} />
+            <CareFact
+              label="Catalog entry"
+              value={species.is_verified ? 'Verified' : 'Community submitted'}
+              colors={colors}
+            />
+          </CareAccordion>
         </View>
-
-        {harmless ? (
-          <View style={[styles.callout, { backgroundColor: '#dcfce7', borderLeftColor: '#166534' }]}>
-            <Text style={[styles.calloutTitle, { color: '#166534' }]}>{(HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS).title}</Text>
-            <Text style={[styles.calloutBody, { color: '#166534' }]}>{(HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS).body}</Text>
-          </View>
-        ) : (species.venom_notes || species.venom_severity === 'medically_significant') ? (
-          <View style={[styles.callout, { backgroundColor: '#fee2e2', borderLeftColor: '#991b1b' }]}>
-            <Text style={[styles.calloutTitle, { color: '#991b1b' }]}>{species.venom_severity === 'medically_significant' ? 'Medically significant venom' : 'Venom note'}</Text>
-            <Text style={[styles.calloutBody, { color: '#991b1b' }]}>{species.venom_notes || 'Venom is medically significant. Experienced keepers only — check local legality and have a protocol.'}</Text>
-          </View>
-        ) : null}
-
-        {species.care_guide && <Section title="About" colors={colors}><Text style={styles.body}>{species.care_guide.replace(/\*\*(.*?)\*\*/g, '$1')}</Text></Section>}
-
-        <Section title="Taxonomy" colors={colors}>
-          <Fact label="Family" value={species.family} colors={colors} />
-          <Fact label="Genus" value={species.genus} colors={colors} />
-          <Fact label="Native region" value={species.native_region} colors={colors} />
-          <Fact label="Type" value={cap(species.type)} colors={colors} />
-          <Fact label="Temperament" value={species.temperament} colors={colors} />
-        </Section>
-
-        <Section title="Size & growth" colors={colors}>
-          <Fact label="Adult size" value={species.adult_size} colors={colors} />
-          {(species.adult_length_min_mm || species.adult_length_max_mm) && <Fact label="Length" value={`${species.adult_length_min_mm ?? '?'}–${species.adult_length_max_mm ?? '?'} mm`} colors={colors} />}
-          <Fact label="Growth rate" value={species.growth_rate} colors={colors} />
-        </Section>
-
-        <Section title="Climate" colors={colors}>
-          {(species.temperature_min || species.temperature_max) && <Fact label="Temperature" value={`${species.temperature_min ?? '?'}–${species.temperature_max ?? '?'} °F`} colors={colors} />}
-          {(species.humidity_min || species.humidity_max) && <Fact label="Humidity" value={`${species.humidity_min ?? '?'}–${species.humidity_max ?? '?'}%`} colors={colors} />}
-        </Section>
-
-        <Section title="Enclosure" colors={colors}>
-          <Fact label="Sling size" value={species.enclosure_size_sling} colors={colors} />
-          <Fact label="Juvenile size" value={species.enclosure_size_juvenile} colors={colors} />
-          <Fact label="Adult size" value={species.enclosure_size_adult} colors={colors} />
-          <Fact label="Substrate" value={species.substrate_type} colors={colors} />
-          <Fact label="Substrate depth" value={species.substrate_depth} colors={colors} />
-          <Fact label="Water dish" value={species.water_dish_required ? 'Required' : 'Optional'} colors={colors} />
-        </Section>
-
-        <Section title="Feeding" colors={colors}>
-          <Fact label="Feeding mode" value={species.feeding_mode ? FEEDING_MODE_LABELS[species.feeding_mode] : null} colors={colors} />
-          <Fact label="Prey size" value={species.prey_size} colors={colors} />
-          <Fact label="Sling cadence" value={species.feeding_frequency_sling} colors={colors} />
-          <Fact label="Juvenile cadence" value={species.feeding_frequency_juvenile} colors={colors} />
-          <Fact label="Adult cadence" value={species.feeding_frequency_adult} colors={colors} />
-        </Section>
-
-        <Text style={styles.metaText}>Times kept: {species.times_kept}</Text>
       </ScrollView>
+
+      {/* Pinned action bar — parity with the tarantula care sheet. Hands the
+          species straight to the generic invert add form, with the taxon
+          carried over so the keeper doesn't re-pick it. */}
+      <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
+        <TouchableOpacity
+          style={styles.actionPrimary}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${species.scientific_name} to your collection`}
+          onPress={() => {
+            // `invert_species` carries mirrored tarantula rows from the
+            // ADR-005 backfill, and INVERT_TAXA deliberately excludes
+            // tarantula — so `/invert/add?taxon=tarantula` would fail
+            // isInvertTaxon and silently fall back to creating a SCORPION.
+            // The browser routes tarantulas to /species/[id], but a deep
+            // link can still land one here, so route on the taxon rather
+            // than assuming.
+            // Cast because `InvertSpecies.taxon` is typed as InvertTaxon,
+            // which excludes tarantula — but the TYPE IS NARROWER THAN THE
+            // DATA: `invert_species` really does hold tarantula rows, so the
+            // API can hand one back and tsc would otherwise call this check
+            // dead code.
+            const isTarantula = (species.taxon as string) === 'tarantula';
+            router.push({
+              pathname: isTarantula ? '/tarantula/add' : '/invert/add',
+              params: {
+                ...(isTarantula ? {} : { taxon: species.taxon }),
+                speciesId: species.id,
+                scientificName: species.scientific_name,
+                commonName: species.common_names?.[0] ?? '',
+              },
+            } as any);
+          }}
+        >
+          <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+          <Text style={styles.actionPrimaryText}>Add to collection</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 function cap(s: string | null | undefined): string | null { if (!s) return null; return s.charAt(0).toUpperCase() + s.slice(1); }
 
-function Section({ title, colors, children }: { title: string; colors: ReturnType<typeof useTheme>['colors']; children: React.ReactNode }) {
-  return (<View style={[ss.section, { backgroundColor: colors.surface, borderColor: colors.border }]}><Text style={[ss.sectionTitle, { color: colors.textTertiary }]}>{title}</Text>{children}</View>);
-}
-function Fact({ label, value, colors }: { label: string; value: string | null | undefined; colors: ReturnType<typeof useTheme>['colors'] }) {
-  if (!value) return null;
-  return (<View style={[ss.factRow, { borderBottomColor: colors.border }]}><Text style={[ss.factLabel, { color: colors.textTertiary }]}>{label}</Text><Text style={[ss.factValue, { color: colors.textPrimary }]}>{value}</Text></View>);
-}
-
-const ss = StyleSheet.create({
-  section: { padding: 14, borderRadius: 12, borderWidth: 1, gap: 4, marginBottom: 12 },
-  sectionTitle: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
-  factRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
-  factLabel: { fontSize: 13 },
-  factValue: { fontSize: 14, fontWeight: '500', flex: 1, textAlign: 'right', marginLeft: 12 },
-});
+// The local Section / Fact components and their `ss` stylesheet are gone —
+// both roles now come from src/components/caresheet (CareAccordion, CareFact),
+// shared with the tarantula sheet so the two can't drift apart again.
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
     flex: { flex: 1, backgroundColor: colors.background },
     center: { alignItems: 'center', justifyContent: 'center' },
-    scroll: { padding: 16, paddingBottom: 32, gap: 12 },
-    tagRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 4 },
-    tag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-    tagText: { fontSize: 12, fontWeight: '600' },
-    callout: { borderLeftWidth: 4, padding: 12, borderRadius: 8, gap: 4, marginBottom: 4 },
-    calloutTitle: { fontSize: 14, fontWeight: '700' },
-    calloutBody: { fontSize: 13, lineHeight: 18 },
-    body: { fontSize: 14, color: colors.textPrimary, lineHeight: 21 },
-    metaText: { fontSize: 11, color: colors.textTertiary, textAlign: 'center', marginTop: 8 },
+    // No horizontal padding — the hero is full-bleed. The body block below
+    // carries its own. paddingBottom clears the pinned action bar.
+    scroll: { paddingBottom: 96 },
+    body: { padding: 16 },
+    prose: { fontSize: 14, lineHeight: 21 },
+    actionBar: {
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    actionPrimary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 13,
+      borderRadius: 13,
+      backgroundColor: colors.primary,
+    },
+    actionPrimaryText: { fontSize: 14.5, fontWeight: '700', color: '#fff' },
     errorText: { color: colors.textPrimary, marginBottom: 16 },
     retryButton: { paddingVertical: 10, paddingHorizontal: 16, backgroundColor: colors.primary, borderRadius: 8 },
     retryText: { color: '#fff', fontWeight: '600' },
