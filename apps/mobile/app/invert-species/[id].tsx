@@ -30,6 +30,7 @@ import {
   previewOf,
   shareSpecies,
 } from '../../src/components/caresheet';
+import { useShortlistToggle } from '../../src/hooks/useShortlistToggle';
 
 const VENOM_LABELS: Record<string, string> = { mild: 'Mild', moderate: 'Moderate', medically_significant: 'Medically significant' };
 // Care-level labels now come from careLevelMeta() in components/caresheet,
@@ -58,6 +59,7 @@ function InvertSpeciesCareSheetScreen() {
   // Enclosure open by default — the reason people open a care sheet. The
   // rest collapse, with a preview line so a closed sheet still says what's
   // inside.
+  const { isBookmarked, bookmarkBusy, toggle: toggleBookmark } = useShortlistToggle(id);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({ enclosure: true });
   const toggle = (k: string) => setExpanded((p) => ({ ...p, [k]: !p[k] }));
 
@@ -111,6 +113,9 @@ function InvertSpeciesCareSheetScreen() {
           onShare={() =>
             shareSpecies(species.scientific_name, species.common_names?.[0], species.id)
           }
+          onToggleBookmark={toggleBookmark}
+          isBookmarked={isBookmarked}
+          bookmarkBusy={bookmarkBusy}
           colors={colors}
         />
 

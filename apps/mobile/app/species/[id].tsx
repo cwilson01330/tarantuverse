@@ -14,6 +14,7 @@ import {
   previewOf,
   shareSpecies,
 } from '../../src/components/caresheet';
+import { useShortlistToggle } from '../../src/hooks/useShortlistToggle';
 
 interface Species {
   id: string;
@@ -77,6 +78,12 @@ export default function SpeciesDetailScreen() {
   const [species, setSpecies] = useState<Species | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // `id` is the invert_species id for shortlist purposes — the tarantula
+  // catalog is mirrored into invert_species with the same primary key by the
+  // ADR-005 backfill, so one shortlist table serves every taxon.
+  const { isBookmarked, bookmarkBusy, toggle: toggleBookmark } = useShortlistToggle(
+    typeof id === 'string' ? id : undefined,
+  );
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
     // Enclosure, not overview — it's the section people actually open a care
     // sheet for. The taxonomy/temperament content in Overview is already
@@ -168,6 +175,9 @@ export default function SpeciesDetailScreen() {
           onShare={() =>
             shareSpecies(species.scientific_name, species.common_names?.[0], species.id)
           }
+          onToggleBookmark={toggleBookmark}
+          isBookmarked={isBookmarked}
+          bookmarkBusy={bookmarkBusy}
           colors={colors}
         />
 

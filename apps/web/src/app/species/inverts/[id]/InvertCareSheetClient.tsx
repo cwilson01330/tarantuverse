@@ -17,6 +17,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import PublicCareShell from '@/components/PublicCareShell'
+import ShortlistButton from '@/components/ShortlistButton'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -188,12 +189,19 @@ export default function InvertCareSheetClient({
           <>
             {/* Header */}
             <div className="mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                {species.common_names?.[0] || species.scientific_name}
-              </h1>
-              <p className="text-lg italic text-gray-600 dark:text-gray-400">
-                {species.scientific_name}
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                    {species.common_names?.[0] || species.scientific_name}
+                  </h1>
+                  <p className="text-lg italic text-gray-600 dark:text-gray-400">
+                    {species.scientific_name}
+                  </p>
+                </div>
+                {/* Renders nothing for signed-out visitors — this is a public
+                    SEO page, so most traffic here isn't logged in. */}
+                <ShortlistButton speciesId={species.id} className="shrink-0 mt-1" />
+              </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 <Badge className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                   {TAXON_LABELS[species.taxon] ?? species.taxon}

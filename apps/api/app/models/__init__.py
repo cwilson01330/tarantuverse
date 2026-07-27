@@ -75,6 +75,11 @@ from app.models.animal_transfer import AnimalTransfer
 # imported first (FK targets), which they are above.
 from app.models.colony import Colony, ColonyEvent
 
+# Species shortlist (shl_20260727) — species a keeper is considering.
+# Server-side rather than device-local so it survives a reinstall and is the
+# same list on web and mobile.
+from app.models.species_shortlist import SpeciesShortlist
+
 __all__ = [
     "User",
     "Tarantula",
@@ -138,4 +143,5 @@ __all__ = [
     "AnimalTransfer",
     "Colony",
     "ColonyEvent",
+    "SpeciesShortlist",
 ]

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import PublicCareShell from '@/components/PublicCareShell'
+import ShortlistButton from '@/components/ShortlistButton'
 
 export interface Species {
   id: string
@@ -269,6 +270,9 @@ export default function EnhancedSpeciesDetailPage({
                     >
                       + Add to Collection
                     </button>
+                    {/* Save for later — the "not yet, but maybe" path that
+                        Add to Collection doesn't cover. */}
+                    <ShortlistButton speciesId={String(id)} variant="onDark" />
                     {canEdit && (
                       <button
                         onClick={() => router.push(`/species/${id}/edit`)}

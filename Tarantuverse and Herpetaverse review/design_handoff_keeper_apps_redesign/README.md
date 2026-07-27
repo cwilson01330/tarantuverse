@@ -2,7 +2,7 @@
 
 ## Overview
 
-A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the six highest-traffic screens:
+A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the four highest-traffic screens:
 
 | App | Screen | Source file today |
 |---|---|---|
@@ -10,8 +10,6 @@ A design review of the two React Native (Expo) keeper apps in the `tarantuverse`
 | Tarantuverse | Collection | `apps/mobile/app/(tabs)/collection.tsx` |
 | Herpetoverse | Home | `apps/mobile-herpetoverse/app/(tabs)/dashboard.tsx` |
 | Herpetoverse | Collection | `apps/mobile-herpetoverse/app/(tabs)/index.tsx` |
-| Tarantuverse | Species browser | `apps/mobile/app/(tabs)/species.tsx` |
-| Tarantuverse | Species care sheet | `apps/mobile/app/species/[id].tsx` |
 
 The brief was **flow, consistency, and discoverability** — not a repaint. The Tarantuverse gradient identity stays. The changes are hierarchy, navigation, and card structure.
 
@@ -124,74 +122,6 @@ In `ReptileCard`, `styles.fedChip` has `marginTop: 6` inside a `cardIndicators` 
 
 ---
 
-## Screen 5 — Tarantuverse Species browser
-
-**Purpose:** browse 312 care sheets across ten taxa; today it is effectively hidden.
-
-### Navigation change (do this first)
-
-The route is `href: null` in `(tabs)/_layout.tsx`. Its only entry points are a 24px `book-open-variant` icon in the Collection header and a Quick Actions tile below the dashboard fold. **Give Species a permanent tab** in the five-tab spine.
-
-### Layout
-
-1. **Header** — gradient band. Title `Species` `20/700`; subtitle `"312 care sheets · 10 taxa"`. Right icons `tune-variant`, `bookmark-outline`.
-   - **Search moves into the header**: `borderRadius: 12`, `rgba(255,255,255,.16)`, `padding: 9 12`, `magnify` 19px, placeholder `15/400 rgba(255,255,255,.75)`.
-   - Deletes the in-body 28px "Species Database" title block, the "Browse by animal type" label, the ten-pill segment control, the "Care level" label and the standalone result count — roughly 260px of chrome before the first result today.
-2. **Filter chip row** — horizontal scroll, `gap: 7`, chip `padding: 7 13`, `borderRadius: 10`, `12.5/600`. `All 312` leads, then one chip per taxon with its MDI glyph + count. Care level moves into the `tune-variant` sheet.
-3. **"Good for beginners" shelf** — section label `12/600` uppercase `letterSpacing: .1em` `textTertiary`, trailing `See all` `12/600 accent`.
-   - Horizontal scroller, tile `width: 104`, `borderRadius: 14`; 74px image block; name `12/600`, scientific `10.5/400 italic`.
-   - Query is `care_level = 'beginner'` ordered by `times_kept` — data you already return. Obvious follow-on shelves: "Species you keep", "Most kept this month", "Communal-safe".
-4. **Result rows** (replaces the 2-up card grid) — `borderRadius: 16`, `borderWidth: 1`, overflow hidden.
-   - 88px full-bleed image column left.
-   - Right column `padding: 11 12 11 13`, `gap: 6`:
-     - Common name `15/600`; scientific name `12/400 italic textTertiary`; `check-decagram` 16px `#22c55e` right-aligned when `is_verified`.
-     - Badge row: care level as **a word in a tinted pill** — `padding: 3 8`, `borderRadius: 7`, `11/700`, bg `color + '24'` (Beginner `#22c55e`, Intermediate `#eab308`, Advanced `#f97316`). Then `Hot venom` (`alert`, `#ef4444`) and/or `Communal` (`account-multiple`, `#3b82f6`) when applicable.
-     - Facts line `11.5/400 textTertiary` — `Terrestrial · 5–6" · New World`.
-     - Optional social proof `11.5/400` — `Kept by 1,204 keepers` (`times_kept`).
-
-### Why rows instead of the current grid
-
-Most catalog entries have no photo, so the current 160px image area renders a block of emoji. Rows fit the same information in less height, give care level and venom tier room to be words, and put biome/size/hemisphere on one scannable line.
-
-### Specific defects
-
-- **Care level is a colored circle containing `✓` / `⚠` / `⚡` / `?`** (`careLevelBadge`, 28px) with the word rendered nowhere on the card. Nothing teaches the mapping and colour alone fails for colour-blind keepers.
-- **Ten taxon pills in a horizontal `ScrollView`** hide seven options with no affordance; a tarantula-only keeper still scrolls past Vinegaroons, Roaches and Other. Lead with `All` and carry counts.
-- `imageGradient` is a flat `rgba(0,0,0,0.2)` block over the bottom 30% of the image, not a gradient — it reads as a grey band. Use a real `LinearGradient` or drop it.
-
----
-
-## Screen 6 — Tarantuverse Species care sheet
-
-**Purpose:** decide whether to keep this species, then keep it.
-
-### Layout
-
-1. **Hero** `height: 192` (was 280) — image, bottom scrim `linear-gradient(transparent, rgba(0,0,0,.8))`.
-   - Floating 38px circular back button top-left; `bookmark-outline` + `share-variant-outline` top-right, same treatment.
-   - Common name `13/600 rgba(255,255,255,.8)` **above** the scientific name `23/700 italic #fff` — the common name is how people search and speak.
-   - Badge row `gap: 7`, badge `padding: 5 10`, `borderRadius: 9`, `11.5/700`: care level, `Hot venom` when `medically_significant_venom`, biome on a neutral `rgba(10,10,15,.55)` chip.
-2. **Quick stats** — one row of four, `gap: 8`, card `borderRadius: 14`, `padding: 11 10`, centered: MDI icon 18px, value `15/700`, label `10.5/400 textTertiary`.
-   - `arrow-expand-horizontal` size · `thermometer` temp · `water-percent` humidity · `trending-up` growth. Replaces the 📏📈🌡️💧 wrapping grid.
-3. **Safety line** — single card, `borderRadius: 12`, `borderLeft: 3px solid #ef4444`, `padding: 12 14`. `alert` 19px; title `13.5/700` combining both hazards; body `12.5/400 textTertiary`, `lineHeight: 1.5`.
-   - Replaces two stacked warning blocks (~150px) that repeat what the hero badges and the Behavior accordion already say.
-4. **Accordions** — `borderRadius: 14`, `padding: 13 14`, title `15/700` + 19px `accent` icon.
-   - **Enclosure expands by default** — it is the reason people open a care sheet.
-   - Collapsed rows **preview their contents** on the right in `12/400 textTertiary`: Feeding → `Adult 1×/wk`, Overview → `India · Skittish`, Community → `318 keepers · 4.6`.
-   - Expanded content: label/value rows, `13px`, label `textTertiary`, value `600 textPrimary`.
-5. **Pinned action bar** — `flex: none`, `padding: 12 16 26`, top border.
-   - Primary `flex: 1`, `borderRadius: 13`, `padding: 13 0`, gradient, `plus` 18px + `Add to collection` `14.5/700 #fff` → routes to the add form **prefilled with this species**.
-   - Secondary 50px outlined `compare` button.
-
-### Specific defects
-
-- **No call to action.** A keeper who decides to buy the species must back out, find Collection, tap the FAB, choose a taxon and retype the name. The pinned bar is the highest-value change on this screen.
-- **All five accordions default closed**, so the sheet opens as five grey bars.
-- **Two care-sheet implementations**: tarantulas render `app/species/[id].tsx`, the other nine taxa render `app/invert-species/[id].tsx`. The browser already normalises all ten into one `Row` union — the detail screen should too, with taxon-conditional sections.
-- Emoji in body copy: `⚠️ MEDICALLY SIGNIFICANT VENOM`, `📚 Source`, `⭐ 4.6`, and `Medically Significant ⚠️` as an `InfoRow` value. Replace with icons per the mapping table below.
-
----
-
 ## Interactions & behavior
 
 - **Feeding hero check button** → `POST` a feeding via the existing quick-feed path (`quickFeedAnimal` in HV, `handleMarkFed` in TV), then optimistically remove the row and decrement the count. Refetch on settle.
@@ -202,8 +132,6 @@ Most catalog entries have no photo, so the current 160px image area renders a bl
 - **Header `view-grid-outline`** → toggles grid ↔ list, persisted (TV already stores `viewMode`).
 - **Card tap** → detail route; **long press** → existing action sheet.
 - **Pull to refresh** → unchanged on all four screens.
-- **Species chip row** → local filter, no refetch. **`tune-variant`** → sheet holding care level + sort.
-- **Species row tap** → care sheet. **`Add to collection`** → add form with `?species_id=` prefilled. **`bookmark-outline`** → local shortlist.
 - Loading skeletons unchanged. Empty states: keep the existing copy, swap the emoji for the mapped MDI icon.
 
 ## State
@@ -215,7 +143,6 @@ No new endpoints. Everything on the proposed Home comes from calls the screens a
 - `/premolt/dashboard` (TV) — premolt stat
 - `/animals/limits` (HV) — cap subtitle + upgrade row
 - Feeder stock stat needs the existing feeders list endpoint summed client-side
-- Species browser: `/species`, `/scorpion-species/`, `/invert-species/?taxon=` — unchanged. The beginners shelf and the chip counts are derived client-side from the rows already loaded.
 
 ## Design tokens
 
@@ -284,10 +211,6 @@ No new assets. Replace every emoji used as UI with `MaterialCommunityIcons` (the
 | 🐍 | `snake` |
 | 🦎 | `turtle` — **note: there is no `lizard` glyph in MDI**; `turtle` is the closest real herp icon. Verify before use. |
 | 🐛 / 🪱 | `bug-outline` / `dots-horizontal` |
-| 🏜️ / 🌳 / ⛰️ / 🏖️ | `weather-sunny` / `tree-outline` / `image-filter-hdr` / `beach` |
-| 📏 / 📈 / 🌡️ / 💧 | `arrow-expand-horizontal` / `trending-up` / `thermometer` / `water-percent` |
-| ✓ ⚠ ⚡ ? (care level) | render the **word**, not a glyph |
-| 📚 / ⭐ | `book-open-page-variant` / `star` |
 
 Emoji may stay in the taxon registry glyphs on the add-picker, where the playfulness is intentional.
 
@@ -298,17 +221,15 @@ Herpetoverse's `ThemeContext` exports a single frozen `darkTheme`. Tarantuverse'
 ## Suggested order
 
 1. Feeding hero on both Home screens — one card, no new data, removes a duplicate section.
-2. Tools grid + five-tab spine — the discoverability fix. Species gets a permanent tab.
+2. Tools grid + five-tab spine — the discoverability fix.
 3. Card rework in both Collections — also kills the `nulld ago` bug.
-4. `Add to collection` on the care sheet + Enclosure expanded by default — two small changes, large payoff.
-5. Species browser rows + word-based care level.
-6. Emoji sweep + shared tokens package.
-7. Port `ThemeContext` to Herpetoverse.
+4. Emoji sweep + shared tokens package.
+5. Port `ThemeContext` to Herpetoverse.
 
 ## Files
 
-- `Design Review.dc.html` — the full review: six Today/Proposed screen pairs, findings, and the cross-app system section. Open in any browser.
+- `Design Review.dc.html` — the full review: four Today/Proposed screen pairs, findings, and the cross-app system section. Open in any browser.
 
 ## Not covered in this pass
 
-Animal detail, Breeding, Settings/Profile, and onboarding were reviewed at a source level but not redesigned. The Herpetoverse species browser (`apps/mobile-herpetoverse/app/(tabs)/species.tsx`) should inherit the Tarantuverse browser changes once they land.
+Animal detail, Breeding, Settings/Profile, and onboarding were reviewed at a source level but not redesigned.

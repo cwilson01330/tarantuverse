@@ -25,7 +25,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -174,6 +174,7 @@ type Row = TarantulaRow | ScorpionRow | CentipedeRow | WhipSpiderRow | GenericIn
 
 export default function UnifiedSpeciesScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   // Allow deep-linking with `?taxon=scorpions` so the entry icons on
   // each collection tab preselect the right segment.
   const { taxon: taxonParam } = useLocalSearchParams<{ taxon?: string }>();
@@ -584,10 +585,24 @@ export default function UnifiedSpeciesScreen() {
   const HeaderContent = (
     <>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Species Database</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {rows.length} {TAXON_META[taxon].noun} species
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>Species Database</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {rows.length} {TAXON_META[taxon].noun} species
+            </Text>
+          </View>
+          {/* Entry point to the saved-species list. */}
+          <TouchableOpacity
+            onPress={() => router.push('/shortlist' as any)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Your shortlist"
+            style={{ paddingTop: 6 }}
+          >
+            <MaterialCommunityIcons name="bookmark-outline" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
@@ -695,7 +710,10 @@ export default function UnifiedSpeciesScreen() {
           renderItem={renderCard}
           keyExtractor={(item) => `${item.taxon}-${item.id}`}
           numColumns={2}
-          contentContainerStyle={styles.listContent}
+          // Bottom inset for the tab bar. This screen used to be a pushed
+          // route with nothing below it; promoting it to a tab put a ~56pt
+          // bar over the last row, so the grid has to clear it explicitly.
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 72 }]}
           keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl

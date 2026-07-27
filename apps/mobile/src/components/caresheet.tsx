@@ -65,6 +65,9 @@ export function CareSheetHero({
   topInset,
   onBack,
   onShare,
+  onToggleBookmark,
+  isBookmarked,
+  bookmarkBusy,
   fallbackIcon = 'spider-web',
   colors,
 }: {
@@ -76,6 +79,10 @@ export function CareSheetHero({
   topInset: number;
   onBack: () => void;
   onShare: () => void;
+  /** Omit to hide the bookmark entirely (e.g. signed-out viewers). */
+  onToggleBookmark?: () => void;
+  isBookmarked?: boolean;
+  bookmarkBusy?: boolean;
   /** MDI glyph shown when the species has no photo. */
   fallbackIcon?: string;
   colors: Colors;
@@ -110,6 +117,30 @@ export function CareSheetHero({
       >
         <MaterialCommunityIcons name="share-variant-outline" size={20} color="#ffffff" />
       </TouchableOpacity>
+
+      {/* Bookmark sits left of share. Only rendered when a handler is given —
+          a bookmark with nowhere to land would be a button that pretends to
+          do something. */}
+      {!!onToggleBookmark && (
+        <TouchableOpacity
+          onPress={onToggleBookmark}
+          disabled={bookmarkBusy}
+          style={[styles.floatingAction, { right: 64, top: topInset + 8 }]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: !!isBookmarked, busy: !!bookmarkBusy }}
+          accessibilityLabel={
+            isBookmarked
+              ? `Remove ${scientificName} from your shortlist`
+              : `Save ${scientificName} to your shortlist`
+          }
+        >
+          <MaterialCommunityIcons
+            name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={isBookmarked ? '#fbbf24' : '#ffffff'}
+          />
+        </TouchableOpacity>
+      )}
 
       {/* Common name ABOVE the binomial — people search and speak in common
           names; the scientific name is the qualifier, not the headline. */}
