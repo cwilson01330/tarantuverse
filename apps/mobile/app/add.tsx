@@ -559,12 +559,16 @@ function AddScreen() {
           )}
 
           {/* --- collapsed detail ---------------------------------------- */}
+          {/* "Acquisition", not "Provenance" — the app already uses
+              provenance for the transfer chain-of-custody feature
+              (animal_transfers), and this section is just where/when you got
+              it. Matches the section heading in invert/add.tsx. */}
           <Collapsed
-            title="Provenance"
+            title="Acquisition"
             icon="tag-outline"
             preview={dateAcquired ? `Acquired ${dateAcquired}` : 'Not set'}
-            open={openSection === 'prov'}
-            onToggle={() => setOpenSection(openSection === 'prov' ? null : 'prov')}
+            open={openSection === 'acq'}
+            onToggle={() => setOpenSection(openSection === 'acq' ? null : 'acq')}
             colors={colors}
             styles={styles}
           >
