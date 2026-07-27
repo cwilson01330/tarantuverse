@@ -290,7 +290,7 @@ export default function TarantulasPage() {
     if (status.is_feeding_paused) {
       return (
         <span className="px-3 py-1 rounded-full bg-indigo-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
-          \u23F8 Paused
+          ⏸ Paused
         </span>
       )
     }
