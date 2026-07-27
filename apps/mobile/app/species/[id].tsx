@@ -159,6 +159,7 @@ export default function SpeciesDetailScreen() {
       <ScrollView>
         <CareSheetHero
           imageUrl={species.image_url}
+          imageAttribution={species.image_attribution}
           commonName={species.common_names?.[0]}
           scientificName={species.scientific_name}
           isVerified={species.is_verified}
@@ -181,33 +182,9 @@ export default function SpeciesDetailScreen() {
           colors={colors}
         />
 
-        {/*
-          Photo credit — satisfies CC-BY attribution for Wikimedia-sourced
-          images and makes editorial provenance obvious. Rendered only
-          when both image AND attribution are present so species without
-          hero images don't show a stray line.
-        */}
-        {species.image_url && species.image_attribution && (
-          <View
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 6,
-              backgroundColor: colors.surface,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.border,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                fontStyle: 'italic',
-                color: colors.textTertiary,
-              }}
-            >
-              {species.image_attribution}
-            </Text>
-          </View>
-        )}
+        {/* The CC-BY photo credit moved INTO the header's full-screen photo
+            viewer, so it travels with the image rather than sitting under a
+            hero that no longer exists. See CareSheetHero. */}
 
         {/* Content */}
         <View style={{ padding: 16 }}>

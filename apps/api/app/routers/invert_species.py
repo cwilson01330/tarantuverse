@@ -74,7 +74,12 @@ async def search_invert_species(
 @router.get("/", response_model=List[InvertSpeciesResponse])
 async def list_invert_species(
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    # Cap raised 200 → 1000 to match the tarantula /species router. The
+    # cross-taxon browser loads the whole catalog in one call so it can show
+    # real per-taxon counts and an "All" view; at 200 it silently truncated
+    # (there are already 204 non-tarantula species). Bump both routers
+    # together if the catalog ever nears 1000.
+    limit: int = Query(50, ge=1, le=1000),
     taxon: Optional[str] = Query(
         None, pattern=TAXON_PATTERN,
     ),

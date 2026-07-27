@@ -90,6 +90,7 @@ function InvertSpeciesCareSheetScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <CareSheetHero
           imageUrl={species.image_url}
+          imageAttribution={species.image_attribution}
           commonName={species.common_names?.[0]}
           scientificName={species.scientific_name}
           isVerified={species.is_verified}

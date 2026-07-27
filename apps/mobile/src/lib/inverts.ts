@@ -217,6 +217,10 @@ export interface InvertSpecies {
   venom_notes: string | null;
   care_guide: string | null;
   image_url: string | null;
+  /** CC-BY credit line. The column has existed on invert_species all along;
+   *  it was just missing from this interface, so the care sheet had no way to
+   *  render it. All 93 non-tarantula images are credited in the DB. */
+  image_attribution: string | null;
   is_verified: boolean;
   times_kept: number;
 }

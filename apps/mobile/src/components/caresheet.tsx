@@ -23,8 +23,8 @@
  * Everything here is presentational — no fetching, no navigation decisions.
  * Colors come from the caller so this stays theme-agnostic.
  */
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Share } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Share, Modal } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 type Colors = any;
@@ -56,8 +56,27 @@ export async function shareSpecies(scientificName: string, commonName: string | 
   }
 }
 
+/**
+ * Compact care-sheet header.
+ *
+ * WHY NO PHOTO HERO
+ * -----------------
+ * This was a 192pt image hero. But 206 of 401 catalog species have no photo
+ * at all (and only 102 of 197 tarantulas do), so on half the catalog that
+ * hero was a large empty frame pushing the husbandry data — the reason people
+ * open a care sheet — below the fold. The header's cost was paid on every
+ * sheet; its benefit landed on half.
+ *
+ * The photo isn't gone: when one exists it renders as a 72pt thumbnail beside
+ * the name, tappable for the full image. Zero footprint when absent.
+ *
+ * ATTRIBUTION IS NOT OPTIONAL. These images are Wikimedia CC-BY. Wherever the
+ * photo goes, `imageAttribution` goes with it — hence the caption in the
+ * full-screen viewer. Don't drop it in a future restyle.
+ */
 export function CareSheetHero({
   imageUrl,
+  imageAttribution,
   commonName,
   scientificName,
   isVerified,
@@ -72,6 +91,8 @@ export function CareSheetHero({
   colors,
 }: {
   imageUrl?: string | null;
+  /** CC-BY credit line. Required whenever imageUrl is present. */
+  imageAttribution?: string | null;
   commonName?: string | null;
   scientificName: string;
   isVerified?: boolean;
@@ -83,91 +104,128 @@ export function CareSheetHero({
   onToggleBookmark?: () => void;
   isBookmarked?: boolean;
   bookmarkBusy?: boolean;
-  /** MDI glyph shown when the species has no photo. */
+  /** MDI glyph shown in the thumbnail slot when there's no photo. */
   fallbackIcon?: string;
   colors: Colors;
 }) {
-  return (
-    <View style={styles.heroContainer}>
-      {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="cover" />
+  const [photoOpen, setPhotoOpen] = useState(false);
+
+  const action = (
+    key: string,
+    icon: string,
+    label: string,
+    onPress: () => void,
+    opts?: { active?: boolean; busy?: boolean; ionicon?: boolean },
+  ) => (
+    <TouchableOpacity
+      key={key}
+      onPress={onPress}
+      disabled={opts?.busy}
+      style={[styles.headerAction, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: !!opts?.active, busy: !!opts?.busy }}
+    >
+      {opts?.ionicon ? (
+        <Ionicons name={icon as any} size={20} color={colors.textPrimary} />
       ) : (
-        // Most catalog entries have no photo. A centred glyph reads as
-        // deliberate; an empty dark box reads as a failed image load.
-        <View style={styles.heroFallback}>
-          <MaterialCommunityIcons name={fallbackIcon as any} size={64} color="rgba(255,255,255,0.16)" />
-        </View>
+        <MaterialCommunityIcons
+          name={icon as any}
+          size={19}
+          color={opts?.active ? '#fbbf24' : colors.textPrimary}
+        />
       )}
-      <View style={styles.heroGradient} />
+    </TouchableOpacity>
+  );
 
-      <TouchableOpacity
-        onPress={onBack}
-        style={[styles.floatingAction, { left: 16, top: topInset + 8 }]}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-      >
-        <Ionicons name="arrow-back" size={22} color="#ffffff" />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={onShare}
-        style={[styles.floatingAction, { right: 16, top: topInset + 8 }]}
-        accessibilityRole="button"
-        accessibilityLabel={`Share ${scientificName}`}
-      >
-        <MaterialCommunityIcons name="share-variant-outline" size={20} color="#ffffff" />
-      </TouchableOpacity>
-
-      {/* Bookmark sits left of share. Only rendered when a handler is given —
-          a bookmark with nowhere to land would be a button that pretends to
-          do something. */}
-      {!!onToggleBookmark && (
-        <TouchableOpacity
-          onPress={onToggleBookmark}
-          disabled={bookmarkBusy}
-          style={[styles.floatingAction, { right: 64, top: topInset + 8 }]}
-          accessibilityRole="button"
-          accessibilityState={{ selected: !!isBookmarked, busy: !!bookmarkBusy }}
-          accessibilityLabel={
+  return (
+    <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+      <View style={styles.headerActionRow}>
+        {action('back', 'arrow-back', 'Go back', onBack, { ionicon: true })}
+        <View style={{ flex: 1 }} />
+        {!!onToggleBookmark &&
+          action(
+            'bookmark',
+            isBookmarked ? 'bookmark' : 'bookmark-outline',
             isBookmarked
               ? `Remove ${scientificName} from your shortlist`
-              : `Save ${scientificName} to your shortlist`
-          }
-        >
-          <MaterialCommunityIcons
-            name={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-            size={20}
-            color={isBookmarked ? '#fbbf24' : '#ffffff'}
-          />
-        </TouchableOpacity>
-      )}
-
-      {/* Common name ABOVE the binomial — people search and speak in common
-          names; the scientific name is the qualifier, not the headline. */}
-      <View style={styles.heroContent}>
-        {!!commonName && (
-          <Text style={styles.heroCommonName} numberOfLines={1}>
-            {commonName}
-          </Text>
-        )}
-        <View style={styles.heroNameRow}>
-          <Text style={styles.heroScientificName} numberOfLines={2}>
-            {scientificName}
-          </Text>
-          {isVerified && <MaterialCommunityIcons name="check-decagram" size={16} color="#22c55e" />}
-        </View>
-
-        <View style={styles.badgeRow}>
-          {badges.map((b) => (
-            <View
-              key={b.label}
-              style={[styles.badge, b.color ? { backgroundColor: b.color } : styles.badgeNeutral]}
-            >
-              <Text style={styles.badgeText}>{b.label}</Text>
-            </View>
-          ))}
-        </View>
+              : `Save ${scientificName} to your shortlist`,
+            onToggleBookmark,
+            { active: isBookmarked, busy: bookmarkBusy },
+          )}
+        {action('share', 'share-variant-outline', `Share ${scientificName}`, onShare)}
       </View>
+
+      <View style={styles.headerBody}>
+        <View style={{ flex: 1 }}>
+          {/* Common name ABOVE the binomial — people search and speak in
+              common names; the scientific name is the qualifier. */}
+          {!!commonName && (
+            <Text style={[styles.headerCommonName, { color: colors.textTertiary }]} numberOfLines={1}>
+              {commonName}
+            </Text>
+          )}
+          <View style={styles.headerNameRow}>
+            <Text
+              style={[styles.headerScientificName, { color: colors.textPrimary }]}
+              numberOfLines={2}
+            >
+              {scientificName}
+            </Text>
+            {isVerified && (
+              <MaterialCommunityIcons name="check-decagram" size={16} color="#22c55e" />
+            )}
+          </View>
+        </View>
+
+        {/* Thumbnail only when there IS a photo — no empty frame otherwise. */}
+        {!!imageUrl && (
+          <TouchableOpacity
+            onPress={() => setPhotoOpen(true)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={`View photo of ${scientificName}`}
+            style={[styles.headerThumb, { borderColor: colors.border }]}
+          >
+            <Image source={{ uri: imageUrl }} style={styles.headerThumbImage} resizeMode="cover" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.badgeRow}>
+        {badges.map((b) => (
+          <View
+            key={b.label}
+            style={[
+              styles.badge,
+              b.color
+                ? { backgroundColor: b.color + '24' }
+                : { backgroundColor: colors.surfaceElevated },
+            ]}
+          >
+            <Text style={[styles.badgeText, { color: b.color ?? colors.textSecondary }]}>
+              {b.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <Modal visible={photoOpen} transparent animationType="fade" onRequestClose={() => setPhotoOpen(false)}>
+        <View style={styles.photoBackdrop}>
+          <TouchableOpacity
+            style={styles.photoClose}
+            onPress={() => setPhotoOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close photo"
+          >
+            <MaterialCommunityIcons name="close" size={26} color="#fff" />
+          </TouchableOpacity>
+          {!!imageUrl && (
+            <Image source={{ uri: imageUrl }} style={styles.photoFull} resizeMode="contain" />
+          )}
+          {/* CC-BY credit travels with the photo. */}
+          {!!imageAttribution && <Text style={styles.photoCredit}>{imageAttribution}</Text>}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -350,54 +408,56 @@ export function careLevelMeta(level?: string | null, fallbackColor = '#9ca3af') 
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  heroContainer: {
-    position: 'relative',
-    height: 192,
-    backgroundColor: '#1e293b',
-  },
-  heroImage: { width: '100%', height: '100%' },
-  heroFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  heroGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '70%',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  floatingAction: {
-    position: 'absolute',
+  // Compact header (replaced the 192pt photo hero)
+  header: { paddingHorizontal: 16, paddingBottom: 14 },
+  headerActionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  headerAction: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
-  heroContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16 },
-  heroCommonName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 2,
-  },
-  heroNameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  heroScientificName: {
+  headerBody: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerCommonName: { fontSize: 13, fontWeight: '600', marginBottom: 2 },
+  headerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  headerScientificName: {
     fontSize: 23,
     fontWeight: '700',
     fontStyle: 'italic',
-    color: '#ffffff',
     flexShrink: 1,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
   },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 9 },
+  headerThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  headerThumbImage: { width: '100%', height: '100%' },
+
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 11 },
   badge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9 },
-  badgeNeutral: { backgroundColor: 'rgba(10,10,15,0.55)' },
-  badgeText: { fontSize: 11.5, fontWeight: '700', color: '#ffffff' },
+  badgeText: { fontSize: 11.5, fontWeight: '700' },
+
+  // Full-screen photo + its CC-BY credit
+  photoBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.94)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  photoClose: { position: 'absolute', top: 48, right: 20, zIndex: 2, padding: 6 },
+  photoFull: { width: '100%', height: '72%' },
+  photoCredit: {
+    marginTop: 16,
+    fontSize: 11.5,
+    fontStyle: 'italic',
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+  },
 
   quickStatsRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   quickStat: {
