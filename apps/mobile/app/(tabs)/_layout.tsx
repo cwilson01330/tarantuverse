@@ -1,15 +1,15 @@
 import { Tabs, useRouter } from 'expo-router';
-import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { useUnreadMessages } from '../../src/hooks/useUnreadMessages';
-import { NotificationBell } from '../../src/components/NotificationBell';
 
+// The message bell / unread badge moved into the dashboard's own gradient
+// header (see app/(tabs)/index.tsx), which is why this file no longer
+// imports NotificationBell or useUnreadMessages.
 export default function TabLayout() {
   const { colors, layout } = useTheme();
   const router = useRouter();
-  const { unreadCount } = useUnreadMessages();
 
   const tintColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
@@ -53,33 +53,15 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
-          tabBarLabel: 'Dashboard',
+          title: 'Home',
+          tabBarLabel: 'Home',
+          // The dashboard renders its own gradient header (greeting +
+          // "{n} animals · {m} species" + actions). Those counts live in
+          // the screen's state, so the header has to live there too —
+          // otherwise the navigator would need a duplicate fetch.
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
-          ),
-          headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 4 }}>
-              <NotificationBell color={tintColor} size={26} />
-              <TouchableOpacity
-                onPress={() => router.push('/messages' as any)}
-                style={styles.headerButton}
-                accessibilityLabel={
-                  unreadCount > 0
-                    ? `Messages — ${unreadCount} unread`
-                    : 'Messages'
-                }
-              >
-                <MaterialCommunityIcons name="message-outline" size={26} color={tintColor} />
-                {unreadCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
+            <MaterialCommunityIcons name="home-variant" size={size} color={color} />
           ),
         }}
       />
@@ -127,6 +109,25 @@ export default function TabLayout() {
           href: null, // Hidden from tab bar, still accessible via navigation
         }}
       />
+      {/* Declaration order below IS the bottom-bar order, so species is
+          declared before community to land on the handoff's spine:
+          Home · Collection · Species · Community · You. */}
+      <Tabs.Screen
+        name="species"
+        options={{
+          // Promoted to a real tab. The care-sheet catalog is the main
+          // reason non-keepers open the app, and it was previously only
+          // reachable via a header icon on the Collection tab.
+          title: 'Species',
+          tabBarLabel: 'Species',
+          // The screen draws its own "Species Database" header inside a
+          // SafeAreaView, so the navigator must not stack a second one.
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="book-open-variant" size={size} color={color} />
+          ),
+        }}
+      />
       <Tabs.Screen
         name="community"
         options={{
@@ -152,12 +153,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="species"
-        options={{
-          href: null, // Accessible via Search and species links
-        }}
-      />
-      <Tabs.Screen
         name="search"
         options={{
           // Hidden from the bottom bar to make room for the Scorpions
@@ -170,10 +165,12 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Settings',
-          tabBarLabel: 'Settings',
+          // "You" rather than "Settings" — this tab is the profile hub
+          // (achievements, subscription, collection stats), not just prefs.
+          title: 'You',
+          tabBarLabel: 'You',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog" size={size} color={color} />
+            <MaterialCommunityIcons name="account-circle-outline" size={size} color={color} />
           ),
         }}
       />
@@ -186,23 +183,5 @@ const styles = StyleSheet.create({
     marginRight: 12,
     padding: 6,
     position: 'relative',
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#ef4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 3,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 12,
   },
 });

@@ -25,7 +25,19 @@ import { AddPickerSheet, type AddPickerTaxon } from '../../src/components/AddPic
 import { useBreakpoint } from '../../src/hooks/useBreakpoint';
 import { getImageUrl } from '../../src/utils/image-url';
 import { listColonies, formatColonyCount, type ColonyListItem } from '../../src/lib/colonies';
-import { INVERT_TAXA } from '../../src/lib/inverts';
+import { INVERT_TAXA, taxonMdiIcon } from '../../src/lib/inverts';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NotificationBell } from '../../src/components/NotificationBell';
+import { useUnreadMessages } from '../../src/hooks/useUnreadMessages';
+
+/** "Good morning" / "Good afternoon" / "Good evening" from the device clock. */
+function timeGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
 /** Emoji for a colony's taxon — INVERT_TAXA excludes tarantula, so map it here. */
 function colonyGlyph(taxon: string): string {
@@ -185,20 +197,25 @@ function StatChip({
 function DashboardHubScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { colors, layout } = useTheme();
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { unreadCount } = useUnreadMessages();
+
+  // First word of the display name only — "Good morning, Cory" reads better
+  // than the full name, and long names would push the header actions off.
+  const firstName = (user?.display_name || user?.username || '').trim().split(/\s+/)[0] ?? '';
   const { start: startTour } = useCopilot();
   const { breakpoint } = useBreakpoint();
 
-  // Quick Actions grid column width. sm (every iPhone and folded phone)
-  // keeps the existing layout — no override, the base style's '31.5%'
-  // wins. Wider Android forms get explicit widths so the grid fills the
-  // extra real estate (4 cols on a large phone or folded foldable, 5 on
-  // unfolded foldable, 6 on a tablet).
+  // Tools grid column width. The base style is now 4-up (see actionButton),
+  // which fits the handoff's 8 tiles in two clean rows on a phone. Wider
+  // Android forms step up from there so the grid fills the extra real
+  // estate rather than leaving a stretched row of four.
   const quickActionWidth =
-    breakpoint === 'xl' ? '15.5%' :
-    breakpoint === 'lg' ? '18.5%' :
-    breakpoint === 'md' ? '23.5%' :
-    undefined;
+    breakpoint === 'xl' ? '11.5%' :   // 8 across — tablet
+    breakpoint === 'lg' ? '15.5%' :   // 6 across — unfolded foldable
+    breakpoint === 'md' ? '18.5%' :   // 5 across — large phone
+    undefined;                        // sm → base 4-up
   const [tarantulas, setTarantulas] = useState<Tarantula[]>([]);
   const [feedingStatusItems, setFeedingStatusItems] = useState<FeedingStatusItem[]>([]);
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
@@ -210,6 +227,7 @@ function DashboardHubScreen() {
   // Cross-taxon collection total (from /inverts/). null until loaded;
   // falls back to tarantulas.length if the call fails.
   const [totalAnimals, setTotalAnimals] = useState<number | null>(null);
+  const [speciesCount, setSpeciesCount] = useState<number | null>(null);
   const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -298,6 +316,20 @@ function DashboardHubScreen() {
 
       if (Array.isArray(invertsRes?.data)) {
         setTotalAnimals(invertsRes.data.length);
+        // Distinct species for the header subtitle. Derived from the list we
+        // already have rather than a new endpoint. Keyed on species_id when
+        // the animal is linked to the catalog, falling back to a normalised
+        // scientific name so unlinked entries still count — but only when a
+        // name is actually present, so a collection of blank-named animals
+        // reads as 0 species rather than 1 phantom one.
+        const keys = new Set<string>();
+        for (const inv of invertsRes.data as any[]) {
+          if (inv?.species_id) keys.add(`id:${inv.species_id}`);
+          else if (inv?.scientific_name?.trim()) {
+            keys.add(`name:${inv.scientific_name.trim().toLowerCase()}`);
+          }
+        }
+        setSpeciesCount(keys.size);
       }
 
       if (Array.isArray(coloniesRes)) {
@@ -459,6 +491,55 @@ function DashboardHubScreen() {
       padding: 16,
       paddingBottom: 32,
     },
+    // Gradient header (replaces the navigator header on this route)
+    gradientHeader: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+    },
+    gradientHeaderInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    gradientHeaderText: {
+      flex: 1,
+      // Keeps a long display name from crowding the action icons.
+      paddingRight: 12,
+    },
+    headerGreeting: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: '#fff',
+    },
+    headerSubtitle: {
+      fontSize: 12,
+      fontWeight: '400',
+      color: 'rgba(255,255,255,0.72)',
+      marginTop: 2,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    headerBadge: {
+      position: 'absolute',
+      top: -4,
+      right: -6,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: '#ef4444',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 3,
+    },
+    headerBadgeText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: '700',
+      lineHeight: 12,
+    },
     // Loading skeleton
     skeletonRow: {
       flexDirection: 'row',
@@ -606,17 +687,6 @@ function DashboardHubScreen() {
       fontWeight: '500',
       marginTop: 2,
     },
-    alertButton: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 10,
-      overflow: 'hidden',
-    },
-    alertButtonText: {
-      color: '#fff',
-      fontSize: 13,
-      fontWeight: '600',
-    },
     // Communal row
     communalRow: {
       flexDirection: 'row',
@@ -688,10 +758,10 @@ function DashboardHubScreen() {
       gap: 10,
     },
     actionButton: {
-      // 2-col base with flexGrow so an odd trailing button fills its row
-      // instead of sitting orphaned at half width (matches Herpetoverse).
-      // Responsive overrides below bump to 4/5/6 cols on large screens.
-      width: '47%',
+      // 4-col base (handoff screen 1: an 8-tile tools grid in two rows).
+      // flexGrow lets a short trailing row spread instead of leaving tiles
+      // orphaned at quarter width. Responsive overrides bump to 5/6/8 cols.
+      width: '22%',
       flexGrow: 1,
       backgroundColor: colors.surfaceElevated,
       borderWidth: 1,
@@ -792,12 +862,6 @@ function DashboardHubScreen() {
       color: colors.textTertiary,
       marginTop: 4,
     },
-    moreText: {
-      fontSize: 13,
-      color: colors.textTertiary,
-      textAlign: 'center',
-      marginTop: 4,
-    },
   });
 
   // Loading skeleton
@@ -870,6 +934,65 @@ function DashboardHubScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Gradient header — handoff screen 1. Rendered by the screen rather
+          than the navigator because the subtitle needs the collection counts,
+          which live in this component's state; plumbing them up to
+          (tabs)/_layout would mean a context or a duplicate fetch. The
+          navigator's header is disabled for this route (headerShown: false).
+
+          paddingTop uses the safe-area inset because we're no longer inside
+          a navigator header, so nothing else is reserving room for the
+          status bar / notch. */}
+      <LinearGradient
+        colors={[colors.primary, colors.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.gradientHeader, { paddingTop: insets.top + 12 }]}
+      >
+        <View style={styles.gradientHeaderInner}>
+          <View style={styles.gradientHeaderText}>
+            <Text style={styles.headerGreeting} numberOfLines={1}>
+              {timeGreeting()}
+              {firstName ? `, ${firstName}` : ''}
+            </Text>
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              {animalCount} {animalCount === 1 ? 'animal' : 'animals'}
+              {speciesCount !== null
+                ? ` · ${speciesCount} ${speciesCount === 1 ? 'species' : 'species'}`
+                : ''}
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/search' as any)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Search"
+            >
+              <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
+            </TouchableOpacity>
+            <NotificationBell color="#fff" size={22} />
+            <TouchableOpacity
+              onPress={() => router.push('/messages' as any)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                unreadCount > 0 ? `Messages — ${unreadCount} unread` : 'Messages'
+              }
+            >
+              <MaterialCommunityIcons name="message-outline" size={22} color="#fff" />
+              {unreadCount > 0 && (
+                <View style={styles.headerBadge}>
+                  <Text style={styles.headerBadgeText}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </LinearGradient>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -988,11 +1111,16 @@ function DashboardHubScreen() {
                       <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.alertImage} />
                     ) : (
                       <View style={styles.alertImagePlaceholder}>
-                        {item.taxon === 'tarantula' ? (
-                          <MaterialCommunityIcons name="spider" size={20} color={colors.textTertiary} />
-                        ) : (
-                          <Text style={{ fontSize: 18 }}>{colonyGlyph(item.taxon)}</Text>
-                        )}
+                        {/* One MDI glyph for every taxon. Mixing an MDI spider
+                            with emoji for the other taxa made the tarantula
+                            rows read as empty boxes — and tarantulas are the
+                            bulk of most collections, so that was the common
+                            case, not the edge case. */}
+                        <MaterialCommunityIcons
+                          name={taxonMdiIcon(item.taxon) as any}
+                          size={20}
+                          color={colors.textSecondary}
+                        />
                       </View>
                     )}
                     <View style={styles.alertInfo}>
@@ -1097,7 +1225,7 @@ function DashboardHubScreen() {
                     <Image source={{ uri: getImageUrl(t.photo_url) }} style={styles.alertImage} />
                   ) : (
                     <View style={styles.alertImagePlaceholder}>
-                      <MaterialCommunityIcons name="spider" size={20} color={colors.textTertiary} />
+                      <MaterialCommunityIcons name="spider" size={20} color={colors.textSecondary} />
                     </View>
                   )}
                   <View style={styles.premoltInfo}>
@@ -1122,23 +1250,29 @@ function DashboardHubScreen() {
           </View>
         )}
 
-        {/* Quick Actions Grid */}
+        {/* Tools grid — handoff screen 1, step 2. Collection and Community
+            dropped from the tile list because both are now permanent tabs
+            in the bottom bar; repeating them here would spend two of eight
+            slots on destinations that are always one tap away. Species is
+            kept despite also being a tab, per the handoff — it's the tile
+            keepers reach for mid-task, from the dashboard. */}
         <CopilotStep
-          text="Jump to common tasks — add a tarantula, view your collection, check analytics, browse species, and more."
+          text="Jump to common tasks — add an animal, check analytics, browse species, manage feeders, and more."
           order={3}
-          name="Quick Actions"
+          name="Tools"
         >
         <WalkthroughableView style={styles.sectionCard}>
-          <Text style={[styles.sectionTitle, { marginBottom: 14 }]}>Quick Actions</Text>
+          <Text style={[styles.sectionTitle, { marginBottom: 14 }]}>Tools</Text>
           <View style={styles.actionsGrid}>
             {([
-              { icon: 'plus-circle-outline', label: 'Add Animal', picker: true },
-              { icon: 'spider', label: 'My Collection', route: '/(tabs)/collection' },
-              { icon: 'bug-outline', label: 'Feeders', route: '/feeders' },
+              { icon: 'plus-circle-outline', label: 'Add', picker: true },
               { icon: 'chart-line', label: 'Analytics', route: '/analytics' },
-              { icon: 'book-open-variant', label: 'Species DB', route: '/(tabs)/species' },
-              { icon: 'account-group-outline', label: 'Community', route: '/(tabs)/community' },
               { icon: 'heart-multiple', label: 'Breeding', route: '/breeding' },
+              { icon: 'book-open-variant', label: 'Species', route: '/(tabs)/species' },
+              { icon: 'home-outline', label: 'Enclosures', route: '/(tabs)/enclosures' },
+              { icon: 'bug-outline', label: 'Feeders', route: '/feeders' },
+              { icon: 'forum-outline', label: 'Forums', route: '/(tabs)/forums' },
+              { icon: 'tray-arrow-up', label: 'Import', route: '/import' },
             ] as const).map((item) => (
               <TouchableOpacity
                 key={item.label}

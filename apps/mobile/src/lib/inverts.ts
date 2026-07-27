@@ -450,3 +450,38 @@ export async function deleteInvertPhoto(photoId: string): Promise<void> {
 export function invertDisplayName(i: Invert): string {
   return i.name || i.common_name || i.scientific_name || `Unnamed ${INVERT_TAXA[i.taxon]?.label.toLowerCase() ?? 'invert'}`;
 }
+
+/**
+ * MaterialCommunityIcons name for a taxon, for use as real UI (placeholders,
+ * list rows, filter chips) rather than decoration.
+ *
+ * The `glyph` field on INVERT_TAXA is an emoji. Emoji render at the platform's
+ * own colours and sizes, so a row that mixes an emoji for one taxon with an
+ * MDI icon for another looks broken — which is exactly what happened on the
+ * dashboard, where tarantulas got a dim MDI spider next to bright emoji
+ * scorpions. Use this everywhere the icon is functional; keep the emoji for
+ * the add-picker, where the playfulness is deliberate.
+ *
+ * Takes a plain string because feeding-status rows carry `taxon: string`, and
+ * 'tarantula' is not in InvertTaxon (the registry excludes it by design).
+ */
+export function taxonMdiIcon(taxon: string): string {
+  switch (taxon) {
+    case 'tarantula':
+    case 'true_spider':
+      return 'spider';
+    case 'scorpion':
+    case 'vinegaroon':      // whip scorpion — closest real glyph
+      return 'zodiac-scorpio';
+    case 'whip_spider':
+      return 'spider-web';
+    case 'centipede':
+    case 'millipede':
+      return 'bug-outline';
+    case 'mantis':
+    case 'roach':
+      return 'ladybug-outline';
+    default:
+      return 'paw-outline';
+  }
+}
