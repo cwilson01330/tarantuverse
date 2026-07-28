@@ -127,6 +127,34 @@ async def list_users(
             .all()
         )
 
+    # Which storefronts each user is actually premium on. A bare yes/no badge
+    # became misleading once plans got app scopes: an HV-only subscriber and a
+    # TV-only subscriber both read as "Premium" while having no overlap in what
+    # they can do. One grouped query rather than is_premium_for_app() per row,
+    # which would be 3 queries per user.
+    premium_apps: dict = {}
+    if user_ids:
+        scope_rows = (
+            db.query(
+                UserSubscription.user_id,
+                func.coalesce(SubscriptionPlan.app, "tarantuverse"),
+            )
+            .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+            .filter(
+                UserSubscription.user_id.in_(user_ids),
+                active_subscription_clause(),
+                SubscriptionPlan.name != "free",
+            )
+            .distinct()
+            .all()
+        )
+        for uid, scope in scope_rows:
+            apps = premium_apps.setdefault(uid, set())
+            if scope == "both":
+                apps.update(("tarantuverse", "herpetoverse"))
+            else:
+                apps.add(scope)
+
     # Build response with is_premium computed from subscription
     result = []
     for user in users:
@@ -134,6 +162,7 @@ async def list_users(
         # Check if user has premium subscription
         limits = user.get_subscription_limits()
         user_dict['is_premium'] = limits.get('is_premium', False)
+        user_dict['premium_apps'] = sorted(premium_apps.get(user.id, set()))
         invert_n = counts.get(user.id, 0)
         animal_n = animal_counts.get(user.id, 0)
         colony_n = colony_counts.get(user.id, 0)

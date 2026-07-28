@@ -30,11 +30,37 @@ interface User {
     is_superuser: boolean;
     is_verified: boolean;
     is_premium?: boolean;
+    // Which storefronts the user is actually premium on. A bare is_premium
+    // can't distinguish an HV-only subscriber from a TV-only one, and the two
+    // unlock completely different things.
+    premium_apps?: string[];
     invert_count?: number;
     animal_count?: number;      // Herpetoverse
     colony_count?: number;      // population-tracked colonies
     collection_count?: number;  // inverts + animals + colonies
     created_at: string;
+}
+
+type GrantApp = 'tarantuverse' | 'herpetoverse' | 'both';
+
+// Mirrors GRANT_PLAN_BY_APP in apps/api/app/routers/promo_codes.py. The API
+// resolves the actual plan row; these are only labels.
+const GRANT_APPS: { value: GrantApp; label: string; hint: string }[] = [
+    { value: 'tarantuverse', label: 'Tarantuverse', hint: 'Premium — inverts only' },
+    { value: 'herpetoverse', label: 'Herpetoverse', hint: 'Herpetoverse Premium — reptiles only' },
+    { value: 'both', label: 'All-Access', hint: 'Both apps' },
+];
+
+const APP_SHORT: Record<string, string> = {
+    tarantuverse: 'TV',
+    herpetoverse: 'HV',
+};
+
+/** Default comp length when the admin picks an expiry: one year out. */
+function oneYearFromNow(): string {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 1);
+    return d.toISOString().slice(0, 10);
 }
 
 export default function ManageUsersPage() {
@@ -50,6 +76,12 @@ export default function ManageUsersPage() {
     const [verifyAllLoading, setVerifyAllLoading] = useState(false);
     const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    // Grant dialog state. A comp now needs two decisions the old
+    // window.confirm() couldn't express: WHICH app, and for HOW LONG.
+    const [grantTarget, setGrantTarget] = useState<User | null>(null);
+    const [grantApp, setGrantApp] = useState<GrantApp>('tarantuverse');
+    const [grantNoExpiry, setGrantNoExpiry] = useState(true);
+    const [grantExpiry, setGrantExpiry] = useState('');
     // Sort toggle for the Animals (kept-invert count) column. null = server order.
     const [animalSort, setAnimalSort] = useState<'asc' | 'desc' | null>(null);
 
@@ -251,27 +283,52 @@ export default function ManageUsersPage() {
         }
     };
 
-    const handleGrantPremium = async (userId: string, username: string) => {
-        if (!confirm(`Grant LIFETIME premium access to ${username}? This action grants permanent premium features.`)) {
-            return;
-        }
+    /** Opens the dialog. The grant itself happens in submitGrant. */
+    const openGrantDialog = (u: User) => {
+        setGrantApp('tarantuverse');
+        setGrantNoExpiry(true);
+        setGrantExpiry(oneYearFromNow());
+        setGrantTarget(u);
+    };
 
-        setGrantLoading(userId);
+    const submitGrant = async () => {
+        const target = grantTarget;
+        if (!target) return;
+
+        setGrantLoading(target.id);
         try {
             const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-            const response = await fetch(`${API_URL}/api/v1/promo-codes/admin/grant/${userId}`, {
+            const response = await fetch(`${API_URL}/api/v1/promo-codes/admin/grant/${target.id}`, {
                 method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
+                body: JSON.stringify({
+                    app: grantApp,
+                    // Send null explicitly rather than omitting the key, so the
+                    // API never has to guess whether "no expiry" was intended.
+                    // End of the chosen day, local — a comp that expires at
+                    // 00:00 would end the day before the admin picked.
+                    expires_at: grantNoExpiry
+                        ? null
+                        : new Date(`${grantExpiry}T23:59:59`).toISOString(),
+                }),
             });
 
+            const data = await response.json();
             if (response.ok) {
-                alert(`✅ Successfully granted lifetime premium to ${username}!`);
-                fetchUsers(searchQuery); // Refresh to show updated status
+                const when = data.is_lifetime
+                    ? 'with no expiry'
+                    : `until ${format(new Date(data.expires_at), 'MMM d, yyyy')}`;
+                const warn = (data.kept_paid_plans ?? []).length
+                    ? `\n\nNote: they also have a paid ${data.kept_paid_plans.join(', ')} subscription still running — it was left untouched.`
+                    : '';
+                alert(`${data.plan_display_name} granted to ${target.username} ${when}.${warn}`);
+                setGrantTarget(null);
+                fetchUsers(searchQuery);
             } else {
-                const error = await response.json();
-                alert(`Failed to grant premium: ${error.detail}`);
+                alert(`Failed to grant premium: ${data.detail}`);
             }
         } catch (error) {
             console.error('Error granting premium:', error);
@@ -282,7 +339,7 @@ export default function ManageUsersPage() {
     };
 
     const handleRevokePremium = async (userId: string, username: string) => {
-        if (!confirm(`Revoke premium access from ${username}? They will lose all premium features.`)) {
+        if (!confirm(`Revoke ALL premium access from ${username}? This cancels every active subscription they have, across both apps.`)) {
             return;
         }
 
@@ -296,12 +353,17 @@ export default function ManageUsersPage() {
                 },
             });
 
+            const data = await response.json();
             if (response.ok) {
-                alert(`✅ Successfully revoked premium from ${username}`);
+                // Cancelling our row doesn't stop Stripe/Apple/Google charging
+                // them — the admin needs to know that before they walk away.
+                const warn = (data.still_billing ?? []).length
+                    ? `\n\n⚠ Still billing externally: ${data.still_billing.join(', ')}. Cancel it with the provider too, or they'll keep paying for access they no longer have.`
+                    : '';
+                alert(`Revoked ${(data.revoked_plans ?? []).join(', ')} from ${username}.${warn}`);
                 fetchUsers(searchQuery); // Refresh to show updated status
             } else {
-                const error = await response.json();
-                alert(`Failed to revoke premium: ${error.detail}`);
+                alert(`Failed to revoke premium: ${data.detail}`);
             }
         } catch (error) {
             console.error('Error revoking premium:', error);
@@ -655,7 +717,16 @@ export default function ManageUsersPage() {
                                                 : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                                 }`}>
                                                 {user.is_premium ? (
-                                                    <><Gem className="w-3 h-3" aria-hidden="true" /> Premium</>
+                                                    <>
+                                                        <Gem className="w-3 h-3" aria-hidden="true" />
+                                                        {/* Name the storefronts. "Premium" alone reads as
+                                                            all-access when it may only cover one app. */}
+                                                        {(user.premium_apps?.length ?? 0) === 2
+                                                            ? 'All-Access'
+                                                            : user.premium_apps?.length
+                                                                ? `Premium · ${user.premium_apps.map((a) => APP_SHORT[a] ?? a).join(' + ')}`
+                                                                : 'Premium'}
+                                                    </>
                                                 ) : (
                                                     <>Free</>
                                                 )}
@@ -810,7 +881,12 @@ export default function ManageUsersPage() {
                                 {resetLoading === u.id ? 'Sending…' : 'Send Password Reset'}
                             </button>
 
-                            {u.is_premium ? (
+                            {/* Grant is ALWAYS offered, even to an existing premium
+                                user — being premium on Tarantuverse says nothing
+                                about Herpetoverse, and the old either/or menu made
+                                comping the second app impossible without first
+                                revoking the first. */}
+                            {u.is_premium && (
                                 <button
                                     type="button"
                                     role="menuitem"
@@ -824,21 +900,20 @@ export default function ManageUsersPage() {
                                     <X className="w-4 h-4" aria-hidden="true" />
                                     {revokeLoading === u.id ? 'Revoking…' : 'Revoke Premium'}
                                 </button>
-                            ) : (
-                                <button
-                                    type="button"
-                                    role="menuitem"
-                                    onClick={() => {
-                                        close();
-                                        handleGrantPremium(u.id, u.username);
-                                    }}
-                                    disabled={grantLoading === u.id}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-50"
-                                >
-                                    <Gem className="w-4 h-4" aria-hidden="true" />
-                                    {grantLoading === u.id ? 'Granting…' : 'Grant Premium'}
-                                </button>
                             )}
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    close();
+                                    openGrantDialog(u);
+                                }}
+                                disabled={grantLoading === u.id}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-left text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                            >
+                                <Gem className="w-4 h-4" aria-hidden="true" />
+                                {grantLoading === u.id ? 'Granting…' : 'Grant Premium…'}
+                            </button>
 
                             {/* Don't allow deleting yourself */}
                             {u.id !== authUser?.id && (
@@ -862,6 +937,118 @@ export default function ManageUsersPage() {
                         </div>
                     );
                 })()}
+
+            {/* Grant premium dialog. Replaces a window.confirm() that could only
+                express "lifetime, Tarantuverse" — which was the only thing the
+                old endpoint could do. */}
+            {grantTarget && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="grant-dialog-title"
+                    onClick={() => grantLoading === null && setGrantTarget(null)}
+                >
+                    <div
+                        className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-5 pt-5 pb-3 border-b border-gray-200 dark:border-gray-700">
+                            <h2 id="grant-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <Gem className="w-4 h-4 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+                                Grant premium
+                            </h2>
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                to <span className="font-medium text-gray-700 dark:text-gray-200">{grantTarget.username}</span> ({grantTarget.email})
+                            </p>
+                        </div>
+
+                        <div className="px-5 py-4 space-y-5">
+                            <fieldset>
+                                <legend className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Which app?</legend>
+                                <div className="space-y-2">
+                                    {GRANT_APPS.map((opt) => (
+                                        <label
+                                            key={opt.value}
+                                            className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition ${grantApp === opt.value
+                                                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+                                                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                                }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="grant-app"
+                                                className="mt-0.5"
+                                                checked={grantApp === opt.value}
+                                                onChange={() => setGrantApp(opt.value)}
+                                            />
+                                            <span>
+                                                <span className="block text-sm font-medium text-gray-900 dark:text-white">{opt.label}</span>
+                                                <span className="block text-xs text-gray-500 dark:text-gray-400">{opt.hint}</span>
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            <fieldset>
+                                <legend className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">How long?</legend>
+                                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={grantNoExpiry}
+                                        onChange={(e) => setGrantNoExpiry(e.target.checked)}
+                                    />
+                                    No expiry (permanent comp)
+                                </label>
+                                {!grantNoExpiry && (
+                                    <div className="mt-2">
+                                        <input
+                                            type="date"
+                                            value={grantExpiry}
+                                            min={new Date().toISOString().slice(0, 10)}
+                                            onChange={(e) => setGrantExpiry(e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white bg-white dark:bg-gray-800"
+                                        />
+                                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Access ends at the end of this day.
+                                        </p>
+                                    </div>
+                                )}
+                            </fieldset>
+
+                            {grantTarget.is_premium && (
+                                <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2.5">
+                                    This user already has premium
+                                    {grantTarget.premium_apps?.length
+                                        ? ` on ${grantTarget.premium_apps.map((a) => APP_SHORT[a] ?? a).join(' + ')}`
+                                        : ''}
+                                    . An existing admin comp for the same app will be replaced; a paid subscription will be left alone.
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="px-5 py-4 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                                type="button"
+                                onClick={() => setGrantTarget(null)}
+                                disabled={grantLoading !== null}
+                                className="px-4 py-2 text-sm rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={submitGrant}
+                                disabled={grantLoading !== null || (!grantNoExpiry && !grantExpiry)}
+                                className="px-4 py-2 text-sm rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
+                            >
+                                {grantLoading !== null ? 'Granting…' : 'Grant'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }

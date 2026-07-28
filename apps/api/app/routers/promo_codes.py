@@ -17,11 +17,33 @@ from app.schemas.promo_code import (
 )
 from app.utils.dependencies import get_current_user, get_current_superuser
 from datetime import datetime, timedelta, timezone
-from typing import List
+from pydantic import BaseModel, Field
+from typing import List, Optional
 import secrets
 import string
 
 router = APIRouter()
+
+
+# Admin comps are resolved to a plan by APP SCOPE, not by a hardcoded name.
+# Tarantuverse and Herpetoverse bill separately (see User.is_premium_for_app),
+# so "grant premium" is meaningless without saying premium to WHAT. The old
+# endpoint hardcoded name == "premium", which happens to be the Tarantuverse
+# plan — correct by accident of naming, and unreachable for the other two.
+GRANT_PLAN_BY_APP = {
+    "tarantuverse": "premium",
+    "herpetoverse": "herpetoverse_premium",
+    "both": "bundle_premium",
+}
+
+
+class AdminGrantRequest(BaseModel):
+    """Body for POST /admin/grant/{user_id}."""
+    app: str = Field(default="tarantuverse", pattern="^(tarantuverse|herpetoverse|both)$")
+    # None means NO EXPIRY (a permanent comp). The admin UI always sends this
+    # field explicitly — either a date or an explicit null — so the ambiguity
+    # between "omitted" and "unlimited" never arises in practice.
+    expires_at: Optional[datetime] = None
 
 
 def generate_promo_code(prefix: str = None, length: int = 12) -> str:
@@ -387,18 +409,30 @@ async def revoke_my_premium(
     }
 
 
+def _plan_app(plan: SubscriptionPlan) -> str:
+    """App scope of a plan. Legacy rows predate the column and are Tarantuverse."""
+    return getattr(plan, "app", None) or "tarantuverse"
+
+
+def _scopes_overlap(a: str, b: str) -> bool:
+    """'both' covers everything; otherwise the scopes must match exactly."""
+    return a == b or a == "both" or b == "both"
+
+
 @router.post("/admin/grant/{user_id}", status_code=status.HTTP_200_OK)
 async def grant_premium_to_user(
     user_id: str,
-    code_type: str = "lifetime",
+    grant: AdminGrantRequest = AdminGrantRequest(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_superuser)
 ):
     """
-    Manually grant premium to a user (Superuser only)
-    Generates and applies a promo code automatically
+    Manually grant premium to a user, scoped to one app (Superuser only).
+
+    Generates and applies an ADMIN- promo code, which is also what records WHO
+    issued the comp (`PromoCode.created_by_admin_id`) — there's no separate
+    audit table yet.
     """
-    # Find user
     target_user = db.query(User).filter(User.id == user_id).first()
     if not target_user:
         raise HTTPException(
@@ -406,47 +440,73 @@ async def grant_premium_to_user(
             detail="User not found"
         )
 
-    # Generate unique promo code
-    code = generate_promo_code(prefix="ADMIN")
-
-    # Create promo code
-    promo_code = PromoCode(
-        code=code,
-        code_type=code_type,
-        usage_limit=1,  # Single use
-        is_active=True,
-        created_by_admin_id=current_user.id
-    )
-    db.add(promo_code)
-    db.flush()  # Get the ID
-
-    # Get premium plan
+    plan_name = GRANT_PLAN_BY_APP[grant.app]
     premium_plan = db.query(SubscriptionPlan).filter(
-        SubscriptionPlan.name == "premium"
+        SubscriptionPlan.name == plan_name
     ).first()
 
     if not premium_plan:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Premium plan not found"
+            detail=f"Plan '{plan_name}' not found — cannot grant {grant.app} premium"
         )
 
-    # Calculate expiration
-    duration_days = promo_code.get_duration_days()
-    expires_at = datetime.now(timezone.utc) + timedelta(days=duration_days) if duration_days < 36500 else None
+    expires_at = grant.expires_at
+    if expires_at is not None:
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Expiry must be in the future"
+            )
 
-    # Cancel existing subscriptions
-    # Use string value explicitly for reliable comparison
+    # Only supersede comps this grant actually replaces. The old code cancelled
+    # EVERY active subscription, which — now that scopes exist — would silently
+    # kill a Stripe-billed Tarantuverse sub as a side effect of comping
+    # Herpetoverse. Cancelling the row also wouldn't stop Stripe billing, so
+    # the user would keep paying for access we'd just revoked.
     existing = db.query(UserSubscription).filter(
         UserSubscription.user_id == user_id,
         UserSubscription.status == "active"
     ).all()
 
+    superseded = []
+    kept_paid = []
     for sub in existing:
+        sub_plan = db.query(SubscriptionPlan).filter(
+            SubscriptionPlan.id == sub.plan_id
+        ).first()
+        if not sub_plan or not _scopes_overlap(_plan_app(sub_plan), grant.app):
+            continue
+        if sub_plan.name == "free":
+            sub.status = "cancelled"
+            sub.cancelled_at = datetime.now(timezone.utc)
+            continue
+        if not sub.granted_by_admin:
+            # A real paid subscription. Leave it alone and say so rather than
+            # cancelling something we can't actually refund or un-bill.
+            kept_paid.append(sub_plan.name)
+            continue
         sub.status = "cancelled"
         sub.cancelled_at = datetime.now(timezone.utc)
+        superseded.append(sub_plan.name)
 
-    # Create new subscription
+    code = generate_promo_code(prefix="ADMIN")
+    promo_code = PromoCode(
+        code=code,
+        code_type=PromoCodeType.LIFETIME.value if expires_at is None else PromoCodeType.CUSTOM.value,
+        custom_duration_days=(
+            None if expires_at is None
+            else max(1, (expires_at - datetime.now(timezone.utc)).days)
+        ),
+        usage_limit=1,  # Single use
+        is_active=True,
+        created_by_admin_id=current_user.id
+    )
+    db.add(promo_code)
+    db.flush()
+
     new_subscription = UserSubscription(
         user_id=user_id,
         plan_id=premium_plan.id,
@@ -457,32 +517,47 @@ async def grant_premium_to_user(
         payment_provider="admin_grant",
         granted_by_admin=True
     )
-
     db.add(new_subscription)
-
-    # Mark promo code as used
     promo_code.times_used = 1
 
     db.commit()
 
     return {
-        "message": f"Premium access granted to {target_user.username}",
+        "message": f"{premium_plan.display_name} granted to {target_user.username}",
+        "app": grant.app,
+        "plan": premium_plan.name,
+        "plan_display_name": premium_plan.display_name,
         "promo_code": code,
         "expires_at": expires_at,
-        "is_lifetime": expires_at is None
+        "is_lifetime": expires_at is None,
+        "superseded_plans": superseded,
+        # Surfaced so the admin knows a paid sub is still running alongside
+        # the comp — not an error, but not something to discover later either.
+        "kept_paid_plans": kept_paid,
     }
 
 
 @router.post("/admin/revoke/{user_id}", status_code=status.HTTP_200_OK)
 async def revoke_premium_from_user(
     user_id: str,
+    app: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_superuser)
 ):
     """
-    Revoke premium from a user (Superuser only)
+    Revoke premium from a user (Superuser only).
+
+    `app` scopes the revocation to one storefront. Omit it to revoke every
+    active paid/comped subscription. The previous version took the FIRST
+    active subscription and cancelled that one, which with multiple app-scoped
+    subs meant the outcome depended on row order.
     """
-    # Find user
+    if app is not None and app not in GRANT_PLAN_BY_APP:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="app must be tarantuverse, herpetoverse or both"
+        )
+
     target_user = db.query(User).filter(User.id == user_id).first()
     if not target_user:
         raise HTTPException(
@@ -490,36 +565,43 @@ async def revoke_premium_from_user(
             detail="User not found"
         )
 
-    # Find active subscription
-    active_sub = db.query(UserSubscription).filter(
+    active_subs = db.query(UserSubscription).filter(
         UserSubscription.user_id == user_id,
         UserSubscription.status == "active"
-    ).first()
+    ).all()
 
-    if not active_sub:
+    revoked = []
+    still_billing = []
+    for sub in active_subs:
+        plan = db.query(SubscriptionPlan).filter(
+            SubscriptionPlan.id == sub.plan_id
+        ).first()
+        if not plan or plan.name == "free":
+            continue
+        if app is not None and not _scopes_overlap(_plan_app(plan), app):
+            continue
+        sub.status = "cancelled"
+        sub.cancelled_at = datetime.now(timezone.utc)
+        revoked.append(plan.name)
+        if not sub.granted_by_admin and sub.payment_provider not in (None, "admin_grant"):
+            # Cancelling our row does NOT cancel Stripe/Apple/Google billing.
+            # Say so plainly — otherwise the user loses access and keeps paying.
+            still_billing.append(f"{plan.name} via {sub.payment_provider}")
+
+    if not revoked:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No active subscription found for this user"
+            detail=(
+                f"No active {app} subscription found for this user"
+                if app else "No active paid subscription found for this user"
+            )
         )
-
-    # Check if it's the free plan
-    plan = db.query(SubscriptionPlan).filter(
-        SubscriptionPlan.id == active_sub.plan_id
-    ).first()
-
-    if plan and plan.name == "free":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User is already on the free plan"
-        )
-
-    # Cancel the subscription
-    active_sub.status = "cancelled"
-    active_sub.cancelled_at = datetime.now(timezone.utc)
 
     db.commit()
 
     return {
         "message": f"Premium access revoked from {target_user.username}",
-        "previous_plan": plan.name if plan else "unknown"
+        "revoked_plans": revoked,
+        "previous_plan": revoked[0],  # kept for older callers
+        "still_billing": still_billing,
     }
