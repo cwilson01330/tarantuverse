@@ -59,6 +59,9 @@ import {
   formatColonyCount,
   type ColonyListItem,
 } from '../../src/lib/colonies';
+// One card for every taxon — replaced five near-identical renderers that had
+// already drifted apart (see AnimalCard's header comment).
+import AnimalCard from '../../src/components/AnimalCard';
 
 // Taxa that have no per-taxon list lib — fetched generically via /inverts/.
 // (scorpion/centipede/whip_spider keep their existing per-taxon fetches.)
@@ -655,345 +658,63 @@ function CollectionScreen() {
   };
 
   const renderTarantula = ({ item }: { item: Tarantula }) => {
-    const displayName = item.name || item.common_name || 'Unknown';
-    const sexLabel = item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
+    const status = feedingStatuses.get(item.id);
+    const prediction = premoltPredictions.get(item.id);
     return (
-      <TouchableOpacity
-        style={styles.card}
+      <AnimalCard
+        displayName={item.name || item.common_name || 'Unknown'}
+        scientificName={item.scientific_name}
+        photoUrl={item.photo_url}
+        sex={item.sex}
+        taxon="tarantula"
+        feeding={{
+          daysSince: status?.days_since_last_feeding,
+          isPaused: status?.is_feeding_paused,
+          // NOTE: no `isOverdue`. This screen's FeedingStatus has no
+          // is_overdue flag, and inferring one from a flat day threshold
+          // would be wrong across taxa (a millipede is a detritivore, not a
+          // 7-day feeder). The card therefore says "Fed 17d ago", never
+          // "17d overdue". Wiring this screen to /inverts/feeding-status —
+          // which the dashboard and Feeding Day already use, and which
+          // computes overdue per species + life stage — is what unlocks the
+          // stronger wording and makes all three surfaces agree.
+        }}
+        premolt={!!prediction && prediction.confidence_level !== 'low'}
         onPress={() => router.push(`/tarantula/${item.id}`)}
         onLongPress={() => setActionTarget(item)}
-        accessibilityRole="button"
-        accessibilityLabel={`${displayName}, ${item.scientific_name}, ${sexLabel}`}
-        accessibilityHint="Opens this tarantula's detail page. Long press for quick actions."
-      >
-        <View style={styles.imageContainer}>
-          {item.photo_url ? (
-            <Image
-              source={{ uri: getImageUrl(item.photo_url) }}
-              style={styles.image}
-              accessibilityLabel={`Photo of ${displayName}`}
-            />
-          ) : (
-            <View
-              style={styles.placeholderImage}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              <MaterialCommunityIcons name="spider" size={40} color={colors.textTertiary} />
-            </View>
-          )}
-          {item.sex && (
-            <View
-              style={[
-                styles.sexBadge,
-                item.sex === 'female'
-                  ? styles.femaleBadge
-                  : item.sex === 'male'
-                    ? styles.maleBadge
-                    : styles.unknownBadge,
-              ]}
-              accessibilityLabel={
-                item.sex === 'female'
-                  ? 'Female'
-                  : item.sex === 'male'
-                    ? 'Male'
-                    : 'Unknown sex'
-              }
-            >
-              <MaterialCommunityIcons
-                name={
-                  item.sex === 'female'
-                    ? 'gender-female'
-                    : item.sex === 'male'
-                      ? 'gender-male'
-                      : 'help-circle-outline'
-                }
-                size={16}
-                color="#fff"
-              />
-            </View>
-          )}
-          {getFeedingStatusBadge(item.id)}
-          {getPremoltBadge(item.id)}
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.name}>{displayName}</Text>
-          <Text style={styles.scientificName}>{item.scientific_name}</Text>
-          {item.common_name && (
-            <Text style={styles.commonName}>{item.common_name}</Text>
-          )}
-        </View>
-      </TouchableOpacity>
+        colors={colors}
+      />
     );
   };
+
 
   // Scorpion card — same visual frame as renderTarantula so the
   // unified grid reads as one collection. No feeding-status pill or
   // premolt badge (those features don't exist for scorpions yet); no
   // long-press action sheet either. Add taxon-specific affordances
   // here as the scorpion surface grows.
-  const renderScorpion = ({ item }: { item: Scorpion }) => {
-    const displayName =
-      item.name || item.common_name || item.scientific_name || 'Unnamed';
-    const sexLabel =
-      item.sex === 'female'
-        ? 'female'
-        : item.sex === 'male'
-          ? 'male'
-          : 'unknown sex';
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => router.push(`/invert/${item.id}` as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, scorpion`}
-        accessibilityHint="Opens this scorpion's detail page."
-      >
-        <View style={styles.imageContainer}>
-          {item.photo_url ? (
-            <Image
-              source={{ uri: getImageUrl(item.photo_url) }}
-              style={styles.image}
-              accessibilityLabel={`Photo of ${displayName}`}
-            />
-          ) : (
-            <View
-              style={styles.placeholderImage}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              <MaterialCommunityIcons
-                name="zodiac-scorpio"
-                size={40}
-                color={colors.textTertiary}
-              />
-            </View>
-          )}
-          {item.sex && item.sex !== 'unknown' && (
-            <View
-              style={[
-                styles.sexBadge,
-                item.sex === 'female' ? styles.femaleBadge : styles.maleBadge,
-              ]}
-              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
-            >
-              <MaterialCommunityIcons
-                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
-                size={16}
-                color="#fff"
-              />
-            </View>
-          )}
-          {/* Small taxon glyph in the bottom-left so scorpions are
-              visually distinguishable from tarantulas at a glance. */}
-          <View style={styles.taxonGlyph}>
-            <Text style={{ fontSize: 14 }}>🦂</Text>
-          </View>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.name}>{displayName}</Text>
-          {item.scientific_name && (
-            <Text style={styles.scientificName}>{item.scientific_name}</Text>
-          )}
-          {item.common_name && (
-            <Text style={styles.commonName}>{item.common_name}</Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  // Scorpion / centipede / whip spider / generic-invert cards were four
+  // near-identical copies of the same JSX that had already drifted apart.
+  // They all route to /invert/[id] and differ only in taxon, so they're one
+  // renderer now. AnimalCard owns the visual treatment for every taxon.
+  const renderInvertCard = (item: any, taxon: string) => (
+    <AnimalCard
+      key={item.id}
+      displayName={item.name || item.common_name || item.scientific_name || 'Unnamed'}
+      scientificName={item.scientific_name}
+      photoUrl={item.photo_url}
+      sex={item.sex}
+      taxon={taxon}
+      onPress={() => router.push(`/invert/${item.id}` as any)}
+      colors={colors}
+    />
+  );
 
-  // Centipede card mirrors the scorpion card. Same simple shape until
-  // feeding-status + premolt indicators ship for the consolidated
-  // taxa. Icon is `bug-outline` (closest MCI glyph to a centipede) +
-  // a 🐛 taxon stamp in the bottom-left.
-  const renderCentipede = ({ item }: { item: Centipede }) => {
-    const displayName =
-      item.name || item.common_name || item.scientific_name || 'Unnamed';
-    const sexLabel =
-      item.sex === 'female'
-        ? 'female'
-        : item.sex === 'male'
-          ? 'male'
-          : 'unknown sex';
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => router.push(`/invert/${item.id}` as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, centipede`}
-        accessibilityHint="Opens this centipede's detail page."
-      >
-        <View style={styles.imageContainer}>
-          {item.photo_url ? (
-            <Image
-              source={{ uri: getImageUrl(item.photo_url) }}
-              style={styles.image}
-              accessibilityLabel={`Photo of ${displayName}`}
-            />
-          ) : (
-            <View
-              style={styles.placeholderImage}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              <MaterialCommunityIcons
-                name="bug-outline"
-                size={40}
-                color={colors.textTertiary}
-              />
-            </View>
-          )}
-          {item.sex && item.sex !== 'unknown' && (
-            <View
-              style={[
-                styles.sexBadge,
-                item.sex === 'female' ? styles.femaleBadge : styles.maleBadge,
-              ]}
-              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
-            >
-              <MaterialCommunityIcons
-                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
-                size={16}
-                color="#fff"
-              />
-            </View>
-          )}
-          <View style={styles.taxonGlyph}>
-            <Text style={{ fontSize: 14 }}>🐛</Text>
-          </View>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.name}>{displayName}</Text>
-          {item.scientific_name && (
-            <Text style={styles.scientificName}>{item.scientific_name}</Text>
-          )}
-          {item.common_name && (
-            <Text style={styles.commonName}>{item.common_name}</Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderScorpion = ({ item }: { item: Scorpion }) => renderInvertCard(item, 'scorpion');
+  const renderCentipede = ({ item }: { item: Centipede }) => renderInvertCard(item, 'centipede');
+  const renderWhipSpider = ({ item }: { item: WhipSpider }) => renderInvertCard(item, 'whip_spider');
+  const renderInvert = ({ item }: { item: GenericInvert }) => renderInvertCard(item, item.taxon);
 
-  // Whip spider card mirrors the centipede card. Icon is `spider`
-  // (closest MCI glyph) + a 🕸️ taxon stamp in the bottom-left.
-  const renderWhipSpider = ({ item }: { item: WhipSpider }) => {
-    const displayName =
-      item.name || item.common_name || item.scientific_name || 'Unnamed';
-    const sexLabel =
-      item.sex === 'female'
-        ? 'female'
-        : item.sex === 'male'
-          ? 'male'
-          : 'unknown sex';
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => router.push(`/invert/${item.id}` as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, whip spider`}
-        accessibilityHint="Opens this whip spider's detail page."
-      >
-        <View style={styles.imageContainer}>
-          {item.photo_url ? (
-            <Image
-              source={{ uri: getImageUrl(item.photo_url) }}
-              style={styles.image}
-              accessibilityLabel={`Photo of ${displayName}`}
-            />
-          ) : (
-            <View
-              style={styles.placeholderImage}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            >
-              <MaterialCommunityIcons
-                name="spider"
-                size={40}
-                color={colors.textTertiary}
-              />
-            </View>
-          )}
-          {item.sex && item.sex !== 'unknown' && (
-            <View
-              style={[
-                styles.sexBadge,
-                item.sex === 'female' ? styles.femaleBadge : styles.maleBadge,
-              ]}
-              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
-            >
-              <MaterialCommunityIcons
-                name={item.sex === 'female' ? 'gender-female' : 'gender-male'}
-                size={16}
-                color="#fff"
-              />
-            </View>
-          )}
-          <View style={styles.taxonGlyph}>
-            <Text style={{ fontSize: 14 }}>🕸️</Text>
-          </View>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.name}>{displayName}</Text>
-          {item.scientific_name && (
-            <Text style={styles.scientificName}>{item.scientific_name}</Text>
-          )}
-          {item.common_name && (
-            <Text style={styles.commonName}>{item.common_name}</Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  // Generic card for the newer taxa (vinegaroon/true_spider/millipede/
-  // mantis/other). Glyph + label come from the registry; routes to the
-  // generic /invert/[id] detail.
-  const renderInvert = ({ item }: { item: GenericInvert }) => {
-    const meta = INVERT_TAXA[item.taxon];
-    const displayName = item.name || item.common_name || item.scientific_name || 'Unnamed';
-    const sexLabel = item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => router.push(`/invert/${item.id}` as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`${displayName}, ${item.scientific_name ?? 'no scientific name'}, ${sexLabel}, ${meta?.label ?? 'invert'}`}
-        accessibilityHint="Opens this animal's detail page."
-      >
-        <View style={styles.imageContainer}>
-          {item.photo_url ? (
-            <Image
-              source={{ uri: getImageUrl(item.photo_url) }}
-              style={styles.image}
-              accessibilityLabel={`Photo of ${displayName}`}
-            />
-          ) : (
-            <View style={styles.placeholderImage} accessibilityElementsHidden importantForAccessibility="no">
-              <Text style={{ fontSize: 40 }}>{meta?.glyph ?? '🐾'}</Text>
-            </View>
-          )}
-          {item.sex && item.sex !== 'unknown' && (
-            <View
-              style={[styles.sexBadge, item.sex === 'female' ? styles.femaleBadge : styles.maleBadge]}
-              accessibilityLabel={item.sex === 'female' ? 'Female' : 'Male'}
-            >
-              <MaterialCommunityIcons name={item.sex === 'female' ? 'gender-female' : 'gender-male'} size={16} color="#fff" />
-            </View>
-          )}
-          <View style={styles.taxonGlyph}>
-            <Text style={{ fontSize: 14 }}>{meta?.glyph ?? '🐾'}</Text>
-          </View>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.name}>{displayName}</Text>
-          {item.scientific_name && <Text style={styles.scientificName}>{item.scientific_name}</Text>}
-          {item.common_name && <Text style={styles.commonName}>{item.common_name}</Text>}
-        </View>
-      </TouchableOpacity>
-    );
-  };
 
   // Colony card (ADR-010). Same card frame, but tagged as a "Colony" with the
   // population count (≈N when estimated) instead of a sex badge. Taxon glyph in
@@ -1517,25 +1238,6 @@ function CollectionScreen() {
       borderTopLeftRadius: 12,
       borderTopRightRadius: 12,
     },
-    sexBadge: {
-      position: 'absolute',
-      top: 8,
-      right: 8,
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    maleBadge: {
-      backgroundColor: '#3b82f6',
-    },
-    femaleBadge: {
-      backgroundColor: '#ec4899',
-    },
-    unknownBadge: {
-      backgroundColor: '#9ca3af',
-    },
     // Small taxon glyph in the card's bottom-left corner. Sits where
     // the feeding badge would land on a tarantula card, but the slot
     // is taxon-specific so they don't collide (scorpions have no
@@ -1661,10 +1363,6 @@ function CollectionScreen() {
       fontStyle: 'italic',
       color: colors.textTertiary,
       marginBottom: 2,
-    },
-    commonName: {
-      fontSize: 12,
-      color: colors.textSecondary,
     },
     empty: {
       flex: 1,

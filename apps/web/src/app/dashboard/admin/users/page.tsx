@@ -557,15 +557,19 @@ export default function ManageUsersPage() {
 
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
                     <div className="overflow-x-auto">
-                        {/* Actions are now consolidated into a per-row ⋮
-                            dropdown so the table doesn't need horizontal
-                            scrolling at typical desktop widths. The wrapper
-                            keeps overflow-x-auto as a defensive fallback
-                            for narrow tablets. */}
-                        <table className="w-full">
+                        {/* Eight columns don't fit a laptop viewport, so this
+                            scrolls horizontally — and scrolling right used to
+                            push the User column off screen, leaving rows you
+                            couldn't identify. The User cell is sticky at
+                            left-0 so the identity stays put while Premium,
+                            Animals and Actions scroll under it.
+
+                            `min-w-max` stops the table compressing columns to
+                            fit and truncating mid-word instead of scrolling. */}
+                        <table className="w-full min-w-max">
                             <thead className="bg-gray-50 dark:bg-gray-700">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                    <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-700 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         User
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -600,8 +604,14 @@ export default function ManageUsersPage() {
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                                 {displayedUsers.map((user) => (
-                                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                                        <td className="px-6 py-4">
+                                    <tr key={user.id} className="group hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                        {/* Sticky partner to the sticky header
+                                            cell. Needs its own opaque
+                                            background or the scrolling columns
+                                            show through underneath it; the
+                                            group-hover variants keep the row
+                                            highlight continuous across it. */}
+                                        <td className="sticky left-0 z-10 bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-700/50 px-6 py-4 border-r border-gray-200 dark:border-gray-700">
                                             <div className="flex flex-col">
                                                 <span className="font-medium text-gray-900 dark:text-white">
                                                     {user.username}
