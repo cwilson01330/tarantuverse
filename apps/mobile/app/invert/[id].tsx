@@ -52,6 +52,10 @@ function InvertDetailScreen() {
   // Lets the hero's photo-count chip jump to the gallery section.
   const scrollRef = useRef<ScrollView | null>(null);
   const photosY = useRef<number | null>(null);
+  // Timeline filter + paging replace three `showAll…` toggles and three
+  // independent hard caps.
+  const [timelineFilter, setTimelineFilter] = useState<'all' | TimelineKind>('all');
+  const [timelineLimit, setTimelineLimit] = useState(12);
 
   const handleTransfer = useCallback(async () => {
     if (!id || transferring) return;
@@ -232,6 +236,53 @@ function InvertDetailScreen() {
   if (invert.target_humidity_min || invert.target_humidity_max) husbandryItems.push({ icon: 'water-percent', label: 'Humidity', value: `${invert.target_humidity_min ?? '?'}–${invert.target_humidity_max ?? '?'}%` });
   husbandryItems.push({ icon: 'cup-water', label: 'Water dish', value: invert.water_dish ? 'Yes' : 'No' });
 
+  // ── Timeline ──────────────────────────────────────────────────────────────
+  // Three independent log lists became one. The old arrangement forced the
+  // keeper to hold three separate chronologies in their head: "she refused on
+  // the 3rd, molted on the 5th" was two lists three sections apart. It also
+  // hard-capped each at 5 entries with no way to see more — a year of feedings
+  // was simply unreachable on this screen.
+  const timeline: TimelineEntry[] = [
+    ...feedings.map((f): TimelineEntry => ({
+      id: `f-${f.id}`,
+      kind: 'feeding',
+      at: f.fed_at,
+      title: f.accepted
+        ? `Ate ${f.food_type ? `a ${f.food_type.toLowerCase()}` : 'a feeder'}`
+        : `Refused ${f.food_type ? `a ${f.food_type.toLowerCase()}` : 'food'}`,
+      trailing: f.accepted ? 'Accepted' : 'Refused',
+      trailingTone: f.accepted ? 'good' : 'bad',
+      onEdit: () => editFeeding(f),
+      onDelete: () => confirmDeleteLog('feeding', () => deleteInvertFeeding(f.id)),
+    })),
+    ...molts.map((m): TimelineEntry => ({
+      id: `m-${m.id}`,
+      kind: 'molt',
+      at: m.molted_at,
+      title: 'Molted',
+      onEdit: () => editMolt(m),
+      onDelete: () => confirmDeleteLog('molt', () => deleteInvertMolt(m.id)),
+    })),
+    ...substrate.map((c): TimelineEntry => ({
+      id: `s-${c.id}`,
+      kind: 'substrate',
+      at: c.changed_at,
+      title: c.substrate_type ? `Substrate changed — ${c.substrate_type}` : 'Substrate changed',
+      trailing: c.substrate_depth ?? undefined,
+      trailingTone: 'muted',
+      onEdit: () => editSubstrate(c),
+      onDelete: () => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id)),
+    })),
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+  const visibleTimeline = timeline
+    .filter((e) => timelineFilter === 'all' || e.kind === timelineFilter)
+    .slice(0, timelineLimit);
+  const filteredTotal = timeline.filter((e) => timelineFilter === 'all' || e.kind === timelineFilter).length;
+
+  const trailingColor = (tone?: TimelineEntry['trailingTone']) =>
+    tone === 'good' ? colors.success : tone === 'bad' ? colors.error : colors.textTertiary;
+
   return (
     <View style={styles.flex}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
@@ -363,15 +414,84 @@ function InvertDetailScreen() {
         </Section>
       )}
 
-      <LogSection title="Feedings" emptyText="No feedings logged yet." ctaLabel="Log feeding"
-        onCta={() => router.push(`/invert/add-feeding?id=${id}` as any)} items={feedings.slice(0, 5)}
-        onEdit={editFeeding} onDelete={(f) => confirmDeleteLog('feeding', () => deleteInvertFeeding(f.id))}
-        renderItem={(item) => (<><Text style={styles.logRowTitle}>{item.food_type || 'Feeding'} · {item.accepted ? 'Accepted' : 'Refused'}</Text><Text style={styles.logRowMeta}>{fmtDate(item.fed_at)}</Text></>)} colors={colors} />
+      {/* One interleaved history. Long-press a row to edit or delete it —
+          the same gesture the photo strip already uses. Putting a pencil and
+          a bin on every row (the old LogSection treatment) meant three tap
+          targets per entry competing with the entry itself. */}
+      <Section title="History">
+        <View style={styles.timelineChips}>
+          {(['all', 'feeding', 'molt', 'substrate'] as const).map((k) => {
+            const active = timelineFilter === k;
+            const count = k === 'all' ? timeline.length : timeline.filter((e) => e.kind === k).length;
+            if (k !== 'all' && count === 0) return null;
+            return (
+              <TouchableOpacity
+                key={k}
+                style={[
+                  styles.timelineChip,
+                  { borderColor: colors.border },
+                  active && { backgroundColor: colors.primary, borderColor: colors.primary },
+                ]}
+                onPress={() => { setTimelineFilter(k); setTimelineLimit(12); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.timelineChipText, { color: active ? '#fff' : colors.textSecondary }]}>
+                  {k === 'all' ? 'All' : TIMELINE_META[k].label} {count}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-      <LogSection title="Molts" emptyText="No molts logged yet." ctaLabel="Log molt"
-        onCta={() => router.push(`/invert/add-molt?id=${id}` as any)} items={molts.slice(0, 5)}
-        onEdit={editMolt} onDelete={(m) => confirmDeleteLog('molt', () => deleteInvertMolt(m.id))}
-        renderItem={(item) => (<><Text style={styles.logRowTitle}>Molt</Text><Text style={styles.logRowMeta}>{fmtDate(item.molted_at)}</Text></>)} colors={colors} />
+        {visibleTimeline.length === 0 ? (
+          <Text style={[s.empty, { color: colors.textTertiary }]}>
+            Nothing logged yet. Use the bar at the bottom to record a feeding, molt or substrate change.
+          </Text>
+        ) : (
+          visibleTimeline.map((e) => (
+            <TouchableOpacity
+              key={e.id}
+              style={[styles.timelineRow, { backgroundColor: colors.surfaceElevated }]}
+              onLongPress={() => {
+                Alert.alert(e.title, fmtDate(e.at), [
+                  { text: 'Edit', onPress: e.onEdit },
+                  { text: 'Delete', style: 'destructive', onPress: e.onDelete },
+                  { text: 'Cancel', style: 'cancel' },
+                ]);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${e.title}, ${fmtRelative(e.at)}${e.trailing ? `, ${e.trailing}` : ''}`}
+              accessibilityHint="Long press to edit or delete this entry."
+            >
+              <View style={[styles.timelineIcon, { backgroundColor: colors.primary + '1F' }]}>
+                <MaterialCommunityIcons name={TIMELINE_META[e.kind].icon as any} size={16} color={colors.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.timelineTitle} numberOfLines={1}>{e.title}</Text>
+                <Text style={styles.timelineDate}>{fmtRelative(e.at)}</Text>
+              </View>
+              {e.trailing ? (
+                <Text style={[styles.timelineTrailing, { color: trailingColor(e.trailingTone) }]}>
+                  {e.trailing}
+                </Text>
+              ) : null}
+            </TouchableOpacity>
+          ))
+        )}
+
+        {filteredTotal > visibleTimeline.length ? (
+          <TouchableOpacity
+            onPress={() => setTimelineLimit((n) => n + 24)}
+            accessibilityRole="button"
+            style={{ paddingTop: SPACING.sm }}
+          >
+            <Text style={[styles.timelineMore, { color: colors.accent }]}>
+              Show {Math.min(24, filteredTotal - visibleTimeline.length)} more
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </Section>
 
       {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot).
           GrowthChart renders its own card, so no Section wrapper. */}
@@ -396,11 +516,6 @@ function InvertDetailScreen() {
           )}
         </Section>
       )}
-
-      <LogSection title="Substrate changes" emptyText="No substrate changes logged yet." ctaLabel="Log substrate change"
-        onCta={() => router.push(`/invert/add-substrate-change?id=${id}` as any)} items={substrate.slice(0, 5)}
-        onEdit={editSubstrate} onDelete={(c) => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id))}
-        renderItem={(item) => (<><Text style={styles.logRowTitle}>{item.substrate_type || 'Substrate change'}</Text><Text style={styles.logRowMeta}>{fmtDate(item.changed_at)}</Text></>)} colors={colors} />
 
       <View onLayout={(e) => { photosY.current = e.nativeEvent.layout.y; }}>
       <Section title="Photos" actionLabel="Add photo" onAction={() => router.push(`/invert/add-photo?id=${id}` as any)}>
@@ -468,6 +583,52 @@ function InvertDetailScreen() {
 
 function fmtSex(sex: Invert['sex']): string { if (!sex || sex === 'unknown') return '—'; return sex.charAt(0).toUpperCase() + sex.slice(1); }
 function fmtDate(iso: string): string { try { return new Date(iso).toLocaleDateString(); } catch { return iso; } }
+
+/**
+ * Relative date for timeline rows — "Today" / "3d ago" / "2mo ago".
+ *
+ * Calendar-day based, in the keeper's own zone. A raw millisecond delta
+ * flips "today" to "1d ago" at UTC midnight rather than theirs, which reads
+ * as broken to anyone who isn't on UTC.
+ */
+function fmtRelative(iso: string): string {
+  try {
+    const then = new Date(iso);
+    const a = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+    const n = new Date();
+    const b = new Date(n.getFullYear(), n.getMonth(), n.getDate());
+    const days = Math.round((b.getTime() - a.getTime()) / 86400000);
+    if (days <= 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return `${days}d ago`;
+    if (days < 60) return `${Math.floor(days / 7)}w ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  } catch {
+    return fmtDate(iso);
+  }
+}
+
+/** One row in the merged timeline, whatever kind of log produced it. */
+type TimelineKind = 'feeding' | 'molt' | 'substrate';
+interface TimelineEntry {
+  id: string;
+  kind: TimelineKind;
+  at: string;
+  /** Sentence, not a label — "Ate a cricket" beats "Feeding · accepted". */
+  title: string;
+  /** Right-aligned outcome or delta. */
+  trailing?: string;
+  trailingTone?: 'good' | 'bad' | 'muted';
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+const TIMELINE_META: Record<TimelineKind, { icon: string; label: string }> = {
+  feeding: { icon: 'silverware-fork-knife', label: 'Feed' },
+  molt: { icon: 'arrow-expand-vertical', label: 'Molt' },
+  substrate: { icon: 'layers-outline', label: 'Sub' },
+};
 function hasHusbandry(s: Invert): boolean {
   return Boolean(s.enclosure_type || s.enclosure_size || s.substrate_type || s.substrate_depth || s.target_temp_min || s.target_temp_max || s.target_humidity_min || s.target_humidity_max);
 }
@@ -488,34 +649,12 @@ function InfoRow({ label, value }: { label: string; value: string; colors?: Retu
   return <UIInfoRow label={label} value={value} />;
 }
 
-function LogSection<T extends { id: string }>({ title, emptyText, ctaLabel, onCta, items, renderItem, onEdit, onDelete, colors }: { title: string; emptyText: string; ctaLabel: string; onCta: () => void; items: T[]; renderItem: (item: T) => React.ReactNode; onEdit?: (item: T) => void; onDelete?: (item: T) => void; colors: ReturnType<typeof useTheme>['colors'] }) {
-  return (
-    <Section title={title} actionLabel={ctaLabel} onAction={onCta}>
-      {items.length === 0 ? (
-        <Text style={[s.empty, { color: colors.textTertiary }]}>{emptyText}</Text>
-      ) : items.map((item) => (
-        <View key={item.id} style={[s.logRow, { borderBottomColor: colors.border }]}>
-          <View style={s.logRowContent}>{renderItem(item)}</View>
-          {onEdit && (
-            <TouchableOpacity onPress={() => onEdit(item)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Edit ${title.toLowerCase()} entry`}>
-              <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.textTertiary} />
-            </TouchableOpacity>
-          )}
-          {onDelete && (
-            <TouchableOpacity onPress={() => onDelete(item)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Delete ${title.toLowerCase()} entry`}>
-              <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.error} />
-            </TouchableOpacity>
-          )}
-        </View>
-      ))}
-    </Section>
-  );
-}
+// NB: `LogSection` was deleted here along with the three lists that used it.
+// One merged History section replaced Feedings / Molts / Substrate changes,
+// so there's nothing left that renders a per-type log list.
 
 const s = StyleSheet.create({
   empty: { ...TYPE.label, fontStyle: 'italic' },
-  logRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth },
-  logRowContent: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: SPACING.sm },
 });
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
@@ -573,6 +712,23 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     heroMeta: { ...TYPE.label, color: 'rgba(255,255,255,0.72)' },
     logRowTitle: { ...TYPE.bodyStrong, color: colors.textPrimary, flex: 1 },
     logRowMeta: { ...TYPE.caption, color: colors.textTertiary },
+    timelineChips: { flexDirection: 'row', gap: 7, marginBottom: SPACING.sm, flexWrap: 'wrap' },
+    timelineChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
+    timelineChipText: { ...TYPE.caption, fontWeight: '600' },
+    timelineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      borderRadius: 13,
+      marginBottom: 6,
+    },
+    timelineIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    timelineTitle: { ...TYPE.bodyStrong, color: colors.textPrimary },
+    timelineDate: { ...TYPE.caption, color: colors.textTertiary },
+    timelineTrailing: { ...TYPE.caption, fontWeight: '700' },
+    timelineMore: { ...TYPE.label, fontWeight: '700' },
     breedRow: { paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
     photoThumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: colors.surfaceElevated },
     heroTag: { position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
