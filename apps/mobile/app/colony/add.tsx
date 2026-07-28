@@ -31,7 +31,7 @@ import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import {
   INVERT_TAXA,
-  INVERT_TAXON_ORDER,
+  PICKER_TAXA,
   type InvertTaxon,
   type Source,
 } from '../../src/lib/inverts';
@@ -180,7 +180,10 @@ export default function AddColonyScreen() {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <Field label="Taxon">
             <View style={styles.chipWrap}>
-              {INVERT_TAXON_ORDER.map((t) => {
+              {/* PICKER_TAXA, not INVERT_TAXON_ORDER — communal tarantula
+                  keeping isn't something to suggest, though it stays valid at
+                  the DB level for migrated setups. */}
+              {PICKER_TAXA.map((t) => {
                 const m = INVERT_TAXA[t];
                 const selected = t === taxon;
                 return (

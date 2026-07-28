@@ -372,10 +372,9 @@ function CollectionScreen() {
    * "12d since fed" would be a number with no meaning attached to it.
    */
   const statusFor = (id: string, taxon?: string): FeedingStatus | undefined => {
-    // Note the registry lookup is only consulted when the taxon IS registered.
-    // `INVERT_TAXA` has no `tarantula` key (tarantula predates the registry and
-    // is excluded from its pickers), so a bare `!== 'predator'` test would
-    // silently strip feeding status from every tarantula on the screen.
+    // The registry now covers every taxon including tarantula (ADR-013), so
+    // this lookup resolves for all of them. The `meta &&` guard remains for
+    // an unrecognised taxon string off the wire.
     const meta = taxon ? INVERT_TAXA[taxon as InvertTaxon] : undefined;
     if (meta && meta.feedingMode !== 'predator') return undefined;
     return feedingStatuses.get(id);

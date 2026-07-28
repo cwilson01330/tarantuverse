@@ -20,6 +20,15 @@ import { apiClient } from '../services/api';
 // ---------------------------------------------------------------------------
 
 export type InvertTaxon =
+  // Tarantula IS an invert taxon. It was left out of this union originally
+  // because it predates the registry and had its own bespoke screens; the
+  // result was a slow accumulation of `taxon === 'tarantula' ? … : …` special
+  // cases at every lookup site, and ultimately two detail screens that drifted
+  // apart (see ADR-013). Membership here is what makes it stop being special.
+  //
+  // NOTE: this union is now "every taxon that exists", NOT "every taxon a
+  // picker should offer". Use PICKER_TAXA for the latter.
+  | 'tarantula'
   | 'scorpion'
   | 'centipede'
   | 'whip_spider'
@@ -55,6 +64,11 @@ export interface InvertTaxonMeta {
 }
 
 export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
+  tarantula: {
+    key: 'tarantula', label: 'Tarantula', glyph: '🕷️', prefix: 'tarantulas',
+    speciesPrefix: 'species', sizeLabel: 'Leg span (mm)', feedingMode: 'predator',
+    safety: 'venom', defaultEnclosureType: 'terrestrial',
+  },
   scorpion: {
     key: 'scorpion', label: 'Scorpion', glyph: '🦂', prefix: 'scorpions',
     speciesPrefix: 'scorpion-species', sizeLabel: 'Length (mm)', feedingMode: 'predator',
@@ -102,12 +116,36 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
   },
 };
 
-/** Taxa exposed in the add-picker / collection filter, in display order. */
+/** Every taxon, in display order. Tarantula leads — it's the biggest surface. */
 export const INVERT_TAXON_ORDER: InvertTaxon[] = [
-  'scorpion', 'centipede', 'whip_spider', 'vinegaroon',
+  'tarantula', 'scorpion', 'centipede', 'whip_spider', 'vinegaroon',
   'true_spider', 'millipede', 'mantis', 'roach', 'other',
 ];
 
+/**
+ * Taxa a COLONY picker should offer.
+ *
+ * Communal tarantula keeping is a fringe practice with a poor survival record,
+ * so we don't put it in front of keepers as a suggested setup — but 'tarantula'
+ * remains valid at the DB level for the handful of communal setups migrated in
+ * (ADR-010), which is why this is a picker-level exclusion rather than a
+ * constraint.
+ *
+ * This constant exists so that exclusion is a NAMED, greppable decision. It
+ * used to be expressed as tarantula's absence from the taxon union, which
+ * meant "we chose not to offer this" and "this doesn't exist" were the same
+ * fact — and any lookup of tarantula metadata silently returned undefined.
+ */
+export const PICKER_TAXA: InvertTaxon[] = INVERT_TAXON_ORDER.filter(
+  (t) => t !== 'tarantula',
+);
+
+/**
+ * Type guard for "is this a known taxon".
+ *
+ * NB: this now returns true for 'tarantula'. If you're using it to mean "is
+ * this offerable in a colony picker", you want PICKER_TAXA.includes() instead.
+ */
 export function isInvertTaxon(t: string | null | undefined): t is InvertTaxon {
   return t != null && t in INVERT_TAXA;
 }

@@ -15,7 +15,7 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
-import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
+import { INVERT_TAXA, isInvertTaxon, PICKER_TAXA } from '@/lib/inverts'
 import {
   ColonyLimitError,
   createColony,
@@ -25,18 +25,10 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-// Colony taxon options — every invert taxon except tarantula.
-const COLONY_TAXA: ColonyTaxon[] = [
-  'scorpion',
-  'centipede',
-  'whip_spider',
-  'vinegaroon',
-  'true_spider',
-  'millipede',
-  'mantis',
-  'roach',
-  'other',
-]
+// Colony taxon options. Derived from PICKER_TAXA rather than hand-listed —
+// this list had to be edited every time a taxon was added, and a hand-kept
+// copy of a registry is a copy that eventually disagrees with it.
+const COLONY_TAXA: ColonyTaxon[] = PICKER_TAXA as ColonyTaxon[]
 
 const DEFAULT_STAGES = ['adults', 'juveniles', 'nymphs']
 
@@ -78,8 +70,10 @@ function AddColonyForm() {
   const { user, token } = useAuth()
 
   const taxonParam = searchParams.get('taxon')
-  // isInvertTaxon already excludes 'tarantula' (not in the web INVERT_TAXA
-  // registry), so a ?taxon=tarantula link simply falls through to the default.
+  // NB: isInvertTaxon no longer excludes 'tarantula' — it joined the taxon
+  // union in ADR-013. The COLONY_TAXA membership test below is what keeps a
+  // ?taxon=tarantula link falling through to the default, and it is now
+  // load-bearing rather than belt-and-braces.
   const initialTaxon: ColonyTaxon =
     taxonParam && isInvertTaxon(taxonParam) && COLONY_TAXA.includes(taxonParam as ColonyTaxon)
       ? (taxonParam as ColonyTaxon)

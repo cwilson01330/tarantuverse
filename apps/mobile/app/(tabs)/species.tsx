@@ -90,9 +90,8 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 const CARE_ORDER: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 };
 
-/** Display label per taxon. INVERT_TAXA covers nine; tarantula is separate. */
+/** Display label per taxon. The registry covers every taxon incl. tarantula. */
 function taxonLabel(taxon: string): string {
-  if (taxon === 'tarantula') return 'Tarantulas';
   const meta = (INVERT_TAXA as any)[taxon];
   if (!meta) return taxon;
   // Registry labels are singular ("Whip spider"); the chips read as counts of

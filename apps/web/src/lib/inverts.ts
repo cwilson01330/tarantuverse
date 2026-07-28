@@ -6,7 +6,10 @@
  * /invert-species/?taxon=), so `prefix`/`speciesPrefix` are kept for
  * reference but are no longer required for new taxa.
  */
+// Tarantula is a member here (ADR-013). This union is "every taxon that
+// exists", not "every taxon a picker should offer" — use PICKER_TAXA for that.
 export type InvertTaxon =
+  | 'tarantula'
   | 'scorpion'
   | 'centipede'
   | 'whip_spider'
@@ -29,6 +32,7 @@ export interface InvertTaxonMeta {
 }
 
 export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
+  tarantula: { label: 'Tarantula', glyph: '🕷️', prefix: 'tarantulas', speciesPrefix: 'species', sizeLabel: 'Leg span (mm)' },
   scorpion: { label: 'Scorpion', glyph: '🦂', prefix: 'scorpions', speciesPrefix: 'scorpion-species', sizeLabel: 'Length (mm)' },
   centipede: { label: 'Centipede', glyph: '🐛', prefix: 'centipedes', speciesPrefix: 'centipede-species', sizeLabel: 'Length (mm)' },
   whip_spider: { label: 'Whip spider', glyph: '🕸️', prefix: 'whip-spiders', speciesPrefix: 'whip-spider-species', sizeLabel: 'Leg span (mm)' },
@@ -40,6 +44,21 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
   other: { label: 'Other invertebrate', glyph: '🐾', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Size (mm)' },
 }
 
+/**
+ * Taxa a COLONY picker should offer — mirrors PICKER_TAXA in the mobile lib.
+ * Communal tarantula keeping isn't something to suggest, but stays valid at
+ * the DB level for setups migrated in under ADR-010.
+ */
+export const PICKER_TAXA: InvertTaxon[] = (Object.keys(INVERT_TAXA) as InvertTaxon[])
+  .filter((t) => t !== 'tarantula')
+
+/**
+ * Type guard for "is this a known taxon".
+ *
+ * NB: this now returns TRUE for 'tarantula' (ADR-013 — tarantula joined the
+ * union so it stops being a special case at every lookup). Call sites that
+ * used this to mean "offerable in a colony picker" must use PICKER_TAXA.
+ */
 export function isInvertTaxon(t: string | null | undefined): t is InvertTaxon {
   return t != null && t in INVERT_TAXA
 }
@@ -47,20 +66,27 @@ export function isInvertTaxon(t: string | null | undefined): t is InvertTaxon {
 // ---------------------------------------------------------------------------
 // Feature-module registry (ADR-008) — web mirror of
 // apps/mobile/src/lib/taxon-modules.ts. Keep the two in lockstep.
-// Tarantula isn't listed here because its web pages are bespoke.
+//
+// Tarantula is listed now (ADR-013). Its web pages are still bespoke, so the
+// row isn't read by anything yet — but a registry that omits a taxon is how
+// "this taxon is handled elsewhere" quietly becomes "this taxon has no
+// features", which is the exact drift that produced two mobile detail screens.
 // ---------------------------------------------------------------------------
 
 export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding'
 
 export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
-  scorpion: ['growth', 'breeding'], // breeding pilot — ADR-010 Phase D
-  centipede: ['growth'],
-  whip_spider: [],
-  vinegaroon: [],
-  true_spider: [],
-  millipede: [], // deliberately skipped: molts underground, rarely measured
-  mantis: ['growth'], // instar tracking is core to mantis keeping
-  roach: [], // growth off at launch — flip later if keepers want instar tracking
+  tarantula: ['premolt', 'feedingStats', 'growth', 'breeding'],
+  scorpion: ['feedingStats', 'growth', 'breeding'], // breeding pilot — ADR-010 Phase D
+  centipede: ['feedingStats', 'growth'],
+  whip_spider: ['feedingStats'],
+  vinegaroon: ['feedingStats'],
+  true_spider: ['feedingStats'],
+  millipede: [], // detritivore — no live-prey cadence, and molts underground
+  mantis: ['feedingStats', 'growth'], // instar tracking is core to mantis keeping
+  // Omnivore grazer, and kept as a colony far more often than individually —
+  // colonies have their own screen (ADR-010). Not an oversight.
+  roach: [],
   other: [],
 }
 

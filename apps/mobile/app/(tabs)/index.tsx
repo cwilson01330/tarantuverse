@@ -39,9 +39,9 @@ function timeGreeting(): string {
   return 'Good evening';
 }
 
-/** Emoji for a colony's taxon — INVERT_TAXA excludes tarantula, so map it here. */
+/** Emoji for a colony's taxon. '👥' covers an unrecognised taxon string. */
 function colonyGlyph(taxon: string): string {
-  return (INVERT_TAXA as any)[taxon]?.glyph ?? (taxon === 'tarantula' ? '🕷️' : '👥');
+  return (INVERT_TAXA as any)[taxon]?.glyph ?? '👥';
 }
 
 const WalkthroughableView = walkthroughable(View);

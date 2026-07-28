@@ -32,6 +32,7 @@ import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '
 import { SPACING, TYPE } from '../../src/theme/tokens';
 import { taxonHasModule, growthLengthLabel } from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
+import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import { getErrorMessage } from '../../src/utils/errors';
 
 function InvertDetailScreen() {
@@ -643,6 +644,16 @@ function InvertDetailScreen() {
           </TouchableOpacity>
         ) : null}
       </Section>
+
+      {/* Premolt module (registry-gated). Tarantula-only today — the model is
+          tuned on tarantula feeding-refusal + molt-interval signal and isn't
+          validated elsewhere. Rendering it here rather than only on the old
+          tarantula screen is what makes that screen safe to retire. */}
+      {taxonHasModule(invert.taxon, 'premolt') && (
+        <View style={{ marginHorizontal: SPACING.lg, marginVertical: SPACING.xs }}>
+          <PremoltPredictionCard tarantulaId={id!} />
+        </View>
+      )}
 
       {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot).
           GrowthChart renders its own card, so no Section wrapper. */}
