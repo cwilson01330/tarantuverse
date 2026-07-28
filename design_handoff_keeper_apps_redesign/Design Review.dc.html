@@ -792,6 +792,224 @@
       </div>
     </div>
 
+    <!-- ══════════ TV ANIMAL DETAIL ══════════ -->
+    <div style="display:flex;flex-direction:column;gap:28px">
+      <div style="display:flex;align-items:baseline;gap:16px;border-top:1px solid #22222f;padding-top:28px">
+        <span style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#0066FF">Tarantuverse</span>
+        <h2 style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;margin:0;letter-spacing:-.01em">Animal detail — standardizing</h2>
+      </div>
+
+      <div style="background:#141420;border:1px solid #3a2030;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:12px;max-width:900px">
+        <div style="display:flex;align-items:center;gap:10px"><i class="mdi mdi-alert" style="font-size:20px;color:#ef4444"></i><span style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600">There are two unrelated detail screens</span></div>
+        <p style="margin:0;font-size:14.5px;line-height:1.65;color:#c9c9d6"><code style="background:#1e1e2c;padding:2px 7px;border-radius:5px;font-size:13px;color:#c9a2ff">app/tarantula/[id].tsx</code> is <strong>1,297 lines</strong> of bespoke markup — a hero photo, an <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">infoGrid</code>, and three hand-rolled log sections each with their own <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">showAll…</code> state and empty state.</p>
+        <p style="margin:0;font-size:14.5px;line-height:1.65;color:#c9c9d6"><code style="background:#1e1e2c;padding:2px 7px;border-radius:5px;font-size:13px;color:#c9a2ff">app/invert/[id].tsx</code> is <strong>426 lines</strong> built on shared <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">Section</code> / <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">InfoRow</code> / <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">LogSection</code> primitives, and carries three things tarantulas <em>cannot</em> show: Provenance, Transfer&nbsp;/&nbsp;rehome, and Breeding pairings.</p>
+        <p style="margin:0;font-size:14.5px;line-height:1.65;color:#c9c9d6">Collection routes on a ternary — <code style="background:#1e1e2c;padding:2px 7px;border-radius:5px;font-size:13px;color:#c9a2ff">item.taxon === 'tarantula' ? `/tarantula/${id}` : `/invert/${id}`</code> — so <strong>a keeper's most-visited screen changes shape depending on which animal they tapped.</strong> Every feature added since has had to be built twice or has silently landed on one side only.</p>
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:11px;background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.22);margin-top:2px">
+          <i class="mdi mdi-check-circle" style="font-size:18px;color:#34D399;margin-top:1px"></i>
+          <div style="font-size:14px;line-height:1.6;color:#c9c9d6">The fix is already half-built. <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">src/lib/taxon-modules.ts</code> declares exactly which rich modules each taxon gets (<code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">premolt</code>, <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">feedingStats</code>, <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">growth</code>, <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:13px;color:#c9a2ff">breeding</code>) — <strong>one shell reading that registry serves all eleven taxa.</strong> Tarantula becomes a set of registry flags, not a separate file.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap">
+
+        <!-- TODAY: TARANTULA -->
+        <div style="display:flex;flex-direction:column;gap:14px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:4px;background:#5b5b6e"></span><span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#8b8b9b">Today · /tarantula/[id]</span></div>
+          <div style="width:375px;height:812px;border-radius:38px;overflow:hidden;background:#0a0a0f;border:1px solid #2a2a3a;box-shadow:0 30px 60px -20px rgba(0,0,0,.8);display:flex;flex-direction:column">
+            <div style="background:#1a1a24;border-bottom:1px solid #2a2a3a;padding:14px 12px 12px;flex:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#e5e7eb"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;font-size:12px"><i class="mdi mdi-signal-cellular-3"></i><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+              <div style="display:flex;align-items:center;margin-top:10px"><i class="mdi mdi-arrow-left" style="font-size:24px;color:#e5e7eb;min-width:44px"></i><div style="flex:1;text-align:center;font-size:18px;font-weight:700;color:#e5e7eb">Nala</div><span style="display:flex;gap:12px;color:#e5e7eb;font-size:21px;min-width:44px"><i class="mdi mdi-pencil-outline"></i><i class="mdi mdi-dots-vertical"></i></span></div>
+            </div>
+            <div style="flex:1;overflow:hidden;display:grid;grid-auto-rows:max-content;align-content:start">
+              <div style="height:250px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;color:#3f3f52;font-size:80px"><i class="mdi mdi-spider"></i></div>
+              <div style="padding:16px;border-bottom:1px solid #2a2a3a"><div style="font-size:28px;font-weight:700;color:#e5e7eb">Nala</div><div style="font-size:16px;font-style:italic;color:#d1d5db;margin-top:2px">Nhandu chromatus</div><div style="font-size:14px;color:#9ca3af;margin-top:2px">Brazilian Red and White Tarantula</div></div>
+              <div style="padding:16px;border-bottom:1px solid #2a2a3a">
+                <div style="font-size:18px;font-weight:700;color:#e5e7eb;margin-bottom:12px">Basic Information</div>
+                <div style="display:flex;flex-wrap:wrap;gap:16px">
+                  <div style="flex:1;min-width:28%;display:flex;flex-direction:column;gap:3px"><i class="mdi mdi-gender-female" style="font-size:20px;color:#0066FF"></i><span style="font-size:12px;color:#d1d5db">Sex</span><span style="font-size:15px;font-weight:600;color:#e5e7eb">Female</span></div>
+                  <div style="flex:1;min-width:28%;display:flex;flex-direction:column;gap:3px"><i class="mdi mdi-calendar" style="font-size:20px;color:#0066FF"></i><span style="font-size:12px;color:#d1d5db">Age</span><span style="font-size:15px;font-weight:600;color:#e5e7eb">4 years</span></div>
+                  <div style="flex:1;min-width:28%;display:flex;flex-direction:column;gap:3px"><i class="mdi mdi-calendar-plus" style="font-size:20px;color:#0066FF"></i><span style="font-size:12px;color:#d1d5db">Acquired</span><span style="font-size:15px;font-weight:600;color:#e5e7eb">Mar 2022</span></div>
+                </div>
+              </div>
+              <div style="margin:16px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:12px;padding:14px"><div style="font-size:15px;font-weight:700;color:#e5e7eb">Premolt prediction</div><div style="font-size:13px;color:#9ca3af;margin-top:4px">Low confidence · 8% · no refusals logged</div></div>
+              <div style="padding:16px;border-bottom:1px solid #2a2a3a"><div style="font-size:18px;font-weight:700;color:#e5e7eb;margin-bottom:10px">Husbandry</div><div style="display:flex;flex-wrap:wrap;gap:14px"><div style="flex:1;min-width:40%"><span style="font-size:12px;color:#9ca3af">Substrate</span><div style="font-size:14px;color:#e5e7eb">Coco fibre (3")</div></div><div style="flex:1;min-width:40%"><span style="font-size:12px;color:#9ca3af">Last Molt</span><div style="font-size:14px;color:#e5e7eb">Apr 18</div></div></div></div>
+              <div style="padding:16px;border-bottom:1px solid #2a2a3a">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><span style="font-size:18px;font-weight:700;color:#e5e7eb">Feeding History</span><span style="font-size:14px;font-weight:600;color:#0066FF">View All (24)</span></div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#1a1a24;border-radius:10px"><i class="mdi mdi-food-drumstick" style="font-size:18px;color:#22c55e"></i><div style="flex:1"><div style="font-size:14px;color:#e5e7eb">Cricket · Accepted</div><div style="font-size:12px;color:#9ca3af">Jul 26</div></div></div>
+                  <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#1a1a24;border-radius:10px"><i class="mdi mdi-food-drumstick" style="font-size:18px;color:#22c55e"></i><div style="flex:1"><div style="font-size:14px;color:#e5e7eb">Roach · Accepted</div><div style="font-size:12px;color:#9ca3af">Jul 12</div></div></div>
+                </div>
+              </div>
+              <div style="padding:16px 16px 0;font-size:11px;color:#4b4b5c;font-style:italic;text-align:center">Molt History · Substrate Changes · Feeding Stats · Growth chart · Photos · Notes — six more sections below</div>
+            </div>
+            <div style="flex:none;background:#1a1a24;border-top:1px solid #2a2a3a;padding:12px 16px 26px;display:flex;gap:8px">
+              <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border-radius:10px;background:rgba(0,102,255,.08)"><i class="mdi mdi-food-drumstick" style="font-size:20px;color:#0066FF"></i><span style="font-size:11px;font-weight:600;color:#0066FF">Feed</span></span>
+              <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border-radius:10px;background:rgba(0,102,255,.08)"><i class="mdi mdi-butterfly-outline" style="font-size:20px;color:#0066FF"></i><span style="font-size:11px;font-weight:600;color:#0066FF">Molt</span></span>
+              <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border-radius:10px;background:rgba(0,102,255,.08)"><i class="mdi mdi-layers" style="font-size:20px;color:#0066FF"></i><span style="font-size:11px;font-weight:600;color:#0066FF">Substrate</span></span>
+              <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border-radius:10px;background:rgba(0,102,255,.08)"><i class="mdi mdi-camera-outline" style="font-size:20px;color:#0066FF"></i><span style="font-size:11px;font-weight:600;color:#0066FF">Photo</span></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TODAY: INVERT -->
+        <div style="display:flex;flex-direction:column;gap:14px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:4px;background:#5b5b6e"></span><span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#8b8b9b">Today · /invert/[id] — same app</span></div>
+          <div style="width:375px;height:812px;border-radius:38px;overflow:hidden;background:#0a0a0f;border:1px solid #2a2a3a;box-shadow:0 30px 60px -20px rgba(0,0,0,.8);display:flex;flex-direction:column">
+            <div style="background:#1a1a24;border-bottom:1px solid #2a2a3a;padding:14px 12px 12px;flex:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#e5e7eb"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;font-size:12px"><i class="mdi mdi-signal-cellular-3"></i><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+              <div style="display:flex;align-items:center;margin-top:10px"><i class="mdi mdi-arrow-left" style="font-size:24px;color:#e5e7eb;min-width:44px"></i><div style="flex:1;text-align:center;font-size:18px;font-weight:700;color:#e5e7eb">Dune</div><span style="display:flex;gap:12px;color:#e5e7eb;font-size:21px;min-width:44px"><i class="mdi mdi-pencil-outline"></i><i class="mdi mdi-dots-vertical"></i></span></div>
+            </div>
+            <div style="flex:1;overflow:hidden;display:grid;grid-auto-rows:max-content;align-content:start;padding-bottom:8px">
+              <div style="margin:16px;height:180px;border-radius:12px;background:#2a2a3a;display:flex;align-items:center;justify-content:center;color:#3f3f52;font-size:56px"><i class="mdi mdi-zodiac-scorpio"></i></div>
+              <div style="padding:0 16px 12px"><div style="font-size:22px;font-weight:700;color:#e5e7eb">Dune</div><div style="font-size:14px;font-style:italic;color:#9ca3af;margin-top:2px">Androctonus bicolor</div></div>
+              <div style="padding:0 16px 14px"><div style="font-size:13px;font-weight:700;letter-spacing:.06em;color:#9ca3af;margin-bottom:8px">IDENTITY</div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #22222e"><span style="font-size:13px;color:#9ca3af">Sex</span><span style="font-size:13px;color:#e5e7eb">Male</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #22222e"><span style="font-size:13px;color:#9ca3af">Molts</span><span style="font-size:13px;color:#e5e7eb">5</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #22222e"><span style="font-size:13px;color:#9ca3af">Body length</span><span style="font-size:13px;color:#e5e7eb">82 mm</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0"><span style="font-size:13px;color:#9ca3af">Acquired</span><span style="font-size:13px;color:#e5e7eb">2024-06-02</span></div>
+              </div>
+              <div style="padding:0 16px 14px"><div style="font-size:13px;font-weight:700;letter-spacing:.06em;color:#9ca3af;margin-bottom:8px">PROVENANCE</div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #22222e"><span style="font-size:13px;color:#9ca3af">Bred / sold by</span><span style="font-size:13px;color:#e5e7eb">@aridexotics</span></div>
+                <div style="display:flex;justify-content:space-between;padding:7px 0"><span style="font-size:13px;color:#9ca3af">Dam</span><span style="font-size:13px;color:#e5e7eb">A. bicolor</span></div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:6px 9px;border-radius:8px;background:rgba(0,102,255,.09);width:fit-content"><i class="mdi mdi-information-outline" style="font-size:13px;color:#3385FF"></i><span style="font-size:11px;color:#3385FF;font-weight:600">Tarantulas can't show this</span></div>
+              </div>
+              <div style="padding:0 16px 14px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:13px;font-weight:700;letter-spacing:.06em;color:#9ca3af">TRANSFER / REHOME</span><span style="font-size:12px;font-weight:600;color:#0066FF">Generate claim link</span></div>
+                <div style="font-size:12.5px;color:#9ca3af;line-height:1.5">Sold or rehoming this animal? Generate a claim link the buyer can use to add it to their collection — pre-loaded with species, provenance, and photos.</div>
+              </div>
+              <div style="padding:0 16px">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:13px;font-weight:700;letter-spacing:.06em;color:#9ca3af">FEEDINGS</span><span style="font-size:12px;font-weight:600;color:#0066FF">Log feeding</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #22222e"><span style="font-size:13.5px;color:#e5e7eb">Cricket · Accepted</span><span style="font-size:12px;color:#9ca3af">Jul 24</span></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0"><span style="font-size:13.5px;color:#e5e7eb">Cricket · Refused</span><span style="font-size:12px;color:#9ca3af">Jul 10</span></div>
+              </div>
+              <div style="padding:14px 16px 0;font-size:11px;color:#4b4b5c;font-style:italic;text-align:center">Molts · Growth · Breeding · Substrate · Photos · Notes below — no bottom action bar exists</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROPOSED -->
+        <div style="display:flex;flex-direction:column;gap:14px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><span style="width:8px;height:8px;border-radius:4px;background:linear-gradient(135deg,#0066FF,#FF0099)"></span><span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#e9e9f0">Proposed · one shell, all 11 taxa</span></div>
+          <div style="width:375px;height:812px;border-radius:38px;overflow:hidden;background:#0a0a0f;border:1px solid #2a2a3a;box-shadow:0 30px 60px -20px rgba(0,0,0,.8);display:flex;flex-direction:column;position:relative">
+            <div style="position:relative;height:214px;background:linear-gradient(150deg,#3a3226,#1c1812);flex:none;display:flex;flex-direction:column;justify-content:flex-end">
+              <div style="position:absolute;top:14px;left:0;right:0;padding:0 18px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:#fff"><span>9:41</span><span style="display:flex;gap:5px;align-items:center;font-size:12px"><i class="mdi mdi-signal-cellular-3"></i><i class="mdi mdi-wifi"></i><i class="mdi mdi-battery-70"></i></span></div>
+              <div style="position:absolute;top:50px;left:16px;right:16px;display:flex;justify-content:space-between">
+                <span style="width:38px;height:38px;border-radius:19px;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:21px"><i class="mdi mdi-arrow-left"></i></span>
+                <span style="display:flex;gap:10px"><span style="width:38px;height:38px;border-radius:19px;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px"><i class="mdi mdi-share-variant-outline"></i></span><span style="width:38px;height:38px;border-radius:19px;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px"><i class="mdi mdi-dots-horizontal"></i></span></span>
+              </div>
+              <div style="position:absolute;bottom:14px;right:16px;padding:5px 10px;border-radius:9px;background:rgba(10,10,15,.62);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px"><i class="mdi mdi-image-multiple-outline" style="font-size:13px"></i>12</div>
+              <div style="position:relative;padding:16px;background:linear-gradient(transparent,rgba(0,0,0,.82))">
+                <div style="display:flex;align-items:center;gap:8px"><span style="font-size:24px;font-weight:700;color:#fff;letter-spacing:-.01em">Nala</span><i class="mdi mdi-gender-female" style="font-size:19px;color:#ec4899"></i></div>
+                <div style="font-size:13px;color:rgba(255,255,255,.8);margin-top:2px"><span style="font-style:italic">Nhandu chromatus</span> · 4y · <i class="mdi mdi-spider" style="font-size:12px"></i> Tarantula</div>
+              </div>
+            </div>
+            <div style="flex:1;overflow:hidden;padding:14px 16px;display:grid;grid-auto-rows:max-content;align-content:start;gap:11px">
+
+              <div style="background:#1a1a24;border:1px solid #2a3040;border-radius:18px;overflow:hidden">
+                <div style="padding:12px 15px;display:flex;align-items:center;gap:13px;border-bottom:1px solid #22222e">
+                  <span style="width:42px;height:42px;border-radius:13px;background:rgba(51,133,255,.14);display:flex;align-items:center;justify-content:center;color:#3385FF;font-size:22px;flex:none"><i class="mdi mdi-silverware-fork-knife"></i></span>
+                  <span style="flex:1;min-width:0"><span style="display:block;font-size:15.5px;font-weight:700;color:#e5e7eb">Feed in 3 days</span><span style="display:block;font-size:12.5px;color:#9ca3af;margin-top:2px">Every 14d · 92% accepted · fed 11d ago</span></span>
+                </div>
+                <div style="padding:9px 12px;display:flex;gap:8px">
+                  <span style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 0;border-radius:11px;background:linear-gradient(135deg,#0066FF,#FF0099);color:#fff;font-size:13.5px;font-weight:700"><i class="mdi mdi-check" style="font-size:16px"></i>Fed — cricket</span>
+                  <span style="width:44px;display:flex;align-items:center;justify-content:center;border-radius:11px;border:1px solid #2a2a3a;color:#9ca3af;font-size:18px"><i class="mdi mdi-tune-variant"></i></span>
+                  <span style="width:44px;display:flex;align-items:center;justify-content:center;border-radius:11px;border:1px solid #2a2a3a;color:#9ca3af;font-size:18px"><i class="mdi mdi-pause"></i></span>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:8px">
+                <div style="flex:1;background:#1a1a24;border:1px solid #2a2a3a;border-radius:14px;padding:9px 11px;display:flex;flex-direction:column;gap:1px"><span style="font-size:11px;font-weight:600;color:#9ca3af">Molts</span><span style="font-size:17px;font-weight:700;color:#e5e7eb;line-height:1.15">9</span><span style="font-size:11px;color:#6b7280">last Apr 18</span></div>
+                <div style="flex:1;background:#1a1a24;border:1px solid #2a2a3a;border-radius:14px;padding:9px 11px;display:flex;flex-direction:column;gap:1px"><span style="font-size:11px;font-weight:600;color:#9ca3af">Leg span</span><span style="font-size:17px;font-weight:700;color:#e5e7eb;line-height:1.15">5.5"</span><span style="display:flex;align-items:center;gap:3px;font-size:11px;font-weight:700;color:#22c55e"><i class="mdi mdi-trending-up" style="font-size:12px"></i>+0.4</span></div>
+                <div style="flex:1;background:#1a1a24;border:1px solid #2a2a3a;border-radius:14px;padding:9px 11px;display:flex;flex-direction:column;gap:1px"><span style="font-size:11px;font-weight:600;color:#9ca3af">Premolt</span><span style="font-size:17px;font-weight:700;color:#e5e7eb;line-height:1.15">8%</span><span style="font-size:11px;color:#6b7280">low</span></div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#6b7280;margin-right:auto">History</span>
+                  <span style="padding:4px 9px;border-radius:8px;background:#0066FF;color:#fff;font-size:11px;font-weight:700">All</span>
+                  <span style="padding:4px 9px;border-radius:8px;border:1px solid #2a2a3a;color:#9ca3af;font-size:11px;font-weight:600">Feed</span>
+                  <span style="padding:4px 9px;border-radius:8px;border:1px solid #2a2a3a;color:#9ca3af;font-size:11px;font-weight:600">Molt</span>
+                  <span style="padding:4px 9px;border-radius:8px;border:1px solid #2a2a3a;color:#9ca3af;font-size:11px;font-weight:600">Sub</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px">
+                  <span style="width:32px;height:32px;border-radius:10px;background:rgba(34,197,94,.13);display:flex;align-items:center;justify-content:center;color:#22c55e;font-size:17px"><i class="mdi mdi-silverware-fork-knife"></i></span>
+                  <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#e5e7eb">Ate a cricket</span><span style="display:block;font-size:11.5px;color:#6b7280;margin-top:1px">Jul 26 · 1 day ago</span></span>
+                  <span style="font-size:11px;font-weight:700;color:#22c55e">Accepted</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px">
+                  <span style="width:32px;height:32px;border-radius:10px;background:rgba(139,92,246,.13);display:flex;align-items:center;justify-content:center;color:#8b5cf6;font-size:17px"><i class="mdi mdi-butterfly-outline"></i></span>
+                  <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#e5e7eb">Molted — 5.5" leg span</span><span style="display:block;font-size:11.5px;color:#6b7280;margin-top:1px">Apr 18 · 100 days ago</span></span>
+                  <span style="font-size:12px;font-weight:700;color:#8b5cf6">+0.4"</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:11px;padding:9px 12px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px">
+                  <span style="width:32px;height:32px;border-radius:10px;background:rgba(249,115,22,.13);display:flex;align-items:center;justify-content:center;color:#f97316;font-size:17px"><i class="mdi mdi-layers"></i></span>
+                  <span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600;color:#e5e7eb">Substrate changed</span><span style="display:block;font-size:11.5px;color:#6b7280;margin-top:1px">Mar 2 · coco fibre, 3"</span></span>
+                </div>
+              </div>
+
+              <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-home-variant-outline" style="font-size:18px;color:#6b7280"></i>Husbandry</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:#6b7280">Coco fibre · 3"</span><i class="mdi mdi-chevron-down" style="font-size:20px;color:#6b7280"></i></span></div>
+              <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-tag-outline" style="font-size:18px;color:#6b7280"></i>Provenance</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:#6b7280">@spidershack</span><i class="mdi mdi-chevron-down" style="font-size:20px;color:#6b7280"></i></span></div>
+              <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-chart-line" style="font-size:18px;color:#6b7280"></i>Growth</span><i class="mdi mdi-chevron-right" style="font-size:20px;color:#6b7280"></i></div>
+              <div style="background:#1a1a24;border:1px solid #2a2a3a;border-radius:13px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:#e5e7eb"><i class="mdi mdi-export" style="font-size:18px;color:#6b7280"></i>Transfer / rehome</span><i class="mdi mdi-chevron-right" style="font-size:20px;color:#6b7280"></i></div>
+
+            </div>
+            <div style="flex:none;padding:11px 16px 26px;background:#0f0f16;border-top:1px solid #22222e;display:flex;gap:9px">
+              <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;color:#9ca3af"><i class="mdi mdi-silverware-fork-knife" style="font-size:20px"></i><span style="font-size:10.5px;font-weight:600">Feed</span></span>
+              <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;color:#9ca3af"><i class="mdi mdi-butterfly-outline" style="font-size:20px"></i><span style="font-size:10.5px;font-weight:600">Molt</span></span>
+              <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;color:#9ca3af"><i class="mdi mdi-layers" style="font-size:20px"></i><span style="font-size:10.5px;font-weight:600">Substrate</span></span>
+              <span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;color:#9ca3af"><i class="mdi mdi-camera-outline" style="font-size:20px"></i><span style="font-size:10.5px;font-weight:600">Photo</span></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px 40px">
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">One shell, modules from the registry</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">The proposed screen is the <em>same file</em> for a tarantula, a scorpion and a mantis. Hero, feeding card, stat strip, timeline and collapsed rows are always present; premolt, growth, feeding-stats and breeding appear only when <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">taxonHasModule()</code> says so — which is what that file was written for.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Three features tarantulas silently lack</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Provenance, Transfer / rehome and Breeding pairings all render on <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">/invert/[id]</code> and nowhere on <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">/tarantula/[id]</code> — even though <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">taxon-modules.ts</code> lists <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">breeding</code> as a tarantula module. Tarantulas are the flagship taxon and can't generate a claim link.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">The same fix as HV detail</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Full-bleed hero carrying the name; one feeding card instead of scattered banners; one interleaved timeline instead of three (here four) independently-paginated log lists; the rest collapsed with previews. Build it once as a shared shell and both apps' detail screens become the same component with different modules.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Name printed three times</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">On the tarantula screen the header shows the name, then a 28px title repeats it, then <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">common_name</code> appears on both line two and line three of the same block — the same duplication as the collection card. One hero title, one subtitle.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">A 250px photo, then no photos</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">The hero eats 250px showing the main photo, and the gallery of every other photo sits ten sections down. Put a count chip on the hero that opens the gallery — the photos are the point, per your brief, and they're currently the least reachable thing on the screen.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#e9e9f0">Inverts have no action bar at all</div>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#9b9bab">Tarantulas get a pinned Feed / Molt / Substrate / Photo bar. Scorpions and the other nine taxa get per-section "Log feeding" text links and nothing pinned — so logging a scorpion feeding means scrolling to find it. Same bar for every taxon, labels driven by the registry.</p>
+        </div>
+      </div>
+
+      <div style="background:#141420;border:1px solid #22222f;border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:16px">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600">What the shell renders, per taxon</div>
+        <p style="margin:0;font-size:13.5px;line-height:1.6;color:#9b9bab">Straight from <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">TAXON_MODULES</code>. Everything not listed here is in the always-on shell.</p>
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:13px">
+          <div style="display:grid;grid-template-columns:1.3fr .8fr .8fr .8fr .8fr 1.1fr;gap:8px;color:#6b6b7b;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase"><span>Taxon</span><span>Premolt</span><span>Feed stats</span><span>Growth</span><span>Breeding</span><span>Size label</span></div>
+          <div style="display:grid;grid-template-columns:1.3fr .8fr .8fr .8fr .8fr 1.1fr;gap:8px;color:#c9c9d6;align-items:center"><span>Tarantula</span><span style="color:#22c55e">✓</span><span style="color:#22c55e">✓</span><span style="color:#22c55e">✓</span><span style="color:#22c55e">✓</span><span style="color:#8b8b9b">Leg span</span></div>
+          <div style="display:grid;grid-template-columns:1.3fr .8fr .8fr .8fr .8fr 1.1fr;gap:8px;color:#c9c9d6;align-items:center"><span>Scorpion</span><span style="color:#3f3f52">—</span><span style="color:#3f3f52">—</span><span style="color:#22c55e">✓</span><span style="color:#22c55e">✓</span><span style="color:#8b8b9b">Body length</span></div>
+          <div style="display:grid;grid-template-columns:1.3fr .8fr .8fr .8fr .8fr 1.1fr;gap:8px;color:#c9c9d6;align-items:center"><span>Centipede</span><span style="color:#3f3f52">—</span><span style="color:#3f3f52">—</span><span style="color:#22c55e">✓</span><span style="color:#3f3f52">—</span><span style="color:#8b8b9b">Body length</span></div>
+          <div style="display:grid;grid-template-columns:1.3fr .8fr .8fr .8fr .8fr 1.1fr;gap:8px;color:#c9c9d6;align-items:center"><span>Mantis</span><span style="color:#3f3f52">—</span><span style="color:#3f3f52">—</span><span style="color:#22c55e">✓</span><span style="color:#3f3f52">—</span><span style="color:#8b8b9b">Body length</span></div>
+          <div style="display:grid;grid-template-columns:1.3fr .8fr .8fr .8fr .8fr 1.1fr;gap:8px;color:#c9c9d6;align-items:center"><span>Roach</span><span style="color:#3f3f52">—</span><span style="color:#3f3f52">—</span><span style="color:#3f3f52">—</span><span style="color:#3f3f52">—</span><span style="color:#8b8b9b">Body length</span></div>
+          <div style="display:grid;grid-template-columns:1.3fr .8fr .8fr .8fr .8fr 1.1fr;gap:8px;color:#c9c9d6;align-items:center"><span style="color:#8b8b9b">Others (6)</span><span style="color:#3f3f52">—</span><span style="color:#3f3f52">—</span><span style="color:#8b8b9b">varies</span><span style="color:#3f3f52">—</span><span style="color:#8b8b9b">Body length</span></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:11px;background:rgba(234,179,8,.07);border:1px solid rgba(234,179,8,.22)">
+          <i class="mdi mdi-alert-circle" style="font-size:18px;color:#eab308;margin-top:1px"></i>
+          <div style="font-size:13.5px;line-height:1.6;color:#c9c9d6">Two registry rows read as oversights worth confirming: <strong style="color:#e9e9f0">roach has every module off</strong> (the file notes growth is "off at launch"), yet roaches are the taxon most likely to be kept as a colony where population tracking matters; and <strong style="color:#e9e9f0">feedingStats is tarantula-only</strong> because the endpoint is <code style="background:#1e1e2c;padding:1px 6px;border-radius:5px;font-size:12px;color:#c9a2ff">/analytics/tarantulas/{id}/feeding-stats</code> — generalising that endpoint would light it up for all eleven.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ══════════ TV ADD FLOW ══════════ -->
     <div style="display:flex;flex-direction:column;gap:28px">
       <div style="display:flex;align-items:baseline;gap:16px;border-top:1px solid #22222f;padding-top:28px">
@@ -1578,14 +1796,14 @@
                 <div style="font-size:13px;color:rgba(255,255,255,.8);margin-top:2px"><span style="font-style:italic">Python regius</span> · Pastel het Clown</div>
               </div>
             </div>
-            <div style="flex:1;overflow:hidden;padding:14px 16px;display:grid;grid-auto-rows:max-content;align-content:start;gap:13px">
+            <div style="flex:1;overflow:hidden;padding:14px 16px;display:grid;grid-auto-rows:max-content;align-content:start;gap:8px">
 
               <div style="background:#171717;border:1px solid #3a3220;border-radius:18px;overflow:hidden">
-                <div style="padding:14px 15px;display:flex;align-items:center;gap:13px;border-bottom:1px solid rgba(38,38,38,.7)">
+                <div style="padding:10px 15px;display:flex;align-items:center;gap:13px;border-bottom:1px solid rgba(38,38,38,.7)">
                   <span style="width:42px;height:42px;border-radius:13px;background:rgba(245,158,11,.14);display:flex;align-items:center;justify-content:center;color:#F59E0B;font-size:22px;flex:none"><i class="mdi mdi-silverware-fork-knife"></i></span>
                   <span style="flex:1;min-width:0"><span style="display:block;font-size:15.5px;font-weight:700;color:#F5F5F5">Feed now — 4 days overdue</span><span style="display:block;font-size:12.5px;color:#A3A3A3;margin-top:2px">Every 7d · prey 141–212 g (10–15% BW)</span></span>
                 </div>
-                <div style="padding:11px 12px;display:flex;gap:8px">
+                <div style="padding:9px 12px;display:flex;gap:8px">
                   <span style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 0;border-radius:11px;background:#10B981;color:#0B0B0B;font-size:13.5px;font-weight:700"><i class="mdi mdi-check" style="font-size:16px"></i>Fed — small rat</span>
                   <span style="width:44px;display:flex;align-items:center;justify-content:center;border-radius:11px;border:1px solid #2c2c2c;color:#A3A3A3;font-size:18px"><i class="mdi mdi-tune-variant"></i></span>
                   <span style="width:44px;display:flex;align-items:center;justify-content:center;border-radius:11px;border:1px solid #2c2c2c;color:#A3A3A3;font-size:18px"><i class="mdi mdi-pause"></i></span>
@@ -1593,17 +1811,17 @@
               </div>
 
               <div style="display:flex;gap:8px">
-                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;gap:2px">
+                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:9px 12px;display:flex;flex-direction:column;gap:2px">
                   <span style="font-size:11px;font-weight:600;color:#A3A3A3">Weight</span>
                   <span style="font-size:17px;font-weight:800;color:#F5F5F5;line-height:1.15">1,410g</span>
                   <span style="display:flex;align-items:center;gap:3px;font-size:11px;font-weight:700;color:#34D399"><i class="mdi mdi-trending-up" style="font-size:13px"></i>+38 · 28d</span>
                 </div>
-                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;gap:2px">
+                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:9px 12px;display:flex;flex-direction:column;gap:2px">
                   <span style="font-size:11px;font-weight:600;color:#A3A3A3">Last shed</span>
                   <span style="font-size:17px;font-weight:800;color:#F5F5F5;line-height:1.15">55d</span>
                   <span style="font-size:11px;color:#737373">Jun 2 · complete</span>
                 </div>
-                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;gap:2px">
+                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:9px 12px;display:flex;flex-direction:column;gap:2px">
                   <span style="font-size:11px;font-weight:600;color:#A3A3A3">Accepted</span>
                   <span style="font-size:17px;font-weight:800;color:#F5F5F5;line-height:1.15">92%</span>
                   <span style="font-size:11px;color:#737373">24 of 26</span>
@@ -1842,9 +2060,9 @@
               </div>
 
               <div style="display:flex;gap:8px">
-                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;font-weight:600;color:#A3A3A3">Pairings</span><span style="font-size:20px;font-weight:800;color:#F5F5F5;line-height:1.15">2</span><span style="font-size:11px;color:#737373">active</span></div>
-                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;font-weight:600;color:#A3A3A3">Eggs</span><span style="font-size:20px;font-weight:800;color:#F5F5F5;line-height:1.15">7</span><span style="font-size:11px;color:#737373">incubating</span></div>
-                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;font-weight:600;color:#A3A3A3">Hatched</span><span style="font-size:20px;font-weight:800;color:#F5F5F5;line-height:1.15">0</span><span style="font-size:11px;color:#737373">this season</span></div>
+                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:9px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;font-weight:600;color:#A3A3A3">Pairings</span><span style="font-size:20px;font-weight:800;color:#F5F5F5;line-height:1.15">2</span><span style="font-size:11px;color:#737373">active</span></div>
+                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:9px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;font-weight:600;color:#A3A3A3">Eggs</span><span style="font-size:20px;font-weight:800;color:#F5F5F5;line-height:1.15">7</span><span style="font-size:11px;color:#737373">incubating</span></div>
+                <div style="flex:1;background:#171717;border:1px solid rgba(38,38,38,.7);border-radius:14px;padding:9px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:11px;font-weight:600;color:#A3A3A3">Hatched</span><span style="font-size:20px;font-weight:800;color:#F5F5F5;line-height:1.15">0</span><span style="font-size:11px;color:#737373">this season</span></div>
               </div>
 
               <div style="display:flex;flex-direction:column;gap:9px">

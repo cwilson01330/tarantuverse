@@ -2,7 +2,7 @@
 
 ## Overview
 
-A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the eleven highest-traffic screens:
+A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the twelve highest-traffic screens:
 
 | App | Screen | Source file today |
 |---|---|---|
@@ -10,6 +10,7 @@ A design review of the two React Native (Expo) keeper apps in the `tarantuverse`
 | Tarantuverse | Collection | `apps/mobile/app/(tabs)/collection.tsx` |
 | Herpetoverse | Home | `apps/mobile-herpetoverse/app/(tabs)/dashboard.tsx` |
 | Herpetoverse | Collection | `apps/mobile-herpetoverse/app/(tabs)/index.tsx` |
+| Tarantuverse | **Animal detail (standardize)** | `app/tarantula/[id].tsx` **+** `app/invert/[id].tsx` |
 | Tarantuverse | Species browser | `apps/mobile/app/(tabs)/species.tsx` |
 | Tarantuverse | Species care sheet | `apps/mobile/app/species/[id].tsx` |
 | Tarantuverse | Add flow | `src/components/AddPickerSheet.tsx` + `app/tarantula/add.tsx` |
@@ -126,6 +127,79 @@ Same skeleton as Tarantuverse Home, same spacing values, emerald palette.
 ### Bug to fix here
 
 In `ReptileCard`, `styles.fedChip` has `marginTop: 6` inside a `cardIndicators` row that is `alignItems: 'center'` — the Fed chip hangs low against the sex chip and day pill. Remove the margin.
+
+---
+
+## Screen 12 — Tarantuverse Animal detail — STANDARDIZE
+
+**This is the app's most-visited screen and it currently exists twice.**
+
+### The problem
+
+| | `app/tarantula/[id].tsx` | `app/invert/[id].tsx` |
+|---|---|---|
+| Size | **1,297 lines** | **426 lines** |
+| Built from | bespoke inline markup | shared `Section` / `InfoRow` / `LogSection` |
+| Hero | 250px full-width image | 180px inset card |
+| Name block | 28px title + scientific + common | 22px title + scientific |
+| Identity | `infoGrid` — icon + label + value tiles | `InfoRow` — label/value rows |
+| Log lists | 3 hand-rolled, each with own `showAll…` state | `LogSection`, hard-capped `.slice(0, 5)` |
+| Provenance | **absent** | present |
+| Transfer / rehome | **absent** | present |
+| Breeding pairings | **absent** (despite being a registered tarantula module) | present |
+| Action bar | pinned Feed / Molt / Substrate / Photo | **none** — per-section text links only |
+
+Routing is a ternary in `(tabs)/collection.tsx` and `(tabs)/index.tsx`:
+
+```tsx
+item.taxon === 'tarantula' ? `/tarantula/${item.id}` : `/invert/${item.id}`
+```
+
+So the keeper's core screen changes shape based on which animal they tapped, and every feature since the split has been built twice or landed on one side only.
+
+### The mechanism already exists
+
+`src/lib/taxon-modules.ts` declares per-taxon opt-in modules — `premolt`, `feedingStats`, `growth`, `breeding` — plus `growthLengthLabel(taxon)`. It was written for exactly this. **Build ONE `AnimalDetailScreen` that reads the registry, and delete both files.** Tarantula stops being a special case and becomes a row of flags.
+
+```
+TAXON_MODULES = {
+  tarantula: ['premolt', 'feedingStats', 'growth', 'breeding'],
+  scorpion:  ['growth', 'breeding'],
+  centipede: ['growth'],
+  mantis:    ['growth'],
+  roach:     [],
+  …
+}
+```
+
+Two registry rows are worth confirming with the team before you build:
+- **`roach: []`** — every module off ("growth off at launch"), yet roaches are the taxon most likely to be kept as a colony where population tracking matters.
+- **`feedingStats` is tarantula-only** because the endpoint is `/analytics/tarantulas/{id}/feeding-stats`. Generalising it to `/analytics/inverts/{id}/feeding-stats` lights the module up for all eleven taxa.
+
+### Proposed layout — one shell
+
+Structurally identical to Screen 9 (HV animal detail). Build the two as one shared shell if you can; at minimum keep them visually identical.
+
+1. **Full-bleed hero**, `height: 214`, scrim `linear-gradient(transparent, rgba(0,0,0,.82))`.
+   - Floating 38px circular back / share / overflow buttons at `top: 50`.
+   - **Photo-count chip** bottom-right: `padding: 5 10`, `borderRadius: 9`, `rgba(10,10,15,.62)`, `image-multiple-outline` + count → opens the gallery. Today the hero shows one photo and the gallery of the rest is ten sections down.
+   - Name `24/700` + sex glyph 17px inline. Subtitle `13/400`: `<i>{scientific_name}</i> · {age} · {taxon icon} {taxon label}`.
+   - **Remove the `AppHeader`.** On the tarantula screen the name currently renders three times (header, 28px title, then `common_name` on both line two and line three of the same block).
+2. **One feeding card**, `borderRadius: 18`, border `#2a3040` (or the overdue tint).
+   - Head: 42px `borderRadius: 13` tinted icon well; verdict as a sentence `15.5/700` ("Feed in 3 days" / "Feed now — 4 days overdue"); reasoning `12.5/400` ("Every 14d · 92% accepted · fed 11d ago").
+   - Action row: primary gradient `Fed — cricket` (repeats the last prey type), 44px `tune-variant` for the full form, 44px `pause` wired to the existing `PauseFeedingSheet`.
+   - This absorbs `FeedingStatsCard`'s headline numbers and the pause banner.
+3. **Stat strip** — three cards, `borderRadius: 14`, `padding: 9 11`. Contents are registry-driven: Molts (count + last date) · size using `growthLengthLabel(taxon)` with delta · Premolt % (only when the `premolt` module is on; otherwise show acceptance rate).
+4. **One interleaved timeline** replacing four independent lists (feedings, molts, substrate changes, and on inverts breeding).
+   - Filter chips: All / Feed / Molt / Sub (+ registry-driven extras).
+   - Rows `borderRadius: 13`, `padding: 9 12`: 32px tinted type icon, sentence `13.5/600` ("Ate a cricket", "Molted — 5.5\" leg span", "Substrate changed"), relative date `11.5/400`, right-aligned outcome or delta.
+   - Replaces three `showAll…` toggles and three bespoke empty states with one list and one empty state.
+5. **Collapsed rows with previews** `borderRadius: 13`, `padding: 11 14`, title `14/600` + 18px icon: Husbandry ("Coco fibre · 3\""), Provenance ("@spidershack"), Growth (chart), Transfer / rehome, Notes. Registry-gated; a taxon without `growth` simply has one fewer row.
+6. **Pinned action bar** — four equal columns, icon 20px + label `10.5/600`: Feed / Molt / Substrate / Photo, labels from the registry. **Inverts have no pinned bar today at all** — logging a scorpion feeding means scrolling to find a text link.
+
+### State
+
+No new endpoints. The unified screen fetches the same data both screens already fetch; the timeline is a client-side merge of the log arrays sorted by date desc and tagged by type. `showAllFeedings` / `showAllMolts` / `showAllSubstrate` are replaced by one filter + paging state, and the invert screen's hard `.slice(0, 5)` cap goes away.
 
 ---
 
@@ -525,19 +599,20 @@ Herpetoverse's `ThemeContext` exports a single frozen `darkTheme`. Tarantuverse'
 
 1. Feeding hero on both Home screens — one card, no new data, removes a duplicate section.
 2. Tools grid + five-tab spine — the discoverability fix. Species gets a permanent tab.
-3. Card rework in both Collections — also kills the `nulld ago` bug.
-4. `Add to collection` on the care sheet + Enclosure expanded by default — two small changes, large payoff.
-5. Species browser rows + word-based care level.
-6. Unified add screen + care-sheet prefill — retires `AddPickerSheet` and the wizard.
-7. Colony population card, quick-log buttons, and the full-width colony row.
-8. HV detail: one feeding card + one timeline + pinned log bar.
-9. HV breeding: season overview, stage pills, progress track, morph-calculator link.
-10. Emoji sweep + shared tokens package.
-11. Port `ThemeContext` to Herpetoverse.
+3. **Unify the two TV detail screens onto one registry-driven shell** — highest-traffic screen, removes ~1,300 lines of divergence, and gives tarantulas provenance + transfer + breeding.
+4. Card rework in both Collections — also kills the `nulld ago` bug.
+5. `Add to collection` on the care sheet + Enclosure expanded by default — two small changes, large payoff.
+6. Species browser rows + word-based care level.
+7. Unified add screen + care-sheet prefill — retires `AddPickerSheet` and the wizard.
+8. Colony population card, quick-log buttons, and the full-width colony row.
+9. HV detail: one feeding card + one timeline + pinned log bar.
+10. HV breeding: season overview, stage pills, progress track, morph-calculator link.
+11. Emoji sweep + shared tokens package.
+12. Port `ThemeContext` to Herpetoverse.
 
 ## Files
 
-- `Design Review.dc.html` — the full review: eleven Today/Proposed screen sets, the findings summary, the cross-app system section, and a verified icon appendix. Open in any browser.
+- `Design Review.dc.html` — the full review: twelve Today/Proposed screen sets, the findings summary, the cross-app system section, and a verified icon appendix. Open in any browser.
 
 ## Not covered in this pass
 

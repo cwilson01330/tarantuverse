@@ -6,15 +6,16 @@
  * the generic /invert/* log screens. Safe-area inset on the hero actions
  * (Android status-bar fix).
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, FlatList, Image, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { AppHeader } from '../../src/components/AppHeader';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
 import {
@@ -36,6 +37,7 @@ function InvertDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, layout } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [invert, setInvert] = useState<Invert | null>(null);
   const [feedings, setFeedings] = useState<InvertFeedingLog[]>([]);
@@ -47,6 +49,9 @@ function InvertDetailScreen() {
   const [transferring, setTransferring] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Lets the hero's photo-count chip jump to the gallery section.
+  const scrollRef = useRef<ScrollView | null>(null);
+  const photosY = useRef<number | null>(null);
 
   const handleTransfer = useCallback(async () => {
     if (!id || transferring) return;
@@ -173,27 +178,49 @@ function InvertDetailScreen() {
 
   const meta = INVERT_TAXA[invert.taxon];
 
-  // Personalized header title (name → common → scientific → "Unnamed <taxon>"),
-  // mirroring the tarantula screen. The AppHeader is preset-aware (gradient in
-  // Hobbyist, flat in Keeper). Action set is honest: share / QR / reminder
-  // aren't wired for inverts yet (QR is tarantula-only on the roadmap), so the
-  // header carries edit + delete until those subsystems generalize.
+  // Display name (name → common → scientific → "Unnamed <taxon>"). Rendered
+  // ONCE, in the hero — the old arrangement had it in an AppHeader as well.
   const headerTitle = invertDisplayName(invert);
-  const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
-  const backButton = (
-    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back">
-      <MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} />
+
+  // Overflow replaces the old header's edit/delete pair. Delete sitting one
+  // tap away in a permanent header button was a lot of exposure for an
+  // irreversible action on the app's most-visited screen.
+  const openOverflow = () => {
+    Alert.alert(headerTitle, undefined, [
+      { text: 'Edit', onPress: () => router.push(`/invert/edit?id=${id}` as any) },
+      { text: 'Delete', style: 'destructive', onPress: handleDelete },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({ message: `Check out ${headerTitle} on Tarantuverse!` });
+    } catch {
+      // User dismissed the share sheet — not an error worth surfacing.
+    }
+  };
+
+  const sexGlyph =
+    invert.sex === 'female' ? 'gender-female'
+      : invert.sex === 'male' ? 'gender-male'
+        : null;
+  const sexColor =
+    invert.sex === 'female' ? colors.female
+      : invert.sex === 'male' ? colors.male
+        : colors.textTertiary;
+
+  /** Floating hero button — circular, translucent, legible over any photo. */
+  const heroButton = (icon: string, label: string, onPress: () => void) => (
+    <TouchableOpacity
+      style={styles.heroButton}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+    >
+      <MaterialCommunityIcons name={icon as any} size={20} color="#fff" />
     </TouchableOpacity>
-  );
-  const headerActions = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-      <TouchableOpacity style={{ padding: 6 }} onPress={() => router.push(`/invert/edit?id=${id}` as any)} accessibilityLabel="Edit">
-        <MaterialCommunityIcons name="pencil" size={22} color={iconColor} />
-      </TouchableOpacity>
-      <TouchableOpacity style={{ padding: 6 }} onPress={handleDelete} accessibilityLabel="Delete">
-        <MaterialCommunityIcons name="trash-can-outline" size={22} color={colors.error} />
-      </TouchableOpacity>
-    </View>
   );
 
   // Husbandry as a rich icon grid (shared InfoGrid) — the convergence look.
@@ -207,8 +234,12 @@ function InvertDetailScreen() {
 
   return (
     <View style={styles.flex}>
-      <AppHeader title={headerTitle} leftAction={backButton} rightAction={headerActions} />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
+        {/* Full-bleed hero. Replaces the AppHeader + inset image + separate
+            identity block. On the tarantula screen that arrangement printed
+            the animal's name THREE times — header title, 28pt title, then
+            common_name again on the next line (because `name` already falls
+            back to common_name). One name, in one place, over the photo. */}
         <View style={styles.hero}>
           {invert.photo_url ? (
             <Image source={{ uri: getImageUrl(invert.photo_url) }} style={styles.heroImage} />
@@ -217,13 +248,69 @@ function InvertDetailScreen() {
               <Text style={{ fontSize: 64 }}>{meta?.glyph ?? '🐾'}</Text>
             </View>
           )}
-        </View>
 
-      <View style={styles.identity}>
-        <Text style={styles.name}>{invert.name || invert.common_name || `Unnamed ${meta?.label.toLowerCase() ?? 'invert'}`}</Text>
-        {invert.scientific_name && <Text style={styles.scientific}>{invert.scientific_name}</Text>}
-        {invert.common_name && invert.name && <Text style={styles.subtitle}>{invert.common_name}</Text>}
-      </View>
+          {/* Scrim — without it, white text over a pale photo is unreadable. */}
+          <LinearGradient
+            pointerEvents="none"
+            colors={['transparent', 'rgba(0,0,0,0.82)']}
+            style={StyleSheet.absoluteFill as any}
+          />
+
+          <View style={[styles.heroActions, { top: insets.top + 8 }]}>
+            {heroButton('chevron-left', 'Back', () => router.back())}
+            <View style={{ flex: 1 }} />
+            {heroButton('share-variant', 'Share', handleShare)}
+            {heroButton('dots-horizontal', 'More actions', openOverflow)}
+          </View>
+
+          {/* Photo count → the gallery. The hero shows one photo and the rest
+              sit most of a screen further down, so the chip scrolls there
+              rather than opening the add-photo form (which is what a naive
+              "photos" tap target would do — and would be a trap). */}
+          {photos.length > 1 ? (
+            <TouchableOpacity
+              style={styles.photoCountChip}
+              onPress={() => {
+                if (photosY.current != null) {
+                  scrollRef.current?.scrollTo({ y: Math.max(0, photosY.current - 12), animated: true });
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${photos.length} photos. Scrolls to the gallery.`}
+            >
+              <MaterialCommunityIcons name="image-multiple-outline" size={13} color="#fff" />
+              <Text style={styles.photoCountText}>{photos.length}</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          <View style={styles.heroCaption}>
+            <View style={styles.heroNameRow}>
+              <Text style={styles.heroName} numberOfLines={2}>{headerTitle}</Text>
+              {sexGlyph ? (
+                <MaterialCommunityIcons
+                  name={sexGlyph as any}
+                  size={17}
+                  color={sexColor}
+                  accessibilityLabel={invert.sex === 'female' ? 'Female' : 'Male'}
+                />
+              ) : null}
+            </View>
+            <View style={styles.heroSubtitleRow}>
+              {invert.scientific_name ? (
+                <Text style={styles.heroScientific} numberOfLines={1}>{invert.scientific_name}</Text>
+              ) : null}
+              {/* NB: the handoff's subtitle includes {age}. There is no honest
+                  source for it — `date_acquired` is when the KEEPER got the
+                  animal, not when it hatched, and the mobile Invert type has no
+                  life_stage. Molt count is the real proxy keepers use, so that's
+                  what's shown when we have it. */}
+              {invert.current_instar ? (
+                <Text style={styles.heroMeta}>· {invert.current_instar} molts</Text>
+              ) : null}
+              <Text style={styles.heroMeta}>· {meta?.label ?? 'Invert'}</Text>
+            </View>
+          </View>
+        </View>
 
       <Section title="Identity">
         <InfoRow label="Sex" value={fmtSex(invert.sex)} colors={colors} />
@@ -315,6 +402,7 @@ function InvertDetailScreen() {
         onEdit={editSubstrate} onDelete={(c) => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id))}
         renderItem={(item) => (<><Text style={styles.logRowTitle}>{item.substrate_type || 'Substrate change'}</Text><Text style={styles.logRowMeta}>{fmtDate(item.changed_at)}</Text></>)} colors={colors} />
 
+      <View onLayout={(e) => { photosY.current = e.nativeEvent.layout.y; }}>
       <Section title="Photos" actionLabel="Add photo" onAction={() => router.push(`/invert/add-photo?id=${id}` as any)}>
         {photos.length === 0 ? (
           <Text style={[s.empty, { color: colors.textTertiary }]}>No photos yet.</Text>
@@ -339,9 +427,41 @@ function InvertDetailScreen() {
           </>
         )}
       </Section>
+      </View>
 
       {invert.notes && <Section title="Notes"><Text style={styles.notes}>{invert.notes}</Text></Section>}
       </ScrollView>
+
+      {/* Pinned action bar. Inverts had NO quick-log affordance at all — the
+          only way to record a scorpion feeding was to scroll until you found
+          the "Log feeding" text link on the Feedings section. The tarantula
+          screen has had this bar all along; the split is why it never crossed
+          over. Labels stay identical across taxa so muscle memory transfers.
+          Safe-area inset or it overhangs the Android nav bar. */}
+      <View
+        style={[
+          styles.actionBar,
+          { paddingBottom: insets.bottom + SPACING.sm, borderTopColor: colors.border },
+        ]}
+      >
+        {([
+          { icon: 'silverware-fork-knife', label: 'Feed', route: `/invert/add-feeding?id=${id}` },
+          { icon: 'arrow-expand-vertical', label: 'Molt', route: `/invert/add-molt?id=${id}` },
+          { icon: 'layers-outline', label: 'Substrate', route: `/invert/add-substrate-change?id=${id}` },
+          { icon: 'camera-outline', label: 'Photo', route: `/invert/add-photo?id=${id}` },
+        ] as const).map((a) => (
+          <TouchableOpacity
+            key={a.label}
+            style={styles.actionBarItem}
+            onPress={() => router.push(a.route as any)}
+            accessibilityRole="button"
+            accessibilityLabel={`Log ${a.label.toLowerCase()}`}
+          >
+            <MaterialCommunityIcons name={a.icon as any} size={20} color={colors.accent} />
+            <Text style={styles.actionBarLabel}>{a.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </View>
   );
 }
@@ -402,14 +522,55 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
     flex: { flex: 1, backgroundColor: colors.background },
     center: { alignItems: 'center', justifyContent: 'center' },
-    scroll: { paddingBottom: SPACING.xxl },
-    hero: { position: 'relative' },
-    heroImage: { width: '100%', height: 280 },
+    // Clears the pinned action bar — content used to end flush with the
+    // screen bottom, so the last section sat under the bar.
+    scroll: { paddingBottom: 96 },
+    actionBar: {
+      flexDirection: 'row',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      backgroundColor: colors.surface,
+      paddingTop: SPACING.sm,
+    },
+    actionBarItem: { flex: 1, alignItems: 'center', gap: 3, paddingVertical: 2 },
+    actionBarLabel: { ...TYPE.caption, color: colors.textSecondary, fontWeight: '600' },
+    hero: { position: 'relative', height: 214, justifyContent: 'flex-end' },
+    heroImage: { ...StyleSheet.absoluteFillObject, width: undefined, height: undefined },
     heroPlaceholder: { backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
-    identity: { paddingHorizontal: SPACING.lg, paddingTop: SPACING.lg, paddingBottom: SPACING.sm, gap: SPACING.xs },
-    name: { ...TYPE.title, color: colors.textPrimary },
-    scientific: { ...TYPE.body, color: colors.textSecondary, fontStyle: 'italic' },
-    subtitle: { ...TYPE.label, color: colors.textTertiary },
+    heroActions: {
+      position: 'absolute',
+      left: SPACING.md,
+      right: SPACING.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    heroButton: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(10,10,15,0.55)',
+    },
+    photoCountChip: {
+      position: 'absolute',
+      right: SPACING.md,
+      bottom: 76,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 9,
+      backgroundColor: 'rgba(10,10,15,0.62)',
+    },
+    photoCountText: { ...TYPE.caption, color: '#fff', fontWeight: '700' },
+    heroCaption: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md, gap: 2 },
+    heroNameRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+    heroName: { ...TYPE.title, color: '#fff', flexShrink: 1 },
+    heroSubtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+    heroScientific: { ...TYPE.label, color: 'rgba(255,255,255,0.86)', fontStyle: 'italic' },
+    heroMeta: { ...TYPE.label, color: 'rgba(255,255,255,0.72)' },
     logRowTitle: { ...TYPE.bodyStrong, color: colors.textPrimary, flex: 1 },
     logRowMeta: { ...TYPE.caption, color: colors.textTertiary },
     breedRow: { paddingVertical: SPACING.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
