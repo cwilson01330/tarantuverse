@@ -84,7 +84,8 @@ export default function ActivityFeedItem({ activity }: Props) {
     switch (activity.action_type) {
       case 'new_tarantula':
         return {
-          verb: `${displayName} added`,
+          actor: displayName,
+          verb: 'added',
           tarantulaName: meta.tarantula_name ?? meta.name,
           speciesName: meta.species_name ?? meta.common_name ?? meta.scientific_name,
           thumbnailUrl: meta.thumbnail_url,
@@ -94,7 +95,8 @@ export default function ActivityFeedItem({ activity }: Props) {
 
       case 'molt':
         return {
-          verb: `${displayName} logged a molt for`,
+          actor: displayName,
+          verb: 'logged a molt for',
           tarantulaName: meta.tarantula_name,
           speciesName: meta.species_name,
           thumbnailUrl: meta.thumbnail_url,
@@ -105,7 +107,8 @@ export default function ActivityFeedItem({ activity }: Props) {
       case 'feeding': {
         const accepted = meta.accepted;
         return {
-          verb: `${displayName} fed`,
+          actor: displayName,
+          verb: 'fed',
           tarantulaName: meta.tarantula_name,
           speciesName: meta.species_name,
           thumbnailUrl: meta.thumbnail_url,
@@ -125,7 +128,8 @@ export default function ActivityFeedItem({ activity }: Props) {
         // in the activity_metadata (older activity rows), disable the
         // tap so we don't route to /community/undefined.
         return {
-          verb: `${displayName} followed ${meta.followed_display_name || meta.followed_username || 'someone'}`,
+          actor: displayName,
+          verb: `followed ${meta.followed_display_name || meta.followed_username || 'someone'}`,
           tarantulaName: undefined,
           speciesName: undefined,
           thumbnailUrl: undefined,
@@ -140,7 +144,8 @@ export default function ActivityFeedItem({ activity }: Props) {
         // this we'd push /forums/thread/null which lands on a hard 404
         // and looks like a broken app, not a missing dataset.
         return {
-          verb: `${displayName} started a thread`,
+          actor: displayName,
+          verb: 'started a thread',
           tarantulaName: meta.thread_title,
           speciesName: `in ${meta.category_name}`,
           thumbnailUrl: undefined,
@@ -155,7 +160,8 @@ export default function ActivityFeedItem({ activity }: Props) {
         // or where the parent thread was deleted. Disable tap rather
         // than route to /forums/thread/undefined.
         return {
-          verb: `${displayName} replied to`,
+          actor: displayName,
+          verb: 'replied to',
           tarantulaName: meta.thread_title,
           speciesName: undefined,
           thumbnailUrl: undefined,

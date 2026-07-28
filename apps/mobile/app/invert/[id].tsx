@@ -65,6 +65,10 @@ function InvertDetailScreen() {
   const [markingFed, setMarkingFed] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  // Which reference rows are open. All collapsed by default — see CollapsibleRow.
+  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
+  const toggleRow = (key: string) =>
+    setOpenRows((prev) => ({ ...prev, [key]: !prev[key] }));
   // Fullscreen gallery. Tapping a thumbnail used to do nothing on this screen —
   // only long-press (set hero / delete) was wired.
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -553,14 +557,40 @@ function InvertDetailScreen() {
       </Section>
 
       {hasHusbandry(invert) && (
-        <Section title="Husbandry">
+        <CollapsibleRow
+          icon="home-variant-outline"
+          title="Husbandry"
+          // Substrate is what a keeper actually glances for; enclosure type is
+          // the fallback when substrate hasn't been recorded.
+          preview={
+            invert.substrate_type
+              ? [invert.substrate_type, invert.substrate_depth].filter(Boolean).join(' · ')
+              : invert.enclosure_type || null
+          }
+          expanded={!!openRows.husbandry}
+          onToggle={() => toggleRow('husbandry')}
+          colors={colors}
+        >
           <InfoGrid items={husbandryItems} />
-        </Section>
+        </CollapsibleRow>
       )}
 
       {/* Provenance (BRIEF §6) — render only the facts we actually have. */}
       {invert.provenance && (
-        <Section title="Provenance">
+        <CollapsibleRow
+          icon="account-arrow-right-outline"
+          title="Provenance"
+          preview={
+            invert.provenance.breeder_handle
+              ? `@${invert.provenance.breeder_handle}`
+              : invert.provenance.transferred_at
+                ? `Acquired ${fmtDate(invert.provenance.transferred_at)}`
+                : null
+          }
+          expanded={!!openRows.provenance}
+          onToggle={() => toggleRow('provenance')}
+          colors={colors}
+        >
           {invert.provenance.breeder_handle ? (
             <InfoRow label="Bred / sold by" value={`@${invert.provenance.breeder_handle}`} colors={colors} />
           ) : null}
@@ -576,10 +606,13 @@ function InvertDetailScreen() {
           {invert.provenance.transferred_at ? (
             <InfoRow label="Acquired via transfer" value={fmtDate(invert.provenance.transferred_at)} colors={colors} />
           ) : null}
-        </Section>
+        </CollapsibleRow>
       )}
 
-      {/* Transfer / rehome (BRIEF §6). Claiming happens on the web claim page. */}
+      {/* Transfer / rehome (BRIEF §6). Claiming happens on the web claim page.
+          A transferred-out animal stays expanded — that's a status, not
+          reference material, and collapsing it would hide the fact that this
+          record is historical. */}
       {invert.transferred_out_at ? (
         <Section title="Transfer / rehome">
           <Text style={[s.empty, { color: colors.textTertiary }]}>
@@ -587,13 +620,33 @@ function InvertDetailScreen() {
           </Text>
         </Section>
       ) : (
-        <Section title="Transfer / rehome" actionLabel={transferring ? 'Working…' : 'Generate claim link'} onAction={handleTransfer}>
+        <CollapsibleRow
+          icon="swap-horizontal"
+          title="Transfer / rehome"
+          preview="Generate a claim link for a buyer"
+          expanded={!!openRows.transfer}
+          onToggle={() => toggleRow('transfer')}
+          colors={colors}
+        >
           <Text style={[s.empty, { color: colors.textTertiary }]}>
             Sold or rehoming this animal? Generate a claim link the buyer can use to
             add it to their collection — pre-loaded with species, provenance, and
             photos. We never process the sale.
           </Text>
-        </Section>
+          {/* The action lives inside the expanded body now — CollapsibleRow has
+              no header action slot, and putting "Generate claim link" on a
+              collapsed row would sit one stray tap from handing an animal away. */}
+          <TouchableOpacity
+            onPress={handleTransfer}
+            disabled={transferring}
+            style={{ marginTop: SPACING.sm }}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.timelineMore, { color: colors.accent }]}>
+              {transferring ? 'Working…' : 'Generate claim link'}
+            </Text>
+          </TouchableOpacity>
+        </CollapsibleRow>
       )}
 
       {/* One interleaved history. Long-press a row to edit or delete it —
@@ -688,9 +741,16 @@ function InvertDetailScreen() {
       {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot).
           GrowthChart renders its own card, so no Section wrapper. */}
       {taxonHasModule(invert.taxon, 'growth') && growth && growth.total_molts > 0 && (
-        <View style={{ marginHorizontal: SPACING.md, marginBottom: SPACING.md }}>
+        <CollapsibleRow
+          icon="chart-line"
+          title="Growth"
+          preview={`${growth.total_molts} ${growth.total_molts === 1 ? 'molt' : 'molts'} recorded`}
+          expanded={!!openRows.growth}
+          onToggle={() => toggleRow('growth')}
+          colors={colors}
+        >
           <GrowthChart data={growth as any} lengthLabel={growthLengthLabel(invert.taxon)} />
-        </View>
+        </CollapsibleRow>
       )}
 
       {/* Breeding module (registry-gated — ADR-010 Phase D) */}
@@ -736,7 +796,18 @@ function InvertDetailScreen() {
       </Section>
       </View>
 
-      {invert.notes && <Section title="Notes"><Text style={styles.notes}>{invert.notes}</Text></Section>}
+      {invert.notes ? (
+        <CollapsibleRow
+          icon="note-text-outline"
+          title="Notes"
+          preview={invert.notes.replace(/\s+/g, ' ').trim()}
+          expanded={!!openRows.notes}
+          onToggle={() => toggleRow('notes')}
+          colors={colors}
+        >
+          <Text style={styles.notes}>{invert.notes}</Text>
+        </CollapsibleRow>
+      ) : null}
       </ScrollView>
 
       {/* Pinned action bar. Inverts had NO quick-log affordance at all — the
@@ -845,6 +916,69 @@ interface TimelineEntry {
   trailingTone?: 'good' | 'bad' | 'muted';
   onEdit: () => void;
   onDelete: () => void;
+}
+
+/**
+ * Collapsed detail row with a preview.
+ *
+ * Husbandry, provenance, growth, transfer and notes are reference material —
+ * a keeper opens this screen to feed an animal or check when it last molted,
+ * not to re-read its substrate depth. Fully expanded they pushed the timeline
+ * (the part that changes) most of a screen down. The preview means collapsing
+ * them doesn't hide the answer when the answer is one line: "Coco fibre · 3in"
+ * is the whole husbandry summary most of the time.
+ *
+ * Hoisted to module scope on purpose. A component defined inside the screen
+ * function is a new component TYPE on every render, which unmounts its subtree
+ * — the bug that once ate keystrokes in the collection search field.
+ */
+function CollapsibleRow({
+  icon, title, preview, expanded, onToggle, colors, children,
+}: {
+  icon: string;
+  title: string;
+  preview?: string | null;
+  expanded: boolean;
+  onToggle: () => void;
+  colors: ReturnType<typeof useTheme>['colors'];
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={{
+      marginHorizontal: SPACING.lg,
+      marginVertical: SPACING.xs,
+      borderRadius: 13,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      overflow: 'hidden',
+    }}>
+      <TouchableOpacity
+        onPress={onToggle}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.md, paddingVertical: 11, paddingHorizontal: 14 }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={preview ? `${title}. ${preview}` : title}
+        accessibilityHint={expanded ? 'Collapses this section.' : 'Expands this section.'}
+      >
+        <MaterialCommunityIcons name={icon as any} size={18} color={colors.accent} />
+        <View style={{ flex: 1 }}>
+          <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>{title}</Text>
+          {!expanded && preview ? (
+            <Text style={[TYPE.caption, { color: colors.textTertiary }]} numberOfLines={1}>{preview}</Text>
+          ) : null}
+        </View>
+        <MaterialCommunityIcons
+          name={expanded ? 'chevron-up' : 'chevron-down'}
+          size={20}
+          color={colors.textTertiary}
+        />
+      </TouchableOpacity>
+      {expanded ? (
+        <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>{children}</View>
+      ) : null}
+    </View>
+  );
 }
 
 const TIMELINE_META: Record<TimelineKind, { icon: string; label: string }> = {
