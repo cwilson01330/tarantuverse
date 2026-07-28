@@ -6,6 +6,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { KeeperCardSkeleton, ActivityFeedSkeleton } from '../../src/components/CommunitySkeletons';
 import ActivityFeedItem, { ActivityFeedItemData } from '../../src/components/ActivityFeedItem';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
+import { AppHeader } from '../../src/components/AppHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Keeper {
@@ -46,7 +47,9 @@ function CommunityScreen() {
   const [activityLoading, setActivityLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'keepers' | 'activity'>('keepers');
+  // The feed leads now; the keeper directory is a detour behind a header icon.
+  const [activeTab, setActiveTab] = useState<'keepers' | 'activity'>('activity');
+  const [feedFilter, setFeedFilter] = useState<'following' | 'all' | 'forums'>('following');
   const [activityPage, setActivityPage] = useState(1);
   const [hasMoreActivities, setHasMoreActivities] = useState(true);
 
@@ -54,11 +57,15 @@ function CommunityScreen() {
     fetchKeepers();
   }, []);
 
+  // Also keyed on feedFilter: switching Following↔All clears `activities`
+  // (see the chip handler), and that empty list is what re-triggers the fetch
+  // against the newly-selected endpoint. Switching to Forums doesn't clear,
+  // so it filters what's already loaded rather than round-tripping.
   useEffect(() => {
     if (activeTab === 'activity' && activities.length === 0) {
       fetchActivities(true);
     }
-  }, [activeTab]);
+  }, [activeTab, feedFilter]);
 
   const fetchKeepers = async () => {
     try {
@@ -83,9 +90,17 @@ function CommunityScreen() {
       const token = await AsyncStorage.getItem('token');
       const currentPage = reset ? 1 : activityPage;
       
-      // Use global feed for now - can switch to personalized if user is logged in
-      const endpoint = token ? '/api/v1/activity/feed' : '/api/v1/activity/global';
-      
+      // Scope comes from the filter chip:
+      //   following → /activity/feed   (server-side: users you follow only)
+      //   all|forums → /activity/global (all public activity)
+      // Signed-out users can't have a following list, so they always get global.
+      //
+      // Forums is a CLIENT-side filter on top: the endpoints take a single
+      // `action_type`, and forum activity is two types (forum_thread +
+      // forum_post), so one request can't express it server-side.
+      const wantsFollowing = feedFilter === 'following' && !!token;
+      const endpoint = wantsFollowing ? '/api/v1/activity/feed' : '/api/v1/activity/global';
+
       const response = await fetch(
         `${API_URL}${endpoint}?page=${currentPage}&limit=20`,
         {
@@ -152,6 +167,14 @@ function CommunityScreen() {
     return { bg: base + '24', text: base };
   };
 
+  // Forums chip narrows the loaded feed to the two forum activity types.
+  const visibleActivities =
+    feedFilter === 'forums'
+      ? activities.filter(
+          (a) => a.activity_type === 'forum_thread' || a.activity_type === 'forum_post',
+        )
+      : activities;
+
   const formatSpecialty = (specialty: string) => {
     return specialty.split('_').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
@@ -189,36 +212,55 @@ function CommunityScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Tabs */}
-      <View style={[styles.tabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'keepers' && { ...styles.activeTab, borderBottomColor: colors.primary }]}
-          onPress={() => setActiveTab('keepers')}
-        >
-          <MaterialCommunityIcons 
-            name="account-group" 
-            size={20} 
-            color={activeTab === 'keepers' ? colors.primary : colors.textSecondary} 
-          />
-          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'keepers' && { color: colors.primary }]}>
-            Keepers
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'activity' && { ...styles.activeTab, borderBottomColor: colors.primary }]}
-          onPress={() => setActiveTab('activity')}
-        >
-          <MaterialCommunityIcons 
-            name="pulse" 
-            size={20} 
-            color={activeTab === 'activity' ? colors.primary : colors.textSecondary} 
-          />
-          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'activity' && { color: colors.primary }]}>
-            Activity Feed
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Gradient header replacing the two-tab bar. The activity feed IS the
+          screen now — it's the only thing in the app that changes on its own,
+          and it was sitting behind a keeper directory that's a one-time
+          browse. The directory moves to a header icon. */}
+      <AppHeader
+        title={activeTab === 'keepers' ? 'Keepers' : 'Community'}
+        subtitle={
+          activeTab === 'keepers'
+            ? 'Find keepers to follow'
+            // NB: the handoff asks for "Following {n} keepers" here. We don't
+            // have that count on this screen without an extra /follows/following
+            // request, and inventing a number on a social screen is exactly the
+            // kind of thing people notice. Describing the active scope is
+            // honest and needs no fetch. Revisit if the count lands in an
+            // endpoint this screen already calls.
+            : feedFilter === 'following'
+              ? 'Keepers you follow'
+              : feedFilter === 'forums'
+                ? 'Forum activity'
+                : 'All keepers'
+        }
+        rightAction={
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            {/* Discover lived on the navigator header this replaces — kept here
+                so retiring that header doesn't quietly retire the feature. */}
+            <TouchableOpacity
+              onPress={() => router.push('/discover')}
+              accessibilityRole="button"
+              accessibilityLabel="Discover"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="compass-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab(activeTab === 'keepers' ? 'activity' : 'keepers')}
+              accessibilityRole="button"
+              accessibilityLabel={activeTab === 'keepers' ? 'Back to the feed' : 'Browse keepers'}
+              accessibilityState={{ selected: activeTab === 'keepers' }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons
+                name={activeTab === 'keepers' ? 'pulse' : 'account-multiple-outline'}
+                size={22}
+                color="#fff"
+              />
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       {activeTab === 'keepers' ? (
         <>
@@ -355,14 +397,59 @@ function CommunityScreen() {
           }}
           scrollEventThrottle={400}
         >
-          {activityLoading && activities.length === 0 ? (
+          {/* Scope chips. Following/All swap the endpoint; Forums narrows the
+              loaded feed client-side (the endpoints accept one action_type and
+              forum activity is two of them). */}
+          <View style={styles.feedChips}>
+            {([
+              { value: 'following' as const, label: 'Following' },
+              { value: 'all' as const, label: 'All keepers' },
+              { value: 'forums' as const, label: 'Forums', icon: 'forum-outline' },
+            ]).map((opt) => {
+              const active = feedFilter === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[
+                    styles.feedChip,
+                    { borderColor: colors.border, backgroundColor: colors.surface },
+                    active && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
+                  onPress={() => {
+                    if (opt.value === feedFilter) return;
+                    setFeedFilter(opt.value);
+                    // 'forums' reuses whatever global scope 'all' loads, so only
+                    // a following↔global swap needs a refetch.
+                    const scopeChanges =
+                      (opt.value === 'following') !== (feedFilter === 'following');
+                    if (scopeChanges) setActivities([]);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                >
+                  {opt.icon ? (
+                    <MaterialCommunityIcons
+                      name={opt.icon as any}
+                      size={14}
+                      color={active ? '#fff' : colors.textSecondary}
+                    />
+                  ) : null}
+                  <Text style={[styles.feedChipText, { color: active ? '#fff' : colors.textSecondary }]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {activityLoading && visibleActivities.length === 0 ? (
             <View style={styles.centerContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
                 Loading activity...
               </Text>
             </View>
-          ) : activities.length === 0 ? (
+          ) : visibleActivities.length === 0 ? (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="pulse" size={48} color={colors.textTertiary} style={{ marginBottom: 12 }} />
               <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No activity yet</Text>
@@ -390,7 +477,7 @@ function CommunityScreen() {
             </View>
           ) : (
             <>
-              {activities.map((activity) => (
+              {visibleActivities.map((activity) => (
                 <ActivityFeedItem key={activity.id} activity={activity} />
               ))}
 
@@ -480,6 +567,25 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 8,
   },
+
+  // --- Feed scope chips ---
+  feedChips: {
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  feedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  feedChipText: { fontSize: 12.5, fontWeight: '600' },
 
   // --- Compact keeper row (replaces keeperCard) ---
   keeperRow: {

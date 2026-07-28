@@ -125,6 +125,10 @@ export default function TabLayout() {
         name="community"
         options={{
           title: 'Community',
+          // The screen draws its own gradient header (title + scope subtitle +
+          // discover/directory actions), same as Home and Collection. Discover
+          // moved into that header rather than being dropped.
+          headerShown: false,
           headerRight: ({ tintColor: tc }) => (
             <TouchableOpacity
               onPress={() => router.push('/discover')}
