@@ -78,7 +78,52 @@ def main():
             params,
         ).fetchall()
 
-        if not matches:
+        # ── Pass 2: bare epithet + exact common name ──────────────────────
+        #
+        # A pre-consolidation bulk add stored only the species epithet —
+        # "cyaneopubescens" instead of "Chromatopelma cyaneopubescens" — while
+        # keeping the common name intact ("Green Bottle Blue"). Pass 1 can't
+        # see these because there's no genus to match on.
+        #
+        # Requiring BOTH halves to agree is what makes this safe: an epithet
+        # alone is ambiguous across genera (several taxa have a "rufus"), and a
+        # common name alone is ambiguous across species. Together, with the
+        # taxon constraint, a false positive would need two independent
+        # collisions.
+        #
+        # HAVING COUNT(DISTINCT s.id) = 1 drops anything that still resolves to
+        # more than one catalog row rather than picking arbitrarily — a wrong
+        # link would attach confidently wrong husbandry to a live animal, which
+        # is worse than leaving it unlinked.
+        epithet_matches = db.execute(
+            text(
+                f"""
+                SELECT i.id AS invert_id, i.taxon, i.scientific_name,
+                       MIN(s.id::text)::uuid       AS species_id,
+                       MIN(s.scientific_name)      AS canonical_name
+                FROM inverts i
+                JOIN invert_species s
+                  ON s.taxon = i.taxon
+                 AND lower(split_part(s.scientific_name, ' ', 2)) = lower(trim(i.scientific_name))
+                 AND EXISTS (
+                       SELECT 1 FROM unnest(s.common_names) c
+                       WHERE lower(trim(c)) = lower(trim(i.common_name))
+                     )
+                WHERE i.species_id IS NULL
+                  AND i.scientific_name IS NOT NULL AND trim(i.scientific_name) <> ''
+                  AND i.common_name IS NOT NULL AND trim(i.common_name) <> ''
+                  AND position(' ' in trim(i.scientific_name)) = 0
+                  AND i.transferred_out_at IS NULL
+                  {where_user}
+                GROUP BY i.id, i.taxon, i.scientific_name
+                HAVING COUNT(DISTINCT s.id) = 1
+                ORDER BY i.taxon, i.scientific_name
+                """
+            ),
+            params,
+        ).fetchall()
+
+        if not matches and not epithet_matches:
             print("Nothing to link — no unlinked inverts match the catalog.")
             return
 
@@ -98,6 +143,35 @@ def main():
                         {"sid": m.species_id, "iid": m.invert_id},
                     )
                 bumps[m.species_id] = bumps.get(m.species_id, 0) + 1
+
+        for m in epithet_matches:
+            legacy = LEGACY_TABLE.get(m.taxon)
+            tag = f"+legacy {legacy}" if legacy else "inverts only"
+            print(
+                f"  REPAIR {m.taxon:10s} {m.scientific_name:20s} -> "
+                f"{m.canonical_name:32s} ({tag})"
+            )
+            if args.commit:
+                # Repair the stripped genus on the animal record too, so the
+                # detail screen and exports stop showing a bare epithet.
+                db.execute(
+                    text(
+                        "UPDATE inverts SET species_id = :sid, scientific_name = :name "
+                        "WHERE id = :iid AND species_id IS NULL"
+                    ),
+                    {"sid": m.species_id, "name": m.canonical_name, "iid": m.invert_id},
+                )
+                if legacy:
+                    db.execute(
+                        text(
+                            f"UPDATE {legacy} SET species_id = :sid, scientific_name = :name "
+                            "WHERE id = :iid AND species_id IS NULL"
+                        ),
+                        {"sid": m.species_id, "name": m.canonical_name, "iid": m.invert_id},
+                    )
+                bumps[m.species_id] = bumps.get(m.species_id, 0) + 1
+
+        matches = list(matches) + list(epithet_matches)
 
         if args.commit:
             for sid, n in bumps.items():
