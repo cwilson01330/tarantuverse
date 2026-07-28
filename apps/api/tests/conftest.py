@@ -42,12 +42,26 @@ TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
 # ── Hard skip when test DB unconfigured ───────────────────────────────────────
 
-def pytest_collection_modifyitems(config, items):
-    """If no test DB is wired up, skip the entire suite with a clear reason.
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "requires_postgres: needs a migrated Postgres at TEST_DATABASE_URL",
+    )
 
-    Rather than let individual tests blow up on `get_db` calls, mark every
-    collected test as skipped with an instructive message. Keeps the
-    landmine-on-fresh-clone problem from happening.
+
+def pytest_collection_modifyitems(config, items):
+    """Skip only the tests that genuinely need a database.
+
+    This used to skip EVERY collected test when `TEST_DATABASE_URL` was unset,
+    which meant pure-logic unit tests were skipped too — and a module could
+    "pass" in CI while never executing. That bit us on the pricing estimator:
+    six tests covering contributor thresholds, deduplication and outlier
+    handling ran green locally by direct invocation and were silently skipped
+    by `pytest apps/api`, so the module with the highest risk of quietly
+    re-fabricating numbers had no regression protection at all.
+
+    Tests that touch the DB must now say so with `@pytest.mark.requires_postgres`.
+    Everything else runs unconditionally.
     """
     if TEST_DATABASE_URL:
         return
@@ -58,7 +72,8 @@ def pytest_collection_modifyitems(config, items):
         )
     )
     for item in items:
-        item.add_marker(skip)
+        if item.get_closest_marker("requires_postgres"):
+            item.add_marker(skip)
 
 
 # ── Engine / session fixtures ────────────────────────────────────────────────

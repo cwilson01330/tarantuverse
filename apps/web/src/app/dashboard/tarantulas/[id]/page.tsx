@@ -21,6 +21,7 @@ import { daysBetween, formatLocalDate } from '@/lib/date'
 interface Tarantula {
   id: string
   species_id?: string
+  life_stage?: "sling" | "juvenile" | "adult"
   common_name: string
   scientific_name: string
   sex?: string
@@ -109,23 +110,30 @@ interface GrowthDataPoint {
   leg_span_change?: number
 }
 
-interface PremoltIndicator {
-  name: string
-  description: string
-  score_contribution: number
-  confidence: string
-}
-
+/**
+ * Canonical premolt shape, matching apps/api/app/schemas/premolt.py.
+ *
+ * Deliberately has NO `probability` field. The service does not compute one —
+ * the legacy /tarantulas/{id}/premolt-prediction endpoint that invented a
+ * percentage has been deleted. We report a boolean call plus the raw
+ * observations that produced it, and let the keeper judge.
+ */
 interface PremoltPrediction {
   tarantula_id: string
-  probability: number
-  confidence_level: string
-  status_text: string
-  indicators: PremoltIndicator[]
-  days_since_last_molt?: number
-  consecutive_refusals: number
-  recent_refusal_rate: number
-  expected_molt_window?: string
+  tarantula_name: string
+  is_premolt_likely: boolean
+  confidence: 'high' | 'medium' | 'low' | string
+  data_quality: 'good' | 'fair' | 'insufficient' | string
+  days_since_last_molt?: number | null
+  average_molt_interval?: number | null
+  molt_interval_progress?: number | null
+  recent_refusal_streak: number
+  refusal_rate_last_30_days?: number | null
+  estimated_molt_window_days?: number | null
+  last_molt_date?: string | null
+  last_feeding_date?: string | null
+  feeding_count: number
+  molt_count: number
 }
 
 interface GrowthAnalytics {
@@ -795,7 +803,11 @@ export default function TarantulaDetailPage() {
   const fetchPremoltPrediction = async (token: string) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${API_URL}/api/v1/tarantulas/${id}/premolt-prediction`, {
+      // Canonical per-animal endpoint. The legacy
+      // /tarantulas/{id}/premolt-prediction route this replaced ran a second,
+      // different algorithm, so this page could contradict the dashboard and
+      // the collection grid about the same animal.
+      const response = await fetch(`${API_URL}/api/v1/premolt/tarantulas/${id}/prediction`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -969,7 +981,7 @@ export default function TarantulaDetailPage() {
             >
               ← Back
             </button>
-            
+
             <h1 className="text-5xl font-bold text-white mb-2 drop-shadow-lg">
               {tarantula.common_name}
             </h1>
@@ -1275,62 +1287,97 @@ export default function TarantulaDetailPage() {
             <div className="space-y-6">
               {/* Pricing Card */}
               {tarantula.species_id && (
-                <PricingCard tarantulaId={tarantula.id} token={token} />
+                <PricingCard
+                  tarantulaId={tarantula.id}
+                  speciesId={tarantula.species_id}
+                  lifeStage={tarantula.life_stage}
+                  token={token}
+                />
               )}
 
-              {/* Premolt Prediction Card */}
+              {/* Premolt Prediction Card
+                  Mirrors apps/mobile/src/components/PremoltPredictionCard.tsx.
+                  Reports a boolean call plus the raw observations behind it —
+                  no invented probability percentage, and an explicit
+                  "not enough data" state rather than a confident-looking 0%. */}
               {premoltPrediction && (
-                <div className={`rounded-2xl shadow-lg p-6 text-white ${
-                  premoltPrediction.confidence_level === 'very_high' ? 'bg-gradient-to-br from-red-600 to-red-700' :
-                  premoltPrediction.confidence_level === 'high' ? 'bg-gradient-to-br from-orange-600 to-orange-700' :
-                  premoltPrediction.confidence_level === 'medium' ? 'bg-gradient-to-br from-yellow-600 to-yellow-700' :
-                  'bg-gradient-to-br from-gray-600 to-gray-700'
-                }`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold">🦋 Premolt Predictor</h3>
-                    <div className="text-3xl font-bold">{premoltPrediction.probability}%</div>
+                premoltPrediction.data_quality === 'insufficient' ? (
+                  <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
+                      💡 Premolt Prediction
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Not enough history yet. Log feedings and molts and this will start
+                      reporting premolt signs.
+                    </p>
                   </div>
-
-                  <div className="mb-4">
-                    <p className="text-sm font-semibold mb-2">{premoltPrediction.status_text}</p>
-                    <div className="w-full bg-white bg-opacity-20 rounded-full h-2.5">
-                      <div
-                        className="bg-white h-2.5 rounded-full"
-                        style={{ width: `${premoltPrediction.probability}%` }}
-                      ></div>
+                ) : (
+                  <div className={`rounded-2xl shadow-lg p-6 border ${
+                    !premoltPrediction.is_premolt_likely
+                      ? 'bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30'
+                      : premoltPrediction.confidence === 'high'
+                        ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30'
+                        : premoltPrediction.confidence === 'medium'
+                          ? 'bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/30'
+                          : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                  }`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        🔮 Premolt Prediction
+                      </h3>
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold uppercase tracking-wide bg-white/70 dark:bg-white/10 text-gray-700 dark:text-gray-200">
+                        {premoltPrediction.confidence} confidence
+                      </span>
                     </div>
-                  </div>
 
-                  {premoltPrediction.indicators.length > 0 && (
-                    <div className="space-y-2 mt-4 pt-4 border-t border-white border-opacity-20">
-                      <p className="text-xs font-semibold uppercase tracking-wide opacity-90">Why This Score?</p>
-                      {premoltPrediction.indicators.map((indicator, idx) => (
-                        <div key={idx} className="text-sm">
-                          <div className="flex justify-between items-start gap-2">
-                            <span className="font-medium">{indicator.name}</span>
-                            <span className="text-xs opacity-75">+{indicator.score_contribution}</span>
-                          </div>
-                          <p className="text-xs opacity-90 mt-0.5">{indicator.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    <p className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                      {premoltPrediction.is_premolt_likely
+                        ? '🦋 Likely in premolt'
+                        : '✅ No premolt signs'}
+                    </p>
 
-                  {premoltPrediction.days_since_last_molt !== null && premoltPrediction.days_since_last_molt !== undefined && (
-                    <div className="mt-4 pt-4 border-t border-white border-opacity-20 text-xs opacity-90">
-                      <div className="flex justify-between">
-                        <span>Days since last molt:</span>
-                        <span className="font-semibold">{premoltPrediction.days_since_last_molt}</span>
-                      </div>
-                      {premoltPrediction.expected_molt_window && (
-                        <div className="flex justify-between mt-1">
-                          <span>Expected window:</span>
-                          <span className="font-semibold">{premoltPrediction.expected_molt_window}</span>
+                    {/* The observations the call was made from. Shown so the keeper
+                        can disagree with it — the animal is the source of truth. */}
+                    <dl className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                      {premoltPrediction.recent_refusal_streak > 0 && (
+                        <div className="flex justify-between">
+                          <dt>Consecutive feeding refusals</dt>
+                          <dd className="font-semibold">{premoltPrediction.recent_refusal_streak}</dd>
                         </div>
                       )}
-                    </div>
-                  )}
-                </div>
+                      {premoltPrediction.days_since_last_molt != null && (
+                        <div className="flex justify-between">
+                          <dt>Days since last molt</dt>
+                          <dd className="font-semibold">{premoltPrediction.days_since_last_molt}</dd>
+                        </div>
+                      )}
+                      {premoltPrediction.average_molt_interval != null && (
+                        <div className="flex justify-between">
+                          <dt>Average molt interval</dt>
+                          <dd className="font-semibold">
+                            {Math.round(premoltPrediction.average_molt_interval)} days
+                          </dd>
+                        </div>
+                      )}
+                      {premoltPrediction.molt_interval_progress != null && (
+                        <div className="flex justify-between">
+                          <dt>Progress through that interval</dt>
+                          <dd className="font-semibold">
+                            {Math.round(premoltPrediction.molt_interval_progress)}%
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
+
+                    {premoltPrediction.data_quality === 'fair' && (
+                      <p className="mt-4 pt-3 border-t border-black/10 dark:border-white/10 text-xs text-gray-600 dark:text-gray-400">
+                        Based on limited history ({premoltPrediction.molt_count} molt
+                        {premoltPrediction.molt_count === 1 ? '' : 's'} logged) — treat as a
+                        nudge to look closer, not a verdict.
+                      </p>
+                    )}
+                  </div>
+                )
               )}
 
               {/* Pause / resume button — toggles the feeding-pause flag on
@@ -1926,7 +1973,7 @@ export default function TarantulaDetailPage() {
         {activeTab === 'husbandry' && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-8">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Husbandry Details</h2>
-            
+
             {(tarantula.enclosure_type || tarantula.enclosure_size || tarantula.substrate_type || tarantula.target_temp_min || tarantula.target_humidity_min) ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {tarantula.enclosure_type && (
@@ -2201,11 +2248,11 @@ export default function TarantulaDetailPage() {
 
       {/* Photo Viewer Modal */}
       {selectedPhoto && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedPhoto(null)}
         >
-          <div 
+          <div
             className="relative max-w-6xl w-full max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
@@ -2224,7 +2271,7 @@ export default function TarantulaDetailPage() {
                 alt={selectedPhoto.caption || 'Tarantula photo'}
                 className="w-full h-auto max-h-[80vh] object-contain"
               />
-              
+
               {/* Photo Info Overlay */}
               {selectedPhoto.caption && (
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-6">

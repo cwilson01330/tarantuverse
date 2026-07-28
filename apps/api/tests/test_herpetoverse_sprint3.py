@@ -23,6 +23,12 @@ from datetime import datetime, timezone, date
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+# Every test in this module hits the real Postgres schema (see the module
+# docstring — `num_nonnulls(...)` has no SQLite equivalent), so the whole file
+# is gated on TEST_DATABASE_URL. Conftest skips only what carries this marker;
+# unmarked tests run unconditionally.
+pytestmark = pytest.mark.requires_postgres
+
 
 # ── Snake CRUD ────────────────────────────────────────────────────────────────
 

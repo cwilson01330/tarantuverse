@@ -83,12 +83,12 @@ function CommunityScreen() {
     }
   };
 
-  const fetchActivities = async (reset = false) => {
+  const fetchActivities = async (reset = false, pageOverride?: number) => {
     try {
       setActivityLoading(true);
       const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
       const token = await AsyncStorage.getItem('token');
-      const currentPage = reset ? 1 : activityPage;
+      const currentPage = reset ? 1 : pageOverride ?? activityPage;
       
       // Scope comes from the filter chip:
       //   following → /activity/feed   (server-side: users you follow only)
@@ -100,9 +100,10 @@ function CommunityScreen() {
       // forum_post), so one request can't express it server-side.
       const wantsFollowing = feedFilter === 'following' && !!token;
       const endpoint = wantsFollowing ? '/api/v1/activity/feed' : '/api/v1/activity/global';
+      const actionTypeParam = feedFilter === 'forums' ? '&action_type=forums' : '';
 
       const response = await fetch(
-        `${API_URL}${endpoint}?page=${currentPage}&limit=20`,
+        `${API_URL}${endpoint}?page=${currentPage}&limit=20${actionTypeParam}`,
         {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         }
@@ -129,8 +130,14 @@ function CommunityScreen() {
 
   const loadMoreActivities = () => {
     if (!activityLoading && hasMoreActivities) {
-      setActivityPage(activityPage + 1);
-      fetchActivities();
+      // Pass the page EXPLICITLY. `setActivityPage` doesn't mutate the
+      // captured `activityPage` in this closure, so calling fetchActivities()
+      // straight after the setter re-requested the page we already had and
+      // appended it a second time — duplicate rows in the feed on every
+      // scroll-to-bottom.
+      const nextPage = activityPage + 1;
+      setActivityPage(nextPage);
+      fetchActivities(false, nextPage);
     }
   };
 
@@ -167,13 +174,12 @@ function CommunityScreen() {
     return { bg: base + '24', text: base };
   };
 
-  // Forums chip narrows the loaded feed to the two forum activity types.
-  const visibleActivities =
-    feedFilter === 'forums'
-      ? activities.filter(
-          (a) => a.activity_type === 'forum_thread' || a.activity_type === 'forum_post',
-        )
-      : activities;
+  // Forums is now a SERVER-side filter (`action_type=forums`, which the API
+  // expands to forum_thread + forum_post), so what's loaded is already the
+  // right set. It used to be filtered here in JS across the loaded page only,
+  // which meant forum activity sitting on page 2 produced an empty feed that
+  // read as "no forum activity exists".
+  const visibleActivities = activities;
 
   const formatSpecialty = (specialty: string) => {
     return specialty.split('_').map(word => 
@@ -418,11 +424,14 @@ function CommunityScreen() {
                   onPress={() => {
                     if (opt.value === feedFilter) return;
                     setFeedFilter(opt.value);
-                    // 'forums' reuses whatever global scope 'all' loads, so only
-                    // a following↔global swap needs a refetch.
-                    const scopeChanges =
-                      (opt.value === 'following') !== (feedFilter === 'following');
-                    if (scopeChanges) setActivities([]);
+                    // EVERY chip change now refetches. Forums is a server-side
+                    // filter (`action_type=forums`), so it can no longer be
+                    // satisfied by narrowing what's already loaded — and the
+                    // page counter has to reset with it, or page 2 of the old
+                    // scope gets appended to page 1 of the new one.
+                    setActivities([]);
+                    setActivityPage(1);
+                    setHasMoreActivities(true);
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}

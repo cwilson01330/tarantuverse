@@ -15,6 +15,28 @@ from app.routers.auth import get_current_user
 
 router = APIRouter(prefix="/api/v1/activity", tags=["activity"])
 
+# Forum activity is TWO action types. A client that wants "just forum posts"
+# therefore can't express it with a single equality filter, and the mobile
+# Forums chip was compensating by filtering the already-loaded page in JS —
+# which meant a keeper whose forum activity happened to fall on page 2 saw an
+# empty feed that read as "no forum activity exists". Absence of loaded data
+# presented as absence of data is the exact failure this codebase keeps trying
+# to design out, so the grouping belongs on the server where it can see every
+# page.
+ACTION_TYPE_GROUPS: dict[str, list[str]] = {
+    "forums": ["forum_thread", "forum_post"],
+}
+
+
+def _apply_action_type(query, action_type: Optional[str]):
+    """Filter by a single action type, or by a named group of them."""
+    if not action_type:
+        return query
+    group = ACTION_TYPE_GROUPS.get(action_type)
+    if group:
+        return query.filter(ActivityFeed.action_type.in_(group))
+    return query.filter(ActivityFeed.action_type == action_type)
+
 
 # ============================================================================
 # Activity Feed Endpoints
@@ -24,7 +46,7 @@ router = APIRouter(prefix="/api/v1/activity", tags=["activity"])
 async def get_personalized_feed(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    action_type: Optional[str] = Query(None, regex="^(new_tarantula|molt|feeding|follow|forum_thread|forum_post)$"),
+    action_type: Optional[str] = Query(None, regex="^(new_tarantula|molt|feeding|follow|forum_thread|forum_post|forums)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -46,12 +68,19 @@ async def get_personalized_feed(
     ).join(
         User, ActivityFeed.user_id == User.id
     ).filter(
-        ActivityFeed.user_id.in_(following_subquery)
+        ActivityFeed.user_id.in_(following_subquery),
+        # Same visibility rule as the global feed. Following is NOT approval:
+        # follows are one-sided and require no consent from the followed
+        # keeper, so "someone followed me" cannot be treated as permission to
+        # read a private collection's activity. Without this, going private
+        # would hide you from strangers while leaving you fully visible to
+        # anyone who had already followed you — the opposite of what the
+        # setting promises.
+        User.collection_visibility == "public",
     )
-    
+
     # Filter by action type if specified
-    if action_type:
-        query = query.filter(ActivityFeed.action_type == action_type)
+    query = _apply_action_type(query, action_type)
     
     # Order by most recent
     query = query.order_by(desc(ActivityFeed.created_at))
@@ -92,12 +121,25 @@ async def get_personalized_feed(
 async def get_global_feed(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    action_type: Optional[str] = Query(None, regex="^(new_tarantula|molt|feeding|follow|forum_thread|forum_post)$"),
+    action_type: Optional[str] = Query(None, regex="^(new_tarantula|molt|feeding|follow|forum_thread|forum_post|forums)$"),
     db: Session = Depends(get_db)
 ):
     """
-    Get global activity feed (all public activity)
-    Shows activity from all users
+    Get global activity feed — PUBLIC ACCOUNTS ONLY.
+
+    This endpoint is unauthenticated. It previously joined `users` purely to
+    decorate rows with a username and avatar, and returned activity for EVERY
+    account regardless of `collection_visibility` — so an anonymous caller
+    could read the animal names, species, photo URLs and feeding outcomes of
+    keepers whose collections were set to private. Account-default-private
+    protected the keeper/profile endpoints; it never reached this one.
+
+    Visibility is enforced HERE, at read time, deliberately. Filtering only at
+    write time would freeze the decision at the moment the activity row was
+    created, so a keeper who later switched to private would leave everything
+    they had already logged permanently exposed. Checking on read means the
+    setting is retroactive, which is what a privacy control has to be to mean
+    anything.
     """
     # Build query for all activities
     query = db.query(
@@ -107,11 +149,12 @@ async def get_global_feed(
         User.avatar_url
     ).join(
         User, ActivityFeed.user_id == User.id
+    ).filter(
+        User.collection_visibility == "public"
     )
-    
+
     # Filter by action type if specified
-    if action_type:
-        query = query.filter(ActivityFeed.action_type == action_type)
+    query = _apply_action_type(query, action_type)
     
     # Order by most recent
     query = query.order_by(desc(ActivityFeed.created_at))
@@ -153,7 +196,7 @@ async def get_user_activity(
     username: str,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    action_type: Optional[str] = Query(None, regex="^(new_tarantula|molt|feeding|follow|forum_thread|forum_post)$"),
+    action_type: Optional[str] = Query(None, regex="^(new_tarantula|molt|feeding|follow|forum_thread|forum_post|forums)$"),
     db: Session = Depends(get_db)
 ):
     """
@@ -184,8 +227,7 @@ async def get_user_activity(
     )
     
     # Filter by action type if specified
-    if action_type:
-        query = query.filter(ActivityFeed.action_type == action_type)
+    query = _apply_action_type(query, action_type)
     
     # Order by most recent
     query = query.order_by(desc(ActivityFeed.created_at))

@@ -33,11 +33,18 @@ interface FeedingStatus {
   feeding_paused_reason?: string | null
 }
 
+/**
+ * Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction.
+ *
+ * No `probability` — the retired legacy endpoint's 0–100 score was never
+ * calibrated against recorded molt outcomes. `confidence` describes how much
+ * data supports the call, not predictive accuracy.
+ */
 interface PremoltPrediction {
   tarantula_id: string
-  probability: number
-  confidence_level: string
-  status_text: string
+  is_premolt_likely: boolean
+  confidence: string
+  data_quality: string
 }
 
 // --- Multi-taxon (ADR-006) -------------------------------------------------
@@ -252,31 +259,31 @@ export default function TarantulasPage() {
     setFeedingStatuses(statusMap)
   }
 
-  const fetchAllPremoltPredictions = async (token: string, tarantulasList: Tarantula[]) => {
+  /**
+   * Premolt signals from the canonical /premolt/dashboard service.
+   *
+   * Replaces N calls to the legacy /tarantulas/{id}/premolt-prediction
+   * endpoint, which ran a different algorithm and could therefore disagree
+   * with the dashboard about the same animal.
+   */
+  const fetchAllPremoltPredictions = async (token: string, _tarantulasList: Tarantula[]) => {
     const predictionMap = new Map<string, PremoltPrediction>()
 
-    await Promise.all(
-      tarantulasList.map(async (t) => {
-        try {
-          const response = await fetch(`${API_URL}/api/v1/tarantulas/${t.id}/premolt-prediction`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          })
-          if (response.ok) {
-            const data = await response.json()
-            predictionMap.set(t.id, {
-              tarantula_id: t.id,
-              probability: data.probability,
-              confidence_level: data.confidence_level,
-              status_text: data.status_text,
-            })
-          }
-        } catch {
-          // Individual premolt prediction failed - skip
-        }
+    try {
+      const response = await fetch(`${API_URL}/api/v1/premolt/dashboard`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       })
-    )
+      if (response.ok) {
+        const data = await response.json()
+        for (const p of (data?.predictions ?? []) as PremoltPrediction[]) {
+          predictionMap.set(p.tarantula_id, p)
+        }
+      }
+    } catch {
+      // See the mobile equivalent: an empty map reads as "no signals", which
+      // is not the same as "we could not check". Tracked with the shared
+      // unavailable-state contract, not fixed here.
+    }
 
     setPremoltPredictions(predictionMap)
   }
@@ -327,22 +334,15 @@ export default function TarantulasPage() {
     const prediction = premoltPredictions.get(tarantulaId)
     if (!prediction) return null
 
-    // Only show badge for medium or higher confidence
-    if (prediction.confidence_level === 'low') return null
-
-    let bgColor = 'bg-gray-500/90'
-
-    if (prediction.confidence_level === 'very_high') {
-      bgColor = 'bg-red-500/90'
-    } else if (prediction.confidence_level === 'high') {
-      bgColor = 'bg-orange-500/90'
-    } else if (prediction.confidence_level === 'medium') {
-      bgColor = 'bg-yellow-500/90'
+    // Both required: the service says premolt is likely, AND it had enough
+    // history to say so. 'insufficient' data quality means the signal is noise.
+    if (!prediction.is_premolt_likely || prediction.data_quality === 'insufficient') {
+      return null
     }
 
     return (
-      <span className={`px-3 py-1 rounded-full ${bgColor} backdrop-blur-sm text-white text-xs font-semibold shadow-lg`}>
-        🦋 {prediction.probability}% Premolt
+      <span className="px-3 py-1 rounded-full bg-yellow-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
+        🦋 Premolt
       </span>
     )
   }
@@ -719,13 +719,12 @@ export default function TarantulasPage() {
                                 )}
                               </td>
                               <td className="px-4 py-3 hidden lg:table-cell align-middle">
-                                {isT && premoltPrediction && premoltPrediction.confidence_level !== 'low' ? (
-                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                                    premoltPrediction.confidence_level === 'very_high' ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
-                                    premoltPrediction.confidence_level === 'high' ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
-                                    'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300'
-                                  }`}>
-                                    🦋 {premoltPrediction.probability}%
+                                {isT
+                                  && premoltPrediction
+                                  && premoltPrediction.is_premolt_likely
+                                  && premoltPrediction.data_quality !== 'insufficient' ? (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300">
+                                    🦋 Premolt
                                   </span>
                                 ) : (
                                   <span className="text-theme-tertiary text-sm">—</span>

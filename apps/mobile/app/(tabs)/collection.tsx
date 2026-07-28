@@ -95,11 +95,26 @@ interface FeedingStatus {
   is_overdue?: boolean;
 }
 
+/**
+ * Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction.
+ *
+ * This deliberately has NO `probability`. The retired legacy endpoint
+ * returned an additive 0–100 score that was never calibrated against recorded
+ * molt outcomes — a number that looked like a measurement and wasn't. The
+ * canonical service reports a boolean plus the observations behind it, which
+ * is what we can actually stand behind.
+ *
+ * `confidence` describes how much DATA supports the call (interval history,
+ * refusal streak length), not predictive accuracy. Don't render it as a
+ * likelihood.
+ */
 interface PremoltPrediction {
   tarantula_id: string;
-  probability: number;
-  confidence_level: string;
-  status_text: string;
+  is_premolt_likely: boolean;
+  confidence: 'high' | 'medium' | 'low' | string;
+  data_quality: 'good' | 'fair' | 'insufficient' | string;
+  recent_refusal_streak?: number;
+  days_since_last_molt?: number | null;
 }
 
 // Taxon discriminator drives the FlatList row dispatcher: tarantulas
@@ -342,25 +357,33 @@ function CollectionScreen() {
     }
   };
 
-  const fetchAllPremoltPredictions = async (tarantulasList: Tarantula[]) => {
+  /**
+   * Premolt signals for the whole collection, from the canonical service.
+   *
+   * This was the LAST caller of `/tarantulas/{id}/premolt-prediction` on
+   * mobile. That endpoint ran a different algorithm from `/premolt/dashboard`
+   * — additive "probability" points versus refusal-streak + molt-interval
+   * analysis — so the same animal could be flagged on one screen and not the
+   * other. Home already moved; this screen was still on the legacy one, which
+   * is why the collection grid and the dashboard could disagree.
+   *
+   * Also collapses N requests into one.
+   */
+  const fetchAllPremoltPredictions = async (_tarantulasList: Tarantula[]) => {
     const predictionMap = new Map<string, PremoltPrediction>();
-
-    await Promise.all(
-      tarantulasList.map(async (t) => {
-        try {
-          const response = await apiClient.get(`/tarantulas/${t.id}/premolt-prediction`);
-          predictionMap.set(t.id, {
-            tarantula_id: t.id,
-            probability: response.data.probability,
-            confidence_level: response.data.confidence_level,
-            status_text: response.data.status_text,
-          });
-        } catch (error) {
-          // Silently fail for individual tarantulas
-        }
-      })
-    );
-
+    try {
+      const response = await apiClient.get('/premolt/dashboard');
+      const predictions: PremoltPrediction[] = response.data?.predictions ?? [];
+      for (const p of predictions) {
+        predictionMap.set(p.tarantula_id, p);
+      }
+    } catch {
+      // NB: an empty map currently renders as "no premolt signals", which
+      // conflates a failed request with a confirmed negative. That's the
+      // loading ≠ unavailable ≠ verified-zero problem and it is NOT fixed
+      // here — it needs the shared {status, data, checkedAt} contract, which
+      // is its own change across every operational widget.
+    }
     setPremoltPredictions(predictionMap);
   };
 
@@ -385,31 +408,33 @@ function CollectionScreen() {
   // that made this screen disagree with Home. AnimalCard's status footer
   // replaced it, and it reads the server's per-species `is_overdue`.
 
-  const getPremoltBadge = (tarantulaId: string) => {
+  /**
+   * Whether to show the premolt marker for an animal.
+   *
+   * Two conditions, both required: the service says premolt is likely, AND it
+   * had enough data to say so. `data_quality === 'insufficient'` means the
+   * animal has too little molt/feeding history for the signal to mean
+   * anything, and surfacing it anyway is how a guess becomes a claim.
+   */
+  const showsPremolt = (tarantulaId: string): boolean => {
     const prediction = premoltPredictions.get(tarantulaId);
-    if (!prediction) return null;
+    if (!prediction) return false;
+    return prediction.is_premolt_likely && prediction.data_quality !== 'insufficient';
+  };
 
-    // Only show badge for medium or higher confidence
-    if (prediction.confidence_level === 'low') return null;
+  const getPremoltBadge = (tarantulaId: string) => {
+    if (!showsPremolt(tarantulaId)) return null;
 
-    let badgeStyle = styles.premoltBadgeGray;
-
-    if (prediction.confidence_level === 'very_high') {
-      badgeStyle = styles.premoltBadgeRed;
-    } else if (prediction.confidence_level === 'high') {
-      badgeStyle = styles.premoltBadgeOrange;
-    } else if (prediction.confidence_level === 'medium') {
-      badgeStyle = styles.premoltBadgeYellow;
-    }
-
+    // No percentage. The number this used to print came from an uncalibrated
+    // additive score on an endpoint that no longer exists; the canonical
+    // service reports a boolean and the observations behind it. A word is an
+    // honest summary of a boolean — "84%" was not.
     return (
       <View
-        style={[styles.premoltBadge, badgeStyle]}
-        accessibilityLabel={`Likely in premolt, ${prediction.probability}% probability`}
+        style={[styles.premoltBadge, styles.premoltBadgeYellow]}
+        accessibilityLabel="Premolt signals detected"
       >
-        <Text style={styles.premoltBadgeText}>
-          🦋 {prediction.probability}%
-        </Text>
+        <Text style={styles.premoltBadgeText}>🦋 Premolt</Text>
       </View>
     );
   };
@@ -644,7 +669,7 @@ function CollectionScreen() {
           // Server-computed, per species + life stage — see loadFeedingStatuses.
           isOverdue: status?.is_overdue,
         }}
-        premolt={!!prediction && prediction.confidence_level !== 'low'}
+        premolt={showsPremolt(item.id)}
         onPress={() => router.push(`/tarantula/${item.id}`)}
         onLongPress={() => setActionTarget(item)}
         colors={colors}
@@ -834,12 +859,14 @@ function CollectionScreen() {
               <Text style={styles.listBadgeText}>{days === 0 ? 'Today' : `${days}d`}</Text>
             </View>
           )}
-          {premoltPrediction && premoltPrediction.confidence_level !== 'low' && (
+          {premoltPrediction
+            && premoltPrediction.is_premolt_likely
+            && premoltPrediction.data_quality !== 'insufficient' && (
             <View
               style={[styles.listBadge, { backgroundColor: '#f97316' }]}
-              accessibilityLabel={`Likely in premolt, ${premoltPrediction.probability}% probability`}
+              accessibilityLabel="Premolt signals detected"
             >
-              <Text style={styles.listBadgeText}>🦋 {premoltPrediction.probability}%</Text>
+              <Text style={styles.listBadgeText}>🦋 Premolt</Text>
             </View>
           )}
         </View>
