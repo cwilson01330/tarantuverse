@@ -70,6 +70,15 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   tarantulaId: string;
+  /**
+   * Which collection surface owns this animal.
+   *
+   * 'tarantulas' keeps the legacy path for the old tarantula screen; 'inverts'
+   * targets PUT /inverts/{id}, which accepts the same two pause fields
+   * (schemas/invert.py) and works for every taxon. Defaulted so existing call
+   * sites are unaffected.
+   */
+  resource?: 'tarantulas' | 'inverts';
   tarantulaName?: string | null;
   /** Current reason, if any — passed in so resume makes sense. */
   currentReason: string | null;
@@ -82,6 +91,7 @@ export function PauseFeedingSheet({
   visible,
   onClose,
   tarantulaId,
+  resource = 'tarantulas',
   tarantulaName,
   currentReason,
   currentUntil,
@@ -133,7 +143,7 @@ export function PauseFeedingSheet({
       // apiClient.baseURL already includes /api/v1 — don't double-prefix.
       // Bug 2026-05-06: prod logs showed PUT /api/v1/api/v1/tarantulas/...
       // 404 because the path was prefixed twice.
-      const res = await apiClient.put(`/tarantulas/${tarantulaId}`, {
+      const res = await apiClient.put(`/${resource}/${tarantulaId}`, {
         feeding_paused_reason: reason,
         feeding_paused_until: until.trim() || null,
       });
@@ -168,7 +178,7 @@ export function PauseFeedingSheet({
     setError(null);
     setSubmitting(true);
     try {
-      const res = await apiClient.put(`/tarantulas/${tarantulaId}`, {
+      const res = await apiClient.put(`/${resource}/${tarantulaId}`, {
         feeding_paused_reason: null,
         feeding_paused_until: null,
       });

@@ -2,7 +2,7 @@
 
 ## Overview
 
-A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the twelve highest-traffic screens:
+A design review of the two React Native (Expo) keeper apps in the `tarantuverse` monorepo, with proposed revisions for the thirteen highest-traffic screens:
 
 | App | Screen | Source file today |
 |---|---|---|
@@ -18,6 +18,7 @@ A design review of the two React Native (Expo) keeper apps in the `tarantuverse`
 | Herpetoverse | Animal detail | `src/screens/AnimalDetailScreen.tsx` + `src/components/reptile-detail/ReptileDetailShared.tsx` |
 | Herpetoverse | Add reptile | `app/reptile/add.tsx` |
 | Herpetoverse | Breeding | `app/(tabs)/breeding.tsx` |
+| Tarantuverse | Community / Activity / Forums | `(tabs)/community.tsx`, `(tabs)/forums.tsx`, `app/forums/*`, `app/community/forums/*`, `src/components/ActivityFeedItem.tsx` |
 
 The brief was **flow, consistency, and discoverability** — not a repaint. The Tarantuverse gradient identity stays. The changes are hierarchy, navigation, and card structure.
 
@@ -424,6 +425,63 @@ File: `app/(tabs)/breeding.tsx`
 
 ---
 
+## Screen 13 — Tarantuverse Community, Activity & Forums
+
+**Purpose:** give keepers a reason to open the app when none of their animals need anything.
+
+### The structural problem
+
+**Forums exist three times:**
+
+| Route | What it is | Reachable? |
+|---|---|---|
+| `app/(tabs)/forums.tsx` | category index | **No** — `href: null` in the tab layout |
+| `app/forums/[category].tsx` + `app/forums/thread/…` | thread list + thread | yes |
+| `app/community/forums/[slug].tsx` + `[slug]/[threadId].tsx` | thread list + thread again | yes |
+
+Two parallel route families for identical content, and the category index that would tie them together can't be opened.
+
+**And the activity feed — the only content in the app that changes on its own — is tab two of Community**, behind a keeper directory that is a one-time browse.
+
+### Two live bugs in `(tabs)/community.tsx`
+
+1. **Wrong skeletons.** The loading branch renders `CategoryCardSkeleton` when `activeTab === 'activity'` — forum-category placeholders for an activity feed. Left over from when tab two was Forums. The screen still fetches `categories` into state and gates `if (loading && keepers.length === 0 && categories.length === 0)` on it, but never renders it. Delete the `categories` state and add a feed skeleton.
+2. **Hardcoded light-mode badge colors.** `getExperienceBadgeColor()` returns literal pairs — `{bg:'#dcfce7',text:'#166534'}` (beginner), `#dbeafe`/`#1e40af` (intermediate), `#f3e8ff`/`#6b21a8` (advanced), `#fef3c7`/`#92400e` (expert) — with no theme access, so experience badges are pale pastel blocks on the dark background. Derive from `colors.success` / `colors.info` / `colors.primary` / `colors.warning` + `'24'` alpha suffix.
+
+### Proposed — Community becomes the feed
+
+1. **Header** — gradient band. Title `Community` `20/700`, subtitle `"Following 14 keepers"`. Right icons: `magnify`, `account-multiple-outline` (opens the keeper directory).
+   - **Delete the two-tab bar.** The feed is the body.
+2. **Filter chips** — `padding: 7 13`, `borderRadius: 10`, `12.5/600`: **Following** (default) · All keepers · Forums (with `forum-outline` 14px).
+3. **Feed cards**, `borderRadius: 16`, three shapes driven by `activity_type`:
+   - **Animal activity** (`animal_added`, `molt_logged`, `feeding_logged`) — 150px photo on top when one exists; actor row (26px avatar, `**Name** verb` `13/400`, relative time right `11/400`); animal name `15.5/600` + scientific `12.5/400 italic`; footer above a hairline with like + comment counts and a contextual link.
+   - **Forum activity** (`thread_created`, `reply_created`) — `forum-outline` avatar tinted `primary`, actor row reading `**Dana** in **Husbandry**`, thread title `15/600`, two-line excerpt `12.5/400`, reply count + "Open thread".
+   - **Social** (`user_followed`) — single compact line, no card body.
+4. **Add reactions.** Like + comment on animal and forum cards. Without them there is no loop — nothing rewards posting, so the feed goes quiet and the tab dies. This is the one genuinely new feature in this screen and it's the difference between a feed and a log.
+5. **Keeper directory** (behind the header icon) — compact rows, not the current cards: 44px avatar, name `15/600`, `@username` `12/400`, one-line bio, experience badge, and a **Follow** button. ~88px per keeper instead of ~300px.
+   - Today's card stacks avatar + name + username + location + 2-line bio + experience badge + years badge + up to 4 specialty chips + a full-width "View Profile" footer, and the whole card is already tappable — so that footer is pure height. Full detail already lives at `/community/[username]`.
+
+### Route consolidation
+
+Pick **one** family. `/community/forums/[slug]/[threadId]` reads best (forums are community). Then:
+
+- Delete `app/forums/[category].tsx`, `app/forums/thread/…`, `app/forums/new-thread.tsx` — or move them under `community/`.
+- Repoint every `router.push('/forums/…')` call.
+- Keep `(tabs)/forums.tsx` as the **category index** but move it out of the tab group; reach it from the Forums filter chip.
+
+### `ActivityFeedItem` cleanup
+
+- Verbs are assembled by concatenation — `\`${displayName} logged a molt for\`` — which prevents styling the actor separately. Return `{actor, verb}` so the actor can be bold and tappable.
+- The `default` case ships **"did something"** to users. Render nothing for unknown types instead.
+- 🕷️ is the avatar placeholder (in both this component and the keeper card) → `account`. 📍 before locations → `map-marker-outline`. 🔍 / 📊 empty states → `account-search-outline` / `pulse`.
+- Forum categories render `category.icon`, a **server-supplied emoji**. Map slugs to MDI names client-side, or add an `icon_name` column.
+
+### State
+
+No new endpoints for the layout work. `GET /activity-feed` already returns the merged stream with `thread_created` / `reply_created` included, so the Forums chip is a client-side filter. Likes and comments are the one addition that needs backend work — scope them separately from the layout change.
+
+---
+
 ## Interactions & behavior
 
 - **Feeding hero check button** → `POST` a feeding via the existing quick-feed path (`quickFeedAnimal` in HV, `handleMarkFed` in TV), then optimistically remove the row and decrement the count. Refetch on settle.
@@ -607,13 +665,14 @@ Herpetoverse's `ThemeContext` exports a single frozen `darkTheme`. Tarantuverse'
 8. Colony population card, quick-log buttons, and the full-width colony row.
 9. HV detail: one feeding card + one timeline + pinned log bar.
 10. HV breeding: season overview, stage pills, progress track, morph-calculator link.
-11. Emoji sweep + shared tokens package.
-12. Port `ThemeContext` to Herpetoverse.
+11. Community → feed-first, forum route consolidation, keeper-directory rows.
+12. Emoji sweep + shared tokens package.
+13. Port `ThemeContext` to Herpetoverse.
 
 ## Files
 
-- `Design Review.dc.html` — the full review: twelve Today/Proposed screen sets, the findings summary, the cross-app system section, and a verified icon appendix. Open in any browser.
+- `Design Review.dc.html` — the full review: thirteen Today/Proposed screen sets, the findings summary, the cross-app system section, and a verified icon appendix. Open in any browser.
 
 ## Not covered in this pass
 
-Settings/Profile, onboarding, Community/Forums, Analytics and Feeders were reviewed at a source level but not redesigned. The Herpetoverse species browser (`apps/mobile-herpetoverse/app/(tabs)/species.tsx`) should inherit the Tarantuverse browser changes once they land.
+Settings/Profile, onboarding, Analytics and Feeders were reviewed at a source level but not redesigned. The Herpetoverse species browser (`apps/mobile-herpetoverse/app/(tabs)/species.tsx`) should inherit the Tarantuverse browser changes once they land.

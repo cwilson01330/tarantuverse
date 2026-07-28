@@ -427,7 +427,9 @@ function DashboardHubScreen() {
   // Detail route for a feeding-status row. Tarantulas keep their bespoke
   // screen; every other taxon renders through the generic invert detail.
   const detailHref = (item: FeedingStatusItem) =>
-    item.taxon === 'tarantula' ? `/tarantula/${item.id}` : `/invert/${item.id}`;
+    // One screen for every taxon now (ADR-013). `/tarantula/{id}` still
+    // resolves — it redirects here — but there's no reason to route through it.
+    `/invert/${item.id}`;
 
   // Sub-line under the hero count, e.g. "5 tarantulas · 2 scorpions".
   // Built from the same rows, so it can never disagree with the number.

@@ -33,6 +33,9 @@ import { SPACING, TYPE } from '../../src/theme/tokens';
 import { taxonHasModule, growthLengthLabel } from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
+import PhotoViewer from '../../src/components/PhotoViewer';
+import QRSheet from '../../src/components/QRSheet';
+import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { getErrorMessage } from '../../src/utils/errors';
 
 function InvertDetailScreen() {
@@ -60,6 +63,11 @@ function InvertDetailScreen() {
   const [timelineLimit, setTimelineLimit] = useState(12);
   const [feedingStats, setFeedingStats] = useState<InvertFeedingStats | null>(null);
   const [markingFed, setMarkingFed] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  // Fullscreen gallery. Tapping a thumbnail used to do nothing on this screen —
+  // only long-press (set hero / delete) was wired.
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const handleTransfer = useCallback(async () => {
     if (!id || transferring) return;
@@ -202,6 +210,8 @@ function InvertDetailScreen() {
   const openOverflow = () => {
     Alert.alert(headerTitle, undefined, [
       { text: 'Edit', onPress: () => router.push(`/invert/edit?id=${id}` as any) },
+      // QR was tarantula-only until the generic upload-session route landed.
+      { text: 'QR label & upload', onPress: () => setQrOpen(true) },
       { text: 'Delete', style: 'destructive', onPress: handleDelete },
       { text: 'Cancel', style: 'cancel' },
     ]);
@@ -510,7 +520,27 @@ function InvertDetailScreen() {
               >
                 <MaterialCommunityIcons name="tune-variant" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.feedSecondary, { borderColor: colors.border }]}
+                onPress={() => setPauseOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Pause feeding reminders"
+              >
+                <MaterialCommunityIcons name="pause" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
             </View>
+          )}
+
+          {/* Paused animals get the way back out in the same place. */}
+          {feedingStats?.is_feeding_paused && (
+            <TouchableOpacity
+              style={{ marginTop: SPACING.md }}
+              onPress={() => setPauseOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Change or end the feeding pause"
+            >
+              <Text style={[styles.timelineMore, { color: colors.accent }]}>Manage pause</Text>
+            </TouchableOpacity>
           )}
         </SectionCard>
       )}
@@ -686,10 +716,10 @@ function InvertDetailScreen() {
         ) : (
           <>
             <FlatList horizontal data={photos} keyExtractor={(p) => p.id} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SPACING.sm }}
-              renderItem={({ item }) => {
+              renderItem={({ item, index }) => {
                 const isHero = invert.photo_url === item.url;
                 return (
-                  <TouchableOpacity activeOpacity={0.8} onLongPress={() => handlePhotoLongPress(item)} accessibilityRole="imagebutton" accessibilityLabel={isHero ? 'Hero photo. Long-press to manage.' : 'Photo. Long-press to set as hero or delete.'}>
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => setViewerIndex(index)} onLongPress={() => handlePhotoLongPress(item)} accessibilityRole="imagebutton" accessibilityLabel={isHero ? 'Hero photo. Opens full screen; long-press to manage.' : 'Photo. Opens full screen; long-press to set as hero or delete.'}>
                     <Image source={{ uri: getImageUrl(item.thumbnail_url ?? item.url) }} style={styles.photoThumb} />
                     {isHero && (
                       <View style={styles.heroTag}>
@@ -700,7 +730,7 @@ function InvertDetailScreen() {
                   </TouchableOpacity>
                 );
               }} />
-            <Text style={[s.empty, { color: colors.textTertiary, fontStyle: 'normal' }]}>Long-press a photo to set it as the hero or delete it.</Text>
+            <Text style={[s.empty, { color: colors.textTertiary, fontStyle: 'normal' }]}>Tap to view full screen. Long-press to set as hero or delete.</Text>
           </>
         )}
       </Section>
@@ -739,6 +769,37 @@ function InvertDetailScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* `resource="inverts"` — PUT /inverts/{id} takes the same two pause
+          fields and works for every taxon, so this no longer has to be the
+          tarantula screen's exclusive feature. */}
+      <PauseFeedingSheet
+        visible={pauseOpen}
+        onClose={() => setPauseOpen(false)}
+        tarantulaId={id!}
+        resource="inverts"
+        tarantulaName={headerTitle}
+        currentReason={feedingStats?.feeding_paused_reason ?? null}
+        currentUntil={feedingStats?.feeding_paused_until ?? null}
+        onChange={fetchAll}
+      />
+
+      <QRSheet
+        visible={qrOpen}
+        onClose={() => setQrOpen(false)}
+        tarantulaId={id!}
+        resource="inverts"
+        tarantulaName={headerTitle}
+        scientificName={invert.scientific_name}
+        onPhotoAdded={fetchAll}
+      />
+
+      <PhotoViewer
+        visible={viewerIndex !== null}
+        photos={photos as any}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+      />
     </View>
   );
 }

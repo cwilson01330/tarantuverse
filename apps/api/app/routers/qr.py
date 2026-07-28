@@ -285,6 +285,66 @@ async def create_animal_upload_session(
     }
 
 
+@router.post("/inverts/{invert_id}/upload-session")
+async def create_invert_upload_session(
+    invert_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a short-lived QR upload session for ANY taxon.
+
+    This is the taxon-agnostic replacement for the per-taxon siblings below
+    (`/tarantulas/`, `/scorpions/`, `/centipedes/`). Those were added one at a
+    time as taxa shipped, which meant every new taxon either got a copy of this
+    function or silently had no QR at all — the latter is what happened to the
+    six taxa added after centipede.
+
+    Matching on the unified `inverts` table (ADR-005) covers every taxon
+    including tarantula, so the QR feature stops being a per-taxon privilege.
+    The legacy routes stay for older app builds still calling them.
+    """
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+
+    # A newly-generated QR supersedes the old one, same as every sibling route.
+    db.query(QRUploadSession).filter(
+        QRUploadSession.invert_id == invert_id,
+        QRUploadSession.user_id == current_user.id,
+        QRUploadSession.is_active == True,
+    ).update({"is_active": False})
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=SESSION_TTL_MINUTES)
+
+    session = QRUploadSession(
+        token=token,
+        invert_id=invert_id,
+        # Tarantulas keep their legacy FK populated too — the upload handler
+        # and public profile routes still resolve through it for older rows.
+        tarantula_id=invert_id if invert.taxon == "tarantula" else None,
+        user_id=current_user.id,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    web_base = getattr(settings, "FRONTEND_URL", "https://tarantuverse.com")
+
+    return {
+        "token": token,
+        "upload_url": f"{web_base}/upload/{token}",
+        "expires_at": expires_at.isoformat(),
+        "expires_in_minutes": SESSION_TTL_MINUTES,
+        "taxon": invert.taxon,
+        "animal_name": invert.name or invert.common_name or invert.scientific_name,
+    }
+
+
 @router.post("/scorpions/{scorpion_id}/upload-session")
 async def create_scorpion_upload_session(
     scorpion_id: str,

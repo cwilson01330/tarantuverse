@@ -26,6 +26,13 @@ interface QRSheetProps {
   visible: boolean
   onClose: () => void
   tarantulaId: string
+  /**
+   * Collection surface. 'inverts' hits the taxon-agnostic upload-session +
+   * photos routes and works for every taxon; 'tarantulas' is the legacy path
+   * kept for the old tarantula screen. Defaulted so existing callers are
+   * unaffected.
+   */
+  resource?: 'tarantulas' | 'inverts'
   tarantulaName: string
   scientificName?: string | null
   onPhotoAdded?: () => void
@@ -40,6 +47,7 @@ export default function QRSheet({
   visible,
   onClose,
   tarantulaId,
+  resource = 'tarantulas',
   tarantulaName,
   scientificName,
   onPhotoAdded,
@@ -67,7 +75,7 @@ export default function QRSheet({
   const generateSession = async () => {
     setUploadState('loading')
     try {
-      const res = await apiClient.post(`/tarantulas/${tarantulaId}/upload-session`)
+      const res = await apiClient.post(`/${resource}/${tarantulaId}/upload-session`)
       const { upload_url, expires_at } = res.data
       setUploadUrl(upload_url)
       setUploadState('ready')
@@ -87,7 +95,7 @@ export default function QRSheet({
       let knownCount = uploadCount
       pollRef.current = setInterval(async () => {
         try {
-          const pr = await apiClient.get(`/tarantulas/${tarantulaId}/photos`)
+          const pr = await apiClient.get(`/${resource}/${tarantulaId}/photos`)
           if (pr.data.length > knownCount) {
             knownCount = pr.data.length
             setUploadCount(pr.data.length)
