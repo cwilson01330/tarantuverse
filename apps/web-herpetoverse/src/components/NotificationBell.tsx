@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
+import { resolveDeeplink } from '@/lib/deeplinks'
 import {
   type AppNotification,
   clearAllNotifications,
@@ -94,7 +95,8 @@ export default function NotificationBell() {
       }
     }
     setOpen(false)
-    if (item.deeplink) router.push(item.deeplink)
+    const target = resolveDeeplink(item.deeplink)
+    if (target) router.push(target)
   }
 
   const handleMarkAllRead = async () => {

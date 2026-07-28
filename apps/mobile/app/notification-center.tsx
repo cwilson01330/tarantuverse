@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppHeader } from '../src/components/AppHeader';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { resolveDeeplink } from '../src/lib/deeplinks';
 
 interface Notification {
   id: string;
@@ -137,13 +138,27 @@ export default function NotificationCenterScreen() {
       setItems((prev) => prev.map((it) => (it.id === n.id ? { ...it, is_read: true } : it)));
       apiClient.post(`/notifications/${n.id}/read`).catch(() => {});
     }
+    // Prefer the server-supplied deeplink, resolved through the shared mapper.
+    // The per-type switch below stays as a fallback for rows written before
+    // deeplinks were populated — those still have `data` and would otherwise be
+    // dead taps forever.
+    const resolved = resolveDeeplink(n.deeplink);
+    if (resolved) {
+      router.push(resolved as any);
+      return;
+    }
+
     const data = n.data ?? {};
     switch (n.type) {
       case 'direct_message':
         if (data.sender) router.push(`/messages/${data.sender}`);
         break;
       case 'forum_reply':
-        if (data.thread_id) router.push(`/community/forums/thread/${data.thread_id}`);
+        // /forums/thread/<id> is the live mobile route. The web shape
+        // (/community/forums/thread/<id>) was the bug here — it matched
+        // app/community/forums/[slug]/[threadId] with slug="thread" and
+        // rendered the wrong screen.
+        if (data.thread_id) router.push(`/forums/thread/${data.thread_id}`);
         break;
       case 'new_follower':
         if (data.follower) router.push(`/community/${data.follower}`);

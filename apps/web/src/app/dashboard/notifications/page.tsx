@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import { resolveDeeplink } from '@/lib/deeplinks'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
@@ -97,8 +98,11 @@ export default function NotificationsPage() {
       )
       await markRead(item.id)
     }
-    if (item.deeplink) {
-      router.push(item.deeplink)
+    // Resolve the canonical route to a real web path. Unknown patterns return
+    // null and we simply don't navigate — better than a tap into a 404.
+    const target = resolveDeeplink(item.deeplink)
+    if (target) {
+      router.push(target)
     }
   }
 

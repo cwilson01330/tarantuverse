@@ -31,6 +31,7 @@ import { AppHeader } from '../src/components/AppHeader';
 import { HeaderBackButton } from '../src/components/HeaderBackButton';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { resolveDeeplink } from '../src/lib/deeplinks';
 import {
   clearAllNotifications,
   deleteNotification,
@@ -165,8 +166,12 @@ export default function NotificationCenterScreen() {
       );
       markNotificationRead(n.id).catch(() => {});
     }
-    if (n.deeplink) {
-      router.push(n.deeplink as never);
+    // Resolve the canonical route to a real HV mobile path. Unknown patterns
+    // return null and we don't navigate — better than pushing a route that
+    // doesn't exist in this app.
+    const target = resolveDeeplink(n.deeplink);
+    if (target) {
+      router.push(target as never);
     }
   };
 

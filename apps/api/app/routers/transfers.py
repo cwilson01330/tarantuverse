@@ -452,7 +452,12 @@ async def _claim_animal_transfer(
             type="transfer_claimed",
             title="Transfer claimed",
             body=f"{current_user.username} claimed {animal_label}.",
-            deeplink="/app/transfers",
+            # Canonical logical route. Only Herpetoverse web currently has a
+            # transfers index (/app/transfers); every other client's resolver
+            # returns null and the notification stays informational rather than
+            # opening a 404. This used to hardcode the HV web path, which meant
+            # a TV keeper's tap went nowhere good.
+            deeplink="/transfers",
             data={"claimer": current_user.username, "transfer_id": str(transfer.id)},
         )
     except Exception:
@@ -628,7 +633,10 @@ async def claim_transfer(
             type="transfer_claimed",
             title="Transfer claimed",
             body=f"{current_user.username} claimed {animal_label}.",
-            deeplink="/dashboard/transfers",
+            # See the animal-transfer twin of this handler above. Tarantuverse
+            # has no transfers index, so TV clients resolve this to null — the
+            # previous hardcoded /dashboard/transfers was a 404 on every client.
+            deeplink="/transfers",
             data={"claimer": current_user.username, "transfer_id": str(transfer.id)},
         )
     except Exception:

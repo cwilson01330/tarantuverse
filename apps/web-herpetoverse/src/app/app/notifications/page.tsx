@@ -19,6 +19,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiError } from '@/lib/apiClient'
 import { useAuth } from '@/lib/auth'
+import { resolveDeeplink } from '@/lib/deeplinks'
 import {
   type AppNotification,
   clearAllNotifications,
@@ -81,7 +82,10 @@ export default function NotificationsPage() {
         // Non-fatal — UI already reflects read state.
       }
     }
-    if (item.deeplink) router.push(item.deeplink)
+    // HV web nests everything under /app/*, so the canonical route needs
+    // rewriting. Unknown patterns resolve to null and we don't navigate.
+    const target = resolveDeeplink(item.deeplink)
+    if (target) router.push(target)
   }
 
   const handleMarkAllRead = async () => {

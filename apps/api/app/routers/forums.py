@@ -489,7 +489,10 @@ async def create_post(
                 type="forum_reply",
                 title=f"{current_user.username} replied to your post",
                 body=f'In "{thread.title}"',
-                deeplink=f"/community/forums/thread/{thread.id}",
+                # Canonical logical route (see DEEPLINK_PATTERNS in
+                # notification_service). Web resolves this to
+                # /community/forums/thread/<id>; mobile serves it directly.
+                deeplink=f"/forums/thread/{thread.id}",
                 data={"thread_id": str(thread.id), "replier": current_user.username},
                 push_category="forum_replies_enabled",
             )

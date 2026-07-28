@@ -6,6 +6,7 @@ import { signOut } from 'next-auth/react'
 import { useThemeStore } from '@/stores/themeStore'
 import { useAuth } from '@/hooks/useAuth'
 import GlobalSearch from './GlobalSearch'
+import { resolveDeeplink } from '@/lib/deeplinks'
 
 interface TopBarProps {
   userName?: string
@@ -156,7 +157,8 @@ export default function TopBar({ userName, userEmail, userAvatar, onMenuClick }:
       }
     }
     setShowNotifications(false)
-    if (item.deeplink) router.push(item.deeplink)
+    const target = resolveDeeplink(item.deeplink)
+    if (target) router.push(target)
   }
 
   const markAllNotificationsRead = async () => {
