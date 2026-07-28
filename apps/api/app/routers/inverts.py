@@ -219,22 +219,39 @@ async def create_invert(
 _STAGE_DEFAULT_INTERVAL = {"sling": 5, "juvenile": 7, "adult": 10}
 _UNKNOWN_INTERVAL = 7  # no species AND no life stage → conservative middle
 
+# Where a returned interval came from. The UI MUST distinguish these: an
+# interval derived from a care sheet is a claim about that species, while a
+# default is a guess about an animal we know nothing about. Rendering both as
+# "every ~7d" tells the keeper we know something we don't.
+#
+# Herpetoverse resolves this differently — `_animal_feeding_interval` in
+# routers/animals.py returns None rather than guessing, because reptile
+# cadences vary by orders of magnitude (a daily-fed gecko vs a monthly-fed
+# adult boa) and a wrong default there is actively misleading. Invertebrate
+# cadences cluster tightly enough (days, not months) that a default is useful
+# as a safety net — but only if it's labeled as one.
+INTERVAL_SOURCE_SPECIES = "species"          # from the species care sheet
+INTERVAL_SOURCE_STAGE_DEFAULT = "stage_default"    # guess, informed by life stage
+INTERVAL_SOURCE_GENERIC_DEFAULT = "generic_default"  # guess, nothing to go on
 
-def _recommended_feeding_interval(
+
+def _recommended_feeding_interval_with_source(
     life_stage: Optional[str], species: Optional[InvertSpecies]
-) -> Optional[int]:
-    """Days-between-feedings threshold for an animal's species + life stage.
+) -> tuple[Optional[int], Optional[str]]:
+    """Days-between-feedings threshold plus WHERE that number came from.
 
     Uses the species' per-stage feeding frequency when available (upper bound
-    of the range = "should have fed by now"). Returns None for detritivores
-    (millipedes etc.) — they graze substrate and have no live-prey cadence, so
-    they're never marked overdue. Leans SHORTER on missing data (safety-first).
+    of the range = "should have fed by now"). Returns (None, None) for
+    detritivores (millipedes etc.) — they graze substrate and have no live-prey
+    cadence, so they're never marked overdue. Leans SHORTER on missing data
+    (safety-first), but reports that the number is a default so callers can
+    present it honestly.
     """
     stage = (life_stage or "").lower().strip() or None
 
     if species is not None:
         if (species.feeding_mode or "predator") == "detritivore":
-            return None  # no overdue concept for grazers
+            return None, None  # no overdue concept for grazers
 
         by_stage = {
             "sling": species.feeding_frequency_sling,
@@ -243,17 +260,26 @@ def _recommended_feeding_interval(
         }
         freq_str = by_stage.get(stage) if stage else None
         if freq_str:
-            return parse_frequency_string(freq_str)[1]  # upper bound
+            return parse_frequency_string(freq_str)[1], INTERVAL_SOURCE_SPECIES
         # Stage unknown or that stage's frequency blank → use the SHORTEST
-        # defined frequency across stages (safer: flags soonest).
+        # defined frequency across stages (safer: flags soonest). Still species
+        # data, so still honest to attribute to the care sheet.
         defined = [parse_frequency_string(v)[1] for v in by_stage.values() if v]
         if defined:
-            return min(defined)
+            return min(defined), INTERVAL_SOURCE_SPECIES
 
     # No species (or no usable frequency) → stage-based default, else unknown.
     if stage in _STAGE_DEFAULT_INTERVAL:
-        return _STAGE_DEFAULT_INTERVAL[stage]
-    return _UNKNOWN_INTERVAL
+        return _STAGE_DEFAULT_INTERVAL[stage], INTERVAL_SOURCE_STAGE_DEFAULT
+    return _UNKNOWN_INTERVAL, INTERVAL_SOURCE_GENERIC_DEFAULT
+
+
+def _recommended_feeding_interval(
+    life_stage: Optional[str], species: Optional[InvertSpecies]
+) -> Optional[int]:
+    """Interval only. Kept for callers that don't surface provenance (the
+    digest decides overdue but never prints the number)."""
+    return _recommended_feeding_interval_with_source(life_stage, species)[0]
 
 
 @router.get("/feeding-status", response_model=List[InvertFeedingStatusItem])
@@ -312,7 +338,9 @@ async def list_feeding_status(
             and (inv.feeding_paused_until is None or inv.feeding_paused_until >= today_local)
         )
         species = species_by_id.get(inv.species_id) if inv.species_id else None
-        interval = _recommended_feeding_interval(inv.life_stage, species)
+        interval, interval_source = _recommended_feeding_interval_with_source(
+            inv.life_stage, species
+        )
         # Never-fed animals are NOT "overdue" — no feeding has established a
         # cadence yet, so flagging them (esp. in a push digest) is noise. Kept
         # in lockstep with digest_service and /animals/feeding-status.
@@ -337,6 +365,7 @@ async def list_feeding_status(
                 is_feeding_paused=paused,
                 is_overdue=is_overdue,
                 interval_days=interval,
+                interval_source=interval_source,
             )
         )
 
@@ -536,7 +565,9 @@ async def get_invert_feeding_stats(
         db.query(InvertSpecies).filter(InvertSpecies.id == invert.species_id).first()
         if invert.species_id else None
     )
-    interval_days = _recommended_feeding_interval(invert.life_stage, species)
+    interval_days, interval_source = _recommended_feeding_interval_with_source(
+        invert.life_stage, species
+    )
     is_overdue = (
         (not is_feeding_paused)
         and interval_days is not None
@@ -556,5 +587,6 @@ async def get_invert_feeding_stats(
         feeding_paused_reason=invert.feeding_paused_reason,
         feeding_paused_until=invert.feeding_paused_until,
         interval_days=interval_days,
+        interval_source=interval_source,
         is_overdue=is_overdue,
     )

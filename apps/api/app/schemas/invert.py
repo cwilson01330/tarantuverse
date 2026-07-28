@@ -141,6 +141,8 @@ class InvertFeedingStats(BaseModel):
     # the daily digest. None when the species has no recorded feeding frequency
     # — in which case the client must NOT invent one.
     interval_days: Optional[int] = None
+    # Provenance of interval_days — see InvertFeedingStatusItem.interval_source.
+    interval_source: Optional[str] = None
     is_overdue: bool = False
 
     model_config = ConfigDict(from_attributes=True)
@@ -168,6 +170,11 @@ class InvertFeedingStatusItem(BaseModel):
     # Recommended days between feedings for this animal's species + life stage
     # (None for detritivores, which graze and have no live-prey cadence).
     interval_days: Optional[int] = None
+    # Provenance of interval_days — "species" (from the care sheet),
+    # "stage_default" or "generic_default" (a guess). Clients MUST NOT render a
+    # default as though it were a species schedule; "every ~7d" on an animal
+    # with no linked species is a claim we can't support.
+    interval_source: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -34,6 +34,9 @@ interface FeedingStatus {
   is_feeding_paused: boolean;
   is_overdue: boolean;
   interval_days: number | null;
+  /** 'species' = from the care sheet; 'stage_default' / 'generic_default' = a
+   *  guess. Never render a default as a species schedule. */
+  interval_source: string | null;
 }
 
 type FilterKey = 'all' | 'overdue' | 'never';
@@ -324,8 +327,13 @@ export default function FeedingDayScreen() {
                   const stageLabel = a.life_stage
                     ? a.life_stage.charAt(0).toUpperCase() + a.life_stage.slice(1)
                     : null;
+                  // "every ~7d" is a claim about this species. Only make it
+                  // when the number came from a care sheet — otherwise label
+                  // it a default so our guess doesn't read as guidance.
                   const cadence = a.interval_days
-                    ? `every ~${a.interval_days}d`
+                    ? a.interval_source === 'species'
+                      ? `every ~${a.interval_days}d`
+                      : `~${a.interval_days}d (default)`
                     : a.taxon === 'millipede'
                       ? 'grazer'
                       : null;

@@ -391,9 +391,13 @@ export interface InvertFeedingStats {
   is_feeding_paused: boolean;
   feeding_paused_reason: string | null;
   feeding_paused_until: string | null;
-  /** Species + life-stage aware. null = the species has no recorded feeding
-   *  frequency, in which case the UI must not imply a schedule exists. */
+  /** Species + life-stage aware. null = detritivore (no live-prey cadence).
+   *  NOTE: for everything else the backend supplies a fallback rather than
+   *  null, so check interval_source before presenting this as a schedule. */
   interval_days: number | null;
+  /** 'species' = from the care sheet; 'stage_default' / 'generic_default' = a
+   *  guess. Never render a default as a species schedule. */
+  interval_source: string | null;
   is_overdue: boolean;
 }
 

@@ -58,6 +58,9 @@ interface FeedingStatusItem {
   is_feeding_paused: boolean
   is_overdue: boolean
   interval_days: number | null
+  /** 'species' = from the care sheet; 'stage_default' / 'generic_default' = a
+   *  guess. Never render a default as a species schedule. */
+  interval_source: string | null
 }
 
 // Mirrors apps/api/app/schemas/premolt.py::PremoltPrediction.

@@ -22,6 +22,9 @@ interface FeedingStatus {
   is_overdue: boolean
   life_stage: string | null
   interval_days: number | null
+  /** 'species' = from the care sheet; 'stage_default' / 'generic_default' = a
+   *  guess. Never render a default as a species schedule. */
+  interval_source: string | null
 }
 
 // Mirrors the /inverts/bulk-feedings response shape.
@@ -76,8 +79,13 @@ function lifeStageMeta(a: FeedingStatus): string | null {
   const stage = a.life_stage
     ? a.life_stage.charAt(0).toUpperCase() + a.life_stage.slice(1)
     : null
+  // "every ~7d" is a claim about this species. Only make it when the number
+  // actually came from a care sheet — otherwise say it's a default, so a
+  // keeper doesn't read our guess as researched guidance.
   const cadence = a.interval_days
-    ? `every ~${a.interval_days}d`
+    ? a.interval_source === 'species'
+      ? `every ~${a.interval_days}d`
+      : `~${a.interval_days}d (default)`
     : a.taxon === 'millipede'
       ? 'grazer'
       : null

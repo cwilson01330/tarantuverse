@@ -295,8 +295,18 @@ function InvertDetailScreen() {
         detail: 'Log the first feeding to start tracking a cadence.',
       };
     }
+    // The backend supplies a fallback interval for animals with no linked
+    // species, so `iv` is almost never null — meaning the "no cadence on file"
+    // branch below was effectively dead and every animal got a confident
+    // "Feed in N days". interval_source is what actually distinguishes a
+    // care-sheet cadence from a default, so say which one this is.
+    const ivFromSpecies = feedingStats.interval_source === 'species';
     const reasoning = [
-      iv ? `Every ${iv}d` : 'No species cadence on file',
+      iv
+        ? ivFromSpecies
+          ? `Every ${iv}d`
+          : `Every ${iv}d (default — no species cadence on file)`
+        : 'No species cadence on file',
       feedingStats.total_feedings > 0
         ? `${Math.round(feedingStats.acceptance_rate)}% accepted (${feedingStats.total_feedings})`
         : null,
@@ -311,7 +321,10 @@ function InvertDetailScreen() {
         detail: reasoning,
       };
     }
-    if (iv) {
+    // Only give a prescriptive countdown when the cadence is a species claim.
+    // On a default we still flag overdue above (safety net), but we don't
+    // present "Feed in 4 days" as though we know this animal's schedule.
+    if (iv && ivFromSpecies) {
       const due = iv - d;
       return {
         tone: 'good' as const,
