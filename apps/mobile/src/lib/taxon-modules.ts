@@ -11,9 +11,13 @@
  * Today only tarantula has modules enabled:
  *   - premolt:      tuned for tarantula feeding-refusal + molt-interval signal;
  *                   not validated for other taxa (see ADR-008).
- *   - feedingStats: backed by /analytics/tarantulas/{id}/feeding-stats only.
- *                   Extending to predatory inverts (feeding_mode='predator')
- *                   needs a generic invert feeding-stats endpoint first.
+ *   - feedingStats: backed by /inverts/{id}/feeding-stats, which is
+ *                   taxon-agnostic. (This comment used to say the module was
+ *                   blocked on "a generic invert feeding-stats endpoint" —
+ *                   that endpoint shipped, and the claim outlived it. Enabled
+ *                   for predator taxa; detritivores and omnivores are left off
+ *                   because they graze rather than take prey on a cadence, so
+ *                   "12 days since fed" would be a number without a meaning.)
  *   - growth:       backed by the generic /inverts/{id}/growth endpoint;
  *                   the invert molt form captures per-molt measurements.
  *                   Rolling out taxon-by-taxon — scorpion is the pilot
@@ -28,14 +32,17 @@ export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding';
 
 export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   tarantula: ['premolt', 'feedingStats', 'growth', 'breeding'],
-  scorpion: ['growth', 'breeding'], // breeding pilot — ADR-010 Phase D (web + mobile)
-  centipede: ['growth'],
-  whip_spider: [],
-  vinegaroon: [],
-  true_spider: [],
-  millipede: [], // deliberately skipped: molts underground, rarely measured
-  mantis: ['growth'], // instar tracking is core to mantis keeping
-  roach: [], // growth off at launch — flip later if keepers want instar tracking
+  scorpion: ['feedingStats', 'growth', 'breeding'], // breeding pilot — ADR-010 Phase D (web + mobile)
+  centipede: ['feedingStats', 'growth'],
+  whip_spider: ['feedingStats'],
+  vinegaroon: ['feedingStats'],
+  true_spider: ['feedingStats'],
+  millipede: [], // detritivore — no live-prey cadence, and molts underground
+  mantis: ['feedingStats', 'growth'], // instar tracking is core to mantis keeping
+  // Omnivore grazer, and kept as a colony far more often than individually —
+  // colonies are a separate table with their own screen (ADR-010), so an
+  // individual roach genuinely has nothing here. Not an oversight.
+  roach: [],
   other: [],
 };
 

@@ -23,7 +23,8 @@ import {
   listInvertFeedings, listInvertMolts, listInvertPhotos, listInvertSubstrateChanges,
   deleteInvertFeeding, deleteInvertMolt, deleteInvertSubstrateChange,
   setInvertMainPhoto, deleteInvertPhoto, getInvertGrowth, listInvertPairings,
-  createInvertTransfer,
+  createInvertTransfer, createInvertFeeding, getInvertFeedingStats,
+  type InvertFeedingStats,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
   type InvertGrowthAnalytics, type InvertPairing,
 } from '../../src/lib/inverts';
@@ -56,6 +57,8 @@ function InvertDetailScreen() {
   // independent hard caps.
   const [timelineFilter, setTimelineFilter] = useState<'all' | TimelineKind>('all');
   const [timelineLimit, setTimelineLimit] = useState(12);
+  const [feedingStats, setFeedingStats] = useState<InvertFeedingStats | null>(null);
+  const [markingFed, setMarkingFed] = useState(false);
 
   const handleTransfer = useCallback(async () => {
     if (!id || transferring) return;
@@ -93,7 +96,7 @@ function InvertDetailScreen() {
     try {
       const i = await getInvert(id);
       setInvert(i);
-      const [f, m, sub, p, g, pr] = await Promise.all([
+      const [f, m, sub, p, g, pr, fs] = await Promise.all([
         listInvertFeedings(i.taxon, id).catch(() => [] as InvertFeedingLog[]),
         listInvertMolts(i.taxon, id).catch(() => [] as InvertMoltLog[]),
         listInvertSubstrateChanges(i.taxon, id).catch(() => [] as InvertSubstrateChange[]),
@@ -106,8 +109,14 @@ function InvertDetailScreen() {
         taxonHasModule(i.taxon, 'breeding')
           ? listInvertPairings(id).catch(() => [] as InvertPairing[])
           : Promise.resolve([] as InvertPairing[]),
+        // Registry-gated: detritivores/omnivores have no feeding cadence, so
+        // a "next feeding" verdict would be fabricated for them.
+        taxonHasModule(i.taxon, 'feedingStats')
+          ? getInvertFeedingStats(id).catch(() => null)
+          : Promise.resolve(null),
       ]);
       setFeedings(f); setMolts(m); setSubstrate(sub); setPhotos(p); setGrowth(g); setPairings(pr);
+      setFeedingStats(fs);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load this animal.");
     } finally {
@@ -236,6 +245,94 @@ function InvertDetailScreen() {
   if (invert.target_humidity_min || invert.target_humidity_max) husbandryItems.push({ icon: 'water-percent', label: 'Humidity', value: `${invert.target_humidity_min ?? '?'}–${invert.target_humidity_max ?? '?'}%` });
   husbandryItems.push({ icon: 'cup-water', label: 'Water dish', value: invert.water_dish ? 'Yes' : 'No' });
 
+  // ── Feeding verdict ───────────────────────────────────────────────────────
+  // A sentence, not a number. "Fed 11d ago" makes the keeper do the arithmetic
+  // against a cadence they'd have to remember; "Feed in 3 days" answers the
+  // question they actually opened the screen with.
+  //
+  // Every branch below is backed by data we hold. When the species has no
+  // recorded feeding frequency (interval_days === null) we say so plainly
+  // rather than inventing a schedule — that's the case where a made-up
+  // "feed every 7 days" would quietly become husbandry advice.
+  const lastPrey = feedings.find((f) => f.accepted)?.food_type?.trim() || null;
+  const feedingVerdict = (() => {
+    if (!feedingStats) return null;
+    const d = feedingStats.days_since_last_feeding;
+    const iv = feedingStats.interval_days;
+
+    if (feedingStats.is_feeding_paused) {
+      return {
+        tone: 'muted' as const,
+        icon: 'pause-circle-outline',
+        headline: 'Feeding paused',
+        detail: feedingStats.feeding_paused_reason
+          ? feedingStats.feeding_paused_until
+            ? `${feedingStats.feeding_paused_reason} · until ${fmtDate(feedingStats.feeding_paused_until)}`
+            : feedingStats.feeding_paused_reason
+          : 'Resume from the ⋯ menu when she starts taking food again.',
+      };
+    }
+    if (d === null || d === undefined) {
+      return {
+        tone: 'muted' as const,
+        icon: 'silverware-fork-knife',
+        headline: 'Not yet fed',
+        detail: 'Log the first feeding to start tracking a cadence.',
+      };
+    }
+    const reasoning = [
+      iv ? `Every ${iv}d` : 'No species cadence on file',
+      feedingStats.total_feedings > 0
+        ? `${Math.round(feedingStats.acceptance_rate)}% accepted (${feedingStats.total_feedings})`
+        : null,
+      `fed ${d === 0 ? 'today' : `${d}d ago`}`,
+    ].filter(Boolean).join(' · ');
+
+    if (feedingStats.is_overdue) {
+      return {
+        tone: 'bad' as const,
+        icon: 'alert-circle-outline',
+        headline: `Feed now — ${d - (iv ?? d)}d overdue`,
+        detail: reasoning,
+      };
+    }
+    if (iv) {
+      const due = iv - d;
+      return {
+        tone: 'good' as const,
+        icon: 'silverware-fork-knife',
+        headline: due <= 0 ? 'Feed today' : `Feed in ${due} ${due === 1 ? 'day' : 'days'}`,
+        detail: reasoning,
+      };
+    }
+    return {
+      tone: 'muted' as const,
+      icon: 'silverware-fork-knife',
+      headline: d === 0 ? 'Fed today' : `Fed ${d}d ago`,
+      detail: reasoning,
+    };
+  })();
+
+  const verdictColor = (tone?: 'good' | 'bad' | 'muted') =>
+    tone === 'bad' ? colors.error : tone === 'good' ? colors.success : colors.textSecondary;
+
+  const handleMarkFed = async () => {
+    if (!invert || markingFed) return;
+    setMarkingFed(true);
+    try {
+      await createInvertFeeding(invert.taxon, id!, {
+        fed_at: new Date().toISOString(),
+        food_type: lastPrey,
+        accepted: true,
+      });
+      await fetchAll();
+    } catch (err) {
+      Alert.alert('Could not log feeding', getErrorMessage(err));
+    } finally {
+      setMarkingFed(false);
+    }
+  };
+
   // ── Timeline ──────────────────────────────────────────────────────────────
   // Three independent log lists became one. The old arrangement forced the
   // keeper to hold three separate chronologies in their head: "she refused on
@@ -362,6 +459,60 @@ function InvertDetailScreen() {
             </View>
           </View>
         </View>
+
+      {/* Feeding card — the question the keeper opened the screen to answer,
+          answered first. Registry-gated: a millipede has no feeding cadence,
+          so it gets no card rather than a fabricated one. */}
+      {feedingVerdict && (
+        <SectionCard>
+          <View style={styles.feedHead}>
+            <View
+              style={[
+                styles.feedIcon,
+                { backgroundColor: verdictColor(feedingVerdict.tone) + '24' },
+              ]}
+            >
+              <MaterialCommunityIcons
+                name={feedingVerdict.icon as any}
+                size={22}
+                color={verdictColor(feedingVerdict.tone)}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.feedHeadline, { color: verdictColor(feedingVerdict.tone) }]}>
+                {feedingVerdict.headline}
+              </Text>
+              <Text style={styles.feedDetail}>{feedingVerdict.detail}</Text>
+            </View>
+          </View>
+
+          {!feedingStats?.is_feeding_paused && (
+            <View style={styles.feedActions}>
+              <TouchableOpacity
+                style={[styles.feedPrimary, { backgroundColor: colors.primary }]}
+                onPress={handleMarkFed}
+                disabled={markingFed}
+                accessibilityRole="button"
+                accessibilityLabel={lastPrey ? `Log a feeding of ${lastPrey}` : 'Log a feeding'}
+              >
+                <MaterialCommunityIcons name="check" size={17} color="#fff" />
+                <Text style={styles.feedPrimaryText}>
+                  {markingFed ? 'Saving…' : lastPrey ? `Fed — ${lastPrey}` : 'Fed'}
+                </Text>
+              </TouchableOpacity>
+              {/* The full form, for a different prey item / date / refusal. */}
+              <TouchableOpacity
+                style={[styles.feedSecondary, { borderColor: colors.border }]}
+                onPress={() => router.push(`/invert/add-feeding?id=${id}` as any)}
+                accessibilityRole="button"
+                accessibilityLabel="Log a feeding with full details"
+              >
+                <MaterialCommunityIcons name="tune-variant" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </SectionCard>
+      )}
 
       <Section title="Identity">
         <InfoRow label="Sex" value={fmtSex(invert.sex)} colors={colors} />
@@ -712,6 +863,29 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     heroMeta: { ...TYPE.label, color: 'rgba(255,255,255,0.72)' },
     logRowTitle: { ...TYPE.bodyStrong, color: colors.textPrimary, flex: 1 },
     logRowMeta: { ...TYPE.caption, color: colors.textTertiary },
+    feedHead: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+    feedIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+    feedHeadline: { ...TYPE.bodyStrong, fontWeight: '700' },
+    feedDetail: { ...TYPE.caption, color: colors.textTertiary, marginTop: 2 },
+    feedActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.md },
+    feedPrimary: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 11,
+      borderRadius: 12,
+    },
+    feedPrimaryText: { ...TYPE.bodyStrong, color: '#fff', fontWeight: '700' },
+    feedSecondary: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     timelineChips: { flexDirection: 'row', gap: 7, marginBottom: SPACING.sm, flexWrap: 'wrap' },
     timelineChip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
     timelineChipText: { ...TYPE.caption, fontWeight: '600' },

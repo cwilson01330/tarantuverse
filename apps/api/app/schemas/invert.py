@@ -137,6 +137,11 @@ class InvertFeedingStats(BaseModel):
     is_feeding_paused: bool = False
     feeding_paused_reason: Optional[str] = None
     feeding_paused_until: Optional[date] = None
+    # Species + life-stage aware cadence, matching /inverts/feeding-status and
+    # the daily digest. None when the species has no recorded feeding frequency
+    # — in which case the client must NOT invent one.
+    interval_days: Optional[int] = None
+    is_overdue: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

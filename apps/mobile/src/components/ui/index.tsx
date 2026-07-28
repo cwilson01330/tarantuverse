@@ -83,27 +83,38 @@ export function Card({ style, children }: { style?: StyleProp<ViewStyle>; childr
 }
 
 // ─── SectionCard ──────────────────────────────────────────────────────────
-// A Card with a header row (title + optional right-aligned text action).
+// A Card with an optional header row (title + optional right-aligned action).
+//
+// `title` is optional because some cards ARE their content — the animal-detail
+// feeding card leads with a verdict ("Feed in 3 days"), and stacking a
+// "Feeding" heading above it would just be the same word twice. When there's
+// no title and no action, the header row is omitted entirely rather than
+// rendered empty, which would leave a stray gap above the content.
 export function SectionCard({
   title, actionLabel, onAction, style, children,
 }: {
-  title: string;
+  title?: string;
   actionLabel?: string;
   onAction?: () => void;
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
   const { colors } = useTheme();
+  const hasHeader = Boolean(title) || Boolean(actionLabel && onAction);
   return (
     <Card style={[{ marginHorizontal: SPACING.lg, marginVertical: SPACING.xs }, style]}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <AppText variant="subheading" accessibilityRole="header">{title}</AppText>
-        {actionLabel && onAction && (
-          <TouchableOpacity onPress={onAction} accessibilityRole="button" accessibilityLabel={actionLabel}>
-            <Text style={[TYPE.bodyStrong, { color: colors.primary }]}>{actionLabel}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {hasHeader && (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          {title ? (
+            <AppText variant="subheading" accessibilityRole="header">{title}</AppText>
+          ) : <View />}
+          {actionLabel && onAction && (
+            <TouchableOpacity onPress={onAction} accessibilityRole="button" accessibilityLabel={actionLabel}>
+              <Text style={[TYPE.bodyStrong, { color: colors.primary }]}>{actionLabel}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
       {children}
     </Card>
   );

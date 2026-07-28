@@ -528,6 +528,23 @@ async def get_invert_feeding_stats(
         last_feeding_date = None
         days_since_last_feeding = None
 
+    # Cadence, computed the SAME way as the list endpoint and the daily digest.
+    # Without these two fields the detail screen could only say "fed 11d ago"
+    # and had to guess whether that was fine — which is how the collection grid
+    # ended up with a flat day threshold that disagreed with everything else.
+    species = (
+        db.query(InvertSpecies).filter(InvertSpecies.id == invert.species_id).first()
+        if invert.species_id else None
+    )
+    interval_days = _recommended_feeding_interval(invert.life_stage, species)
+    is_overdue = (
+        (not is_feeding_paused)
+        and interval_days is not None
+        and last_feeding_date is not None
+        and days_since_last_feeding is not None
+        and days_since_last_feeding >= interval_days
+    )
+
     return InvertFeedingStats(
         invert_id=invert_id,
         total_feedings=total_feedings,
@@ -538,4 +555,6 @@ async def get_invert_feeding_stats(
         is_feeding_paused=is_feeding_paused,
         feeding_paused_reason=invert.feeding_paused_reason,
         feeding_paused_until=invert.feeding_paused_until,
+        interval_days=interval_days,
+        is_overdue=is_overdue,
     )

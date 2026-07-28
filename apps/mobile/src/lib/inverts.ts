@@ -342,6 +342,31 @@ export async function listInvertFeedings(_taxon: InvertTaxon, id: string): Promi
   const { data } = await apiClient.get<InvertFeedingLog[]>(`/inverts/${id}/feedings`);
   return data;
 }
+/** Feeding summary for one animal — taxon-agnostic. */
+export interface InvertFeedingStats {
+  invert_id: string;
+  total_feedings: number;
+  total_accepted: number;
+  acceptance_rate: number;
+  last_feeding_date: string | null;
+  days_since_last_feeding: number | null;
+  is_feeding_paused: boolean;
+  feeding_paused_reason: string | null;
+  feeding_paused_until: string | null;
+  /** Species + life-stage aware. null = the species has no recorded feeding
+   *  frequency, in which case the UI must not imply a schedule exists. */
+  interval_days: number | null;
+  is_overdue: boolean;
+}
+
+export async function getInvertFeedingStats(id: string): Promise<InvertFeedingStats> {
+  // Calendar days in the keeper's zone — see the endpoint's tz_offset_minutes.
+  const res = await apiClient.get(`/inverts/${id}/feeding-stats`, {
+    params: { tz_offset_minutes: new Date().getTimezoneOffset() },
+  });
+  return res.data;
+}
+
 export async function createInvertFeeding(_taxon: InvertTaxon, id: string, payload: { fed_at: string; food_type?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
   const { data } = await apiClient.post<InvertFeedingLog>(`/inverts/${id}/feedings`, payload);
   return data;
