@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Refres
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { KeeperCardSkeleton, CategoryCardSkeleton } from '../../src/components/CommunitySkeletons';
+import { KeeperCardSkeleton, ActivityFeedSkeleton } from '../../src/components/CommunitySkeletons';
 import ActivityFeedItem, { ActivityFeedItemData } from '../../src/components/ActivityFeedItem';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,7 +38,9 @@ function CommunityScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [keepers, setKeepers] = useState<Keeper[]>([]);
-  const [categories, setCategories] = useState<ForumCategory[]>([]);
+  // NB: a `categories` state + fetchCategories() lived here, left over from
+  // when tab two was Forums. Nothing rendered it — it only fed a loading
+  // condition. Removed along with its network call.
   const [activities, setActivities] = useState<ActivityFeedItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -50,7 +52,6 @@ function CommunityScreen() {
 
   useEffect(() => {
     fetchKeepers();
-    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -72,18 +73,6 @@ function CommunityScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com';
-      const response = await fetch(`${API_URL}/api/v1/forums/categories`);
-      if (!response.ok) throw new Error('Failed to fetch categories');
-      const data = await response.json();
-      setCategories(data);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
     }
   };
 
@@ -144,14 +133,23 @@ function CommunityScreen() {
     fetchKeepers();
   };
 
+  /**
+   * Experience badge colours, derived from the theme.
+   *
+   * These were hardcoded light-mode pairs (#dcfce7 on #166534 and friends)
+   * with no theme access, so on the dark background every badge rendered as a
+   * pale pastel block — a light-mode component that had never been looked at
+   * in dark mode. Tinting the semantic colour at 24/255 alpha gives a badge
+   * that reads on either background and follows the theme.
+   */
   const getExperienceBadgeColor = (level?: string) => {
-    switch (level) {
-      case 'beginner': return { bg: '#dcfce7', text: '#166534' };
-      case 'intermediate': return { bg: '#dbeafe', text: '#1e40af' };
-      case 'advanced': return { bg: '#f3e8ff', text: '#6b21a8' };
-      case 'expert': return { bg: '#fef3c7', text: '#92400e' };
-      default: return { bg: '#f3f4f6', text: '#374151' };
-    }
+    const base =
+      level === 'beginner' ? colors.success
+        : level === 'intermediate' ? colors.info
+          : level === 'advanced' ? colors.primary
+            : level === 'expert' ? colors.warning
+              : colors.textTertiary;
+    return { bg: base + '24', text: base };
   };
 
   const formatSpecialty = (specialty: string) => {
@@ -160,10 +158,12 @@ function CommunityScreen() {
     ).join(' ');
   };
 
-  if (loading && keepers.length === 0 && categories.length === 0) {
+  // Loading gate no longer consults `categories` — this tab hasn't rendered
+  // forum categories since tab two became the activity feed, so gating on a
+  // list that's always empty made the skeleton depend on a dead variable.
+  if (loading && keepers.length === 0 && activities.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Skeleton loading */}
         <View style={{ padding: 16 }}>
           {activeTab === 'keepers' ? (
             <>
@@ -172,10 +172,14 @@ function CommunityScreen() {
               <KeeperCardSkeleton />
             </>
           ) : (
+            // Was CategoryCardSkeleton — forum-category placeholders standing
+            // in for an activity feed, left over from when tab two was Forums.
+            // A skeleton that doesn't match what loads is worse than none: it
+            // tells the user to expect the wrong thing.
             <>
-              <CategoryCardSkeleton />
-              <CategoryCardSkeleton />
-              <CategoryCardSkeleton />
+              <ActivityFeedSkeleton />
+              <ActivityFeedSkeleton />
+              <ActivityFeedSkeleton />
             </>
           )}
         </View>
@@ -246,7 +250,7 @@ function CommunityScreen() {
           >
             {keepers.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyEmoji}>🔍</Text>
+                <MaterialCommunityIcons name="account-search-outline" size={48} color={colors.textTertiary} style={{ marginBottom: 12 }} />
                 <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
                   {searchQuery ? 'No keepers found' : 'Be the first to go public'}
                 </Text>
@@ -282,7 +286,7 @@ function CommunityScreen() {
                             <Image source={{ uri: keeper.avatar_url }} style={styles.avatar} />
                           ) : (
                             <View style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]}>
-                              <Text style={styles.avatarEmoji}>🕷️</Text>
+                              <MaterialCommunityIcons name="account" size={26} color={colors.textTertiary} />
                             </View>
                           )}
                         </View>
@@ -291,7 +295,10 @@ function CommunityScreen() {
                           <Text style={[styles.keeperName, { color: colors.textPrimary }]}>{keeper.display_name}</Text>
                           <Text style={[styles.keeperUsername, { color: colors.textTertiary }]}>@{keeper.username}</Text>
                           {keeper.profile_location && (
-                            <Text style={[styles.keeperLocation, { color: colors.textSecondary }]}>📍 {keeper.profile_location}</Text>
+                            <Text style={[styles.keeperLocation, { color: colors.textSecondary }]}>
+                              <MaterialCommunityIcons name="map-marker-outline" size={12} color={colors.textSecondary} />
+                              {' '}{keeper.profile_location}
+                            </Text>
                           )}
                         </View>
                       </View>
@@ -374,7 +381,7 @@ function CommunityScreen() {
             </View>
           ) : activities.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>📊</Text>
+              <MaterialCommunityIcons name="pulse" size={48} color={colors.textTertiary} style={{ marginBottom: 12 }} />
               <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No activity yet</Text>
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary, marginBottom: 20, paddingHorizontal: 24 }]}>
                 Follow other keepers to see their feedings, molts, and new tarantulas appear here. Or add your own to start contributing.

@@ -35,6 +35,30 @@ export function KeeperCardSkeleton() {
   );
 }
 
+/**
+ * Placeholder for an activity-feed row.
+ *
+ * Mirrors ActivityFeedItem's actual shape — type icon, thumbnail, two lines of
+ * text, avatar. The Community tab previously showed CategoryCardSkeleton here,
+ * so the feed loaded behind placeholders shaped like forum categories.
+ */
+export function ActivityFeedSkeleton() {
+  const { colors } = useTheme();
+
+  return (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Skeleton width={36} height={36} borderRadius={18} />
+      <Skeleton width={44} height={44} borderRadius={8} style={styles.marginLeft8} />
+      <View style={[styles.content, styles.marginLeft8]}>
+        <Skeleton width="60%" height={13} borderRadius={4} style={styles.marginBottom4} />
+        <Skeleton width="80%" height={15} borderRadius={4} style={styles.marginBottom4} />
+        <Skeleton width="35%" height={11} borderRadius={4} />
+      </View>
+      <Skeleton width={32} height={32} borderRadius={16} />
+    </View>
+  );
+}
+
 export function CategoryCardSkeleton() {
   const { colors } = useTheme();
 

@@ -172,13 +172,12 @@ export default function ActivityFeedItem({ activity }: Props) {
         };
 
       default:
-        return {
-          verb: `${displayName} did something`,
-          tarantulaName: undefined,
-          speciesName: undefined,
-          thumbnailUrl: undefined,
-          subtitle: undefined,
-        };
+        // Render NOTHING for an activity type this build doesn't know about.
+        // This used to ship the literal string "did something" to users — which
+        // is what an unknown type looks like when the fallback tries to be
+        // friendly instead of silent. A server that starts emitting a new
+        // activity_type should be invisible to older clients, not chatty.
+        return null;
     }
   };
 
@@ -187,13 +186,16 @@ export default function ActivityFeedItem({ activity }: Props) {
   const icon = getActivityIcon();
   const content = getActivityContent();
 
+  // Unknown activity type — render nothing rather than a placeholder row.
+  if (!content) return null;
+
   return (
     <TouchableOpacity
       style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}
       onPress={content.onPress}
       disabled={!content.onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${content.verb}${content.tarantulaName ? ` ${content.tarantulaName}` : ''}`}
+      accessibilityLabel={`${content.actor} ${content.verb}${content.tarantulaName ? ` ${content.tarantulaName}` : ''}`}
     >
       <View style={styles.row}>
         {/* Activity type icon */}
@@ -210,14 +212,31 @@ export default function ActivityFeedItem({ activity }: Props) {
           />
         ) : content.tarantulaName && (
           <View style={[styles.thumbnail, styles.thumbnailPlaceholder, { backgroundColor: colors.surfaceElevated }]}>
-            <Text style={{ fontSize: 18 }}>🕷️</Text>
+            {/* Was 🕷️. An emoji placeholder is wrong twice over: it renders at
+                a different metric box than surrounding text, and it asserts
+                "spider" for a feed that carries ten taxa. */}
+            <MaterialCommunityIcons name="paw" size={18} color={colors.textTertiary} />
           </View>
         )}
 
         {/* Text content */}
         <View style={styles.textContent}>
+          {/* Actor split out from the verb so it can be bold and tappable.
+              These were previously concatenated into one string, which made
+              the person who did the thing indistinguishable from the thing. */}
           <Text style={[styles.verb, { color: colors.textSecondary }]} numberOfLines={1}>
-            {content.verb}
+            <Text
+              style={{ fontWeight: '700', color: colors.textPrimary }}
+              onPress={
+                activity.username
+                  ? () => router.push(`/community/${activity.username}` as never)
+                  : undefined
+              }
+              suppressHighlighting
+            >
+              {content.actor}
+            </Text>
+            {' '}{content.verb}
           </Text>
 
           {content.tarantulaName && (
