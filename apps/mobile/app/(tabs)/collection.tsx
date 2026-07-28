@@ -13,6 +13,7 @@ import {
   Platform,
   ToastAndroid,
   ScrollView,
+  Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,9 +52,11 @@ import {
   listInverts,
   invertDisplayName,
   INVERT_TAXA,
+  taxonMdiIcon,
   type Invert as GenericInvert,
   type InvertTaxon,
 } from '../../src/lib/inverts';
+import { AppHeader } from '../../src/components/AppHeader';
 import {
   listColonies,
   formatColonyCount,
@@ -79,11 +82,17 @@ interface Tarantula {
 interface FeedingStatus {
   tarantula_id: string;
   days_since_last_feeding?: number;
-  acceptance_rate: number;
+  acceptance_rate?: number;
   // Pause flag — see migration pst_20260502. When true, the
   // collection grid renders a quiet "Paused" pill instead of the
   // red overdue treatment.
   is_feeding_paused?: boolean;
+  // Species + life-stage aware, computed server-side. NOT a day threshold:
+  // a sling eating every 5 days and an adult Grammostola eating every 30 are
+  // both "overdue" at their own interval. This screen used to infer overdue
+  // from a flat day count, so it disagreed with Home and the daily digest
+  // about the same animal.
+  is_overdue?: boolean;
 }
 
 interface PremoltPrediction {
@@ -93,24 +102,44 @@ interface PremoltPrediction {
   status_text: string;
 }
 
-interface CollectionStats {
-  total_tarantulas: number;
-  unique_species: number;
-  total_feedings: number;
-  total_molts: number;
-  sex_distribution: {
-    male: number;
-    female: number;
-    unknown: number;
-  };
-}
-
 // Taxon discriminator drives the FlatList row dispatcher: tarantulas
 // keep their full-featured card (feeding badge + premolt + action
 // sheet), scorpions + centipedes render via a simpler card until
 // those features ship for the additional surfaces. New taxa land
 // here when added.
-type TaxonFilter = 'all' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | InvertTaxon;
+// 'due' is a cross-taxon slice (everything overdue), not a taxon.
+type TaxonFilter = 'all' | 'due' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | InvertTaxon;
+
+/**
+ * Chip key for a taxon.
+ *
+ * The four oldest taxa have PLURAL chip keys ('scorpions') for historical
+ * reasons while their taxon strings are singular ('scorpion'); newer taxa use
+ * the taxon string as-is. This function is the single place that knows.
+ */
+function taxonFilterKey(taxon: string): TaxonFilter {
+  switch (taxon) {
+    case 'tarantula': return 'tarantulas';
+    case 'scorpion': return 'scorpions';
+    case 'centipede': return 'centipedes';
+    case 'whip_spider': return 'whip_spiders';
+    default: return taxon as TaxonFilter;
+  }
+}
+
+/** Chip order + labels. Only chips with a non-zero count are rendered. */
+const TAXON_CHIPS: { value: TaxonFilter; label: string; taxon: string }[] = [
+  { value: 'tarantulas', label: 'Tarantulas', taxon: 'tarantula' },
+  { value: 'scorpions', label: 'Scorpions', taxon: 'scorpion' },
+  { value: 'centipedes', label: 'Centipedes', taxon: 'centipede' },
+  { value: 'whip_spiders', label: 'Whip spiders', taxon: 'whip_spider' },
+  { value: 'vinegaroon', label: 'Vinegaroons', taxon: 'vinegaroon' },
+  { value: 'true_spider', label: 'True spiders', taxon: 'true_spider' },
+  { value: 'millipede', label: 'Millipedes', taxon: 'millipede' },
+  { value: 'mantis', label: 'Mantises', taxon: 'mantis' },
+  { value: 'roach', label: 'Roaches', taxon: 'roach' },
+  { value: 'other', label: 'Other', taxon: 'other' },
+];
 
 type Row =
   | { kind: 'tarantula'; data: Tarantula }
@@ -132,15 +161,12 @@ function CollectionScreen() {
   const [whipSpiders, setWhipSpiders] = useState<WhipSpider[]>([]);
   const [otherInverts, setOtherInverts] = useState<GenericInvert[]>([]);
   const [colonies, setColonies] = useState<ColonyListItem[]>([]);
+  // ONE map for every taxon, filled by a single /inverts/feeding-status call.
+  // There used to be two (one per fetcher) purely to stop the tarantula fetch
+  // from clobbering the invert one — a race that only existed because each
+  // taxon fetched separately.
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
-  // Separate map for non-tarantula taxa so the four invert fetchers can merge
-  // into it without racing the tarantula fetch (which replaces feedingStatuses
-  // wholesale). Only predator-mode taxa are populated — detritivores
-  // (millipedes) and omnivores (roaches) have no live-prey cadence, so an
-  // "overdue" badge would be misleading.
-  const [invertFeedingStatuses, setInvertFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map());
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map());
-  const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
@@ -149,6 +175,11 @@ function CollectionScreen() {
   // Taxon filter — sits above search/sort. When 'tarantulas' or
   // 'scorpions', the other taxon is filtered out entirely.
   const [taxonFilter, setTaxonFilter] = useState<TaxonFilter>('all');
+  // Search and sort moved off the list body and behind header actions — the
+  // body used to open with a search field, a sort row, a title row and a stats
+  // card before the first animal appeared.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [sortSheetOpen, setSortSheetOpen] = useState(false);
   // Long-press quick-actions sheet. `actionTarget` holds the tarantula
   // whose sheet is open (null = closed); `actionBusy` gates the rows
   // while the mark-fed POST is in flight.
@@ -193,17 +224,51 @@ function CollectionScreen() {
     fetchWhipSpiders();
     fetchOtherInverts();
     fetchColonies();
-    fetchCollectionStats();
+    loadFeedingStatuses();
   }, []);
 
-  const fetchCollectionStats = async () => {
+  /**
+   * Feeding status for EVERY animal in one request.
+   *
+   * This replaces two fetchers that between them fired one HTTP request per
+   * animal (`/tarantulas/{id}/feeding-stats` for tarantulas, `/inverts/{id}/
+   * feeding-stats` for the rest) — a 60-animal collection opened 60 requests
+   * on every mount. `/inverts/feeding-status` answers for the whole
+   * collection with one grouped query.
+   *
+   * It also fixes a correctness problem, which matters more: that endpoint
+   * returns a species + life-stage aware `is_overdue`. This screen previously
+   * inferred "overdue" from a flat day count, so Home, the Feeding Day screen
+   * and the daily digest could each call the same animal something different.
+   */
+  const loadFeedingStatuses = async () => {
     try {
-      const response = await apiClient.get('/analytics/collection');
-      setCollectionStats(response.data);
-    } catch (error) {
-      // Silently fail - stats are optional
+      // Calendar days in the keeper's zone — a UTC delta flips "0d" to "1d"
+      // at UTC midnight rather than theirs.
+      const tzOffset = new Date().getTimezoneOffset();
+      const res = await apiClient.get('/inverts/feeding-status', {
+        params: { tz_offset_minutes: tzOffset },
+      });
+      const next = new Map<string, FeedingStatus>();
+      for (const row of res.data ?? []) {
+        next.set(row.id, {
+          tarantula_id: row.id,
+          days_since_last_feeding: row.days_since_last_feeding ?? undefined,
+          is_feeding_paused: row.is_feeding_paused ?? false,
+          is_overdue: row.is_overdue ?? false,
+        });
+      }
+      setFeedingStatuses(next);
+    } catch {
+      // Non-fatal: cards fall back to no status line rather than blanking.
     }
   };
+
+  // NB: the collection-stats fetch was removed with the stats card. It read
+  // /analytics/collection purely to fill a card that duplicated Home's stat
+  // strip, and that endpoint counts only the legacy tarantula table — so on a
+  // mixed collection it was both redundant AND wrong. Total/species counts in
+  // the header are computed from the loaded lists instead.
 
   const fetchScorpions = async () => {
     // Failure here is non-fatal — scorpions are an additive surface;
@@ -211,7 +276,6 @@ function CollectionScreen() {
     try {
       const rows = await listScorpions();
       setScorpions(rows);
-      loadInvertFeedingStatuses(rows.map((r) => ({ id: r.id, taxon: 'scorpion' })));
     } catch {
       setScorpions([]);
     }
@@ -225,7 +289,6 @@ function CollectionScreen() {
     try {
       const rows = await listCentipedes();
       setCentipedes(rows);
-      loadInvertFeedingStatuses(rows.map((r) => ({ id: r.id, taxon: 'centipede' })));
     } catch {
       setCentipedes([]);
     }
@@ -238,7 +301,6 @@ function CollectionScreen() {
     try {
       const rows = await listWhipSpiders();
       setWhipSpiders(rows);
-      loadInvertFeedingStatuses(rows.map((r) => ({ id: r.id, taxon: 'whip_spider' })));
     } catch {
       setWhipSpiders([]);
     }
@@ -251,7 +313,6 @@ function CollectionScreen() {
       const all = await listInverts();
       const others = all.filter((i) => GENERIC_TAXA.includes(i.taxon));
       setOtherInverts(others);
-      loadInvertFeedingStatuses(others.map((i) => ({ id: i.id, taxon: i.taxon })));
     } catch {
       setOtherInverts([]);
     }
@@ -273,42 +334,12 @@ function CollectionScreen() {
     try {
       const response = await apiClient.get('/tarantulas/');
       setTarantulas(response.data);
-      await fetchAllFeedingStatuses(response.data);
       await fetchAllPremoltPredictions(response.data);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to load tarantulas');
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchAllFeedingStatuses = async (tarantulasList: Tarantula[]) => {
-    const statusMap = new Map<string, FeedingStatus>();
-    // Pass tz offset so days_since_last_feeding reflects calendar days
-    // in the user's zone (otherwise evening feedings flip from "0d" to
-    // "1d" only at UTC midnight, not local midnight).
-    const tzOffset = new Date().getTimezoneOffset();
-
-    await Promise.all(
-      tarantulasList.map(async (t) => {
-        try {
-          const response = await apiClient.get(
-            `/tarantulas/${t.id}/feeding-stats`,
-            { params: { tz_offset_minutes: tzOffset } },
-          );
-          statusMap.set(t.id, {
-            tarantula_id: t.id,
-            days_since_last_feeding: response.data.days_since_last_feeding,
-            acceptance_rate: response.data.acceptance_rate,
-            is_feeding_paused: response.data.is_feeding_paused,
-          });
-        } catch (error) {
-          // Silently fail for individual tarantulas
-        }
-      })
-    );
-    
-    setFeedingStatuses(statusMap);
   };
 
   const fetchAllPremoltPredictions = async (tarantulasList: Tarantula[]) => {
@@ -333,97 +364,27 @@ function CollectionScreen() {
     setPremoltPredictions(predictionMap);
   };
 
-  // Feeding statuses for predator-mode inverts → invertFeedingStatuses (merged,
-  // not replaced, so the four taxon fetchers don't clobber each other). Skips
-  // detritivores/omnivores. Fails silently per animal, and is a no-op against an
-  // API that predates /inverts/{id}/feeding-stats — older instances just show no
-  // badge instead of erroring.
-  const loadInvertFeedingStatuses = async (
-    rows: { id: string; taxon: InvertTaxon }[],
-  ) => {
-    const predators = rows.filter(
-      (r) => INVERT_TAXA[r.taxon]?.feedingMode === 'predator',
-    );
-    if (predators.length === 0) return;
-    const tzOffset = new Date().getTimezoneOffset();
-    const entries = await Promise.all(
-      predators.map(async (r) => {
-        try {
-          const res = await apiClient.get(`/inverts/${r.id}/feeding-stats`, {
-            params: { tz_offset_minutes: tzOffset },
-          });
-          const status: FeedingStatus = {
-            tarantula_id: r.id,
-            days_since_last_feeding: res.data.days_since_last_feeding ?? undefined,
-            acceptance_rate: res.data.acceptance_rate ?? 0,
-            is_feeding_paused: res.data.is_feeding_paused ?? false,
-          };
-          return [r.id, status] as const;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    setInvertFeedingStatuses((prev) => {
-      const next = new Map(prev);
-      for (const e of entries) if (e) next.set(e[0], e[1]);
-      return next;
-    });
+  /**
+   * Feeding status for a row, whatever its taxon.
+   *
+   * Detritivores and omnivores (millipedes, roaches) are deliberately excluded:
+   * they graze on standing food rather than taking live prey on a cadence, so
+   * "12d since fed" would be a number with no meaning attached to it.
+   */
+  const statusFor = (id: string, taxon?: string): FeedingStatus | undefined => {
+    // Note the registry lookup is only consulted when the taxon IS registered.
+    // `INVERT_TAXA` has no `tarantula` key (tarantula predates the registry and
+    // is excluded from its pickers), so a bare `!== 'predator'` test would
+    // silently strip feeding status from every tarantula on the screen.
+    const meta = taxon ? INVERT_TAXA[taxon as InvertTaxon] : undefined;
+    if (meta && meta.feedingMode !== 'predator') return undefined;
+    return feedingStatuses.get(id);
   };
 
-  const getFeedingStatusBadge = (tarantulaId: string) => {
-    const status = feedingStatuses.get(tarantulaId);
-    if (!status) return null;
-
-    // Paused trumps everything. A 7-month premolt sling shouldn't
-    // see her tile flashing red every day.
-    if (status.is_feeding_paused) {
-      return (
-        <View
-          style={[styles.feedingBadge, styles.feedingBadgePaused]}
-          accessibilityLabel="Feeding paused"
-        >
-          <Text style={styles.feedingBadgeText}>⏸ Paused</Text>
-        </View>
-      );
-    }
-
-    // null (never fed / no accepted feeding) is just as "no data" as undefined —
-    // guard both, or `${null}d ago` renders the literal "nulld ago" badge.
-    if (status.days_since_last_feeding === undefined || status.days_since_last_feeding === null) return null;
-
-    const days = status.days_since_last_feeding;
-    let badgeStyle = styles.feedingBadgeGreen;
-    let label: string;
-    // Screen-reader label — spells out the meaning the emoji carries visually.
-    let a11yLabel: string;
-
-    if (days === 0) {
-      label = '✓ Fed today';
-      a11yLabel = 'Fed today';
-    } else if (days >= 21) {
-      badgeStyle = styles.feedingBadgeRed;
-      label = `⚠️ ${days}d ago`;
-      a11yLabel = `Overdue, last fed ${days} days ago`;
-    } else if (days >= 14) {
-      badgeStyle = styles.feedingBadgeOrange;
-      label = `⏰ ${days}d ago`;
-      a11yLabel = `Feeding due soon, last fed ${days} days ago`;
-    } else if (days >= 7) {
-      badgeStyle = styles.feedingBadgeYellow;
-      label = `📅 ${days}d ago`;
-      a11yLabel = `Last fed ${days} days ago`;
-    } else {
-      label = `✓ ${days}d ago`;
-      a11yLabel = `Last fed ${days} days ago`;
-    }
-
-    return (
-      <View style={[styles.feedingBadge, badgeStyle]} accessibilityLabel={a11yLabel}>
-        <Text style={styles.feedingBadgeText}>{label}</Text>
-      </View>
-    );
-  };
+  // NB: `getFeedingStatusBadge` was deleted here. It rendered the photo-overlay
+  // feeding pill with a hardcoded 7/14/21-day colour ramp — the flat threshold
+  // that made this screen disagree with Home. AnimalCard's status footer
+  // replaced it, and it reads the server's per-species `is_overdue`.
 
   const getPremoltBadge = (tarantulaId: string) => {
     const prediction = premoltPredictions.get(tarantulaId);
@@ -469,37 +430,41 @@ function CollectionScreen() {
     return centipedeDisplayName(row.data);
   };
 
-  // Filter and sort rows (tarantulas + scorpions + centipedes, gated
-  // by taxonFilter). When a specific taxon is selected the other two
-  // collapse out entirely so the keeper can focus.
+  // Filter and sort rows, gated by taxonFilter. Selecting one taxon collapses
+  // the others out entirely so the keeper can focus. 'due' cuts across taxa.
   const getFilteredRows = (): Row[] => {
     const query = searchQuery.toLowerCase();
+    // 'due' is a cross-taxon slice, so every taxon stays in and the overdue
+    // filter is applied to the merged list further down.
+    const wide = taxonFilter === 'all' || taxonFilter === 'due';
 
     const tarantulaRows: Row[] =
-      taxonFilter === 'all' || taxonFilter === 'tarantulas'
+      wide || taxonFilter === 'tarantulas'
         ? tarantulas.map((t) => ({ kind: 'tarantula' as const, data: t }))
         : [];
     const scorpionRows: Row[] =
-      taxonFilter === 'all' || taxonFilter === 'scorpions'
+      wide || taxonFilter === 'scorpions'
         ? scorpions.map((s) => ({ kind: 'scorpion' as const, data: s }))
         : [];
     const centipedeRows: Row[] =
-      taxonFilter === 'all' || taxonFilter === 'centipedes'
+      wide || taxonFilter === 'centipedes'
         ? centipedes.map((c) => ({ kind: 'centipede' as const, data: c }))
         : [];
     const whipSpiderRows: Row[] =
-      taxonFilter === 'all' || taxonFilter === 'whip_spiders'
+      wide || taxonFilter === 'whip_spiders'
         ? whipSpiders.map((w) => ({ kind: 'whip_spider' as const, data: w }))
         : [];
     // Newer generic taxa — included under 'all' or when their own chip is active.
     const otherInvertRows: Row[] = otherInverts
-      .filter((i) => taxonFilter === 'all' || taxonFilter === i.taxon)
+      .filter((i) => wide || taxonFilter === i.taxon)
       .map((i) => ({ kind: 'invert' as const, data: i }));
 
-    // Colonies (ADR-010) — a colony shows under 'all' or under its taxon's
-    // chip (a roach colony appears when the Roaches filter is active).
+    // Colonies (ADR-010) — a colony shows under 'all' or under its taxon's chip.
+    // Note the key mapping: the four oldest chips are PLURAL ('scorpions'),
+    // while a colony's taxon is singular ('scorpion'). Comparing them directly
+    // meant a scorpion colony vanished when you filtered to Scorpions.
     const colonyRows: Row[] = colonies
-      .filter((c) => taxonFilter === 'all' || taxonFilter === c.taxon)
+      .filter((c) => wide || taxonFilter === taxonFilterKey(c.taxon))
       .map((c) => ({ kind: 'colony' as const, data: c }));
 
     let rows: Row[] = [
@@ -510,6 +475,15 @@ function CollectionScreen() {
       ...otherInvertRows,
       ...colonyRows,
     ];
+
+    // 'due' — everything the server flagged overdue. Colonies are excluded:
+    // they have no per-animal feeding cadence (ADR-010 deferred colony feeding
+    // entirely), so they'd otherwise sit in a list of things to go feed.
+    if (taxonFilter === 'due') {
+      rows = rows.filter(
+        (row) => row.kind !== 'colony' && feedingStatuses.get(row.data.id)?.is_overdue,
+      );
+    }
 
     // Search across name, common_name, and scientific_name regardless
     // of taxon. Empty query short-circuits. Colonies have no common_name /
@@ -535,18 +509,16 @@ function CollectionScreen() {
 
     switch (sortBy) {
       case 'lastFed': {
-        // Only tarantulas have feeding statuses today — scorpions sort
-        // to the bottom by default. When scorpion feeding analytics
-        // ship, generalize this to a per-row "lastFed" accessor.
+        // Now cross-taxon: one feeding-status call covers every animal, so a
+        // hungry scorpion sorts alongside a hungry tarantula instead of being
+        // pinned below every tarantula regardless of how long it's been.
+        // Colonies have no feeding cadence and sort last.
         rows.sort((a, b) => {
-          if (a.kind !== 'tarantula' && b.kind !== 'tarantula') return 0;
-          if (a.kind !== 'tarantula') return 1;
-          if (b.kind !== 'tarantula') return -1;
-          const daysA =
-            feedingStatuses.get(a.data.id)?.days_since_last_feeding ?? Infinity;
-          const daysB =
-            feedingStatuses.get(b.data.id)?.days_since_last_feeding ?? Infinity;
-          return daysB - daysA;
+          const daysOf = (r: Row) =>
+            r.kind === 'colony'
+              ? -1
+              : feedingStatuses.get(r.data.id)?.days_since_last_feeding ?? Infinity;
+          return daysOf(b) - daysOf(a);
         });
         break;
       }
@@ -569,7 +541,7 @@ function CollectionScreen() {
       fetchWhipSpiders(),
       fetchOtherInverts(),
       fetchColonies(),
-      fetchCollectionStats(),
+      loadFeedingStatuses(),
     ]);
     setRefreshing(false);
   }, []);
@@ -670,14 +642,8 @@ function CollectionScreen() {
         feeding={{
           daysSince: status?.days_since_last_feeding,
           isPaused: status?.is_feeding_paused,
-          // NOTE: no `isOverdue`. This screen's FeedingStatus has no
-          // is_overdue flag, and inferring one from a flat day threshold
-          // would be wrong across taxa (a millipede is a detritivore, not a
-          // 7-day feeder). The card therefore says "Fed 17d ago", never
-          // "17d overdue". Wiring this screen to /inverts/feeding-status —
-          // which the dashboard and Feeding Day already use, and which
-          // computes overdue per species + life stage — is what unlocks the
-          // stronger wording and makes all three surfaces agree.
+          // Server-computed, per species + life stage — see loadFeedingStatuses.
+          isOverdue: status?.is_overdue,
         }}
         premolt={!!prediction && prediction.confidence_level !== 'low'}
         onPress={() => router.push(`/tarantula/${item.id}`)}
@@ -697,18 +663,34 @@ function CollectionScreen() {
   // near-identical copies of the same JSX that had already drifted apart.
   // They all route to /invert/[id] and differ only in taxon, so they're one
   // renderer now. AnimalCard owns the visual treatment for every taxon.
-  const renderInvertCard = (item: any, taxon: string) => (
-    <AnimalCard
-      key={item.id}
-      displayName={item.name || item.common_name || item.scientific_name || 'Unnamed'}
-      scientificName={item.scientific_name}
-      photoUrl={item.photo_url}
-      sex={item.sex}
-      taxon={taxon}
-      onPress={() => router.push(`/invert/${item.id}` as any)}
-      colors={colors}
-    />
-  );
+  const renderInvertCard = (item: any, taxon: string) => {
+    // Non-tarantula taxa now get the same status footer the tarantula card
+    // has — one feeding-status call covers the whole collection, so there's
+    // no longer a cost reason to leave them blank. statusFor() still returns
+    // nothing for detritivores/omnivores.
+    const status = statusFor(item.id, taxon);
+    return (
+      <AnimalCard
+        key={item.id}
+        displayName={item.name || item.common_name || item.scientific_name || 'Unnamed'}
+        scientificName={item.scientific_name}
+        photoUrl={item.photo_url}
+        sex={item.sex}
+        taxon={taxon}
+        feeding={
+          status
+            ? {
+                daysSince: status.days_since_last_feeding,
+                isPaused: status.is_feeding_paused,
+                isOverdue: status.is_overdue,
+              }
+            : undefined
+        }
+        onPress={() => router.push(`/invert/${item.id}` as any)}
+        colors={colors}
+      />
+    );
+  };
 
   const renderScorpion = ({ item }: { item: Scorpion }) => renderInvertCard(item, 'scorpion');
   const renderCentipede = ({ item }: { item: Centipede }) => renderInvertCard(item, 'centipede');
@@ -898,7 +880,7 @@ function CollectionScreen() {
     const sexLabel =
       item.sex === 'female' ? 'female' : item.sex === 'male' ? 'male' : 'unknown sex';
 
-    // Feeding badge (predator taxa only — see loadInvertFeedingStatuses).
+    // Feeding badge (predator taxa only — see statusFor).
     // Paused trumps the days-since treatment, same as the tarantula row.
     const feedingDays = feedingStatus?.days_since_last_feeding;
     const feedingColor = feedingStatusColor(feedingDays, colors);
@@ -1048,84 +1030,14 @@ function CollectionScreen() {
     );
   };
 
-  const ViewToggle = () => (
-    <View style={styles.viewToggleContainer} accessibilityRole="radiogroup">
-      <TouchableOpacity
-        style={[styles.viewToggleButton, viewMode === 'card' && styles.viewToggleActive]}
-        onPress={() => toggleViewMode('card')}
-        accessibilityRole="radio"
-        accessibilityState={{ selected: viewMode === 'card' }}
-        accessibilityLabel="Grid view"
-      >
-        <MaterialCommunityIcons
-          name="view-grid"
-          size={20}
-          color={viewMode === 'card' ? '#fff' : colors.textSecondary}
-        />
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleActive]}
-        onPress={() => toggleViewMode('list')}
-        accessibilityRole="radio"
-        accessibilityState={{ selected: viewMode === 'list' }}
-        accessibilityLabel="List view"
-      >
-        <MaterialCommunityIcons
-          name="view-list"
-          size={20}
-          color={viewMode === 'list' ? '#fff' : colors.textSecondary}
-        />
-      </TouchableOpacity>
-    </View>
-  );
-
-  // Search bar was previously a `const SearchBar = () => (...)`
-  // component defined inside CollectionScreen, which caused React to
-  // see a NEW component type on every parent render — so the inner
-  // TextInput got unmounted after every keystroke and the keyboard
-  // lost focus. Now inlined directly into the FlatList header below.
-  // The other inline header components (SortChips, ViewToggle,
-  // TaxonFilterChips) still follow the old pattern but have no input
-  // state that suffers from unmount/remount; clean those up when
-  // there's a reason to touch them again.
-
-  const SortChips = () => (
-    <View style={styles.sortContainer} accessibilityRole="radiogroup">
-      <TouchableOpacity
-        style={[styles.sortChip, sortBy === 'name' && styles.sortChipActive, { borderColor: colors.border }]}
-        onPress={() => setSortBy('name')}
-        accessibilityRole="radio"
-        accessibilityState={{ selected: sortBy === 'name' }}
-        accessibilityLabel="Sort alphabetically"
-      >
-        <Text style={[styles.sortChipText, sortBy === 'name' && styles.sortChipTextActive, { color: sortBy === 'name' ? '#fff' : colors.textSecondary }]}>
-          A-Z
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.sortChip, sortBy === 'lastFed' && styles.sortChipActive, { borderColor: colors.border }]}
-        onPress={() => setSortBy('lastFed')}
-        accessibilityRole="radio"
-        accessibilityState={{ selected: sortBy === 'lastFed' }}
-        accessibilityLabel="Sort by last fed date"
-      >
-        <Text style={[styles.sortChipText, sortBy === 'lastFed' && styles.sortChipTextActive, { color: sortBy === 'lastFed' ? '#fff' : colors.textSecondary }]}>
-          Last Fed
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.sortChip, sortBy === 'acquired' && styles.sortChipActive, { borderColor: colors.border }]}
-        onPress={() => setSortBy('acquired')}
-        accessibilityRole="radio"
-        accessibilityState={{ selected: sortBy === 'acquired' }}
-        accessibilityLabel="Sort by acquisition date"
-      >
-        <Text style={[styles.sortChipText, sortBy === 'acquired' && styles.sortChipTextActive, { color: sortBy === 'acquired' ? '#fff' : colors.textSecondary }]}>
-          Acquired
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+  // The old inline `ViewToggle` and `SortChips` components are gone — the view
+  // toggle is a header icon now and sort lives in the ⚙ sheet. (Historical
+  // note worth keeping: a `SearchBar` component defined inside this screen
+  // once made React see a NEW component type on every parent render, which
+  // unmounted the TextInput and dropped keyboard focus after one character.
+  // That's why the search field is written inline in the header rather than
+  // extracted, and why any future extraction has to be hoisted out of the
+  // screen function.)
 
   const styles = StyleSheet.create({
     container: {
@@ -1600,6 +1512,103 @@ function CollectionScreen() {
       marginHorizontal: 8,
       marginBottom: 12,
     },
+
+    // --- Header actions + search (gradient band) ---
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    headerSearch: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 12,
+      paddingHorizontal: 12,
+      height: 40,
+      borderRadius: 10,
+    },
+    headerSearchInput: {
+      flex: 1,
+      color: '#fff',
+      fontSize: 15,
+      // Android centres text oddly in a fixed-height row without this.
+      paddingVertical: 0,
+    },
+
+    // --- Filter chips ---
+    filterChipRow: {
+      flexDirection: 'row',
+      gap: 7,
+      paddingHorizontal: 8,
+      paddingTop: 12,
+      paddingBottom: 4,
+    },
+    filterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 13,
+      paddingVertical: 7,
+      borderRadius: 10,
+      borderWidth: 1,
+    },
+    filterChipText: {
+      fontSize: 12.5,
+      fontWeight: '600',
+    },
+
+    // --- Empty result state (filter/search matched nothing) ---
+    filteredEmpty: {
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 56,
+      paddingHorizontal: 32,
+    },
+    filteredEmptyText: {
+      fontSize: 15,
+      textAlign: 'center',
+    },
+    filteredEmptyAction: {
+      fontSize: 14,
+      fontWeight: '700',
+    },
+
+    // --- Sort bottom sheet ---
+    sheetBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    sheetBody: {
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      borderTopWidth: 1,
+      borderLeftWidth: 1,
+      borderRightWidth: 1,
+      paddingTop: 18,
+      paddingHorizontal: 16,
+    },
+    sheetTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      marginBottom: 8,
+      marginLeft: 4,
+    },
+    sheetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 4,
+    },
+    sheetRowText: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '600',
+    },
     sortChip: {
       paddingHorizontal: 12,
       paddingVertical: 6,
@@ -1668,17 +1677,17 @@ function CollectionScreen() {
     if (item.kind === 'scorpion') {
       return viewMode === 'card'
         ? renderScorpion({ item: item.data })
-        : renderInvertListItem(item.data, '🦂', 'scorpion', invertFeedingStatuses.get(item.data.id));
+        : renderInvertListItem(item.data, '🦂', 'scorpion', statusFor(item.data.id, 'scorpion'));
     }
     if (item.kind === 'centipede') {
       return viewMode === 'card'
         ? renderCentipede({ item: item.data })
-        : renderInvertListItem(item.data, '🐛', 'centipede', invertFeedingStatuses.get(item.data.id));
+        : renderInvertListItem(item.data, '🐛', 'centipede', statusFor(item.data.id, 'centipede'));
     }
     if (item.kind === 'whip_spider') {
       return viewMode === 'card'
         ? renderWhipSpider({ item: item.data })
-        : renderInvertListItem(item.data, '🕸️', 'whip spider', invertFeedingStatuses.get(item.data.id));
+        : renderInvertListItem(item.data, '🕸️', 'whip spider', statusFor(item.data.id, 'whip_spider'));
     }
     if (item.kind === 'invert') {
       const meta = INVERT_TAXA[item.data.taxon];
@@ -1688,7 +1697,7 @@ function CollectionScreen() {
             item.data,
             meta?.glyph ?? '🐾',
             meta?.label ?? 'invert',
-            invertFeedingStatuses.get(item.data.id),
+            statusFor(item.data.id, item.data.taxon),
           );
     }
     if (item.kind === 'colony') {
@@ -1701,56 +1710,76 @@ function CollectionScreen() {
       : renderListItem({ item: item.data });
   };
 
-  // Inline three-chip taxon filter — sits at the top of the list
-  // header so the keeper can switch focus without leaving the screen.
-  const TaxonFilterChips = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.sortContainer}
-    >
-      {(
-        [
-          { value: 'all' as const, label: 'All' },
-          { value: 'tarantulas' as const, label: '🕷 Tarantulas' },
-          { value: 'scorpions' as const, label: '🦂 Scorpions' },
-          { value: 'centipedes' as const, label: '🐛 Centipedes' },
-          { value: 'whip_spiders' as const, label: '🕸️ Whip spiders' },
-          { value: 'vinegaroon' as const, label: '🦂 Vinegaroons' },
-          { value: 'true_spider' as const, label: '🕷 True spiders' },
-          { value: 'millipede' as const, label: '🪱 Millipedes' },
-          { value: 'mantis' as const, label: '🦗 Mantises' },
-          { value: 'roach' as const, label: '🪳 Roaches' },
-          { value: 'other' as const, label: '🐾 Other' },
-        ]
-      ).map((opt) => {
-        const active = taxonFilter === opt.value;
-        return (
-          <TouchableOpacity
-            key={opt.value}
+  /**
+   * Taxon filter chips.
+   *
+   * Two changes from the old row: chips carry counts, and only taxa the keeper
+   * ACTUALLY OWNS are rendered. Previously all eleven rendered regardless, so
+   * a keeper with four tarantulas scrolled past Vinegaroons, Millipedes and
+   * Mantises to reach an empty list — the row advertised the catalog instead
+   * of describing the collection. (Pattern ported from Herpetoverse's
+   * `ownedTaxa` in `apps/mobile-herpetoverse/app/(tabs)/index.tsx`.)
+   */
+  const TaxonFilterChips = () => {
+    const chip = (
+      value: TaxonFilter,
+      label: string,
+      count: number,
+      opts?: { icon?: string; iconColor?: string },
+    ) => {
+      const active = taxonFilter === value;
+      return (
+        <TouchableOpacity
+          key={value}
+          style={[
+            styles.filterChip,
+            { borderColor: colors.border, backgroundColor: colors.surface },
+            active && { backgroundColor: colors.primary, borderColor: colors.primary },
+          ]}
+          onPress={() => setTaxonFilter(value)}
+          accessibilityRole="button"
+          accessibilityState={{ selected: active }}
+          accessibilityLabel={`${label}, ${count}`}
+        >
+          {opts?.icon ? (
+            <MaterialCommunityIcons
+              name={opts.icon as any}
+              size={14}
+              color={active ? '#fff' : opts.iconColor ?? colors.textSecondary}
+            />
+          ) : null}
+          <Text
             style={[
-              styles.sortChip,
-              active && styles.sortChipActive,
-              { borderColor: colors.border },
+              styles.filterChipText,
+              { color: active ? '#fff' : colors.textSecondary },
             ]}
-            onPress={() => setTaxonFilter(opt.value)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
           >
-            <Text
-              style={[
-                styles.sortChipText,
-                active && styles.sortChipTextActive,
-                { color: active ? '#fff' : colors.textSecondary },
-              ]}
-            >
-              {opt.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
-  );
+            {label} {count}
+          </Text>
+        </TouchableOpacity>
+      );
+    };
+
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterChipRow}
+      >
+        {chip('all', 'All', totalAnimals)}
+        {/* Only offered when something is actually due — a permanent "Due 0"
+            chip is a filter that leads to an empty screen. */}
+        {dueCount > 0
+          ? chip('due', 'Due', dueCount, { icon: 'alert-circle', iconColor: colors.error })
+          : null}
+        {TAXON_CHIPS.map(({ value, label, taxon }) => {
+          const count = countsByFilter.get(value) ?? 0;
+          if (count === 0) return null;
+          return chip(value, label, count, { icon: taxonMdiIcon(taxon) });
+        })}
+      </ScrollView>
+    );
+  };
 
   // Empty state card component for when collection is empty.
   // NB: currently unused since the empty-state branch below renders
@@ -1809,8 +1838,107 @@ function CollectionScreen() {
     ].filter((s) => s.length > 0),
   ).size;
 
+  // Per-chip counts. Built from the same sources getFilteredRows() draws on, so
+  // a chip's number always matches what tapping it shows.
+  const countsByFilter = new Map<TaxonFilter, number>();
+  const bump = (key: TaxonFilter) =>
+    countsByFilter.set(key, (countsByFilter.get(key) ?? 0) + 1);
+  tarantulas.forEach(() => bump('tarantulas'));
+  scorpions.forEach(() => bump('scorpions'));
+  centipedes.forEach(() => bump('centipedes'));
+  whipSpiders.forEach(() => bump('whip_spiders'));
+  otherInverts.forEach((i) => bump(taxonFilterKey(i.taxon)));
+  colonies.forEach((c) => bump(taxonFilterKey(c.taxon)));
+
+  // Overdue count for the Due chip. Counted from the same map the cards read,
+  // so the chip can't claim 7 while six cards say "overdue".
+  const dueCount = [
+    ...tarantulas, ...scorpions, ...centipedes, ...whipSpiders, ...otherInverts,
+  ].filter((a: any) => feedingStatuses.get(a.id)?.is_overdue).length;
+
+  const headerIcon = (
+    name: string,
+    label: string,
+    onPress: () => void,
+    active?: boolean,
+  ) => (
+    <TouchableOpacity
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: !!active }}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+    >
+      <MaterialCommunityIcons
+        name={name as any}
+        size={22}
+        color={active ? '#fff' : 'rgba(255,255,255,0.82)'}
+      />
+    </TouchableOpacity>
+  );
+
   return (
     <View style={styles.container}>
+      {/* Gradient header owning the screen's identity, counts and actions.
+          Replaces the navigator's "My Collection" title bar AND the four
+          stacked rows the list body used to open with (search field, sort
+          chips, title + view toggle, stats card) — that was most of a screen
+          of chrome before the first animal. */}
+      <AppHeader
+        title="Collection"
+        subtitle={`${totalAnimals} ${totalAnimals === 1 ? 'animal' : 'animals'} · ${uniqueSpeciesCount} ${uniqueSpeciesCount === 1 ? 'species' : 'species'}`}
+        paddingBottom={searchOpen ? 12 : 16}
+        rightAction={
+          <View style={styles.headerActions}>
+            {headerIcon('magnify', searchOpen ? 'Close search' : 'Search collection', () => {
+              // Clearing on close keeps the visible list honest: leaving a
+              // stale query filtering a collapsed search box hides animals
+              // with no on-screen explanation.
+              if (searchOpen) setSearchQuery('');
+              setSearchOpen((v) => !v);
+            }, searchOpen)}
+            {headerIcon('tune-variant', 'Sort options', () => setSortSheetOpen(true))}
+            {headerIcon(
+              viewMode === 'card' ? 'view-grid-outline' : 'view-list-outline',
+              viewMode === 'card' ? 'Switch to list view' : 'Switch to grid view',
+              () => toggleViewMode(viewMode === 'card' ? 'list' : 'card'),
+            )}
+          </View>
+        }
+      >
+        {searchOpen ? (
+          <View style={[styles.headerSearch, { backgroundColor: 'rgba(255,255,255,0.16)' }]}>
+            <MaterialCommunityIcons
+              name="magnify"
+              size={18}
+              color="rgba(255,255,255,0.8)"
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+            <TextInput
+              style={styles.headerSearchInput}
+              placeholder="Search by name or species…"
+              placeholderTextColor="rgba(255,255,255,0.6)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              accessibilityLabel="Search collection by name or species"
+            />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <MaterialCommunityIcons name="close-circle" size={18} color="rgba(255,255,255,0.8)" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
+      </AppHeader>
+
       {collectionEmpty ? (
         <View style={styles.empty}>
           <MaterialCommunityIcons name="paw" size={64} color={colors.textTertiary} />
@@ -1858,102 +1986,40 @@ function CollectionScreen() {
             contentContainerStyle={styles.list}
             ListHeaderComponent={
               <>
-                {/* Premolt Alert Card */}
                 <PremoltAlertCard />
-
-                {/* Search Bar — inlined (not a sub-component) so the
-                    TextInput keeps its identity across re-renders.
-                    Defining it as `const SearchBar = () => (...)` made
-                    React see a new component type every keystroke,
-                    which unmounted the input and dropped keyboard
-                    focus after one character. */}
-                <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <MaterialCommunityIcons
-                    name="magnify"
-                    size={20}
-                    color={colors.textSecondary}
-                    accessibilityElementsHidden
-                    importantForAccessibility="no"
-                  />
-                  <TextInput
-                    style={[styles.searchInput, { color: colors.textPrimary }]}
-                    placeholder="Search by name, species..."
-                    placeholderTextColor={colors.textTertiary}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    accessibilityLabel="Search tarantulas by name or species"
-                  />
-                  {searchQuery.length > 0 && (
-                    <TouchableOpacity
-                      onPress={() => setSearchQuery('')}
-                      accessibilityRole="button"
-                      accessibilityLabel="Clear search"
-                    >
-                      <MaterialCommunityIcons name="close-circle" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {/* Taxon filter — sits above the sort chips so it
-                    reads as the primary axis (taxon first, then sort
-                    inside that taxon). */}
+                {/* The only chrome left in the body. Search moved into the
+                    header, sort into the ⚙ sheet, layout into the header
+                    toggle, and the stats card was a duplicate of Home's. */}
                 <TaxonFilterChips />
-
-                {/* Sort Chips */}
-                <SortChips />
-
-                {/* View Toggle Row */}
-                <View style={styles.statsHeaderRow}>
-                  <Text style={styles.statsTitle}>🕷️ My Collection</Text>
-                  <ViewToggle />
-                </View>
-
-                {/* Stats Card */}
-                {collectionStats && (
-                  <View style={styles.statsCard}>
-                    <View style={styles.statsHeader}>
-                      <Text style={styles.statsTitle}>📊 Collection Stats</Text>
-                      <TouchableOpacity onPress={() => router.push('/analytics')}>
-                        <Text style={styles.viewAllLink}>View All →</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <View style={styles.statsGrid}>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{totalAnimals}</Text>
-                        <Text style={styles.statLabel}>Total</Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{uniqueSpeciesCount}</Text>
-                        <Text style={styles.statLabel}>Species</Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{collectionStats.total_feedings}</Text>
-                        <Text style={styles.statLabel}>Feedings</Text>
-                      </View>
-                      <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{collectionStats.total_molts}</Text>
-                        <Text style={styles.statLabel}>Molts</Text>
-                      </View>
-                    </View>
-                    <View style={styles.sexDistribution}>
-                      <View style={styles.sexItem}>
-                        <MaterialCommunityIcons name="gender-male" size={16} color={colors.male} />
-                        <Text style={styles.sexText}>{collectionStats.sex_distribution.male} ♂</Text>
-                      </View>
-                      <View style={styles.sexItem}>
-                        <MaterialCommunityIcons name="gender-female" size={16} color={colors.female} />
-                        <Text style={styles.sexText}>{collectionStats.sex_distribution.female} ♀</Text>
-                      </View>
-                      <View style={styles.sexItem}>
-                        <MaterialCommunityIcons name="help-circle" size={16} color={colors.textTertiary} />
-                        <Text style={styles.sexText}>{collectionStats.sex_distribution.unknown} ?</Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
               </>
+            }
+            ListEmptyComponent={
+              // A filter that matches nothing used to leave a blank screen
+              // with the chips still lit — indistinguishable from a failed
+              // load.
+              <View style={styles.filteredEmpty}>
+                <MaterialCommunityIcons name="filter-remove-outline" size={40} color={colors.textTertiary} />
+                <Text style={[styles.filteredEmptyText, { color: colors.textSecondary }]}>
+                  {searchQuery
+                    ? `Nothing matches “${searchQuery}”`
+                    : taxonFilter === 'due'
+                      ? 'Nothing is overdue right now'
+                      : 'Nothing here yet'}
+                </Text>
+                {(searchQuery || taxonFilter !== 'all') && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setSearchQuery('');
+                      setTaxonFilter('all');
+                    }}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.filteredEmptyAction, { color: colors.accent }]}>
+                      Show everything
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             }
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
@@ -1986,6 +2052,77 @@ function CollectionScreen() {
         onLogMolt={handleLogMolt}
         onEdit={handleEditFromSheet}
       />
+
+      {/* Sort sheet — reached from the header's tune-variant icon. The sort
+          chips used to occupy a permanent row in the list body; sort order is
+          something a keeper sets occasionally, not something they need
+          on-screen at all times. */}
+      <Modal
+        visible={sortSheetOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSortSheetOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.sheetBackdrop}
+          activeOpacity={1}
+          onPress={() => setSortSheetOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close sort options"
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={[
+              styles.sheetBody,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                paddingBottom: insets.bottom + 16,
+              },
+            ]}
+          >
+            <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Sort by</Text>
+            {(
+              [
+                { value: 'name' as const, label: 'Name', icon: 'sort-alphabetical-ascending' },
+                { value: 'lastFed' as const, label: 'Longest since fed', icon: 'silverware-fork-knife' },
+                { value: 'acquired' as const, label: 'Date acquired', icon: 'calendar-blank-outline' },
+              ]
+            ).map((opt) => {
+              const active = sortBy === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={styles.sheetRow}
+                  onPress={() => {
+                    setSortBy(opt.value);
+                    setSortSheetOpen(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                >
+                  <MaterialCommunityIcons
+                    name={opt.icon as any}
+                    size={20}
+                    color={active ? colors.accent : colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.sheetRowText,
+                      { color: active ? colors.accent : colors.textPrimary },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                  {active ? (
+                    <MaterialCommunityIcons name="check" size={20} color={colors.accent} />
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Add-to-collection taxon picker. Same always-mounted pattern. */}
       <AddPickerSheet

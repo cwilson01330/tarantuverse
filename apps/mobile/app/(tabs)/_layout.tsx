@@ -73,23 +73,16 @@ export default function TabLayout() {
           // ADR-003 pattern: one bottom-bar entry, taxon disambiguates
           // inside the add flow. Header icon opens the unified species
           // browser — keepers can browse both catalogs from one place.
-          title: 'My Collection',
+          title: 'Collection',
           tabBarLabel: 'Collection',
+          // Like Home, the screen draws its own gradient header — it carries
+          // the live "{n} animals · {m} species" counts plus the search /
+          // filter / layout actions, all of which read screen state. A
+          // navigator header would need a duplicate fetch to say the same
+          // things.
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="paw" size={size} color={color} />
-          ),
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => router.push('/species' as any)}
-              style={styles.headerButton}
-              accessibilityLabel="Browse species catalog"
-            >
-              <MaterialCommunityIcons
-                name="book-open-variant"
-                size={24}
-                color={tintColor}
-              />
-            </TouchableOpacity>
           ),
         }}
       />

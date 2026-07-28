@@ -67,7 +67,10 @@ function feedingLine(f: AnimalCardFeeding | undefined, colors: any) {
     return { text: 'Not yet fed', color: colors.textTertiary };
   }
   const d = f.daysSince;
-  if (f.isOverdue) return { text: `${d}d overdue`, color: '#ef4444', strong: true };
+  // Semantic colors come from the theme — they're immutable across aesthetic
+  // presets, but they still differ between light and dark mode (#ef4444 vs
+  // #dc2626), so hardcoding the dark value washes out on a light background.
+  if (f.isOverdue) return { text: `${d}d overdue`, color: colors.error, strong: true };
   if (d === 0) return { text: 'Fed today', color: colors.textSecondary };
   return { text: `Fed ${d}d ago`, color: colors.textSecondary };
 }
@@ -143,9 +146,9 @@ export function AnimalCard({
           style={[
             styles.sexChip,
             sex === 'female'
-              ? { backgroundColor: '#ec4899' }
+              ? { backgroundColor: colors.female }
               : sex === 'male'
-              ? { backgroundColor: '#3b82f6' }
+              ? { backgroundColor: colors.male }
               : { backgroundColor: 'rgba(10,10,15,0.7)' },
           ]}
         >
