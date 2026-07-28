@@ -275,76 +275,59 @@ function CommunityScreen() {
                 {keepers.map((keeper) => {
                   const badgeColor = getExperienceBadgeColor(keeper.profile_experience_level);
                   return (
+                    /* Compact row (~88pt) replacing a ~300pt card.
+                       The card stacked avatar + name + username + location +
+                       2-line bio + experience badge + years badge + up to 4
+                       specialty chips + a full-width "View Profile" footer —
+                       on a card that was ALREADY tappable, so that footer was
+                       pure height restating what tapping already did. Three
+                       keepers filled a screen. Full detail lives one tap away
+                       at /community/[username]. */
                     <TouchableOpacity
                       key={keeper.id}
-                      style={[styles.keeperCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                      style={[styles.keeperRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
                       onPress={() => router.push(`/community/${keeper.username}`)}
+                      accessibilityRole="button"
+                      accessibilityLabel={[
+                        keeper.display_name,
+                        `@${keeper.username}`,
+                        keeper.profile_experience_level,
+                        keeper.profile_location,
+                      ].filter(Boolean).join(', ')}
                     >
-                      <View style={styles.keeperHeader}>
-                        <View style={styles.avatarContainer}>
-                          {keeper.avatar_url ? (
-                            <Image source={{ uri: keeper.avatar_url }} style={styles.avatar} />
-                          ) : (
-                            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.border }]}>
-                              <MaterialCommunityIcons name="account" size={26} color={colors.textTertiary} />
+                      {keeper.avatar_url ? (
+                        <Image source={{ uri: keeper.avatar_url }} style={styles.rowAvatar} />
+                      ) : (
+                        <View style={[styles.rowAvatar, styles.rowAvatarPlaceholder, { backgroundColor: colors.border }]}>
+                          <MaterialCommunityIcons name="account" size={22} color={colors.textTertiary} />
+                        </View>
+                      )}
+
+                      <View style={{ flex: 1 }}>
+                        <View style={styles.rowNameLine}>
+                          <Text style={[styles.rowName, { color: colors.textPrimary }]} numberOfLines={1}>
+                            {keeper.display_name}
+                          </Text>
+                          {keeper.profile_experience_level && (
+                            <View style={[styles.rowBadge, { backgroundColor: badgeColor.bg }]}>
+                              <Text style={[styles.rowBadgeText, { color: badgeColor.text }]}>
+                                {keeper.profile_experience_level.charAt(0).toUpperCase() + keeper.profile_experience_level.slice(1)}
+                              </Text>
                             </View>
                           )}
                         </View>
-
-                        <View style={styles.keeperInfo}>
-                          <Text style={[styles.keeperName, { color: colors.textPrimary }]}>{keeper.display_name}</Text>
-                          <Text style={[styles.keeperUsername, { color: colors.textTertiary }]}>@{keeper.username}</Text>
-                          {keeper.profile_location && (
-                            <Text style={[styles.keeperLocation, { color: colors.textSecondary }]}>
-                              <MaterialCommunityIcons name="map-marker-outline" size={12} color={colors.textSecondary} />
-                              {' '}{keeper.profile_location}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-
-                      {keeper.profile_bio && (
-                        <Text style={[styles.keeperBio, { color: colors.textSecondary }]} numberOfLines={2}>
-                          {keeper.profile_bio}
+                        <Text style={[styles.rowUsername, { color: colors.textTertiary }]} numberOfLines={1}>
+                          @{keeper.username}
+                          {keeper.profile_location ? ` · ${keeper.profile_location}` : ''}
                         </Text>
-                      )}
-
-                      <View style={styles.keeperMeta}>
-                        {keeper.profile_experience_level && (
-                          <View style={[styles.badge, { backgroundColor: badgeColor.bg }]}>
-                            <Text style={[styles.badgeText, { color: badgeColor.text }]}>
-                              {keeper.profile_experience_level.charAt(0).toUpperCase() + keeper.profile_experience_level.slice(1)}
-                            </Text>
-                          </View>
-                        )}
-                        {keeper.profile_years_keeping && keeper.profile_years_keeping > 0 && (
-                          <View style={[styles.badge, { backgroundColor: colors.border }]}>
-                            <Text style={[styles.badgeText, { color: colors.textSecondary }]}>
-                              {keeper.profile_years_keeping}yr{keeper.profile_years_keeping !== 1 ? 's' : ''}
-                            </Text>
-                          </View>
-                        )}
+                        {keeper.profile_bio ? (
+                          <Text style={[styles.rowBio, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {keeper.profile_bio}
+                          </Text>
+                        ) : null}
                       </View>
 
-                      {keeper.profile_specialties && keeper.profile_specialties.length > 0 && (
-                        <View style={styles.specialties}>
-                          {keeper.profile_specialties.slice(0, 3).map((specialty, index) => (
-                            <View key={index} style={[styles.specialtyBadge, { backgroundColor: colors.border }]}>
-                              <Text style={[styles.specialtyText, { color: colors.textSecondary }]}>{formatSpecialty(specialty)}</Text>
-                            </View>
-                          ))}
-                          {keeper.profile_specialties.length > 3 && (
-                            <View style={[styles.specialtyBadge, { backgroundColor: colors.border }]}>
-                              <Text style={[styles.specialtyText, { color: colors.textSecondary }]}>+{keeper.profile_specialties.length - 3}</Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-
-                      <View style={[styles.viewProfileButton, { borderTopColor: colors.border }]}>
-                        <Text style={[styles.viewProfileText, { color: colors.primary }]}>View Profile</Text>
-                        <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
-                      </View>
+                      <MaterialCommunityIcons name="chevron-right" size={20} color={colors.textTertiary} />
                     </TouchableOpacity>
                   );
                 })}
@@ -495,8 +478,27 @@ const styles = StyleSheet.create({
   },
   keeperList: {
     padding: 16,
-    gap: 12,
+    gap: 8,
   },
+
+  // --- Compact keeper row (replaces keeperCard) ---
+  keeperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  rowAvatar: { width: 44, height: 44, borderRadius: 22 },
+  rowAvatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  rowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rowName: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  rowBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  rowBadgeText: { fontSize: 10.5, fontWeight: '700' },
+  rowUsername: { fontSize: 12, marginTop: 1 },
+  rowBio: { fontSize: 12, marginTop: 2 },
   keeperCard: {
     borderRadius: 16,
     padding: 16,
