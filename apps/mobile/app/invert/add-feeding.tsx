@@ -13,13 +13,17 @@ import { getInvert, createInvertFeeding, updateInvertFeeding, type InvertTaxon }
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 const FOOD_TYPES = ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'];
+// Same three values the tarantula form has always used. Kept identical so the
+// existing food_size data stays consistent — the column is free-text VARCHAR(50)
+// and would happily accept a fourth spelling of "medium".
+const FOOD_SIZES = ['Small', 'Medium', 'Large'];
 
 export default function AddInvertFeedingScreen() {
   const router = useRouter();
   // logId present ⇒ edit mode (PUT). The detail screen passes the current
   // values as params so we prefill without a single-log GET endpoint.
-  const { id, logId, fed_at, food_type, accepted: acceptedParam, notes: notesParam } =
-    useLocalSearchParams<{ id?: string; logId?: string; fed_at?: string; food_type?: string; accepted?: string; notes?: string }>();
+  const { id, logId, fed_at, food_type, food_size, accepted: acceptedParam, notes: notesParam } =
+    useLocalSearchParams<{ id?: string; logId?: string; fed_at?: string; food_type?: string; food_size?: string; accepted?: string; notes?: string }>();
   const isEdit = !!logId;
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
@@ -27,6 +31,14 @@ export default function AddInvertFeedingScreen() {
   const [taxon, setTaxon] = useState<InvertTaxon | null>(null);
   const [date, setDate] = useState(fed_at ? toISODateLocal(new Date(fed_at)) : toISODateLocal(new Date()));
   const [foodType, setFoodType] = useState(food_type || 'Cricket');
+  /** Prey size. Optional — '' means the keeper didn't record one, which is a
+   *  real answer and must not be sent as a guess.
+   *
+   *  This form is now the feeding path for EVERY taxon including tarantulas
+   *  (ADR-013 merged the detail screens), but it never carried a size picker,
+   *  so tarantula keepers silently lost the one they'd had on
+   *  `tarantula/add-feeding`. Reported by a keeper 2026-07-28. */
+  const [foodSize, setFoodSize] = useState(food_size || '');
   const [accepted, setAccepted] = useState(acceptedParam ? acceptedParam === 'true' : true);
   const [notes, setNotes] = useState(notesParam || '');
   const [saving, setSaving] = useState(false);
@@ -37,7 +49,15 @@ export default function AddInvertFeedingScreen() {
     if (!id || !taxon) return;
     try {
       setSaving(true);
-      const payload = { fed_at: new Date(date + 'T12:00:00').toISOString(), food_type: foodType, accepted, notes: notes.trim() || null };
+      const payload = {
+        fed_at: new Date(date + 'T12:00:00').toISOString(),
+        food_type: foodType,
+        // null, not '' — an unrecorded size should read as absent, and on edit
+        // it has to be able to CLEAR a previously saved value.
+        food_size: foodSize || null,
+        accepted,
+        notes: notes.trim() || null,
+      };
       if (isEdit && logId) {
         await updateInvertFeeding(logId, payload);
       } else {
@@ -60,6 +80,22 @@ export default function AddInvertFeedingScreen() {
               {FOOD_TYPES.map((f) => { const sel = f === foodType; return (
                 <TouchableOpacity key={f} onPress={() => setFoodType(f)} style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? colors.primary : colors.surface }}>
                   <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontWeight: '600', fontSize: 13 }}>{f}</Text>
+                </TouchableOpacity>); })}
+            </View>
+          </Field>
+          {/* Optional, and tappable to deselect — a keeper who doesn't measure
+              prey shouldn't be forced to pick one, and forcing a default would
+              put a size on the record that nobody actually observed. */}
+          <Field label="Prey size (optional)" colors={colors}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {FOOD_SIZES.map((s) => { const sel = s === foodSize; return (
+                <TouchableOpacity
+                  key={s}
+                  onPress={() => setFoodSize(sel ? '' : s)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: sel }}
+                  style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? colors.primary : colors.surface }}>
+                  <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontWeight: '600', fontSize: 13 }}>{s}</Text>
                 </TouchableOpacity>); })}
             </View>
           </Field>

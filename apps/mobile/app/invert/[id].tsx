@@ -164,7 +164,7 @@ function InvertDetailScreen() {
   };
 
   const editFeeding = (f: InvertFeedingLog) => router.push(
-    `/invert/add-feeding?id=${id}&logId=${f.id}&fed_at=${encodeURIComponent(f.fed_at)}&food_type=${encodeURIComponent(f.food_type ?? '')}&accepted=${f.accepted}&notes=${encodeURIComponent(f.notes ?? '')}` as any,
+    `/invert/add-feeding?id=${id}&logId=${f.id}&fed_at=${encodeURIComponent(f.fed_at)}&food_type=${encodeURIComponent(f.food_type ?? '')}&food_size=${encodeURIComponent(f.food_size ?? '')}&accepted=${f.accepted}&notes=${encodeURIComponent(f.notes ?? '')}` as any,
   );
   const editMolt = (m: InvertMoltLog) => router.push(
     `/invert/add-molt?id=${id}&logId=${m.id}&molted_at=${encodeURIComponent(m.molted_at)}&notes=${encodeURIComponent(m.notes ?? '')}` as any,
@@ -376,9 +376,16 @@ function InvertDetailScreen() {
       id: `f-${f.id}`,
       kind: 'feeding',
       at: f.fed_at,
-      title: f.accepted
-        ? `Ate ${f.food_type ? `a ${f.food_type.toLowerCase()}` : 'a feeder'}`
-        : `Refused ${f.food_type ? `a ${f.food_type.toLowerCase()}` : 'food'}`,
+      // Size goes in front of the prey — "a medium cricket". Omitted entirely
+      // when unrecorded rather than substituted, so a blank stays a blank.
+      title: (() => {
+        const prey = [f.food_size?.trim().toLowerCase(), f.food_type?.trim().toLowerCase()]
+          .filter(Boolean)
+          .join(' ');
+        return f.accepted
+          ? `Ate ${prey ? `a ${prey}` : 'a feeder'}`
+          : `Refused ${prey ? `a ${prey}` : 'food'}`;
+      })(),
       trailing: f.accepted ? 'Accepted' : 'Refused',
       trailingTone: f.accepted ? 'good' : 'bad',
       onEdit: () => editFeeding(f),

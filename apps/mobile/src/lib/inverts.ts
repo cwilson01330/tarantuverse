@@ -263,7 +263,7 @@ export interface InvertSpecies {
   times_kept: number;
 }
 
-export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; accepted: boolean; notes: string | null; }
+export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; food_size: string | null; accepted: boolean; notes: string | null; }
 export interface InvertMoltLog {
   id: string;
   invert_id: string | null;
@@ -409,7 +409,7 @@ export async function getInvertFeedingStats(id: string): Promise<InvertFeedingSt
   return res.data;
 }
 
-export async function createInvertFeeding(_taxon: InvertTaxon, id: string, payload: { fed_at: string; food_type?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
+export async function createInvertFeeding(_taxon: InvertTaxon, id: string, payload: { fed_at: string; food_type?: string | null; food_size?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
   const { data } = await apiClient.post<InvertFeedingLog>(`/inverts/${id}/feedings`, payload);
   return data;
 }
@@ -484,7 +484,7 @@ export async function uploadInvertPhoto(_taxon: InvertTaxon, id: string, form: F
 // rich edit/delete + set-hero UX tarantulas have works for every taxon.
 // ---------------------------------------------------------------------------
 
-export async function updateInvertFeeding(feedingId: string, payload: { fed_at?: string; food_type?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
+export async function updateInvertFeeding(feedingId: string, payload: { fed_at?: string; food_type?: string | null; food_size?: string | null; accepted?: boolean; notes?: string | null }): Promise<InvertFeedingLog> {
   const { data } = await apiClient.put<InvertFeedingLog>(`/feedings/${feedingId}`, payload);
   return data;
 }
