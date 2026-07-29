@@ -178,6 +178,9 @@ export interface Invert {
   date_acquired: string | null;
   source: Source | null;
   price_paid: string | null;
+  /** sling | juvenile | adult | null. Drives the species+stage feeding cadence
+   *  and gates market-signal eligibility. */
+  life_stage: string | null;
   current_instar: number | null;
   current_length_mm: string | null;
   enclosure_type: string | null;
@@ -268,6 +271,7 @@ export interface InvertMoltLog {
   id: string;
   invert_id: string | null;
   molted_at: string;
+  premolt_started_at: string | null;
   notes: string | null;
   // Per-molt measurements (ADR-008 growth module). Columns are named
   // leg_span_* for legacy reasons; for non-spider taxa the value is the
@@ -280,6 +284,9 @@ export interface InvertMoltLog {
 
 /** Optional per-molt measurements accepted by the molt endpoints. */
 export interface InvertMoltMeasurements {
+  /** When premolt was first observed. Optional and often genuinely unknown.
+   *  Feeds premolt_service's interval analysis. */
+  premolt_started_at?: string | null;
   leg_span_before?: number | null;
   leg_span_after?: number | null;
   weight_before?: number | null;

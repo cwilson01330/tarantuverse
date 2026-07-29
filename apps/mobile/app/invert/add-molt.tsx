@@ -33,6 +33,17 @@ export default function AddInvertMoltScreen() {
   const [lengthAfter, setLengthAfter] = useState('');
   const [weightBefore, setWeightBefore] = useState('');
   const [weightAfter, setWeightAfter] = useState('');
+  /** When premolt was first observed. Optional, and genuinely often unknown —
+   *  keepers notice premolt at different points. Gated behind a toggle because
+   *  DateInput requires a concrete Date, and defaulting to "today" would write
+   *  an observation nobody made.
+   *
+   *  The tarantula molt form has always had this; the generic form didn't, so
+   *  ADR-013's detail-screen merge silently removed it for tarantula keepers.
+   *  It feeds premolt_service's interval analysis, so losing it degrades molt
+   *  prediction quietly rather than visibly. */
+  const [hasPremoltStart, setHasPremoltStart] = useState(false);
+  const [premoltStart, setPremoltStart] = useState(toISODateLocal(new Date()));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
@@ -46,6 +57,10 @@ export default function AddInvertMoltScreen() {
       if (m.leg_span_after != null) setLengthAfter(String(m.leg_span_after));
       if (m.weight_before != null) setWeightBefore(String(m.weight_before));
       if (m.weight_after != null) setWeightAfter(String(m.weight_after));
+      if (m.premolt_started_at) {
+        setHasPremoltStart(true);
+        setPremoltStart(toISODateLocal(new Date(m.premolt_started_at)));
+      }
     }).catch(() => {});
   }, [logId]);
 
@@ -64,6 +79,11 @@ export default function AddInvertMoltScreen() {
       const payload = {
         molted_at: new Date(date + 'T12:00:00').toISOString(),
         notes: combined,
+        // null when the toggle is off — on edit that has to be able to CLEAR a
+        // previously recorded date, not just leave it untouched.
+        premolt_started_at: hasPremoltStart
+          ? new Date(premoltStart + 'T12:00:00').toISOString()
+          : null,
         leg_span_before: parseMeasure(lengthBefore),
         leg_span_after: parseMeasure(lengthAfter),
         weight_before: parseMeasure(weightBefore),
@@ -87,6 +107,34 @@ export default function AddInvertMoltScreen() {
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date molted" colors={colors}><DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Date molted" /></Field>
           <Field label="Molt number (optional)" colors={colors}><TextInput style={styles.input} value={moltNum} onChangeText={setMoltNum} placeholder="e.g. 4" placeholderTextColor={colors.textTertiary} keyboardType="number-pad" /></Field>
+          {/* Premolt start. Hidden behind a toggle so an unrecorded date stays
+              unrecorded rather than silently defaulting to today. */}
+          <Field label="Premolt started (optional)" colors={colors}>
+            <TouchableOpacity
+              onPress={() => setHasPremoltStart(!hasPremoltStart)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: hasPremoltStart }}
+              accessibilityLabel="Record when premolt started"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}
+            >
+              <MaterialCommunityIcons
+                name={hasPremoltStart ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                size={22}
+                color={hasPremoltStart ? colors.primary : colors.textTertiary}
+              />
+              <Text style={{ color: colors.textSecondary, fontSize: 14, flex: 1 }}>
+                I know when premolt started
+              </Text>
+            </TouchableOpacity>
+            {hasPremoltStart && (
+              <DateInput
+                value={parseLocalDate(premoltStart) ?? new Date()}
+                onChange={(d) => setPremoltStart(toISODateLocal(d))}
+                maximumDate={parseLocalDate(date) ?? new Date()}
+                label="Premolt start date"
+              />
+            )}
+          </Field>
           <View style={styles.measureRow}>
             <View style={styles.measureCol}>
               <Field label={`${lengthLabel} before (cm)`} colors={colors}><TextInput style={styles.input} value={lengthBefore} onChangeText={setLengthBefore} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>

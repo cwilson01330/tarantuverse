@@ -73,6 +73,14 @@ export default function AddInvertScreen() {
   const [commonName, setCommonName] = useState(commonNameParam ?? '');
   const [scientificName, setScientificName] = useState(scientificNameParam ?? '');
   const [sex, setSex] = useState<Sex>('unknown');
+  /** sling | juvenile | adult, or '' for unrecorded.
+   *
+   *  Not cosmetic: life_stage is what makes the feeding cadence species- AND
+   *  stage-aware, and it's one of two requirements for market-signal
+   *  eligibility. The tarantula form has always had it; this one didn't, so
+   *  every non-tarantula animal — and, after the ADR-013 detail merge, any
+   *  tarantula edited from the detail screen — had no way to set it. */
+  const [lifeStage, setLifeStage] = useState('');
   const [molts, setMolts] = useState('');
   const [sizeMm, setSizeMm] = useState('');
   // Acquisition (parity with the tarantula form)
@@ -91,6 +99,9 @@ export default function AddInvertScreen() {
   const [waterDish, setWaterDish] = useState(true);
   const [mistingSchedule, setMistingSchedule] = useState('');
   const [lastCleaning, setLastCleaning] = useState('');
+  /** Last substrate change. Distinct from last_enclosure_cleaning — a spot
+   *  clean isn't a substrate change — and the tarantula form tracked both. */
+  const [lastSubstrateChange, setLastSubstrateChange] = useState('');
   const [enclosureNotes, setEnclosureNotes] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -119,6 +130,7 @@ export default function AddInvertScreen() {
         scientific_name: scientificName.trim() || null,
         species_id: speciesId,
         sex,
+        life_stage: lifeStage || null,
         current_instar: molts ? Number(molts) : null,
         current_length_mm: sizeMm.trim() || null,
         date_acquired: dateAcquired.trim() || null,
@@ -135,6 +147,7 @@ export default function AddInvertScreen() {
         water_dish: waterDish,
         misting_schedule: mistingSchedule.trim() || null,
         last_enclosure_cleaning: lastCleaning.trim() || null,
+        last_substrate_change: lastSubstrateChange.trim() || null,
         enclosure_notes: enclosureNotes.trim() || null,
         notes: notes.trim() || null,
       });
@@ -204,6 +217,35 @@ export default function AddInvertScreen() {
 
           <Field label="Sex">
             <ChipGroup options={SEX_OPTIONS} value={sex} onChange={setSex} colors={colors} />
+          </Field>
+
+          {/* Not ChipGroup — that can't deselect, and life stage has to be
+              clearable. "Unknown" is a real answer for a freshly acquired
+              animal, and guessing one skews its feeding cadence. */}
+          <Field label="Life stage">
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                { value: 'sling', label: 'Sling' },
+                { value: 'juvenile', label: 'Juvenile' },
+                { value: 'adult', label: 'Adult' },
+              ].map((o) => {
+                const selected = lifeStage === o.value;
+                return (
+                  <TouchableOpacity
+                    key={o.value}
+                    onPress={() => setLifeStage(selected ? '' : o.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.surface }}
+                  >
+                    <Text style={{ color: selected ? '#fff' : colors.textPrimary, fontWeight: '600', fontSize: 13 }}>{o.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 6 }}>
+              Sets the feeding cadence for this animal.
+            </Text>
           </Field>
 
           <Field label="Molts">
@@ -294,6 +336,14 @@ export default function AddInvertScreen() {
               onChange={(d) => setLastCleaning(toISODateLocal(d))}
               maximumDate={new Date()}
               label="Last enclosure cleaning"
+            />
+          </Field>
+          <Field label="Last substrate change">
+            <DateInput
+              value={parseLocalDate(lastSubstrateChange) ?? new Date()}
+              onChange={(d) => setLastSubstrateChange(toISODateLocal(d))}
+              maximumDate={new Date()}
+              label="Last substrate change"
             />
           </Field>
           <Field label="Enclosure notes">

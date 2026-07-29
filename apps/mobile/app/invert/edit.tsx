@@ -51,11 +51,12 @@ export default function EditInvertScreen() {
       setSaving(true);
       await updateInvert(id, {
         name: form.name, common_name: form.common_name, scientific_name: form.scientific_name,
-        species_id: form.species_id, sex: form.sex, current_instar: form.current_instar, current_length_mm: form.current_length_mm,
+        species_id: form.species_id, sex: form.sex, life_stage: form.life_stage, current_instar: form.current_instar, current_length_mm: form.current_length_mm,
         date_acquired: form.date_acquired, source: form.source, price_paid: form.price_paid,
         enclosure_type: form.enclosure_type, enclosure_size: form.enclosure_size, substrate_type: form.substrate_type, substrate_depth: form.substrate_depth,
         target_temp_min: form.target_temp_min, target_temp_max: form.target_temp_max, target_humidity_min: form.target_humidity_min, target_humidity_max: form.target_humidity_max,
-        water_dish: form.water_dish, misting_schedule: form.misting_schedule, last_enclosure_cleaning: form.last_enclosure_cleaning, enclosure_notes: form.enclosure_notes, notes: form.notes,
+        water_dish: form.water_dish, misting_schedule: form.misting_schedule, last_enclosure_cleaning: form.last_enclosure_cleaning,
+        last_substrate_change: form.last_substrate_change, enclosure_notes: form.enclosure_notes, notes: form.notes,
       });
       router.back();
     } catch (err) {
@@ -80,6 +81,31 @@ export default function EditInvertScreen() {
           )}
           <Field label="Nickname"><TextInput style={styles.input} value={form.name ?? ''} onChangeText={(t) => update('name', t)} autoCapitalize="words" /></Field>
           <Field label="Sex"><ChipGroup options={SEX_OPTIONS} value={form.sex ?? 'unknown'} onChange={(v) => update('sex', v)} colors={colors} /></Field>
+          {/* Clearable — tap the selected chip to unset. "Unknown" is a real
+              answer, and life_stage drives the feeding cadence, so a guess here
+              produces a wrong schedule rather than a missing one. */}
+          <Field label="Life stage">
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                { value: 'sling', label: 'Sling' },
+                { value: 'juvenile', label: 'Juvenile' },
+                { value: 'adult', label: 'Adult' },
+              ].map((o) => {
+                const selected = form.life_stage === o.value;
+                return (
+                  <TouchableOpacity
+                    key={o.value}
+                    onPress={() => update('life_stage', selected ? null : o.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.surface }}
+                  >
+                    <Text style={{ color: selected ? '#fff' : colors.textPrimary, fontWeight: '600', fontSize: 13 }}>{o.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Field>
           <Field label="Molts"><TextInput style={styles.input} value={form.current_instar?.toString() ?? ''} onChangeText={(t) => update('current_instar', t ? Number(t) : null)} keyboardType="number-pad" /></Field>
           <Field label={meta?.sizeLabel ?? 'Size (mm)'}><TextInput style={styles.input} value={form.current_length_mm ?? ''} onChangeText={(t) => update('current_length_mm', t)} keyboardType="decimal-pad" /></Field>
 
@@ -107,6 +133,7 @@ export default function EditInvertScreen() {
           </View>
           <Field label="Misting schedule"><TextInput style={styles.input} value={form.misting_schedule ?? ''} onChangeText={(t) => update('misting_schedule', t || null)} placeholder="e.g. 2x per week" placeholderTextColor={colors.textTertiary} /></Field>
           <Field label="Last enclosure cleaning"><DateInput value={parseLocalDate(form.last_enclosure_cleaning) ?? new Date()} onChange={(d) => update('last_enclosure_cleaning', toISODateLocal(d))} maximumDate={new Date()} label="Last enclosure cleaning" /></Field>
+          <Field label="Last substrate change"><DateInput value={parseLocalDate(form.last_substrate_change) ?? new Date()} onChange={(d) => update('last_substrate_change', toISODateLocal(d))} maximumDate={new Date()} label="Last substrate change" /></Field>
           <Field label="Enclosure notes"><TextInput style={[styles.input, styles.textArea]} value={form.enclosure_notes ?? ''} onChangeText={(t) => update('enclosure_notes', t || null)} placeholder="Decor, modifications, etc." placeholderTextColor={colors.textTertiary} multiline /></Field>
           <Field label="Notes"><TextInput style={[styles.input, styles.textArea]} value={form.notes ?? ''} onChangeText={(t) => update('notes', t)} multiline /></Field>
 
