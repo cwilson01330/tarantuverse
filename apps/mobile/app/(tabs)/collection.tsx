@@ -93,6 +93,10 @@ interface FeedingStatus {
   // from a flat day count, so it disagreed with Home and the daily digest
   // about the same animal.
   is_overdue?: boolean;
+  /** Recommended days between feedings for this animal. Lets the card report
+   *  how far PAST DUE it is rather than how long since it last ate — those
+   *  differ by the whole interval. */
+  interval_days?: number | null;
 }
 
 /**
@@ -639,6 +643,47 @@ function CollectionScreen() {
     }
   };
 
+  /** One-tap feed straight from a collection card, for any taxon.
+   *
+   *  A keeper reported (2026-07-28) that she'd lost the ability to "go to the
+   *  collection and log feedings that way" — the capability was still there,
+   *  but only behind a long press, which nothing advertises. This is the same
+   *  write as `handleMarkFed`, reachable without knowing the gesture.
+   *
+   *  Tarantulas still post to the legacy per-taxon route because the ADR-005
+   *  read cutover hasn't happened; everything else uses the generic invert
+   *  route. Keep this in step with handleMarkFed above.
+   */
+  const [quickFeedingIds, setQuickFeedingIds] = useState<Set<string>>(new Set());
+
+  const handleQuickFeed = async (id: string, taxon: string, displayName: string) => {
+    if (quickFeedingIds.has(id)) return;
+    setQuickFeedingIds((prev) => new Set(prev).add(id));
+    try {
+      const path =
+        taxon === 'tarantula' ? `/tarantulas/${id}/feedings` : `/inverts/${id}/feedings`;
+      await apiClient.post(path, {
+        fed_at: new Date().toISOString(),
+        accepted: true,
+      });
+      await refreshFeedingStatus(id);
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`Logged a feeding for ${displayName}`, ToastAndroid.SHORT);
+      }
+    } catch (error) {
+      Alert.alert(
+        'Could not log feeding',
+        `Something went wrong logging a feeding for ${displayName}. Please try again.`,
+      );
+    } finally {
+      setQuickFeedingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   const handleLogMolt = () => {
     if (!actionTarget) return;
     const tarantulaId = actionTarget.id;
@@ -668,10 +713,16 @@ function CollectionScreen() {
           isPaused: status?.is_feeding_paused,
           // Server-computed, per species + life stage — see loadFeedingStatuses.
           isOverdue: status?.is_overdue,
+          // Lets the card say how far past due, not just days since fed.
+          intervalDays: status?.interval_days,
         }}
         premolt={showsPremolt(item.id)}
         onPress={() => router.push(`/tarantula/${item.id}`)}
         onLongPress={() => setActionTarget(item)}
+        onQuickFeed={() =>
+          handleQuickFeed(item.id, 'tarantula', getDisplayName(item))
+        }
+        quickFeedBusy={quickFeedingIds.has(item.id)}
         colors={colors}
       />
     );
@@ -707,10 +758,25 @@ function CollectionScreen() {
                 daysSince: status.days_since_last_feeding,
                 isPaused: status.is_feeding_paused,
                 isOverdue: status.is_overdue,
+                intervalDays: status.interval_days,
               }
             : undefined
         }
         onPress={() => router.push(`/invert/${item.id}` as any)}
+        // Only offer the button where a feeding cadence is meaningful. statusFor
+        // returns nothing for detritivores/omnivores, and a "Fed" button on a
+        // millipede would imply a live-prey schedule it doesn't have.
+        onQuickFeed={
+          status
+            ? () =>
+                handleQuickFeed(
+                  item.id,
+                  taxon,
+                  item.name || item.common_name || item.scientific_name || 'this animal',
+                )
+            : undefined
+        }
+        quickFeedBusy={quickFeedingIds.has(item.id)}
         colors={colors}
       />
     );

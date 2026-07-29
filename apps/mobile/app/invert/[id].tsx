@@ -314,10 +314,14 @@ function InvertDetailScreen() {
     ].filter(Boolean).join(' · ');
 
     if (feedingStats.is_overdue) {
+      // `is_overdue` fires at days >= interval, so the day the interval is
+      // reached gives d - iv === 0 and this read "Feed now — 0d overdue",
+      // which is a contradiction. Zero days past due means it's due today.
+      const daysPast = iv != null ? d - iv : 0;
       return {
         tone: 'bad' as const,
         icon: 'alert-circle-outline',
-        headline: `Feed now — ${d - (iv ?? d)}d overdue`,
+        headline: daysPast > 0 ? `Feed now — ${daysPast}d overdue` : 'Feed today',
         detail: reasoning,
       };
     }

@@ -35,6 +35,10 @@ export interface AnimalCardFeeding {
   daysSince?: number | null;
   isOverdue?: boolean;
   isPaused?: boolean;
+  /** Recommended days between feedings, from /inverts/feeding-status. Needed to
+   *  say how far PAST DUE an animal is; without it the card says "Overdue"
+   *  rather than guessing a number. */
+  intervalDays?: number | null;
 }
 
 export interface AnimalCardProps {
@@ -49,6 +53,15 @@ export interface AnimalCardProps {
   premolt?: boolean;
   onPress: () => void;
   onLongPress?: () => void;
+  /** Logs an accepted feeding for this animal, today.
+   *
+   *  Restores the path a keeper reported losing (2026-07-28): "I liked the
+   *  simplicity of going to the collection and logging feedings that way."
+   *  The capability never went away — it moved behind a long press, which is
+   *  invisible. Feeding Day remains the batch flow; this is the one-off. */
+  onQuickFeed?: () => void;
+  /** Disables the feed button while a log is in flight. */
+  quickFeedBusy?: boolean;
   colors: any;
   /** Extra style for the root. The default is `flex: 1, margin: 8`, which is
    *  what the collection grid relies on — it sizes columns with flex inside
@@ -70,7 +83,18 @@ function feedingLine(f: AnimalCardFeeding | undefined, colors: any) {
   // Semantic colors come from the theme — they're immutable across aesthetic
   // presets, but they still differ between light and dark mode (#ef4444 vs
   // #dc2626), so hardcoding the dark value washes out on a light background.
-  if (f.isOverdue) return { text: `${d}d overdue`, color: colors.error, strong: true };
+  if (f.isOverdue) {
+    // `d` is days SINCE FEEDING, not days PAST DUE. Rendering it as
+    // "20d overdue" for an animal on an 18-day cadence overstates it by the
+    // whole interval — it's 2 days late, not 20. With the interval we can say
+    // it properly; without one, don't invent a number.
+    const past = f.intervalDays != null ? d - f.intervalDays : null;
+    return {
+      text: past == null ? 'Overdue' : past > 0 ? `${past}d overdue` : 'Due today',
+      color: colors.error,
+      strong: true,
+    };
+  }
   if (d === 0) return { text: 'Fed today', color: colors.textSecondary };
   return { text: `Fed ${d}d ago`, color: colors.textSecondary };
 }
@@ -85,6 +109,8 @@ export function AnimalCard({
   premolt,
   onPress,
   onLongPress,
+  onQuickFeed,
+  quickFeedBusy,
   colors,
   style,
 }: AnimalCardProps) {
@@ -201,6 +227,36 @@ export function AnimalCard({
             </Text>
           </View>
         )}
+
+        {/* Visible one-tap feed. Nested Touchable inside the card's own
+            Touchable: taps here must NOT also open the detail screen, which RN
+            handles because the inner responder wins. */}
+        {!!onQuickFeed && (
+          <TouchableOpacity
+            style={[
+              styles.feedButton,
+              { borderColor: colors.border },
+              quickFeedBusy && { opacity: 0.5 },
+            ]}
+            onPress={onQuickFeed}
+            disabled={quickFeedBusy}
+            accessibilityRole="button"
+            accessibilityLabel={`Log a feeding for ${displayName}`}
+            accessibilityState={{ disabled: !!quickFeedBusy }}
+            // Small control on a dense grid — widen the touch target beyond the
+            // visual bounds rather than making the button itself taller.
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MaterialCommunityIcons
+              name="silverware-fork-knife"
+              size={13}
+              color={colors.textSecondary}
+            />
+            <Text style={styles.feedButtonText} numberOfLines={1}>
+              {quickFeedBusy ? 'Saving…' : 'Fed'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -266,6 +322,21 @@ const makeStyles = (colors: any) =>
     },
     dot: { width: 7, height: 7, borderRadius: 3.5 },
     statusText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
+    feedButton: {
+      marginTop: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      paddingVertical: 6,
+      borderRadius: 10,
+      borderWidth: 1,
+      // Deliberately quiet — outline, not filled. On a two-column grid a
+      // filled accent button on every card competes with the photos and makes
+      // the collection read as a to-do list.
+      backgroundColor: 'transparent',
+    },
+    feedButtonText: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
   });
 
 export default AnimalCard;
