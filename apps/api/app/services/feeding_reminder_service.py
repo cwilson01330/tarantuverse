@@ -14,29 +14,96 @@ from app.models.molt_log import MoltLog
 from app.schemas.feeding_reminder import FeedingReminderResponse
 
 
-def parse_frequency_string(frequency_str: Optional[str]) -> Tuple[int, int]:
-    """
-    Parse a frequency string like "every 3-4 days" or "every 7-14 days" to get day range.
-    Returns tuple of (min_days, max_days).
+# Words keepers use instead of digits.
+_WORD_COUNTS = {"once": 1, "twice": 2, "thrice": 3, "one": 1, "two": 2, "three": 3}
+_UNIT_DAYS = {"day": 1, "week": 7, "month": 30}
 
-    Examples:
-        "every 3-4 days" -> (3, 4)
-        "every 5-7 days" -> (5, 7)
-        "every 7-14 days" -> (7, 14)
-        None or unparseable -> (10, 10)  # default
+# INTERVAL phrasing — the number(s) are immediately followed by a time unit.
+#   "every 10-18 days", "Every 1-2 weeks", "Every 3 days"
+_INTERVAL_RE = re.compile(
+    r"(\d+)\s*(?:[-–—]|\bto\b)\s*(\d+)\s*(day|week|month)s?"
+    r"|(\d+)\s*(day|week|month)s?",
+    re.IGNORECASE,
+)
+
+# FREQUENCY phrasing — a COUNT of feedings within a period.
+#   "1 prey per week", "1-2 prey per week", "2x per week", "Twice per week", "weekly"
+_FREQUENCY_RE = re.compile(
+    r"(?:(once|twice|thrice|one|two|three)|(\d+)(?:\s*[-–—]\s*(\d+))?)"
+    r"\s*(?:x\b|times?\b)?"          # "2x", "2 times"
+    r"(?:[^,;.]*?)"                  # "prey", "small prey", "feeders" …
+    r"\bper\s*(day|week|month)\b",
+    re.IGNORECASE,
+)
+_BARE_PERIOD_RE = re.compile(r"\b(daily|weekly|monthly)\b", re.IGNORECASE)
+_BARE_PERIOD_DAYS = {"daily": 1, "weekly": 7, "monthly": 30}
+
+
+def parse_frequency_string(frequency_str: Optional[str]) -> Optional[Tuple[int, int]]:
+    """Parse a care-sheet feeding frequency into a (min_days, max_days) interval.
+
+    Returns None when the string can't be read as a cadence — callers MUST treat
+    that as "no cadence on file" rather than substituting a number.
+
+    Two distinct phrasings appear in the catalog and they mean opposite things:
+
+      INTERVAL  "1 prey every 10-18 days"  -> feed every 10-18 days
+      FREQUENCY "1-2 prey per week"        -> 1-2 feedings per week, i.e. every 3-7 days
+
+    The previous implementation ran `re.search(r'(\\d+)\\s*-?\\s*(\\d*)')` and took
+    the first number in the string regardless of what followed it. That made
+    "1 prey every 10-18 days" parse to (1, 1) — a keeper with an adult
+    Aphonopelma moderatum was told to feed it DAILY instead of every 18 days.
+    Reported by a user 2026-07-28.
+
+    It failed in one direction only — always toward feeding more often — because
+    the leading number is a prey count, and prey counts are small. Roughly 245 of
+    655 catalog strings were affected: everything phrased in weeks, and
+    everything with a prey count in front. Only the "every X-Y days" form
+    survived, which is why this went unnoticed.
     """
     if not frequency_str:
-        return (10, 10)  # Safe default
+        return None
 
-    # Try to extract numbers from patterns like "every 3-4 days" or "every 7 days"
-    # Match patterns: "X-Y" or just "X"
-    match = re.search(r'(\d+)\s*-?\s*(\d*)', frequency_str)
-    if match:
-        first = int(match.group(1))
-        second = int(match.group(2)) if match.group(2) else first
-        return (min(first, second), max(first, second))
+    s = frequency_str.strip()
+    if not s:
+        return None
 
-    return (10, 10)  # Safe default if parsing fails
+    # Frequency first: "1 prey per week" contains no unit directly after the
+    # number, but "per week" is decisive. Checking interval first would let the
+    # bare-number branch below swallow it.
+    m = _FREQUENCY_RE.search(s)
+    if m:
+        word, lo_digits, hi_digits, unit = m.group(1), m.group(2), m.group(3), m.group(4)
+        if word:
+            lo_count = hi_count = _WORD_COUNTS[word.lower()]
+        else:
+            lo_count = int(lo_digits)
+            hi_count = int(hi_digits) if hi_digits else lo_count
+        lo_count, hi_count = max(1, min(lo_count, hi_count)), max(1, max(lo_count, hi_count))
+        period = _UNIT_DAYS[unit.lower()]
+        # MORE feedings per period = SHORTER interval, so the counts invert.
+        return (max(1, period // hi_count), max(1, period // lo_count))
+
+    m = _INTERVAL_RE.search(s)
+    if m:
+        if m.group(1):  # ranged: "10-18 days"
+            lo, hi, unit = int(m.group(1)), int(m.group(2)), m.group(3)
+        else:           # single: "3 days"
+            lo = hi = int(m.group(4))
+            unit = m.group(5)
+        mult = _UNIT_DAYS[unit.lower()]
+        lo, hi = lo * mult, hi * mult
+        return (max(1, min(lo, hi)), max(1, max(lo, hi)))
+
+    m = _BARE_PERIOD_RE.search(s)
+    if m:
+        days = _BARE_PERIOD_DAYS[m.group(1).lower()]
+        return (days, days)
+
+    # Unreadable — e.g. "continuous — leaf litter, decaying hardwood". Detritivore
+    # grazing has no live-prey cadence and must not be given one.
+    return None
 
 
 def get_life_stage(tarantula: Tarantula, db: Session) -> str:
@@ -112,11 +179,13 @@ def get_recommended_interval(tarantula: Tarantula, db: Session) -> int:
     if not frequency_str:
         return default_intervals[life_stage]
 
-    # Parse frequency string to get day range, then take midpoint
-    min_days, max_days = parse_frequency_string(frequency_str)
-    midpoint = (min_days + max_days) // 2
-
-    return midpoint
+    # Parse frequency string to get day range, then take midpoint. Unreadable
+    # strings fall back to the life-stage default rather than fabricating one.
+    parsed = parse_frequency_string(frequency_str)
+    if not parsed:
+        return default_intervals[life_stage]
+    min_days, max_days = parsed
+    return (min_days + max_days) // 2
 
 
 def get_last_feeding(tarantula_id, db: Session) -> Optional[FeedingLog]:

@@ -258,13 +258,21 @@ def _recommended_feeding_interval_with_source(
             "juvenile": species.feeding_frequency_juvenile,
             "adult": species.feeding_frequency_adult,
         }
+        # parse_frequency_string returns None for strings it can't read as a
+        # cadence (e.g. "continuous — leaf litter"). Falling through to a default
+        # is correct there; inventing a number from an unreadable string is what
+        # produced the "feed every 1 day" bug.
         freq_str = by_stage.get(stage) if stage else None
         if freq_str:
-            return parse_frequency_string(freq_str)[1], INTERVAL_SOURCE_SPECIES
-        # Stage unknown or that stage's frequency blank → use the SHORTEST
-        # defined frequency across stages (safer: flags soonest). Still species
-        # data, so still honest to attribute to the care sheet.
-        defined = [parse_frequency_string(v)[1] for v in by_stage.values() if v]
+            parsed = parse_frequency_string(freq_str)
+            if parsed:
+                return parsed[1], INTERVAL_SOURCE_SPECIES
+        # Stage unknown or that stage's frequency blank/unreadable → use the
+        # SHORTEST defined frequency across stages (safer: flags soonest). Still
+        # species data, so still honest to attribute to the care sheet.
+        defined = [
+            p[1] for p in (parse_frequency_string(v) for v in by_stage.values() if v) if p
+        ]
         if defined:
             return min(defined), INTERVAL_SOURCE_SPECIES
 

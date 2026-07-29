@@ -91,12 +91,13 @@ def _parse_reptile_interval(s: Optional[str]) -> Optional[int]:
         return 7
     if "monthly" in t or "per month" in t or "once a month" in t:
         return 30
-    # Numeric ranges like "every 5-7 days" / "every 10 days" — only trust the
-    # parser when the string actually contains a digit (its no-match default
-    # would otherwise masquerade as a real "10").
+    # Numeric ranges like "every 5-7 days" / "every 10 days". The parser now
+    # returns None when it can't read a cadence instead of a fake "10", so the
+    # digit guard is no longer load-bearing — but it's kept because it's free
+    # and documents the intent.
     if re.search(r"\d", t):
-        _lo, hi = parse_frequency_string(t)
-        return hi
+        parsed = parse_frequency_string(t)
+        return parsed[1] if parsed else None
     return None
 
 
