@@ -208,20 +208,44 @@ function CollectionScreen() {
   // dialog so the options render left-aligned with their glyphs.
   const [addPickerOpen, setAddPickerOpen] = useState(false);
 
-  // Load view preference from AsyncStorage
+  /** Show the one-tap "Fed" button on cards. Defaults ON — it was added
+   *  because a keeper reported losing that path, so hiding it by default would
+   *  reintroduce the same problem. Off is for keepers who'd rather keep the
+   *  grid purely visual, or who log feedings in batches from Feeding Day.
+   *
+   *  Device-local (AsyncStorage), like collection_view_mode: it's a display
+   *  preference for this screen on this phone, not account state. */
+  const [showFedButton, setShowFedButton] = useState(true);
+
+  // Load view + display preferences from AsyncStorage
   useEffect(() => {
-    const loadViewMode = async () => {
+    const loadPrefs = async () => {
       try {
-        const savedView = await AsyncStorage.getItem('collection_view_mode');
+        const [savedView, savedFed] = await Promise.all([
+          AsyncStorage.getItem('collection_view_mode'),
+          AsyncStorage.getItem('collection_show_fed_button'),
+        ]);
         if (savedView === 'card' || savedView === 'list') {
           setViewMode(savedView);
         }
+        // Only an explicit 'false' turns it off; a missing key means the
+        // keeper has never chosen, which is the ON default.
+        if (savedFed === 'false') setShowFedButton(false);
       } catch (error) {
         // Silently fail
       }
     };
-    loadViewMode();
+    loadPrefs();
   }, []);
+
+  const toggleFedButton = async (next: boolean) => {
+    setShowFedButton(next);
+    try {
+      await AsyncStorage.setItem('collection_show_fed_button', next ? 'true' : 'false');
+    } catch (error) {
+      // Silently fail — the in-memory value still applies for this session.
+    }
+  };
 
   const toggleViewMode = async (mode: 'card' | 'list') => {
     setViewMode(mode);
@@ -719,8 +743,10 @@ function CollectionScreen() {
         premolt={showsPremolt(item.id)}
         onPress={() => router.push(`/tarantula/${item.id}`)}
         onLongPress={() => setActionTarget(item)}
-        onQuickFeed={() =>
-          handleQuickFeed(item.id, 'tarantula', getDisplayName(item))
+        onQuickFeed={
+          showFedButton
+            ? () => handleQuickFeed(item.id, 'tarantula', getDisplayName(item))
+            : undefined
         }
         quickFeedBusy={quickFeedingIds.has(item.id)}
         colors={colors}
@@ -767,7 +793,7 @@ function CollectionScreen() {
         // returns nothing for detritivores/omnivores, and a "Fed" button on a
         // millipede would imply a live-prey schedule it doesn't have.
         onQuickFeed={
-          status
+          status && showFedButton
             ? () =>
                 handleQuickFeed(
                   item.id,
@@ -1701,6 +1727,13 @@ function CollectionScreen() {
       fontSize: 16,
       fontWeight: '600',
     },
+    // Separates the sort options from the display preferences below them.
+    sheetDivider: {
+      height: StyleSheet.hairlineWidth,
+      marginTop: 8,
+      marginBottom: 16,
+      marginHorizontal: 4,
+    },
     sortChip: {
       paddingHorizontal: 12,
       paddingVertical: 6,
@@ -2212,6 +2245,39 @@ function CollectionScreen() {
                 </TouchableOpacity>
               );
             })}
+
+            {/* Display preferences. Lives in this sheet rather than Settings
+                because it's about THIS screen and the keeper is already here
+                deciding how the grid should look. */}
+            <View style={[styles.sheetDivider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>Display</Text>
+            <TouchableOpacity
+              style={styles.sheetRow}
+              onPress={() => toggleFedButton(!showFedButton)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: showFedButton }}
+              accessibilityLabel="Show Fed button on cards"
+              accessibilityHint="Adds a one tap feeding button to every card in the collection"
+            >
+              <MaterialCommunityIcons
+                name="silverware-fork-knife"
+                size={20}
+                color={showFedButton ? colors.accent : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.sheetRowText,
+                  { color: showFedButton ? colors.accent : colors.textPrimary },
+                ]}
+              >
+                Show Fed button
+              </Text>
+              <MaterialCommunityIcons
+                name={showFedButton ? 'toggle-switch' : 'toggle-switch-off-outline'}
+                size={26}
+                color={showFedButton ? colors.accent : colors.textTertiary}
+              />
+            </TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
