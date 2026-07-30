@@ -709,6 +709,38 @@ function CollectionScreen() {
     }
   };
 
+  /** One-tap group feeding from the collection card.
+   *
+   *  Separate from handleQuickFeed because a colony isn't an invert — it has
+   *  its own endpoint and its own semantics: ONE log for the feeding event,
+   *  not one per animal. Reuses quickFeedingIds so the busy state and the
+   *  Fed-button toggle behave identically across both card types. */
+  const handleQuickFeedColony = async (id: string, displayName: string) => {
+    if (quickFeedingIds.has(id)) return;
+    setQuickFeedingIds((prev) => new Set(prev).add(id));
+    try {
+      await apiClient.post(`/colonies/${id}/feedings`, {
+        fed_at: new Date().toISOString(),
+        accepted: true,
+      });
+      await fetchColonies();
+      if (Platform.OS === 'android') {
+        ToastAndroid.show(`Logged a feeding for ${displayName}`, ToastAndroid.SHORT);
+      }
+    } catch (error) {
+      Alert.alert(
+        'Could not log feeding',
+        `Something went wrong logging a feeding for ${displayName}. Please try again.`,
+      );
+    } finally {
+      setQuickFeedingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   const handleLogMolt = () => {
     if (!actionTarget) return;
     const tarantulaId = actionTarget.id;
@@ -843,7 +875,18 @@ function CollectionScreen() {
         taxon={item.taxon}
         kindLabel={colonyKindLabel(item.taxon)}
         countLabel={countLabel}
+        // Colonies get the same feeding treatment as animals now that they can
+        // actually be fed (cph_20260729_colony_logs). Days-since only — no
+        // isOverdue, because a colony has no life stage to resolve a cadence
+        // from and the card must not imply one exists.
+        feeding={{ daysSince: item.days_since_last_feeding }}
         onPress={() => router.push(`/colony/${item.id}` as any)}
+        onQuickFeed={
+          showFedButton
+            ? () => handleQuickFeedColony(item.id, item.name)
+            : undefined
+        }
+        quickFeedBusy={quickFeedingIds.has(item.id)}
         colors={colors}
       />
     );

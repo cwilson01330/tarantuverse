@@ -11,9 +11,10 @@ place) so SQLAlchemy flushes the change.
 """
 from typing import List, Optional
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -21,6 +22,7 @@ from app.models.user import User
 from app.models.colony import Colony, ColonyEvent
 from app.models.invert_species import InvertSpecies
 from app.models.enclosure import Enclosure
+from app.models.feeding_log import FeedingLog
 from app.schemas.colony import (
     ColonyCreate,
     ColonyUpdate,
@@ -131,7 +133,42 @@ async def list_colonies(
     if not include_inactive:
         q = q.filter(Colony.is_active.is_(True))
     colonies = q.order_by(Colony.created_at.desc()).all()
-    return [ColonyListItem(**_build_response(c, db)) for c in colonies]
+
+    # Last ACCEPTED feeding per colony, in ONE grouped query rather than one
+    # per row. The collection grid shows "Fed 4d ago" on every card and an
+    # N+1 here would be a query per colony on a screen that already fans out.
+    #
+    # Only accepted feedings count, same rule as animals — a refusal isn't a
+    # feeding, and treating it as one is how "fed today" ends up on an animal
+    # that ate nothing.
+    last_fed: dict = {}
+    if colonies:
+        rows = (
+            db.query(FeedingLog.colony_id, func.max(FeedingLog.fed_at))
+            .filter(
+                FeedingLog.colony_id.in_([c.id for c in colonies]),
+                FeedingLog.accepted.is_(True),
+            )
+            .group_by(FeedingLog.colony_id)
+            .all()
+        )
+        last_fed = {r[0]: r[1] for r in rows}
+
+    now = datetime.now(timezone.utc)
+    items = []
+    for c in colonies:
+        data = _build_response(c, db)
+        fed_at = last_fed.get(c.id)
+        data["last_feeding_date"] = fed_at
+        # Days since only — deliberately NOT an overdue flag. Overdue needs a
+        # cadence, and a colony has no life_stage to resolve one from; the
+        # stage buckets are a census, not a maturity. Inventing a cadence here
+        # is exactly the fabrication the feeding parser fix removed elsewhere.
+        data["days_since_last_feeding"] = (
+            (now - fed_at).days if fed_at is not None else None
+        )
+        items.append(ColonyListItem(**data))
+    return items
 
 
 @router.post("/", response_model=ColonyResponse, status_code=status.HTTP_201_CREATED)

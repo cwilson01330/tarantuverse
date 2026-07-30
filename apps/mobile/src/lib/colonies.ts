@@ -49,6 +49,10 @@ export interface ColonyListItem {
   species_display_name: string | null;
   species_scientific_name: string | null;
   species_missing: boolean;
+  /** Last ACCEPTED feeding. Lets the collection card read "Fed 4d ago" like
+   *  every other card. */
+  last_feeding_date?: string | null;
+  days_since_last_feeding?: number | null;
 }
 
 export interface Colony {
@@ -246,4 +250,75 @@ export const COLONY_EVENT_ICONS: Record<ColonyEventType, string> = {
 /** Event types that carry a severity rating (aggression/cannibalism). */
 export function eventHasSeverity(t: ColonyEventType): boolean {
   return t === 'aggression' || t === 'cannibalism';
+}
+
+// ---------------------------------------------------------------------------
+// Photos + feedings (cph_20260729_colony_logs)
+//
+// A communal tarantula is a display animal housed as a group, so it gets the
+// same gallery and feeding log as any other animal. Feeder colonies can use
+// these too — nothing is withheld — but the UI doesn't push them at it.
+// ---------------------------------------------------------------------------
+
+export interface ColonyPhoto {
+  id: string;
+  url: string;
+  thumbnail_url: string | null;
+  caption: string | null;
+  taken_at: string | null;
+  created_at: string;
+}
+
+export interface ColonyFeedingLog {
+  id: string;
+  colony_id: string | null;
+  fed_at: string;
+  food_type: string | null;
+  food_size: string | null;
+  /** For a colony this means "did the GROUP take it", not any one animal —
+   *  a communal is fed as a unit and you can't see which spider ate what. */
+  accepted: boolean;
+  notes: string | null;
+}
+
+export async function listColonyPhotos(id: string): Promise<ColonyPhoto[]> {
+  const { data } = await apiClient.get<ColonyPhoto[]>(`/colonies/${id}/photos`);
+  return data;
+}
+
+export async function listColonyFeedings(id: string): Promise<ColonyFeedingLog[]> {
+  const { data } = await apiClient.get<ColonyFeedingLog[]>(`/colonies/${id}/feedings`);
+  return data;
+}
+
+export async function createColonyFeeding(
+  id: string,
+  payload: {
+    fed_at: string;
+    food_type?: string | null;
+    food_size?: string | null;
+    accepted?: boolean;
+    notes?: string | null;
+  },
+): Promise<ColonyFeedingLog> {
+  const { data } = await apiClient.post<ColonyFeedingLog>(`/colonies/${id}/feedings`, payload);
+  return data;
+}
+
+/** Promote a photo to the colony's hero. Shares the generic photo route —
+ *  `set-main` resolves ownership through the photo's parent, so it needed no
+ *  colony-specific handling. */
+export async function setColonyMainPhoto(photoId: string): Promise<void> {
+  await apiClient.patch(`/photos/${photoId}/set-main`);
+}
+
+export async function deleteColonyPhoto(photoId: string): Promise<void> {
+  await apiClient.delete(`/photos/${photoId}`);
+}
+
+export async function uploadColonyPhoto(id: string, form: FormData): Promise<ColonyPhoto> {
+  const { data } = await apiClient.post<ColonyPhoto>(`/colonies/${id}/photos`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
 }

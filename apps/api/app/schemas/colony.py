@@ -203,6 +203,12 @@ class ColonyListItem(BaseModel):
 
 
 # ---------- ColonyEvent ----------
+    # Last ACCEPTED feeding, so the collection card can say "Fed 4d ago" like
+    # every other card. No overdue flag: a colony has no life_stage to resolve
+    # a cadence from, and guessing one would be fabrication.
+    last_feeding_date: Optional[datetime] = None
+    days_since_last_feeding: Optional[int] = None
+
 
 class ColonyEventCreate(BaseModel):
     event_type: str

@@ -13,14 +13,17 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -33,11 +36,19 @@ import DateInput from '../../src/components/DateInput';
 import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { getImageUrl } from '../../src/utils/image-url';
+import { getErrorMessage } from '../../src/utils/errors';
 import { parseLocalDate, toISODateLocal, formatLocalDate } from '../../src/utils/date';
 import { INVERT_TAXA } from '../../src/lib/inverts';
 import {
   getColony,
   listColonyEvents,
+  listColonyPhotos,
+  listColonyFeedings,
+  createColonyFeeding,
+  setColonyMainPhoto,
+  deleteColonyPhoto,
+  type ColonyPhoto,
+  type ColonyFeedingLog,
   createColonyEvent,
   deleteColonyEvent,
   deleteColony,
@@ -88,6 +99,9 @@ export default function ColonyDetailScreen() {
 
   const [colony, setColony] = useState<Colony | null>(null);
   const [events, setEvents] = useState<ColonyEvent[]>([]);
+  const [photos, setPhotos] = useState<ColonyPhoto[]>([]);
+  const [feedings, setFeedings] = useState<ColonyFeedingLog[]>([]);
+  const [feedingBusy, setFeedingBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -111,12 +125,18 @@ export default function ColonyDetailScreen() {
   const fetchColony = useCallback(async () => {
     if (!colonyId) return;
     try {
-      const [colonyRes, eventsRes] = await Promise.all([
+      const [colonyRes, eventsRes, photosRes, feedingsRes] = await Promise.all([
         getColony(colonyId),
         listColonyEvents(colonyId),
+        // Non-fatal: a colony with no photos or feedings is the normal state,
+        // and neither should be able to break the whole screen.
+        listColonyPhotos(colonyId).catch(() => [] as ColonyPhoto[]),
+        listColonyFeedings(colonyId).catch(() => [] as ColonyFeedingLog[]),
       ]);
       setColony(colonyRes);
       setEvents(eventsRes);
+      setPhotos(photosRes);
+      setFeedings(feedingsRes);
       setLoadError('');
     } catch (e: any) {
       if (e?.response?.status === 401) return;
@@ -309,6 +329,65 @@ export default function ColonyDetailScreen() {
 
   const stageEntries = Object.entries(colony.stage_counts ?? {});
 
+
+  /** One-tap group feeding. A communal is fed as a unit, so this is ONE log for
+   *  the event rather than one per animal — you can't see which spider took
+   *  which cricket, and inventing per-animal rows would be data nobody
+   *  observed. Prey type is left null; the keeper can add it by editing. */
+  const handleFeedColony = async () => {
+    if (!colonyId || feedingBusy) return;
+    setFeedingBusy(true);
+    try {
+      await createColonyFeeding(colonyId, {
+        fed_at: new Date().toISOString(),
+        accepted: true,
+      });
+      await fetchColony();
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Logged a feeding for this colony', ToastAndroid.SHORT);
+      }
+    } catch (e) {
+      Alert.alert('Could not log feeding', getErrorMessage(e));
+    } finally {
+      setFeedingBusy(false);
+    }
+  };
+
+  /** Photo options. Mirrors the invert detail screen: visible control, not a
+   *  long-press-only gesture. */
+  const handlePhotoOptions = (photo: ColonyPhoto) => {
+    const isHero = colony?.photo_url === photo.url;
+    Alert.alert('Photo options', photo.caption || 'Manage this photo', [
+      { text: 'Cancel', style: 'cancel' },
+      ...(!isHero
+        ? [{
+            text: 'Set as hero photo',
+            onPress: async () => {
+              try { await setColonyMainPhoto(photo.id); await fetchColony(); }
+              catch (e) { Alert.alert('Error', getErrorMessage(e)); }
+            },
+          }]
+        : []),
+      {
+        text: 'Delete photo',
+        style: 'destructive' as const,
+        onPress: () => {
+          Alert.alert('Delete photo?', 'This cannot be undone.', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                try { await deleteColonyPhoto(photo.id); await fetchColony(); }
+                catch (e) { Alert.alert('Error', getErrorMessage(e)); }
+              },
+            },
+          ]);
+        },
+      },
+    ]);
+  };
+
   const husbandryItems: InfoGridItem[] = [];
   // Enclosure leads the grid — for a communal, floor space per animal is the
   // variable that decides whether the group holds together, so it belongs
@@ -418,6 +497,104 @@ export default function ColonyDetailScreen() {
               <InfoGrid items={husbandryItems} />
             </View>
           )}
+
+
+          {/* Feeding. A communal is fed as a unit, so this is a group log —
+              one row per feeding event, not one per animal. ADR-010 deferred
+              this on the grounds colony taxa are casual-feed detritivores,
+              which is true of isopods but not of a balfouri communal. */}
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
+            <View style={styles.eventsHeaderRow}>
+              <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>FEEDING</Text>
+              <TouchableOpacity
+                onPress={handleFeedColony}
+                disabled={feedingBusy}
+                accessibilityRole="button"
+                accessibilityLabel="Log a feeding for this colony"
+                style={{ opacity: feedingBusy ? 0.5 : 1 }}
+              >
+                <Text style={[styles.addEventLink, { color: colors.primary }]}>
+                  {feedingBusy ? 'Saving…' : '+ Log feeding'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {feedings.length === 0 ? (
+              <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                No feedings logged yet.
+              </Text>
+            ) : (
+              feedings.slice(0, 8).map((f) => (
+                <View key={f.id} style={styles.feedRow}>
+                  <MaterialCommunityIcons
+                    name={f.accepted ? 'silverware-fork-knife' : 'close-circle-outline'}
+                    size={16}
+                    color={f.accepted ? colors.textSecondary : colors.error}
+                  />
+                  <Text style={[styles.detailBody, { flex: 1 }]}>
+                    {[f.food_size, f.food_type].filter(Boolean).join(' ') || 'Fed'}
+                    {f.accepted ? '' : ' — refused'}
+                  </Text>
+                  {/* Relative AND absolute, same as the animal timeline. */}
+                  <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                    {new Date(f.fed_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+
+          {/* Photos. A communal is a display animal housed as a group — it gets
+              a gallery like anything else in the collection. The card in the
+              collection grid has always had a photo slot; until now there was
+              no way to fill it. */}
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
+            <View style={styles.eventsHeaderRow}>
+              <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>PHOTOS</Text>
+              <TouchableOpacity
+                onPress={() => router.push(`/colony/add-photo?id=${colonyId}` as any)}
+                accessibilityRole="button"
+                accessibilityLabel="Add a photo to this colony"
+              >
+                <Text style={[styles.addEventLink, { color: colors.primary }]}>+ Add photo</Text>
+              </TouchableOpacity>
+            </View>
+            {photos.length === 0 ? (
+              <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                No photos yet.
+              </Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {photos.map((ph) => {
+                  const isHero = colony.photo_url === ph.url;
+                  return (
+                    <View key={ph.id} style={{ marginRight: 8 }}>
+                      <Image
+                        source={{ uri: getImageUrl(ph.thumbnail_url ?? ph.url) }}
+                        style={styles.colonyPhotoThumb}
+                        accessibilityLabel={ph.caption || 'Colony photo'}
+                      />
+                      {isHero && (
+                        <View style={styles.colonyHeroTag}>
+                          <MaterialCommunityIcons name="star" size={11} color="#fff" />
+                        </View>
+                      )}
+                      {/* Visible control, not a long-press. */}
+                      <TouchableOpacity
+                        style={styles.colonyPhotoManage}
+                        onPress={() => handlePhotoOptions(ph)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Photo options"
+                        accessibilityHint="Set as hero photo or delete"
+                      >
+                        <MaterialCommunityIcons name="dots-horizontal" size={16} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
 
           {/* Notes */}
           {colony.notes ? (
@@ -666,6 +843,18 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     archivedPill: { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
     archivedText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, color: colors.textSecondary },
     card: { borderWidth: 1, padding: 16, marginBottom: 16 },
+    feedRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
+    colonyPhotoThumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: colors.surfaceElevated },
+    colonyHeroTag: {
+      position: 'absolute', top: 6, left: 6,
+      backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 6, padding: 3,
+    },
+    colonyPhotoManage: {
+      position: 'absolute', bottom: 4, right: 4,
+      width: 24, height: 24, borderRadius: 12,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.65)',
+    },
     sectionHeading: { fontSize: 11, fontWeight: '700', letterSpacing: 1, color: colors.textTertiary, marginBottom: 8 },
     speciesPlain: { fontSize: 15, fontWeight: '600', color: colors.textPrimary },
     careCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, padding: 16, marginBottom: 16 },
