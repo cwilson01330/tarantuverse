@@ -839,8 +839,24 @@ function InvertDetailScreen() {
               renderItem={({ item, index }) => {
                 const isHero = invert.photo_url === item.url;
                 return (
-                  <TouchableOpacity activeOpacity={0.8} onPress={() => setViewerIndex(index)} onLongPress={() => handlePhotoLongPress(item)} accessibilityRole="imagebutton" accessibilityLabel={isHero ? 'Hero photo. Opens full screen; long-press to manage.' : 'Photo. Opens full screen; long-press to set as hero or delete.'}>
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => setViewerIndex(index)} onLongPress={() => handlePhotoLongPress(item)} accessibilityRole="imagebutton" accessibilityLabel={isHero ? 'Hero photo. Opens full screen.' : 'Photo. Opens full screen.'}>
                     <Image source={{ uri: getImageUrl(item.thumbnail_url ?? item.url) }} style={styles.photoThumb} />
+                    {/* Visible manage control. Tap-to-view is the right default,
+                        but "set as hero" and "delete" were reachable only by
+                        long-press, so a keeper who wanted to change their hero
+                        photo had no way to discover it. Nested Touchable — the
+                        inner responder wins, so this doesn't also open the
+                        viewer. */}
+                    <TouchableOpacity
+                      style={styles.photoManage}
+                      onPress={() => handlePhotoLongPress(item)}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Photo options"
+                      accessibilityHint="Set as hero photo or delete"
+                    >
+                      <MaterialCommunityIcons name="dots-horizontal" size={16} color="#fff" />
+                    </TouchableOpacity>
                     {isHero && (
                       <View style={styles.heroTag}>
                         <MaterialCommunityIcons name="star" size={11} color="#fff" />
@@ -1173,6 +1189,17 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     photoThumb: { width: 96, height: 96, borderRadius: 8, backgroundColor: colors.surfaceElevated },
     heroTag: { position: 'absolute', top: 6, left: 6, flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: 'rgba(0,0,0,0.65)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
     heroTagText: { ...TYPE.caption, color: '#fff' },
+    photoManage: {
+      position: 'absolute',
+      bottom: 4,
+      right: 4,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.65)',
+    },
     notes: { ...TYPE.body, color: colors.textSecondary },
     errorText: { ...TYPE.body, color: colors.textPrimary, marginBottom: SPACING.lg },
     retryButton: { paddingVertical: SPACING.sm, paddingHorizontal: SPACING.lg, backgroundColor: colors.primary, borderRadius: 8 },
