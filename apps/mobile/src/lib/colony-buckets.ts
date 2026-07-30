@@ -110,3 +110,27 @@ export function enclosureSizePlaceholder(taxon: string | null | undefined): stri
       return 'e.g. 12x12x12 inches';
   }
 }
+
+/**
+ * Is this colony kept as livestock rather than as pets?
+ *
+ * Feeder colonies (roaches today) are inventory: the keeper cares about
+ * headcount and whether it's producing, not what it looks like. Nobody
+ * photographs a dubia tub, so a photo-led card gives them a generic glyph
+ * forever, and photo galleries would be effort spent on the wrong colonies.
+ *
+ * Communal tarantulas are the opposite — they're display animals that happen
+ * to be housed as a group, and they deserve the same card as any other animal
+ * in the collection.
+ *
+ * This drives presentation, not capability: nothing is withheld from feeder
+ * colonies, they're just not pushed toward features that don't serve them.
+ */
+export function isFeederColony(taxon: string | null | undefined): boolean {
+  return taxon === 'roach';
+}
+
+/** Card label. "Colony" reads as a pet group; feeders say what they are. */
+export function colonyKindLabel(taxon: string | null | undefined): string {
+  return isFeederColony(taxon) ? 'Feeders' : 'Colony';
+}

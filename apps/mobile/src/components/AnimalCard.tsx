@@ -51,6 +51,16 @@ export interface AnimalCardProps {
   feeding?: AnimalCardFeeding;
   /** Renders the premolt pill. Only pass true when a prediction is active. */
   premolt?: boolean;
+  /** Marks this as something other than a single animal — currently "Colony".
+   *
+   *  When set, the sex chip is suppressed (a colony has no one sex) and this
+   *  label takes its place, with `countLabel` shown opposite. Colonies used to
+   *  have a hand-rolled card built on the pre-AnimalCard styles, which is why
+   *  they read as second-class next to the animals in the same grid. A tarantula
+   *  communal is a first-class entry in a collection and should look like one. */
+  kindLabel?: string;
+  /** Population, e.g. "11" or "≈11". Only meaningful alongside kindLabel. */
+  countLabel?: string;
   onPress: () => void;
   onLongPress?: () => void;
   /** Logs an accepted feeding for this animal, today.
@@ -107,6 +117,8 @@ export function AnimalCard({
   taxon,
   feeding,
   premolt,
+  kindLabel,
+  countLabel,
   onPress,
   onLongPress,
   onQuickFeed,
@@ -167,7 +179,14 @@ export function AnimalCard({
 
         {/* Overlay 1 — sex, top right. Rendered for unknown too, because a
             keeper who hasn't sexed an animal yet still wants to see that at a
-            glance; it just uses the neutral treatment. */}
+            glance; it just uses the neutral treatment.
+            Suppressed for colonies: a group has no single sex, so the slot
+            carries the kind label instead. */}
+        {kindLabel ? (
+          <View style={styles.kindChip}>
+            <Text style={styles.kindChipText}>{kindLabel}</Text>
+          </View>
+        ) : (
         <View
           style={[
             styles.sexChip,
@@ -190,6 +209,15 @@ export function AnimalCard({
             color="#fff"
           />
         </View>
+        )}
+
+        {/* Population count, top left — the equivalent "at a glance" number
+            for a colony that days-since-fed is for an animal. */}
+        {!!countLabel && (
+          <View style={styles.countChip}>
+            <Text style={styles.countChipText}>{countLabel}</Text>
+          </View>
+        )}
 
         {/* Overlay 2 — premolt, bottom left, ONLY when active. This used to
             share its position with a taxon glyph that duplicated the
@@ -322,6 +350,18 @@ const makeStyles = (colors: any) =>
     },
     dot: { width: 7, height: 7, borderRadius: 3.5 },
     statusText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
+    kindChip: {
+      position: 'absolute', top: 8, right: 8,
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+      backgroundColor: 'rgba(10,10,15,0.7)',
+    },
+    kindChipText: { fontSize: 10, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+    countChip: {
+      position: 'absolute', top: 8, left: 8,
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+      backgroundColor: 'rgba(10,10,15,0.7)',
+    },
+    countChipText: { fontSize: 11, fontWeight: '700', color: '#fff' },
     feedButton: {
       marginTop: 8,
       flexDirection: 'row',

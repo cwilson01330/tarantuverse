@@ -65,6 +65,7 @@ import {
 // One card for every taxon — replaced five near-identical renderers that had
 // already drifted apart (see AnimalCard's header comment).
 import AnimalCard from '../../src/components/AnimalCard';
+import { colonyKindLabel } from '../../src/lib/colony-buckets';
 
 // Taxa that have no per-taxon list lib — fetched generically via /inverts/.
 // (scorpion/centipede/whip_spider keep their existing per-taxon fetches.)
@@ -817,6 +818,16 @@ function CollectionScreen() {
   // Colony card (ADR-010). Same card frame, but tagged as a "Colony" with the
   // population count (≈N when estimated) instead of a sex badge. Taxon glyph in
   // the bottom-left, same as the other invert cards. Routes to /colony/[id].
+  /** Colony card. Uses AnimalCard like every other entry — a tarantula
+   *  communal is a first-class member of the collection and shouldn't render
+   *  in a different visual language from the animals beside it.
+   *
+   *  This was a bespoke renderer built on the pre-AnimalCard styles (fixed-
+   *  height image, different overlay positions), which is exactly the drift
+   *  AnimalCard exists to prevent — it just predated the consolidation.
+   *  The sex chip becomes a "Colony" label and the population takes the
+   *  opposite corner, since headcount is the at-a-glance number for a group
+   *  the way days-since-fed is for an individual. */
   const renderColony = ({ item }: { item: ColonyListItem }) => {
     const meta = INVERT_TAXA[item.taxon];
     const countLabel = formatColonyCount(item.total_count, item.count_is_estimated);
@@ -824,42 +835,17 @@ function CollectionScreen() {
       ? 'Species removed'
       : item.species_display_name || item.species_scientific_name || `${meta?.label ?? 'Colony'} colony`;
     return (
-      <TouchableOpacity
-        style={styles.card}
+      <AnimalCard
+        key={item.id}
+        displayName={item.name}
+        scientificName={speciesLabel}
+        photoUrl={item.photo_url}
+        taxon={item.taxon}
+        kindLabel={colonyKindLabel(item.taxon)}
+        countLabel={countLabel}
         onPress={() => router.push(`/colony/${item.id}` as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.name}, colony, ${countLabel} animals, ${speciesLabel}`}
-        accessibilityHint="Opens this colony's detail page."
-      >
-        <View style={styles.imageContainer}>
-          {item.photo_url ? (
-            <Image
-              source={{ uri: getImageUrl(item.photo_url) }}
-              style={styles.image}
-              accessibilityLabel={`Photo of ${item.name}`}
-            />
-          ) : (
-            <View style={styles.placeholderImage} accessibilityElementsHidden importantForAccessibility="no">
-              <Text style={{ fontSize: 40 }}>{meta?.glyph ?? '🐜'}</Text>
-            </View>
-          )}
-          {/* Colony tag — top-right, where the sex badge sits on animal cards. */}
-          <View style={styles.colonyTag} accessibilityLabel="Colony">
-            <Text style={styles.colonyTagText}>Colony</Text>
-          </View>
-          {/* Population count — top-left. */}
-          <View style={styles.colonyCountBadge} accessibilityLabel={`${countLabel} animals`}>
-            <Text style={styles.colonyCountText}>{countLabel}</Text>
-          </View>
-          <View style={styles.taxonGlyph}>
-            <Text style={{ fontSize: 14 }}>{meta?.glyph ?? '🐜'}</Text>
-          </View>
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.scientificName}>{speciesLabel}</Text>
-        </View>
-      </TouchableOpacity>
+        colors={colors}
+      />
     );
   };
 
@@ -1282,37 +1268,6 @@ function CollectionScreen() {
       backgroundColor: 'rgba(0,0,0,0.45)',
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    // Colony card overlays (ADR-010). "Colony" tag top-right (where the sex
-    // badge sits), population count top-left (where the feeding badge sits).
-    colonyTag: {
-      position: 'absolute',
-      top: 8,
-      right: 8,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 10,
-      backgroundColor: 'rgba(139, 92, 246, 0.9)',
-    },
-    colonyTagText: {
-      color: '#fff',
-      fontSize: 10,
-      fontWeight: '700',
-      letterSpacing: 0.3,
-    },
-    colonyCountBadge: {
-      position: 'absolute',
-      top: 8,
-      left: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 12,
-      backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    },
-    colonyCountText: {
-      color: '#fff',
-      fontSize: 12,
-      fontWeight: '700',
     },
     colonyListTag: {
       height: 22,
