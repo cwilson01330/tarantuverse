@@ -16,8 +16,15 @@ class FeedingLog(Base):
         # / animal_id / scorpion_id is set. snake/lizard/frog were
         # collapsed into animal_id in anm_20260514 (ADR-003); scorpion_id
         # was added in scp_20260522 (scorpion expansion v1).
+        # Kept in sync with cph_20260729_colony_logs. Had drifted the same way
+        # photos.py had — still the pre-invert_id form. A feeding belongs to
+        # exactly one animal OR one colony. The first branch stays loose about
+        # invert_id because dual-write rows carry both parents.
         CheckConstraint(
-            'num_nonnulls(tarantula_id, enclosure_id, animal_id, scorpion_id) = 1',
+            '(num_nonnulls(tarantula_id, enclosure_id, animal_id, scorpion_id) = 1 '
+            'AND colony_id IS NULL) '
+            'OR (num_nonnulls(tarantula_id, enclosure_id, animal_id, scorpion_id) = 0 '
+            'AND num_nonnulls(invert_id, colony_id) = 1)',
             name='feeding_logs_must_have_exactly_one_parent',
         ),
     )
@@ -42,6 +49,14 @@ class FeedingLog(Base):
     # legacy parent column is set, populated by dual-write in Phase A2
     # and by the backfill script in Phase B. Becomes the canonical
     # parent once Phase D drops the legacy columns.
+    # Group feedings. A communal is fed as a unit — one log per feeding event,
+    # not one per animal (cph_20260729_colony_logs).
+    colony_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colonies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     invert_id = Column(
         UUID(as_uuid=True),
         ForeignKey("inverts.id", ondelete="CASCADE"),

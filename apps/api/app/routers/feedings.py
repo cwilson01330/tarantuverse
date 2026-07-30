@@ -509,6 +509,68 @@ async def create_invert_feeding_log(
     return new_feeding
 
 
+@router.get("/colonies/{colony_id}/feedings", response_model=List[FeedingLogResponse])
+async def get_colony_feeding_logs(
+    colony_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List feedings for a colony the caller owns, newest first."""
+    from app.models.colony import Colony
+
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+    return (
+        db.query(FeedingLog)
+        .filter(FeedingLog.colony_id == colony_id)
+        .order_by(FeedingLog.fed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/colonies/{colony_id}/feedings",
+    response_model=FeedingLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_colony_feeding_log(
+    colony_id: uuid.UUID,
+    feeding_data: FeedingLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a feeding for a colony the caller owns. Sets only colony_id.
+
+    ONE LOG PER FEEDING EVENT, not one per animal. A communal is fed as a unit:
+    the keeper drops in prey and the group takes it. Splitting that into
+    per-animal rows would invent data nobody observed — you don't know which
+    spider ate which cricket.
+
+    That also means `accepted` means something slightly different here: for an
+    individual it's "did this animal take it", for a colony it's "did the group
+    take it". Refusal across a whole communal is a real and meaningful signal
+    (often pre-molt or a husbandry problem), which is why the field is kept
+    rather than dropped.
+    """
+    from app.models.colony import Colony
+
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+    new_feeding = FeedingLog(colony_id=colony_id, **feeding_data.model_dump())
+    db.add(new_feeding)
+    db.commit()
+    db.refresh(new_feeding)
+    return new_feeding
+
+
 @router.post(
     "/inverts/bulk-feedings",
     response_model=BulkFeedingResult,

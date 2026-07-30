@@ -21,8 +21,17 @@ class Photo(Base):
         # Polymorphic across TV tarantulas, HV animals, and TV
         # scorpions — exactly one parent is set. scorpion_id added in
         # scp_20260522.
+        # Kept in sync with cph_20260729_colony_logs. This declaration had
+        # drifted — it still listed the pre-invert_id form long after the DB
+        # had been widened, so anyone reading the model got the wrong rule.
+        # A photo belongs to exactly one animal OR one colony, never both.
+        # The first branch is loose about invert_id on purpose: dual-write rows
+        # carry a legacy id AND the unified one.
         CheckConstraint(
-            'num_nonnulls(tarantula_id, animal_id, scorpion_id) = 1',
+            '(num_nonnulls(tarantula_id, animal_id, scorpion_id) = 1 '
+            'AND colony_id IS NULL) '
+            'OR (num_nonnulls(tarantula_id, animal_id, scorpion_id) = 0 '
+            'AND num_nonnulls(invert_id, colony_id) = 1)',
             name='photos_must_have_exactly_one_parent',
         ),
     )
@@ -46,6 +55,14 @@ class Photo(Base):
         index=True,
     )
     # Inverts consolidation companion column — see ADR-005.
+    # Colonies own photos too — a communal tarantula is a display animal that
+    # happens to be housed as a group (cph_20260729_colony_logs).
+    colony_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colonies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     invert_id = Column(
         UUID(as_uuid=True),
         ForeignKey("inverts.id", ondelete="CASCADE"),

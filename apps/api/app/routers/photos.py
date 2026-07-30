@@ -214,6 +214,15 @@ def _photo_owner_parent(photo: Photo, db: Session, user: User):
             Invert.id == photo.invert_id,
             Invert.user_id == user.id,
         ).first()
+    # Colony photos (cph_20260729_colony_logs). Adding the branch here is what
+    # makes DELETE, caption-edit and set-main work for colonies without any
+    # taxon branching in those handlers.
+    if photo.colony_id:
+        from app.models.colony import Colony
+        return db.query(Colony).filter(
+            Colony.id == photo.colony_id,
+            Colony.user_id == user.id,
+        ).first()
     return None
 
 
@@ -730,6 +739,111 @@ async def upload_invert_photo(
         raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
 
 
+@router.post("/colonies/{colony_id}/photos")
+async def upload_colony_photo(
+    colony_id: str,
+    file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload a photo for a colony the caller owns. Sets only colony_id.
+
+    A communal tarantula is a display animal that happens to be housed as a
+    group — it deserves a gallery like any other animal. Until
+    cph_20260729_colony_logs there was no upload path at all, so `photo_url`
+    existed on the model but could never be filled and the collection card
+    showed a generic glyph forever.
+    """
+    from app.models.colony import Colony
+
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+
+    try:
+        file_data = await file.read()
+        try:
+            detected_mime = validate_image_bytes(file_data)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        max_size = 15 * 1024 * 1024
+        if len(file_data) > max_size:
+            raise HTTPException(status_code=400, detail="File size exceeds 15 MB limit")
+
+        photo_url, thumbnail_url = await storage_service.upload_photo(
+            file_data=file_data,
+            filename=file.filename or "upload.jpg",
+            content_type=detected_mime,
+        )
+        photo = Photo(
+            id=str(uuid.uuid4()),
+            colony_id=colony_id,
+            url=photo_url,
+            thumbnail_url=thumbnail_url,
+            caption=caption,
+            taken_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+        )
+        db.add(photo)
+        # First upload becomes the hero, same as every other parent type.
+        if not colony.photo_url:
+            colony.photo_url = photo_url
+        db.commit()
+        db.refresh(photo)
+        return {
+            "id": photo.id,
+            "url": photo.url,
+            "thumbnail_url": photo.thumbnail_url,
+            "caption": photo.caption,
+            "taken_at": photo.taken_at.isoformat() if photo.taken_at else None,
+            "created_at": photo.created_at.isoformat(),
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("Photo upload failed for colony %s", colony_id)
+        raise HTTPException(status_code=500, detail="Failed to upload photo. Please try again.")
+
+
+@router.get("/colonies/{colony_id}/photos")
+async def get_colony_photos(
+    colony_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List photos for a colony the caller owns."""
+    from app.models.colony import Colony
+
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+    photos = (
+        db.query(Photo)
+        .filter(Photo.colony_id == colony_id)
+        .order_by(Photo.created_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": p.id,
+            "url": p.url,
+            "thumbnail_url": p.thumbnail_url,
+            "caption": p.caption,
+            "taken_at": p.taken_at.isoformat() if p.taken_at else None,
+            "created_at": p.created_at.isoformat(),
+        }
+        for p in photos
+    ]
+
+
 @router.get("/inverts/{invert_id}/photos")
 async def get_invert_photos(
     invert_id: str,
@@ -790,6 +904,11 @@ async def delete_photo(
             else Photo.animal_id == photo.animal_id if photo.animal_id
             else Photo.scorpion_id == photo.scorpion_id if photo.scorpion_id
             else Photo.invert_id == photo.invert_id if photo.invert_id
+            # Colony photos (cph_20260729_colony_logs). Without this branch the
+            # chain fell through to None, so deleting a colony's hero CLEARED
+            # the hero instead of promoting the next photo — the colony would
+            # drop back to a generic glyph while other photos still existed.
+            else Photo.colony_id == photo.colony_id if photo.colony_id
             else None
         )
 
