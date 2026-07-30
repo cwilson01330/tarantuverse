@@ -310,6 +310,11 @@ export default function ColonyDetailScreen() {
   const stageEntries = Object.entries(colony.stage_counts ?? {});
 
   const husbandryItems: InfoGridItem[] = [];
+  // Enclosure leads the grid — for a communal, floor space per animal is the
+  // variable that decides whether the group holds together, so it belongs
+  // above substrate rather than buried after it.
+  if (colony.enclosure_type) husbandryItems.push({ icon: 'shape-outline', label: 'Type', value: colony.enclosure_type });
+  if (colony.enclosure_size) husbandryItems.push({ icon: 'cube-outline', label: 'Enclosure', value: colony.enclosure_size });
   if (colony.substrate_type) husbandryItems.push({ icon: 'layers', label: 'Substrate', value: colony.substrate_type });
   if (colony.substrate_depth) husbandryItems.push({ icon: 'ruler', label: 'Substrate depth', value: colony.substrate_depth });
   if (colony.target_temp_min || colony.target_temp_max)

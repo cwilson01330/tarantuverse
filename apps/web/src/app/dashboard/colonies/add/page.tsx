@@ -22,6 +22,7 @@ import {
   type ColonySource,
   type ColonyTaxon,
 } from '@/lib/colonies'
+import { showsEnclosureOrientation, enclosureSizePlaceholder } from '@/lib/colony-presets'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -92,6 +93,8 @@ function AddColonyForm() {
   const [foundedDate, setFoundedDate] = useState('')
   const [source, setSource] = useState<ColonySource | ''>('')
 
+  const [enclosureType, setEnclosureType] = useState('')
+  const [enclosureSize, setEnclosureSize] = useState('')
   const [substrateType, setSubstrateType] = useState('')
   const [substrateDepth, setSubstrateDepth] = useState('')
   const [tempMin, setTempMin] = useState('')
@@ -206,6 +209,8 @@ function AddColonyForm() {
         source: source || null,
         stage_counts: Object.keys(stageCounts).length > 0 ? stageCounts : null,
         count_is_estimated: countEstimated,
+        enclosure_type: enclosureType || null,
+        enclosure_size: enclosureSize.trim() || null,
         substrate_type: substrateType.trim() || null,
         substrate_depth: substrateDepth.trim() || null,
         target_temp_min: numOrNull(tempMin),
@@ -459,6 +464,28 @@ function AddColonyForm() {
             Husbandry
           </h2>
           <div className="grid grid-cols-2 gap-4">
+            {showsEnclosureOrientation(taxon) && (
+            <Field label="Enclosure type">
+              <select
+                value={enclosureType}
+                onChange={(e) => setEnclosureType(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Not set</option>
+                <option value="terrestrial">Terrestrial</option>
+                <option value="arboreal">Arboreal</option>
+                <option value="fossorial">Fossorial</option>
+              </select>
+            </Field>
+            )}
+            <Field label="Enclosure size">
+              <input
+                value={enclosureSize}
+                onChange={(e) => setEnclosureSize(e.target.value)}
+                placeholder={enclosureSizePlaceholder(taxon)}
+                className={inputCls}
+              />
+            </Field>
             <Field label="Substrate type">
               <input
                 value={substrateType}

@@ -63,6 +63,12 @@ export interface Colony {
   source: Source | null;
   stage_counts: StageCounts;
   count_is_estimated: boolean;
+  /** terrestrial | arboreal | fossorial. Same vocabulary as inverts. */
+  enclosure_type: string | null;
+  /** Free text, e.g. "12x12x12 inches". Floor space per animal is the main
+   *  driver of communal success, so this matters more here than on a solitary
+   *  animal — it was missing entirely until 2026-07-29. */
+  enclosure_size: string | null;
   substrate_type: string | null;
   substrate_depth: string | null;
   last_substrate_change: string | null;
@@ -93,6 +99,8 @@ export interface ColonyCreate {
   source?: Source | null;
   stage_counts?: StageCounts | null;
   count_is_estimated?: boolean;
+  enclosure_type?: string | null;
+  enclosure_size?: string | null;
   substrate_type?: string | null;
   substrate_depth?: string | null;
   last_substrate_change?: string | null;

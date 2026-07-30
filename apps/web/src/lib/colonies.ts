@@ -70,6 +70,11 @@ export interface ColonyResponse {
   source: ColonySource | null
   stage_counts: StageCounts | null
   count_is_estimated: boolean
+  /** terrestrial | arboreal | fossorial — same vocabulary as inverts. */
+  enclosure_type: string | null
+  /** Free text. Floor space per animal is the main driver of communal
+   *  success, so this matters more for a colony than a solitary animal. */
+  enclosure_size: string | null
   substrate_type: string | null
   substrate_depth: string | null
   last_substrate_change: string | null
@@ -100,6 +105,8 @@ export interface ColonyCreate {
   source?: ColonySource | null
   stage_counts?: StageCounts | null
   count_is_estimated?: boolean
+  enclosure_type?: string | null
+  enclosure_size?: string | null
   substrate_type?: string | null
   substrate_depth?: string | null
   last_substrate_change?: string | null

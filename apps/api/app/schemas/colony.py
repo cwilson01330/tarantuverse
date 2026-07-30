@@ -43,6 +43,12 @@ class ColonyBase(BaseModel):
     stage_counts: Optional[Dict[str, int]] = None
     count_is_estimated: bool = False
 
+    # Enclosure — mirrors the invert fields. Free-text size because keepers
+    # describe enclosures in whatever format their supplier uses.
+    enclosure_type: Optional[str] = Field(
+        None, pattern="^(terrestrial|arboreal|fossorial)$"
+    )
+    enclosure_size: Optional[str] = Field(None, max_length=50)
     substrate_type: Optional[str] = Field(None, max_length=100)
     substrate_depth: Optional[str] = Field(None, max_length=50)
     last_substrate_change: Optional[date] = None
@@ -97,6 +103,12 @@ class ColonyUpdate(BaseModel):
     source: Optional[str] = None
     stage_counts: Optional[Dict[str, int]] = None
     count_is_estimated: Optional[bool] = None
+    # Enclosure — mirrors the invert fields. Free-text size because keepers
+    # describe enclosures in whatever format their supplier uses.
+    enclosure_type: Optional[str] = Field(
+        None, pattern="^(terrestrial|arboreal|fossorial)$"
+    )
+    enclosure_size: Optional[str] = Field(None, max_length=50)
     substrate_type: Optional[str] = Field(None, max_length=100)
     substrate_depth: Optional[str] = Field(None, max_length=50)
     last_substrate_change: Optional[date] = None
@@ -145,6 +157,8 @@ class ColonyResponse(BaseModel):
     stage_counts: Optional[Dict[str, int]] = None
     count_is_estimated: bool = False
 
+    enclosure_type: Optional[str] = None
+    enclosure_size: Optional[str] = None
     substrate_type: Optional[str] = None
     substrate_depth: Optional[str] = None
     last_substrate_change: Optional[date] = None

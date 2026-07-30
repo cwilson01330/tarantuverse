@@ -262,6 +262,8 @@ export default function ColonyDetailPage() {
       'No species set'
   const stageEntries = colony.stage_counts ? Object.entries(colony.stage_counts) : []
   const hasHusbandry =
+    colony.enclosure_type ||
+    colony.enclosure_size ||
     colony.substrate_type ||
     colony.substrate_depth ||
     colony.target_temp_min != null ||
@@ -404,6 +406,16 @@ export default function ColonyDetailPage() {
               Husbandry
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              {(colony.enclosure_type || colony.enclosure_size) && (
+                <div>
+                  <div className="text-theme-tertiary">Enclosure</div>
+                  <div className="text-theme-primary font-medium capitalize">
+                    {[colony.enclosure_size, colony.enclosure_type]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                </div>
+              )}
               {colony.substrate_type && (
                 <div>
                   <div className="text-theme-tertiary">Substrate</div>

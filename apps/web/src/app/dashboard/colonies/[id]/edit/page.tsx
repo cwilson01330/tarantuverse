@@ -19,6 +19,7 @@ import {
   type ColonyResponse,
   type ColonySource,
 } from '@/lib/colonies'
+import { showsEnclosureOrientation, enclosureSizePlaceholder } from '@/lib/colony-presets'
 
 interface StageRow {
   key: string
@@ -68,6 +69,8 @@ export default function EditColonyPage() {
   const [dateAcquired, setDateAcquired] = useState('')
   const [foundedDate, setFoundedDate] = useState('')
   const [source, setSource] = useState<ColonySource | ''>('')
+  const [enclosureType, setEnclosureType] = useState('')
+  const [enclosureSize, setEnclosureSize] = useState('')
   const [substrateType, setSubstrateType] = useState('')
   const [substrateDepth, setSubstrateDepth] = useState('')
   const [tempMin, setTempMin] = useState('')
@@ -93,6 +96,8 @@ export default function EditColonyPage() {
       setDateAcquired(c.date_acquired ?? '')
       setFoundedDate(c.founded_date ?? '')
       setSource((c.source as ColonySource) ?? '')
+      setEnclosureType(c.enclosure_type ?? '')
+      setEnclosureSize(c.enclosure_size ?? '')
       setSubstrateType(c.substrate_type ?? '')
       setSubstrateDepth(c.substrate_depth ?? '')
       setTempMin(numToStr(c.target_temp_min))
@@ -168,6 +173,8 @@ export default function EditColonyPage() {
         date_acquired: dateAcquired.trim() || null,
         founded_date: foundedDate.trim() || null,
         source: source || null,
+        enclosure_type: enclosureType || null,
+        enclosure_size: enclosureSize.trim() || null,
         substrate_type: substrateType.trim() || null,
         substrate_depth: substrateDepth.trim() || null,
         target_temp_min: numOrNull(tempMin),
@@ -375,6 +382,28 @@ export default function EditColonyPage() {
             Husbandry
           </h2>
           <div className="grid grid-cols-2 gap-4">
+            {showsEnclosureOrientation(colony.taxon) && (
+            <Field label="Enclosure type">
+              <select
+                value={enclosureType}
+                onChange={(e) => setEnclosureType(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Not set</option>
+                <option value="terrestrial">Terrestrial</option>
+                <option value="arboreal">Arboreal</option>
+                <option value="fossorial">Fossorial</option>
+              </select>
+            </Field>
+            )}
+            <Field label="Enclosure size">
+              <input
+                value={enclosureSize}
+                onChange={(e) => setEnclosureSize(e.target.value)}
+                placeholder={enclosureSizePlaceholder(colony.taxon)}
+                className={inputCls}
+              />
+            </Field>
             <Field label="Substrate type">
               <input
                 value={substrateType}

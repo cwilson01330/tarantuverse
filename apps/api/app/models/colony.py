@@ -53,6 +53,13 @@ class Colony(Base):
             "visibility IN ('private', 'public')",
             name="colonies_visibility_check",
         ),
+        # Same three values inverts allows. Kept in lockstep with
+        # inverts_enclosure_type_check.
+        CheckConstraint(
+            "enclosure_type IS NULL OR "
+            "enclosure_type IN ('terrestrial', 'arboreal', 'fossorial')",
+            name="colonies_enclosure_type_check",
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -91,6 +98,11 @@ class Colony(Base):
     count_is_estimated = Column(Boolean, nullable=False, default=False)
 
     # Husbandry (parity with the invert detail card)
+    # Enclosure. Mirrors the invert columns exactly so the two surfaces stay
+    # comparable — floor space per animal is the main driver of communal
+    # success, so this matters more here than on a solitary animal.
+    enclosure_type = Column(String(30), nullable=True)   # terrestrial|arboreal|fossorial
+    enclosure_size = Column(String(50), nullable=True)   # free text, e.g. "12x12x12 inches"
     substrate_type = Column(String(100), nullable=True)
     substrate_depth = Column(String(50), nullable=True)
     last_substrate_change = Column(Date, nullable=True)

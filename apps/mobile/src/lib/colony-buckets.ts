@@ -75,3 +75,38 @@ export function bucketHint(taxon: string | null | undefined): string | null {
       return null;
   }
 }
+
+/**
+ * Enclosure presentation, per taxon.
+ *
+ * The terrestrial / arboreal / fossorial vocabulary comes from the individual
+ * invert record and fits animals kept in display enclosures. It's a poor fit
+ * for a feeder colony: dubia and hissers live in opaque bins or tubs, and
+ * nobody describes a 32-quart tub as "fossorial" even though the roaches
+ * burrow into the substrate. Asking the question at all implies a choice that
+ * doesn't matter for that keeper.
+ *
+ * So the orientation chips are shown only where the distinction changes
+ * husbandry, and the size placeholder uses the units that taxon is actually
+ * kept in.
+ */
+
+/** Whether terrestrial/arboreal/fossorial is a meaningful choice here. */
+export function showsEnclosureOrientation(taxon: string | null | undefined): boolean {
+  // Feeder colonies are kept in bins by convention — the orientation question
+  // adds a field without adding information.
+  return taxon !== 'roach';
+}
+
+/** Example that matches how this taxon is actually housed. */
+export function enclosureSizePlaceholder(taxon: string | null | undefined): string {
+  switch (taxon) {
+    case 'roach':
+      // Bins are sold and discussed by volume, not dimensions.
+      return 'e.g. 32-quart bin';
+    case 'millipede':
+      return 'e.g. 10-gallon / 20x10x12 inches';
+    default:
+      return 'e.g. 12x12x12 inches';
+  }
+}

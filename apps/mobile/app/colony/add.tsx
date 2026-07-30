@@ -27,7 +27,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import DateInput from '../../src/components/DateInput';
-import { suggestedBuckets, bucketHint } from '../../src/lib/colony-buckets';
+import { suggestedBuckets, bucketHint, showsEnclosureOrientation, enclosureSizePlaceholder } from '../../src/lib/colony-buckets';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import {
@@ -88,6 +88,8 @@ export default function AddColonyScreen() {
   const [source, setSource] = useState<Source | null>(null);
 
   // Husbandry
+  const [enclosureType, setEnclosureType] = useState('');
+  const [enclosureSize, setEnclosureSize] = useState('');
   const [substrateType, setSubstrateType] = useState('');
   const [substrateDepth, setSubstrateDepth] = useState('');
   const [tempMin, setTempMin] = useState('');
@@ -145,6 +147,8 @@ export default function AddColonyScreen() {
         date_acquired: dateAcquired.trim() || null,
         founded_date: foundedDate.trim() || null,
         source: source ?? null,
+        enclosure_type: enclosureType || null,
+        enclosure_size: enclosureSize.trim() || null,
         substrate_type: substrateType.trim() || null,
         substrate_depth: substrateDepth.trim() || null,
         target_temp_min: tempMin.trim() || null,
@@ -358,6 +362,32 @@ export default function AddColonyScreen() {
 
           {/* Husbandry */}
           <Text style={styles.sectionHeading}>Husbandry</Text>
+          {/* Enclosure. Type first (it frames what a "good" size even means —
+              an arboreal needs height, a fossorial needs depth), then the size
+              as free text. */}
+          {showsEnclosureOrientation(taxon) && (
+          <Field label="Enclosure type">
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              {(['terrestrial', 'arboreal', 'fossorial'] as const).map((t) => {
+                const sel = enclosureType === t;
+                return (
+                  <TouchableOpacity
+                    key={t}
+                    onPress={() => setEnclosureType(sel ? '' : t)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: sel }}
+                    style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? colors.primary : colors.surface }}
+                  >
+                    <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontWeight: '600', fontSize: 13, textTransform: 'capitalize' }}>{t}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Field>
+          )}
+          <Field label="Enclosure size">
+            <TextInput style={styles.input} placeholder={enclosureSizePlaceholder(taxon)} placeholderTextColor={colors.textTertiary} value={enclosureSize} onChangeText={setEnclosureSize} />
+          </Field>
           <Field label="Substrate type">
             <TextInput style={styles.input} placeholder="e.g. coco fiber" placeholderTextColor={colors.textTertiary} value={substrateType} onChangeText={setSubstrateType} />
           </Field>
