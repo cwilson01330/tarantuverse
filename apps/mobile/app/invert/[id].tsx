@@ -153,6 +153,21 @@ function InvertDetailScreen() {
   // ── Inline log management (ADR-008) ──────────────────────────────────────
   // Delete confirms then refetches; edit routes to the matching add-* screen
   // in edit mode (logId + prefilled values via params).
+  /** Edit/delete menu for one timeline entry. Shared by tap and long-press so
+   *  both gestures do the same thing rather than one silently doing nothing. */
+  const openTimelineActions = (e: {
+    title: string;
+    at: string;
+    onEdit: () => void;
+    onDelete: () => void;
+  }) => {
+    Alert.alert(e.title, fmtDate(e.at), [
+      { text: 'Edit', onPress: e.onEdit },
+      { text: 'Delete', style: 'destructive', onPress: e.onDelete },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const confirmDeleteLog = (label: string, run: () => Promise<void>) => {
     Alert.alert('Delete this log?', `This removes the ${label} entry. This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
@@ -310,7 +325,10 @@ function InvertDetailScreen() {
       feedingStats.total_feedings > 0
         ? `${Math.round(feedingStats.acceptance_rate)}% accepted (${feedingStats.total_feedings})`
         : null,
-      `fed ${d === 0 ? 'today' : `${d}d ago`}`,
+      // Same reasoning as the timeline rows — carry the date, not just the gap.
+      feedingStats.last_feeding_date
+        ? `fed ${d === 0 ? 'today' : `${d}d ago`} (${fmtDate(feedingStats.last_feeding_date)})`
+        : `fed ${d === 0 ? 'today' : `${d}d ago`}`,
     ].filter(Boolean).join(' · ');
 
     if (feedingStats.is_overdue) {
@@ -712,29 +730,47 @@ function InvertDetailScreen() {
             <TouchableOpacity
               key={e.id}
               style={[styles.timelineRow, { backgroundColor: colors.surfaceElevated }]}
-              onLongPress={() => {
-                Alert.alert(e.title, fmtDate(e.at), [
-                  { text: 'Edit', onPress: e.onEdit },
-                  { text: 'Delete', style: 'destructive', onPress: e.onDelete },
-                  { text: 'Cancel', style: 'cancel' },
-                ]);
-              }}
+              // TAP, not just long-press. This row previously had no onPress at
+              // all: tapping the entry you wanted to correct did nothing, and
+              // the only way to reach Edit/Delete was a gesture nothing
+              // advertised. A keeper reading that as "logs can't be edited" is
+              // the correct inference from the behaviour they saw.
+              // Long-press stays wired for anyone who already learned it.
+              onPress={() => openTimelineActions(e)}
+              onLongPress={() => openTimelineActions(e)}
               accessibilityRole="button"
               accessibilityLabel={`${e.title}, ${fmtRelative(e.at)}${e.trailing ? `, ${e.trailing}` : ''}`}
-              accessibilityHint="Long press to edit or delete this entry."
+              accessibilityHint="Opens edit and delete options for this entry."
             >
               <View style={[styles.timelineIcon, { backgroundColor: colors.primary + '1F' }]}>
                 <MaterialCommunityIcons name={TIMELINE_META[e.kind].icon as any} size={16} color={colors.accent} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.timelineTitle} numberOfLines={1}>{e.title}</Text>
-                <Text style={styles.timelineDate}>{fmtRelative(e.at)}</Text>
+                {/* Relative AND absolute. "4d ago" answers "is she due?" at a
+                    glance; the date answers "when exactly did I feed her?",
+                    which is the question a written record exists for. The date
+                    was previously only reachable by long-pressing the row,
+                    which nothing advertised — a keeper asked for it back
+                    (2026-07-29). */}
+                <Text style={styles.timelineDate}>
+                  {fmtRelative(e.at)} · {fmtDate(e.at)}
+                </Text>
               </View>
               {e.trailing ? (
                 <Text style={[styles.timelineTrailing, { color: trailingColor(e.trailingTone) }]}>
                   {e.trailing}
                 </Text>
               ) : null}
+              {/* Makes the row read as interactive. Without it the entry looks
+                  like a static list item, which is why nobody found the
+                  edit menu. */}
+              <MaterialCommunityIcons
+                name="dots-horizontal"
+                size={18}
+                color={colors.textTertiary}
+                style={{ marginLeft: 6 }}
+              />
             </TouchableOpacity>
           ))
         )}
