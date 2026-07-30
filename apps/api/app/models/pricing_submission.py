@@ -36,6 +36,7 @@ class PricingSubmission(Base):
 
     # Quality/condition
     notes = Column(Text, nullable=True)
+    # Aggregate eligibility. Individual reports remain owner-only through the API.
     is_public = Column(Boolean, nullable=False, server_default='true')
 
     # Moderation

@@ -21,14 +21,26 @@ class PricingSubmissionBase(BaseModel):
     size_category: SizeCategory
     approximate_size: Optional[str] = None
     price_paid: Decimal = Field(..., gt=0, decimal_places=2)
-    currency: str = Field(default="USD", max_length=3)
+    currency: str = Field(default="USD", min_length=3, max_length=3)
     purchase_date: Optional[date] = None
     sex: Optional[Sex] = None
     vendor_name: Optional[str] = Field(None, max_length=255)
     vendor_type: Optional[VendorType] = None
     location: Optional[str] = Field(None, max_length=100)
     notes: Optional[str] = None
-    is_public: bool = True
+    is_public: bool = False
+
+    @field_validator("currency")
+    @classmethod
+    def normalize_currency(cls, value: str) -> str:
+        return value.upper()
+
+    @field_validator("purchase_date")
+    @classmethod
+    def validate_purchase_date(cls, value):
+        if value and value > date.today():
+            raise ValueError("Purchase date cannot be in the future")
+        return value
 
     @field_validator('approximate_size')
     @classmethod
@@ -46,13 +58,20 @@ class PricingSubmissionCreate(PricingSubmissionBase):
 class PricingSubmissionUpdate(BaseModel):
     """Schema for updating a pricing submission"""
     approximate_size: Optional[str] = None
-    price_paid: Optional[Decimal] = None
+    price_paid: Optional[Decimal] = Field(None, gt=0, decimal_places=2)
     purchase_date: Optional[date] = None
     vendor_name: Optional[str] = None
     vendor_type: Optional[VendorType] = None
     location: Optional[str] = None
     notes: Optional[str] = None
     is_public: Optional[bool] = None
+
+    @field_validator("purchase_date")
+    @classmethod
+    def validate_purchase_date(cls, value):
+        if value and value > date.today():
+            raise ValueError("Purchase date cannot be in the future")
+        return value
 
 
 class PricingSubmissionResponse(PricingSubmissionBase):
@@ -70,14 +89,22 @@ class PricingSubmissionResponse(PricingSubmissionBase):
 
 
 class PriceEstimate(BaseModel):
-    """Estimated price range for a tarantula"""
-    estimated_low: Decimal
-    estimated_high: Decimal
-    confidence: Literal["low", "medium", "high"]
+    """Evidence summary for recent, community-reported purchase prices."""
+    estimated_low: Optional[Decimal] = None
+    estimated_high: Optional[Decimal] = None
+    evidence_status: Literal["insufficient_evidence", "observed_range"]
+    evidence_quality: Literal["insufficient", "limited", "moderate"]
     data_points: int
-    last_updated: Optional[datetime] = None
-    factors_used: list[str] = []
-
+    contributor_count: int
+    vendor_count: int
+    verified_points: int
+    currency: Literal["USD"] = "USD"
+    observation_start: Optional[date] = None
+    observation_end: Optional[date] = None
+    last_updated: Optional[date] = None
+    source_type: Literal["community_reported_purchase"] = "community_reported_purchase"
+    limitations: list[str] = Field(default_factory=list)
+    factors_used: list[str] = Field(default_factory=list)
 
 class SpeciesPricing(BaseModel):
     """Pricing data for a species broken down by size/sex"""
@@ -113,15 +140,16 @@ class SpeciesPricing(BaseModel):
 
 
 class CollectionValue(BaseModel):
-    """Total estimated value of a user's collection"""
-    total_low: Decimal
-    total_high: Decimal
+    """Sum of animals for which an observed range is supportable."""
+    total_low: Optional[Decimal] = None
+    total_high: Optional[Decimal] = None
     total_tarantulas: int
-    valued_tarantulas: int  # How many have pricing data
-    most_valuable: Optional[dict] = None  # {"id": "...", "name": "...", "value_high": 120}
-    by_species: list[dict] = []  # Species breakdown
-    confidence: Literal["low", "medium", "high"]
-
+    valued_tarantulas: int
+    most_valuable: Optional[dict] = None
+    by_species: list[dict] = Field(default_factory=list)
+    evidence_status: Literal["insufficient_evidence", "partial_observed_range", "observed_range"]
+    evidence_quality: Literal["insufficient", "limited", "moderate"]
+    limitations: list[str] = Field(default_factory=list)
 
 class PricingStats(BaseModel):
     """Statistics about pricing data"""

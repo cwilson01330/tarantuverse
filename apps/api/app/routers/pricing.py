@@ -17,9 +17,9 @@ from app.schemas.pricing import (
     PricingSubmissionUpdate,
     PricingSubmissionResponse,
     PriceEstimate,
-    SpeciesPricing,
     CollectionValue,
-    PricingStats
+    PricingStats,
+    SizeCategory,
 )
 from app.utils.dependencies import get_current_user
 from app.utils.pricing_estimator import PricingEstimator
@@ -46,7 +46,11 @@ async def submit_pricing_data(
                 detail="Species not found"
             )
 
-    # Verify tarantula ownership if provided
+    submission_data = submission.model_dump()
+
+    # When a report references an owned animal, the server-recorded taxonomy,
+    # life stage, and sex are authoritative. Clients cannot relabel an animal to
+    # influence a different comparison group.
     if submission.tarantula_id:
         tarantula = db.query(Tarantula).filter(
             Tarantula.id == submission.tarantula_id,
@@ -57,11 +61,35 @@ async def submit_pricing_data(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Tarantula not found or you don't have permission"
             )
+        if not tarantula.species_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The referenced tarantula must have a species before contributing."
+            )
+        recorded_stage = PricingEstimator._enum_value(tarantula.life_stage)
+        if not recorded_stage:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The referenced tarantula must have a keeper-recorded life stage."
+            )
+        if submission.species_id and str(tarantula.species_id) != submission.species_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Submitted species does not match the referenced tarantula."
+            )
+        if submission.size_category != recorded_stage:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Submitted life stage does not match the referenced tarantula."
+            )
 
-    # Create new pricing submission
+        submission_data["species_id"] = str(tarantula.species_id)
+        submission_data["size_category"] = recorded_stage
+        submission_data["sex"] = PricingEstimator._enum_value(tarantula.sex) or "unknown"
+
     new_submission = PricingSubmission(
         user_id=current_user.id,
-        **submission.model_dump()
+        **submission_data
     )
 
     db.add(new_submission)
@@ -90,22 +118,16 @@ async def get_submission(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get a specific pricing submission"""
+    """Get one of the current user's submissions; public means aggregate-only."""
     submission = db.query(PricingSubmission).filter(
-        PricingSubmission.id == submission_id
+        PricingSubmission.id == submission_id,
+        PricingSubmission.user_id == current_user.id,
     ).first()
 
     if not submission:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Pricing submission not found"
-        )
-
-    # Only allow viewing own submissions or public submissions
-    if submission.user_id != current_user.id and not submission.is_public:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to view this submission"
+            detail="Pricing submission not found or you don't have permission",
         )
 
     return submission
@@ -164,21 +186,21 @@ async def delete_submission(
     return None
 
 
-@router.get("/species/{species_id}", response_model=PriceEstimate)
+@router.get("/market-signals/species/{species_id}", response_model=PriceEstimate)
 async def get_species_pricing(
     species_id: str,
-    size_category: str,
+    size_category: SizeCategory,
     sex: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Get pricing estimate for a species
-    Public endpoint - no authentication required
+    Get an evidence summary for comparable reported purchase prices.
+    Public endpoint; no authentication is required.
     """
     estimator = PricingEstimator(db)
 
     try:
-        low, high, confidence, data_points = estimator.estimate_price(
+        signal = estimator.estimate_price(
             species_id=species_id,
             size_category=size_category,
             sex=sex,
@@ -186,11 +208,12 @@ async def get_species_pricing(
         )
 
         return PriceEstimate(
-            estimated_low=low,
-            estimated_high=high,
-            confidence=confidence,
-            data_points=data_points,
-            factors_used=["species_data", "community_average", "estimation_algorithm"]
+            **signal.__dict__,
+            factors_used=[
+                "recent_public_usd_reports",
+                "contributor_deduplication",
+                "robust_percentile_range",
+            ],
         )
     except Exception as e:
         raise HTTPException(
@@ -199,15 +222,15 @@ async def get_species_pricing(
         )
 
 
-@router.get("/tarantulas/{tarantula_id}/value", response_model=PriceEstimate)
+@router.get("/market-signals/tarantulas/{tarantula_id}", response_model=PriceEstimate)
 async def get_tarantula_value(
     tarantula_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get estimated value for a specific tarantula
-    Requires authentication and ownership
+    Get market evidence for a specific tarantula.
+    Requires authentication and ownership.
     """
     tarantula = db.query(Tarantula).filter(
         Tarantula.id == tarantula_id,
@@ -228,13 +251,13 @@ async def get_tarantula_value(
 
     estimator = PricingEstimator(db)
 
-    # Determine size category (this is a simplified version)
-    # In production, you might want to enhance this based on molt logs
+    # Use only a keeper-recorded life stage. Ownership duration is not evidence
+    # of an animal's stage.
     size_category = estimator._determine_size_category(tarantula)
     sex = tarantula.sex or "unknown"
 
     try:
-        low, high, confidence, data_points = estimator.estimate_price(
+        signal = estimator.estimate_price(
             species_id=str(tarantula.species_id),
             size_category=size_category,
             sex=sex,
@@ -242,11 +265,13 @@ async def get_tarantula_value(
         )
 
         return PriceEstimate(
-            estimated_low=low,
-            estimated_high=high,
-            confidence=confidence,
-            data_points=data_points,
-            factors_used=["species_data", "community_average", "size", "sex"]
+            **signal.__dict__,
+            factors_used=[
+                "keeper_recorded_life_stage",
+                "recent_public_usd_reports",
+                "contributor_deduplication",
+                "robust_percentile_range",
+            ],
         )
     except Exception as e:
         raise HTTPException(
@@ -255,14 +280,14 @@ async def get_tarantula_value(
         )
 
 
-@router.get("/collection/value", response_model=CollectionValue)
+@router.get("/market-signals/collection", response_model=CollectionValue)
 async def get_collection_value(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get total estimated value of user's collection
-    Requires authentication
+    Sum only supported observed ranges across the user's collection.
+    Requires authentication.
     """
     tarantulas = db.query(Tarantula).filter(
         Tarantula.user_id == current_user.id
@@ -275,7 +300,9 @@ async def get_collection_value(
             total_tarantulas=0,
             valued_tarantulas=0,
             by_species=[],
-            confidence="low"
+            evidence_status="insufficient_evidence",
+            evidence_quality="insufficient",
+            limitations=["The collection is empty; no market evidence was evaluated."],
         )
 
     estimator = PricingEstimator(db)
@@ -288,22 +315,45 @@ async def get_collection_value(
         if breakdown:
             most_valuable = max(breakdown, key=lambda x: x["value_high"])
 
-        # Calculate overall confidence
-        if valued_count >= len(tarantulas) * 0.8:
-            overall_confidence = "high"
-        elif valued_count >= len(tarantulas) * 0.5:
-            overall_confidence = "medium"
+        if valued_count == 0:
+            evidence_status = "insufficient_evidence"
+            evidence_quality = "insufficient"
+            response_low = None
+            response_high = None
         else:
-            overall_confidence = "low"
+            evidence_status = (
+                "observed_range"
+                if valued_count == len(tarantulas)
+                else "partial_observed_range"
+            )
+            evidence_quality = (
+                "moderate"
+                if all(item["evidence_quality"] == "moderate" for item in breakdown)
+                else "limited"
+            )
+            response_low = total_low
+            response_high = total_high
+
+        limitations = [
+            "Totals include only animals with enough recent public USD purchase reports.",
+            "Community reports are not independently confirmed sales and are not appraisals.",
+        ]
+        if valued_count != len(tarantulas):
+            limitations.append(
+                f"{len(tarantulas) - valued_count} of {len(tarantulas)} animals "
+                "were excluded for insufficient evidence."
+            )
 
         return CollectionValue(
-            total_low=total_low,
-            total_high=total_high,
+            total_low=response_low,
+            total_high=response_high,
             total_tarantulas=len(tarantulas),
             valued_tarantulas=valued_count,
             most_valuable=most_valuable,
             by_species=breakdown,
-            confidence=overall_confidence
+            evidence_status=evidence_status,
+            evidence_quality=evidence_quality,
+            limitations=limitations,
         )
     except Exception as e:
         raise HTTPException(
@@ -311,6 +361,46 @@ async def get_collection_value(
             detail=f"Error calculating collection value: {str(e)}"
         )
 
+
+@router.get("/species/{species_id}", deprecated=True)
+async def deprecated_species_pricing(species_id: str):
+    """Retired because the endpoint could return synthetic price estimates."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "This synthetic valuation endpoint has been retired. "
+            "Use /pricing/market-signals/species/{species_id}."
+        ),
+    )
+
+
+@router.get("/tarantulas/{tarantula_id}/value", deprecated=True)
+async def deprecated_tarantula_value(
+    tarantula_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Retired because the endpoint could return synthetic price estimates."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "This synthetic valuation endpoint has been retired. "
+            "Use /pricing/market-signals/tarantulas/{tarantula_id}."
+        ),
+    )
+
+
+@router.get("/collection/value", deprecated=True)
+async def deprecated_collection_value(
+    current_user: User = Depends(get_current_user),
+):
+    """Retired because the endpoint could return synthetic collection totals."""
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail=(
+            "This synthetic valuation endpoint has been retired. "
+            "Use /pricing/market-signals/collection."
+        ),
+    )
 
 @router.get("/stats", response_model=PricingStats)
 async def get_pricing_stats(
@@ -335,7 +425,7 @@ async def get_pricing_stats(
 
     # Verified submissions
     verified_submissions = db.query(func.count(PricingSubmission.id)).filter(
-        PricingSubmission.is_verified == True
+        PricingSubmission.is_verified.is_(True)
     ).scalar()
 
     # Species with pricing data
@@ -349,12 +439,19 @@ async def get_pricing_stats(
         PricingSubmission.created_at >= cutoff_date
     ).scalar()
 
-    # Average price per category
+    # Descriptive averages use the same eligible evidence pool as market signals.
+    pricing_cutoff_date = (datetime.now() - timedelta(days=730)).date()
+    today = datetime.now().date()
     avg_prices = {}
     for category in ["sling", "juvenile", "subadult", "adult"]:
         avg = db.query(func.avg(PricingSubmission.price_paid)).filter(
             PricingSubmission.size_category == category,
-            PricingSubmission.flagged_as_outlier == False
+            PricingSubmission.is_public.is_(True),
+            PricingSubmission.flagged_as_outlier.is_(False),
+            func.upper(PricingSubmission.currency) == "USD",
+            PricingSubmission.purchase_date.isnot(None),
+            PricingSubmission.purchase_date >= pricing_cutoff_date,
+            PricingSubmission.purchase_date <= today,
         ).scalar()
         if avg:
             avg_prices[category] = float(avg)
