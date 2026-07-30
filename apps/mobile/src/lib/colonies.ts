@@ -275,6 +275,10 @@ export interface ColonyFeedingLog {
   fed_at: string;
   food_type: string | null;
   food_size: string | null;
+  /** How many prey items went in. THE number for a group feeding — you don't
+   *  feed a communal "a cricket", you drop six in for eleven spiders, and the
+   *  ratio is what tells you whether the colony is being fed enough. */
+  quantity: number | null;
   /** For a colony this means "did the GROUP take it", not any one animal —
    *  a communal is fed as a unit and you can't see which spider ate what. */
   accepted: boolean;
@@ -297,6 +301,7 @@ export async function createColonyFeeding(
     fed_at: string;
     food_type?: string | null;
     food_size?: string | null;
+    quantity?: number | null;
     accepted?: boolean;
     notes?: string | null;
   },

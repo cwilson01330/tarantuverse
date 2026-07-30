@@ -125,11 +125,23 @@ export const INVERT_TAXON_ORDER: InvertTaxon[] = [
 /**
  * Taxa a COLONY picker should offer.
  *
- * Communal tarantula keeping is a fringe practice with a poor survival record,
- * so we don't put it in front of keepers as a suggested setup — but 'tarantula'
- * remains valid at the DB level for the handful of communal setups migrated in
- * (ADR-010), which is why this is a picker-level exclusion rather than a
- * constraint.
+ * KNOWN INCOMPLETE — 2026-07-29. The blanket tarantula exclusion is wrong and
+ * is scheduled to be replaced, just not in the push that added colony feeding.
+ *
+ * The original reasoning was that communal keeping is a fringe practice with a
+ * poor survival record. That's true as a generalisation and false at the
+ * species level: Monocentropus balfouri, Neoholothele incei and several
+ * Hapalopus spp. are kept communally as established practice, not as an
+ * experiment. Excluding the whole taxon means a keeper doing something
+ * accepted can't record it — and other taxa (some scorpions, whip spiders)
+ * have the same species-level split.
+ *
+ * So the replacement isn't "add tarantula here", it's a per-species
+ * communal-suitability signal on invert_species that the picker reads, with
+ * unsuitable species carrying an honest warning rather than a hard block.
+ * Until that exists, tarantula stays out of the picker but remains fully valid
+ * at the DB level (ADR-010) — migrated communals work everywhere else in the
+ * app: buckets, cards, photos, feeding.
  *
  * This constant exists so that exclusion is a NAMED, greppable decision. It
  * used to be expressed as tarantula's absence from the taxon union, which

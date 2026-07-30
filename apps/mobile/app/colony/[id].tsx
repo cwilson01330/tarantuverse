@@ -17,13 +17,11 @@ import {
   Image,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -44,7 +42,6 @@ import {
   listColonyEvents,
   listColonyPhotos,
   listColonyFeedings,
-  createColonyFeeding,
   setColonyMainPhoto,
   deleteColonyPhoto,
   type ColonyPhoto,
@@ -101,7 +98,6 @@ export default function ColonyDetailScreen() {
   const [events, setEvents] = useState<ColonyEvent[]>([]);
   const [photos, setPhotos] = useState<ColonyPhoto[]>([]);
   const [feedings, setFeedings] = useState<ColonyFeedingLog[]>([]);
-  const [feedingBusy, setFeedingBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -330,27 +326,27 @@ export default function ColonyDetailScreen() {
   const stageEntries = Object.entries(colony.stage_counts ?? {});
 
 
-  /** One-tap group feeding. A communal is fed as a unit, so this is ONE log for
-   *  the event rather than one per animal — you can't see which spider took
-   *  which cricket, and inventing per-animal rows would be data nobody
-   *  observed. Prey type is left null; the keeper can add it by editing. */
-  const handleFeedColony = async () => {
-    if (!colonyId || feedingBusy) return;
-    setFeedingBusy(true);
-    try {
-      await createColonyFeeding(colonyId, {
-        fed_at: new Date().toISOString(),
-        accepted: true,
-      });
-      await fetchColony();
-      if (Platform.OS === 'android') {
-        ToastAndroid.show('Logged a feeding for this colony', ToastAndroid.SHORT);
-      }
-    } catch (e) {
-      Alert.alert('Could not log feeding', getErrorMessage(e));
-    } finally {
-      setFeedingBusy(false);
-    }
+  /** Group feeding goes through a form, not a one-tap write.
+   *
+   *  For a single animal, "fed" is a complete record — there's one mouth and
+   *  it got one prey item. For a group it isn't: the useful fact is "six
+   *  crickets into eleven spiders", and a one-tap log that silently means
+   *  "1 unspecified prey" is a claim the keeper never made. So the colony
+   *  path collects prey type, size, count and outcome.
+   *
+   *  This is deliberately scoped to colonies for now. Quantity would also be
+   *  honest on individual animals — a keeper drops three crickets in for an
+   *  adult female — and it's the only shape that could ever support decrementing
+   *  a feeder colony's inventory as prey is used. That's a larger change
+   *  touching every taxon's feeding form, so it isn't bundled here. */
+  const openFeedingForm = () => {
+    if (!colonyId) return;
+    router.push({
+      pathname: '/colony/add-feeding',
+      // Taxon drives the prey vocabulary — greens for a dubia bin, crickets
+      // for a balfouri communal.
+      params: { id: colonyId, taxon: colony?.taxon ?? '' },
+    });
   };
 
   /** Photo options. Mirrors the invert detail screen: visible control, not a
@@ -507,15 +503,11 @@ export default function ColonyDetailScreen() {
             <View style={styles.eventsHeaderRow}>
               <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>FEEDING</Text>
               <TouchableOpacity
-                onPress={handleFeedColony}
-                disabled={feedingBusy}
+                onPress={openFeedingForm}
                 accessibilityRole="button"
                 accessibilityLabel="Log a feeding for this colony"
-                style={{ opacity: feedingBusy ? 0.5 : 1 }}
               >
-                <Text style={[styles.addEventLink, { color: colors.primary }]}>
-                  {feedingBusy ? 'Saving…' : '+ Log feeding'}
-                </Text>
+                <Text style={[styles.addEventLink, { color: colors.primary }]}>+ Log feeding</Text>
               </TouchableOpacity>
             </View>
             {feedings.length === 0 ? (
@@ -531,7 +523,16 @@ export default function ColonyDetailScreen() {
                     color={f.accepted ? colors.textSecondary : colors.error}
                   />
                   <Text style={[styles.detailBody, { flex: 1 }]}>
-                    {[f.food_size, f.food_type].filter(Boolean).join(' ') || 'Fed'}
+                    {/* Lead with the count — for a group it's the number that
+                        carries meaning. Omitted entirely when unrecorded rather
+                        than shown as "1", which would invent a fact. */}
+                    {[
+                      f.quantity != null ? `${f.quantity}×` : null,
+                      f.food_size,
+                      f.food_type,
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || 'Fed'}
                     {f.accepted ? '' : ' — refused'}
                   </Text>
                   {/* Relative AND absolute, same as the animal timeline. */}

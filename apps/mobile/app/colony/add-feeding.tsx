@@ -1,7 +1,18 @@
 /**
- * Generic invert: log feeding — ADR-007.
+ * Colony: log a group feeding — cph_20260729_colony_logs.
+ *
+ * ONE log per feeding event, not one per animal: you drop prey into a communal
+ * and the group takes it, and nobody can see which spider ate which cricket.
+ *
+ * That makes `quantity` the important field here, in a way it isn't for a
+ * solitary animal. "Fed a cricket" is a complete record for one tarantula;
+ * for an eleven-spider communal the useful fact is "six crickets for eleven
+ * animals". Without the count the log says almost nothing.
+ *
+ * `accepted` also shifts meaning — for a group it's "did they take it",
+ * and a whole communal refusing is a real signal worth keeping.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,60 +20,71 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import DateInput from '../../src/components/DateInput';
-import { getInvert, createInvertFeeding, updateInvertFeeding, type InvertTaxon } from '../../src/lib/inverts';
+import { createColonyFeeding } from '../../src/lib/colonies';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
-const FOOD_TYPES = ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'];
+/**
+ * Prey list, per taxon.
+ *
+ * A communal tarantula eats live prey and the list matches every other
+ * predatory animal in the app. A roach or millipede colony does not — feeding
+ * a dubia bin means dropping in vegetables and a protein source, and offering
+ * "Cricket / Superworm" as the options makes the form read as though it was
+ * written for something else. Detritivore colonies get the vocabulary their
+ * keepers actually use.
+ */
+const PREDATOR_FOODS = ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other'];
+const DETRITIVORE_FOODS = ['Veg / greens', 'Fruit', 'Dry gutload', 'Protein (fish flake)', 'Leaf litter', 'Other'];
+
+function foodTypesFor(taxon: string | undefined): string[] {
+  // Roaches and millipedes are the colony taxa fed as detritivores today.
+  // feeding_mode lives on invert_species, not on the colony, so this reads
+  // from taxon — honest for the taxa that can currently BE a colony.
+  return taxon === 'roach' || taxon === 'millipede' ? DETRITIVORE_FOODS : PREDATOR_FOODS;
+}
+
 // Same three values the tarantula form has always used. Kept identical so the
 // existing food_size data stays consistent — the column is free-text VARCHAR(50)
 // and would happily accept a fourth spelling of "medium".
 const FOOD_SIZES = ['Small', 'Medium', 'Large'];
 
-export default function AddInvertFeedingScreen() {
+export default function AddColonyFeedingScreen() {
   const router = useRouter();
-  // logId present ⇒ edit mode (PUT). The detail screen passes the current
-  // values as params so we prefill without a single-log GET endpoint.
-  const { id, logId, fed_at, food_type, food_size, accepted: acceptedParam, notes: notesParam } =
-    useLocalSearchParams<{ id?: string; logId?: string; fed_at?: string; food_type?: string; food_size?: string; accepted?: string; notes?: string }>();
-  const isEdit = !!logId;
+  const { id, taxon } = useLocalSearchParams<{ id?: string; taxon?: string }>();
+  const foodTypes = foodTypesFor(taxon);
+  // Prey size is a live-prey concept — a handful of greens has no 'Medium'.
+  const showsPreySize = foodTypes === PREDATOR_FOODS;
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
-  const [taxon, setTaxon] = useState<InvertTaxon | null>(null);
-  const [date, setDate] = useState(fed_at ? toISODateLocal(new Date(fed_at)) : toISODateLocal(new Date()));
-  const [foodType, setFoodType] = useState(food_type || 'Cricket');
-  /** Prey size. Optional — '' means the keeper didn't record one, which is a
-   *  real answer and must not be sent as a guess.
-   *
-   *  This form is now the feeding path for EVERY taxon including tarantulas
-   *  (ADR-013 merged the detail screens), but it never carried a size picker,
-   *  so tarantula keepers silently lost the one they'd had on
-   *  `tarantula/add-feeding`. Reported by a keeper 2026-07-28. */
-  const [foodSize, setFoodSize] = useState(food_size || '');
-  const [accepted, setAccepted] = useState(acceptedParam ? acceptedParam === 'true' : true);
-  const [notes, setNotes] = useState(notesParam || '');
+  const [date, setDate] = useState(toISODateLocal(new Date()));
+  const [foodType, setFoodType] = useState(foodTypes[0]);
+  /** Prey size. Optional — '' means the keeper didn't record one. */
+  const [foodSize, setFoodSize] = useState('');
+  /** Prey count. Blank means unrecorded — we send null rather than defaulting
+   *  to 1, because "1 cricket" for an 11-spider communal would be a claim
+   *  nobody made. The backend column defaults to 1 for individuals, which is
+   *  right there and wrong here. */
+  const [quantity, setQuantity] = useState('');
+  const [accepted, setAccepted] = useState(true);
+  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
 
   const handleSave = async () => {
-    if (!id || !taxon) return;
+    if (!id) return;
     try {
       setSaving(true);
-      const payload = {
+      const n = parseInt(quantity, 10);
+      await createColonyFeeding(id, {
         fed_at: new Date(date + 'T12:00:00').toISOString(),
         food_type: foodType,
-        // null, not '' — an unrecorded size should read as absent, and on edit
-        // it has to be able to CLEAR a previously saved value.
         food_size: foodSize || null,
+        // null, not 1 — an unrecorded count stays unrecorded.
+        quantity: Number.isFinite(n) && n > 0 ? n : null,
         accepted,
         notes: notes.trim() || null,
-      };
-      if (isEdit && logId) {
-        await updateInvertFeeding(logId, payload);
-      } else {
-        await createInvertFeeding(taxon, id, payload);
-      }
+      });
       router.back();
     } catch (err) { Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.'); }
     finally { setSaving(false); }
@@ -71,13 +93,13 @@ export default function AddInvertFeedingScreen() {
   const styles = makeStyles(colors);
   return (
     <View style={styles.flex}>
-      <AppHeader title={isEdit ? 'Edit feeding' : 'Log feeding'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
+      <AppHeader title="Log feeding" leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date" colors={colors}><DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Feeding date" /></Field>
           <Field label="Food type" colors={colors}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {FOOD_TYPES.map((f) => { const sel = f === foodType; return (
+              {foodTypes.map((f) => { const sel = f === foodType; return (
                 <TouchableOpacity key={f} onPress={() => setFoodType(f)} style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, borderWidth: 1, borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? colors.primary : colors.surface }}>
                   <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontWeight: '600', fontSize: 13 }}>{f}</Text>
                 </TouchableOpacity>); })}
@@ -86,6 +108,7 @@ export default function AddInvertFeedingScreen() {
           {/* Optional, and tappable to deselect — a keeper who doesn't measure
               prey shouldn't be forced to pick one, and forcing a default would
               put a size on the record that nobody actually observed. */}
+          {showsPreySize && (
           <Field label="Prey size (optional)" colors={colors}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {FOOD_SIZES.map((s) => { const sel = s === foodSize; return (
@@ -99,9 +122,25 @@ export default function AddInvertFeedingScreen() {
                 </TouchableOpacity>); })}
             </View>
           </Field>
+          )}
+          <Field label={showsPreySize ? 'How many?' : 'Amount (optional)'} colors={colors}>
+            <TextInput
+              style={styles.input}
+              value={quantity}
+              onChangeText={setQuantity}
+              placeholder="e.g. 6"
+              placeholderTextColor={colors.textTertiary}
+              keyboardType="number-pad"
+            />
+            <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 6 }}>
+              {showsPreySize
+                ? 'Number of prey items offered to the group — six crickets for eleven spiders tells you far more than “fed”.'
+                : 'Portions or items offered. Leave blank if you didn’t count.'}
+            </Text>
+          </Field>
           <Field label="Outcome" colors={colors}>
             <View style={{ flexDirection: 'row', gap: 8 }}>
-              {[{ v: true, l: 'Accepted', i: 'check-circle' as const }, { v: false, l: 'Refused', i: 'close-circle' as const }].map((opt) => { const sel = opt.v === accepted; return (
+              {[{ v: true, l: 'Taken', i: 'check-circle' as const }, { v: false, l: 'Refused', i: 'close-circle' as const }].map((opt) => { const sel = opt.v === accepted; return (
                 <TouchableOpacity key={opt.l} onPress={() => setAccepted(opt.v)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? colors.primary : colors.surface }}>
                   <MaterialCommunityIcons name={opt.i} size={18} color={sel ? '#fff' : colors.textTertiary} />
                   <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontWeight: '600' }}>{opt.l}</Text>
@@ -109,8 +148,8 @@ export default function AddInvertFeedingScreen() {
             </View>
           </Field>
           <Field label="Notes (optional)" colors={colors}><TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} multiline placeholderTextColor={colors.textTertiary} /></Field>
-          <TouchableOpacity style={[styles.saveButton, (saving || !taxon) && { opacity: 0.6 }]} onPress={handleSave} disabled={saving || !taxon}>
-            <Text style={styles.saveText}>{saving ? 'Saving…' : isEdit ? 'Update feeding' : 'Save feeding'}</Text>
+          <TouchableOpacity style={[styles.saveButton, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
+            <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save feeding'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

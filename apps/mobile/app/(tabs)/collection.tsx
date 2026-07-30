@@ -709,36 +709,19 @@ function CollectionScreen() {
     }
   };
 
-  /** One-tap group feeding from the collection card.
+  /** Group feeding from the collection card opens the form instead of writing.
    *
-   *  Separate from handleQuickFeed because a colony isn't an invert — it has
-   *  its own endpoint and its own semantics: ONE log for the feeding event,
-   *  not one per animal. Reuses quickFeedingIds so the busy state and the
-   *  Fed-button toggle behave identically across both card types. */
-  const handleQuickFeedColony = async (id: string, displayName: string) => {
-    if (quickFeedingIds.has(id)) return;
-    setQuickFeedingIds((prev) => new Set(prev).add(id));
-    try {
-      await apiClient.post(`/colonies/${id}/feedings`, {
-        fed_at: new Date().toISOString(),
-        accepted: true,
-      });
-      await fetchColonies();
-      if (Platform.OS === 'android') {
-        ToastAndroid.show(`Logged a feeding for ${displayName}`, ToastAndroid.SHORT);
-      }
-    } catch (error) {
-      Alert.alert(
-        'Could not log feeding',
-        `Something went wrong logging a feeding for ${displayName}. Please try again.`,
-      );
-    } finally {
-      setQuickFeedingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
+   *  The one-tap Fed button is right for an individual: one animal, one prey
+   *  item, nothing left to specify. It's wrong for a group — it would write a
+   *  log that reads "fed" with no count, when the number of prey offered is
+   *  the whole point of a communal feeding record. So the colony card's Fed
+   *  button navigates to the form rather than posting silently.
+   *
+   *  Kept as a separate handler from handleQuickFeed because a colony isn't an
+   *  invert: different endpoint, different semantics (ONE log per feeding
+   *  event, not one per animal). */
+  const handleQuickFeedColony = (id: string, taxon: string | null | undefined) => {
+    router.push({ pathname: '/colony/add-feeding', params: { id, taxon: taxon ?? '' } });
   };
 
   const handleLogMolt = () => {
@@ -881,12 +864,8 @@ function CollectionScreen() {
         // from and the card must not imply one exists.
         feeding={{ daysSince: item.days_since_last_feeding }}
         onPress={() => router.push(`/colony/${item.id}` as any)}
-        onQuickFeed={
-          showFedButton
-            ? () => handleQuickFeedColony(item.id, item.name)
-            : undefined
-        }
-        quickFeedBusy={quickFeedingIds.has(item.id)}
+        // Opens the form rather than logging in place — see the handler.
+        onQuickFeed={showFedButton ? () => handleQuickFeedColony(item.id, item.taxon) : undefined}
         colors={colors}
       />
     );

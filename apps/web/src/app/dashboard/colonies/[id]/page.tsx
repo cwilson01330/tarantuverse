@@ -21,6 +21,11 @@ import {
   deleteColonyEvent,
   getColony,
   listColonyEvents,
+  listColonyFeedings,
+  createColonyFeeding,
+  colonyFoodTypes,
+  colonyShowsPreySize,
+  type ColonyFeedingLog,
   type ColonyEventResponse,
   type ColonyEventType,
   type ColonyResponse,
@@ -73,6 +78,7 @@ export default function ColonyDetailPage() {
 
   const [colony, setColony] = useState<ColonyResponse | null>(null)
   const [events, setEvents] = useState<ColonyEventResponse[]>([])
+  const [feedings, setFeedings] = useState<ColonyFeedingLog[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -86,6 +92,19 @@ export default function ColonyDetailPage() {
   const [evtSubmitting, setEvtSubmitting] = useState(false)
   const [evtError, setEvtError] = useState('')
 
+  // Log-feeding form. A group feeding is entered, not one-tapped: for a
+  // communal the prey COUNT is the record, and a one-tap "fed" would write a
+  // log that silently claims a quantity nobody counted.
+  const [feedOpen, setFeedOpen] = useState(false)
+  const [feedDate, setFeedDate] = useState(todayIso())
+  const [feedType, setFeedType] = useState('')
+  const [feedSize, setFeedSize] = useState('')
+  const [feedQty, setFeedQty] = useState('')
+  const [feedAccepted, setFeedAccepted] = useState(true)
+  const [feedNotes, setFeedNotes] = useState('')
+  const [feedSubmitting, setFeedSubmitting] = useState(false)
+  const [feedError, setFeedError] = useState('')
+
   // Delete colony
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -93,12 +112,16 @@ export default function ColonyDetailPage() {
   const fetchAll = useCallback(async () => {
     if (!token || !colonyId) return
     try {
-      const [c, evs] = await Promise.all([
+      const [c, evs, feeds] = await Promise.all([
         getColony(token, colonyId),
         listColonyEvents(token, colonyId).catch(() => [] as ColonyEventResponse[]),
+        // Non-fatal: a colony with no feedings is the normal state and must
+        // not be able to break the whole page.
+        listColonyFeedings(token, colonyId).catch(() => [] as ColonyFeedingLog[]),
       ])
       setColony(c)
       setEvents(evs)
+      setFeedings(feeds)
       setLoadError('')
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -121,6 +144,35 @@ export default function ColonyDetailPage() {
     if (!colony?.stage_counts) return []
     return Object.keys(colony.stage_counts)
   }, [colony])
+
+  const submitFeeding = async () => {
+    if (!token || !colonyId) return
+    setFeedSubmitting(true)
+    setFeedError('')
+    try {
+      const n = parseInt(feedQty, 10)
+      await createColonyFeeding(token, colonyId, {
+        // Noon local so the date the keeper picked survives the UTC round trip
+        // instead of sliding a day back for anyone west of Greenwich.
+        fed_at: new Date(`${feedDate}T12:00:00`).toISOString(),
+        food_type: feedType || null,
+        food_size: feedSize || null,
+        // null, not 1 — an uncounted feeding stays uncounted.
+        quantity: Number.isFinite(n) && n > 0 ? n : null,
+        accepted: feedAccepted,
+        notes: feedNotes.trim() || null,
+      })
+      setFeedOpen(false)
+      setFeedQty('')
+      setFeedNotes('')
+      setFeedAccepted(true)
+      await fetchAll()
+    } catch (e) {
+      setFeedError(e instanceof Error ? e.message : 'Failed to log feeding')
+    } finally {
+      setFeedSubmitting(false)
+    }
+  }
 
   const submitEvent = async () => {
     if (!token || !colony || !meta) return
@@ -477,6 +529,189 @@ export default function ColonyDetailPage() {
             <div className="text-theme-primary whitespace-pre-wrap">{colony.notes}</div>
           </section>
         )}
+
+        {/* Feeding. ADR-010 deferred this for colonies on the grounds that
+            colony taxa are casual-feed detritivores — true of isopods, not of
+            a balfouri communal, which is fed on a cadence like any tarantula.
+            cph_20260729_colony_logs added the parent column. */}
+        <section aria-labelledby="feeding-heading" className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2
+              id="feeding-heading"
+              className="text-sm font-semibold text-theme-tertiary uppercase tracking-wide"
+            >
+              Feeding
+            </h2>
+            <button
+              type="button"
+              onClick={() => setFeedOpen((o) => !o)}
+              aria-expanded={feedOpen}
+              className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              {feedOpen ? 'Cancel' : '+ Log feeding'}
+            </button>
+          </div>
+
+          {feedOpen && (
+            <div className="p-4 mb-3 rounded-2xl border border-theme bg-surface space-y-3">
+              {feedError && (
+                <div
+                  role="alert"
+                  className="p-2 text-sm rounded-lg border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+                >
+                  {feedError}
+                </div>
+              )}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="block text-sm font-medium text-theme-secondary mb-1">Date</span>
+                  <input
+                    type="date"
+                    value={feedDate}
+                    max={todayIso()}
+                    onChange={(e) => setFeedDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-theme bg-surface text-theme-primary"
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-sm font-medium text-theme-secondary mb-1">
+                    Food type
+                  </span>
+                  <select
+                    value={feedType}
+                    onChange={(e) => setFeedType(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-theme bg-surface text-theme-primary"
+                  >
+                    <option value="">Not recorded</option>
+                    {/* Taxon-aware: greens for a dubia bin, crickets for a
+                        communal tarantula. */}
+                    {colonyFoodTypes(colony.taxon).map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {colonyShowsPreySize(colony.taxon) && (
+                  <label className="block">
+                    <span className="block text-sm font-medium text-theme-secondary mb-1">
+                      Prey size
+                    </span>
+                    <select
+                      value={feedSize}
+                      onChange={(e) => setFeedSize(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-theme bg-surface text-theme-primary"
+                    >
+                      <option value="">Not recorded</option>
+                      <option value="Small">Small</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Large">Large</option>
+                    </select>
+                  </label>
+                )}
+                <label className="block">
+                  <span className="block text-sm font-medium text-theme-secondary mb-1">
+                    {colonyShowsPreySize(colony.taxon) ? 'How many?' : 'Amount'}
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={feedQty}
+                    onChange={(e) => setFeedQty(e.target.value)}
+                    placeholder="e.g. 6"
+                    className="w-full px-3 py-2 rounded-lg border border-theme bg-surface text-theme-primary"
+                  />
+                  <span className="block mt-1 text-xs text-theme-tertiary">
+                    {colonyShowsPreySize(colony.taxon)
+                      ? 'Prey items offered to the group — six crickets for eleven spiders says far more than “fed”.'
+                      : 'Portions or items offered.'}{' '}
+                    Leave blank if you didn&apos;t count.
+                  </span>
+                </label>
+              </div>
+              <fieldset>
+                <legend className="block text-sm font-medium text-theme-secondary mb-1">
+                  Outcome
+                </legend>
+                <div className="flex gap-2">
+                  {[
+                    { v: true, l: 'Taken' },
+                    { v: false, l: 'Refused' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.l}
+                      type="button"
+                      onClick={() => setFeedAccepted(opt.v)}
+                      aria-pressed={feedAccepted === opt.v}
+                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition ${
+                        feedAccepted === opt.v
+                          ? 'bg-primary-600 border-primary-600 text-white'
+                          : 'border-theme bg-surface text-theme-primary hover:border-primary-400'
+                      }`}
+                    >
+                      {opt.l}
+                    </button>
+                  ))}
+                </div>
+                <span className="block mt-1 text-xs text-theme-tertiary">
+                  For a group this means the colony took it, not any one animal.
+                </span>
+              </fieldset>
+              <label className="block">
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  Notes (optional)
+                </span>
+                <textarea
+                  value={feedNotes}
+                  onChange={(e) => setFeedNotes(e.target.value)}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-theme bg-surface text-theme-primary"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={submitFeeding}
+                disabled={feedSubmitting}
+                className="px-4 py-2 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition disabled:opacity-60"
+              >
+                {feedSubmitting ? 'Saving…' : 'Save feeding'}
+              </button>
+            </div>
+          )}
+
+          <div className="p-4 rounded-2xl border border-theme bg-surface">
+            {feedings.length === 0 ? (
+              <p className="text-sm text-theme-tertiary">No feedings logged yet.</p>
+            ) : (
+              <ul className="divide-y divide-theme">
+                {feedings.slice(0, 10).map((f) => (
+                  <li key={f.id} className="py-2 flex items-center gap-3 text-sm">
+                    <span aria-hidden="true">{f.accepted ? '🍽️' : '🚫'}</span>
+                    <span className="flex-1 text-theme-primary">
+                      {/* Count leads — for a group it's the number that carries
+                          the meaning. Omitted when unrecorded rather than shown
+                          as 1, which would invent a fact. */}
+                      {[f.quantity != null ? `${f.quantity}×` : null, f.food_size, f.food_type]
+                        .filter(Boolean)
+                        .join(' ') || 'Fed'}
+                      {f.accepted ? '' : ' — refused'}
+                      {f.notes ? (
+                        <span className="block text-theme-tertiary">{f.notes}</span>
+                      ) : null}
+                    </span>
+                    <time
+                      dateTime={f.fed_at}
+                      className="text-theme-tertiary whitespace-nowrap"
+                    >
+                      {new Date(f.fed_at).toLocaleDateString()}
+                    </time>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
 
         {/* Add event */}
         <section aria-labelledby="addevent-heading" className="mb-6">

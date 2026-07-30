@@ -13,7 +13,15 @@ class FeedingLogBase(BaseModel):
     fed_at: datetime
     food_type: Optional[str] = None
     food_size: Optional[str] = None
-    quantity: int = 1  # For group feedings: "fed 8 roaches"
+    # For group feedings: "fed 8 roaches".
+    #
+    # Optional rather than plain int so "unrecorded" is expressible. A client
+    # that omits the field still gets 1 — correct for an individual animal,
+    # where one feeding event is one prey item and there's nothing to record.
+    # A colony can send null explicitly, because "fed a communal 1 cricket" is
+    # a claim nobody made: for a group the count IS the record, and inventing
+    # a 1 would be worse than admitting it wasn't counted.
+    quantity: Optional[int] = Field(1, ge=1)
     accepted: bool = True
     # Snake-only: grams of prey. Populating this enables the prey-to-
     # body-weight ratio advisory on the feeding form. Nullable because
@@ -106,6 +114,10 @@ class FeedingLogResponse(FeedingLogBase):
     tarantula_id: Optional[uuid.UUID] = None  # TV tarantula parent
     enclosure_id: Optional[uuid.UUID] = None  # enclosure-level (feeders)
     animal_id: Optional[uuid.UUID] = None  # HV animal parent (any taxon)
+    # cph_20260729_colony_logs: a group feeding belongs to a colony, not to any
+    # animal. Exposed so a client can tell a colony log apart from an individual
+    # one without inferring it from which id is missing.
+    colony_id: Optional[uuid.UUID] = None
     created_at: datetime
 
     class Config:

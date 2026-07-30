@@ -12,9 +12,18 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
-// Colony taxa reuse the invert taxon vocabulary, minus tarantula (colonies are
-// for communal/population keepers). 'other' catches isopods/springtails etc.
+// Colony taxa reuse the invert taxon vocabulary. 'other' catches
+// isopods/springtails etc.
+//
+// 'tarantula' IS a member. It was omitted originally because communal tarantula
+// keeping isn't a setup we suggest — but that made "we chose not to offer this"
+// and "this doesn't exist" the same fact, so a migrated balfouri communal came
+// back from the API with a taxon outside the union and every metadata lookup
+// for it silently returned undefined. Mobile hit this and split the two ideas
+// apart (INVERT_TAXON_ORDER vs PICKER_TAXA); this is the web half of that fix.
+// Use COLONY_PICKER_TAXA for anything that offers a choice.
 export type ColonyTaxon =
+  | 'tarantula'
   | 'scorpion'
   | 'centipede'
   | 'whip_spider'
@@ -233,6 +242,85 @@ export async function deleteColony(token: string, id: string): Promise<void> {
     headers: authHeaders(token),
   })
   if (!res.ok && res.status !== 204) throw new Error('Failed to delete colony')
+}
+
+// ── Colony feedings ───────────────────────────────────────────────────────────
+
+/**
+ * A group feeding: ONE log per feeding event, not one per animal.
+ *
+ * `quantity` carries the weight here that it doesn't for an individual. Feeding
+ * one tarantula is one prey item and "fed" is a complete record; feeding a
+ * communal is "six crickets into eleven spiders", and the ratio is the whole
+ * point. It's nullable because an uncounted feeding should stay uncounted —
+ * defaulting to 1 would put a number in the record that nobody observed.
+ *
+ * `accepted` also shifts meaning: for a group it's "did they take it", and a
+ * whole communal refusing is a real signal (often pre-molt or a husbandry
+ * problem), not noise.
+ */
+export interface ColonyFeedingLog {
+  id: string
+  colony_id: string | null
+  fed_at: string
+  food_type: string | null
+  food_size: string | null
+  quantity: number | null
+  accepted: boolean
+  notes: string | null
+}
+
+export async function listColonyFeedings(
+  token: string,
+  colonyId: string,
+): Promise<ColonyFeedingLog[]> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/feedings`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Failed to load colony feedings')
+  return (await res.json()) as ColonyFeedingLog[]
+}
+
+export async function createColonyFeeding(
+  token: string,
+  colonyId: string,
+  payload: {
+    fed_at: string
+    food_type?: string | null
+    food_size?: string | null
+    /** null = not counted. Send it explicitly rather than omitting, or the
+     *  server default of 1 applies — right for an animal, wrong for a group. */
+    quantity?: number | null
+    accepted?: boolean
+    notes?: string | null
+  },
+): Promise<ColonyFeedingLog> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/feedings`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Failed to log feeding')
+  return (await res.json()) as ColonyFeedingLog
+}
+
+/**
+ * Prey vocabulary, per taxon — mirrors apps/mobile/app/colony/add-feeding.tsx.
+ *
+ * A communal tarantula eats live prey. A dubia or millipede colony does not:
+ * feeding it means vegetables and a protein source, and offering
+ * "Cricket / Superworm" makes the form read as if written for something else.
+ */
+export const PREDATOR_FOODS = ['Cricket', 'Dubia Roach', 'Red Runner', 'Mealworm', 'Superworm', 'Other']
+export const DETRITIVORE_FOODS = ['Veg / greens', 'Fruit', 'Dry gutload', 'Protein (fish flake)', 'Leaf litter', 'Other']
+
+export function colonyFoodTypes(taxon: string | null | undefined): string[] {
+  return taxon === 'roach' || taxon === 'millipede' ? DETRITIVORE_FOODS : PREDATOR_FOODS
+}
+
+/** Prey size is a live-prey concept — a handful of greens has no "Medium". */
+export function colonyShowsPreySize(taxon: string | null | undefined): boolean {
+  return colonyFoodTypes(taxon) === PREDATOR_FOODS
 }
 
 // ── Colony events ─────────────────────────────────────────────────────────────
