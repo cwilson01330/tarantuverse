@@ -387,3 +387,134 @@ def _slugify(name: str) -> str:
     s = (name or "").lower().strip()
     s = re.sub(r"[^a-z0-9]+", "-", s)
     return s.strip("-") or "unknown"
+
+
+# ---------------------------------------------------------------------------
+# REVERSE mirror: inverts → legacy.
+#
+# Everything above flows legacy → inverts, which was correct while the legacy
+# routers were the only write path. ADR-013 changed that: merging the detail
+# screens means tarantula edits now go through PUT /inverts/{id}, and nothing
+# propagated them back. Meanwhile GET /tarantulas/ still reads the legacy table
+# (the C1 read cutover hasn't happened), so the collection grid kept showing
+# pre-edit values indefinitely.
+#
+# Reported by a keeper 2026-07-29: renamed a communal from "Communal of 6" to
+# "Communal of 11"; the detail screen showed the new name, the collection card
+# showed the old one. Name was just the visible symptom — sex, species,
+# husbandry and notes diverged the same way.
+#
+# This is a stopgap for the expand-contract window. When C1 lands and the
+# collection reads /inverts/, this whole direction can be deleted along with
+# the rest of the module.
+# ---------------------------------------------------------------------------
+
+# Columns that exist on BOTH Invert and the legacy per-taxon tables and are
+# safe to copy back verbatim. Deliberately explicit rather than introspected:
+# `species_id` is excluded because the two surfaces reference different catalogs
+# (see module docstring), and id/user_id/taxon are immutable.
+_REVERSE_SHARED_FIELDS = (
+    "enclosure_id",
+    "name",
+    "common_name",
+    "scientific_name",
+    "sex",
+    "date_acquired",
+    "source",
+    "price_paid",
+    "enclosure_size",
+    "substrate_type",
+    "substrate_depth",
+    "last_substrate_change",
+    "target_temp_min",
+    "target_temp_max",
+    "target_humidity_min",
+    "target_humidity_max",
+    "water_dish",
+    "misting_schedule",
+    "last_enclosure_cleaning",
+    "enclosure_notes",
+    "feeding_paused_reason",
+    "feeding_paused_until",
+    "photo_url",
+    "is_public",
+    "visibility",
+    "notes",
+)
+
+# Legacy tables that still back a read path. Taxa absent here (centipede,
+# mantis, roach …) live only on `inverts`, so there's nothing to mirror to.
+_LEGACY_MODEL_BY_TAXON = {
+    "tarantula": "app.models.tarantula:Tarantula",
+    "scorpion": "app.models.scorpion:Scorpion",
+}
+
+
+def mirror_invert_update_to_legacy(db: Session, invert: Invert) -> None:
+    """Push an `inverts` edit back onto its legacy row, if one exists.
+
+    No-ops for taxa with no legacy table, and for inverts created after the
+    per-taxon tables stopped being written. Never creates a legacy row — this
+    only keeps an existing one from going stale.
+
+    `life_stage` and `enclosure_type` are handled separately: they're SQLEnum
+    columns on Tarantula but plain CHECK-constrained strings on Invert, and
+    assigning an out-of-range string would raise on flush. We assign only when
+    the value is a valid member of the legacy enum, and skip otherwise rather
+    than failing the whole edit over a display field.
+    """
+    target = _LEGACY_MODEL_BY_TAXON.get(invert.taxon)
+    if target is None:
+        return
+
+    module_path, class_name = target.split(":")
+    import importlib
+
+    model = getattr(importlib.import_module(module_path), class_name)
+    row = db.query(model).filter(model.id == invert.id).first()
+    if row is None:
+        return  # invert-native animal; nothing legacy to keep in sync
+
+    for field in _REVERSE_SHARED_FIELDS:
+        if hasattr(row, field):
+            setattr(row, field, getattr(invert, field))
+
+    # Enum-typed columns, guarded.
+    for field in ("life_stage", "enclosure_type"):
+        value = getattr(invert, field, None)
+        column = getattr(type(row), field, None)
+        if column is None:
+            continue
+        if value is None:
+            setattr(row, field, None)
+            continue
+        enum_cls = getattr(column.type, "enum_class", None)
+        if enum_cls is None:
+            setattr(row, field, value)  # plain string column (Scorpion)
+        elif value in {e.value for e in enum_cls}:
+            setattr(row, field, value)
+
+
+def mirror_invert_delete_to_legacy(db: Session, invert: Invert) -> None:
+    """Delete the legacy tarantulas/scorpions row alongside an invert delete.
+
+    Without this, deleting through the unified detail screen removes the
+    `inverts` row while GET /tarantulas/ keeps returning the legacy one — the
+    animal appears not to delete at all, which is worse than the stale-name
+    symptom because the keeper will just try again.
+
+    Safe to call before or after `db.delete(invert)`: each CASCADE fires on its
+    own FK, and logs carrying both parent ids get cleaned up by whichever side
+    runs first (same reasoning as mirror_tarantula_delete).
+    """
+    target = _LEGACY_MODEL_BY_TAXON.get(invert.taxon)
+    if target is None:
+        return
+
+    module_path, class_name = target.split(":")
+    import importlib
+
+    model = getattr(importlib.import_module(module_path), class_name)
+    row = db.query(model).filter(model.id == invert.id).first()
+    if row is not None:
+        db.delete(row)

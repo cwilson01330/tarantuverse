@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { suggestedBuckets, bucketHint } from '../../../src/lib/colony-buckets';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../../src/contexts/ThemeContext';
@@ -138,6 +139,18 @@ export default function EditColonyScreen() {
       delete copy[key];
       return copy;
     });
+  };
+
+  /** Add a bucket by name. Shared by the suggestion chips and the free-text
+   *  field so both normalise and dedupe identically. */
+  const addNamedBucket = (name: string) => {
+    const k = name.trim().toLowerCase();
+    if (!k) return;
+    if (stageCounts[k] !== undefined) {
+      Alert.alert('Duplicate bucket', `A "${k}" bucket already exists.`);
+      return;
+    }
+    setStageCounts((prev) => ({ ...prev, [k]: '' }));
   };
 
   const addBucket = () => {
@@ -284,6 +297,31 @@ export default function EditColonyScreen() {
                 </TouchableOpacity>
               </View>
             ))}
+            {/* Suggested buckets for this taxon. Tapping one adds it; the
+                free-text field below still accepts anything. The presets differ
+                by group on purpose — a communal tarantula is tracked by sex
+                with most animals unsexed, while a roach colony can only sex
+                adults and counts nymphs separately. */}
+            {suggestedBuckets(taxon, stageCounts).length > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+                {suggestedBuckets(taxon, stageCounts).map((sug) => (
+                  <TouchableOpacity
+                    key={sug}
+                    onPress={() => addNamedBucket(sug)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${sug} bucket`}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}
+                  >
+                    <MaterialCommunityIcons name="plus" size={13} color={colors.textSecondary} />
+                    <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }}>{sug}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {bucketHint(taxon) ? (
+              <Text style={[styles.hint, { marginBottom: 10 }]}>{bucketHint(taxon)}</Text>
+            ) : null}
+
             <View style={styles.addBucketRow}>
               <TextInput style={[styles.input, { flex: 1 }]} value={newStageName} onChangeText={setNewStageName} placeholder="Add a bucket (e.g. mixed)" placeholderTextColor={colors.textTertiary} maxLength={30} autoCapitalize="none" />
               <TouchableOpacity onPress={addBucket} disabled={!newStageName.trim()} style={[styles.addBucketBtn, { borderColor: colors.border, opacity: newStageName.trim() ? 1 : 0.5 }]}>

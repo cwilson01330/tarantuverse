@@ -433,6 +433,20 @@ async def update_invert(
     for field, value in data.items():
         setattr(invert, field, value)
 
+    # Push the edit back onto the legacy tarantulas/scorpions row.
+    #
+    # GET /tarantulas/ still reads the legacy table (the ADR-005 C1 read
+    # cutover hasn't happened), but since ADR-013 merged the detail screens
+    # every tarantula edit arrives here instead of at the legacy router. Without
+    # this the collection grid keeps showing pre-edit values forever — a keeper
+    # renamed a communal and the card never updated (2026-07-29).
+    #
+    # No-ops for taxa that only exist on `inverts`. Delete this call along with
+    # the rest of the dual-write module when C1 lands.
+    from app.services.inverts_dualwrite import mirror_invert_update_to_legacy
+
+    mirror_invert_update_to_legacy(db, invert)
+
     db.commit()
     db.refresh(invert)
     return invert
@@ -455,6 +469,13 @@ async def delete_invert(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Invert not found",
         )
+    # Remove the legacy twin too. GET /tarantulas/ reads the legacy table until
+    # the C1 read cutover, so deleting only the invert row leaves the animal
+    # visible in the collection — it looks like the delete silently failed.
+    from app.services.inverts_dualwrite import mirror_invert_delete_to_legacy
+
+    mirror_invert_delete_to_legacy(db, invert)
+
     db.delete(invert)
     db.commit()
     return None

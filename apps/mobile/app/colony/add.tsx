@@ -27,6 +27,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import DateInput from '../../src/components/DateInput';
+import { suggestedBuckets, bucketHint } from '../../src/lib/colony-buckets';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import {
@@ -47,7 +48,11 @@ const SOURCE_OPTIONS: { value: Source; label: string }[] = [
 
 // Suggested starting buckets for a fresh colony. Keepers can rename/remove
 // and add their own; "mixed" is always the casual catch-all.
-const SUGGESTED_STAGES = ['adults', 'juveniles', 'nymphs', 'mixed'];
+// Suggestions now come from src/lib/colony-buckets, which varies them by
+// taxon. The old flat list ['adults','juveniles','nymphs','mixed'] offered
+// "nymphs" to tarantula keepers (who don't have nymphs) and never offered sex
+// buckets to anyone — so a communal keeper tracking females vs males had to
+// type the vocabulary themselves.
 
 function parseCount(s: string): number {
   if (s.trim() === '') return 0;
@@ -163,7 +168,7 @@ export default function AddColonyScreen() {
 
   const styles = makeStyles(colors);
 
-  const unusedSuggestions = SUGGESTED_STAGES.filter((s) => stageCounts[s] === undefined);
+  const unusedSuggestions = suggestedBuckets(taxon, stageCounts);
 
   return (
     <View style={styles.flex}>
@@ -287,6 +292,12 @@ export default function AddColonyScreen() {
                 ))}
               </View>
             )}
+            {/* Why the suggestions differ by taxon — a communal tarantula is
+                tracked by sex with most animals unsexed, while a roach colony
+                can only sex adults. */}
+            {bucketHint(taxon) ? (
+              <Text style={[styles.hint, { marginBottom: 10 }]}>{bucketHint(taxon)}</Text>
+            ) : null}
 
             {/* Custom bucket */}
             <View style={styles.addBucketRow}>
