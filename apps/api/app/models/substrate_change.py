@@ -37,6 +37,15 @@ class SubstrateChange(Base):
         nullable=True,
         index=True,
     )
+    # csc_20260731: a communal's rehousings belong to the group. Rehousing a
+    # colony is a bigger, riskier operation than moving one animal, so this
+    # history matters more here, not less.
+    colony_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colonies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
 
     changed_at = Column(Date, nullable=False)
     substrate_type = Column(String(100))  # Type of substrate used
@@ -53,6 +62,7 @@ class SubstrateChange(Base):
     enclosure = relationship("Enclosure", back_populates="substrate_changes")
     scorpion = relationship("Scorpion", backref=backref("substrate_changes", passive_deletes=True))
     invert = relationship("Invert", backref=backref("substrate_changes", passive_deletes=True))
+    colony = relationship("Colony", backref=backref("substrate_changes", passive_deletes=True))
 
     def __repr__(self):
         parent = self.tarantula_id or self.enclosure_id or self.scorpion_id

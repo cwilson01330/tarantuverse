@@ -42,6 +42,16 @@ def _substrate_owner_parent(change: SubstrateChange, db: Session, user: User):
             Invert.id == change.invert_id,
             Invert.user_id == user.id,
         ).first()
+    # Colony-parented (csc_20260731). Edit/delete resolve ownership through the
+    # colony exactly as they do through an animal, so the generic routes need
+    # no colony-specific handling.
+    if change.colony_id:
+        from app.models.colony import Colony
+
+        return db.query(Colony).filter(
+            Colony.id == change.colony_id,
+            Colony.user_id == user.id,
+        ).first()
     return None
 
 
@@ -424,3 +434,81 @@ async def delete_substrate_change(
     db.delete(change)
     db.commit()
     return None
+
+
+# --- Colony substrate changes (csc_20260731) --------------------------------
+#
+# Rehousing a communal is a bigger and riskier operation than moving a single
+# animal, and WHY it happened ("mold", "they needed more height") is exactly
+# the context a keeper wants when a group starts going wrong. The colony
+# already carried current substrate state; this is the history behind it.
+
+
+@router.get(
+    "/colonies/{colony_id}/substrate-changes",
+    response_model=List[SubstrateChangeResponse],
+)
+async def get_colony_substrate_changes(
+    colony_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List substrate changes for a colony the caller owns, newest first."""
+    from app.models.colony import Colony
+
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+
+    return (
+        db.query(SubstrateChange)
+        .filter(SubstrateChange.colony_id == colony_id)
+        .order_by(SubstrateChange.changed_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/colonies/{colony_id}/substrate-changes",
+    response_model=SubstrateChangeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_colony_substrate_change(
+    colony_id: uuid.UUID,
+    change_data: SubstrateChangeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Log a substrate change for a colony, and roll it up onto the colony.
+
+    Mirrors the per-animal behaviour: the log is the history, and the colony's
+    current substrate fields are updated to match so the detail screen doesn't
+    disagree with its own timeline.
+    """
+    from app.models.colony import Colony
+
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+
+    new_change = SubstrateChange(colony_id=colony_id, **change_data.model_dump())
+    db.add(new_change)
+
+    # Forward-only: backfilling an older change must not rewrite current state
+    # to something that was true months ago.
+    if colony.last_substrate_change is None or new_change.changed_at >= colony.last_substrate_change:
+        colony.last_substrate_change = new_change.changed_at
+        if new_change.substrate_type:
+            colony.substrate_type = new_change.substrate_type
+        if new_change.substrate_depth:
+            colony.substrate_depth = new_change.substrate_depth
+
+    db.commit()
+    db.refresh(new_change)
+    return new_change

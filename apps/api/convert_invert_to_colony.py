@@ -15,10 +15,26 @@ which is the question that surfaced this in the first place.
 
 WHAT CONVERTS, AND WHAT IT COSTS
 --------------------------------
-  feeding_logs  →  reparented invert_id → colony_id   (lossless)
-  photos        →  reparented invert_id → colony_id   (lossless)
-  molt_logs     →  reparented invert_id → colony_id   (lossless)
-  the invert    →  deleted, after everything else moved
+  feeding_logs       →  reparented invert_id → colony_id   (lossless)
+  photos             →  reparented invert_id → colony_id   (lossless)
+  molt_logs          →  reparented invert_id → colony_id   (lossless)
+  substrate_changes  →  reparented invert_id → colony_id   (lossless)
+  the invert         →  deleted, along with its legacy twin
+
+TWO THINGS THE FIRST DRY RUN MISSED
+-----------------------------------
+Both were invisible in the dry run because it rolls back before flushing the
+delete, so nothing exercised the cascade.
+
+1. substrate_changes had no colony_id, and cascades from the invert. The first
+   keeper converted had two rehousing entries — one noting the group was moved
+   back for more height — that would have been deleted silently. csc_20260731
+   added the column; they now move like everything else.
+
+2. A tarantula exists as BOTH a legacy `tarantulas` row and an `inverts` mirror
+   (ADR-005 dual-write; the read cutover hasn't happened). Deleting only the
+   invert leaves an orphan legacy row that the legacy read paths still serve —
+   the animal would appear to survive the conversion on some screens. Both go.
 
 Nothing is lost. An earlier draft of this script degraded molt logs into
 `molt_found` colony events, because colonies couldn't own molts. That was the
@@ -119,6 +135,11 @@ def main() -> None:
             print(f"ALREADY CONVERTED → colony {existing.id} ({existing.name!r}). Nothing to do.")
             return
 
+        substrate_count = db.execute(
+            text("SELECT count(*) FROM substrate_changes WHERE invert_id = :iid"),
+            {"iid": str(invert_id)},
+        ).scalar_one()
+
         molt_count = db.execute(
             text("SELECT count(*) FROM molt_logs WHERE invert_id = :iid"),
             {"iid": str(invert_id)},
@@ -137,7 +158,7 @@ def main() -> None:
         print(f"\nWill create colony : {args.name or inv.name!r}")
         print(f"  buckets          : {buckets}  (total {total})")
         print(f"  reparent         : {feedings} feeding(s), {photos} photo(s)")
-        print(f"  reparent         : {molt_count} molt log(s)")
+        print(f"  reparent         : {molt_count} molt log(s), {substrate_count} substrate change(s)")
         print(f"  then delete invert {invert_id}")
 
         # Species: the colony references invert_species, same catalog the invert
@@ -187,7 +208,7 @@ def main() -> None:
         # same way. molt_logs carries only an at-least-one-parent CHECK (not
         # exactly-one like the other two), but nulling the old parent is still
         # correct — a row should name one owner, not two.
-        for table in ("feeding_logs", "photos", "molt_logs"):
+        for table in ("feeding_logs", "photos", "molt_logs", "substrate_changes"):
             res = db.execute(
                 text(
                     f"UPDATE {table} SET colony_id = :cid, invert_id = NULL, "
@@ -204,7 +225,18 @@ def main() -> None:
             {"cid": str(colony.id)},
         )
 
+        # Delete the legacy twin too. Invert and its per-taxon row share a
+        # primary key by design, and leaving the legacy row behind would keep
+        # the animal alive on any path that hasn't cut over to `inverts` yet.
+        for legacy in ("tarantulas", "scorpions"):
+            res = db.execute(
+                text(f"DELETE FROM {legacy} WHERE id = :iid"), {"iid": str(invert_id)}
+            )
+            if res.rowcount:
+                print(f"  deleted legacy {legacy} row {invert_id}")
+
         db.delete(inv)
+        db.flush()  # surface FK problems HERE, not at commit
         print(f"  deleted invert {invert_id}")
 
         if args.commit:

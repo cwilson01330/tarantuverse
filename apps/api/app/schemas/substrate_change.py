@@ -35,6 +35,10 @@ class SubstrateChangeResponse(SubstrateChangeBase):
     id: uuid.UUID
     tarantula_id: Optional[uuid.UUID] = None  # Now optional - can be enclosure-level
     enclosure_id: Optional[uuid.UUID] = None  # For enclosure-level substrate changes
+    scorpion_id: Optional[uuid.UUID] = None
+    invert_id: Optional[uuid.UUID] = None  # unified inverts surface (ADR-005)
+    # csc_20260731: a communal's rehousings belong to the group.
+    colony_id: Optional[uuid.UUID] = None
     created_at: datetime
 
     class Config:
