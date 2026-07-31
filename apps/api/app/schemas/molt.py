@@ -44,6 +44,12 @@ class MoltLogResponse(MoltLogBase):
     id: uuid.UUID
     tarantula_id: Optional[uuid.UUID] = None  # Now optional - can be enclosure-level
     enclosure_id: Optional[uuid.UUID] = None  # For enclosure-level molts
+    scorpion_id: Optional[uuid.UUID] = None
+    invert_id: Optional[uuid.UUID] = None  # unified inverts surface (ADR-005)
+    # cml_20260730: a communal's molts belong to the group. Exposed so a client
+    # can tell a colony molt from an individual one without inferring it from
+    # which parent id happens to be absent.
+    colony_id: Optional[uuid.UUID] = None
     created_at: datetime
 
     class Config:

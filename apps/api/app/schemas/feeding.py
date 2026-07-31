@@ -71,6 +71,11 @@ class BulkFeedingResult(BaseModel):
     created_count: int
     created_ids: List[uuid.UUID]
     skipped: List[BulkFeedingSkip] = []
+    # Ids whose feeding pause was cleared because the animal ate. Reported so
+    # the client can TELL the user rather than silently changing state — a pause
+    # is the keeper's deliberate judgment and quietly undoing it would be worse
+    # than leaving it. Empty on a refusal, by design.
+    resumed_ids: List[uuid.UUID] = []
 
 
 # --- Herpetoverse animals (Feeding Day) ---
@@ -100,6 +105,11 @@ class AnimalBulkFeedingResult(BaseModel):
     created_count: int
     created_ids: List[uuid.UUID]
     skipped: List[AnimalBulkFeedingSkip] = []
+    # Ids whose feeding pause was cleared because the animal ate. Reported so
+    # the client can TELL the user rather than silently changing state — a pause
+    # is the keeper's deliberate judgment and quietly undoing it would be worse
+    # than leaving it. Empty on a refusal, by design.
+    resumed_ids: List[uuid.UUID] = []
 
 
 class FeedingLogResponse(FeedingLogBase):

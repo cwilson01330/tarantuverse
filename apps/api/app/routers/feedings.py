@@ -25,6 +25,7 @@ from app.schemas.feeding import (
 )
 from app.schemas.feeding_reminder import FeedingReminderSummary
 from app.utils.dependencies import get_current_user
+from app.utils.feeding_pause import resume_if_accepted
 from app.services.activity_service import create_activity
 from app.services.feeding_reminder_service import get_user_feeding_reminders
 # ADR-005 Phase A2 — opportunistically populate invert_id on new logs.
@@ -125,6 +126,11 @@ async def create_feeding_log(
         **feeding_data.model_dump()
     )
 
+    # Taking food ends a pause; a refusal confirms it. Applied on the single-
+    # feeding path too, not just Feeding Day — otherwise which screen you
+    # happened to use would decide whether the pause survived.
+    resume_if_accepted(tarantula, feeding_data.accepted, db)
+
     db.add(new_feeding)
     db.commit()
     db.refresh(new_feeding)
@@ -210,6 +216,8 @@ async def create_animal_feeding_log(
         raise HTTPException(status_code=404, detail="Animal not found")
 
     new_feeding = FeedingLog(animal_id=animal_id, **feeding_data.model_dump())
+    # Taking food ends a pause; a refusal confirms it. See utils/feeding_pause.
+    resume_if_accepted(animal, feeding_data.accepted)
     db.add(new_feeding)
 
     # Forward-only denormalization.
@@ -260,6 +268,8 @@ async def quick_feed_animal(
         food_type=last.food_type if last else None,
         food_size=last.food_size if last else None,
     )
+    # Quick-feed is accepted by definition, so it always ends a pause.
+    resume_if_accepted(animal, True)
     db.add(new_feeding)
 
     # last_fed_at may come back tz-aware from the DB while `now` is naive —
@@ -503,6 +513,10 @@ async def create_invert_feeding_log(
     if not invert:
         raise HTTPException(status_code=404, detail="Animal not found")
     new_feeding = FeedingLog(invert_id=invert_id, **feeding_data.model_dump())
+    # Taking food ends a pause; a refusal confirms it. Applied on the single-
+    # feeding path too, not just Feeding Day — otherwise which screen you
+    # happened to use would decide whether the pause survived.
+    resume_if_accepted(invert, feeding_data.accepted, db)
     db.add(new_feeding)
     db.commit()
     db.refresh(new_feeding)
@@ -586,19 +600,28 @@ async def bulk_create_invert_feedings(
     The same fed_at / accepted / food_type / food_size / notes is applied to
     each animal. Ids the caller doesn't own are skipped (reported in
     `skipped`), never fatal. All writes commit together.
+
+    An ACCEPTED feeding also resumes any animal that was paused, reported in
+    `resumed_ids` so the client can say so rather than silently changing state.
+    A refusal leaves the pause alone: an animal declining food while paused for
+    premolt is confirming the pause, not ending it.
     """
     # De-dupe while preserving the caller's order.
     requested = list(dict.fromkeys(payload.invert_ids))
-    owned_ids = {
-        row[0]
-        for row in db.query(Invert.id)
+    # Load the rows, not just the ids — an accepted feeding resumes a paused
+    # animal, and that needs the ORM objects.
+    owned = (
+        db.query(Invert)
         .filter(Invert.id.in_(requested), Invert.user_id == current_user.id)
         .all()
-    }
+    )
+    owned_by_id = {inv.id: inv for inv in owned}
+    owned_ids = set(owned_by_id)
     fed_at = payload.fed_at or datetime.now(timezone.utc)
 
     created_ids = []
     skipped = []
+    resumed_ids = []
     for iid in requested:
         if iid not in owned_ids:
             skipped.append(BulkFeedingSkip(invert_id=iid, reason="Not found or not yours"))
@@ -615,12 +638,16 @@ async def bulk_create_invert_feedings(
             )
         )
         created_ids.append(iid)
+        # Taking food ends a pause. A refusal doesn't — see utils/feeding_pause.
+        if resume_if_accepted(owned_by_id[iid], payload.accepted, db):
+            resumed_ids.append(iid)
 
     db.commit()
     return BulkFeedingResult(
         created_count=len(created_ids),
         created_ids=created_ids,
         skipped=skipped,
+        resumed_ids=resumed_ids,
     )
 
 

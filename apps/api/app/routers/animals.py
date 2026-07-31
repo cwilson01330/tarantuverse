@@ -45,6 +45,7 @@ from app.schemas.feeding import (
 )
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
+from app.utils.feeding_pause import resume_if_accepted
 
 router = APIRouter()
 
@@ -374,16 +375,19 @@ async def bulk_create_animal_feedings(
     `animals.last_fed_at` is bumped so collection cards + status refresh.
     """
     requested = list(dict.fromkeys(payload.animal_ids))
-    owned_ids = {
-        row[0]
-        for row in db.query(Animal.id)
+    # Full rows, not just ids — an accepted feeding resumes a paused animal.
+    owned = (
+        db.query(Animal)
         .filter(Animal.id.in_(requested), Animal.user_id == current_user.id)
         .all()
-    }
+    )
+    owned_by_id = {a.id: a for a in owned}
+    owned_ids = set(owned_by_id)
     fed_at = payload.fed_at or datetime.now(timezone.utc)
 
     created_ids = []
     skipped = []
+    resumed_ids = []
     for aid in requested:
         if aid not in owned_ids:
             skipped.append(AnimalBulkFeedingSkip(animal_id=aid, reason="Not found or not yours"))
@@ -400,6 +404,9 @@ async def bulk_create_animal_feedings(
             )
         )
         created_ids.append(aid)
+        # Taking food ends a pause; refusing confirms it. See utils/feeding_pause.
+        if resume_if_accepted(owned_by_id[aid], payload.accepted):
+            resumed_ids.append(aid)
 
     if payload.accepted and created_ids:
         db.query(Animal).filter(Animal.id.in_(created_ids)).update(
@@ -411,6 +418,7 @@ async def bulk_create_animal_feedings(
         created_count=len(created_ids),
         created_ids=created_ids,
         skipped=skipped,
+        resumed_ids=resumed_ids,
     )
 
 

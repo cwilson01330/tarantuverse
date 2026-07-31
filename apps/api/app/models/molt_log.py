@@ -12,11 +12,15 @@ from app.database import Base
 class MoltLog(Base):
     __tablename__ = "molt_logs"
     __table_args__ = (
-        # At-least-one parent: tarantula_id, enclosure_id, OR scorpion_id.
-        # scorpion_id added in scp_20260522.
+        # At-least-one parent. Kept in step with the LIVE definition — this
+        # declaration had drifted (it omitted invert_id, added in inv_20260527)
+        # and a stale copy here is worse than none, because it reads as
+        # authoritative while the database enforces something else.
+        # colony_id added in cml_20260730.
         CheckConstraint(
             'tarantula_id IS NOT NULL OR enclosure_id IS NOT NULL '
-            'OR scorpion_id IS NOT NULL',
+            'OR scorpion_id IS NOT NULL OR invert_id IS NOT NULL '
+            'OR colony_id IS NOT NULL',
             name='molt_log_must_have_parent'
         ),
     )
@@ -39,9 +43,23 @@ class MoltLog(Base):
         index=True,
     )
 
+    # cml_20260730: a communal's molts belong to the GROUP. Finding a shed
+    # skin is often the only observation a communal keeper gets, and it's how
+    # sexing happens — you sex the molt, not the spider.
+    colony_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colonies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+
     molted_at = Column(DateTime(timezone=True), nullable=False)
     premolt_started_at = Column(DateTime(timezone=True))
-    is_unidentified = Column(Boolean, default=False)  # For communals: "found a molt but don't know who"
+    # "Found a molt but don't know who." Meaningful for an enclosure-level or
+    # communal record; for a colony-parented row it's implied — a colony molt
+    # is by definition unattributed, since you can't tell which of eleven
+    # spiders shed it.
+    is_unidentified = Column(Boolean, default=False)
 
     # Measurements
     leg_span_before = Column(Numeric(5, 2))  # in inches or cm
@@ -61,7 +79,11 @@ class MoltLog(Base):
     enclosure = relationship("Enclosure", back_populates="molt_logs")
     scorpion = relationship("Scorpion", backref=backref("molt_logs", passive_deletes=True))
     invert = relationship("Invert", backref=backref("molt_logs", passive_deletes=True))
+    colony = relationship("Colony", backref=backref("molt_logs", passive_deletes=True))
 
     def __repr__(self):
-        parent = self.tarantula_id or self.enclosure_id or self.scorpion_id
+        parent = (
+            self.tarantula_id or self.enclosure_id or self.scorpion_id
+            or self.invert_id or self.colony_id
+        )
         return f"<MoltLog {parent} @ {self.molted_at}>"

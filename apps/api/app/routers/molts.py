@@ -47,6 +47,17 @@ def _molt_owner_parent(molt: MoltLog, db: Session, user: User):
             Invert.id == molt.invert_id,
             Invert.user_id == user.id,
         ).first()
+    # Colony-parented molts (cml_20260730). A communal's molts belong to the
+    # group — edit and delete resolve ownership through the colony exactly as
+    # they do through an animal, so the generic /molts/{id} routes need no
+    # colony-specific handling.
+    if molt.colony_id:
+        from app.models.colony import Colony
+
+        return db.query(Colony).filter(
+            Colony.id == molt.colony_id,
+            Colony.user_id == user.id,
+        ).first()
     return None
 
 
@@ -399,3 +410,75 @@ async def delete_molt_log(
     db.delete(molt)
     db.commit()
     return None
+
+
+# --- Colony molts (cml_20260730) -------------------------------------------
+#
+# Finding a shed skin is frequently the ONLY observation a communal keeper
+# gets: the animals are hidden, can't be handled without dismantling the
+# enclosure, and a molt in the web is the one piece of evidence that surfaces
+# by itself. It's also how sexing happens in a communal — you sex the molt, not
+# the spider. So these matter more here than for a solitary animal, not less.
+#
+# Measurements stay available but are expected to be null: you generally can't
+# say which of eleven animals shed it, let alone what it weighed before.
+
+
+@router.get("/colonies/{colony_id}/molts", response_model=List[MoltLogResponse])
+async def get_colony_molt_logs(
+    colony_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List molts found in a colony the caller owns, newest first."""
+    from app.models.colony import Colony
+
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+
+    return (
+        db.query(MoltLog)
+        .filter(MoltLog.colony_id == colony_id)
+        .order_by(MoltLog.molted_at.desc())
+        .all()
+    )
+
+
+@router.post(
+    "/colonies/{colony_id}/molts",
+    response_model=MoltLogResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_colony_molt_log(
+    colony_id: uuid.UUID,
+    molt_data: MoltLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Record a molt found in a colony. Sets only colony_id.
+
+    `is_unidentified` is forced True: a colony molt is unattributed by
+    definition. Storing False would assert the keeper knows which animal shed
+    it, which the enclosure makes impossible — and that claim would then flow
+    into any later analysis as though it were observed.
+    """
+    from app.models.colony import Colony
+
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+
+    payload = molt_data.model_dump()
+    payload["is_unidentified"] = True
+    new_molt = MoltLog(colony_id=colony_id, **payload)
+    db.add(new_molt)
+    db.commit()
+    db.refresh(new_molt)
+    return new_molt
