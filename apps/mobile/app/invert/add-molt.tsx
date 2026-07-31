@@ -9,9 +9,18 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import DateInput from '../../src/components/DateInput';
-import { getInvert, getInvertMolt, createInvertMolt, updateInvertMolt, type InvertTaxon } from '../../src/lib/inverts';
+import { getInvert, getInvertMolt, createInvertMolt, updateInvertMolt, type InvertTaxon, type MoltOutcome } from '../../src/lib/inverts';
 import { growthLengthLabel } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
+
+/** successful / stuck / lost_limb / fatal — the backend vocabulary. Finer
+ *  gradations would be guesses about a process the keeper mostly didn't watch. */
+const MOLT_OUTCOMES: { value: MoltOutcome; label: string; color: (c: any) => string }[] = [
+  { value: 'successful', label: 'Went fine', color: (c: any) => c.success ?? '#22c55e' },
+  { value: 'stuck', label: 'Stuck molt', color: (c: any) => c.warning ?? '#d97706' },
+  { value: 'lost_limb', label: 'Lost a limb', color: (c: any) => c.warning ?? '#d97706' },
+  { value: 'fatal', label: 'Died in molt', color: (c: any) => c.error ?? '#dc2626' },
+];
 
 export default function AddInvertMoltScreen() {
   const router = useRouter();
@@ -44,6 +53,11 @@ export default function AddInvertMoltScreen() {
    *  prediction quietly rather than visibly. */
   const [hasPremoltStart, setHasPremoltStart] = useState(false);
   const [premoltStart, setPremoltStart] = useState(toISODateLocal(new Date()));
+  /** Molt outcome (ADR-015). Blank by default and stays blank unless the
+   *  keeper says otherwise — most molts are routine, and a pre-selected
+   *  "Successful" would record a judgment nobody made. */
+  const [outcome, setOutcome] = useState<MoltOutcome | ''>('');
+  const [complication, setComplication] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
@@ -55,6 +69,8 @@ export default function AddInvertMoltScreen() {
     getInvertMolt(logId).then((m) => {
       if (m.leg_span_before != null) setLengthBefore(String(m.leg_span_before));
       if (m.leg_span_after != null) setLengthAfter(String(m.leg_span_after));
+      if (m.outcome) setOutcome(m.outcome);
+      if (m.complication_notes) setComplication(m.complication_notes);
       if (m.weight_before != null) setWeightBefore(String(m.weight_before));
       if (m.weight_after != null) setWeightAfter(String(m.weight_after));
       if (m.premolt_started_at) {
@@ -88,6 +104,8 @@ export default function AddInvertMoltScreen() {
         leg_span_after: parseMeasure(lengthAfter),
         weight_before: parseMeasure(weightBefore),
         weight_after: parseMeasure(weightAfter),
+        outcome: outcome || null,
+        complication_notes: complication.trim() || null,
       };
       if (isEdit && logId) {
         await updateInvertMolt(logId, payload);
@@ -151,6 +169,60 @@ export default function AddInvertMoltScreen() {
               <Field label="Weight after (g)" colors={colors}><TextInput style={styles.input} value={weightAfter} onChangeText={setWeightAfter} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
             </View>
           </View>
+          {/* Molting is the most dangerous thing these animals do and the most
+              common way one dies. Until now there was nowhere to say a molt
+              went wrong except free text, where nothing could find it. */}
+          <Field label="How did it go? (optional)" colors={colors}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {MOLT_OUTCOMES.map((o) => {
+                const sel = o.value === outcome;
+                return (
+                  <TouchableOpacity
+                    key={o.value}
+                    onPress={() => setOutcome(sel ? '' : o.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: sel }}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: sel ? o.color(colors) : colors.border,
+                      backgroundColor: sel ? o.color(colors) : colors.surface,
+                    }}
+                  >
+                    <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontWeight: '600', fontSize: 13 }}>
+                      {o.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 6 }}>
+              Leave blank if it was unremarkable — we won&apos;t assume either way.
+            </Text>
+          </Field>
+          {outcome !== '' && outcome !== 'successful' && (
+            <Field label="What happened? (optional)" colors={colors}>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={complication}
+                onChangeText={setComplication}
+                placeholder="e.g. stuck on the old exuvia, lost a rear leg"
+                placeholderTextColor={colors.textTertiary}
+                multiline
+              />
+            </Field>
+          )}
+          {outcome === 'fatal' && (
+            /* Deliberately a prompt, not an action. Inferring a death from a
+               log entry and silently retiring the animal would be the app
+               deciding something that grave on the keeper's behalf. */
+            <Text style={{ color: colors.textTertiary, fontSize: 12, marginBottom: 16 }}>
+              You can mark {'\u2018'}died{'\u2019'} on the animal itself when you&apos;re ready.
+              Saving this won&apos;t do it for you.
+            </Text>
+          )}
           <Field label="Notes (optional)" colors={colors}><TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} placeholder="How they look post-molt, behavior, etc." placeholderTextColor={colors.textTertiary} multiline /></Field>
           <TouchableOpacity style={[styles.saveButton, (saving || !taxon) && { opacity: 0.6 }]} onPress={handleSave} disabled={saving || !taxon}>
             <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save molt'}</Text>

@@ -17,6 +17,13 @@ import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 
+const MOLT_OUTCOMES = [
+  { value: 'successful', label: 'Went fine', color: (c: any) => c.success ?? '#22c55e' },
+  { value: 'stuck', label: 'Stuck molt', color: (c: any) => c.warning ?? '#d97706' },
+  { value: 'lost_limb', label: 'Lost a limb', color: (c: any) => c.warning ?? '#d97706' },
+  { value: 'fatal', label: 'Died in molt', color: (c: any) => c.error ?? '#dc2626' },
+];
+
 export default function AddMoltScreen() {
   const router = useRouter();
   // `id` is the tarantula id; `moltId` is set in edit mode and flips
@@ -35,6 +42,12 @@ export default function AddMoltScreen() {
   const [weightBefore, setWeightBefore] = useState('');
   const [weightAfter, setWeightAfter] = useState('');
   const [notes, setNotes] = useState('');
+  /** Molt outcome (ADR-015). This legacy screen is still reachable from the
+   *  collection's quick-log action, so it needs the field too — otherwise
+   *  whether a keeper could record a bad molt would depend on which entry
+   *  point they happened to use. */
+  const [outcome, setOutcome] = useState('');
+  const [complication, setComplication] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -53,6 +66,8 @@ export default function AddMoltScreen() {
       if (m.weight_before != null) setWeightBefore(String(m.weight_before));
       if (m.weight_after != null) setWeightAfter(String(m.weight_after));
       setNotes(m.notes ?? '');
+      if (m.outcome) setOutcome(m.outcome);
+      if (m.complication_notes) setComplication(m.complication_notes);
     } catch (error) {
       console.error('Failed to load molt for edit:', error);
       Alert.alert('Error', "Couldn't load this molt to edit.");
@@ -70,6 +85,8 @@ export default function AddMoltScreen() {
         leg_span_after: legSpanAfter ? parseFloat(legSpanAfter) : undefined,
         weight_before: weightBefore ? parseFloat(weightBefore) : undefined,
         weight_after: weightAfter ? parseFloat(weightAfter) : undefined,
+        outcome: outcome || null,
+        complication_notes: complication.trim() || null,
         notes: notes.trim() || undefined,
       };
 
@@ -196,6 +213,58 @@ export default function AddMoltScreen() {
               />
             </View>
           </View>
+        </View>
+
+        {/* Outcome — molting is the most dangerous thing these animals do and
+            the most common way one dies. */}
+        <View style={[styles.section, { borderBottomColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textPrimary }]}>How did it go?</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+            {MOLT_OUTCOMES.map((o) => {
+              const sel = o.value === outcome;
+              const tint = o.color(colors);
+              return (
+                <TouchableOpacity
+                  key={o.value}
+                  onPress={() => setOutcome(sel ? '' : o.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: sel }}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: sel ? tint : colors.border,
+                    backgroundColor: sel ? tint : colors.surface,
+                  }}
+                >
+                  <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontWeight: '600', fontSize: 13 }}>
+                    {o.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 8 }}>
+            Leave blank if it was unremarkable — we won&apos;t assume either way.
+          </Text>
+          {outcome !== '' && outcome !== 'successful' && (
+            <TextInput
+              style={[styles.textArea, { marginTop: 10, backgroundColor: colors.surfaceElevated, borderColor: colors.border, color: colors.textPrimary }]}
+              value={complication}
+              onChangeText={setComplication}
+              placeholder="What happened? e.g. stuck on the old exuvia, lost a rear leg"
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              textAlignVertical="top"
+            />
+          )}
+          {outcome === 'fatal' && (
+            <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 8 }}>
+              You can mark this animal as died on its own page when you&apos;re ready.
+              Saving this won&apos;t do it for you.
+            </Text>
+          )}
         </View>
 
         {/* Notes */}

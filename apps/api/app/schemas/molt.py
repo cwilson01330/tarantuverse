@@ -1,11 +1,22 @@
 """
 Molt log schemas
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 from decimal import Decimal
 import uuid
+
+
+# A molt either worked, went wrong, or killed the animal. Nothing in between is
+# worth a separate value — finer gradations ("slightly stuck") would be guesses
+# about a process the keeper mostly didn't watch.
+#
+# `fatal` records that the animal died IN the molt. It does NOT itself mark the
+# animal as died — see ADR-015 D6. Inferring a death from a log entry and
+# silently retiring the animal would be the app deciding something that grave
+# on the keeper's behalf.
+MOLT_OUTCOMES = ("successful", "stuck", "lost_limb", "fatal")
 
 
 class MoltLogBase(BaseModel):
@@ -17,8 +28,24 @@ class MoltLogBase(BaseModel):
     leg_span_after: Optional[Decimal] = Field(None, ge=0, le=999.99)
     weight_before: Optional[Decimal] = Field(None, ge=0, le=9999.99)
     weight_after: Optional[Decimal] = Field(None, ge=0, le=9999.99)
+    # Outcome (ADR-015). Optional — a molt log with just a date is still a
+    # complete record, and most keepers won't fill this in on a routine molt.
+    # The value is in the exceptions.
+    outcome: Optional[str] = None
+    complication_notes: Optional[str] = None
     notes: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("outcome")
+    @classmethod
+    def _known_outcome(cls, v: Optional[str]) -> Optional[str]:
+        # '' comes from a cleared picker — that's "didn't say", not invalid,
+        # and must not 422 someone out of logging the molt at all.
+        if v is None or v == "":
+            return None
+        if v not in MOLT_OUTCOMES:
+            raise ValueError(f"outcome must be one of: {', '.join(MOLT_OUTCOMES)}")
+        return v
 
 
 class MoltLogCreate(MoltLogBase):
@@ -35,8 +62,21 @@ class MoltLogUpdate(BaseModel):
     leg_span_after: Optional[Decimal] = None
     weight_before: Optional[Decimal] = None
     weight_after: Optional[Decimal] = None
+    # Editable after the fact — a keeper often doesn't know a molt went badly
+    # until days later, when a leg doesn't come right or the animal dies.
+    outcome: Optional[str] = None
+    complication_notes: Optional[str] = None
     notes: Optional[str] = None
     image_url: Optional[str] = None
+
+    @field_validator("outcome")
+    @classmethod
+    def _known_outcome(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        if v not in MOLT_OUTCOMES:
+            raise ValueError(f"outcome must be one of: {', '.join(MOLT_OUTCOMES)}")
+        return v
 
 
 class MoltLogResponse(MoltLogBase):

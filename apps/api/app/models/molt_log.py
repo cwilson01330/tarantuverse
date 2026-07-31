@@ -67,6 +67,18 @@ class MoltLog(Base):
     weight_before = Column(Numeric(6, 2))  # in grams
     weight_after = Column(Numeric(6, 2))
 
+    # --- Outcome (ADR-015, mol_20260731) -------------------------------------
+    # Molting is the most dangerous thing a tarantula does and the most common
+    # way one dies, and until now there was nowhere to say a molt went wrong.
+    # Mirrors the husbandry-signal fields on shed_logs: a keeper logging a stuck
+    # molt is reporting a humidity problem, not just a timestamp.
+    #
+    # Nullable with NO default. Defaulting to 'successful' would make every
+    # existing row assert an outcome nobody recorded — "probably fine" and "the
+    # keeper said it was fine" are different claims. NULL means not stated.
+    outcome = Column(String(20), nullable=True, index=True)
+    complication_notes = Column(Text, nullable=True)
+
     notes = Column(Text)
     image_url = Column(String(500))  # Photo of the molt
 

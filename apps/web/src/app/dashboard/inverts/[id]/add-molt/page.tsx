@@ -18,6 +18,13 @@ function localToday() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+const MOLT_OUTCOMES = [
+  { value: 'successful', label: 'Went fine', selected: 'bg-green-600 border-green-600 text-white' },
+  { value: 'stuck', label: 'Stuck molt', selected: 'bg-amber-600 border-amber-600 text-white' },
+  { value: 'lost_limb', label: 'Lost a limb', selected: 'bg-amber-600 border-amber-600 text-white' },
+  { value: 'fatal', label: 'Died in molt', selected: 'bg-red-600 border-red-600 text-white' },
+]
+
 export default function AddInvertMoltPage() {
   const params = useParams()
   const id = params?.id as string
@@ -38,6 +45,10 @@ export default function AddInvertMoltPage() {
   const [lengthAfter, setLengthAfter] = useState('')
   const [weightBefore, setWeightBefore] = useState('')
   const [weightAfter, setWeightAfter] = useState('')
+  // Molt outcome (ADR-015). Blank by default and stays blank — most molts are
+  // routine, and a pre-selected "Went fine" would record a judgment nobody made.
+  const [outcome, setOutcome] = useState('')
+  const [complication, setComplication] = useState('')
   const [saving, setSaving] = useState(false)
   const isEdit = !!logId
 
@@ -59,6 +70,10 @@ export default function AddInvertMoltPage() {
             const m = await res.json()
             if (m.leg_span_before != null) setLengthBefore(String(m.leg_span_before))
             if (m.leg_span_after != null) setLengthAfter(String(m.leg_span_after))
+            // A keeper often learns a molt went badly days later, so these must
+            // prefill on edit or the correction silently reverts.
+            if (m.outcome) setOutcome(m.outcome)
+            if (m.complication_notes) setComplication(m.complication_notes)
             if (m.weight_before != null) setWeightBefore(String(m.weight_before))
             if (m.weight_after != null) setWeightAfter(String(m.weight_after))
           } catch { /* leave blank */ }
@@ -99,6 +114,8 @@ export default function AddInvertMoltPage() {
             leg_span_after: parseMeasure(lengthAfter),
             weight_before: parseMeasure(weightBefore),
             weight_after: parseMeasure(weightAfter),
+            outcome: outcome || null,
+            complication_notes: complication.trim() || null,
           }),
         },
       )
@@ -127,6 +144,53 @@ export default function AddInvertMoltPage() {
             <div><label className={labelCls}>Weight before (g)</label><input value={weightBefore} onChange={(e) => setWeightBefore(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
             <div><label className={labelCls}>Weight after (g)</label><input value={weightAfter} onChange={(e) => setWeightAfter(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
           </div>
+          {/* Molting is the most dangerous thing these animals do and the most
+              common way one dies. Until now there was nowhere to say a molt
+              went wrong except free text, where nothing could find it. */}
+          <div>
+            <label className={labelCls}>How did it go? (optional)</label>
+            <div className="flex flex-wrap gap-2">
+              {MOLT_OUTCOMES.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setOutcome(outcome === o.value ? '' : o.value)}
+                  aria-pressed={outcome === o.value}
+                  className={`px-3 py-1.5 rounded-full border text-sm font-medium transition ${
+                    outcome === o.value
+                      ? o.selected
+                      : 'border-theme bg-surface text-theme-primary hover:border-primary-400'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-theme-tertiary">
+              Leave blank if it was unremarkable — we won&apos;t assume either way.
+            </p>
+          </div>
+          {outcome !== '' && outcome !== 'successful' && (
+            <div>
+              <label className={labelCls}>What happened? (optional)</label>
+              <textarea
+                value={complication}
+                onChange={(e) => setComplication(e.target.value)}
+                rows={2}
+                placeholder="e.g. stuck on the old exuvia, lost a rear leg"
+                className={inputCls}
+              />
+            </div>
+          )}
+          {outcome === 'fatal' && (
+            /* A prompt, not an action. Inferring a death from a log entry and
+               silently retiring the animal would be the app deciding something
+               that grave on the keeper's behalf. */
+            <p className="text-xs text-theme-tertiary">
+              You can mark this animal as died on its own page when you&apos;re
+              ready. Saving this molt won&apos;t do it for you.
+            </p>
+          )}
           <div><label className={labelCls}>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} /></div>
           <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : isEdit ? 'Update molt' : 'Save molt'}</button>
         </div>
