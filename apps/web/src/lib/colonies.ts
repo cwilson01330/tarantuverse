@@ -323,6 +323,83 @@ export function colonyShowsPreySize(taxon: string | null | undefined): boolean {
   return colonyFoodTypes(taxon) === PREDATOR_FOODS
 }
 
+// ── Colony substrate changes ─────────────────────────────────────────────────
+
+/**
+ * Applies to every colony taxon, not just communal tarantulas — a dubia bin
+ * gets cleaned out, and for detritivores the substrate is the food. Only the
+ * vocabulary differs; see colonySubstrateReasons().
+ */
+export interface ColonySubstrateChange {
+  id: string
+  colony_id: string | null
+  changed_at: string
+  substrate_type: string | null
+  substrate_depth: string | null
+  reason: string | null
+  notes: string | null
+}
+
+export async function listColonySubstrateChanges(
+  token: string,
+  colonyId: string,
+): Promise<ColonySubstrateChange[]> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/substrate-changes`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Failed to load substrate changes')
+  return (await res.json()) as ColonySubstrateChange[]
+}
+
+export async function createColonySubstrateChange(
+  token: string,
+  colonyId: string,
+  payload: {
+    changed_at: string
+    substrate_type?: string | null
+    substrate_depth?: string | null
+    reason?: string | null
+    notes?: string | null
+  },
+): Promise<ColonySubstrateChange> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/substrate-changes`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Failed to log substrate change')
+  return (await res.json()) as ColonySubstrateChange
+}
+
+export async function deleteColonySubstrateChange(
+  token: string,
+  changeId: string,
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/substrate-changes/${changeId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  if (!res.ok && res.status !== 204) throw new Error('Failed to delete')
+}
+
+/**
+ * Why a keeper changes substrate, per taxon. Mirrors the mobile lib.
+ *
+ * Rehousing dominates for a communal — moving a whole group is a real
+ * operation. Nobody rehouses dubia; they clean out frass on a cycle. And for
+ * detritivores the substrate is the food, so "topped up" is a distinct action
+ * that isn't a change in the tarantula sense at all.
+ */
+export function colonySubstrateReasons(taxon: string | null | undefined): string[] {
+  if (taxon === 'roach') {
+    return ['Frass buildup', 'Routine clean-out', 'Mold', 'Mites', 'Other']
+  }
+  if (taxon === 'millipede' || taxon === 'other') {
+    return ['Topped up', 'Depleted', 'Mold', 'Mites', 'Rehousing', 'Other']
+  }
+  return ['Rehousing', 'Routine maintenance', 'Mold', 'Mites', 'Too dry', 'Other']
+}
+
 // ── Colony molts ──────────────────────────────────────────────────────────────
 
 /**

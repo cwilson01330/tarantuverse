@@ -43,6 +43,10 @@ import {
   listColonyPhotos,
   listColonyFeedings,
   listColonyMolts,
+  listColonySubstrateChanges,
+  createColonySubstrateChange,
+  deleteColonySubstrateChange,
+  substrateReasonsFor,
   createColonyMolt,
   deleteColonyMolt,
   setColonyMainPhoto,
@@ -50,6 +54,7 @@ import {
   type ColonyPhoto,
   type ColonyFeedingLog,
   type ColonyMoltLog,
+  type ColonySubstrateChange,
   createColonyEvent,
   deleteColonyEvent,
   deleteColony,
@@ -107,6 +112,13 @@ export default function ColonyDetailScreen() {
   const [moltFormOpen, setMoltFormOpen] = useState(false);
   const [moltDate, setMoltDate] = useState(toISODateLocal(new Date()));
   const [moltNote, setMoltNote] = useState('');
+  const [substrates, setSubstrates] = useState<ColonySubstrateChange[]>([]);
+  const [subFormOpen, setSubFormOpen] = useState(false);
+  const [subDate, setSubDate] = useState(toISODateLocal(new Date()));
+  const [subReason, setSubReason] = useState('');
+  const [subType, setSubType] = useState('');
+  const [subNote, setSubNote] = useState('');
+  const [subBusy, setSubBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -130,7 +142,7 @@ export default function ColonyDetailScreen() {
   const fetchColony = useCallback(async () => {
     if (!colonyId) return;
     try {
-      const [colonyRes, eventsRes, photosRes, feedingsRes, moltsRes] = await Promise.all([
+      const [colonyRes, eventsRes, photosRes, feedingsRes, moltsRes, subsRes] = await Promise.all([
         getColony(colonyId),
         listColonyEvents(colonyId),
         // Non-fatal: a colony with no photos or feedings is the normal state,
@@ -138,12 +150,14 @@ export default function ColonyDetailScreen() {
         listColonyPhotos(colonyId).catch(() => [] as ColonyPhoto[]),
         listColonyFeedings(colonyId).catch(() => [] as ColonyFeedingLog[]),
         listColonyMolts(colonyId).catch(() => [] as ColonyMoltLog[]),
+        listColonySubstrateChanges(colonyId).catch(() => [] as ColonySubstrateChange[]),
       ]);
       setColony(colonyRes);
       setEvents(eventsRes);
       setPhotos(photosRes);
       setFeedings(feedingsRes);
       setMolts(moltsRes);
+      setSubstrates(subsRes);
       setLoadError('');
     } catch (e: any) {
       if (e?.response?.status === 401) return;
@@ -389,6 +403,52 @@ export default function ColonyDetailScreen() {
     }
   };
 
+  /** Log a substrate change for the whole colony.
+   *
+   *  Rehousing a group is a bigger and riskier operation than moving one
+   *  animal, so the reason matters more here — "they needed more height" is
+   *  the kind of note that explains a later problem.
+   */
+  const submitSubstrate = async () => {
+    if (!colonyId || subBusy) return;
+    setSubBusy(true);
+    try {
+      await createColonySubstrateChange(colonyId, {
+        changed_at: subDate,
+        substrate_type: subType.trim() || null,
+        reason: subReason || null,
+        notes: subNote.trim() || null,
+      });
+      setSubFormOpen(false);
+      setSubReason('');
+      setSubType('');
+      setSubNote('');
+      await fetchColony();
+    } catch (e) {
+      Alert.alert('Could not save', getErrorMessage(e));
+    } finally {
+      setSubBusy(false);
+    }
+  };
+
+  const confirmDeleteSubstrate = (c: ColonySubstrateChange) => {
+    Alert.alert('Delete this substrate change?', formatLocalDate(c.changed_at), [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteColonySubstrateChange(c.id);
+            await fetchColony();
+          } catch (e) {
+            Alert.alert('Could not delete', getErrorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
   const confirmDeleteMolt = (molt: ColonyMoltLog) => {
     Alert.alert('Delete this molt record?', formatLocalDate(molt.molted_at), [
       { text: 'Cancel', style: 'cancel' },
@@ -598,6 +658,118 @@ export default function ColonyDetailScreen() {
                     {new Date(f.fed_at).toLocaleDateString()}
                   </Text>
                 </View>
+              ))
+            )}
+          </View>
+
+          {/* Substrate (csc_20260731).
+              Applies to every colony taxon — a dubia bin gets cleaned out and
+              for detritivores the substrate IS the food — but the reasons
+              differ, so the chips are taxon-aware. Rehousing a whole group is
+              a bigger operation than moving one animal, which is why the
+              reason and note carry real weight here. */}
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
+            <View style={styles.eventsHeaderRow}>
+              <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>SUBSTRATE</Text>
+              <TouchableOpacity
+                onPress={() => setSubFormOpen((o) => !o)}
+                accessibilityRole="button"
+                accessibilityLabel="Log a substrate change for this colony"
+              >
+                <Text style={[styles.addEventLink, { color: colors.primary }]}>
+                  {subFormOpen ? 'Cancel' : '+ Log change'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {subFormOpen && (
+              <View style={{ marginBottom: 12, gap: 10 }}>
+                <DateInput
+                  value={parseLocalDate(subDate) ?? new Date()}
+                  onChange={(d) => setSubDate(toISODateLocal(d))}
+                  maximumDate={new Date()}
+                  label="Date changed"
+                />
+                <Text style={styles.fieldLabel}>REASON</Text>
+                <View style={styles.chipWrap}>
+                  {substrateReasonsFor(colony.taxon).map((r) => {
+                    const sel = r === subReason;
+                    return (
+                      <TouchableOpacity
+                        key={r}
+                        onPress={() => setSubReason(sel ? '' : r)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: sel }}
+                        style={[
+                          styles.eventChip,
+                          {
+                            borderColor: sel ? colors.primary : colors.border,
+                            backgroundColor: sel ? colors.primary : colors.surface,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontSize: 13, fontWeight: '600' }}>
+                          {r}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  style={styles.input}
+                  value={subType}
+                  onChangeText={setSubType}
+                  placeholder="Substrate type (optional)"
+                  placeholderTextColor={colors.textTertiary}
+                />
+                <TextInput
+                  style={styles.textarea}
+                  value={subNote}
+                  onChangeText={setSubNote}
+                  multiline
+                  placeholder="Notes — e.g. moved back to the taller enclosure"
+                  placeholderTextColor={colors.textTertiary}
+                />
+                <PrimaryButton
+                  onPress={submitSubstrate}
+                  disabled={subBusy}
+                  style={[styles.saveBtn, { borderRadius: layout.radius.sm }]}
+                  outerStyle={{ borderRadius: layout.radius.sm }}
+                >
+                  <Text style={styles.onPrimaryText}>{subBusy ? 'Saving…' : 'Save change'}</Text>
+                </PrimaryButton>
+              </View>
+            )}
+
+            {substrates.length === 0 ? (
+              <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                No substrate changes logged yet.
+              </Text>
+            ) : (
+              substrates.slice(0, 10).map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.feedRow}
+                  onPress={() => confirmDeleteSubstrate(c)}
+                  onLongPress={() => confirmDeleteSubstrate(c)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Substrate change ${formatLocalDate(c.changed_at)}. Tap to delete.`}
+                >
+                  <MaterialCommunityIcons name="shovel" size={16} color={colors.textSecondary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.detailBody}>
+                      {[c.reason, c.substrate_type].filter(Boolean).join(' · ') || 'Substrate changed'}
+                    </Text>
+                    {c.notes ? (
+                      <Text style={[styles.detailBody, { color: colors.textTertiary, fontSize: 12 }]}>
+                        {c.notes}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                    {formatLocalDate(c.changed_at)}
+                  </Text>
+                </TouchableOpacity>
               ))
             )}
           </View>

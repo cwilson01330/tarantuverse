@@ -23,6 +23,10 @@ import {
   listColonyEvents,
   listColonyFeedings,
   listColonyMolts,
+  listColonySubstrateChanges,
+  createColonySubstrateChange,
+  deleteColonySubstrateChange,
+  colonySubstrateReasons,
   createColonyMolt,
   deleteColonyMolt,
   createColonyFeeding,
@@ -30,6 +34,7 @@ import {
   colonyShowsPreySize,
   type ColonyFeedingLog,
   type ColonyMoltLog,
+  type ColonySubstrateChange,
   type ColonyEventResponse,
   type ColonyEventType,
   type ColonyResponse,
@@ -89,6 +94,14 @@ export default function ColonyDetailPage() {
   const [moltNote, setMoltNote] = useState('')
   const [moltBusy, setMoltBusy] = useState(false)
   const [moltError, setMoltError] = useState('')
+  const [substrates, setSubstrates] = useState<ColonySubstrateChange[]>([])
+  const [subOpen, setSubOpen] = useState(false)
+  const [subDate, setSubDate] = useState(todayIso())
+  const [subReason, setSubReason] = useState('')
+  const [subType, setSubType] = useState('')
+  const [subNote, setSubNote] = useState('')
+  const [subBusy, setSubBusy] = useState(false)
+  const [subError, setSubError] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -122,18 +135,22 @@ export default function ColonyDetailPage() {
   const fetchAll = useCallback(async () => {
     if (!token || !colonyId) return
     try {
-      const [c, evs, feeds, mlts] = await Promise.all([
+      const [c, evs, feeds, mlts, subs] = await Promise.all([
         getColony(token, colonyId),
         listColonyEvents(token, colonyId).catch(() => [] as ColonyEventResponse[]),
         // Non-fatal: a colony with no feedings is the normal state and must
         // not be able to break the whole page.
         listColonyFeedings(token, colonyId).catch(() => [] as ColonyFeedingLog[]),
         listColonyMolts(token, colonyId).catch(() => [] as ColonyMoltLog[]),
+        listColonySubstrateChanges(token, colonyId).catch(
+          () => [] as ColonySubstrateChange[],
+        ),
       ])
       setColony(c)
       setEvents(evs)
       setFeedings(feeds)
       setMolts(mlts)
+      setSubstrates(subs)
       setLoadError('')
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -156,6 +173,39 @@ export default function ColonyDetailPage() {
     if (!colony?.stage_counts) return []
     return Object.keys(colony.stage_counts)
   }, [colony])
+
+  const submitSubstrate = async () => {
+    if (!token || !colonyId) return
+    setSubBusy(true)
+    setSubError('')
+    try {
+      await createColonySubstrateChange(token, colonyId, {
+        changed_at: subDate,
+        substrate_type: subType.trim() || null,
+        reason: subReason || null,
+        notes: subNote.trim() || null,
+      })
+      setSubOpen(false)
+      setSubReason('')
+      setSubType('')
+      setSubNote('')
+      await fetchAll()
+    } catch (e) {
+      setSubError(e instanceof Error ? e.message : 'Failed to log change')
+    } finally {
+      setSubBusy(false)
+    }
+  }
+
+  const removeSubstrate = async (id: string) => {
+    if (!token) return
+    try {
+      await deleteColonySubstrateChange(token, id)
+      await fetchAll()
+    } catch (e) {
+      setSubError(e instanceof Error ? e.message : 'Failed to delete')
+    }
+  }
 
   const submitMolt = async () => {
     if (!token || !colonyId) return
@@ -747,6 +797,148 @@ export default function ColonyDetailPage() {
                     >
                       {new Date(f.fed_at).toLocaleDateString()}
                     </time>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Substrate (csc_20260731). Every colony taxon has substrate — a dubia
+            bin gets cleaned out, and for detritivores it IS the food — so this
+            isn't gated to communal tarantulas. Only the reasons differ. */}
+        <section aria-labelledby="substrate-heading" className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2
+              id="substrate-heading"
+              className="text-sm font-semibold text-theme-tertiary uppercase tracking-wide"
+            >
+              Substrate
+            </h2>
+            <button
+              type="button"
+              onClick={() => setSubOpen((o) => !o)}
+              aria-expanded={subOpen}
+              className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              {subOpen ? 'Cancel' : '+ Log change'}
+            </button>
+          </div>
+
+          {subError && (
+            <div
+              role="alert"
+              className="mb-3 p-2 text-sm rounded-lg border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+            >
+              {subError}
+            </div>
+          )}
+
+          {subOpen && (
+            <div className="p-4 mb-3 rounded-2xl border border-theme bg-surface space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="block text-sm font-medium text-theme-secondary mb-1">
+                    Date changed
+                  </span>
+                  <input
+                    type="date"
+                    value={subDate}
+                    max={todayIso()}
+                    onChange={(e) => setSubDate(e.target.value)}
+                    className={inputCls}
+                  />
+                </label>
+                <label className="block">
+                  <span className="block text-sm font-medium text-theme-secondary mb-1">
+                    Substrate type
+                  </span>
+                  <input
+                    type="text"
+                    value={subType}
+                    onChange={(e) => setSubType(e.target.value)}
+                    placeholder="Optional"
+                    className={inputCls}
+                  />
+                </label>
+              </div>
+              <fieldset>
+                <legend className="block text-sm font-medium text-theme-secondary mb-1">
+                  Reason
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {/* Taxon-aware: nobody rehouses dubia, they clean out frass. */}
+                  {colonySubstrateReasons(colony.taxon).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setSubReason(subReason === r ? '' : r)}
+                      aria-pressed={subReason === r}
+                      className={`px-3 py-1.5 rounded-full border text-sm font-medium transition ${
+                        subReason === r
+                          ? 'bg-primary-600 border-primary-600 text-white'
+                          : 'border-theme bg-surface text-theme-primary hover:border-primary-400'
+                      }`}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="block">
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  Notes
+                </span>
+                <textarea
+                  value={subNote}
+                  onChange={(e) => setSubNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. moved back to the taller enclosure"
+                  className={inputCls}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={submitSubstrate}
+                disabled={subBusy}
+                className="px-4 py-2 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition disabled:opacity-60"
+              >
+                {subBusy ? 'Saving…' : 'Save change'}
+              </button>
+            </div>
+          )}
+
+          <div className="p-4 rounded-2xl border border-theme bg-surface">
+            {substrates.length === 0 ? (
+              <p className="text-sm text-theme-tertiary">
+                No substrate changes logged yet.
+              </p>
+            ) : (
+              <ul className="divide-y divide-theme">
+                {substrates.slice(0, 12).map((c) => (
+                  <li key={c.id} className="py-2 flex items-start gap-3 text-sm">
+                    <span aria-hidden="true">🪵</span>
+                    <span className="flex-1 text-theme-primary">
+                      {[c.reason, c.substrate_type].filter(Boolean).join(' · ') ||
+                        'Substrate changed'}
+                      {c.notes ? (
+                        <span className="block text-theme-tertiary">{c.notes}</span>
+                      ) : null}
+                    </span>
+                    <time
+                      dateTime={c.changed_at}
+                      className="text-theme-tertiary whitespace-nowrap"
+                    >
+                      {formatEventDate(c.changed_at)}
+                    </time>
+                    <button
+                      type="button"
+                      onClick={() => removeSubstrate(c.id)}
+                      aria-label={`Delete substrate change from ${formatEventDate(c.changed_at)}`}
+                      className="text-theme-tertiary hover:text-red-600 transition"
+                    >
+                      ×
+                    </button>
                   </li>
                 ))}
               </ul>

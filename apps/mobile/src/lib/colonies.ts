@@ -326,6 +326,76 @@ export async function deleteColonyMolt(moltId: string): Promise<void> {
   await apiClient.delete(`/molts/${moltId}`);
 }
 
+/**
+ * A substrate change for the colony.
+ *
+ * Applies to EVERY colony taxon, not just communal tarantulas. A dubia bin gets
+ * cleaned out when frass builds up; for millipedes and isopods the substrate is
+ * literally the food, so replacing it is a feeding decision. Withholding this
+ * from feeder colonies would be arbitrary.
+ *
+ * What differs is the vocabulary — see substrateReasonsFor().
+ */
+export interface ColonySubstrateChange {
+  id: string;
+  colony_id: string | null;
+  changed_at: string;
+  substrate_type: string | null;
+  substrate_depth: string | null;
+  reason: string | null;
+  notes: string | null;
+}
+
+export async function listColonySubstrateChanges(
+  id: string,
+): Promise<ColonySubstrateChange[]> {
+  const { data } = await apiClient.get<ColonySubstrateChange[]>(
+    `/colonies/${id}/substrate-changes`,
+  );
+  return data;
+}
+
+export async function createColonySubstrateChange(
+  id: string,
+  payload: {
+    changed_at: string;
+    substrate_type?: string | null;
+    substrate_depth?: string | null;
+    reason?: string | null;
+    notes?: string | null;
+  },
+): Promise<ColonySubstrateChange> {
+  const { data } = await apiClient.post<ColonySubstrateChange>(
+    `/colonies/${id}/substrate-changes`,
+    payload,
+  );
+  return data;
+}
+
+/** Shared route — resolves ownership through whichever parent the row carries. */
+export async function deleteColonySubstrateChange(changeId: string): Promise<void> {
+  await apiClient.delete(`/substrate-changes/${changeId}`);
+}
+
+/**
+ * Why a keeper changes substrate, per taxon.
+ *
+ * "Rehousing" is the big one for a communal — moving a whole group is a real
+ * operation with real risk, and it's usually the reason. A feeder bin is
+ * different: nobody rehouses dubia, they clean out frass on a cycle. And for
+ * detritivores the substrate IS the food, so "topped up" is a distinct and
+ * common action that isn't a change at all in the tarantula sense.
+ */
+export function substrateReasonsFor(taxon: string | null | undefined): string[] {
+  if (taxon === 'roach') {
+    return ['Frass buildup', 'Routine clean-out', 'Mold', 'Mites', 'Other'];
+  }
+  if (taxon === 'millipede' || taxon === 'other') {
+    return ['Topped up', 'Depleted', 'Mold', 'Mites', 'Rehousing', 'Other'];
+  }
+  return ['Rehousing', 'Routine maintenance', 'Mold', 'Mites', 'Too dry', 'Other'];
+}
+
 export async function listColonyPhotos(id: string): Promise<ColonyPhoto[]> {
   const { data } = await apiClient.get<ColonyPhoto[]>(`/colonies/${id}/photos`);
   return data;
