@@ -316,6 +316,22 @@ export function updateAnimal(
 }
 
 /**
+ * Lift a feeding pause.
+ *
+ * Named rather than left as a raw updateAnimal call so the intent is greppable
+ * and every caller clears BOTH columns. Clearing only the reason would leave an
+ * orphan `until` that nothing reads, and clearing only `until` would leave an
+ * open-ended pause that never expires — either way the animal stays quietly
+ * exempt from overdue checks. Mirrors resumeFeeding in the mobile lib.
+ */
+export function resumeFeeding(id: string): Promise<Animal> {
+  return updateAnimal(id, {
+    feeding_paused_reason: null,
+    feeding_paused_until: null,
+  })
+}
+
+/**
  * Hard delete — CASCADEs to weight logs, feedings, sheds, and photos.
  * Callers should surface that clearly before calling.
  */
@@ -612,11 +628,17 @@ export interface BulkFeedResult {
   created_count: number
   created_ids: string[]
   skipped: BulkFeedSkip[]
+  /** Ids whose feeding pause was cleared because the animal ate. Surfaced so
+   *  the keeper is TOLD — they set that pause deliberately, and undoing it
+   *  silently would be worse than leaving it. Empty on a refusal, since an
+   *  animal declining food while paused is confirming the pause. */
+  resumed_ids: string[]
 }
 
 /**
  * Log one feeding (or refusal) across many animals in a single call.
- * Server returns how many were created plus any it skipped (with reason).
+ * Server returns how many were created plus any it skipped (with reason),
+ * and which paused animals were resumed because they ate.
  */
 export function bulkFeedAnimals(
   payload: BulkFeedPayload,

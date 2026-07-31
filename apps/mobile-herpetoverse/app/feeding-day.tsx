@@ -18,6 +18,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -41,6 +42,7 @@ import {
   ANIMAL_TAXA,
   bulkFeedAnimals,
   listAnimalFeedingStatus,
+  resumeFeeding,
   type AnimalFeedingStatus,
 } from '../src/lib/animals';
 
@@ -151,16 +153,63 @@ function FeedingDayScreen() {
     });
   };
 
+  const [resumedNote, setResumedNote] = useState('');
+  const [resumingId, setResumingId] = useState<string | null>(null);
+
+  /** Lift a pause straight from the list.
+   *
+   *  Feeding Day is where a keeper NOTICES a stale pause — scanning the list
+   *  and seeing one that's been paused since April. Until now the only way to
+   *  act on that was to leave, find the animal and open its detail screen, and
+   *  that distance is exactly why pauses outlive their reason.
+   *
+   *  Confirmed rather than instant: a pause encodes a husbandry judgment, and
+   *  an accidental tap would drop the animal back into overdue nagging.
+   */
+  const confirmResume = (a: AnimalFeedingStatus) => {
+    Alert.alert(
+      `Resume feeding for ${displayName(a)}?`,
+      'It will start appearing in overdue checks again.',
+      [
+        { text: 'Keep paused', style: 'cancel' },
+        {
+          text: 'Resume',
+          onPress: async () => {
+            setResumingId(a.id);
+            try {
+              await resumeFeeding(a.id);
+              await fetchStatus();
+            } catch (e: any) {
+              setLoadError(
+                e?.response?.data?.detail || e?.message || 'Could not resume feeding',
+              );
+            } finally {
+              setResumingId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const submit = async () => {
     if (selected.size === 0) return;
     setSubmitting(true);
     try {
-      await bulkFeedAnimals({
+      const res = await bulkFeedAnimals({
         animal_ids: Array.from(selected),
         accepted: outcome === 'fed',
         food_type: foodType.trim() || undefined,
         notes: notes.trim() || undefined,
       });
+      const resumed = res?.resumed_ids?.length ?? 0;
+      // An accepted feeding lifts a pause server-side. Say so — the keeper set
+      // that pause deliberately and shouldn't have to notice the pill vanish.
+      setResumedNote(
+        resumed > 0
+          ? `${resumed} paused ${resumed === 1 ? 'animal' : 'animals'} resumed — they ate.`
+          : '',
+      );
       setSheetOpen(false);
       setSelected(new Set());
       setFoodType('');
@@ -287,6 +336,21 @@ function FeedingDayScreen() {
           </View>
         )}
 
+        {resumedNote !== '' && (
+          <View
+            style={[
+              styles.errorCard,
+              { backgroundColor: colors.surface, borderColor: colors.success },
+            ]}
+            accessibilityLiveRegion="polite"
+          >
+            <Text style={{ color: colors.success, flex: 1 }}>{resumedNote}</Text>
+            <TouchableOpacity onPress={() => setResumedNote('')} accessibilityLabel="Dismiss">
+              <Text style={{ color: colors.success, fontWeight: '700' }}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {loadError !== '' && !loading && (
           <View
             style={[
@@ -390,13 +454,28 @@ function FeedingDayScreen() {
                     </Text>
                   ) : null}
                 </View>
-                <View
-                  style={[styles.pill, { backgroundColor: `${pill.color}22` }]}
-                >
-                  <Text style={[styles.pillText, { color: pill.color }]}>
-                    {pill.label}
-                  </Text>
-                </View>
+                {/* Tappable when paused — see confirmResume. */}
+                {a.is_feeding_paused ? (
+                  <TouchableOpacity
+                    onPress={() => confirmResume(a)}
+                    disabled={resumingId === a.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${displayName(a)} is paused. Tap to resume feeding.`}
+                    style={[styles.pill, { backgroundColor: `${pill.color}22` }]}
+                  >
+                    <Text style={[styles.pillText, { color: pill.color }]}>
+                      {resumingId === a.id ? 'Resuming…' : 'Paused ✕'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View
+                    style={[styles.pill, { backgroundColor: `${pill.color}22` }]}
+                  >
+                    <Text style={[styles.pillText, { color: pill.color }]}>
+                      {pill.label}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })}

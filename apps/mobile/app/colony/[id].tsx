@@ -42,10 +42,14 @@ import {
   listColonyEvents,
   listColonyPhotos,
   listColonyFeedings,
+  listColonyMolts,
+  createColonyMolt,
+  deleteColonyMolt,
   setColonyMainPhoto,
   deleteColonyPhoto,
   type ColonyPhoto,
   type ColonyFeedingLog,
+  type ColonyMoltLog,
   createColonyEvent,
   deleteColonyEvent,
   deleteColony,
@@ -98,6 +102,11 @@ export default function ColonyDetailScreen() {
   const [events, setEvents] = useState<ColonyEvent[]>([]);
   const [photos, setPhotos] = useState<ColonyPhoto[]>([]);
   const [feedings, setFeedings] = useState<ColonyFeedingLog[]>([]);
+  const [molts, setMolts] = useState<ColonyMoltLog[]>([]);
+  const [moltBusy, setMoltBusy] = useState(false);
+  const [moltFormOpen, setMoltFormOpen] = useState(false);
+  const [moltDate, setMoltDate] = useState(toISODateLocal(new Date()));
+  const [moltNote, setMoltNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -121,18 +130,20 @@ export default function ColonyDetailScreen() {
   const fetchColony = useCallback(async () => {
     if (!colonyId) return;
     try {
-      const [colonyRes, eventsRes, photosRes, feedingsRes] = await Promise.all([
+      const [colonyRes, eventsRes, photosRes, feedingsRes, moltsRes] = await Promise.all([
         getColony(colonyId),
         listColonyEvents(colonyId),
         // Non-fatal: a colony with no photos or feedings is the normal state,
         // and neither should be able to break the whole screen.
         listColonyPhotos(colonyId).catch(() => [] as ColonyPhoto[]),
         listColonyFeedings(colonyId).catch(() => [] as ColonyFeedingLog[]),
+        listColonyMolts(colonyId).catch(() => [] as ColonyMoltLog[]),
       ]);
       setColony(colonyRes);
       setEvents(eventsRes);
       setPhotos(photosRes);
       setFeedings(feedingsRes);
+      setMolts(moltsRes);
       setLoadError('');
     } catch (e: any) {
       if (e?.response?.status === 401) return;
@@ -349,6 +360,53 @@ export default function ColonyDetailScreen() {
     });
   };
 
+  /** Log a molt found in the colony.
+   *
+   *  Deliberately just a date and a note — no legspan or weight. For a communal
+   *  those would invite a guess about an animal the keeper can't identify, and
+   *  a guessed measurement is worse than a missing one. Everything worth saying
+   *  ("one molt, confirmed female") is how keepers already write it.
+   *
+   *  NB: an earlier version used Alert.prompt, which is iOS-only and silently
+   *  does nothing on Android. Inline form instead.
+   */
+  const submitMolt = async () => {
+    if (!colonyId || moltBusy) return;
+    setMoltBusy(true);
+    try {
+      await createColonyMolt(colonyId, {
+        molted_at: new Date(moltDate + 'T12:00:00').toISOString(),
+        notes: moltNote.trim() || null,
+      });
+      setMoltFormOpen(false);
+      setMoltNote('');
+      setMoltDate(toISODateLocal(new Date()));
+      await fetchColony();
+    } catch (e) {
+      Alert.alert('Could not log molt', getErrorMessage(e));
+    } finally {
+      setMoltBusy(false);
+    }
+  };
+
+  const confirmDeleteMolt = (molt: ColonyMoltLog) => {
+    Alert.alert('Delete this molt record?', formatLocalDate(molt.molted_at), [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteColonyMolt(molt.id);
+            await fetchColony();
+          } catch (e) {
+            Alert.alert('Could not delete', getErrorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
   /** Photo options. Mirrors the invert detail screen: visible control, not a
    *  long-press-only gesture. */
   const handlePhotoOptions = (photo: ColonyPhoto) => {
@@ -540,6 +598,87 @@ export default function ColonyDetailScreen() {
                     {new Date(f.fed_at).toLocaleDateString()}
                   </Text>
                 </View>
+              ))
+            )}
+          </View>
+
+          {/* Molts (cml_20260730).
+              For a communal a shed skin is often the ONLY observation that
+              surfaces on its own — the animals are hidden and can't be handled
+              without dismantling the enclosure — and it's how sexing happens:
+              you sex the molt, not the spider. So this matters more here than
+              on a solitary animal, not less. */}
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
+            <View style={styles.eventsHeaderRow}>
+              <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>MOLTS</Text>
+              <TouchableOpacity
+                onPress={() => setMoltFormOpen((o) => !o)}
+                accessibilityRole="button"
+                accessibilityLabel="Record a molt found in this colony"
+              >
+                <Text style={[styles.addEventLink, { color: colors.primary }]}>
+                  {moltFormOpen ? 'Cancel' : '+ Found a molt'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {moltFormOpen && (
+              <View style={{ marginBottom: 12, gap: 10 }}>
+                <DateInput
+                  value={parseLocalDate(moltDate) ?? new Date()}
+                  onChange={(d) => setMoltDate(toISODateLocal(d))}
+                  maximumDate={new Date()}
+                  label="Date found"
+                />
+                <TextInput
+                  style={styles.textarea}
+                  value={moltNote}
+                  onChangeText={setMoltNote}
+                  multiline
+                  placeholder="e.g. one molt, confirmed female"
+                  placeholderTextColor={colors.textTertiary}
+                />
+                {/* No legspan or weight fields: you can't measure an animal you
+                    can't identify, and a guessed number is worse than none. */}
+                <Text style={[styles.detailBody, { color: colors.textTertiary, fontSize: 12 }]}>
+                  Colony molts aren&apos;t tied to one animal — nobody can tell which
+                  of the group shed it.
+                </Text>
+                <PrimaryButton
+                  onPress={submitMolt}
+                  disabled={moltBusy}
+                  style={[styles.saveBtn, { borderRadius: layout.radius.sm }]}
+                  outerStyle={{ borderRadius: layout.radius.sm }}
+                >
+                  <Text style={styles.onPrimaryText}>
+                    {moltBusy ? 'Saving…' : 'Save molt'}
+                  </Text>
+                </PrimaryButton>
+              </View>
+            )}
+
+            {molts.length === 0 ? (
+              <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                No molts recorded yet.
+              </Text>
+            ) : (
+              molts.slice(0, 10).map((m) => (
+                <TouchableOpacity
+                  key={m.id}
+                  style={styles.feedRow}
+                  onLongPress={() => confirmDeleteMolt(m)}
+                  onPress={() => confirmDeleteMolt(m)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Molt found ${formatLocalDate(m.molted_at)}. Tap to delete.`}
+                >
+                  <MaterialCommunityIcons name="feather" size={16} color={colors.textSecondary} />
+                  <Text style={[styles.detailBody, { flex: 1 }]}>
+                    {m.notes || 'Molt found'}
+                  </Text>
+                  <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                    {formatLocalDate(m.molted_at)}
+                  </Text>
+                </TouchableOpacity>
               ))
             )}
           </View>

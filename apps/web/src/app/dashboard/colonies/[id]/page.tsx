@@ -22,10 +22,14 @@ import {
   getColony,
   listColonyEvents,
   listColonyFeedings,
+  listColonyMolts,
+  createColonyMolt,
+  deleteColonyMolt,
   createColonyFeeding,
   colonyFoodTypes,
   colonyShowsPreySize,
   type ColonyFeedingLog,
+  type ColonyMoltLog,
   type ColonyEventResponse,
   type ColonyEventType,
   type ColonyResponse,
@@ -79,6 +83,12 @@ export default function ColonyDetailPage() {
   const [colony, setColony] = useState<ColonyResponse | null>(null)
   const [events, setEvents] = useState<ColonyEventResponse[]>([])
   const [feedings, setFeedings] = useState<ColonyFeedingLog[]>([])
+  const [molts, setMolts] = useState<ColonyMoltLog[]>([])
+  const [moltOpen, setMoltOpen] = useState(false)
+  const [moltDate, setMoltDate] = useState(todayIso())
+  const [moltNote, setMoltNote] = useState('')
+  const [moltBusy, setMoltBusy] = useState(false)
+  const [moltError, setMoltError] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -112,16 +122,18 @@ export default function ColonyDetailPage() {
   const fetchAll = useCallback(async () => {
     if (!token || !colonyId) return
     try {
-      const [c, evs, feeds] = await Promise.all([
+      const [c, evs, feeds, mlts] = await Promise.all([
         getColony(token, colonyId),
         listColonyEvents(token, colonyId).catch(() => [] as ColonyEventResponse[]),
         // Non-fatal: a colony with no feedings is the normal state and must
         // not be able to break the whole page.
         listColonyFeedings(token, colonyId).catch(() => [] as ColonyFeedingLog[]),
+        listColonyMolts(token, colonyId).catch(() => [] as ColonyMoltLog[]),
       ])
       setColony(c)
       setEvents(evs)
       setFeedings(feeds)
+      setMolts(mlts)
       setLoadError('')
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -144,6 +156,35 @@ export default function ColonyDetailPage() {
     if (!colony?.stage_counts) return []
     return Object.keys(colony.stage_counts)
   }, [colony])
+
+  const submitMolt = async () => {
+    if (!token || !colonyId) return
+    setMoltBusy(true)
+    setMoltError('')
+    try {
+      await createColonyMolt(token, colonyId, {
+        molted_at: new Date(`${moltDate}T12:00:00`).toISOString(),
+        notes: moltNote.trim() || null,
+      })
+      setMoltOpen(false)
+      setMoltNote('')
+      await fetchAll()
+    } catch (e) {
+      setMoltError(e instanceof Error ? e.message : 'Failed to log molt')
+    } finally {
+      setMoltBusy(false)
+    }
+  }
+
+  const removeMolt = async (id: string) => {
+    if (!token) return
+    try {
+      await deleteColonyMolt(token, id)
+      await fetchAll()
+    } catch (e) {
+      setMoltError(e instanceof Error ? e.message : 'Failed to delete')
+    }
+  }
 
   const submitFeeding = async () => {
     if (!token || !colonyId) return
@@ -706,6 +747,113 @@ export default function ColonyDetailPage() {
                     >
                       {new Date(f.fed_at).toLocaleDateString()}
                     </time>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
+        {/* Molts (cml_20260730). For a communal a shed skin is often the only
+            observation that surfaces on its own — the animals are hidden and
+            can't be handled without dismantling the enclosure — and it's how
+            sexing happens: you sex the molt, not the spider. */}
+        <section aria-labelledby="molts-heading" className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2
+              id="molts-heading"
+              className="text-sm font-semibold text-theme-tertiary uppercase tracking-wide"
+            >
+              Molts
+            </h2>
+            <button
+              type="button"
+              onClick={() => setMoltOpen((o) => !o)}
+              aria-expanded={moltOpen}
+              className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              {moltOpen ? 'Cancel' : '+ Found a molt'}
+            </button>
+          </div>
+
+          {moltError && (
+            <div
+              role="alert"
+              className="mb-3 p-2 text-sm rounded-lg border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+            >
+              {moltError}
+            </div>
+          )}
+
+          {moltOpen && (
+            <div className="p-4 mb-3 rounded-2xl border border-theme bg-surface space-y-3">
+              <label className="block">
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  Date found
+                </span>
+                <input
+                  type="date"
+                  value={moltDate}
+                  max={todayIso()}
+                  onChange={(e) => setMoltDate(e.target.value)}
+                  className={inputCls}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  Notes
+                </span>
+                <textarea
+                  value={moltNote}
+                  onChange={(e) => setMoltNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. one molt, confirmed female"
+                  className={inputCls}
+                />
+                {/* Deliberately no legspan or weight fields. Measuring means
+                    knowing whose molt it is, and in a communal you don't — a
+                    guessed number would be worse than a missing one. */}
+                <span className="block mt-1 text-xs text-theme-tertiary">
+                  Colony molts aren&apos;t tied to one animal — nobody can tell which
+                  of the group shed it.
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={submitMolt}
+                disabled={moltBusy}
+                className="px-4 py-2 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 transition disabled:opacity-60"
+              >
+                {moltBusy ? 'Saving…' : 'Save molt'}
+              </button>
+            </div>
+          )}
+
+          <div className="p-4 rounded-2xl border border-theme bg-surface">
+            {molts.length === 0 ? (
+              <p className="text-sm text-theme-tertiary">No molts recorded yet.</p>
+            ) : (
+              <ul className="divide-y divide-theme">
+                {molts.slice(0, 12).map((m) => (
+                  <li key={m.id} className="py-2 flex items-center gap-3 text-sm">
+                    <span aria-hidden="true">🪶</span>
+                    <span className="flex-1 text-theme-primary">
+                      {m.notes || 'Molt found'}
+                    </span>
+                    <time
+                      dateTime={m.molted_at}
+                      className="text-theme-tertiary whitespace-nowrap"
+                    >
+                      {new Date(m.molted_at).toLocaleDateString()}
+                    </time>
+                    <button
+                      type="button"
+                      onClick={() => removeMolt(m.id)}
+                      aria-label={`Delete molt record from ${new Date(m.molted_at).toLocaleDateString()}`}
+                      className="text-theme-tertiary hover:text-red-600 transition"
+                    >
+                      ×
+                    </button>
                   </li>
                 ))}
               </ul>

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  Alert,
   View,
   Text,
   StyleSheet,
@@ -152,11 +153,56 @@ export default function FeedingDayScreen() {
     });
   };
 
+  // Cleared on the next fetch; purely informational.
+  const [resumedNote, setResumedNote] = useState('');
+
+  const [resumingId, setResumingId] = useState<string | null>(null);
+
+  /** Lift a pause from the list, with a confirmation.
+   *
+   *  Confirmed rather than instant because a pause encodes a husbandry
+   *  judgment — "this one is in premolt, leave it alone" — and an accidental
+   *  tap would put the animal straight back into overdue nagging. Cheap to
+   *  redo, but the tap is easy to make by accident while scanning a list.
+   */
+  const confirmResume = (a: FeedingStatus) => {
+    Alert.alert(
+      `Resume feeding for ${displayName(a)}?`,
+      'It will start appearing in overdue checks again.',
+      [
+        { text: 'Keep paused', style: 'cancel' },
+        {
+          text: 'Resume',
+          onPress: async () => {
+            setResumingId(a.id);
+            try {
+              await apiClient.put(`/inverts/${a.id}`, {
+                feeding_paused_reason: null,
+                feeding_paused_until: null,
+              });
+              await fetchStatus();
+            } catch (e: any) {
+              setLoadError(
+                e?.response?.data?.detail || e?.message || 'Could not resume feeding',
+              );
+            } finally {
+              setResumingId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const submit = async () => {
     if (selected.size === 0) return;
     setSubmitting(true);
     try {
-      const res = await apiClient.post<{ created_count: number; skipped: any[] }>(
+      const res = await apiClient.post<{
+        created_count: number;
+        skipped: any[];
+        resumed_ids: string[];
+      }>(
         '/inverts/bulk-feedings',
         {
           invert_ids: Array.from(selected),
@@ -166,13 +212,21 @@ export default function FeedingDayScreen() {
         }
       );
       const n = res.data?.created_count ?? 0;
+      const resumed = res.data?.resumed_ids?.length ?? 0;
       setSheetOpen(false);
       setSelected(new Set());
       setFoodType('');
       setNotes('');
       await fetchStatus();
-      // Lightweight confirmation via the overdue banner refresh; keep it quiet.
       setLoadError('');
+      // Resuming a pause is a state change the KEEPER made deliberately when
+      // they paused, so undoing it silently would be wrong even though the
+      // undo is correct. Say it happened; stay quiet on an ordinary feeding.
+      setResumedNote(
+        resumed > 0
+          ? `${resumed} paused ${resumed === 1 ? 'animal' : 'animals'} resumed — they ate.`
+          : '',
+      );
       void n;
     } catch (e: any) {
       setLoadError(e?.response?.data?.detail || e?.message || 'Failed to log feeding');
@@ -272,6 +326,26 @@ export default function FeedingDayScreen() {
           </View>
         )}
 
+        {/* An accepted feeding resumes a paused animal server-side. Announce it
+            rather than letting the Paused pill quietly vanish — the keeper set
+            that pause on purpose and deserves to know it's been lifted. */}
+        {resumedNote !== '' && (
+          <View
+            style={[
+              styles.errorCard,
+              { backgroundColor: 'rgba(34, 197, 94, 0.12)', borderColor: colors.success ?? '#22c55e' },
+            ]}
+            accessibilityLiveRegion="polite"
+          >
+            <Text style={[styles.errorText, { color: colors.success ?? '#15803d' }]}>
+              {resumedNote}
+            </Text>
+            <TouchableOpacity onPress={() => setResumedNote('')} accessibilityLabel="Dismiss">
+              <Text style={[styles.retryText, { color: colors.success ?? '#15803d' }]}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {!loading && !loadError && shown.length === 0 && (
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyEmoji}>🍽️</Text>
@@ -345,9 +419,28 @@ export default function FeedingDayScreen() {
                   ) : null;
                 })()}
               </View>
-              <View style={[styles.pill, { backgroundColor: `${pill.color}22` }]}>
-                <Text style={[styles.pillText, { color: pill.color }]}>{pill.label}</Text>
-              </View>
+              {/* The Paused pill is tappable — Feeding Day is where a keeper
+                  notices a pause is stale ("this one's been paused since
+                  April"), and until now the only way to lift it was to leave,
+                  find the animal, and open its detail screen. That distance is
+                  why pauses outlive their reason. */}
+              {a.is_feeding_paused ? (
+                <TouchableOpacity
+                  onPress={() => confirmResume(a)}
+                  disabled={resumingId === a.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${displayName(a)} is paused. Tap to resume feeding.`}
+                  style={[styles.pill, { backgroundColor: `${pill.color}22` }]}
+                >
+                  <Text style={[styles.pillText, { color: pill.color }]}>
+                    {resumingId === a.id ? 'Resuming…' : 'Paused ✕'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.pill, { backgroundColor: `${pill.color}22` }]}>
+                  <Text style={[styles.pillText, { color: pill.color }]}>{pill.label}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}

@@ -23,6 +23,7 @@ import {
   type AnimalFeedingStatus,
   bulkFeedAnimals,
   listAnimalFeedingStatus,
+  resumeFeeding,
 } from '@/lib/animals'
 
 type FilterKey = 'all' | 'overdue' | 'never_fed'
@@ -71,6 +72,7 @@ export default function FeedingDayPage() {
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState('')
+  const [resumingId, setResumingId] = useState<string | null>(null)
   const [resultMessage, setResultMessage] = useState('')
 
   const fetchStatus = useCallback(async () => {
@@ -148,6 +150,35 @@ export default function FeedingDayPage() {
   const clearSelection = () => setSelectedIds(new Set())
   const selectedCount = selectedIds.size
 
+  /** Lift a pause directly from the list.
+   *
+   *  Confirmed rather than instant: a pause encodes a husbandry judgment, and
+   *  an accidental click while scanning would drop the animal straight back
+   *  into overdue nagging.
+   */
+  const handleResume = async (a: AnimalFeedingStatus) => {
+    const label = a.name || a.common_name || a.scientific_name || 'this animal'
+    if (
+      !window.confirm(
+        `Resume feeding for ${label}? It will start appearing in overdue checks again.`,
+      )
+    ) {
+      return
+    }
+    setResumingId(a.id)
+    setActionError('')
+    try {
+      await resumeFeeding(a.id)
+      await fetchStatus()
+    } catch (e) {
+      setActionError(
+        e instanceof ApiError ? e.message : 'Could not resume feeding',
+      )
+    } finally {
+      setResumingId(null)
+    }
+  }
+
   const submitFeeding = async () => {
     if (selectedCount === 0) return
     setSubmitting(true)
@@ -170,10 +201,17 @@ export default function FeedingDayPage() {
       const verb = outcome === 'fed' ? 'Logged feeding' : 'Logged refusal'
       const skippedNote =
         result.skipped.length > 0 ? ` · ${result.skipped.length} skipped` : ''
+      // An accepted feeding lifts a pause server-side. Name it — the keeper
+      // set that pause deliberately, so it shouldn't quietly disappear.
+      const resumed = result.resumed_ids?.length ?? 0
+      const resumedNote =
+        resumed > 0
+          ? ` ${resumed} paused animal${resumed === 1 ? ' was' : 's were'} resumed — they ate.`
+          : ''
       setResultMessage(
         `${verb} for ${result.created_count} animal${
           result.created_count === 1 ? '' : 's'
-        }${skippedNote}.`,
+        }${skippedNote}.${resumedNote}`,
       )
       // Clear selection + form, then refetch fresh status.
       clearSelection()
@@ -406,7 +444,11 @@ export default function FeedingDayPage() {
                       )}
                     </div>
                     {/* Status pill */}
-                    <StatusPill animal={a} />
+                    <StatusPill
+                      animal={a}
+                      onResume={handleResume}
+                      resuming={resumingId === a.id}
+                    />
                   </label>
                 </li>
               )
@@ -556,8 +598,35 @@ export default function FeedingDayPage() {
  * beardies) get a calm fed-today check instead of a red days-overdue that would
  * nag every morning.
  */
-function StatusPill({ animal }: { animal: AnimalFeedingStatus }) {
+function StatusPill({
+  animal,
+  onResume,
+  resuming,
+}: {
+  animal: AnimalFeedingStatus
+  onResume?: (a: AnimalFeedingStatus) => void
+  resuming?: boolean
+}) {
   if (animal.is_feeding_paused) {
+    // Clickable when a handler is supplied. Feeding Day is where a stale pause
+    // gets noticed, and until now acting on it meant navigating away to the
+    // animal's detail page — which is why pauses outlive their reason.
+    if (onResume) {
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation() // don't toggle the row's selection
+            onResume(animal)
+          }}
+          disabled={resuming}
+          title="Resume feeding for this animal"
+          className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 hover:bg-amber-500/30 transition disabled:opacity-60"
+        >
+          {resuming ? 'Resuming…' : 'Paused ✕'}
+        </button>
+      )
+    }
     return (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300">
         Paused

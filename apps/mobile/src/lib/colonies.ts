@@ -285,6 +285,47 @@ export interface ColonyFeedingLog {
   notes: string | null;
 }
 
+/**
+ * A molt found in the colony.
+ *
+ * Unattributed by definition — you can't tell which of eleven spiders shed it,
+ * which is exactly why `is_unidentified` is forced true server-side. The
+ * measurement fields exist because the table is shared with individual animals;
+ * for a colony they're expected to stay null, since you can't weigh a molt's
+ * owner when you don't know who that is.
+ *
+ * Worth more here than for a solitary animal, not less: for a communal a shed
+ * skin is often the only observation that surfaces on its own, and sexing a
+ * communal means sexing molts.
+ */
+export interface ColonyMoltLog {
+  id: string;
+  colony_id: string | null;
+  molted_at: string;
+  notes: string | null;
+  image_url: string | null;
+  is_unidentified: boolean;
+}
+
+export async function listColonyMolts(id: string): Promise<ColonyMoltLog[]> {
+  const { data } = await apiClient.get<ColonyMoltLog[]>(`/colonies/${id}/molts`);
+  return data;
+}
+
+export async function createColonyMolt(
+  id: string,
+  payload: { molted_at: string; notes?: string | null; image_url?: string | null },
+): Promise<ColonyMoltLog> {
+  const { data } = await apiClient.post<ColonyMoltLog>(`/colonies/${id}/molts`, payload);
+  return data;
+}
+
+/** Shared with individual animals — molts resolve ownership through whichever
+ *  parent they carry, so no colony-specific delete route was needed. */
+export async function deleteColonyMolt(moltId: string): Promise<void> {
+  await apiClient.delete(`/molts/${moltId}`);
+}
+
 export async function listColonyPhotos(id: string): Promise<ColonyPhoto[]> {
   const { data } = await apiClient.get<ColonyPhoto[]>(`/colonies/${id}/photos`);
   return data;

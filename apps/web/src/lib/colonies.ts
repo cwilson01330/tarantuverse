@@ -323,6 +323,57 @@ export function colonyShowsPreySize(taxon: string | null | undefined): boolean {
   return colonyFoodTypes(taxon) === PREDATOR_FOODS
 }
 
+// ── Colony molts ──────────────────────────────────────────────────────────────
+
+/**
+ * A molt found in the colony — unattributed by definition, since you can't tell
+ * which animal shed it. Measurement columns exist on the shared table but stay
+ * null for a colony. For a communal this is often the only observation that
+ * surfaces by itself, and it's how sexing happens: you sex the molt.
+ */
+export interface ColonyMoltLog {
+  id: string
+  colony_id: string | null
+  molted_at: string
+  notes: string | null
+  image_url: string | null
+  is_unidentified: boolean
+}
+
+export async function listColonyMolts(
+  token: string,
+  colonyId: string,
+): Promise<ColonyMoltLog[]> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/molts`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Failed to load colony molts')
+  return (await res.json()) as ColonyMoltLog[]
+}
+
+export async function createColonyMolt(
+  token: string,
+  colonyId: string,
+  payload: { molted_at: string; notes?: string | null },
+): Promise<ColonyMoltLog> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/molts`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Failed to log molt')
+  return (await res.json()) as ColonyMoltLog
+}
+
+/** Shared route — molts resolve ownership through whichever parent they carry. */
+export async function deleteColonyMolt(token: string, moltId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/molts/${moltId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  if (!res.ok && res.status !== 204) throw new Error('Failed to delete molt')
+}
+
 // ── Colony events ─────────────────────────────────────────────────────────────
 
 export async function listColonyEvents(

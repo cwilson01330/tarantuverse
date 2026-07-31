@@ -610,6 +610,11 @@ export interface BulkFeedResult {
   created_count: number;
   created_ids: string[];
   skipped: unknown[];
+  /** Ids whose feeding pause was cleared because the animal ate. Surfaced so
+   *  the keeper is TOLD — they set that pause deliberately, and undoing it
+   *  silently would be worse than leaving it. Empty on a refusal, since an
+   *  animal declining food while paused is confirming the pause. */
+  resumed_ids: string[];
 }
 
 /**

@@ -33,6 +33,9 @@ interface BulkFeedingSkip {
   reason: string
 }
 interface BulkFeedingResult {
+  /** Ids whose pause was cleared because they ate. Empty on a refusal —
+   *  an animal declining food while paused is confirming the pause. */
+  resumed_ids?: string[]
   created_count: number
   created_ids: string[]
   skipped: BulkFeedingSkip[]
@@ -199,6 +202,47 @@ export default function FeedingDayPage() {
 
   const selectedCount = selectedIds.size
 
+  const [resumingId, setResumingId] = useState<string | null>(null)
+
+  /** Lift a pause directly from the list.
+   *
+   *  Confirmed rather than instant: a pause encodes a husbandry judgment
+   *  ("this one's in premolt, leave it alone"), and an accidental click while
+   *  scanning would put the animal straight back into overdue nagging.
+   */
+  const handleResume = async (a: FeedingStatus) => {
+    if (!token) return
+    const label = a.name || a.common_name || a.scientific_name || 'this animal'
+    if (
+      !window.confirm(
+        `Resume feeding for ${label}? It will start appearing in overdue checks again.`,
+      )
+    ) {
+      return
+    }
+    setResumingId(a.id)
+    setActionError('')
+    try {
+      const res = await fetch(`${API_URL}/api/v1/inverts/${a.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          feeding_paused_reason: null,
+          feeding_paused_until: null,
+        }),
+      })
+      if (!res.ok) throw new Error('Could not resume feeding')
+      await fetchStatus()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Could not resume feeding')
+    } finally {
+      setResumingId(null)
+    }
+  }
+
   const submitFeeding = async () => {
     if (!token || selectedCount === 0) return
     setSubmitting(true)
@@ -235,10 +279,17 @@ export default function FeedingDayPage() {
         result.skipped.length > 0
           ? ` · ${result.skipped.length} skipped`
           : ''
+      // An accepted feeding lifts a pause server-side. Name it: the keeper set
+      // that pause deliberately, so it shouldn't just quietly disappear.
+      const resumed = result.resumed_ids?.length ?? 0
+      const resumedNote =
+        resumed > 0
+          ? ` ${resumed} paused animal${resumed === 1 ? ' was' : 's were'} resumed — they ate.`
+          : ''
       setResultMessage(
         `${verb} for ${result.created_count} animal${
           result.created_count === 1 ? '' : 's'
-        }${skippedNote}.`,
+        }${skippedNote}.${resumedNote}`,
       )
       // Clear selection + form, then refetch fresh status.
       clearSelection()
@@ -479,7 +530,11 @@ export default function FeedingDayPage() {
                       )}
                     </div>
                     {/* Status pill */}
-                    <StatusPill animal={a} />
+                    <StatusPill
+                      animal={a}
+                      onResume={handleResume}
+                      resuming={resumingId === a.id}
+                    />
                   </label>
                 </li>
               )
@@ -612,8 +667,36 @@ export default function FeedingDayPage() {
 }
 
 /** Status pill: Paused (amber) → Overdue (red/orange) → Never fed → Xd ago. */
-function StatusPill({ animal }: { animal: FeedingStatus }) {
+function StatusPill({
+  animal,
+  onResume,
+  resuming,
+}: {
+  animal: FeedingStatus
+  onResume?: (a: FeedingStatus) => void
+  resuming?: boolean
+}) {
   if (animal.is_feeding_paused) {
+    // Clickable when a handler is supplied. Feeding Day is where a stale pause
+    // gets NOTICED — scanning the list and spotting one paused since April —
+    // and until now acting on it meant leaving for the animal's detail page.
+    // That distance is why pauses outlive the reason they were set.
+    if (onResume) {
+      return (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation() // don't toggle the row's selection checkbox
+            onResume(animal)
+          }}
+          disabled={resuming}
+          title="Resume feeding for this animal"
+          className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/70 transition disabled:opacity-60"
+        >
+          {resuming ? 'Resuming…' : 'Paused ✕'}
+        </button>
+      )
+    }
     return (
       <span className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200">
         Paused
