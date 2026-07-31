@@ -54,6 +54,7 @@ import app.routers.feeder_colonies as feeder_colonies
 import app.routers.hv_feeder_species as hv_feeder_species
 import app.routers.hv_feeder_stocks as hv_feeder_stocks
 import app.routers.colonies as colonies  # ADR-010 pet colony mode
+import app.routers.animal_events as animal_events  # ADR-015 per-animal events
 import app.routers.species_shortlist as species_shortlist  # care-sheet bookmarks
 import app.routers.waitlist as waitlist
 import app.routers.animals as animals  # Herpetoverse — unified taxon table (ADR-003)
@@ -306,6 +307,10 @@ app.include_router(feeder_colonies.router, prefix="/api/v1/feeder-colonies", tag
 app.include_router(hv_feeder_species.router, prefix="/api/v1/hv-feeder-species", tags=["herpetoverse", "feeders"])
 app.include_router(hv_feeder_stocks.router, prefix="/api/v1/hv-feeder-stocks", tags=["herpetoverse", "feeders"])
 app.include_router(colonies.router, prefix="/api/v1/colonies", tags=["colonies"])
+# Mounted at the bare /api/v1 because its routes already carry their own
+# resource prefixes — one router serves both /inverts/{id}/events and
+# /animals/{id}/events, since the concept is identical across the two products.
+app.include_router(animal_events.router, prefix="/api/v1", tags=["events"])
 app.include_router(species_shortlist.router, prefix="/api/v1/species-shortlist", tags=["species"])
 
 print("[STARTUP] Registering waitlist router...")

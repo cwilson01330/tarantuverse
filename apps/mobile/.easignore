@@ -31,3 +31,12 @@
 # Docs
 ../../*.md
 !../../apps/mobile/README.md
+
+# Python tooling caches. Metro walks the monorepo root and hits an EPERM on
+# .pytest_cache on Windows, logging a scary-looking error on every build. It's
+# harmless (the directory is skipped) but it's noise that hides real warnings.
+../../.pytest_cache/
+../../**/.pytest_cache/
+../../**/__pycache__/
+../../**/*.pyc
+../../.ruff_cache/

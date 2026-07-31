@@ -80,6 +80,9 @@ from app.models.colony import Colony, ColonyEvent
 # same list on web and mobile.
 from app.models.species_shortlist import SpeciesShortlist
 
+# Per-animal event log (ADR-015). Depends on Invert + Animal above (FK targets).
+from app.models.animal_event import AnimalEvent
+
 __all__ = [
     "User",
     "Tarantula",
