@@ -99,6 +99,10 @@ def _tarantula_to_invert_kwargs(t: "Tarantula") -> dict:
         "enclosure_notes": t.enclosure_notes,
         "feeding_paused_reason": t.feeding_paused_reason,
         "feeding_paused_until": t.feeding_paused_until,
+        # ADR-015 — keep death in step in BOTH directions.
+        "died_at": t.died_at,
+        "death_cause": t.death_cause,
+        "death_notes": t.death_notes,
         "photo_url": t.photo_url,
         "is_public": t.is_public,
         "visibility": t.visibility,
@@ -141,6 +145,9 @@ def _scorpion_to_invert_kwargs(s: "Scorpion") -> dict:
         "enclosure_notes": s.enclosure_notes,
         "feeding_paused_reason": s.feeding_paused_reason,
         "feeding_paused_until": s.feeding_paused_until,
+        "died_at": s.died_at,
+        "death_cause": s.death_cause,
+        "death_notes": s.death_notes,
         "photo_url": s.photo_url,
         "is_public": s.is_public,
         "visibility": s.visibility,
@@ -436,6 +443,11 @@ _REVERSE_SHARED_FIELDS = (
     "enclosure_notes",
     "feeding_paused_reason",
     "feeding_paused_until",
+    # ADR-015 — a death must reach the legacy twin, or the animal stays alive
+    # on any read path that hasn't cut over to `inverts`.
+    "died_at",
+    "death_cause",
+    "death_notes",
     "photo_url",
     "is_public",
     "visibility",

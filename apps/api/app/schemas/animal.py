@@ -120,6 +120,12 @@ class AnimalResponse(AnimalBase):
     # non-null on a handed-off SOURCE record; the others populate a claimed
     # record's provenance block. `provenance` is the frozen snapshot dict.
     transferred_out_at: Optional[datetime] = None
+    # Death (ADR-015). Read-only on the main update paths — set via the
+    # dedicated mark-as-died endpoint so it can't be flipped by an incidental
+    # PATCH. A non-null died_at makes this a historical record.
+    died_at: Optional[date] = None
+    death_cause: Optional[str] = None
+    death_notes: Optional[str] = None
     origin_keeper_name: Optional[str] = None
     bred_by_user_id: Optional[uuid.UUID] = None
     source_transfer_id: Optional[uuid.UUID] = None

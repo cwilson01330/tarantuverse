@@ -41,10 +41,16 @@ def active_inverts_query(db: Session, user_id):
     cap or appearing in active collection counts (BRIEF §4b). Every count/list
     over a user's inverts should start from this query so the filter can't be
     forgotten in a new call site.
+
+    Also excludes animals that have DIED (ADR-015). A deceased animal never
+    counts toward the cap: charging someone for an animal that died — or making
+    them delete its history to make room for another — isn't a trade we make for
+    cap integrity. The record is kept in full; it just stops being "active".
     """
     return db.query(Invert).filter(
         Invert.user_id == user_id,
         Invert.transferred_out_at.is_(None),
+        Invert.died_at.is_(None),
     )
 
 
@@ -92,6 +98,8 @@ def active_animals_query(db: Session, user_id):
     return db.query(Animal).filter(
         Animal.user_id == user_id,
         Animal.transferred_out_at.is_(None),
+        # ADR-015 — a deceased animal never counts toward the cap.
+        Animal.died_at.is_(None),
     )
 
 

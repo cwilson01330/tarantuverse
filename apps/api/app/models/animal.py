@@ -137,6 +137,25 @@ class Animal(Base):
     # record carries bred_by_user_id / origin_keeper_name / source_transfer_id
     # and a frozen `provenance` snapshot.
     transferred_out_at = Column(DateTime(timezone=True), nullable=True, index=True)
+
+    # --- Death (ADR-015, dth_20260731) ---------------------------------------
+    # A terminal state, NOT a delete. Setting died_at makes the record read-only
+    # history: every log, photo and molt is kept, and it drops out of the
+    # collection list, the free-tier count, feeding status and every reminder —
+    # exactly like transferred_out_at, which proved the pattern.
+    #
+    # Separate from transferred_out_at because the two are structurally
+    # identical and semantically opposite. A "Transferred" badge on an animal
+    # that died would be worse than no feature.
+    #
+    # A deceased animal NEVER counts toward the cap (utils/limits.py). Charging
+    # someone for an animal that died, or making them erase its history to make
+    # room, isn't a trade we make for cap integrity.
+    died_at = Column(Date, nullable=True, index=True)
+    # Optional. 'unknown' is a real answer, not a null — most invertebrate
+    # deaths are genuinely unexplained.
+    death_cause = Column(String(40), nullable=True)
+    death_notes = Column(Text, nullable=True)
     bred_by_user_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),

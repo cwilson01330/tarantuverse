@@ -108,6 +108,13 @@ class Scorpion(Base):
     feeding_paused_reason = Column(String(40), nullable=True)
     feeding_paused_until = Column(Date, nullable=True)
 
+    # Death (ADR-015). Mirrored from `inverts` so the legacy read paths agree.
+    # Source of truth is the Invert row; this exists only until ADR-005 Phase D
+    # drops these tables.
+    died_at = Column(Date, nullable=True, index=True)
+    death_cause = Column(String(40), nullable=True)
+    death_notes = Column(Text, nullable=True)
+
     # Media / privacy / notes
     photo_url = Column(String(500))
     is_public = Column(Boolean, default=False)

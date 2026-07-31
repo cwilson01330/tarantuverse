@@ -16,7 +16,7 @@ from their own tables; dual-write lands in A2 and the read cutover in
 C1.
 """
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -45,7 +45,8 @@ from app.schemas.invert import (
 from app.services.growth_service import compute_growth_fields
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
-from app.utils.limits import enforce_collection_limit
+from app.utils.limits import active_inverts_query, enforce_collection_limit
+from app.schemas.death import MarkDiedRequest
 
 router = APIRouter()
 
@@ -128,20 +129,36 @@ async def list_inverts(
         description="When false (default) returns only ACTIVE animals; when true "
         "returns only animals handed off via transfer (the 'Transferred' view).",
     ),
+    deceased: bool = Query(
+        False,
+        description="Return only animals that have died (ADR-015). Their records "
+        "are kept in full with every log intact; this is the memorial view. "
+        "Ignored when `transferred=true`.",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """List the authenticated user's inverts, newest first.
 
-    By default excludes transferred-out animals so the displayed collection +
-    count match what the cap enforces (BRIEF §4b). Pass `transferred=true` for
-    the separate "Transferred" history view.
+    By default excludes transferred-out AND deceased animals, so the displayed
+    collection + count match what the cap enforces (BRIEF §4b, ADR-015). Pass
+    `transferred=true` for the handed-off history view, or `deceased=true` for
+    animals that have died — those records are retained in full.
     """
     query = db.query(Invert).filter(Invert.user_id == current_user.id)
+    # Three terminal states now, not two: active, transferred out, and died
+    # (ADR-015). `transferred=true` keeps its meaning; `deceased=true` is the
+    # memorial view. The default excludes BOTH, so the displayed collection
+    # still matches what the cap enforces.
     if transferred:
         query = query.filter(Invert.transferred_out_at.isnot(None))
+    elif deceased:
+        query = query.filter(Invert.died_at.isnot(None))
     else:
-        query = query.filter(Invert.transferred_out_at.is_(None))
+        query = query.filter(
+            Invert.transferred_out_at.is_(None),
+            Invert.died_at.is_(None),
+        )
     if taxon:
         query = query.filter(Invert.taxon == taxon)
     if colony_id is not None:
@@ -308,7 +325,12 @@ async def list_feeding_status(
     NOTE: this static route MUST stay declared before `/{invert_id}` or the
     dynamic route would swallow "feeding-status" and 422 on UUID parsing.
     """
-    inverts = db.query(Invert).filter(Invert.user_id == current_user.id).all()
+    # Use the shared active query. This previously filtered on NOTHING, which
+    # meant transferred-out animals were already showing up on TV Feeding Day —
+    # a live bug, not just a gap ahead of ADR-015. Routing through
+    # active_inverts_query fixes that and excludes deceased animals in the same
+    # move, so nobody is ever asked to feed an animal that died.
+    inverts = active_inverts_query(db, current_user.id).all()
     if not inverts:
         return []
 
@@ -619,3 +641,90 @@ async def get_invert_feeding_stats(
         interval_source=interval_source,
         is_overdue=is_overdue,
     )
+
+
+# --- Death (ADR-015) --------------------------------------------------------
+#
+# A terminal state, not a delete. Before this, a keeper whose animal died could
+# only hard-delete it — destroying every feeding, molt, photo, and for a
+# breeding female her pairings, egg sacs and all offspring beneath them — or
+# leave it in the collection where Feeding Day would nag them to feed it,
+# redder every week, forever.
+#
+# Its own endpoint rather than a field on the generic update, so `died_at`
+# cannot be flipped by an incidental PATCH that happens to carry the key.
+
+
+@router.post("/{invert_id}/died", response_model=InvertResponse)
+async def mark_invert_died(
+    invert_id: UUID,
+    payload: MarkDiedRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Record that an animal died. Keeps the record and every log intact.
+
+    The animal drops out of the collection list, the free-tier count, feeding
+    status, Feeding Day, overdue counts and the daily digest — but nothing is
+    deleted, and it remains readable under the deceased view.
+    """
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+
+    invert.died_at = payload.died_at or date.today()
+    invert.death_cause = payload.death_cause
+    invert.death_notes = payload.death_notes
+
+    # A dead animal is not "off food" — it's gone. Leaving a pause set would
+    # keep a husbandry judgment attached to a record it can no longer describe.
+    invert.feeding_paused_reason = None
+    invert.feeding_paused_until = None
+
+    from app.services.inverts_dualwrite import mirror_invert_update_to_legacy
+
+    # Keep the legacy twin in step (ADR-005 dual-write; read cutover pending),
+    # or the animal stays alive on any path still reading `tarantulas`.
+    mirror_invert_update_to_legacy(db, invert)
+
+    db.commit()
+    db.refresh(invert)
+    return invert
+
+
+@router.post("/{invert_id}/revive", response_model=InvertResponse)
+async def revive_invert(
+    invert_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Undo a mark-as-died.
+
+    Exists because the alternative is a keeper who mis-tapped living with a
+    memorial for an animal sitting in front of them. Clears the cause and notes
+    too — a lingering cause with no date would be an orphan nobody can see.
+
+    NB: this can push a free-tier keeper back over the cap, since the animal
+    starts counting again. We allow it rather than block: refusing to correct a
+    mistake because of a billing limit would be indefensible.
+    """
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+
+    from app.services.inverts_dualwrite import mirror_invert_update_to_legacy
+
+    invert.died_at = None
+    invert.death_cause = None
+    invert.death_notes = None
+    mirror_invert_update_to_legacy(db, invert)
+
+    db.commit()
+    db.refresh(invert)
+    return invert

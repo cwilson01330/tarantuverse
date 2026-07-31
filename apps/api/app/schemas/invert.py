@@ -102,6 +102,12 @@ class InvertResponse(InvertBase):
     source_transfer_id: Optional[uuid.UUID] = None
     provenance: Optional[dict] = None
     transferred_out_at: Optional[datetime] = None
+    # Death (ADR-015). Read-only on the main update paths — set via the
+    # dedicated mark-as-died endpoint so it can't be flipped by an incidental
+    # PATCH. A non-null died_at makes this a historical record.
+    died_at: Optional[date] = None
+    death_cause: Optional[str] = None
+    death_notes: Optional[str] = None
 
     # Pattern-free overrides for serialization. These columns are plain VARCHAR and
     # store UPPERCASE enum casing (the shared DB convention: sex/source are

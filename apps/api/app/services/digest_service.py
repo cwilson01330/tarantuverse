@@ -21,7 +21,7 @@ from app.models.notification_preferences import NotificationPreferences
 from app.models.invert_species import InvertSpecies
 from app.models.feeding_log import FeedingLog
 from app.models.animal import Animal
-from app.utils.limits import active_inverts_query
+from app.utils.limits import active_animals_query, active_inverts_query
 from app.services.notification_service import create_notification
 # Reuse the overdue engines that power /inverts/feeding-status +
 # /animals/feeding-status (Feeding Day) so the digest count matches the app.
@@ -78,13 +78,14 @@ def _animal_overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int
     """Overdue reptiles/amphibians (HV) for one user — the `animals` mirror of
     _overdue_count, using the animal cadence resolver. Never-fed is NOT counted
     (consistent with /animals/feeding-status + the dashboard)."""
+    # Route through the shared helper rather than re-stating the filter. This
+    # inlined copy already had to be updated separately every time the
+    # definition of "active" changed, and ADR-015 added deceased animals to it —
+    # a digest that nags about an animal that died would be the worst possible
+    # notification this app could send.
     animals = (
-        db.query(Animal)
+        active_animals_query(db, user_id)
         .options(selectinload(Animal.herp_species))
-        .filter(
-            Animal.user_id == user_id,
-            Animal.transferred_out_at.is_(None),
-        )
         .all()
     )
     if not animals:

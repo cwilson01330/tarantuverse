@@ -14,7 +14,7 @@ Ownership model: every query filters by
 through `/t/{id}` (qr router).
 """
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
@@ -46,6 +46,7 @@ from app.schemas.feeding import (
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
 from app.utils.feeding_pause import resume_if_accepted
+from app.schemas.death import MarkDiedRequest
 
 router = APIRouter()
 
@@ -208,6 +209,9 @@ async def get_animals(
             # Handed-off animals (transferred to another keeper) drop out of
             # the active collection — see htr_20260707.
             Animal.transferred_out_at.is_(None),
+            # As do animals that have died (ADR-015). The record is kept in
+            # full; it just isn't part of the living collection.
+            Animal.died_at.is_(None),
         )
     )
     if taxon:
@@ -505,3 +509,70 @@ async def delete_animal(
     db.delete(animal)
     db.commit()
     return None
+
+
+# --- Death (ADR-015) --------------------------------------------------------
+#
+# Mirrors the TV endpoints. HV animals have no consolidation twin, so there's
+# nothing to keep in step.
+
+
+@router.post("/{animal_id}/died", response_model=AnimalResponse)
+async def mark_animal_died(
+    animal_id: UUID,
+    payload: MarkDiedRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Record that an animal died. Keeps the record and every log intact.
+
+    Drops out of the collection list, the free-tier count, feeding status,
+    Feeding Day and the daily digest — nothing is deleted.
+    """
+    animal = db.query(Animal).filter(
+        Animal.id == animal_id,
+        Animal.user_id == current_user.id,
+    ).first()
+    if not animal:
+        raise HTTPException(status_code=404, detail="Animal not found")
+
+    animal.died_at = payload.died_at or date.today()
+    animal.death_cause = payload.death_cause
+    animal.death_notes = payload.death_notes
+
+    # A dead animal isn't "off food" — it's gone. A lingering pause would keep
+    # a husbandry judgment attached to a record it can no longer describe.
+    animal.feeding_paused_reason = None
+    animal.feeding_paused_until = None
+
+    db.commit()
+    db.refresh(animal)
+    return animal
+
+
+@router.post("/{animal_id}/revive", response_model=AnimalResponse)
+async def revive_animal(
+    animal_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Undo a mark-as-died.
+
+    Deliberately not blocked when it would push a free-tier keeper back over
+    the cap: refusing to let someone correct a mistake because of a billing
+    limit would be indefensible.
+    """
+    animal = db.query(Animal).filter(
+        Animal.id == animal_id,
+        Animal.user_id == current_user.id,
+    ).first()
+    if not animal:
+        raise HTTPException(status_code=404, detail="Animal not found")
+
+    animal.died_at = None
+    animal.death_cause = None
+    animal.death_notes = None
+
+    db.commit()
+    db.refresh(animal)
+    return animal
