@@ -23,7 +23,8 @@ import {
   listInvertFeedings, listInvertMolts, listInvertPhotos, listInvertSubstrateChanges,
   deleteInvertFeeding, deleteInvertMolt, deleteInvertSubstrateChange,
   setInvertMainPhoto, deleteInvertPhoto, getInvertGrowth, listInvertPairings,
-  reviveInvert,
+  reviveInvert, listInvertEvents, deleteAnimalEvent, ANIMAL_EVENT_LABELS,
+  type AnimalEvent,
   createInvertTransfer, createInvertFeeding, getInvertFeedingStats,
   type InvertFeedingStats,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
@@ -53,6 +54,7 @@ function InvertDetailScreen() {
   const [molts, setMolts] = useState<InvertMoltLog[]>([]);
   const [substrate, setSubstrate] = useState<InvertSubstrateChange[]>([]);
   const [photos, setPhotos] = useState<InvertPhoto[]>([]);
+  const [events, setEvents] = useState<AnimalEvent[]>([]);
   const [growth, setGrowth] = useState<InvertGrowthAnalytics | null>(null);
   const [pairings, setPairings] = useState<InvertPairing[]>([]);
   const [transferring, setTransferring] = useState(false);
@@ -115,7 +117,7 @@ function InvertDetailScreen() {
     try {
       const i = await getInvert(id);
       setInvert(i);
-      const [f, m, sub, p, g, pr, fs] = await Promise.all([
+      const [f, m, sub, p, g, pr, fs, ev] = await Promise.all([
         listInvertFeedings(i.taxon, id).catch(() => [] as InvertFeedingLog[]),
         listInvertMolts(i.taxon, id).catch(() => [] as InvertMoltLog[]),
         listInvertSubstrateChanges(i.taxon, id).catch(() => [] as InvertSubstrateChange[]),
@@ -133,8 +135,10 @@ function InvertDetailScreen() {
         taxonHasModule(i.taxon, 'feedingStats')
           ? getInvertFeedingStats(id).catch(() => null)
           : Promise.resolve(null),
+        listInvertEvents(id).catch(() => [] as AnimalEvent[]),
       ]);
       setFeedings(f); setMolts(m); setSubstrate(sub); setPhotos(p); setGrowth(g); setPairings(pr);
+      setEvents(ev);
       setFeedingStats(fs);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load this animal.");
@@ -461,6 +465,22 @@ function InvertDetailScreen() {
       onEdit: () => editMolt(m),
       onDelete: () => confirmDeleteLog('molt', () => deleteInvertMolt(m.id)),
     })),
+    ...events.map((e): TimelineEntry => ({
+      id: `e-${e.id}`,
+      kind: 'event',
+      // A DATE, not a timestamp — timelineOrder puts it at the foot of its
+      // day rather than pretending it happened at midnight.
+      at: e.occurred_at,
+      title: ANIMAL_EVENT_LABELS[e.event_type],
+      // Severity only exists for injury and illness; showing it elsewhere
+      // would imply a judgment the keeper never made.
+      trailing: e.severity ? e.severity[0].toUpperCase() + e.severity.slice(1) : undefined,
+      trailingTone: e.event_type === 'recovered' ? 'good'
+        : e.severity === 'severe' ? 'bad' : 'muted',
+      subtitle: e.notes ?? undefined,
+      onEdit: () => router.push(`/invert/add-event?id=${id}&logId=${e.id}` as any),
+      onDelete: () => confirmDeleteLog('event', () => deleteAnimalEvent(e.id)),
+    })),
     ...substrate.map((c): TimelineEntry => ({
       id: `s-${c.id}`,
       kind: 'substrate',
@@ -775,9 +795,16 @@ function InvertDetailScreen() {
           the same gesture the photo strip already uses. Putting a pencil and
           a bin on every row (the old LogSection treatment) meant three tap
           targets per entry competing with the entry itself. */}
-      <Section title="History">
+      {/* "Add event" lives on the History header. Feedings and molts already
+          have their own add screens reachable from the action bar; events had
+          no entry point at all, and a log nobody can reach is not a log. */}
+      <Section
+        title="History"
+        actionLabel="Add event"
+        onAction={() => router.push(`/invert/add-event?id=${id}` as any)}
+      >
         <View style={styles.timelineChips}>
-          {(['all', 'feeding', 'molt', 'substrate'] as const).map((k) => {
+          {(['all', 'feeding', 'molt', 'substrate', 'event'] as const).map((k) => {
             const active = timelineFilter === k;
             const count = k === 'all' ? timeline.length : timeline.filter((e) => e.kind === k).length;
             if (k !== 'all' && count === 0) return null;
@@ -836,6 +863,12 @@ function InvertDetailScreen() {
                 <Text style={styles.timelineDate}>
                   {fmtRelative(e.at)} · {fmtDate(e.at)}
                 </Text>
+                {/* The keeper's own words. On an event row this is usually the
+                    most useful thing in the list — "lost most of leg III right
+                    in a fall from the lid" is the record; "Injury" is a label. */}
+                {e.subtitle ? (
+                  <Text style={styles.timelineSubtitle} numberOfLines={2}>{e.subtitle}</Text>
+                ) : null}
               </View>
               {e.trailing ? (
                 <Text style={[styles.timelineTrailing, { color: trailingColor(e.trailingTone) }]}>
@@ -1082,7 +1115,11 @@ function fmtRelative(iso: string): string {
 }
 
 /** One row in the merged timeline, whatever kind of log produced it. */
-type TimelineKind = 'feeding' | 'molt' | 'substrate';
+// A fourth KIND, not a fourth section. ADR-013 already merged this screen's
+// logs into one History list, so events join the merge — the Event chip is
+// what stops three rows a year drowning in 38 feedings. Filtering, not
+// placement, is the answer on a merged screen.
+type TimelineKind = 'feeding' | 'molt' | 'substrate' | 'event';
 interface TimelineEntry {
   id: string;
   kind: TimelineKind;
@@ -1093,6 +1130,9 @@ interface TimelineEntry {
   title: string;
   /** Right-aligned outcome or delta. */
   trailing?: string;
+  /** Optional second line. Events carry the keeper's own words, which are
+   *  usually the most useful thing in the row. */
+  subtitle?: string;
   trailingTone?: 'good' | 'bad' | 'muted';
   onEdit: () => void;
   onDelete: () => void;
@@ -1203,6 +1243,7 @@ const TIMELINE_META: Record<TimelineKind, { icon: string; label: string }> = {
   feeding: { icon: 'silverware-fork-knife', label: 'Feed' },
   molt: { icon: 'arrow-expand-vertical', label: 'Molt' },
   substrate: { icon: 'layers-outline', label: 'Sub' },
+  event: { icon: 'alert-circle-outline', label: 'Event' },
 };
 function hasHusbandry(s: Invert): boolean {
   return Boolean(s.enclosure_type || s.enclosure_size || s.substrate_type || s.substrate_depth || s.target_temp_min || s.target_temp_max || s.target_humidity_min || s.target_humidity_max);
@@ -1237,6 +1278,9 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     // Death treatment — one mark, replacing 💀 / ✝️ / ☠. A filled dot reads as
     // a full stop: neutral, secular, carrying no opinion about how anyone
     // should feel. Slate, never colors.error.
+    timelineSubtitle: {
+      ...TYPE.label, color: colors.textTertiary, marginTop: 2,
+    },
     diedCard: {
       marginHorizontal: 16, marginTop: 12, marginBottom: 4, padding: 16,
       borderRadius: 14, borderWidth: 1, borderColor: colors.border,

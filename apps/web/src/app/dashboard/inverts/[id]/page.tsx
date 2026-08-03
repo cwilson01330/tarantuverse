@@ -17,10 +17,30 @@ import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import GrowthChart from '@/components/GrowthChart'
 import UpgradeModal from '@/components/UpgradeModal'
+import {
+  DEATH_CAUSE_LABELS,
+  DEATH_CAUSE_ORDER,
+  markInvertDied,
+  tenureLabel,
+  reviveInvert,
+  type DeathCause,
+} from '@/lib/animal-lifecycle'
 import { taxonHasModule, growthLengthLabel } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+const inputCls =
+  'w-full px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary'
+
+/** Local calendar today as YYYY-MM-DD. Not toISOString() — that's UTC, and
+ *  would offer "tomorrow" to anyone east of Greenwich late in the day. */
+function todayIso(): string {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
 
 /**
  * Loading ≠ zero ≠ error.
@@ -68,6 +88,11 @@ interface Invert {
   bred_by_user_id?: string | null
   origin_keeper_name?: string | null
   transferred_out_at?: string | null
+  // ADR-015. Non-null makes this a historical record: kept in full, out of the
+  // collection, the cap, feeding status and every reminder.
+  died_at?: string | null
+  death_cause?: DeathCause | null
+  death_notes?: string | null
 }
 
 interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
@@ -94,6 +119,17 @@ export default function InvertDetailPage() {
   const [pairings, setPairings] = useState<any[]>([])
   const [mates, setMates] = useState<Invert[]>([])
   const [pairOpen, setPairOpen] = useState(false)
+  // Mark-as-died. Its own dialog rather than a field on edit, so this can't
+  // happen as a side effect of an incidental save.
+  const [diedOpen, setDiedOpen] = useState(false)
+  const [diedDate, setDiedDate] = useState('')
+  const [diedCause, setDiedCause] = useState<DeathCause | ''>('')
+  const [diedNotes, setDiedNotes] = useState('')
+  const [diedExpanded, setDiedExpanded] = useState(false)
+  const [diedBusy, setDiedBusy] = useState(false)
+  const [diedError, setDiedError] = useState('')
+
+  const tenure = tenureLabel(invert?.date_acquired, invert?.died_at)
   const [pairMateId, setPairMateId] = useState('')
   const [pairDate, setPairDate] = useState(() => {
     const d = new Date()
@@ -192,6 +228,49 @@ export default function InvertDetailPage() {
     }
     fetchAll()
   }, [isLoading, isAuthenticated, token, fetchAll, router])
+
+  const openDied = () => {
+    // Default to today, but leave it editable — backdating is normal, because
+    // most people log this once they've dealt with it.
+    setDiedDate(todayIso())
+    setDiedCause('')
+    setDiedNotes('')
+    setDiedExpanded(false)
+    setDiedError('')
+    setDiedOpen(true)
+  }
+
+  const submitDied = async () => {
+    if (!token || !id || diedBusy) return
+    setDiedBusy(true)
+    setDiedError('')
+    try {
+      await markInvertDied(token, String(id), {
+        died_at: diedDate || null,
+        death_cause: diedCause || null,
+        death_notes: diedNotes.trim() || null,
+      })
+      setDiedOpen(false)
+      await fetchAll()
+    } catch (e) {
+      // Stay open. Closing on failure would look like it worked, and they'd
+      // find the animal still in their collection later with no idea why.
+      setDiedError(e instanceof Error ? e.message : 'Couldn’t save that. Nothing has changed.')
+    } finally {
+      setDiedBusy(false)
+    }
+  }
+
+  const handleRevive = async () => {
+    if (!token || !id) return
+    if (!confirm('Restore this animal to your collection? They’ll count toward your plan again and reappear in your reminders.')) return
+    try {
+      await reviveInvert(token, String(id))
+      await fetchAll()
+    } catch {
+      alert('Could not restore. Please try again.')
+    }
+  }
 
   const handleDelete = async () => {
     if (!invert || !token) return
@@ -357,6 +436,24 @@ export default function InvertDetailPage() {
                 >
                   Edit
                 </button>
+                {/* Mark as died is the exit for an animal that died; delete
+                    survives for records added by mistake, which is what it's
+                    actually for. Neutral, not red — this destroys nothing. */}
+                {invert?.died_at ? (
+                  <button
+                    onClick={handleRevive}
+                    className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
+                  >
+                    Restore
+                  </button>
+                ) : (
+                  <button
+                    onClick={openDied}
+                    className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
+                  >
+                    Mark as died
+                  </button>
+                )}
                 <button
                   onClick={handleDelete}
                   className="px-4 py-2 rounded-lg bg-red-600/90 text-white text-sm font-semibold backdrop-blur-sm hover:bg-red-600"
@@ -478,6 +575,32 @@ export default function InvertDetailPage() {
                 </p>
               </Section>
             )}
+            {/* Status card. The mark is a filled slate dot — a full stop at
+                the end of a sentence. Never red: red means destructive action
+                everywhere else here, and nothing was destroyed. */}
+            {invert?.died_at && (
+              <div className="mb-6 p-4 rounded-2xl border border-theme bg-surface">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-500" aria-hidden="true" />
+                  <p className="font-semibold text-theme-primary">
+                    Died {formatLocalDate(invert.died_at)}
+                  </p>
+                </div>
+                {tenure && <p className="mt-1 text-sm text-theme-secondary">In your care {tenure}</p>}
+                <p className="mt-2 text-sm text-theme-secondary">
+                  {invert.death_cause ? `${DEATH_CAUSE_LABELS[invert.death_cause]}. ` : ''}
+                  This is a historical record — everything below is kept. They&apos;re out of
+                  your collection, your reminders and your animal count.
+                </p>
+                {invert.death_notes && (
+                  <p className="mt-2 text-sm italic text-theme-tertiary">{invert.death_notes}</p>
+                )}
+                <p className="mt-3 text-xs text-theme-tertiary">
+                  Logging is closed. Records stay readable and exportable.
+                </p>
+              </div>
+            )}
+
             {invert?.transferred_out_at && (
               <Section title="Transfer / rehome">
                 <p className="text-sm text-theme-tertiary">
@@ -577,6 +700,130 @@ export default function InvertDetailPage() {
       </div>
 
       {/* New pairing modal (breeding module) */}
+      {/* Mark as died. The dialog IS the confirm — the date is already
+          defaulted, so the flow completes in one click. Cause and note sit
+          behind one optional line so this never reads as a form. */}
+      {diedOpen && invert && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !diedBusy && setDiedOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-theme bg-surface p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-theme-primary">
+              Mark {invert.name || invert.common_name || 'this animal'} as died
+            </h2>
+
+            {/* The most reassuring fact available, and it was invisible before
+                this dialog existed. Counts come from the fetch this page
+                already ran. */}
+            <p className="text-sm text-theme-secondary">
+              Nothing is deleted. {feedings.length > 0 || molts.length > 0 || photos.length > 0
+                ? `Their ${[
+                    feedings.length ? `${feedings.length} feeding${feedings.length === 1 ? '' : 's'}` : null,
+                    molts.length ? `${molts.length} molt${molts.length === 1 ? '' : 's'}` : null,
+                    photos.length ? `${photos.length} photo${photos.length === 1 ? '' : 's'}` : null,
+                  ].filter(Boolean).join(', ')} stay in your records, and they stop counting toward your plan.`
+                : 'Every feeding, molt and photo stays in your records, and they stop counting toward your plan.'}
+            </p>
+
+            <label className="block">
+              <span className="block text-sm font-medium text-theme-secondary mb-1">
+                Date of death
+              </span>
+              <input
+                type="date"
+                value={diedDate}
+                // Today, not the current selection — the server rejects future
+                // dates anyway, but the picker should say so first.
+                max={todayIso()}
+                onChange={(e) => setDiedDate(e.target.value)}
+                className={inputCls}
+              />
+              <span className="block mt-1 text-xs text-theme-tertiary">
+                Backdating is fine — pick any past date.
+              </span>
+            </label>
+
+            {diedExpanded && (
+              <>
+                <fieldset>
+                  <legend className="block text-sm font-medium text-theme-secondary mb-1">
+                    Cause <span className="text-theme-tertiary font-normal">Optional</span>
+                  </legend>
+                  {/* Chips, not a dropdown — "I don't know" has to be as easy
+                      to pick as a real cause, or people guess. */}
+                  <div className="flex flex-wrap gap-2">
+                    {DEATH_CAUSE_ORDER.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setDiedCause(diedCause === c ? '' : c)}
+                        aria-pressed={diedCause === c}
+                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition ${
+                          diedCause === c
+                            ? 'bg-theme-primary border-theme-primary text-surface'
+                            : 'border-theme bg-surface text-theme-primary hover:border-primary-400'
+                        }`}
+                      >
+                        {DEATH_CAUSE_LABELS[c]}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="block">
+                  <span className="block text-sm font-medium text-theme-secondary mb-1">
+                    Note <span className="text-theme-tertiary font-normal">Optional</span>
+                  </span>
+                  <textarea
+                    value={diedNotes}
+                    onChange={(e) => setDiedNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Stuck in the old exoskeleton at the third leg…"
+                    className={inputCls}
+                  />
+                </label>
+              </>
+            )}
+
+            {diedError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">{diedError}</p>
+            )}
+
+            {/* Neutral ink, never the accent — colors.primary is user-chosen,
+                and someone who picked hot pink shouldn't get it here. Never
+                red either: red means destructive, and this destroys nothing. */}
+            <button
+              type="button"
+              onClick={submitDied}
+              disabled={diedBusy}
+              className="w-full py-3 rounded-xl bg-theme-primary text-surface font-semibold disabled:opacity-60"
+            >
+              {diedBusy ? 'Saving…' : 'Mark as died'}
+            </button>
+
+            {!diedExpanded && (
+              <button
+                type="button"
+                onClick={() => setDiedExpanded(true)}
+                className="w-full text-sm font-semibold text-theme-secondary hover:underline"
+              >
+                Add a cause or a note
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setDiedOpen(false)}
+              className="w-full text-sm text-theme-tertiary hover:underline"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {pairOpen && invert && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"

@@ -221,7 +221,48 @@ export interface Invert {
   bred_by_user_id?: string | null;
   origin_keeper_name?: string | null;
   transferred_out_at?: string | null;
+
+  /** Death (ADR-015). A non-null died_at makes this a historical record: kept
+   *  in full, with every log, but out of the collection, the free-tier count,
+   *  feeding status and every reminder. Set via markDied, never a plain edit. */
+  died_at?: string | null;
+  death_cause?: DeathCause | null;
+  death_notes?: string | null;
 }
+
+/** Offered, never demanded. `unknown` is a real answer — most invertebrate
+ *  deaths are genuinely unexplained, and a keeper who doesn't know should be
+ *  able to say so rather than leave a blank that reads as an omission. */
+export type DeathCause =
+  | 'bad_molt'
+  | 'dehydration'
+  | 'dks'
+  | 'illness'
+  | 'injury'
+  | 'escaped'
+  | 'old_age'
+  | 'unknown'
+  | 'other';
+
+export const DEATH_CAUSE_LABELS: Record<DeathCause, string> = {
+  bad_molt: 'Bad molt',
+  dehydration: 'Dehydration',
+  dks: 'DKS',
+  illness: 'Illness',
+  injury: 'Injury',
+  escaped: 'Escaped, never found',
+  old_age: 'Old age',
+  unknown: "I don't know",
+  other: 'Something else',
+};
+
+/** Display order. `unknown` sits high on purpose — it's the honest answer for
+ *  most invertebrate deaths, and burying it at the bottom would nudge people
+ *  into guessing a cause they didn't observe. */
+export const DEATH_CAUSE_ORDER: DeathCause[] = [
+  'bad_molt', 'unknown', 'dehydration', 'dks', 'illness', 'injury',
+  'escaped', 'old_age', 'other',
+];
 
 export interface TransferCreateResponse {
   token: string;
@@ -279,6 +320,12 @@ export interface InvertSpecies {
 }
 
 export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; food_size: string | null; accepted: boolean; notes: string | null; }
+/** successful | stuck | lost_limb | fatal — the backend vocabulary.
+ *  Deliberately small: finer gradations would be guesses about a process the
+ *  keeper mostly didn't watch. `fatal` records a death IN the molt and does
+ *  NOT retire the animal — that stays a deliberate act on the animal itself. */
+export type MoltOutcome = 'successful' | 'stuck' | 'lost_limb' | 'fatal';
+
 export interface InvertMoltLog {
   id: string;
   invert_id: string | null;
@@ -292,6 +339,13 @@ export interface InvertMoltLog {
   leg_span_after?: number | string | null;
   weight_before?: number | string | null;
   weight_after?: number | string | null;
+  /** How the molt went (ADR-015). Null means NOT STATED, not "fine" — most
+   *  molts are routine and go unremarked, and defaulting to successful would
+   *  claim a judgment nobody made. Molting is the most dangerous thing these
+   *  animals do and the most common way one dies, so the exceptions are the
+   *  whole point of the field. */
+  outcome?: MoltOutcome | null;
+  complication_notes?: string | null;
 }
 
 /** Optional per-molt measurements accepted by the molt endpoints. */
@@ -303,6 +357,13 @@ export interface InvertMoltMeasurements {
   leg_span_after?: number | null;
   weight_before?: number | null;
   weight_after?: number | null;
+  /** How the molt went (ADR-015). Null means NOT STATED, not "fine" — most
+   *  molts are routine and go unremarked, and defaulting to successful would
+   *  claim a judgment nobody made. Molting is the most dangerous thing these
+   *  animals do and the most common way one dies, so the exceptions are the
+   *  whole point of the field. */
+  outcome?: MoltOutcome | null;
+  complication_notes?: string | null;
 }
 
 /** Growth analytics from /inverts/{id}/growth (mirrors GrowthChart's shape). */
@@ -591,4 +652,139 @@ export function taxonMdiIcon(taxon: string): string {
     default:
       return 'paw';
   }
+}
+
+// --- Death (ADR-015) -------------------------------------------------------
+
+/**
+ * Record that an animal died.
+ *
+ * A terminal state, never a delete: the record and all its logs are kept. The
+ * animal drops out of the collection, the free-tier count, feeding status and
+ * every reminder — nothing will ask you to feed it again.
+ *
+ * Its own endpoint rather than a field on updateInvert, so this can't happen
+ * by accident from an incidental edit.
+ */
+export async function markInvertDied(
+  id: string,
+  payload: { died_at?: string | null; death_cause?: DeathCause | null; death_notes?: string | null },
+): Promise<Invert> {
+  const { data } = await apiClient.post<Invert>(`/inverts/${id}/died`, payload);
+  return data;
+}
+
+/** Undo a mark-as-died. Exists so a mis-tap doesn't leave someone living with
+ *  a memorial for an animal sitting in front of them. */
+export async function reviveInvert(id: string): Promise<Invert> {
+  const { data } = await apiClient.post<Invert>(`/inverts/${id}/revive`, {});
+  return data;
+}
+
+/** The memorial view — animals that have died, records intact. */
+export async function listDeceasedInverts(): Promise<Invert[]> {
+  const { data } = await apiClient.get<Invert[]>('/inverts/?deceased=true');
+  return data;
+}
+
+// --- Per-animal events (ADR-015 D5) ----------------------------------------
+
+export type AnimalEventType =
+  | 'injury' | 'illness' | 'bad_molt' | 'escape' | 'recovered'
+  | 'rehoused' | 'vet_visit' | 'observation' | 'death';
+
+export type AnimalEventSeverity = 'minor' | 'moderate' | 'severe';
+
+export interface AnimalEvent {
+  id: string;
+  invert_id: string | null;
+  animal_id: string | null;
+  event_type: AnimalEventType;
+  occurred_at: string;
+  severity: AnimalEventSeverity | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export const ANIMAL_EVENT_LABELS: Record<AnimalEventType, string> = {
+  injury: 'Injury',
+  illness: 'Illness',
+  bad_molt: 'Bad molt',
+  escape: 'Escaped',
+  recovered: 'Recovered',
+  rehoused: 'Rehoused',
+  vet_visit: 'Vet visit',
+  observation: 'Observation',
+  death: 'Died',
+};
+
+export const ANIMAL_EVENT_ICONS: Record<AnimalEventType, string> = {
+  injury: 'bandage',
+  illness: 'thermometer',
+  bad_molt: 'alert-circle-outline',
+  escape: 'run',
+  recovered: 'heart-pulse',
+  rehoused: 'home-switch-outline',
+  vet_visit: 'medical-bag',
+  observation: 'note-text-outline',
+  // Deliberately not a skull or a cross. A skull is the wrong register for an
+  // animal someone cared about, and a cross imposes a religious frame on
+  // someone else's grief.
+  death: 'circle-slice-8',
+};
+
+/** Severity only means something for injury and illness. Offering it on an
+ *  observation would invite a judgment the keeper never made. */
+export function eventHasSeverity(t: AnimalEventType): boolean {
+  return t === 'injury' || t === 'illness';
+}
+
+/** Order for the picker. Observation leads because it's the catch-all people
+ *  reach for most; death sits last so nobody taps it by accident. */
+export const ANIMAL_EVENT_ORDER: AnimalEventType[] = [
+  'observation', 'injury', 'illness', 'bad_molt', 'recovered',
+  'escape', 'rehoused', 'vet_visit', 'death',
+];
+
+export async function listInvertEvents(id: string): Promise<AnimalEvent[]> {
+  const { data } = await apiClient.get<AnimalEvent[]>(`/inverts/${id}/events`);
+  return data;
+}
+
+export async function createInvertEvent(
+  id: string,
+  payload: {
+    event_type: AnimalEventType;
+    occurred_at?: string | null;
+    severity?: AnimalEventSeverity | null;
+    notes?: string | null;
+  },
+): Promise<AnimalEvent> {
+  const { data } = await apiClient.post<AnimalEvent>(`/inverts/${id}/events`, payload);
+  return data;
+}
+
+/**
+ * Correct an event. Parent-agnostic, like delete.
+ *
+ * Events get revised more than most logs — an "injury" turns out to have been
+ * a mismolt, a severity is downgraded once the animal recovers. Without this
+ * the edit screen would create a duplicate instead of updating.
+ */
+export async function updateAnimalEvent(
+  eventId: string,
+  payload: {
+    event_type?: AnimalEventType;
+    occurred_at?: string | null;
+    severity?: AnimalEventSeverity | null;
+    notes?: string | null;
+  },
+): Promise<AnimalEvent> {
+  const { data } = await apiClient.put<AnimalEvent>(`/animal-events/${eventId}`, payload);
+  return data;
+}
+
+/** Parent-agnostic — resolves ownership through whichever parent the row has. */
+export async function deleteAnimalEvent(eventId: string): Promise<void> {
+  await apiClient.delete(`/animal-events/${eventId}`);
 }
