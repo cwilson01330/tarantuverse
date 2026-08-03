@@ -124,35 +124,40 @@ async def list_inverts(
         description="Filter to a single taxon. Omit for the whole collection.",
     ),
     colony_id: Optional[UUID] = Query(None),
-    transferred: bool = Query(
-        False,
-        description="When false (default) returns only ACTIVE animals; when true "
-        "returns only animals handed off via transfer (the 'Transferred' view).",
+    status: Optional[str] = Query(
+        None,
+        pattern="^(active|transferred|deceased)$",
+        description=(
+            "Which lifecycle view to return. 'active' (default) excludes both "
+            "handed-off and deceased animals, so the list matches what the cap "
+            "enforces. 'transferred' and 'deceased' are the history views — "
+            "those records are kept in full, with every log intact."
+        ),
     ),
-    deceased: bool = Query(
-        False,
-        description="Return only animals that have died (ADR-015). Their records "
-        "are kept in full with every log intact; this is the memorial view. "
-        "Ignored when `transferred=true`.",
-    ),
+    # Deprecated. Superseded by `status` — two independent booleans made the
+    # precedence between them load-bearing, and a third terminal state would
+    # have made that worse. Kept so an already-installed mobile bundle doesn't
+    # break the moment this deploys; remove once those have rolled over.
+    transferred: bool = Query(False, deprecated=True, description="Use status=transferred."),
+    deceased: bool = Query(False, deprecated=True, description="Use status=deceased."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """List the authenticated user's inverts, newest first.
 
-    By default excludes transferred-out AND deceased animals, so the displayed
-    collection + count match what the cap enforces (BRIEF §4b, ADR-015). Pass
-    `transferred=true` for the handed-off history view, or `deceased=true` for
-    animals that have died — those records are retained in full.
+    Defaults to the ACTIVE view, which excludes both handed-off and deceased
+    animals so the displayed collection matches what the cap enforces
+    (BRIEF §4b, ADR-015). Pass `status=transferred` or `status=deceased` for
+    the history views — those records are retained in full, every log intact.
     """
     query = db.query(Invert).filter(Invert.user_id == current_user.id)
-    # Three terminal states now, not two: active, transferred out, and died
-    # (ADR-015). `transferred=true` keeps its meaning; `deceased=true` is the
-    # memorial view. The default excludes BOTH, so the displayed collection
-    # still matches what the cap enforces.
-    if transferred:
+    # Three terminal states: active, transferred out, died (ADR-015). Resolve
+    # the legacy booleans into the same vocabulary so there's exactly one
+    # branch to read, rather than a precedence rule between two flags.
+    view = status or ('transferred' if transferred else 'deceased' if deceased else 'active')
+    if view == 'transferred':
         query = query.filter(Invert.transferred_out_at.isnot(None))
-    elif deceased:
+    elif view == 'deceased':
         query = query.filter(Invert.died_at.isnot(None))
     else:
         query = query.filter(
