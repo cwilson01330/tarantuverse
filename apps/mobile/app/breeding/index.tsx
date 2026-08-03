@@ -48,6 +48,7 @@ import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { apiClient } from '../../src/services/api';
 import { getErrorMessage } from '../../src/utils/errors';
+import { parseLocalDate } from '../../src/utils/date';
 
 // ─── Inline types — match the response_model shapes on the API ────────
 
@@ -116,10 +117,16 @@ function fmtOutcome(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Routes through parseLocalDate. A bare "YYYY-MM-DD" from a DATE column is
+// parsed by `new Date()` as UTC midnight, and toLocaleDateString then rewinds
+// it a day for everyone west of Greenwich — so a substrate change dated the
+// 28th printed as the 27th for every keeper in the Americas. The helper in
+// utils/date has anchored pure dates to the local calendar since it was
+// written; these local copies simply never used it.
 function fmtDate(iso: string | null): string {
   if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
+  const d = parseLocalDate(iso);
+  if (!d || Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',

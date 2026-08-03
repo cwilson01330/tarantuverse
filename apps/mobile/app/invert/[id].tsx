@@ -23,6 +23,7 @@ import {
   listInvertFeedings, listInvertMolts, listInvertPhotos, listInvertSubstrateChanges,
   deleteInvertFeeding, deleteInvertMolt, deleteInvertSubstrateChange,
   setInvertMainPhoto, deleteInvertPhoto, getInvertGrowth, listInvertPairings,
+  reviveInvert,
   createInvertTransfer, createInvertFeeding, getInvertFeedingStats,
   type InvertFeedingStats,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
@@ -37,6 +38,9 @@ import PhotoViewer from '../../src/components/PhotoViewer';
 import QRSheet from '../../src/components/QRSheet';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { getErrorMessage } from '../../src/utils/errors';
+import { MarkDiedSheet } from '../../src/components/MarkDiedSheet';
+import { COPY as LIFECYCLE_COPY, historicalRecordLine, pronounsFor, tenureLabel } from '../../src/lib/lifecycle-copy';
+import { parseLocalDate } from '../../src/utils/date';
 
 function InvertDetailScreen() {
   const router = useRouter();
@@ -65,6 +69,8 @@ function InvertDetailScreen() {
   const [markingFed, setMarkingFed] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const [diedOpen, setDiedOpen] = useState(false);
+  const [reviving, setReviving] = useState(false);
   // Which reference rows are open. All collapsed by default — see CollapsibleRow.
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
   const toggleRow = (key: string) =>
@@ -138,6 +144,38 @@ function InvertDetailScreen() {
   }, [id]);
 
   useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
+
+  /** Undo a mark-as-died.
+   *
+   *  Confirmed, but gently — this is a correction, not a destructive act. It
+   *  can push a free-tier keeper back over the cap and we allow it anyway:
+   *  refusing to let someone fix a mistake because of a billing limit would be
+   *  indefensible.
+   */
+  const handleRevive = () => {
+    if (!invert) return;
+    Alert.alert(
+      `Restore ${invertDisplayName(invert)} to your collection?`,
+      'They’ll count toward your plan again and reappear in your reminders.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restore',
+          onPress: async () => {
+            setReviving(true);
+            try {
+              await reviveInvert(String(id));
+              await fetchAll();
+            } catch (e) {
+              Alert.alert('Could not restore', getErrorMessage(e));
+            } finally {
+              setReviving(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleDelete = () => {
     if (!invert) return;
@@ -231,7 +269,13 @@ function InvertDetailScreen() {
       { text: 'Edit', onPress: () => router.push(`/invert/edit?id=${id}` as any) },
       // QR was tarantula-only until the generic upload-session route landed.
       { text: 'QR label & upload', onPress: () => setQrOpen(true) },
-      { text: 'Delete', style: 'destructive', onPress: handleDelete },
+      // Mark as died sits ABOVE delete and without destructive styling. Delete
+      // stops being the only exit for an animal that died — it survives for
+      // records added by mistake, which is what it's actually for.
+      ...(invert.died_at
+        ? [{ text: 'Restore to collection', onPress: handleRevive }]
+        : [{ text: LIFECYCLE_COPY.menuItem, onPress: () => setDiedOpen(true) }]),
+      { text: 'Delete record', style: 'destructive' as const, onPress: handleDelete },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -427,7 +471,7 @@ function InvertDetailScreen() {
       onEdit: () => editSubstrate(c),
       onDelete: () => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id)),
     })),
-  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  ].sort(timelineOrder);
 
   const visibleTimeline = timeline
     .filter((e) => timelineFilter === 'all' || e.kind === timelineFilter)
@@ -440,6 +484,42 @@ function InvertDetailScreen() {
   return (
     <View style={styles.flex}>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
+        {/* Status card — design handoff 1a frame 4.
+            Sits ABOVE the hero because it changes what everything below means.
+            The mark is a filled dot: a full stop at the end of a sentence.
+            Slate, never colors.error — red means destructive action everywhere
+            else in this app, and this doesn't destroy anything. */}
+        {invert.died_at ? (
+          <View style={styles.diedCard}>
+            <View style={styles.diedHeadRow}>
+              <View style={styles.diedDot} />
+              <Text style={styles.diedTitle}>Died {fmtDate(invert.died_at)}</Text>
+            </View>
+            {(() => {
+              const t = tenureLabel(invert.date_acquired, invert.died_at);
+              return t ? <Text style={styles.diedTenure}>In your care {t}</Text> : null;
+            })()}
+            <Text style={styles.diedBody}>
+              {historicalRecordLine(invert.death_cause, pronounsFor(invert.sex).subject)}
+            </Text>
+            {invert.death_notes ? (
+              <Text style={styles.diedNotes}>{invert.death_notes}</Text>
+            ) : null}
+            <View style={styles.diedActions}>
+              {/* Undo persists here rather than in a snackbar — /revive
+                  deserves longer than four seconds. */}
+              <TouchableOpacity onPress={handleRevive} disabled={reviving} accessibilityRole="button">
+                <Text style={styles.diedAction}>
+                  {reviving ? 'Restoring…' : LIFECYCLE_COPY.undo}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setDiedOpen(true)} accessibilityRole="button">
+                <Text style={styles.diedAction}>{LIFECYCLE_COPY.editDetails}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
         {/* Full-bleed hero. Replaces the AppHeader + inset image + separate
             identity block. On the tarantula screen that arrangement printed
             the animal's name THREE times — header title, 28pt title, then
@@ -931,6 +1011,19 @@ function InvertDetailScreen() {
         onChange={fetchAll}
       />
 
+      {/* Counts come from the fetch this screen already ran, so the sheet's
+          key line ("her 41 feedings, 9 molts and 12 photos stay") costs no
+          extra request. */}
+      <MarkDiedSheet
+        visible={diedOpen}
+        onClose={() => setDiedOpen(false)}
+        invertId={id!}
+        name={headerTitle}
+        sex={invert.sex}
+        counts={{ feedings: feedings.length, molts: molts.length, photos: photos.length }}
+        onDone={() => { setDiedOpen(false); fetchAll(); }}
+      />
+
       <QRSheet
         visible={qrOpen}
         onClose={() => setQrOpen(false)}
@@ -952,7 +1045,16 @@ function InvertDetailScreen() {
 }
 
 function fmtSex(sex: Invert['sex']): string { if (!sex || sex === 'unknown') return '—'; return sex.charAt(0).toUpperCase() + sex.slice(1); }
-function fmtDate(iso: string): string { try { return new Date(iso).toLocaleDateString(); } catch { return iso; } }
+// Routes through parseLocalDate. A bare "YYYY-MM-DD" from a DATE column is
+// parsed by `new Date()` as UTC midnight, and toLocaleDateString then rewinds
+// it a day for everyone west of Greenwich — so a substrate change dated the
+// 28th printed as the 27th for every keeper in the Americas. The helper in
+// utils/date has anchored pure dates to the local calendar since it was
+// written; these local copies simply never used it.
+function fmtDate(iso: string): string {
+  const d = parseLocalDate(iso);
+  return d ? d.toLocaleDateString() : iso;
+}
 
 /**
  * Relative date for timeline rows — "Today" / "3d ago" / "2mo ago".
@@ -984,6 +1086,8 @@ type TimelineKind = 'feeding' | 'molt' | 'substrate';
 interface TimelineEntry {
   id: string;
   kind: TimelineKind;
+  /** ISO timestamp OR a bare YYYY-MM-DD. The distinction matters — see
+   *  timelineOrder. */
   at: string;
   /** Sentence, not a label — "Ate a cricket" beats "Feeding · accepted". */
   title: string;
@@ -992,6 +1096,44 @@ interface TimelineEntry {
   trailingTone?: 'good' | 'bad' | 'muted';
   onEdit: () => void;
   onDelete: () => void;
+}
+
+/** Does this row carry a real clock time, or only a calendar date?
+ *
+ *  feeding_logs.fed_at and molt_logs.molted_at are timestamps. But
+ *  substrate_changes.changed_at and animal_events.occurred_at are DATE columns,
+ *  and `new Date('2026-06-28')` parses to midnight UTC.
+ */
+function hasClockTime(at: string): boolean {
+  return at.includes('T');
+}
+
+/**
+ * Newest first, with an honest same-day rule.
+ *
+ * THIS WAS A LIVE BUG. The sort was `new Date(b.at) - new Date(a.at)` with no
+ * tiebreak, so a date-only substrate change parsed to midnight and therefore
+ * sorted ABOVE every feeding on the same day — including one recorded at 14:20.
+ * The screen stated an order of events it had no basis for, which is worse than
+ * declining to: a keeper reading a stuck molt and a substrate change on one day
+ * would draw a causal conclusion from an artefact of parsing.
+ *
+ * Now: compare calendar day first. Within a day, a row that knows its time
+ * beats one that doesn't, and two timed rows compare on the clock. A date-only
+ * row sinks to the bottom of its day — "sometime that day" is what we actually
+ * know, and the bottom is where it makes the fewest false claims.
+ */
+function timelineOrder(a: TimelineEntry, b: TimelineEntry): number {
+  const dayA = a.at.slice(0, 10);
+  const dayB = b.at.slice(0, 10);
+  if (dayA !== dayB) return dayA < dayB ? 1 : -1;
+
+  const timedA = hasClockTime(a.at);
+  const timedB = hasClockTime(b.at);
+  if (timedA !== timedB) return timedA ? -1 : 1;
+  if (!timedA) return 0; // both date-only: leave insertion order alone
+
+  return new Date(b.at).getTime() - new Date(a.at).getTime();
 }
 
 /**
@@ -1092,6 +1234,27 @@ const s = StyleSheet.create({
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
+    // Death treatment — one mark, replacing 💀 / ✝️ / ☠. A filled dot reads as
+    // a full stop: neutral, secular, carrying no opinion about how anyone
+    // should feel. Slate, never colors.error.
+    diedCard: {
+      marginHorizontal: 16, marginTop: 12, marginBottom: 4, padding: 16,
+      borderRadius: 14, borderWidth: 1, borderColor: colors.border,
+      backgroundColor: colors.surface, gap: 6,
+    },
+    diedHeadRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+    diedDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#64748b' },
+    diedTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+    // Flat, deliberately. Tenure turns maudlin the moment it's decorated —
+    // no icon, no larger type than the row around it.
+    diedTenure: { fontSize: 13, color: colors.textSecondary },
+    diedBody: { fontSize: 13, lineHeight: 20, color: colors.textSecondary, marginTop: 2 },
+    diedNotes: {
+      fontSize: 13, lineHeight: 20, color: colors.textTertiary,
+      fontStyle: 'italic', marginTop: 2,
+    },
+    diedActions: { flexDirection: 'row', gap: 20, marginTop: 8 },
+    diedAction: { fontSize: 14, fontWeight: '600', color: colors.textSecondary },
     flex: { flex: 1, backgroundColor: colors.background },
     center: { alignItems: 'center', justifyContent: 'center' },
     // Clears the pinned action bar — content used to end flush with the

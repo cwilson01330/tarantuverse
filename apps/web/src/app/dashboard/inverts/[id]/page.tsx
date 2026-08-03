@@ -22,6 +22,16 @@ import { formatLocalDate } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+/**
+ * Loading ≠ zero ≠ error.
+ *
+ * A count of 0 is a claim we verified. An em dash is the tell for "we don't
+ * know". Rendering "No feedings logged yet." after a failed request converts
+ * ignorance into a fact about the animal, and the keeper has no way to tell
+ * the difference — which is exactly the case where they'd most want to.
+ */
+type LoadState = 'loading' | 'ok' | 'error' 
+
 type TaxonKey = 'scorpion' | 'centipede' | 'whip_spider' | 'tarantula'
 
 const TAXON_META: Record<TaxonKey, { glyph: string; label: string; prefix: string }> = {
@@ -76,6 +86,9 @@ export default function InvertDetailPage() {
   const [molts, setMolts] = useState<MoltLog[]>([])
   const [substrate, setSubstrate] = useState<SubstrateChange[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
+  const [logState, setLogState] = useState<Record<'feedings' | 'molts' | 'substrate' | 'photos', LoadState>>({
+    feedings: 'loading', molts: 'loading', substrate: 'loading', photos: 'loading',
+  })
   const [growth, setGrowth] = useState<any | null>(null)
   // Breeding module (registry-gated, ADR-010 Phase D)
   const [pairings, setPairings] = useState<any[]>([])
@@ -117,20 +130,41 @@ export default function InvertDetailPage() {
 
       // Logs go through the generic /inverts/{id}/… endpoints (ADR-007),
       // so this works for every taxon without a per-taxon prefix.
+      // Per-source load state. These used to end in `.catch(() => [])`, which
+      // turned a failed request into an empty array — and the section then
+      // rendered "No feedings logged yet." A connection problem was displayed
+      // as a verified fact about the animal's history, which is the honesty
+      // violation the audit named: loading ≠ zero ≠ error.
+      const load = async <T,>(path: string): Promise<{ data: T[]; state: LoadState }> => {
+        try {
+          const r = await fetch(`${API_URL}/api/v1/inverts/${id}/${path}`, { headers })
+          if (!r.ok) return { data: [], state: 'error' }
+          return { data: await r.json(), state: 'ok' }
+        } catch {
+          return { data: [], state: 'error' }
+        }
+      }
+
       const [f, m, s, p, g] = await Promise.all([
-        fetch(`${API_URL}/api/v1/inverts/${id}/feedings`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-        fetch(`${API_URL}/api/v1/inverts/${id}/molts`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-        fetch(`${API_URL}/api/v1/inverts/${id}/substrate-changes`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
-        fetch(`${API_URL}/api/v1/inverts/${id}/photos`, { headers }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        load<any>('feedings'),
+        load<any>('molts'),
+        load<any>('substrate-changes'),
+        load<any>('photos'),
         // Growth module is registry-gated (ADR-008) — only fetch where enabled
         taxonHasModule(data.taxon, 'growth')
           ? fetch(`${API_URL}/api/v1/inverts/${id}/growth`, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
           : Promise.resolve(null),
       ])
-      setFeedings(Array.isArray(f) ? f : [])
-      setMolts(Array.isArray(m) ? m : [])
-      setSubstrate(Array.isArray(s) ? s : [])
-      setPhotos(Array.isArray(p) ? p : [])
+      setFeedings(f.data)
+      setMolts(m.data)
+      setSubstrate(s.data)
+      setPhotos(p.data)
+      setLogState({
+        feedings: f.state,
+        molts: m.state,
+        substrate: s.state,
+        photos: p.state,
+      })
       setGrowth(g)
 
       // Breeding module (registry-gated — ADR-010 Phase D). Fetch this
@@ -386,6 +420,8 @@ export default function InvertDetailPage() {
               cta="Log feeding"
               onCta={() => router.push(`/dashboard/inverts/${id}/add-feeding`)}
               empty="No feedings logged yet."
+              state={logState.feedings}
+              onRetry={fetchAll}
               rows={feedings.slice(0, 8).map((x) => ({
                 key: x.id,
                 left: `${x.food_type || 'Feeding'} · ${x.accepted ? 'Accepted' : 'Refused'}`,
@@ -399,6 +435,8 @@ export default function InvertDetailPage() {
               cta="Log molt"
               onCta={() => router.push(`/dashboard/inverts/${id}/add-molt`)}
               empty="No molts logged yet."
+              state={logState.molts}
+              onRetry={fetchAll}
               rows={molts.slice(0, 8).map((x) => ({
                 key: x.id, left: 'Molt', right: formatLocalDate(x.molted_at),
                 onEdit: () => router.push(`/dashboard/inverts/${id}/add-molt?${qp({ logId: x.id, molted_at: x.molted_at, notes: x.notes })}`),
@@ -481,6 +519,8 @@ export default function InvertDetailPage() {
               cta="Log substrate change"
               onCta={() => router.push(`/dashboard/inverts/${id}/add-substrate-change`)}
               empty="No substrate changes logged yet."
+              state={logState.substrate}
+              onRetry={fetchAll}
               rows={substrate.slice(0, 8).map((x) => ({
                 key: x.id, left: x.substrate_type || 'Substrate change', right: formatLocalDate(x.changed_at),
                 onEdit: () => router.push(`/dashboard/inverts/${id}/add-substrate-change?${qp({ logId: x.id, changed_at: x.changed_at, substrate_type: x.substrate_type, substrate_depth: x.substrate_depth, reason: x.reason, notes: x.notes })}`),
@@ -722,16 +762,45 @@ function LogSection({
   onCta,
   empty,
   rows,
+  state = 'ok',
+  onRetry,
 }: {
   title: string
   cta: string
   onCta: () => void
   empty: string
   rows: { key: string; left: string; right: string; onEdit?: () => void; onDelete?: () => void }[]
+  /** Loading ≠ zero ≠ error — see LoadState. */
+  state?: LoadState
+  onRetry?: () => void
 }) {
   return (
     <Section title={title} action={{ label: cta, onClick: onCta }}>
-      {rows.length === 0 ? (
+      {state === 'loading' ? (
+        // No text and no count. We don't know yet, so we say nothing.
+        <div className="space-y-2" aria-busy="true">
+          <div className="h-4 w-2/3 rounded bg-surface-elevated animate-pulse" />
+          <div className="h-4 w-1/2 rounded bg-surface-elevated animate-pulse" />
+        </div>
+      ) : state === 'error' ? (
+        // Never the empty copy. These records still exist; we failed to fetch
+        // them, and saying otherwise would be a claim about the animal.
+        <div role="alert" className="text-sm text-theme-secondary">
+          <p>
+            We couldn&apos;t load {title.toLowerCase()}. They&apos;re still here — this is a
+            connection problem.
+          </p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-1 font-semibold text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      ) : rows.length === 0 ? (
         <p className="text-sm text-theme-tertiary italic">{empty}</p>
       ) : (
         rows.map((r) => (
