@@ -121,13 +121,26 @@ export async function reviveInvert(token: string, id: string): Promise<void> {
   if (!res.ok) throw new Error('Could not restore')
 }
 
-/** The memorial view — animals that have died, records intact. */
-export async function listDeceasedInverts(token: string): Promise<any[]> {
-  const res = await fetch(`${API_URL}/api/v1/inverts/?deceased=true`, {
+/**
+ * Which lifecycle view of the collection to fetch. One param rather than
+ * independent booleans — see the mobile twin for the reasoning.
+ */
+export type CollectionStatus = 'active' | 'transferred' | 'deceased'
+
+export async function listInvertsByStatus(
+  token: string,
+  status: CollectionStatus,
+): Promise<any[]> {
+  const res = await fetch(`${API_URL}/api/v1/inverts/?status=${status}`, {
     headers: authHeaders(token),
   })
   if (!res.ok) throw new Error('Failed to load')
   return res.json()
+}
+
+/** The memorial view — animals that have died, records intact. */
+export async function listDeceasedInverts(token: string): Promise<any[]> {
+  return listInvertsByStatus(token, 'deceased')
 }
 
 // ── Per-animal events ────────────────────────────────────────────────────────

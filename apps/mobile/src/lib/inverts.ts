@@ -681,10 +681,24 @@ export async function reviveInvert(id: string): Promise<Invert> {
   return data;
 }
 
+/**
+ * Which lifecycle view of the collection to fetch.
+ *
+ * One param rather than independent booleans: with two flags the precedence
+ * between them was load-bearing, and a third terminal state would have made
+ * that worse. These are mutually exclusive by nature — an animal is in your
+ * collection, or handed off, or gone.
+ */
+export type CollectionStatus = 'active' | 'transferred' | 'deceased';
+
+export async function listInvertsByStatus(status: CollectionStatus): Promise<Invert[]> {
+  const { data } = await apiClient.get<Invert[]>(`/inverts/?status=${status}`);
+  return data;
+}
+
 /** The memorial view — animals that have died, records intact. */
 export async function listDeceasedInverts(): Promise<Invert[]> {
-  const { data } = await apiClient.get<Invert[]>('/inverts/?deceased=true');
-  return data;
+  return listInvertsByStatus('deceased');
 }
 
 // --- Per-animal events (ADR-015 D5) ----------------------------------------
