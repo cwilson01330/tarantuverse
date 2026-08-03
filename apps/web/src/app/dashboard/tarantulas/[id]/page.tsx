@@ -17,6 +17,14 @@ import PricingCard from '@/components/PricingCard'
 import PremoltPredictionSection from '@/components/PremoltPredictionSection'
 import apiClient from '@/lib/api'
 import { daysBetween, formatLocalDate } from '@/lib/date'
+import {
+  DEATH_CAUSE_LABELS,
+  DEATH_CAUSE_ORDER,
+  markInvertDied,
+  reviveInvert,
+  tenureLabel,
+  type DeathCause,
+} from '@/lib/animal-lifecycle'
 
 interface Tarantula {
   id: string
@@ -51,6 +59,11 @@ interface Tarantula {
   // Feeding pause — pst_20260502
   feeding_paused_reason?: string | null
   feeding_paused_until?: string | null
+  // ADR-015. Written through POST /inverts/{id}/died — the legacy row and the
+  // unified row share a primary key, so one endpoint serves both surfaces.
+  died_at?: string | null
+  death_cause?: DeathCause | null
+  death_notes?: string | null
 
   created_at: string
 }
@@ -263,6 +276,18 @@ export default function TarantulaDetailPage() {
   const [showShareModal, setShowShareModal] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showPauseModal, setShowPauseModal] = useState(false)
+  // Mark as died (ADR-015). Ported onto this page rather than cutting tarantulas
+  // over to the generic invert screen — that screen is materially thinner for
+  // tarantulas (no premolt, no feeding stats, no QR, and molt rows that render
+  // as the bare word "Molt"), so a cutover to ship one feature would have cost
+  // nine others. Parity on the generic page is its own project.
+  const [diedOpen, setDiedOpen] = useState(false)
+  const [diedDate, setDiedDate] = useState('')
+  const [diedCause, setDiedCause] = useState<DeathCause | ''>('')
+  const [diedNotes, setDiedNotes] = useState('')
+  const [diedExpanded, setDiedExpanded] = useState(false)
+  const [diedBusy, setDiedBusy] = useState(false)
+  const [diedError, setDiedError] = useState('')
   const [pauseError, setPauseError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -685,6 +710,56 @@ export default function TarantulaDetailPage() {
     await Promise.all([fetchTarantula(token), fetchFeedingStats(token)])
   }
 
+  const todayIso = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  const openDied = () => {
+    setDiedDate(todayIso())
+    setDiedCause('')
+    setDiedNotes('')
+    setDiedExpanded(false)
+    setDiedError('')
+    setDiedOpen(true)
+  }
+
+  /**
+   * Mark as died. Posts to /inverts/{id}/died — the unified row shares this
+   * tarantula's primary key, and the reverse mirror copies died_at back onto
+   * the legacy row this page reads.
+   */
+  const submitDied = async () => {
+    if (!token || !id || diedBusy) return
+    setDiedBusy(true)
+    setDiedError('')
+    try {
+      await markInvertDied(token, String(id), {
+        died_at: diedDate || null,
+        death_cause: diedCause || null,
+        death_notes: diedNotes.trim() || null,
+      })
+      setDiedOpen(false)
+      await fetchTarantula(token)
+    } catch (e) {
+      // Stay open on failure — closing would look like it worked.
+      setDiedError(e instanceof Error ? e.message : 'Couldn’t save that. Nothing has changed.')
+    } finally {
+      setDiedBusy(false)
+    }
+  }
+
+  const handleRevive = async () => {
+    if (!token || !id) return
+    if (!confirm('Restore this animal to your collection? They’ll count toward your plan again and reappear in your reminders.')) return
+    try {
+      await reviveInvert(token, String(id))
+      await fetchTarantula(token)
+    } catch {
+      alert('Could not restore. Please try again.')
+    }
+  }
+
   const handleResumeFeeding = async () => {
     if (!token) return
     setPauseError(null)
@@ -1022,10 +1097,67 @@ export default function TarantulaDetailPage() {
         </div>
       </div>
 
+      {/* Status card (ADR-015). Above the action bar because it changes what
+          everything below means. The mark is a filled slate dot — a full stop
+          at the end of a sentence. Never red: red is destructive everywhere
+          else in this app, and nothing here was destroyed. */}
+      {tarantula.died_at && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="p-4 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-slate-500" aria-hidden="true" />
+              <p className="font-semibold text-gray-900 dark:text-white">
+                Died {new Date(`${tarantula.died_at}T12:00:00`).toLocaleDateString()}
+              </p>
+            </div>
+            {tenureLabel(tarantula.date_acquired, tarantula.died_at) && (
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                In your care {tenureLabel(tarantula.date_acquired, tarantula.died_at)}
+              </p>
+            )}
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              {tarantula.death_cause ? `${DEATH_CAUSE_LABELS[tarantula.death_cause]}. ` : ''}
+              This is a historical record — everything below is kept. They&apos;re out of
+              your collection, your reminders and your animal count.
+            </p>
+            {tarantula.death_notes && (
+              <p className="mt-2 text-sm italic text-gray-500 dark:text-gray-500">
+                {tarantula.death_notes}
+              </p>
+            )}
+            <div className="mt-3 flex gap-4">
+              <button
+                onClick={handleRevive}
+                className="text-sm font-semibold text-gray-600 dark:text-gray-300 hover:underline"
+              >
+                Undo
+              </button>
+              <button
+                onClick={openDied}
+                className="text-sm font-semibold text-gray-600 dark:text-gray-300 hover:underline"
+              >
+                Edit details
+              </button>
+            </div>
+            <p className="mt-3 text-xs text-gray-500 dark:text-gray-500">
+              Logging is closed. Records stay readable and exportable.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons Bar */}
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex flex-wrap gap-2 items-center">
+            {!tarantula.died_at && (
+              <button
+                onClick={openDied}
+                className="px-3 py-1.5 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 text-sm font-medium"
+              >
+                Mark as died
+              </button>
+            )}
             {tarantula.species_id && (
               <button
                 onClick={() => router.push(`/species/${tarantula.species_id}`)}
@@ -2321,6 +2453,127 @@ export default function TarantulaDetailPage() {
                 </button>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Mark as died. The dialog IS the confirm — date defaulted, so the flow
+          completes in one click; cause and note behind one optional line so it
+          never reads as a form. */}
+      {diedOpen && tarantula && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !diedBusy && setDiedOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-gray-800 p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              Mark {tarantula.name || tarantula.common_name} as died
+            </h2>
+
+            {/* The most reassuring fact available. Counts come from the fetches
+                this page already ran. */}
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Nothing is deleted.{' '}
+              {feedings.length || molts.length || photos.length
+                ? `Their ${[
+                    feedings.length ? `${feedings.length} feeding${feedings.length === 1 ? '' : 's'}` : null,
+                    molts.length ? `${molts.length} molt${molts.length === 1 ? '' : 's'}` : null,
+                    photos.length ? `${photos.length} photo${photos.length === 1 ? '' : 's'}` : null,
+                  ].filter(Boolean).join(', ')} stay in your records, and they stop counting toward your plan.`
+                : 'Every feeding, molt and photo stays in your records, and they stop counting toward your plan.'}
+            </p>
+
+            <label className="block">
+              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Date of death
+              </span>
+              <input
+                type="date"
+                value={diedDate}
+                max={todayIso()}
+                onChange={(e) => setDiedDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+              <span className="block mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Backdating is fine — pick any past date.
+              </span>
+            </label>
+
+            {diedExpanded && (
+              <>
+                <fieldset>
+                  <legend className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Cause <span className="font-normal text-gray-500">Optional</span>
+                  </legend>
+                  {/* Chips, not a dropdown — "I don't know" has to be as easy to
+                      pick as a real cause, or people guess. */}
+                  <div className="flex flex-wrap gap-2">
+                    {DEATH_CAUSE_ORDER.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setDiedCause(diedCause === c ? '' : c)}
+                        aria-pressed={diedCause === c}
+                        className={`px-3 py-1.5 rounded-full border text-sm font-medium transition ${
+                          diedCause === c
+                            ? 'bg-gray-900 dark:bg-white border-gray-900 dark:border-white text-white dark:text-gray-900'
+                            : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        {DEATH_CAUSE_LABELS[c]}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="block">
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Note <span className="font-normal text-gray-500">Optional</span>
+                  </span>
+                  <textarea
+                    value={diedNotes}
+                    onChange={(e) => setDiedNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Stuck in the old exoskeleton at the third leg…"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </label>
+              </>
+            )}
+
+            {diedError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">{diedError}</p>
+            )}
+
+            {/* Neutral ink. Never red — red means destructive everywhere else
+                here, and this destroys nothing. */}
+            <button
+              type="button"
+              onClick={submitDied}
+              disabled={diedBusy}
+              className="w-full py-3 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-semibold disabled:opacity-60"
+            >
+              {diedBusy ? 'Saving…' : 'Mark as died'}
+            </button>
+
+            {!diedExpanded && (
+              <button
+                type="button"
+                onClick={() => setDiedExpanded(true)}
+                className="w-full text-sm font-semibold text-gray-600 dark:text-gray-300 hover:underline"
+              >
+                Add a cause or a note
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setDiedOpen(false)}
+              className="w-full text-sm text-gray-500 dark:text-gray-400 hover:underline"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

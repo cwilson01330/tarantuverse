@@ -42,6 +42,15 @@ class TarantulaBase(BaseModel):
     feeding_paused_reason: Optional[str] = Field(None, max_length=40)
     feeding_paused_until: Optional[date] = None
 
+    # Death (ADR-015). Written via POST /inverts/{id}/died — the unified row
+    # and the legacy row share a primary key, so the same endpoint serves both
+    # surfaces and the reverse mirror copies these back here. Exposed on the
+    # response because the web tarantula detail page still reads
+    # /tarantulas/{id} and would otherwise write a death it could never see.
+    died_at: Optional[date] = None
+    death_cause: Optional[str] = Field(None, max_length=40)
+    death_notes: Optional[str] = None
+
     photo_url: Optional[str] = Field(None, max_length=500)
     is_public: bool = False
     # Per-tarantula visibility on public keeper profiles. `public` means
