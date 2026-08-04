@@ -155,6 +155,34 @@ def _scorpion_to_invert_kwargs(s: "Scorpion") -> dict:
     }
 
 
+# Never reassigned by a mirror, on create or update.
+_IMMUTABLE = frozenset({"id", "user_id", "taxon"})
+
+# Columns the kwargs builders hardcode to None because the LEGACY row has
+# nothing to say about them. Per-taxon, because what's hardcoded differs:
+# `colony_id` is a real scorpion column but always None for tarantulas, and
+# `life_stage` is the mirror image of that.
+#
+# Hardcoding None is correct on INSERT — it means "not known yet". On UPDATE it
+# is destructive, because these columns are OWNED by the invert side: the Phase
+# B backfill resolved species links, and the generic UI writes them directly.
+# Applying the whole kwargs dict meant every PUT /tarantulas/{id} silently
+# nulled `inverts.species_id`. The care sheet link vanished from the detail
+# screen and the feeding cadence quietly downgraded from species-backed to a
+# generic default, with nothing on screen to say anything had happened.
+_INVERT_OWNED_TARANTULA = frozenset({"species_id", "colony_id"})
+_INVERT_OWNED_SCORPION = frozenset({"species_id", "life_stage"})
+
+
+def _apply_forward(invert: "Invert", fields: dict, owned: frozenset) -> None:
+    """Copy the legacy row's values onto its mirror, leaving invert-owned
+    columns alone."""
+    for k, v in fields.items():
+        if k in _IMMUTABLE or k in owned:
+            continue
+        setattr(invert, k, v)
+
+
 def mirror_tarantula_create(db: Session, t: "Tarantula") -> None:
     """Insert a matching `inverts` row for a newly-created Tarantula."""
     db.add(Invert(**_tarantula_to_invert_kwargs(t)))
@@ -172,10 +200,7 @@ def mirror_tarantula_update(db: Session, t: "Tarantula") -> None:
     if invert is None:
         db.add(Invert(**fields))
         return
-    for k, v in fields.items():
-        if k in ("id", "user_id", "taxon"):  # immutable
-            continue
-        setattr(invert, k, v)
+    _apply_forward(invert, fields, _INVERT_OWNED_TARANTULA)
 
 
 def mirror_tarantula_delete(db: Session, tarantula_id: UUID) -> None:
@@ -200,10 +225,7 @@ def mirror_scorpion_update(db: Session, s: "Scorpion") -> None:
     if invert is None:
         db.add(Invert(**fields))
         return
-    for k, v in fields.items():
-        if k in ("id", "user_id", "taxon"):
-            continue
-        setattr(invert, k, v)
+    _apply_forward(invert, fields, _INVERT_OWNED_SCORPION)
 
 
 def mirror_scorpion_delete(db: Session, scorpion_id: UUID) -> None:
@@ -452,6 +474,14 @@ _REVERSE_SHARED_FIELDS = (
     "is_public",
     "visibility",
     "notes",
+    # Scorpion-only columns. The loop below guards with hasattr(), so they're
+    # skipped harmlessly for tarantulas. Without them, moving a scorpion
+    # between communals or recording an instar on the generic screen left the
+    # legacy row on its old value — and `GET /scorpions/?colony_id=` filters on
+    # both surfaces, so the same animal could appear in two colonies.
+    "colony_id",
+    "current_instar",
+    "current_length_mm",
 )
 
 # Legacy tables that still back a read path. Taxa absent here (centipede,

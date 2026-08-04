@@ -17,6 +17,7 @@ from app.models.user import User
 from app.services.storage import storage_service
 from app.config import settings
 from app.utils.file_validation import validate_image_bytes
+from app.utils.hero_photo import sync_hero_photo
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 
 

@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta, date
 from collections import Counter
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula, Sex, Source
@@ -57,14 +57,22 @@ async def get_tarantulas(
     # so the collection grid + count match the cap (BRIEF §4b — transfer
     # provenance). Until C1 read-cutover, this legacy route is still what the
     # collection screens call, so the filter has to be applied here too.
+    # ADR-015: deceased animals are excluded for the same reason. Death is
+    # written to both rows, but this route filtered only on transfer — so a
+    # keeper could mark an animal died on mobile, watch it leave that
+    # collection, then open the web grid and find it still sitting there.
+    # Indistinguishable from the mark-died having failed.
     from app.models.invert import Invert
-    transferred_ids = db.query(Invert.id).filter(
+    archived_ids = db.query(Invert.id).filter(
         Invert.user_id == current_user.id,
-        Invert.transferred_out_at.isnot(None),
+        or_(
+            Invert.transferred_out_at.isnot(None),
+            Invert.died_at.isnot(None),
+        ),
     )
     tarantulas = db.query(Tarantula).filter(
         Tarantula.user_id == current_user.id,
-        Tarantula.id.notin_(transferred_ids),
+        Tarantula.id.notin_(archived_ids),
     ).order_by(Tarantula.created_at.desc()).all()
 
     return tarantulas

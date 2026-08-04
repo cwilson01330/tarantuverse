@@ -43,6 +43,7 @@ from app.models.shed_log import ShedLog
 from app.models.species import Species
 from app.utils.dependencies import get_current_user
 from app.utils.file_validation import validate_image_bytes
+from app.utils.hero_photo import sync_hero_photo
 from app.services.storage import storage_service
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.config import settings
@@ -598,10 +599,13 @@ async def upload_photo_via_token(
         photo = Photo(**photo_kwargs)
         db.add(photo)
 
-        # Set as main photo if none exists. Tarantula, Animal, and
-        # Scorpion all expose `photo_url`.
+        # Set as main photo if none exists. Tarantula, Animal, and Scorpion all
+        # expose `photo_url`. Goes through sync_hero_photo so a QR upload
+        # reaches BOTH rows of the dual-write pair — a bare assignment here
+        # would update whichever row the session resolved and leave the other
+        # stale, which is the bug fixed in photos.py.
         if not parent.photo_url:
-            parent.photo_url = photo_url
+            sync_hero_photo(db, parent, photo_url)
 
         display_name = _display_name_for(kind, parent)
 

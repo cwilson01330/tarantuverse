@@ -59,6 +59,14 @@ class ScorpionBase(BaseModel):
     feeding_paused_reason: Optional[str] = Field(None, max_length=40)
     feeding_paused_until: Optional[date] = None
 
+    # ADR-015 death. Read-exposed for the same reason it was added to
+    # TarantulaBase: `POST /inverts/{id}/died` writes BOTH rows of the
+    # dual-write pair, so without these the legacy scorpion surface would
+    # report a dead animal as alive — a write it can make but can't see.
+    died_at: Optional[date] = None
+    death_cause: Optional[str] = Field(None, max_length=40)
+    death_notes: Optional[str] = None
+
     photo_url: Optional[str] = Field(None, max_length=500)
     is_public: bool = False
     visibility: Optional[str] = Field(None, pattern="^(public|private)$")
