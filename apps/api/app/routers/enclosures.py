@@ -299,8 +299,12 @@ async def add_inhabitant(
             detail="Tarantula not found"
         )
 
-    # Add to enclosure
+    # Add to enclosure. Mirrored, or the generic detail screen keeps showing
+    # the old enclosure (or none) while the legacy page shows the new one.
+    from app.services.inverts_dualwrite import mirror_tarantula_update
+
     tarantula.enclosure_id = enclosure_id
+    mirror_tarantula_update(db, tarantula)
     db.commit()
 
     return {"message": "Tarantula added to enclosure", "tarantula_id": str(tarantula_id)}
@@ -339,8 +343,11 @@ async def remove_inhabitant(
             detail="Tarantula not found in this enclosure"
         )
 
-    # Remove from enclosure
+    # Remove from enclosure — mirrored for the same reason as adding.
+    from app.services.inverts_dualwrite import mirror_tarantula_update
+
     tarantula.enclosure_id = None
+    mirror_tarantula_update(db, tarantula)
     db.commit()
 
     return {"message": "Tarantula removed from enclosure", "tarantula_id": str(tarantula_id)}

@@ -589,6 +589,16 @@ async def claim_transfer(
         offspring.status_date = _now().date()
         offspring.buyer_info = current_user.username
 
+    # ADR-005 dual-write. Deliberately last: the hero photo is assigned during
+    # the copy loop above, and mirroring before that would leave the legacy row
+    # with a null photo_url — the same one-directional hero bug fixed in
+    # photos.py. Building the legacy row from the finished invert avoids it.
+    # Without this the claimed animal exists on mobile and is absent from the
+    # web collection, search, analytics and the export.
+    from app.services.inverts_dualwrite import mirror_invert_create_to_legacy
+
+    mirror_invert_create_to_legacy(db, new_invert)
+
     db.commit()
     db.refresh(new_invert)
 

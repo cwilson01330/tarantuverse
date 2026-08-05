@@ -492,12 +492,22 @@ _LEGACY_MODEL_BY_TAXON = {
 }
 
 
-def mirror_invert_update_to_legacy(db: Session, invert: Invert) -> None:
-    """Push an `inverts` edit back onto its legacy row, if one exists.
+def _legacy_model_for(taxon: str):
+    """Resolve the legacy model class for a taxon, or None if it lives only on
+    `inverts` (centipede, mantis, and everything added after the per-taxon
+    tables stopped being written)."""
+    target = _LEGACY_MODEL_BY_TAXON.get(taxon)
+    if target is None:
+        return None
 
-    No-ops for taxa with no legacy table, and for inverts created after the
-    per-taxon tables stopped being written. Never creates a legacy row — this
-    only keeps an existing one from going stale.
+    module_path, class_name = target.split(":")
+    import importlib
+
+    return getattr(importlib.import_module(module_path), class_name)
+
+
+def _apply_reverse(row, invert: Invert) -> None:
+    """Copy an invert's shared columns onto its legacy row.
 
     `life_stage` and `enclosure_type` are handled separately: they're SQLEnum
     columns on Tarantula but plain CHECK-constrained strings on Invert, and
@@ -505,23 +515,10 @@ def mirror_invert_update_to_legacy(db: Session, invert: Invert) -> None:
     the value is a valid member of the legacy enum, and skip otherwise rather
     than failing the whole edit over a display field.
     """
-    target = _LEGACY_MODEL_BY_TAXON.get(invert.taxon)
-    if target is None:
-        return
-
-    module_path, class_name = target.split(":")
-    import importlib
-
-    model = getattr(importlib.import_module(module_path), class_name)
-    row = db.query(model).filter(model.id == invert.id).first()
-    if row is None:
-        return  # invert-native animal; nothing legacy to keep in sync
-
     for field in _REVERSE_SHARED_FIELDS:
         if hasattr(row, field):
             setattr(row, field, getattr(invert, field))
 
-    # Enum-typed columns, guarded.
     for field in ("life_stage", "enclosure_type"):
         value = getattr(invert, field, None)
         column = getattr(type(row), field, None)
@@ -537,6 +534,157 @@ def mirror_invert_update_to_legacy(db: Session, invert: Invert) -> None:
             setattr(row, field, value)
 
 
+def _legacy_species_id(db: Session, invert: Invert):
+    """The species id to put on the legacy row, or None.
+
+    The catalogs share primary keys for mirrored species — Phase B preserved
+    the id when copying `species` into `invert_species` — so the value can be
+    copied directly. But the FKs target different tables, and a species created
+    natively on `invert_species` has no legacy counterpart, so copying blindly
+    would raise a foreign key violation. Guard on existence, exactly as
+    backfill_inverts.py step 5 does.
+    """
+    if invert.species_id is None:
+        return None
+
+    if invert.taxon == "tarantula":
+        from app.models.species import Species as LegacyCatalog
+    elif invert.taxon == "scorpion":
+        from app.models.scorpion_species import ScorpionSpecies as LegacyCatalog
+    else:
+        return None
+
+    exists = (
+        db.query(LegacyCatalog.id)
+        .filter(LegacyCatalog.id == invert.species_id)
+        .first()
+    )
+    return invert.species_id if exists else None
+
+
+_SPECIES_REVERSE_EXCLUDE = frozenset({
+    "id",             # immutable identity, shared across both catalogs
+    "created_at",
+    "updated_at",
+    # Species.burrowing is a Boolean; invert_species.burrowing is
+    # 'none' | 'light' | 'heavy'. The forward map collapses True → 'heavy', so
+    # a reverse copy followed by a forward copy would silently promote 'light'
+    # to 'heavy'. Leaving it stale is recoverable; corrupting it on every round
+    # trip is not.
+    "burrowing",
+    # SQLEnum on Species, plain string on InvertSpecies — handled separately
+    # below so an out-of-range value skips instead of raising.
+    "care_level",
+})
+
+
+def _species_reverse_fields(legacy_model) -> tuple:
+    """Columns safe to copy from `invert_species` back onto a legacy catalog row.
+
+    Derived from the model intersection rather than hand-listed: the catalogs
+    have 40 columns in common and a maintained list would drift. A column added
+    to both tables is mirrored automatically; one that needs special handling
+    goes in _SPECIES_REVERSE_EXCLUDE with a reason.
+    """
+    from app.models.invert_species import InvertSpecies
+
+    shared = {c.key for c in legacy_model.__table__.columns} & {
+        c.key for c in InvertSpecies.__table__.columns
+    }
+    return tuple(sorted(shared - _SPECIES_REVERSE_EXCLUDE))
+
+
+def mirror_invert_species_update_to_legacy(db: Session, species) -> None:
+    """Push an `invert_species` edit back onto its legacy catalog row.
+
+    The legacy `species` / `scorpion_species` tables still back real reads: the
+    tarantula feeding-stats route, the public species pages, and the
+    Appalachian Tarantulas storefront care guides, which fetch this API. Editing
+    a care sheet on the unified surface updated none of them.
+
+    Note the feeding-interval columns are NOT part of this — they exist only on
+    `species` and can't be set through `invert_species` at all, so the feeding
+    prediction was never at risk from this gap.
+
+    No-op for taxa with no legacy catalog (centipede, mantis, and the rest).
+    """
+    from app.models.scorpion_species import ScorpionSpecies
+    from app.models.species import Species
+
+    if species.taxon == "tarantula":
+        legacy_model = Species
+    elif species.taxon == "scorpion":
+        legacy_model = ScorpionSpecies
+    else:
+        return
+
+    row = db.query(legacy_model).filter(legacy_model.id == species.id).first()
+    if row is None:
+        return  # catalog entry born on the unified surface; no legacy twin
+
+    for field in _species_reverse_fields(legacy_model):
+        setattr(row, field, getattr(species, field))
+
+    # care_level: enum-typed on the legacy row. Assign only a valid member,
+    # rather than failing the whole edit over one display field.
+    value = getattr(species, "care_level", None)
+    column = getattr(legacy_model, "care_level", None)
+    if column is not None:
+        enum_cls = getattr(column.type, "enum_class", None)
+        if value is None or enum_cls is None:
+            row.care_level = value
+        elif value in {e.value for e in enum_cls}:
+            row.care_level = value
+
+
+def mirror_invert_create_to_legacy(db: Session, invert: Invert) -> None:
+    """Create the legacy row for an invert born on the unified surface.
+
+    Until the C1 read cutover, an animal with no legacy row is invisible to
+    every read path that hasn't moved yet: the web collection, keeper profiles,
+    search, dashboard analytics, premolt, achievements, enclosure assignment and
+    the data export. Transfer claims and CSV imports both created inverts
+    directly, so a claimed or imported tarantula showed up on mobile and simply
+    wasn't there on web — which reads as an import that half-worked.
+
+    Idempotent: no-ops when the row already exists, so it's safe to call from a
+    path that may or may not have gone through a legacy create.
+    """
+    model = _legacy_model_for(invert.taxon)
+    if model is None:
+        return  # invert-native taxon; there is no legacy table to write
+
+    existing = db.query(model.id).filter(model.id == invert.id).first()
+    if existing:
+        return
+
+    # Shares the primary key with the invert — that identity is what lets every
+    # other mirror in this module find its twin.
+    row = model(id=invert.id, user_id=invert.user_id)
+    _apply_reverse(row, invert)
+    row.species_id = _legacy_species_id(db, invert)
+    db.add(row)
+
+
+def mirror_invert_update_to_legacy(db: Session, invert: Invert) -> None:
+    """Push an `inverts` edit back onto its legacy row, if one exists.
+
+    No-ops for taxa with no legacy table, and for inverts created after the
+    per-taxon tables stopped being written. Never creates a legacy row — see
+    mirror_invert_create_to_legacy for that; keeping them separate means an
+    edit can't silently resurrect a row someone deliberately deleted.
+    """
+    model = _legacy_model_for(invert.taxon)
+    if model is None:
+        return
+
+    row = db.query(model).filter(model.id == invert.id).first()
+    if row is None:
+        return  # invert-native animal; nothing legacy to keep in sync
+
+    _apply_reverse(row, invert)
+
+
 def mirror_invert_delete_to_legacy(db: Session, invert: Invert) -> None:
     """Delete the legacy tarantulas/scorpions row alongside an invert delete.
 
@@ -549,14 +697,10 @@ def mirror_invert_delete_to_legacy(db: Session, invert: Invert) -> None:
     own FK, and logs carrying both parent ids get cleaned up by whichever side
     runs first (same reasoning as mirror_tarantula_delete).
     """
-    target = _LEGACY_MODEL_BY_TAXON.get(invert.taxon)
-    if target is None:
+    model = _legacy_model_for(invert.taxon)
+    if model is None:
         return
 
-    module_path, class_name = target.split(":")
-    import importlib
-
-    model = getattr(importlib.import_module(module_path), class_name)
     row = db.query(model).filter(model.id == invert.id).first()
     if row is not None:
         db.delete(row)

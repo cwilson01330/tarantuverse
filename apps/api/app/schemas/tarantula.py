@@ -84,8 +84,24 @@ class TarantulaResponse(TarantulaBase):
     id: uuid.UUID
     user_id: uuid.UUID
     species_id: Optional[uuid.UUID]
+    # On both tables and written by the enclosure routes, but absent here — so
+    # the legacy surface could change an animal's enclosure and never show it.
+    enclosure_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: Optional[datetime]
+
+    # Pattern-free overrides for serialization. The strict patterns on
+    # TarantulaBase are right for INPUT, but on the response a single row
+    # holding an out-of-range value raises ResponseValidationError and 500s the
+    # ENTIRE list — the whole web collection renders empty over one bad animal.
+    # The reverse mirror copies `sex` and `visibility` straight off `inverts`,
+    # which is precisely the channel such a value would arrive through.
+    # InvertResponse and ScorpionResponse already carry these; this one didn't.
+    sex: Optional[str] = None
+    source: Optional[str] = None
+    life_stage: Optional[str] = None
+    enclosure_type: Optional[str] = None
+    visibility: Optional[str] = None
 
     class Config:
         from_attributes = True

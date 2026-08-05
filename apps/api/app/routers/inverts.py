@@ -208,6 +208,15 @@ def create_invert_row(
 
     new_invert = Invert(user_id=user.id, **data)
     db.add(new_invert)
+    db.flush()  # assign the PK so the legacy row can share it
+
+    # ADR-005 dual-write: until the read cutover, an animal with no legacy row
+    # is invisible to the web collection, keeper profiles, search, analytics,
+    # premolt, achievements and the export. No-ops for invert-native taxa.
+    from app.services.inverts_dualwrite import mirror_invert_create_to_legacy
+
+    mirror_invert_create_to_legacy(db, new_invert)
+
     db.commit()
     db.refresh(new_invert)
 
@@ -496,11 +505,18 @@ async def delete_invert(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Invert not found",
         )
+    # Clear references a cascade won't handle — chiefly `pairings`, which still
+    # points at the legacy row for any animal that has been bred. Without this
+    # the delete raised IntegrityError and 500'd, so a bred female could be
+    # deleted from the old web page but not from this screen.
+    from app.services.inverts_dualwrite import mirror_invert_delete_to_legacy
+    from app.utils.animal_delete import clear_dependent_references
+
+    clear_dependent_references(db, invert_id)
+
     # Remove the legacy twin too. GET /tarantulas/ reads the legacy table until
     # the C1 read cutover, so deleting only the invert row leaves the animal
     # visible in the collection — it looks like the delete silently failed.
-    from app.services.inverts_dualwrite import mirror_invert_delete_to_legacy
-
     mirror_invert_delete_to_legacy(db, invert)
 
     db.delete(invert)

@@ -15,9 +15,8 @@ from app.models.molt_log import MoltLog
 from app.models.feeding_log import FeedingLog
 from app.models.substrate_change import SubstrateChange
 from app.models.photo import Photo
-from app.models.pairing import Pairing
-from app.models.offspring import Offspring
-from app.models.pricing_submission import PricingSubmission
+# Pairing / Offspring / PricingSubmission are reached through
+# app.utils.animal_delete.clear_dependent_references, not directly.
 from app.models.species import Species
 from app.schemas.tarantula import (
     TarantulaCreate,
@@ -261,16 +260,12 @@ async def delete_tarantula(
     db.query(MoltLog).filter(MoltLog.tarantula_id == tarantula_id).delete()
     db.query(SubstrateChange).filter(SubstrateChange.tarantula_id == tarantula_id).delete()
     db.query(Photo).filter(Photo.tarantula_id == tarantula_id).delete()
-    db.query(PricingSubmission).filter(PricingSubmission.tarantula_id == tarantula_id).update(
-        {PricingSubmission.tarantula_id: None}
-    )
-    db.query(Offspring).filter(Offspring.tarantula_id == tarantula_id).update(
-        {Offspring.tarantula_id: None}
-    )
-    # Delete pairings where this tarantula is male or female
-    db.query(Pairing).filter(
-        (Pairing.male_id == tarantula_id) | (Pairing.female_id == tarantula_id)
-    ).delete(synchronize_session='fetch')
+    # Pricing, offspring and pairing references — shared with DELETE
+    # /inverts/{id} so both routes leave the same state behind. Also covers the
+    # invert-side pairing columns, which this route used to miss.
+    from app.utils.animal_delete import clear_dependent_references
+
+    clear_dependent_references(db, tarantula_id)
 
     db.delete(tarantula)
     # Mirror the delete to the unified `inverts` table. Each CASCADE

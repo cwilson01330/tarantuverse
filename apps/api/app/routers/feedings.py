@@ -340,6 +340,12 @@ async def create_scorpion_feeding_log(
         invert_id=invert_id_if_exists(db, scorpion_id),
         **feeding_data.model_dump(),
     )
+    # Taking food ends a pause; a refusal confirms it. This path was the only
+    # feeding route that never cleared one, so a paused scorpion stayed paused
+    # after eating — and stayed exempt from overdue detection, which is the
+    # blind spot utils/feeding_pause exists to close.
+    resume_if_accepted(scorpion, feeding_data.accepted, db)
+
     db.add(new_feeding)
     db.commit()
     db.refresh(new_feeding)

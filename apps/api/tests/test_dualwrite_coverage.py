@@ -162,6 +162,85 @@ def test_owned_sets_do_not_hide_real_columns():
 
 # ── Response schema symmetry ─────────────────────────────────────────────────
 
+# ── The create mirror (transfer claims, CSV imports) ─────────────────────────
+
+class _FakeQuery:
+    def __init__(self, result):
+        self._result = result
+
+    def filter(self, *_criteria):
+        return self
+
+    def first(self):
+        return self._result
+
+
+class _FakeSession:
+    """Records what got added; returns a fixed lookup result."""
+
+    def __init__(self, lookup=None):
+        self.lookup = lookup
+        self.added = []
+
+    def query(self, *_args):
+        return _FakeQuery(self.lookup)
+
+    def add(self, obj):
+        self.added.append(obj)
+
+
+def test_create_mirror_noops_for_invert_native_taxa():
+    """Centipedes, mantises and everything added after the per-taxon tables
+    stopped being written have no legacy table. The mirror must not invent one."""
+    from app.services.inverts_dualwrite import mirror_invert_create_to_legacy
+
+    db = _FakeSession()
+    mirror_invert_create_to_legacy(db, Invert(id="x", taxon="centipede"))
+    assert db.added == []
+
+
+def test_create_mirror_is_idempotent():
+    """Called from a path that may already have gone through a legacy create,
+    so a second call must not produce a duplicate row."""
+    from app.services.inverts_dualwrite import mirror_invert_create_to_legacy
+
+    db = _FakeSession(lookup=("already-there",))
+    mirror_invert_create_to_legacy(db, Invert(id="x", taxon="tarantula"))
+    assert db.added == []
+
+
+def test_legacy_species_id_is_dropped_when_the_catalog_row_is_absent():
+    """THE FK GUARD. The catalogs share ids for mirrored species, so the value
+    can be copied — but a species created natively on `invert_species` has no
+    legacy counterpart, and copying it blindly would raise a foreign key
+    violation and fail the whole claim or import."""
+    from app.services.inverts_dualwrite import _legacy_species_id
+
+    invert = Invert(id="x", taxon="tarantula", species_id="sp-1")
+
+    assert _legacy_species_id(_FakeSession(lookup=None), invert) is None
+    assert _legacy_species_id(_FakeSession(lookup=("sp-1",)), invert) == "sp-1"
+
+
+def test_species_reverse_mirror_only_touches_shared_columns():
+    """Derived from the model intersection, so it can never try to write an
+    invert-only column (slug, taxon, venom_severity …) onto a legacy catalog
+    row — which would fail on flush."""
+    from app.models.scorpion_species import ScorpionSpecies
+    from app.models.species import Species
+    from app.services.inverts_dualwrite import _species_reverse_fields
+
+    from app.models.invert_species import InvertSpecies
+
+    invert_cols = {c.key for c in InvertSpecies.__table__.columns}
+    for legacy in (Species, ScorpionSpecies):
+        legacy_cols = {c.key for c in legacy.__table__.columns}
+        fields = set(_species_reverse_fields(legacy))
+        assert fields <= legacy_cols, f"{legacy.__name__}: would write a column it lacks"
+        assert fields <= invert_cols, f"{legacy.__name__}: would read a column invert_species lacks"
+        assert fields, "mirror would be a no-op"
+
+
 def test_death_columns_are_readable_on_every_surface():
     """Bugs 1 and 4. A surface that can WRITE a death via the shared id must be
     able to READ it back, or the animal reports as alive on that surface."""

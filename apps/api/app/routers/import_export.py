@@ -296,6 +296,15 @@ async def import_commit(
                         continue
                     if hasattr(existing, fld):
                         setattr(existing, fld, val)
+                # ADR-005 dual-write. Without this a re-import updates the
+                # unified row and leaves the legacy twin stale across the whole
+                # file at once — the renamed-communal symptom multiplied by the
+                # row count, and on a surface where nobody would think to look.
+                from app.services.inverts_dualwrite import (
+                    mirror_invert_update_to_legacy,
+                )
+
+                mirror_invert_update_to_legacy(db, existing)
                 db.commit()
                 updated += 1
             else:
