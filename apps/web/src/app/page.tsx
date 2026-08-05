@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { TarantuverseLogoTransparent } from '@/components/TarantuverseLogo'
+import StoreRating from '@/components/StoreRating'
 
 export default function Home() {
   const { data: session, status } = useSession()
@@ -138,6 +139,13 @@ export default function Home() {
               >
                 <img src="/app-store-badge.svg" alt="Download on the App Store" className="h-14 w-auto" />
               </a>
+            </div>
+
+            {/* Shown because it's marked up in JSON-LD — a rating Google reads
+                should be one the visitor can see. Count sits beside the average
+                deliberately; see components/StoreRating. */}
+            <div className="mb-8">
+              <StoreRating />
             </div>
 
             <div className="flex flex-col sm:flex-row gap-6 text-sm text-gray-400">
