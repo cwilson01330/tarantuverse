@@ -130,3 +130,6 @@ apps/api/species_without_images.txt
 apps/api/species_images_sourced.csv
 apps/api/species_images_r2.csv
 docs/design/species_images_r2.csv
+
+# Design agent HTML exports
+*(standalone).html
