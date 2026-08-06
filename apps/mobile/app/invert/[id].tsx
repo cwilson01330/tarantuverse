@@ -40,6 +40,10 @@ import QRSheet from '../../src/components/QRSheet';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { getErrorMessage } from '../../src/utils/errors';
 import { MarkDiedSheet } from '../../src/components/MarkDiedSheet';
+import {
+  OverflowMenuSheet,
+  type OverflowMenuRow,
+} from '../../src/components/OverflowMenuSheet';
 import { COPY as LIFECYCLE_COPY, historicalRecordLine, pronounsFor, tenureLabel } from '../../src/lib/lifecycle-copy';
 import { parseLocalDate } from '../../src/utils/date';
 
@@ -72,6 +76,7 @@ function InvertDetailScreen() {
   const [pauseOpen, setPauseOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [diedOpen, setDiedOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [reviving, setReviving] = useState(false);
   // Which reference rows are open. All collapsed by default — see CollapsibleRow.
   const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
@@ -268,21 +273,52 @@ function InvertDetailScreen() {
   // Overflow replaces the old header's edit/delete pair. Delete sitting one
   // tap away in a permanent header button was a lot of exposure for an
   // irreversible action on the app's most-visited screen.
-  const openOverflow = () => {
-    Alert.alert(headerTitle, undefined, [
-      { text: 'Edit', onPress: () => router.push(`/invert/edit?id=${id}` as any) },
-      // QR was tarantula-only until the generic upload-session route landed.
-      { text: 'QR label & upload', onPress: () => setQrOpen(true) },
-      // Mark as died sits ABOVE delete and without destructive styling. Delete
-      // stops being the only exit for an animal that died — it survives for
-      // records added by mistake, which is what it's actually for.
-      ...(invert.died_at
-        ? [{ text: 'Restore to collection', onPress: handleRevive }]
-        : [{ text: LIFECYCLE_COPY.menuItem, onPress: () => setDiedOpen(true) }]),
-      { text: 'Delete record', style: 'destructive' as const, onPress: handleDelete },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
+  //
+  // This was an Alert.alert until 2026-08-06. Android's native dialog renders
+  // at most THREE buttons and React Native drops the rest silently, so "Delete
+  // record" — fourth in the list — did not exist on Android. A keeper who added
+  // an animal by mistake had no way to remove it. iOS showed all five, which is
+  // why it went unnoticed. See components/OverflowMenuSheet.
+  const overflowRows: OverflowMenuRow[] = [
+    {
+      key: 'edit',
+      label: 'Edit',
+      icon: 'pencil-outline',
+      onPress: () => router.push(`/invert/edit?id=${id}` as any),
+    },
+    // QR was tarantula-only until the generic upload-session route landed.
+    {
+      key: 'qr',
+      label: 'QR label & upload',
+      icon: 'qrcode',
+      onPress: () => setQrOpen(true),
+    },
+    // Mark as died sits ABOVE delete and without destructive styling. Delete
+    // stops being the only exit for an animal that died — it survives for
+    // records added by mistake, which is what it's actually for.
+    invert.died_at
+      ? {
+          key: 'revive',
+          label: 'Restore to collection',
+          icon: 'backup-restore',
+          onPress: handleRevive,
+        }
+      : {
+          key: 'died',
+          label: LIFECYCLE_COPY.menuItem,
+          icon: 'weather-night',
+          onPress: () => setDiedOpen(true),
+        },
+    {
+      key: 'delete',
+      label: 'Delete record',
+      icon: 'trash-can-outline',
+      destructive: true,
+      onPress: handleDelete,
+    },
+  ];
+
+  const openOverflow = () => setMenuOpen(true);
 
   const handleShare = async () => {
     try {
@@ -1047,6 +1083,13 @@ function InvertDetailScreen() {
       {/* Counts come from the fetch this screen already ran, so the sheet's
           key line ("her 41 feedings, 9 molts and 12 photos stay") costs no
           extra request. */}
+      <OverflowMenuSheet
+        visible={menuOpen}
+        title={headerTitle}
+        rows={overflowRows}
+        onClose={() => setMenuOpen(false)}
+      />
+
       <MarkDiedSheet
         visible={diedOpen}
         onClose={() => setDiedOpen(false)}
