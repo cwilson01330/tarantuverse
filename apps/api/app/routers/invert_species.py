@@ -209,6 +209,15 @@ async def update_invert_species(
     for field, value in data.items():
         setattr(species, field, value)
 
+    # ADR-005 dual-write. The legacy catalogs still back the public species
+    # pages and the storefront care guides, so an edit made only here would
+    # leave those showing the old husbandry.
+    from app.services.inverts_dualwrite import (
+        mirror_invert_species_update_to_legacy,
+    )
+
+    mirror_invert_species_update_to_legacy(db, species)
+
     db.commit()
     db.refresh(species)
     return species
