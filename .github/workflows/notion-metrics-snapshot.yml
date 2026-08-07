@@ -1,0 +1,78 @@
+name: Daily metrics snapshot to Notion
+
+# Writes one row a day to the Notion Metrics database, so there's a history to
+# look back at. The dashboard shows what is true now; nothing retains what was
+# true in June, which makes questions like "did the taxa expansion move signups"
+# unanswerable after the fact.
+#
+# WHY GITHUB ACTIONS IS FINE HERE, HAVING BEEN A BAD FIT BEFORE
+# -------------------------------------------------------------
+# The keep-warm workflow this replaces asked for a run every 10 minutes and got
+# about 9% of them — gaps of 94 to 164 minutes. Scheduled workflows are
+# deprioritised and explicitly best-effort.
+#
+# A once-daily job tolerates that. Three attempts are scheduled rather than one,
+# because a single 06:00 attempt that silently doesn't fire costs a day of
+# history that can never be recovered. The endpoint skips a date that already
+# has a row, so extra attempts are free — the first one to land wins and the
+# rest return "skipped" without writing.
+#
+# The three times are clustered in the morning on purpose. `Feedings today` is a
+# same-day count, so rows are only comparable if they're taken at a similar hour.
+# Spreading attempts across the whole day would make that column noisy.
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC — the intended capture time
+    - cron: "0 8 * * *"   # backup if the first didn't fire
+    - cron: "0 11 * * *"  # last chance, still morning-ish in UTC
+  workflow_dispatch: # manual trigger from the Actions tab
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    # Must comfortably exceed the worst-case curl budget below. The previous
+    # workflow had a 285s budget under a 120s timeout, so the runner killed it
+    # mid-retry and the job reported failed exactly when the API was slow.
+    timeout-minutes: 5
+    steps:
+      - name: Snapshot platform metrics
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET is not set on this repository."
+            exit 1
+          fi
+
+          URL="https://tarantuverse-api.onrender.com/api/v1/notion/metrics/cron-snapshot"
+
+          # Budget: 3 attempts x 45s + 2 x 10s delay = 155s, inside the 5 min
+          # job timeout. Keep these numbers and timeout-minutes in step.
+          # -f makes 4xx/5xx a failure; a skipped day returns 200 and passes.
+          BODY=$(curl -fsS -X POST \
+            -H "X-Cron-Secret: ${CRON_SECRET}" \
+            --max-time 45 --retry 2 --retry-delay 10 \
+            "$URL") || {
+              # A real failure SHOULD go red. A metrics history with silent
+              # gaps is worse than one that tells you when it broke.
+              echo "::error::Snapshot request failed. Today's row may be missing."
+              exit 1
+            }
+
+          echo "$BODY"
+
+          case "$BODY" in
+            *'"status":"created"'*)
+              echo "::notice::Snapshot written." ;;
+            *'"status":"skipped"'*)
+              echo "::notice::Already recorded today — nothing to do." ;;
+            *'"status":"disabled"'*)
+              # Not a failure. The integration just isn't configured, and
+              # failing here would train us to ignore this workflow.
+              echo "::warning::Notion metrics are not configured on the API." ;;
+            *)
+              echo "::warning::Unrecognised response — check the API." ;;
+          esac
