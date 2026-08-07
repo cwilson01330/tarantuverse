@@ -96,6 +96,15 @@ class Settings(BaseSettings):
     APPLE_IAP_ISSUER_ID: str = ""    # UUID shown above the key list
     APPLE_IAP_PRIVATE_KEY: str = ""  # full contents of the .p8 file
 
+    # Notion — admin-only push of support messages and metrics snapshots.
+    # Unset means the feature is simply off; nothing errors, the buttons report
+    # that it isn't configured. Create an internal integration at
+    # notion.so/my-integrations, then share each database with it — an
+    # integration can only see pages explicitly shared with it.
+    NOTION_TOKEN: str = ""
+    NOTION_FEEDBACK_DATABASE_ID: str = ""
+    NOTION_METRICS_DATABASE_ID: str = ""
+
     # Environment
     ENVIRONMENT: str = "development"
     DEBUG: bool = True

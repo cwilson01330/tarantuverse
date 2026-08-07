@@ -34,6 +34,7 @@ import app.routers.notifications as notifications
 import app.routers.import_export as import_export
 import app.routers.admin as admin
 import app.routers.admin_analytics as admin_analytics
+import app.routers.notion as notion
 import app.routers.promo_codes as promo_codes
 import app.routers.user_blocks as user_blocks
 import app.routers.content_reports as content_reports
@@ -259,6 +260,7 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 print("[STARTUP] Registering admin analytics router...")
 app.include_router(admin_analytics.router, prefix="/api/v1", tags=["admin-analytics"])
+app.include_router(notion.router, prefix="/api/v1/notion", tags=["notion"])
 
 print("[STARTUP] Registering promo codes router...")
 app.include_router(promo_codes.router, prefix="/api/v1/promo-codes", tags=["promo_codes", "premium"])

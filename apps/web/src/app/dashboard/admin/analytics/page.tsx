@@ -234,7 +234,10 @@ export default function AdminAnalyticsPage() {
             Platform metrics and insights
           </p>
         </div>
-        <PeriodSelector value={period} onChange={setPeriod} />
+        <div className="flex items-center gap-3">
+          <SnapshotToNotionButton token={token} />
+          <PeriodSelector value={period} onChange={setPeriod} />
+        </div>
       </div>
 
       {/* Overview Stats */}
@@ -353,6 +356,84 @@ export default function AdminAnalyticsPage() {
 }
 
 // Users Tab Content
+/**
+ * Writes today's numbers to the Notion Metrics database.
+ *
+ * The dashboard above already shows what's true right now. What it can't show
+ * is what was true in June — nothing retains history, so questions like "did
+ * the taxa expansion move signups" are unanswerable after the fact. Each press
+ * records a fact that can't be recovered later.
+ *
+ * Hides itself when Notion isn't configured, rather than offering an action
+ * that will fail.
+ */
+function SnapshotToNotionButton({ token }: { token: string | null }) {
+  const [enabled, setEnabled] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; text: string; url?: string } | null>(null)
+
+  useEffect(() => {
+    if (!token) return
+    fetch(`${API_URL}/api/v1/notion/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setEnabled(Boolean(d?.metrics_enabled)))
+      .catch(() => setEnabled(false))
+  }, [token])
+
+  if (!enabled) return null
+
+  const snapshot = async () => {
+    setBusy(true)
+    setResult(null)
+    try {
+      const res = await fetch(`${API_URL}/api/v1/notion/metrics/snapshot`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.detail || `Failed (${res.status})`)
+      setResult({ ok: true, text: 'Saved to Notion', url: data?.url })
+    } catch (e: any) {
+      // Surfaced rather than swallowed — a snapshot that silently didn't
+      // happen is worse than none, because you'd believe you had the data.
+      setResult({ ok: false, text: e.message || 'Could not save' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {result && (
+        <span
+          className={`text-xs ${
+            result.ok
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400'
+          }`}
+        >
+          {result.url ? (
+            <a href={result.url} target="_blank" rel="noopener noreferrer" className="underline">
+              {result.text}
+            </a>
+          ) : (
+            result.text
+          )}
+        </span>
+      )}
+      <button
+        onClick={snapshot}
+        disabled={busy}
+        className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition"
+      >
+        {busy ? 'Saving…' : 'Snapshot to Notion'}
+      </button>
+    </div>
+  )
+}
+
 function UsersTabContent({ data }: { data: UserAnalyticsResponse }) {
   return (
     <div className="space-y-6">
