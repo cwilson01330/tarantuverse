@@ -167,6 +167,45 @@ def _num(value) -> dict:
     return {"number": f}
 
 
+def has_snapshot_for(day: date) -> bool:
+    """True if the Metrics database already holds a row for this date.
+
+    Only the cron uses this. A human pressing the button twice is making two
+    deliberate observations and both are kept; an automated job firing twice is
+    noise, and a time series with random duplicate days is harder to read and
+    easy to misinterpret as activity.
+
+    Fails OPEN — on any error this returns False so the snapshot still gets
+    written. A duplicate row is a nuisance; a silently missing day is a hole in
+    the history that can never be filled.
+    """
+    if not metrics_configured():
+        return False
+    try:
+        with httpx.Client(timeout=15) as client:
+            response = client.post(
+                f"https://api.notion.com/v1/databases/{settings.NOTION_METRICS_DATABASE_ID}/query",
+                headers={
+                    "Authorization": f"Bearer {settings.NOTION_TOKEN}",
+                    "Notion-Version": NOTION_VERSION,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "filter": {"property": "Date", "date": {"equals": day.isoformat()}},
+                    "page_size": 1,
+                },
+            )
+        if response.status_code >= 400:
+            logger.warning(
+                "Notion duplicate check failed (%s) — writing anyway", response.status_code
+            )
+            return False
+        return bool(response.json().get("results"))
+    except httpx.HTTPError as e:
+        logger.warning("Notion duplicate check errored (%s) — writing anyway", e)
+        return False
+
+
 def send_metrics_snapshot(overview, *, on_date: Optional[date] = None) -> Optional[str]:
     """Append one row to the Metrics database from an AdminAnalyticsOverview.
 

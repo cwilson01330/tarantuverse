@@ -12,9 +12,10 @@ Everything here is gated on `get_current_admin`. A keeper's private message
 must never be forwardable by anyone but the person it was sent to.
 """
 import logging
+import os
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -133,3 +134,44 @@ async def push_metrics_snapshot(
             status_code=502, detail="Notion rejected the snapshot. Try again."
         )
     return NotionPushResponse(url=url)
+
+
+@router.post("/metrics/cron-snapshot")
+async def cron_metrics_snapshot(
+    x_cron_secret: str = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Secret-gated daily snapshot. Matches the `/notifications/run-digests`
+    pattern — guarded by CRON_SECRET rather than user auth, because a cron has
+    no user.
+
+    Skips when today already has a row. A person pressing the button twice is
+    making two deliberate observations; a job firing twice is noise, and Render
+    Cron can retry.
+
+    Returns 200 with `skipped` rather than an error when there's nothing to do,
+    so a retry or an overlapping run doesn't show up as a failure.
+    """
+    secret = os.environ.get("CRON_SECRET")
+    if not secret or x_cron_secret != secret:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    if not notion_service.metrics_configured():
+        # Not an error — the integration just isn't set up. Saying so plainly
+        # beats a 500 that looks like an outage in the cron logs.
+        return {"status": "disabled", "reason": "Notion metrics not configured"}
+
+    today = date.today()
+    if notion_service.has_snapshot_for(today):
+        return {"status": "skipped", "reason": f"{today.isoformat()} already recorded"}
+
+    from app.routers.admin_analytics import get_analytics_overview
+
+    overview = await get_analytics_overview(db=db)
+    url = notion_service.send_metrics_snapshot(overview, on_date=today)
+
+    if not url:
+        # 502 so a genuine failure shows red in the cron history — a metrics
+        # history with silent gaps is worse than one that tells you it broke.
+        raise HTTPException(status_code=502, detail="Notion rejected the snapshot.")
+    return {"status": "created", "url": url}
