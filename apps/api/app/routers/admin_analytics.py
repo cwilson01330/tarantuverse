@@ -10,7 +10,7 @@ Provides comprehensive analytics endpoints for admin dashboard:
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, distinct, and_, case, text
+from sqlalchemy import func, distinct, and_, or_, case, text
 from datetime import datetime, timedelta, timezone, date
 from typing import Literal
 
@@ -163,6 +163,53 @@ async def get_analytics_overview(
     for app_name, cnt in app_rows:
         premium_by_app[app_name] = int(cnt or 0)
 
+    # Comped vs paying. total_premium_users counts BOTH, so charted over time it
+    # rises whenever comps are handed out — which reads as conversion when it's
+    # generosity. Splitting keeps the growth story honest.
+    #
+    # `comped` is the positive test: admin-granted, or a promo-sourced sub.
+    # Everything else is counted as paying, which is an inference rather than
+    # evidence — some early rows predate `subscription_source` and carry NULL.
+    # `subscribers_unknown_source` surfaces exactly how much of "paying" is
+    # assumption, so the number can be read with the right amount of trust.
+    _comped_clause = or_(
+        UserSubscription.granted_by_admin.is_(True),
+        UserSubscription.subscription_source == "promo",
+    )
+    comped_subscribers = (
+        db.query(func.count(distinct(UserSubscription.user_id)))
+        .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(
+            active_subscription_clause(),
+            SubscriptionPlan.name != "free",
+            _comped_clause,
+        )
+        .scalar()
+    ) or 0
+
+    paying_subscribers = (
+        db.query(func.count(distinct(UserSubscription.user_id)))
+        .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(
+            active_subscription_clause(),
+            SubscriptionPlan.name != "free",
+            ~_comped_clause,
+        )
+        .scalar()
+    ) or 0
+
+    subscribers_unknown_source = (
+        db.query(func.count(distinct(UserSubscription.user_id)))
+        .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(
+            active_subscription_clause(),
+            SubscriptionPlan.name != "free",
+            UserSubscription.granted_by_admin.is_(False),
+            UserSubscription.subscription_source.is_(None),
+        )
+        .scalar()
+    ) or 0
+
     # MRR: sum monthly price of active, non-expired, auto-renewing PAID subs.
     mrr_result = db.query(func.sum(SubscriptionPlan.price_monthly)).join(
         UserSubscription, UserSubscription.plan_id == SubscriptionPlan.id
@@ -222,6 +269,9 @@ async def get_analytics_overview(
         user_growth_rate=round(user_growth_rate, 1),
         total_premium_users=total_premium_users,
         premium_by_app=premium_by_app,
+        paying_subscribers=paying_subscribers,
+        comped_subscribers=comped_subscribers,
+        subscribers_unknown_source=subscribers_unknown_source,
         mrr=round(mrr, 2),
         subscription_conversion_rate=round(subscription_conversion_rate, 1),
         total_tarantulas=total_tarantulas,

@@ -27,6 +27,15 @@ class AdminAnalyticsOverview(BaseModel):
     # Distinct paid subscribers by app scope: tarantuverse | herpetoverse | both
     # (All-Access). Lets the admin distinguish app-specific vs combo subscribers.
     premium_by_app: dict[str, int] = {}
+    # total_premium_users counts comps AND payers together, so it rises when
+    # comps are handed out — indistinguishable from conversion on a chart.
+    # Split so the growth story stays honest. Defaults keep older clients working.
+    paying_subscribers: int = 0
+    comped_subscribers: int = 0
+    # How much of `paying_subscribers` is inference rather than evidence: rows
+    # predating `subscription_source` have no recorded provenance and are
+    # counted as paying by exclusion. A number to shrink, not to live with.
+    subscribers_unknown_source: int = 0
     mrr: float  # Monthly Recurring Revenue
     subscription_conversion_rate: float  # Percentage of users on premium
 

@@ -236,6 +236,13 @@ def send_metrics_snapshot(overview, *, on_date: Optional[date] = None) -> Option
             "Active 30d": _num(overview.active_users_30d),
             "New users 7d": _num(overview.new_users_7d),
             "Premium users": _num(overview.total_premium_users),
+            # Kept alongside the total rather than replacing it. Premium users
+            # counts comps and payers together, so on its own it rises whenever
+            # comps are handed out and reads as conversion. The split is what
+            # makes the line interpretable a year from now.
+            "Paying": _num(getattr(overview, "paying_subscribers", None)),
+            "Comped": _num(getattr(overview, "comped_subscribers", None)),
+            "Unknown source": _num(getattr(overview, "subscribers_unknown_source", None)),
             "MRR": _num(overview.mrr),
             "Conversion rate": _num(overview.subscription_conversion_rate),
             # total_collection is the honest cross-product figure. total_tarantulas
