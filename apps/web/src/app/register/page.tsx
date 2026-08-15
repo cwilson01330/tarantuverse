@@ -7,6 +7,11 @@ import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 import { warmupApi, useColdStartIndicator } from '@/lib/cold-start'
 import { readApiError } from '@/lib/api-error'
+import {
+  classifySignupFailure,
+  trackSignupFailed,
+  trackSignupSucceeded,
+} from '@/lib/signup-telemetry'
 
 interface ReferrerInfo {
   valid: boolean;
@@ -102,8 +107,16 @@ function RegisterForm() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(readApiError(data, 'Registration failed. Please try again.'))
+        const message = readApiError(data, 'Registration failed. Please try again.')
+        // Categorised here, while the HTTP status is still in scope — it's what
+        // separates a rate limit from a server error from a bad password.
+        trackSignupFailed(classifySignupFailure(message, response.status), response.status)
+        const handled: any = new Error(message)
+        handled.__signupTracked = true // stops the catch double-counting it
+        throw handled
       }
+
+      trackSignupSucceeded()
 
       // Step 2: Auto-sign-in so the user lands in the dashboard with one
       // action instead of being forced to re-enter email + password on a
@@ -138,7 +151,16 @@ function RegisterForm() {
       setSuccessMessage(data.message || 'Registration successful. Check your inbox if email verification is required, then log in.')
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || 'Something went wrong')
+      const message = err?.message || 'Something went wrong'
+      // A fetch that never returned (offline, DNS, CORS) throws before the
+      // !response.ok branch, so it would otherwise be counted as nothing at
+      // all — the exact silence this telemetry exists to remove. The flag set
+      // above marks failures already categorised, so one attempt never
+      // produces two events.
+      if (!err?.__signupTracked) {
+        trackSignupFailed(classifySignupFailure(message))
+      }
+      setError(message)
     } finally {
       setLoading(false)
     }
