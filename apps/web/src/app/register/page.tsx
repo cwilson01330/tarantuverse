@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 import { warmupApi, useColdStartIndicator } from '@/lib/cold-start'
+import { readApiError } from '@/lib/api-error'
 
 interface ReferrerInfo {
   valid: boolean;
@@ -13,6 +14,7 @@ interface ReferrerInfo {
   referrer_display_name?: string;
   message?: string;
 }
+
 
 function RegisterForm() {
   const router = useRouter()
@@ -100,7 +102,7 @@ function RegisterForm() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Registration failed')
+        throw new Error(readApiError(data, 'Registration failed. Please try again.'))
       }
 
       // Step 2: Auto-sign-in so the user lands in the dashboard with one
@@ -235,7 +237,17 @@ function RegisterForm() {
               className="w-full px-3 py-2 border border-theme rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-surface text-theme-primary"
               placeholder="••••••••"
             />
-            <p className="text-xs text-theme-tertiary mt-1">At least 8 characters</p>
+            {/* State the ACTUAL rules. This said "At least 8 characters" while
+                the API also required upper, lower, a digit and a symbol — so a
+                password like `password123` satisfied the form and was rejected
+                by the server. Telling people the rule after they fail is how a
+                signup form silently loses its users. */}
+            <ul className="text-xs text-theme-tertiary mt-1 space-y-0.5">
+              <li>At least 8 characters</li>
+              <li>An uppercase and a lowercase letter</li>
+              <li>A number</li>
+              <li>A symbol, like ! ? # or $</li>
+            </ul>
           </div>
 
           {/*

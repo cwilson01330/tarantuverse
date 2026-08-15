@@ -26,6 +26,22 @@ export function getErrorMessage(err: any, fallback = 'Something went wrong.'): s
   const detail = err?.response?.data?.detail;
 
   if (typeof detail === 'string' && detail.trim()) return detail;
+
+  // Pydantic 422s send an ARRAY of {loc, msg, type}. This used to fall through
+  // to JSON.stringify, which showed the user raw JSON with the real message
+  // buried inside it — technically not a crash, but unreadable. The password
+  // complexity rules on register and reset-password are the common case.
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item: any) =>
+        typeof item?.msg === 'string'
+          ? item.msg.replace(/^Value error,\s*/i, '').trim()
+          : null,
+      )
+      .filter(Boolean);
+    if (messages.length) return messages.join(' ');
+  }
+
   if (detail && typeof detail === 'object') {
     // Structured detail (402 gate, some 422s) — prefer the message field.
     if (typeof detail.message === 'string' && detail.message.trim()) return detail.message;

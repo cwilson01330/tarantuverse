@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { readApiError } from '@/lib/api-error'
 
 function ResetPasswordForm() {
     const router = useRouter()
@@ -67,7 +68,9 @@ function ResetPasswordForm() {
                 }, 3000)
             } else {
                 const data = await response.json()
-                throw new Error(data.detail || 'Failed to reset password')
+                // Same complexity validator as registration, so the same 422
+                // shape — reading `detail` directly showed "[object Object]".
+                throw new Error(readApiError(data, 'Failed to reset password'))
             }
         } catch (err: any) {
             setError(err.message || 'Something went wrong')
@@ -97,7 +100,7 @@ function ResetPasswordForm() {
             const data = await response.json()
 
             if (!response.ok) {
-                throw new Error(data.detail || 'Failed to send reset email')
+                throw new Error(readApiError(data, 'Failed to send reset email'))
             }
 
             setRequestSuccess(true)

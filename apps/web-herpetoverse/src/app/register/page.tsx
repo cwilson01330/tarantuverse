@@ -174,7 +174,15 @@ function RegisterForm() {
               className="w-full px-3 py-2.5 rounded-md bg-neutral-950 border border-neutral-800 focus:border-herp-teal focus:outline-none focus:ring-1 focus:ring-herp-teal/50 text-neutral-100 placeholder-neutral-600"
               placeholder="••••••••"
             />
-            <p className="text-xs text-neutral-600 mt-1">At least 8 characters</p>
+            {/* The API also requires upper, lower, a digit and a symbol.
+                Stating only the length meant a password that satisfied the
+                form was rejected by the server. */}
+            <ul className="text-xs text-neutral-600 mt-1 space-y-0.5">
+              <li>At least 8 characters</li>
+              <li>An uppercase and a lowercase letter</li>
+              <li>A number</li>
+              <li>A symbol, like ! ? # or $</li>
+            </ul>
           </div>
 
           <div>
