@@ -60,6 +60,24 @@ export default function RegisterScreen() {
   async function handleSubmit() {
     if (submitting) return;
     setError(null);
+
+    // Mirror the server's rules (schemas/user.py) so a keeper learns what's
+    // wrong before a request is made. Without this the only feedback was a 422,
+    // and until today that rendered as "[object Object]" — which told them
+    // nothing and made signup impossible unless they guessed the rules.
+    const problems: string[] = [];
+    if (password.length < 8) problems.push('be at least 8 characters');
+    if (!/[A-Z]/.test(password)) problems.push('include a capital letter');
+    if (!/[a-z]/.test(password)) problems.push('include a lowercase letter');
+    if (!/\d/.test(password)) problems.push('include a number');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+      problems.push('include a symbol, like ! ? # or $');
+    }
+    if (problems.length) {
+      setError(`Your password needs to ${problems.join(', and ')}.`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const result = await register(email.trim(), username.trim(), password);

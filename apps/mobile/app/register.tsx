@@ -97,8 +97,25 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+    // Mirror the server's rules exactly (schemas/user.py). Checking only the
+    // length here meant `password123` passed this gate and was rejected by the
+    // API — and the rejection arrived as an unreadable validation array, so the
+    // keeper was told nothing at all. Catching it locally means they get a
+    // clear sentence before a request is even made.
+    const passwordProblems: string[] = [];
+    if (password.length < 8) passwordProblems.push('be at least 8 characters');
+    if (!/[A-Z]/.test(password)) passwordProblems.push('include a capital letter');
+    if (!/[a-z]/.test(password)) passwordProblems.push('include a lowercase letter');
+    if (!/\d/.test(password)) passwordProblems.push('include a number');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+      passwordProblems.push('include a symbol, like ! ? # or $');
+    }
+
+    if (passwordProblems.length) {
+      Alert.alert(
+        'Choose a stronger password',
+        `Your password needs to ${passwordProblems.join(', and ')}.`,
+      );
       return;
     }
 

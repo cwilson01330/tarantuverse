@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient, authEvents, AUTH_EXPIRED_EVENT } from '../services/api';
 import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable } from '../services/google-signin';
 import { getExpoPushToken } from '../services/notifications';
+import { getErrorMessage } from '../utils/errors';
 
 // Re-export for convenience so login screens can import from one place
 export { isGoogleSignInAvailable };
@@ -179,7 +180,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Return the response so the UI can handle showing the verification message
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Registration failed');
+      // `detail` is an ARRAY of validation objects on a 422 — the password
+      // complexity rules are the common case. Passing it to new Error()
+      // stringified it to the literal "[object Object]", so the one message
+      // explaining what was wrong got thrown away and registration became
+      // impossible for anyone who didn't already know the rules.
+      throw new Error(getErrorMessage(error, 'Registration failed'));
     }
   };
 

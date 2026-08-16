@@ -21,6 +21,7 @@ import {
 } from '../services/api';
 import { getExpoPushToken } from '../services/notifications';
 import { signInWithGoogle, signInWithApple } from '../services/google-signin';
+import { getErrorMessage } from '../utils/errors';
 
 export interface AuthUser {
   id: string;
@@ -187,7 +188,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       return response.data;
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Registration failed');
+      // `detail` is an ARRAY on a 422 — password complexity is the common
+      // case — and new Error() stringified it to "[object Object]".
+      throw new Error(getErrorMessage(error, 'Registration failed'));
     }
   }
 
