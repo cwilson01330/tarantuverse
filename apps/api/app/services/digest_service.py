@@ -61,7 +61,12 @@ def _overdue_count(db: Session, user_id, tz_offset: Optional[int]) -> int:
         ):
             continue
         interval = _recommended_feeding_interval(
-            inv.life_stage, species_by.get(inv.species_id) if inv.species_id else None
+            inv.life_stage,
+            species_by.get(inv.species_id) if inv.species_id else None,
+            # ADR-017 — the digest must respect a keeper's own cadence, or the
+            # push notification becomes the loudest place we tell them they're
+            # behind when they aren't.
+            inv.feeding_interval_days,
         )
         if interval is None:
             continue  # detritivore — no live-prey cadence

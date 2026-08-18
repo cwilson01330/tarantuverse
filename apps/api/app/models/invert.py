@@ -125,6 +125,13 @@ class Invert(Base):
     feeding_paused_reason = Column(String(40))
     feeding_paused_until = Column(Date)
 
+    # ADR-017 — the keeper's own cadence, in days. NULL means "derive it from
+    # the care sheet / life stage" (the default for everyone). When set it
+    # outranks the care sheet: it's a fact about how this animal is kept, not a
+    # general claim about the species. Deliberately absent from the legacy
+    # tarantulas/scorpions tables — feeding status is computed from `inverts`.
+    feeding_interval_days = Column(Integer)
+
     # Media / privacy / notes
     photo_url = Column(String(500))
     is_public = Column(Boolean, default=False)

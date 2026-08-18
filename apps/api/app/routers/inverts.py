@@ -264,10 +264,13 @@ _UNKNOWN_INTERVAL = 7  # no species AND no life stage → conservative middle
 INTERVAL_SOURCE_SPECIES = "species"          # from the species care sheet
 INTERVAL_SOURCE_STAGE_DEFAULT = "stage_default"    # guess, informed by life stage
 INTERVAL_SOURCE_GENERIC_DEFAULT = "generic_default"  # guess, nothing to go on
+INTERVAL_SOURCE_KEEPER = "keeper"            # ADR-017 — the keeper said so
 
 
 def _recommended_feeding_interval_with_source(
-    life_stage: Optional[str], species: Optional[InvertSpecies]
+    life_stage: Optional[str],
+    species: Optional[InvertSpecies],
+    keeper_interval: Optional[int] = None,
 ) -> tuple[Optional[int], Optional[str]]:
     """Days-between-feedings threshold plus WHERE that number came from.
 
@@ -277,12 +280,24 @@ def _recommended_feeding_interval_with_source(
     cadence, so they're never marked overdue. Leans SHORTER on missing data
     (safety-first), but reports that the number is a default so callers can
     present it honestly.
+
+    ADR-017: a keeper-set interval outranks everything below it. The care sheet
+    is a general claim about a species; the keeper's number is a fact about how
+    THIS animal is actually kept, and we are not better informed than the person
+    holding it. Without this, anyone whose practice differs from the sheet — a
+    keeper feeding slings weekly, say — is told they're behind every single day.
     """
+    if keeper_interval:
+        return keeper_interval, INTERVAL_SOURCE_KEEPER
+
     stage = (life_stage or "").lower().strip() or None
 
     if species is not None:
         if (species.feeding_mode or "predator") == "detritivore":
-            return None, None  # no overdue concept for grazers
+            # No overdue concept for grazers. Checked AFTER the keeper override
+            # so someone who deliberately sets a cadence on a millipede gets it
+            # — an explicit choice beats our judgement that it's meaningless.
+            return None, None
 
         by_stage = {
             "sling": species.feeding_frequency_sling,
@@ -324,11 +339,15 @@ def _recommended_feeding_interval_with_source(
 
 
 def _recommended_feeding_interval(
-    life_stage: Optional[str], species: Optional[InvertSpecies]
+    life_stage: Optional[str],
+    species: Optional[InvertSpecies],
+    keeper_interval: Optional[int] = None,
 ) -> Optional[int]:
     """Interval only. Kept for callers that don't surface provenance (the
     digest decides overdue but never prints the number)."""
-    return _recommended_feeding_interval_with_source(life_stage, species)[0]
+    return _recommended_feeding_interval_with_source(
+        life_stage, species, keeper_interval
+    )[0]
 
 
 @router.get("/feeding-status", response_model=List[InvertFeedingStatusItem])
@@ -393,7 +412,7 @@ async def list_feeding_status(
         )
         species = species_by_id.get(inv.species_id) if inv.species_id else None
         interval, interval_source = _recommended_feeding_interval_with_source(
-            inv.life_stage, species
+            inv.life_stage, species, inv.feeding_interval_days
         )
         # Never-fed animals are NOT "overdue" — no feeding has established a
         # cadence yet, so flagging them (esp. in a push digest) is noise. Kept
@@ -648,7 +667,7 @@ async def get_invert_feeding_stats(
         if invert.species_id else None
     )
     interval_days, interval_source = _recommended_feeding_interval_with_source(
-        invert.life_stage, species
+        invert.life_stage, species, invert.feeding_interval_days
     )
     is_overdue = (
         (not is_feeding_paused)

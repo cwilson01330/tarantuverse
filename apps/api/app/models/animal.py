@@ -26,6 +26,7 @@ from sqlalchemy import (
     String,
     Text,
     Boolean,
+    Integer,
     Numeric,
     Date,
     DateTime,
@@ -121,6 +122,12 @@ class Animal(Base):
     # waits, breeding-season off-feed. See pse_20260502.
     feeding_paused_reason = Column(String(40), nullable=True)
     feeding_paused_until = Column(Date, nullable=True)
+
+    # ADR-017 — the keeper's own cadence, in days. NULL means "work it out from
+    # the species and life stage", which is what everyone gets by default. Set
+    # explicitly it outranks the care sheet, because it describes how this
+    # animal is actually kept rather than what the species generally needs.
+    feeding_interval_days = Column(Integer, nullable=True)
 
     # CGD override — NULL inherits from herp_species.feeds_on_cgd,
     # true/false explicitly overrides for this animal. Drives CGD-aware

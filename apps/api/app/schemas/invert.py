@@ -62,6 +62,12 @@ class InvertBase(BaseModel):
     feeding_paused_reason: Optional[str] = Field(None, max_length=40)
     feeding_paused_until: Optional[date] = None
 
+    # ADR-017 — keeper's own cadence in days. None means "derive it", which is
+    # the default. Bounded rather than free: 0 would mark the animal
+    # permanently overdue, and anything past a year is a typo rather than a
+    # husbandry choice.
+    feeding_interval_days: Optional[int] = Field(None, ge=1, le=365)
+
     # Media / privacy / notes
     photo_url: Optional[str] = Field(None, max_length=500)
     is_public: bool = False
@@ -176,10 +182,12 @@ class InvertFeedingStatusItem(BaseModel):
     # Recommended days between feedings for this animal's species + life stage
     # (None for detritivores, which graze and have no live-prey cadence).
     interval_days: Optional[int] = None
-    # Provenance of interval_days — "species" (from the care sheet),
-    # "stage_default" or "generic_default" (a guess). Clients MUST NOT render a
-    # default as though it were a species schedule; "every ~7d" on an animal
-    # with no linked species is a claim we can't support.
+    # Provenance of interval_days — "keeper" (they set it themselves, ADR-017),
+    # "species" (from the care sheet), "stage_default" or "generic_default"
+    # (a guess). Clients MUST NOT render a default as though it were a species
+    # schedule; "every ~7d" on an animal with no linked species is a claim we
+    # can't support. Equally, "keeper" must not be dressed up as species
+    # knowledge — it's the keeper's own judgement reflected back to them.
     interval_source: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
