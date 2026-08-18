@@ -155,6 +155,12 @@ class FeedingStats(BaseModel):
     last_feeding_date: Optional[datetime] = None
     days_since_last_feeding: Optional[int] = None
     next_feeding_prediction: Optional[date] = None  # predicted date
+    # ADR-017 — the keeper's own cadence, when they've set one. Carried here
+    # because this legacy surface reads `tarantulas`, which deliberately does
+    # not hold the column; the value comes from the `inverts` row sharing this
+    # animal's id. Lets the page label its control and say whose number the
+    # prediction came from without a second request.
+    feeding_interval_days: Optional[int] = None
     longest_gap_days: Optional[int] = None
     current_streak_accepted: int = 0
     prey_type_distribution: list[PreyTypeCount] = []

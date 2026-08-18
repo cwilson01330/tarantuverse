@@ -27,6 +27,7 @@ import {
 } from '@/lib/animal-lifecycle'
 import { taxonHasModule, growthLengthLabel } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
+import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -93,6 +94,9 @@ interface Invert {
   died_at?: string | null
   death_cause?: DeathCause | null
   death_notes?: string | null
+  // ADR-017 — the keeper's own feeding cadence in days. null means the app
+  // derives it from the care sheet or life stage, which is the default.
+  feeding_interval_days?: number | null
 }
 
 interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
@@ -121,6 +125,7 @@ export default function InvertDetailPage() {
   const [pairOpen, setPairOpen] = useState(false)
   // Mark-as-died. Its own dialog rather than a field on edit, so this can't
   // happen as a side effect of an incidental save.
+  const [cadenceOpen, setCadenceOpen] = useState(false)
   const [diedOpen, setDiedOpen] = useState(false)
   const [diedDate, setDiedDate] = useState('')
   const [diedCause, setDiedCause] = useState<DeathCause | ''>('')
@@ -454,6 +459,18 @@ export default function InvertDetailPage() {
                     Mark as died
                   </button>
                 )}
+                {/* ADR-017 — an offer, not a setting. Once set it reports the
+                    value, so the control doubles as the indicator. This page
+                    has no feeding-stats card (an ADR-016 gap), so the animal
+                    record is the only source for the current value here. */}
+                <button
+                  onClick={() => setCadenceOpen(true)}
+                  className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
+                >
+                  {invert?.feeding_interval_days
+                    ? `Every ${invert.feeding_interval_days}d`
+                    : 'Feeding schedule'}
+                </button>
                 <button
                   onClick={handleDelete}
                   className="px-4 py-2 rounded-lg bg-red-600/90 text-white text-sm font-semibold backdrop-blur-sm hover:bg-red-600"
@@ -698,6 +715,20 @@ export default function InvertDetailPage() {
           </>
         )}
       </div>
+
+      {/* Keeper feeding cadence — ADR-017. Same dialog as the legacy tarantula
+          page; it always addresses /inverts/{id}, which is this page's own
+          endpoint anyway. */}
+      <FeedingCadenceDialog
+        open={cadenceOpen}
+        animalId={id as string}
+        token={token}
+        current={invert?.feeding_interval_days ?? null}
+        derivedDays={null}
+        derivedSource={null}
+        onClose={() => setCadenceOpen(false)}
+        onSaved={fetchAll}
+      />
 
       {/* New pairing modal (breeding module) */}
       {/* Mark as died. The dialog IS the confirm — the date is already

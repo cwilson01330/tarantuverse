@@ -489,6 +489,20 @@ async def get_feeding_stats(
         )
     )
 
+    # ADR-017 — the keeper's own cadence, if they've set one. Read once, here,
+    # so it reaches BOTH the empty-history branch and the full one: a paused or
+    # never-fed animal still has a schedule the UI needs to label its control
+    # with. It lives on the `inverts` row (deliberately not duplicated onto this
+    # legacy table), which shares this animal's primary key.
+    from app.models.invert import Invert
+
+    _mirror = (
+        db.query(Invert.feeding_interval_days)
+        .filter(Invert.id == tarantula_id)
+        .first()
+    )
+    keeper_interval = _mirror[0] if _mirror else None
+
     if not feeding_logs:
         # Return empty stats if no feedings recorded
         return FeedingStats(
@@ -502,6 +516,7 @@ async def get_feeding_stats(
             is_feeding_paused=is_feeding_paused,
             feeding_paused_reason=tarantula.feeding_paused_reason,
             feeding_paused_until=tarantula.feeding_paused_until,
+            feeding_interval_days=keeper_interval,
         )
 
     # Calculate basic stats
@@ -585,8 +600,22 @@ async def get_feeding_stats(
     # Skip species-cadence prediction when the keeper has explicitly
     # paused feedings. A 7-month premolt tarantula doesn't need a
     # "next feeding by 2026-05-09" tile telling them they're behind.
+    # ADR-017 — a keeper-set cadence outranks all of the above. It lives on the
+    # `inverts` row (deliberately not duplicated onto this legacy table), which
+    # shares this animal's primary key.
+    #
+    # This endpoint computes its interval completely separately from
+    # `_recommended_feeding_interval_with_source` — it reads the numeric
+    # `feeding_interval_max_days_*` columns rather than parsing the care sheet
+    # strings. That divergence is ADR-016's problem, not this one's, but it does
+    # mean the override has to be honoured here explicitly or the web tarantula
+    # page would let a keeper set a schedule and then visibly ignore it.
     next_feeding_prediction = None
-    if (
+    if keeper_interval and last_feeding_date is not None and not is_feeding_paused:
+        next_feeding_prediction = (
+            last_feeding_date + timedelta(days=int(keeper_interval))
+        ).date()
+    elif (
         not is_feeding_paused
         and tarantula.species_id
         and tarantula.life_stage
@@ -644,6 +673,7 @@ async def get_feeding_stats(
         last_feeding_date=last_feeding_date,
         days_since_last_feeding=days_since_last_feeding,
         next_feeding_prediction=next_feeding_prediction,
+        feeding_interval_days=keeper_interval,
         longest_gap_days=longest_gap,
         current_streak_accepted=current_streak,
         prey_type_distribution=prey_distribution,

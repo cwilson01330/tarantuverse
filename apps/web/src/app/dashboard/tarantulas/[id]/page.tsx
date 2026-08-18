@@ -15,6 +15,7 @@ const PauseFeedingModal = dynamic(() => import('@/components/PauseFeedingModal')
 import UpgradeModal from '@/components/UpgradeModal'
 import PricingCard from '@/components/PricingCard'
 import PremoltPredictionSection from '@/components/PremoltPredictionSection'
+import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
 import apiClient from '@/lib/api'
 import { daysBetween, formatLocalDate } from '@/lib/date'
 import {
@@ -184,6 +185,10 @@ interface FeedingStats {
   is_feeding_paused?: boolean
   feeding_paused_reason?: string | null
   feeding_paused_until?: string | null
+  /** ADR-017 — the keeper's own cadence, when set. Carried on the stats
+   *  response because the column lives on `inverts` and this page's animal
+   *  fetch reads the legacy `tarantulas` table. */
+  feeding_interval_days?: number | null
 }
 
 interface Pairing {
@@ -289,6 +294,7 @@ export default function TarantulaDetailPage() {
   const [diedBusy, setDiedBusy] = useState(false)
   const [diedError, setDiedError] = useState('')
   const [pauseError, setPauseError] = useState<string | null>(null)
+  const [showCadenceModal, setShowCadenceModal] = useState(false)
 
   useEffect(() => {
     // Wait for auth to load
@@ -1516,7 +1522,22 @@ export default function TarantulaDetailPage() {
                   the tarantula record. When paused, the FeedingStatsCard
                   swaps the red "X days ago" treatment for a quiet
                   paused indicator. Wired to pst_20260502 columns. */}
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                {/* ADR-017 — sits with pause because both answer "how is this
+                    animal handled", and neither belongs on the edit form.
+                    Worded as an offer; once set it reports the value, so the
+                    control doubles as the indicator. */}
+                <button
+                  onClick={() => setShowCadenceModal(true)}
+                  className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                >
+                  {/* Read from feedingStats, NOT the tarantula record: the
+                      column lives on `inverts` and GET /tarantulas/{id} reads
+                      the legacy table, so it would always be undefined here. */}
+                  {feedingStats?.feeding_interval_days
+                    ? `Schedule — every ${feedingStats.feeding_interval_days}d`
+                    : 'Feed on my own schedule'}
+                </button>
                 {tarantula.feeding_paused_reason ? (
                   <button
                     onClick={handleResumeFeeding}
@@ -2577,6 +2598,20 @@ export default function TarantulaDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Keeper feeding cadence — ADR-017. Addresses /inverts/{id} rather than
+          /tarantulas/{id}: the column lives on `inverts` and the two tables
+          share a primary key, so this works from either detail page. */}
+      <FeedingCadenceDialog
+        open={showCadenceModal}
+        animalId={id as string}
+        token={token}
+        current={feedingStats?.feeding_interval_days ?? null}
+        derivedDays={null}
+        derivedSource={null}
+        onClose={() => setShowCadenceModal(false)}
+        onSaved={() => { if (token) fetchFeedingStats(token) }}
+      />
 
       {/* Pause Feeding Modal */}
       {tarantula && (
