@@ -43,6 +43,14 @@ interface Props {
    *  open the PauseFeedingSheet from the banner itself instead of
    *  hunting for a separate button. */
   onPausedPress?: () => void;
+  /** ADR-017 — when the animal is OVERDUE against a cadence the keeper never
+   *  chose, the banner becomes the way to state their own. Reuses the same
+   *  affordance as the paused state rather than adding a second control. */
+  onSetCadence?: () => void;
+  /** True once they've set one. Suppresses the offer: from then on an overdue
+   *  banner means they're past their own intention, and that signal is worth
+   *  keeping free of prompts. */
+  hasKeeperCadence?: boolean;
 }
 
 interface Visual {
@@ -58,7 +66,13 @@ interface Visual {
   detail?: string;
 }
 
-export function FeedingStatusBanner({ animalId, refreshKey, onPausedPress }: Props) {
+export function FeedingStatusBanner({
+  animalId,
+  refreshKey,
+  onPausedPress,
+  onSetCadence,
+  hasKeeperCadence,
+}: Props) {
   const { colors, layout } = useTheme();
   const [status, setStatus] = useState<FeedingStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -102,7 +116,17 @@ export function FeedingStatusBanner({ animalId, refreshKey, onPausedPress }: Pro
   }
 
   const visual = describe(status, colors);
-  const tappable = status.status === 'paused' && !!onPausedPress;
+
+  // Two reasons the banner can be tapped, and they never overlap: a paused
+  // animal opens the pause sheet, an overdue one opens the cadence sheet.
+  // The cadence offer is suppressed once the keeper has set their own, so a
+  // red banner then means what it should — past their own schedule.
+  const pausePress = status.status === 'paused' && !!onPausedPress;
+  const cadencePress =
+    status.status === 'overdue' && !!onSetCadence && !hasKeeperCadence;
+  const tappable = pausePress || cadencePress;
+  const onPress = pausePress ? onPausedPress : onSetCadence;
+  const hintLabel = pausePress ? 'Edit' : 'Set schedule';
 
   // Static JSX branches — the dynamic component pattern
   // (`const W: any = condition ? Touchable : View`) crashes Hermes
@@ -122,7 +146,7 @@ export function FeedingStatusBanner({ animalId, refreshKey, onPausedPress }: Pro
       </View>
       {tappable && (
         <View style={styles.editHint}>
-          <Text style={[styles.editHintText, { color: visual.fg }]}>Edit</Text>
+          <Text style={[styles.editHintText, { color: visual.fg }]}>{hintLabel}</Text>
           <MaterialCommunityIcons name="chevron-right" size={16} color={visual.fg} />
         </View>
       )}
@@ -132,7 +156,7 @@ export function FeedingStatusBanner({ animalId, refreshKey, onPausedPress }: Pro
   if (tappable) {
     return (
       <TouchableOpacity
-        onPress={onPausedPress}
+        onPress={onPress}
         activeOpacity={0.75}
         style={[
           styles.banner,

@@ -41,6 +41,13 @@ class AnimalBase(BaseModel):
     feeding_paused_reason: Optional[str] = Field(None, max_length=40)
     feeding_paused_until: Optional[date] = None
 
+    # ADR-017 — the keeper's own cadence in days. None means "work it out",
+    # which is the default. Distinct from `feeding_schedule` above: that's
+    # free text a keeper writes for themselves and the app parses heuristically;
+    # this is an exact number that outranks every inference. Bounded because 0
+    # would mark the animal permanently overdue and a year-plus is a typo.
+    feeding_interval_days: Optional[int] = Field(None, ge=1, le=365)
+
     # CGD override — NULL inherits the herp_species.feeds_on_cgd default;
     # true/false explicitly overrides for this animal. Clients resolve
     # the effective value as `override ?? species.feeds_on_cgd`.

@@ -19,6 +19,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
@@ -134,11 +135,28 @@ def _interval_from_life_stage_feeding(brackets, weight_g) -> Optional[int]:
 def _animal_feeding_interval(animal: Animal) -> Optional[int]:
     """Resolve the recommended feeding interval (days) for one animal.
 
-    Priority: CGD (geckos on a complete diet, refreshed ~every few days →
-    overdue day 4) → weight-bracketed snake schedule → the animal's own
-    free-text schedule → the species' per-stage frequency → None (unknown).
+    Priority: an explicit keeper-set interval → CGD (geckos on a complete diet,
+    refreshed ~every few days → overdue day 4) → weight-bracketed snake
+    schedule → the animal's own free-text schedule → the species' per-stage
+    frequency → None (unknown).
     Requires herp_species eager-loaded for the CGD + species fallbacks.
+
+    ADR-017 puts the keeper's own number first. It matters more here than on
+    the invert side: reptile cadences span a daily-fed juvenile gecko to a
+    monthly-fed adult boa, which is why every other branch below is a careful
+    inference and why this function returns None rather than guessing when they
+    all miss. A number the keeper stated is the only cadence the app can ever
+    be certain of.
+
+    NOTE: `feeding_schedule` — the free-text field a keeper can already type —
+    currently ranks BELOW the CGD flag and the weight bracket, so a computed
+    inference can overrule something the keeper wrote by hand. That predates
+    this change and is left alone deliberately; it's a husbandry judgement, not
+    a bug to fix in passing.
     """
+    if animal.feeding_interval_days:
+        return animal.feeding_interval_days
+
     species = animal.herp_species
     if bool(getattr(animal, "feeds_on_cgd", False)):
         return 4
@@ -473,6 +491,54 @@ async def update_animal(
     db.commit()
     db.refresh(animal)
     return animal
+
+
+class BulkCadenceRequest(BaseModel):
+    """ADR-017 Phase 3 — one cadence across many animals.
+
+    `feeding_interval_days = None` clears the override, so a keeper who applied
+    a cadence collection-wide has the same reach to undo it.
+    """
+
+    feeding_interval_days: Optional[int] = Field(None, ge=1, le=365)
+    # Explicit rather than inferred from an empty id list — reaching everything
+    # someone owns should be stated, not implied by an omission.
+    apply_to_all: bool = False
+    animal_ids: Optional[List[UUID]] = None
+
+
+class BulkCadenceResponse(BaseModel):
+    updated: int
+
+
+@router.post("/bulk-feeding-cadence", response_model=BulkCadenceResponse)
+async def bulk_set_feeding_cadence(
+    payload: BulkCadenceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Apply one feeding cadence to many animals at once.
+
+    Mirrors /inverts/bulk-feeding-cadence. Scoped to the caller's living,
+    untransferred animals; deceased and transferred records are excluded
+    because they have no cadence and sweeping them up would edit history.
+    """
+    if not payload.apply_to_all and not payload.animal_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose which animals to apply this to.",
+        )
+
+    query = active_animals_query(db, current_user.id)
+    if not payload.apply_to_all:
+        query = query.filter(Animal.id.in_(payload.animal_ids or []))
+
+    targets = query.all()
+    for a in targets:
+        a.feeding_interval_days = payload.feeding_interval_days
+
+    db.commit()
+    return BulkCadenceResponse(updated=len(targets))
 
 
 @router.delete("/{animal_id}", status_code=status.HTTP_204_NO_CONTENT)

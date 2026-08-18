@@ -124,6 +124,12 @@ export interface Animal {
   /** ISO date (YYYY-MM-DD) — pause auto-resumes after this date. Null = indefinite. */
   feeding_paused_until: string | null;
 
+  /** ADR-017 — the keeper's own cadence in days. null means the app works it
+   *  out from weight, diet and species. Distinct from `feeding_schedule`, which
+   *  is free text the app parses heuristically; this is exact and outranks
+   *  every inference. */
+  feeding_interval_days: number | null;
+
   /** Per-animal CGD override. NULL inherits the species default. */
   feeds_on_cgd_override: boolean | null;
   /** Resolved CGD flag (override ?? species default). Server-computed. */
@@ -405,6 +411,34 @@ export async function resumeFeeding(animalId: string): Promise<Animal> {
     { feeding_paused_reason: null, feeding_paused_until: null },
   );
   return data;
+}
+
+/**
+ * ADR-017 — set or clear this animal's own feeding cadence.
+ * `days = null` returns it to the derived interval.
+ */
+export async function setFeedingCadence(
+  animalId: string,
+  days: number | null,
+): Promise<Animal> {
+  const { data } = await apiClient.put<Animal>(
+    `/animals/${encodeURIComponent(animalId)}`,
+    { feeding_interval_days: days },
+  );
+  return data;
+}
+
+/**
+ * Apply one cadence across the collection. Scoped server-side to living,
+ * untransferred animals; clearing has the same reach so the action isn't a
+ * one-way door.
+ */
+export async function bulkSetFeedingCadence(days: number | null): Promise<number> {
+  const { data } = await apiClient.post<{ updated: number }>(
+    '/animals/bulk-feeding-cadence',
+    { feeding_interval_days: days, apply_to_all: true },
+  );
+  return data.updated;
 }
 
 // ---------------------------------------------------------------------------

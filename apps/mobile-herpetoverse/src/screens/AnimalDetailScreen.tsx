@@ -38,6 +38,7 @@ import { FeedingIntelligence } from '../components/FeedingIntelligence';
 import { FeedingStatusBanner } from '../components/FeedingStatusBanner';
 import { GenotypeSection } from '../components/GenotypeSection';
 import { PauseFeedingSheet } from '../components/PauseFeedingSheet';
+import { FeedingCadenceSheet } from '../components/FeedingCadenceSheet';
 import { ReptileShareSheet } from '../components/ReptileShareSheet';
 import { AnimalTransferSection } from '../components/AnimalTransferSection';
 import {
@@ -86,6 +87,7 @@ export function AnimalDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
+  const [cadenceOpen, setCadenceOpen] = useState(false);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -222,10 +224,15 @@ export function AnimalDetailScreen() {
             tappable, with an "Edit" hint. The canonical pause entry point
             lives inside Log Feeding (the natural moment to think "it's
             been refusing for weeks, mute reminders"). */}
+        {/* ADR-017 — when overdue against a cadence the keeper never chose,
+            the banner is also the way to state their own. Suppressed once
+            they have, so a red banner then means past THEIR schedule. */}
         <FeedingStatusBanner
           animalId={animal.id}
-          refreshKey={`${feedings.length}-${animal.feeding_paused_reason ?? ''}-${animal.feeding_paused_until ?? ''}`}
+          refreshKey={`${feedings.length}-${animal.feeding_paused_reason ?? ''}-${animal.feeding_paused_until ?? ''}-${animal.feeding_interval_days ?? ''}`}
           onPausedPress={() => setPauseOpen(true)}
+          onSetCadence={() => setCadenceOpen(true)}
+          hasKeeperCadence={!!animal.feeding_interval_days}
         />
 
         {/* Species-aware feeding intelligence — prey range, interval,
@@ -375,6 +382,14 @@ export function AnimalDetailScreen() {
         onClose={() => setShareOpen(false)}
         animalId={animal.id}
         animalName={animalTitle(animal)}
+      />
+
+      <FeedingCadenceSheet
+        visible={cadenceOpen}
+        animalId={animal.id}
+        current={animal.feeding_interval_days ?? null}
+        onClose={() => setCadenceOpen(false)}
+        onSaved={fetchAll}
       />
 
       <PauseFeedingSheet
