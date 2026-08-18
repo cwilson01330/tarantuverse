@@ -40,6 +40,7 @@ import {
 import { ApiError } from '@/lib/apiClient'
 import PhotoGallery from '@/components/PhotoGallery'
 import { PauseFeedingDialog } from '@/components/PauseFeedingDialog'
+import { FeedingCadenceDialog } from '@/components/FeedingCadenceDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
 import {
   type Animal,
@@ -1119,9 +1120,22 @@ function FeedingIntelligence({
   // order across renders. (The old snake-only client called these useMemos
   // *after* the empty-state returns; consolidating was the chance to fix it.)
   const nextWindow = useMemo(() => {
-    if (!animal.last_fed_at || suggestion.interval_days_min == null)
-      return null
+    if (!animal.last_fed_at) return null
     const last = new Date(animal.last_fed_at)
+
+    // ADR-017 — a keeper-set cadence replaces the species window entirely.
+    // This screen computes the window client-side from the prey suggestion,
+    // which is a different path from the API resolver, so the override has to
+    // be honoured here explicitly or the keeper would set a schedule and watch
+    // this page carry on using its own. A stated number is exact, so the
+    // window collapses to a single day rather than a range.
+    if (animal.feeding_interval_days) {
+      const due = new Date(last)
+      due.setDate(due.getDate() + animal.feeding_interval_days)
+      return { min: due, max: due }
+    }
+
+    if (suggestion.interval_days_min == null) return null
     const min = new Date(last)
     min.setDate(min.getDate() + (suggestion.interval_days_min ?? 0))
     const max = new Date(last)
@@ -1130,7 +1144,7 @@ function FeedingIntelligence({
         (suggestion.interval_days_max ?? suggestion.interval_days_min ?? 0),
     )
     return { min, max }
-  }, [animal.last_fed_at, suggestion])
+  }, [animal.last_fed_at, animal.feeding_interval_days, suggestion])
 
   const overdue = useMemo(() => {
     if (!nextWindow) return false
@@ -1329,6 +1343,7 @@ function LogFeedingForm({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pauseOpen, setPauseOpen] = useState(false)
+  const [cadenceOpen, setCadenceOpen] = useState(false)
   const [pauseHelpOpen, setPauseHelpOpen] = useState(false)
   // One-tap "Refresh CGD" — separate busy/error state so the button
   // can show progress without forcing the full form open.
@@ -1513,6 +1528,18 @@ function LogFeedingForm({
             ⏸ {pauseLabel} — tap to edit
           </button>
         )}
+        {/* ADR-017 — sits beside pause because both answer "how is this animal
+            handled". An offer when unset; once set it reports the value, so the
+            control doubles as the indicator. */}
+        <button
+          onClick={() => setCadenceOpen(true)}
+          className="text-xs text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
+          title="Set how often you feed this animal"
+        >
+          {animal.feeding_interval_days
+            ? `🗓 Every ${animal.feeding_interval_days}d — tap to edit`
+            : '🗓 Feed on my own schedule'}
+        </button>
         <PauseFeedingDialog
           open={pauseOpen}
           onClose={() => setPauseOpen(false)}
@@ -1520,6 +1547,13 @@ function LogFeedingForm({
           animalName={animalTitle(animal)}
           currentReason={animal.feeding_paused_reason}
           currentUntil={animal.feeding_paused_until}
+          onChange={onPauseChanged}
+        />
+        <FeedingCadenceDialog
+          open={cadenceOpen}
+          onClose={() => setCadenceOpen(false)}
+          animalId={animal.id}
+          current={animal.feeding_interval_days ?? null}
           onChange={onPauseChanged}
         />
       </div>

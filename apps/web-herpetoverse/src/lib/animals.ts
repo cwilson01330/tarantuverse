@@ -109,6 +109,12 @@ export interface Animal {
   feeding_paused_reason: string | null
   feeding_paused_until: string | null
 
+  /** ADR-017 — the keeper's own cadence in days. null means the app works it
+   *  out from diet, weight and species. Distinct from `feeding_schedule`, which
+   *  is free text parsed heuristically; this is exact and outranks every
+   *  inference. */
+  feeding_interval_days: number | null
+
   /** Per-animal CGD override. NULL inherits the species default. */
   feeds_on_cgd_override: boolean | null
   /** Resolved CGD flag (override ?? species default). Server-computed. */
@@ -287,8 +293,22 @@ export interface CreateAnimalPayload {
   // resume. See migration pse_20260502.
   feeding_paused_reason?: string | null
   feeding_paused_until?: string | null
+  /** ADR-017 — keeper's own cadence in days. null clears it. */
+  feeding_interval_days?: number | null
   /** Per-animal CGD override. null inherits the species default. */
   feeds_on_cgd_override?: boolean | null
+}
+
+/**
+ * ADR-017 — apply one cadence across the collection. Scoped server-side to
+ * living, untransferred animals. `days = null` clears it everywhere, so a
+ * keeper who applied one collection-wide has the same reach to undo it.
+ */
+export function bulkSetFeedingCadence(days: number | null): Promise<{ updated: number }> {
+  return apiFetch<{ updated: number }>('/api/v1/animals/bulk-feeding-cadence', {
+    method: 'POST',
+    json: { feeding_interval_days: days, apply_to_all: true },
+  })
 }
 
 export function createAnimal(payload: CreateAnimalPayload): Promise<Animal> {
