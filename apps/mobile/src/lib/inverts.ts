@@ -210,6 +210,9 @@ export interface Invert {
   enclosure_notes: string | null;
   feeding_paused_reason: string | null;
   feeding_paused_until: string | null;
+  /** ADR-017 — the keeper's own cadence in days. null means the app derives it
+   *  from the care sheet or life stage, which is the default for everyone. */
+  feeding_interval_days: number | null;
   photo_url: string | null;
   is_public: boolean;
   visibility: Visibility | null;
@@ -475,8 +478,10 @@ export interface InvertFeedingStats {
    *  NOTE: for everything else the backend supplies a fallback rather than
    *  null, so check interval_source before presenting this as a schedule. */
   interval_days: number | null;
-  /** 'species' = from the care sheet; 'stage_default' / 'generic_default' = a
-   *  guess. Never render a default as a species schedule. */
+  /** 'keeper' = they set it themselves (ADR-017); 'species' = from the care
+   *  sheet; 'stage_default' / 'generic_default' = a guess. Never render a
+   *  default as a species schedule, and never render a keeper's own number as
+   *  though it were species knowledge. */
   interval_source: string | null;
   is_overdue: boolean;
 }

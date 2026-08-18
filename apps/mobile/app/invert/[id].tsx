@@ -38,6 +38,7 @@ import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import PhotoViewer from '../../src/components/PhotoViewer';
 import QRSheet from '../../src/components/QRSheet';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
+import { FeedingCadenceSheet } from '../../src/components/FeedingCadenceSheet';
 import { getErrorMessage } from '../../src/utils/errors';
 import { MarkDiedSheet } from '../../src/components/MarkDiedSheet';
 import {
@@ -74,6 +75,7 @@ function InvertDetailScreen() {
   const [feedingStats, setFeedingStats] = useState<InvertFeedingStats | null>(null);
   const [markingFed, setMarkingFed] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
+  const [cadenceOpen, setCadenceOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [diedOpen, setDiedOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -309,6 +311,18 @@ function InvertDetailScreen() {
           icon: 'weather-night',
           onPress: () => setDiedOpen(true),
         },
+    // ADR-017. Sits with the other "how this animal is handled" controls rather
+    // than on the edit form — a keeper adding their first sling has no basis
+    // for answering this and should never be asked. Wording is an offer, not a
+    // setting, because most keepers never need it.
+    {
+      key: 'cadence',
+      label: invert.feeding_interval_days
+        ? `Feeding schedule — every ${invert.feeding_interval_days}d`
+        : 'Feed on my own schedule',
+      icon: 'calendar-clock',
+      onPress: () => setCadenceOpen(true),
+    },
     {
       key: 'delete',
       label: 'Delete record',
@@ -399,12 +413,22 @@ function InvertDetailScreen() {
     // branch below was effectively dead and every animal got a confident
     // "Feed in N days". interval_source is what actually distinguishes a
     // care-sheet cadence from a default, so say which one this is.
+    // ADR-017 adds a third kind: a cadence the KEEPER set. It must not be
+    // described as a default (it isn't a guess) nor as a species claim (it
+    // isn't ours) — it's their own schedule reflected back to them.
+    const ivFromKeeper = feedingStats.interval_source === 'keeper';
     const ivFromSpecies = feedingStats.interval_source === 'species';
+    // A countdown is only honest when someone actually stated the cadence —
+    // the keeper, or the care sheet. On a default we still flag overdue as a
+    // safety net, but we don't say "Feed in 4 days" as though we knew.
+    const ivIsStated = ivFromKeeper || ivFromSpecies;
     const reasoning = [
       iv
-        ? ivFromSpecies
-          ? `Every ${iv}d`
-          : `Every ${iv}d (default — no species cadence on file)`
+        ? ivFromKeeper
+          ? `Every ${iv}d (your schedule)`
+          : ivFromSpecies
+            ? `Every ${iv}d`
+            : `Every ${iv}d (default — no species cadence on file)`
         : 'No species cadence on file',
       feedingStats.total_feedings > 0
         ? `${Math.round(feedingStats.acceptance_rate)}% accepted (${feedingStats.total_feedings})`
@@ -427,10 +451,9 @@ function InvertDetailScreen() {
         detail: reasoning,
       };
     }
-    // Only give a prescriptive countdown when the cadence is a species claim.
-    // On a default we still flag overdue above (safety net), but we don't
-    // present "Feed in 4 days" as though we know this animal's schedule.
-    if (iv && ivFromSpecies) {
+    // Countdown only when the cadence was actually stated — by the keeper or
+    // by a care sheet. See ivIsStated above.
+    if (iv && ivIsStated) {
       const due = iv - d;
       return {
         tone: 'good' as const,
@@ -1088,6 +1111,16 @@ function InvertDetailScreen() {
         title={headerTitle}
         rows={overflowRows}
         onClose={() => setMenuOpen(false)}
+      />
+
+      <FeedingCadenceSheet
+        visible={cadenceOpen}
+        invertId={id!}
+        current={invert.feeding_interval_days ?? null}
+        derivedDays={feedingStats?.interval_days ?? null}
+        derivedSource={feedingStats?.interval_source ?? null}
+        onClose={() => setCadenceOpen(false)}
+        onSaved={fetchAll}
       />
 
       <MarkDiedSheet
