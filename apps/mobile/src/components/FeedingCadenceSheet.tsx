@@ -39,7 +39,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../contexts/ThemeContext';
-import { updateInvert } from '../lib/inverts';
+import { bulkSetFeedingCadence, updateInvert } from '../lib/inverts';
 import { getErrorMessage } from '../utils/errors';
 
 /** Common cadences, so the usual answer is one tap rather than typing. */
@@ -71,6 +71,7 @@ export function FeedingCadenceSheet({
   const [days, setDays] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [applyAll, setApplyAll] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -79,6 +80,9 @@ export function FeedingCadenceSheet({
     // keeper has to guess into.
     setDays(String(current ?? derivedDays ?? 7));
     setError(null);
+    // Always off on open. Applying to a whole collection is a big action and
+    // must be chosen each time, never inherited from a previous visit.
+    setApplyAll(false);
   }, [visible, current, derivedDays]);
 
   const parsed = parseInt(days, 10);
@@ -89,7 +93,11 @@ export function FeedingCadenceSheet({
     setSaving(true);
     setError(null);
     try {
-      await updateInvert(invertId, { feeding_interval_days: value });
+      if (applyAll) {
+        await bulkSetFeedingCadence(value);
+      } else {
+        await updateInvert(invertId, { feeding_interval_days: value });
+      }
       onSaved();
       onClose();
     } catch (e) {
@@ -165,6 +173,30 @@ export function FeedingCadenceSheet({
                 ]}
               />
 
+              {/* Phase 3 — the answer for someone who feeds their whole
+                  collection the same way. Setting the same number thirty seven
+                  times is a chore that replaces a complaint, not a fix. */}
+              <TouchableOpacity
+                onPress={() => setApplyAll((v) => !v)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: applyAll }}
+                style={styles.applyAll}
+              >
+                <MaterialCommunityIcons
+                  name={applyAll ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                  size={22}
+                  color={applyAll ? colors.primary : colors.textTertiary}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.applyAllText, { color: colors.textPrimary }]}>
+                    Apply to every animal in my collection
+                  </Text>
+                  <Text style={[styles.applyAllHint, { color: colors.textTertiary }]}>
+                    You can still change any individual afterwards.
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
               {error ? (
                 <Text style={[styles.error, { color: colors.error }]}>{error}</Text>
               ) : null}
@@ -182,7 +214,9 @@ export function FeedingCadenceSheet({
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={styles.primaryText}>
-                    Feed every {valid ? parsed : '—'} days
+                    {applyAll
+                      ? `Feed everything every ${valid ? parsed : '—'} days`
+                      : `Feed every ${valid ? parsed : '—'} days`}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -233,6 +267,9 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, borderWidth: 1 },
   label: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 18, marginBottom: 6 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
+  applyAll: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 18 },
+  applyAllText: { fontSize: 14, fontWeight: '600' },
+  applyAllHint: { fontSize: 12, marginTop: 1 },
   error: { fontSize: 13, marginTop: 10 },
   primary: { marginTop: 18, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   primaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },

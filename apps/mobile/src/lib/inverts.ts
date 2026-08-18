@@ -419,6 +419,23 @@ export async function updateInvert(id: string, payload: InvertUpdate): Promise<I
   return data;
 }
 
+/**
+ * ADR-017 Phase 3 — apply one feeding cadence across the collection.
+ *
+ * `days = null` clears the override everywhere, so a keeper who set a cadence
+ * collection-wide has the same reach to undo it.
+ *
+ * Scoped server-side to the caller's living, untransferred animals; deceased
+ * and transferred records are deliberately excluded.
+ */
+export async function bulkSetFeedingCadence(days: number | null): Promise<number> {
+  const { data } = await apiClient.post<{ updated: number }>(
+    '/inverts/bulk-feeding-cadence',
+    { feeding_interval_days: days, apply_to_all: true },
+  );
+  return data.updated;
+}
+
 export async function deleteInvert(id: string): Promise<void> {
   await apiClient.delete(`/inverts/${id}`);
 }
