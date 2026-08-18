@@ -702,6 +702,33 @@ function InvertDetailScreen() {
             </View>
           </View>
 
+          {/* ADR-017 Phase 2 — the offer, shown only to the person it's for.
+              Someone flagged overdue against a number they never chose is the
+              only keeper who needs this, so it appears there and nowhere else.
+              Suppressed once they've set their own cadence: at that point the
+              flag means they're genuinely past their own intention, which is
+              the signal we want to keep sharp. */}
+          {feedingStats?.is_overdue
+            && feedingStats.interval_source !== 'keeper'
+            && !feedingStats.is_feeding_paused && (
+            <TouchableOpacity
+              onPress={() => setCadenceOpen(true)}
+              accessibilityRole="button"
+              style={[styles.cadenceOffer, { borderTopColor: colors.border }]}
+            >
+              <MaterialCommunityIcons
+                name="calendar-clock"
+                size={15}
+                color={colors.textTertiary}
+              />
+              <Text style={[styles.cadenceOfferText, { color: colors.textSecondary }]}>
+                {feedingStats.interval_days
+                  ? `Feed on a different schedule than every ${feedingStats.interval_days}d?`
+                  : 'Feed on your own schedule?'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {!feedingStats?.is_feeding_paused && (
             <View style={styles.feedActions}>
               <TouchableOpacity
@@ -1433,6 +1460,17 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     feedHeadline: { ...TYPE.bodyStrong, fontWeight: '700' },
     feedDetail: { ...TYPE.caption, color: colors.textTertiary, marginTop: 2 },
     feedActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.md },
+    // Quiet by design — an offer, not a call to action. It sits below a red
+    // overdue headline and must not compete with the Fed button beside it.
+    cadenceOffer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      marginTop: SPACING.md,
+      paddingTop: SPACING.sm,
+      borderTopWidth: 1,
+    },
+    cadenceOfferText: { ...TYPE.caption, flex: 1 },
     feedPrimary: {
       flex: 1,
       flexDirection: 'row',

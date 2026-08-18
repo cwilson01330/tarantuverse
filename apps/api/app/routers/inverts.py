@@ -21,6 +21,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -515,6 +516,62 @@ async def update_invert(
     db.commit()
     db.refresh(invert)
     return invert
+
+
+class BulkCadenceRequest(BaseModel):
+    """ADR-017 Phase 3 — set one cadence across many animals.
+
+    `feeding_interval_days = None` clears the override, returning those animals
+    to the derived interval. That has to be expressible: a keeper who applies a
+    cadence collection-wide and changes their mind needs the same reach to undo
+    it, or the bulk action is a one-way door.
+    """
+
+    feeding_interval_days: Optional[int] = Field(None, ge=1, le=365)
+    # Explicit rather than inferred from an empty id list. "Apply to everything
+    # I own" is a big action and should be stated, not implied by an omission.
+    apply_to_all: bool = False
+    invert_ids: Optional[List[UUID]] = None
+
+
+class BulkCadenceResponse(BaseModel):
+    updated: int
+
+
+@router.post("/bulk-feeding-cadence", response_model=BulkCadenceResponse)
+async def bulk_set_feeding_cadence(
+    payload: BulkCadenceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Apply one feeding cadence to many animals at once.
+
+    The case this exists for: a keeper with 37 animals who feeds all of them
+    weekly. Asking her to set the same number 37 times isn't a fix, it's a
+    chore that replaces a complaint.
+
+    Scoped to the caller's own living, untransferred animals. Deceased and
+    transferred records are excluded deliberately — they have no feeding
+    cadence, and sweeping them up would silently edit history.
+    """
+    if not payload.apply_to_all and not payload.invert_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose which animals to apply this to.",
+        )
+
+    query = active_inverts_query(db, current_user.id)
+    if not payload.apply_to_all:
+        query = query.filter(Invert.id.in_(payload.invert_ids or []))
+
+    targets = query.all()
+    for inv in targets:
+        inv.feeding_interval_days = payload.feeding_interval_days
+
+    # No legacy mirror call: the column lives on `inverts` only, so there's
+    # nothing on the tarantulas/scorpions rows to keep in step.
+    db.commit()
+    return BulkCadenceResponse(updated=len(targets))
 
 
 @router.delete("/{invert_id}", status_code=status.HTTP_204_NO_CONTENT)

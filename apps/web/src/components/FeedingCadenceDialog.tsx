@@ -54,6 +54,7 @@ export default function FeedingCadenceDialog({
   const [days, setDays] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [applyAll, setApplyAll] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -61,6 +62,9 @@ export default function FeedingCadenceDialog({
     // derived one. Starting from current reality beats an empty box.
     setDays(String(current ?? derivedDays ?? 7))
     setError(null)
+    // Always defaults off. Applying to a whole collection is a big action and
+    // must be chosen every time, never inherited from a previous visit.
+    setApplyAll(false)
   }, [open, current, derivedDays])
 
   if (!open) return null
@@ -74,14 +78,26 @@ export default function FeedingCadenceDialog({
     setError(null)
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const res = await fetch(`${API_URL}/api/v1/inverts/${animalId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ feeding_interval_days: value }),
-      })
+      // ADR-017 Phase 3. Clearing applies to all as well when chosen — a
+      // keeper who set a cadence collection-wide needs the same reach to undo
+      // it, or the bulk action is a one-way door.
+      const res = applyAll
+        ? await fetch(`${API_URL}/api/v1/inverts/bulk-feeding-cadence`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ feeding_interval_days: value, apply_to_all: true }),
+          })
+        : await fetch(`${API_URL}/api/v1/inverts/${animalId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ feeding_interval_days: value }),
+          })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
         throw new Error(readApiError(body, 'Could not save that.'))
@@ -145,6 +161,25 @@ export default function FeedingCadenceDialog({
           className="mt-1 w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-white focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
 
+        {/* Phase 3 — the answer for someone who feeds their whole collection
+            the same way. Setting the same number thirty seven times is a chore
+            that replaces a complaint, not a fix. Off by default and re-chosen
+            every time, because it reaches everything they own. */}
+        <label className="mt-4 flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={applyAll}
+            onChange={(e) => setApplyAll(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+          />
+          <span className="text-sm text-gray-600 dark:text-gray-300">
+            Apply to every animal in my collection
+            <span className="block text-xs text-gray-500 dark:text-gray-400">
+              You can still change any individual afterwards.
+            </span>
+          </span>
+        </label>
+
         {error && (
           <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>
         )}
@@ -155,7 +190,11 @@ export default function FeedingCadenceDialog({
           disabled={!valid || saving}
           className="mt-5 w-full rounded-lg bg-primary-600 px-4 py-3 font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
         >
-          {saving ? 'Saving…' : `Feed every ${valid ? parsed : '—'} days`}
+          {saving
+            ? 'Saving…'
+            : applyAll
+              ? `Feed everything every ${valid ? parsed : '—'} days`
+              : `Feed every ${valid ? parsed : '—'} days`}
         </button>
 
         {current != null && (

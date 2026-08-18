@@ -25,6 +25,9 @@ interface FeedingStats {
   is_feeding_paused?: boolean;
   feeding_paused_reason?: string | null;
   feeding_paused_until?: string | null;
+  /** ADR-017 — the keeper's own cadence, when set. Its presence suppresses the
+   *  offer below, since they've already answered the question. */
+  feeding_interval_days?: number | null;
 }
 
 // Canonical reason → friendly prose. Free-form values fall through
@@ -44,6 +47,9 @@ function pauseReasonLabel(reason?: string | null): string {
 
 interface FeedingStatsCardProps {
   data: FeedingStats;
+  /** ADR-017 — opens the cadence dialog. Optional: pages that don't offer it
+   *  simply don't pass it, and the prompt never renders. */
+  onSetCadence?: () => void;
 }
 
 const preyBarColors = [
@@ -55,7 +61,7 @@ const preyBarColors = [
   'bg-cyan-500 dark:bg-cyan-400',
 ];
 
-export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
+export default function FeedingStatsCard({ data, onSetCadence }: FeedingStatsCardProps) {
   // Determine feeding status color
   const getFeedingStatusColor = (days?: number) => {
     if (!days) return "gray";
@@ -176,6 +182,23 @@ export default function FeedingStatsCard({ data }: FeedingStatsCardProps) {
                 </div>
               )}
             </div>
+
+            {/* ADR-017 Phase 2 — the offer, shown only to the person it's for.
+                Appears when the animal is flagged late against a number the
+                keeper never chose. Once they've set their own cadence it
+                disappears: from then on a red banner means they're genuinely
+                past their own intention, and that signal is worth protecting. */}
+            {onSetCadence
+              && statusColor === 'red'
+              && !data.feeding_interval_days && (
+              <button
+                type="button"
+                onClick={onSetCadence}
+                className="mt-3 pt-3 border-t border-current/20 w-full text-left text-xs opacity-80 hover:opacity-100 underline"
+              >
+                Feed this one on a different schedule?
+              </button>
+            )}
           </div>
         )
       )}

@@ -1561,7 +1561,12 @@ export default function TarantulaDetailPage() {
               )}
 
               {/* Feeding Stats Card */}
-              {feedingStats && <FeedingStatsCard data={feedingStats} />}
+              {feedingStats && (
+                <FeedingStatsCard
+                  data={feedingStats}
+                  onSetCadence={() => setShowCadenceModal(true)}
+                />
+              )}
 
               {/* Stats Card */}
               <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl shadow-lg p-6 text-white">
