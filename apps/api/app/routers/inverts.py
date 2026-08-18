@@ -298,14 +298,24 @@ def _recommended_feeding_interval_with_source(
             parsed = parse_frequency_string(freq_str)
             if parsed:
                 return parsed[1], INTERVAL_SOURCE_SPECIES
-        # Stage unknown or that stage's frequency blank/unreadable → use the
-        # SHORTEST defined frequency across stages (safer: flags soonest). Still
-        # species data, so still honest to attribute to the care sheet.
-        defined = [
-            p[1] for p in (parse_frequency_string(v) for v in by_stage.values() if v) if p
-        ]
-        if defined:
-            return min(defined), INTERVAL_SOURCE_SPECIES
+        # The stage's own frequency is blank or unreadable.
+        #
+        # Only borrow from other stages when we DON'T KNOW the stage. Taking the
+        # shortest across all stages regardless meant a known adult whose adult
+        # frequency happened to be blank inherited the SLING cadence — being told
+        # to feed a mature female every three days because that's what her
+        # spiderlings needed. Knowing the stage and ignoring it is worse than
+        # having no species data at all.
+        #
+        # When the stage IS known, fall through to the stage default below: a
+        # number chosen for adults beats a number chosen for slings, even though
+        # the latter came from a care sheet.
+        if stage is None:
+            defined = [
+                p[1] for p in (parse_frequency_string(v) for v in by_stage.values() if v) if p
+            ]
+            if defined:
+                return min(defined), INTERVAL_SOURCE_SPECIES
 
     # No species (or no usable frequency) → stage-based default, else unknown.
     if stage in _STAGE_DEFAULT_INTERVAL:

@@ -31,14 +31,24 @@ from app.services.feeding_reminder_service import parse_frequency_string
         # Frequency phrasing — count per period, was the raw count.
         ("1 prey per week", 7),              # was 1
         ("1-2 prey per week", 7),            # was 2
-        ("2 prey per week", 3),              # was 2
-        ("2-3 prey per week", 3),
-        ("2-3 small prey per week", 3),
+        # The upper bound rounds UP as of 2026-08-09. Twice a week is every 3.5
+        # days; the July fix produced 3 because 7 // 2 floors — an incidental
+        # result of the arithmetic, not a decision about rounding. Callers use
+        # this bound as "should have fed by now", so flooring declared the
+        # animal overdue half a day early on every cycle. Reported by a keeper
+        # as juveniles perpetually showing "feed every 3 days".
+        #
+        # These changes tighten the parser rather than relax the July
+        # regression — the raw-count bug it guards is still covered by the
+        # "was N" cases above.
+        ("2 prey per week", 4),              # was 2, then 3
+        ("2-3 prey per week", 4),
+        ("2-3 small prey per week", 4),
         # Word counts — previously fell through to the fake "10" default.
         ("Once per week", 7),
-        ("Twice per week", 3),
+        ("Twice per week", 4),
         ("weekly", 7),
-        ("2x per week", 3),
+        ("2x per week", 4),
         # Interval phrasing in days — these were the ONLY correct cases before.
         ("every 2-3 days", 3),
         ("Every 4-5 days", 5),

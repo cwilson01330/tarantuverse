@@ -83,7 +83,22 @@ def parse_frequency_string(frequency_str: Optional[str]) -> Optional[Tuple[int, 
         lo_count, hi_count = max(1, min(lo_count, hi_count)), max(1, max(lo_count, hi_count))
         period = _UNIT_DAYS[unit.lower()]
         # MORE feedings per period = SHORTER interval, so the counts invert.
-        return (max(1, period // hi_count), max(1, period // lo_count))
+        #
+        # The UPPER bound rounds UP, not down. Callers use it as the "should
+        # have fed by now" threshold, and flooring it flags early on every
+        # cycle: "twice per week" is every 3.5 days, and 7 // 2 = 3 declared a
+        # juvenile overdue half a day before it was. That phrasing is on
+        # Avicularia avicularia, Poecilotheria metallica, P. murinus,
+        # P. irminia, M. balfouri and a dozen more, so the early nag was
+        # systematic rather than occasional — reported by a keeper 2026-08-09
+        # as "some of my tarantulas still show feed every 3 days".
+        #
+        # The lower bound keeps flooring: it's the earliest reasonable feed,
+        # where erring short is the safe direction.
+        return (
+            max(1, period // hi_count),
+            max(1, -(-period // lo_count)),  # ceil
+        )
 
     m = _INTERVAL_RE.search(s)
     if m:
