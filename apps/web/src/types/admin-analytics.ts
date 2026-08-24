@@ -18,6 +18,14 @@ export interface AdminAnalyticsOverview {
   user_growth_rate: number;
   total_premium_users: number;
   mrr: number;
+  /** Paying subscribers still active and paid up, but not renewing. They leave
+   *  MRR the moment renewal is switched off while their status stays 'active',
+   *  so without this a cancellation is invisible and revenue moves for no
+   *  visible reason. Also the earliest churn signal available. */
+  cancelling_subscribers?: number;
+  /** What those accounts are worth before they lapse — exactly the amount MRR
+   *  has already stopped counting. Not part of MRR. */
+  mrr_winding_down?: number;
   subscription_conversion_rate: number;
   /** Legacy `tarantulas` table only — use total_inverts for the real TV count. */
   total_tarantulas: number;

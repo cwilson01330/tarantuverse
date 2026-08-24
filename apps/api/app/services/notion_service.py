@@ -243,6 +243,11 @@ def send_metrics_snapshot(overview, *, on_date: Optional[date] = None) -> Option
             "Paying": _num(getattr(overview, "paying_subscribers", None)),
             "Comped": _num(getattr(overview, "comped_subscribers", None)),
             "Unknown source": _num(getattr(overview, "subscribers_unknown_source", None)),
+            # Recorded alongside MRR, not instead of it. A month from now the
+            # question "why did revenue dip in August" is only answerable if
+            # the leaving was written down at the time.
+            "Cancelling": _num(getattr(overview, "cancelling_subscribers", None)),
+            "MRR winding down": _num(getattr(overview, "mrr_winding_down", None)),
             "MRR": _num(overview.mrr),
             "Conversion rate": _num(overview.subscription_conversion_rate),
             # total_collection is the honest cross-product figure. total_tarantulas

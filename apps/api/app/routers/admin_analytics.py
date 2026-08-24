@@ -210,6 +210,46 @@ async def get_analytics_overview(
         .scalar()
     ) or 0
 
+    # Cancelling: still active, still paid up, but NOT renewing.
+    #
+    # MRR excludes these the moment `auto_renew` flips, which is right for a
+    # forward-looking number — they won't be here next month. But their `status`
+    # stays 'active' until the paid period ends, so nothing in the admin shows
+    # them as leaving. On 2026-08-23 that meant MRR dropped $4.99 with no
+    # cancellation visible anywhere, and the only way to find the cause was to
+    # query the table by hand.
+    #
+    # This is also the earliest churn signal available: someone who has decided
+    # to leave but hasn't gone yet, and can still be asked why.
+    cancelling_subscribers = (
+        db.query(func.count(distinct(UserSubscription.user_id)))
+        .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(
+            active_subscription_clause(),
+            SubscriptionPlan.name != "free",
+            UserSubscription.auto_renew.is_(False),
+            # Paid only. A comped account never renews by definition, so
+            # counting those would drown the signal in noise.
+            ~_comped_clause,
+        )
+        .scalar()
+    ) or 0
+
+    # Revenue still to arrive from those accounts before they lapse. Not part
+    # of MRR — it is precisely the amount MRR has already stopped counting.
+    mrr_winding_down = float(
+        db.query(func.sum(SubscriptionPlan.price_monthly))
+        .join(UserSubscription, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(
+            active_subscription_clause(),
+            SubscriptionPlan.name != "free",
+            UserSubscription.auto_renew.is_(False),
+            ~_comped_clause,
+        )
+        .scalar()
+        or 0.0
+    )
+
     # MRR: sum monthly price of active, non-expired, auto-renewing PAID subs.
     mrr_result = db.query(func.sum(SubscriptionPlan.price_monthly)).join(
         UserSubscription, UserSubscription.plan_id == SubscriptionPlan.id
@@ -272,6 +312,8 @@ async def get_analytics_overview(
         paying_subscribers=paying_subscribers,
         comped_subscribers=comped_subscribers,
         subscribers_unknown_source=subscribers_unknown_source,
+        cancelling_subscribers=cancelling_subscribers,
+        mrr_winding_down=mrr_winding_down,
         mrr=round(mrr, 2),
         subscription_conversion_rate=round(subscription_conversion_rate, 1),
         total_tarantulas=total_tarantulas,

@@ -36,6 +36,15 @@ class AdminAnalyticsOverview(BaseModel):
     # predating `subscription_source` have no recorded provenance and are
     # counted as paying by exclusion. A number to shrink, not to live with.
     subscribers_unknown_source: int = 0
+    # Still active and paid up, but not renewing. MRR drops the moment
+    # auto_renew flips while `status` stays 'active', so without this a
+    # cancellation is invisible and revenue appears to move for no reason.
+    # It's also the earliest churn signal there is — someone who has decided to
+    # leave but is still reachable.
+    cancelling_subscribers: int = 0
+    # What those accounts are worth before they lapse. Not part of MRR; it is
+    # exactly the amount MRR has already stopped counting.
+    mrr_winding_down: float = 0.0
     mrr: float  # Monthly Recurring Revenue
     subscription_conversion_rate: float  # Percentage of users on premium
 
