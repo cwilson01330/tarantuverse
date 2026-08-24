@@ -36,6 +36,9 @@ const adminSections: AdminSection[] = [
     href: '/dashboard/admin/species/manage',
     color: 'from-purple-500 to-pink-500',
     items: [
+      // First in the list on purpose: this is the one that edits the content
+      // keepers actually read, and the only route to sources and images.
+      { label: 'Care Guides', href: '/dashboard/admin/species/care-guides' },
       { label: 'Manage Species', href: '/dashboard/admin/species/manage' },
       { label: 'Add New Species', href: '/dashboard/admin/species/add' },
       { label: 'Bulk Import', href: '/dashboard/admin/species/bulk-import' },
