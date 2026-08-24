@@ -22,11 +22,12 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import {
   ANIMAL_TAXA,
@@ -38,8 +39,7 @@ import {
   getAnimalLimits,
   listAnimals,
 } from '../../src/lib/animals';
-import { AppHeader } from '../../src/components/AppHeader';
-import { NotificationBell } from '../../src/components/NotificationBell';
+import { GradientBand } from '../../src/components/GradientBand';
 import { AnimalActionSheet } from '../../src/components/AnimalActionSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { daysSince, relativeDays } from '../../src/utils/relative-days';
@@ -50,6 +50,9 @@ import { DEFAULT_CGD_FOOD_TYPE, feedingPillColor } from '../../src/lib/cgd';
 // Full shapes live in the detail screens; here we keep the surface
 // small so the API contract is obvious.
 // ---------------------------------------------------------------------------
+
+/** Emerald → near-black, matching the Home header band. */
+const BAND_COLORS = ['#065F46', '#0B0B0B'] as const;
 
 type Sex = 'male' | 'female' | 'unknown' | null;
 // ADR-003: every taxon flows through the unified animals endpoint.
@@ -66,6 +69,10 @@ interface ReptileBase {
   /** Resolved CGD flag — drives the tighter feeding-status ramp. */
   feeds_on_cgd: boolean;
   created_at: string;
+  /** Secondary fact on the card's status line. Server sends a string. */
+  current_weight_g: string | null;
+  /** Secondary fact — "shed 6d ago". */
+  last_shed_at: string | null;
 }
 
 interface ReptileRow extends ReptileBase {
@@ -88,44 +95,13 @@ function reptileTitle(r: ReptileBase): string {
 function CollectionScreen() {
   const router = useRouter();
   const { colors, layout } = useTheme();
+  const insets = useSafeAreaInsets();
 
-  // Header right slot — notification bell (in-app notification center) +
-  // Import (bring a collection in from a Sheet/CSV) + Feeding Day entry
-  // (bulk-log feedings across the collection). Rendered here so all three
-  // are reachable from the loading, empty, and populated states without
-  // restructuring the list.
-  const feedingDayAction = (
-    <View style={styles.headerActions}>
-      <NotificationBell color={colors.primary} size={22} />
-      <TouchableOpacity
-        onPress={() => router.push('/feeders' as never)}
-        hitSlop={8}
-        style={styles.headerAction}
-        accessibilityRole="button"
-        accessibilityLabel="Feeders — track feeder stock and freezer inventory"
-      >
-        <MaterialCommunityIcons name="fridge-outline" size={22} color={colors.primary} />
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => router.push('/import' as never)}
-        hitSlop={8}
-        style={styles.headerAction}
-        accessibilityRole="button"
-        accessibilityLabel="Import collection from a Google Sheet or file"
-      >
-        <MaterialCommunityIcons name="tray-arrow-down" size={22} color={colors.primary} />
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => router.push('/feeding-day' as never)}
-        hitSlop={8}
-        style={styles.headerAction}
-        accessibilityRole="button"
-        accessibilityLabel="Feeding Day — log feeding for many animals at once"
-      >
-        <MaterialCommunityIcons name="silverware-fork-knife" size={22} color={colors.primary} />
-      </TouchableOpacity>
-    </View>
-  );
+  // Search is local-only: it filters the rows already loaded, so there is
+  // no endpoint, no debounce and no loading state. `searching` toggles the
+  // input; clearing the query collapses it again.
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
 
   const [rows, setRows] = useState<ReptileRow[] | null>(null);
   // Free-tier cap status, for the subtle "X / 5" header counter. null =
@@ -152,8 +128,78 @@ function CollectionScreen() {
   // and when limits haven't loaded. Undefined = no subtitle rendered.
   const capSubtitle =
     limits && !limits.is_premium && limits.limit > 0
-      ? `${limits.current_count} / ${limits.limit} animals`
+      ? `${limits.current_count} of ${limits.limit} animals`
       : undefined;
+
+  /**
+   * Emerald header band, shared by the loading / empty / populated states.
+   *
+   * The four unlabeled 22px icons that used to live here (bell, Feeders,
+   * Import, Feeding Day) are gone — every one of those destinations is now
+   * a labelled tile or the bell on Home, so nothing became unreachable and
+   * the header stopped being a row of unexplained glyphs.
+   *
+   * Only `magnify` is here, and it does real work: a local filter over the
+   * rows already in memory. The handoff also specced `tune-variant` (sort
+   * sheet) and `view-grid-outline` (layout toggle); both are deliberately
+   * left out until they have behaviour behind them, because a header icon
+   * that does nothing is worse than an absent one.
+   */
+  const collectionHeader = (
+    <GradientBand colors={BAND_COLORS} style={{ paddingTop: insets.top + 10 }}>
+      <View style={styles.headerRow}>
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Collection
+          </Text>
+          {(capSubtitle || rows) && (
+            <Text style={styles.headerSubtitle} numberOfLines={1}>
+              {capSubtitle ??
+                `${rows?.length ?? 0} ${
+                  (rows?.length ?? 0) === 1 ? 'animal' : 'animals'
+                }`}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            // Closing search clears the query too, otherwise the list stays
+            // filtered by an input the keeper can no longer see.
+            setSearching((s) => {
+              if (s) setQuery('');
+              return !s;
+            });
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={searching ? 'Close search' : 'Search your collection'}
+        >
+          <MaterialCommunityIcons
+            name={searching ? 'close' : 'magnify'}
+            size={22}
+            color="#fff"
+          />
+        </TouchableOpacity>
+      </View>
+
+      {searching && (
+        <View style={styles.searchWrap}>
+          <MaterialCommunityIcons name="magnify" size={19} color="rgba(255,255,255,0.75)" />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by name or species"
+            placeholderTextColor="rgba(255,255,255,0.6)"
+            style={styles.searchInput}
+            autoFocus
+            autoCorrect={false}
+            returnKeyType="search"
+            accessibilityLabel="Search your collection by name or species"
+          />
+        </View>
+      )}
+    </GradientBand>
+  );
 
   const fetchAll = useCallback(async () => {
     // Cap status for the header counter — best-effort, never blocks the
@@ -177,6 +223,8 @@ function CollectionScreen() {
         feeds_on_cgd: a.feeds_on_cgd,
         created_at: a.created_at,
         taxon: a.taxon,
+        current_weight_g: a.current_weight_g,
+        last_shed_at: a.last_shed_at,
       }));
       // Newest first.
       merged.sort(
@@ -329,9 +377,21 @@ function CollectionScreen() {
   // Rows after the active taxon filter. Null filter = show everything.
   const visibleRows = useMemo(() => {
     if (!rows) return rows;
-    if (!taxonFilter) return rows;
-    return rows.filter((r) => r.taxon === taxonFilter);
-  }, [rows, taxonFilter]);
+    let out = taxonFilter ? rows.filter((r) => r.taxon === taxonFilter) : rows;
+
+    // Local search across the fields the keeper actually sees on the card:
+    // their own name for the animal, the common name and the scientific
+    // name. Matching hidden fields would make results look arbitrary.
+    const q = query.trim().toLowerCase();
+    if (q) {
+      out = out.filter((r) =>
+        [r.name, r.common_name, r.scientific_name]
+          .filter(Boolean)
+          .some((v) => v!.toLowerCase().includes(q)),
+      );
+    }
+    return out;
+  }, [rows, taxonFilter, query]);
 
   // If the keeper deletes their last animal of the filtered taxon, drop
   // back to "All" so we don't get stuck on an empty filtered view.
@@ -346,7 +406,7 @@ function CollectionScreen() {
         edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <AppHeader title="Collection" subtitle={capSubtitle} rightAction={feedingDayAction} />
+        {collectionHeader}
         <View style={styles.centerContent}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -361,7 +421,7 @@ function CollectionScreen() {
         edges={['left', 'right', 'bottom']}
         style={[styles.safeArea, { backgroundColor: colors.background }]}
       >
-        <AppHeader title="Collection" rightAction={feedingDayAction} />
+        {collectionHeader}
         <View style={styles.emptyState}>
           <MaterialCommunityIcons
             name="snake"
@@ -399,7 +459,7 @@ function CollectionScreen() {
       edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <AppHeader title="Collection" subtitle={capSubtitle} rightAction={feedingDayAction} />
+      {collectionHeader}
       <FlatList
         data={visibleRows ?? []}
         keyExtractor={(r) => `${r.taxon}:${r.id}`}
@@ -555,6 +615,24 @@ function TaxonFilterBar({
 // Card
 // ---------------------------------------------------------------------------
 
+/**
+ * Collection row — Screen 4 of the design handoff.
+ *
+ * The photo is a 96px full-bleed column rather than a 56px inset thumb:
+ * this is a screen about animals, and the photo is how a keeper actually
+ * recognises them.
+ *
+ * The three actions below (Fed / log shed / log weight) already existed —
+ * behind an unadvertised long-press on the action sheet. Surfacing them on
+ * the card is the single biggest discoverability win in this app. The
+ * long-press sheet stays for Edit.
+ *
+ * Not implemented from the spec: appending the morph to the species line
+ * ("Python regius · Pastel het Clown"). The animals list payload carries no
+ * morph/genetics field — that data lives behind the detail screen's
+ * Genetics section. Adding it needs a backend field on the list response,
+ * so it's a separate change rather than something to fake here.
+ */
 function ReptileCard({
   row,
   onPress,
@@ -568,6 +646,7 @@ function ReptileCard({
   onFed: () => void;
   fedBusy: boolean;
 }) {
+  const router = useRouter();
   const { colors, layout } = useTheme();
   const lastFed = relativeDays(row.last_fed_at);
   const days = daysSince(row.last_fed_at);
@@ -575,16 +654,32 @@ function ReptileCard({
   // generic herp glyph rather than mislabeling as a lizard.
   const taxonGlyph = ANIMAL_TAXA[row.taxon]?.glyph ?? '🦕';
 
-  // Color-coded last-fed indicator. Snake/lizard cadence is the
-  // default; CGD-fed rhacodactylids get a tighter ramp (overdue at
-  // day 4 instead of day 7) so a healthy crestie reads as green at
-  // day 2, not yellow. See lib/cgd.ts.
-  const pillBg = feedingPillColor(days, row.feeds_on_cgd, {
+  // Colour-coded last-fed indicator. Snake/lizard cadence is the default;
+  // CGD-fed rhacodactylids get a tighter ramp (overdue at day 4 instead of
+  // day 7) so a healthy crestie reads as green at day 2, not yellow.
+  const statusColor = feedingPillColor(days, row.feeds_on_cgd, {
     green: colors.success,
     yellow: '#eab308',
     orange: '#f97316',
     red: '#ef4444',
   });
+
+  // Status line. `days` is null for an animal that has never been fed —
+  // saying "0d" there would be a lie, and concatenating the null is what
+  // produced the "nulld ago" bug on the Tarantuverse card.
+  const statusText =
+    days == null ? 'Not yet fed' : lastFed ? `Fed ${lastFed.toLowerCase()}` : `${days}d`;
+
+  // Secondary facts, only when real. Weight arrives as a string from the
+  // server, so it's parsed before formatting and dropped if unparseable.
+  const secondary: string[] = [];
+  if (row.feeds_on_cgd) secondary.push('CGD');
+  const weight = row.current_weight_g ? Number(row.current_weight_g) : NaN;
+  if (Number.isFinite(weight) && weight > 0) {
+    secondary.push(`${Math.round(weight).toLocaleString()} g`);
+  }
+  const shedDays = daysSince(row.last_shed_at);
+  if (shedDays != null) secondary.push(`shed ${shedDays}d ago`);
 
   return (
     <TouchableOpacity
@@ -600,58 +695,34 @@ function ReptileCard({
       ]}
       accessibilityRole="button"
       accessibilityLabel={`${reptileTitle(row)}, ${row.taxon}, ${
-        lastFed ? 'fed ' + lastFed.toLowerCase() : 'never fed'
+        days == null ? 'never fed' : statusText.toLowerCase()
       }`}
       accessibilityHint="Opens the detail screen. Long press for quick actions."
     >
-      {/* Photo or placeholder */}
-      <View style={styles.cardImageWrap}>
-        {row.photo_url ? (
-          <Image source={{ uri: row.photo_url }} style={styles.cardImage} />
-        ) : (
-          <View
-            style={[styles.cardImage, { backgroundColor: colors.surfaceRaised }]}
-          >
-            <Text style={{ fontSize: 24 }}>{taxonGlyph}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Title + metadata */}
-      <View style={styles.cardBody}>
-        <Text
-          style={[styles.cardTitle, { color: colors.textPrimary }]}
-          numberOfLines={1}
-        >
-          {reptileTitle(row)}
-        </Text>
-        {row.scientific_name && (
-          <Text
-            style={[styles.cardSubtitle, { color: colors.textTertiary }]}
-            numberOfLines={1}
-          >
-            {row.scientific_name}
-          </Text>
-        )}
-      </View>
-
-      {/* Right-side indicators — sex chip + last-fed pill, both sharing
-          the same height so they align cleanly (same pattern we used for
-          the Tarantuverse list view). */}
-      <View style={styles.cardIndicators}>
+      {/* Photo — full-bleed left column, no inset, no overlays. */}
+      {row.photo_url ? (
+        <Image source={{ uri: row.photo_url }} style={styles.cardImage} />
+      ) : (
         <View
           style={[
-            styles.sexChip,
-            {
-              backgroundColor:
-                row.sex === 'female'
-                  ? '#ec489920'
-                  : row.sex === 'male'
-                    ? '#3b82f620'
-                    : colors.border,
-            },
+            styles.cardImage,
+            styles.cardImageEmpty,
+            { backgroundColor: colors.surfaceRaised },
           ]}
         >
+          <Text style={{ fontSize: 28 }}>{taxonGlyph}</Text>
+        </View>
+      )}
+
+      <View style={styles.cardBody}>
+        {/* Name + sex glyph */}
+        <View style={styles.cardTitleRow}>
+          <Text
+            style={[styles.cardTitle, { color: colors.textPrimary }]}
+            numberOfLines={1}
+          >
+            {reptileTitle(row)}
+          </Text>
           <MaterialCommunityIcons
             name={
               row.sex === 'female'
@@ -660,7 +731,7 @@ function ReptileCard({
                   ? 'gender-male'
                   : 'help-circle-outline'
             }
-            size={14}
+            size={17}
             color={
               row.sex === 'female'
                 ? '#ec4899'
@@ -670,28 +741,90 @@ function ReptileCard({
             }
           />
         </View>
-        {days != null && (
-          <View style={[styles.feedingPill, { backgroundColor: pillBg }]}>
-            <Text style={styles.feedingPillText}>{days}d</Text>
-          </View>
+
+        {row.scientific_name && (
+          <Text
+            style={[styles.cardSubtitle, { color: colors.textTertiary }]}
+            numberOfLines={1}
+          >
+            {row.scientific_name}
+          </Text>
         )}
-        {/* One-tap "Fed" — logs a feeding with the remembered meal, no
-            long-press or form needed. Inner touchable captures the tap so
-            it doesn't open the detail screen. */}
-        <TouchableOpacity
-          onPress={onFed}
-          disabled={fedBusy}
-          hitSlop={6}
-          style={[
-            styles.fedChip,
-            { backgroundColor: colors.primary, opacity: fedBusy ? 0.6 : 1 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Log a feeding for ${reptileTitle(row)}`}
-        >
-          <MaterialCommunityIcons name="silverware-fork-knife" size={13} color="#0B0B0B" />
-          <Text style={styles.fedChipText}>{fedBusy ? '…' : 'Fed'}</Text>
-        </TouchableOpacity>
+
+        {/* Status line — dot + feeding delta, then the secondary facts. */}
+        <View style={styles.statusRow}>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: days == null ? colors.textTertiary : statusColor },
+            ]}
+          />
+          <Text
+            style={[
+              styles.statusText,
+              { color: days == null ? colors.textTertiary : statusColor },
+            ]}
+            numberOfLines={1}
+          >
+            {statusText}
+          </Text>
+          {secondary.length > 0 && (
+            <Text
+              style={[styles.statusSecondary, { color: colors.textTertiary }]}
+              numberOfLines={1}
+            >
+              {` · ${secondary.join(' · ')}`}
+            </Text>
+          )}
+        </View>
+
+        {/* Actions. These were long-press-only until now. */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            onPress={onFed}
+            disabled={fedBusy}
+            style={[
+              styles.actionPrimary,
+              { backgroundColor: colors.primary, opacity: fedBusy ? 0.6 : 1 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              row.feeds_on_cgd
+                ? `Log a fresh CGD serving for ${reptileTitle(row)}`
+                : `Log a feeding for ${reptileTitle(row)}`
+            }
+          >
+            <Text style={styles.actionPrimaryText}>
+              {fedBusy ? '…' : row.feeds_on_cgd ? 'Refresh CGD' : 'Fed'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push(`/reptile/log-shed/${row.id}` as never)}
+            style={[styles.actionIconBtn, { borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Log a shed for ${reptileTitle(row)}`}
+          >
+            <MaterialCommunityIcons
+              name="weather-windy"
+              size={15}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push(`/reptile/log-weight/${row.id}` as never)}
+            style={[styles.actionIconBtn, { borderColor: colors.border }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Log a weight for ${reptileTitle(row)}`}
+          >
+            <MaterialCommunityIcons
+              name="scale-bathroom"
+              size={15}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -703,16 +836,6 @@ function ReptileCard({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerAction: {
-    width: 44,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-  },
   centerContent: {
     flex: 1,
     justifyContent: 'center',
@@ -776,71 +899,103 @@ const styles = StyleSheet.create({
   errorBannerText: { color: '#dc2626', fontSize: 13 },
 
   // Card
-  card: {
+  // Header band
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 14,
     gap: 12,
   },
-  cardImageWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
+  headerText: { flex: 1, minWidth: 0 },
+  headerTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: 'rgba(255,255,255,0.72)',
+    marginTop: 2,
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#fff',
+    // Height is pinned so the band doesn't jump between platforms —
+    // Android's TextInput carries extra intrinsic padding.
+    padding: 0,
+  },
+
+  // Card — photo is a full-bleed column, so the card itself has no
+  // padding and clips its children instead.
+  card: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    borderWidth: 1,
     overflow: 'hidden',
   },
   cardImage: {
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 96,
+    // No fixed height: alignSelf stretch makes the photo match the body's
+    // height, so the column stays full-bleed as the body grows.
+    alignSelf: 'stretch',
   },
-  cardBody: { flex: 1, minWidth: 0 },
-  cardTitle: { fontSize: 15, fontWeight: '600' },
+  cardImageEmpty: { alignItems: 'center', justifyContent: 'center' },
+  cardBody: {
+    flex: 1,
+    minWidth: 0,
+    paddingTop: 12,
+    paddingRight: 12,
+    paddingBottom: 12,
+    paddingLeft: 14,
+    gap: 7,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cardTitle: { flex: 1, minWidth: 0, fontSize: 16, fontWeight: '600' },
   cardSubtitle: {
     fontSize: 12,
     fontStyle: 'italic',
-    marginTop: 2,
+    // gap on cardBody handles the rhythm; a margin here would double it.
+    marginTop: -3,
   },
-  cardIndicators: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sexChip: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  feedingPill: {
-    height: 22,
-    minWidth: 22,
-    paddingHorizontal: 8,
-    borderRadius: 11,
+
+  // Status line
+  statusRow: { flexDirection: 'row', alignItems: 'center' },
+  statusDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  statusSecondary: { flex: 1, minWidth: 0, fontSize: 12 },
+
+  // Action row
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  actionPrimary: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  feedingPillText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 13,
-  },
-  fedChip: {
-    flexDirection: 'row',
+  actionPrimaryText: { color: '#0B0B0B', fontSize: 12, fontWeight: '700' },
+  actionIconBtn: {
+    width: 38,
+    height: 30,
+    borderRadius: 9,
+    borderWidth: 1,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 999,
-    // No marginTop: this sits inside a `cardIndicators` row that already
-    // centres its children, so the offset just pushed the Fed chip low
-    // against the sex chip and day pill beside it.
+    justifyContent: 'center',
   },
-  fedChipText: { color: '#0B0B0B', fontSize: 11, fontWeight: '700' },
 
   // FAB
   fab: {
