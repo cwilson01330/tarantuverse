@@ -37,6 +37,7 @@ from app.models.user import User
 from app.models.animal import Animal
 from app.models.reptile_species import ReptileSpecies
 from app.models.weight_log import WeightLog
+from app.services.feeding_reminder_service import parse_frequency_string
 from app.schemas.weight_log import (
     WeightLogCreate,
     WeightLogUpdate,
@@ -102,6 +103,62 @@ def _species_for_animal(db: Session, animal: Animal) -> ReptileSpecies | None:
         .filter(ReptileSpecies.id == animal.herp_species_id)
         .first()
     )
+
+
+def _resolve_interval_window(
+    animal: Animal,
+    species: ReptileSpecies | None,
+    suggestion: dict,
+) -> tuple[Optional[int], Optional[int]]:
+    """Resolve the (min, max) feeding interval for the per-animal status.
+
+    This endpoint previously read ONLY `suggestion`, which comes from
+    `suggest_prey_range()` and is derived purely from the weight-bracketed
+    `life_stage_feeding` JSON. That produced two wrong answers:
+
+      1. An animal with NO logged weight got interval=None and rendered
+         "No species feeding cadence on file. Link this animal to a species
+         with a care sheet" — even when the linked sheet had explicit
+         per-stage frequencies. Reported from a Python regius whose sheet
+         carries "Every 10-14 days" for adults; the animal was correctly
+         linked, so the message was both false and un-actionable.
+      2. The keeper's OWN cadence (ADR-017 `feeding_interval_days`) was
+         ignored entirely here, so a keeper who had explicitly stated a
+         number still saw "cadence not on file" on the detail screen while
+         /animals/feeding-status (collection-wide) honoured it. Two
+         surfaces disagreeing about the same animal.
+
+    Priority matches `routers.animals._animal_feeding_interval` so the two
+    surfaces can't drift again:
+      keeper's number → weight bracket → species per-stage frequency → None.
+    """
+    # 1. ADR-017 — a number the keeper stated is the only cadence the app
+    #    can be certain of, so it outranks every inference. Exact, so the
+    #    window collapses to a single value.
+    keeper = getattr(animal, "feeding_interval_days", None)
+    if keeper:
+        return int(keeper), int(keeper)
+
+    # 2. Weight-bracketed schedule — the most precise inference we have,
+    #    but only available once the animal has a weight on file.
+    lo, hi = suggestion.get("interval_days_min"), suggestion.get("interval_days_max")
+    if lo is not None and hi is not None:
+        return lo, hi
+
+    # 3. The species sheet's free-text per-stage frequency. Adult-first
+    #    ordering mirrors _animal_feeding_interval; without a weight we
+    #    can't compute a life stage, so there is no better basis to choose.
+    if species is not None:
+        for freq in (
+            species.feeding_frequency_adult,
+            species.feeding_frequency_juvenile,
+            species.feeding_frequency_hatchling,
+        ):
+            parsed = parse_frequency_string(freq)
+            if parsed:
+                return parsed[0], parsed[1]
+
+    return None, None
 
 
 # ── Weight log CRUD ───────────────────────────────────────────────────
@@ -422,6 +479,7 @@ def _compute_feeding_status(
     brumation_active: bool = False,
     feeding_paused_reason: Optional[str] = None,
     feeding_paused_until: Optional[date] = None,
+    is_species_linked: bool = False,
 ) -> FeedingStatus:
     """Pure function — combines inputs into the canonical FeedingStatus.
 
@@ -456,12 +514,22 @@ def _compute_feeding_status(
         )
 
     if interval_days_min is None or interval_days_max is None:
+        # The old copy always told the keeper to link a species. When the
+        # animal was already linked — the common case — that was both
+        # false and un-actionable: it named a step they had done and hid
+        # the one that would actually help. Two states, two answers.
+        note = (
+            "This species sheet has no feeding cadence yet. "
+            "Set your own cadence to get reminders."
+            if is_species_linked
+            else "No feeding cadence on file. Link this animal to a species, "
+            "or set your own cadence, to see reminders."
+        )
         return FeedingStatus(
             status="no_data",
             last_fed_at=last_fed_at,
             is_data_available=False,
-            note="No species feeding cadence on file. Link this animal "
-            "to a species with a care sheet to see reminders.",
+            note=note,
         )
 
     if last_fed_at is None:
@@ -534,10 +602,15 @@ async def animal_feeding_status(
 
     last_fed = _last_accepted_feeding(db, animal_id)
 
+    # Full resolution chain, not just the weight bracket — see
+    # _resolve_interval_window for the two bugs this fixes.
+    interval_min, interval_max = _resolve_interval_window(animal, species, suggestion)
+
     return _compute_feeding_status(
         last_fed_at=last_fed.fed_at if last_fed else None,
-        interval_days_min=suggestion["interval_days_min"],
-        interval_days_max=suggestion["interval_days_max"],
+        interval_days_min=interval_min,
+        interval_days_max=interval_max,
+        is_species_linked=species is not None,
         brumation_active=bool(getattr(animal, "brumation_active", False)),
         feeding_paused_reason=getattr(animal, "feeding_paused_reason", None),
         feeding_paused_until=getattr(animal, "feeding_paused_until", None),
