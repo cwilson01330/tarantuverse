@@ -18,6 +18,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -39,6 +40,12 @@ import {
 } from '../../src/components/forms/FormPrimitives';
 import { EnclosurePicker } from '../../src/components/forms/EnclosurePicker';
 import { ReptileSpeciesAutocomplete } from '../../src/components/forms/ReptileSpeciesAutocomplete';
+import {
+  AddGenesField,
+  type PickedGene,
+  pickedGenesToPayloads,
+} from '../../src/components/forms/AddGenesField';
+import { addAnimalGenotype } from '../../src/lib/genes';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import {
   ANIMAL_TAXA,
@@ -149,6 +156,9 @@ function AddReptileScreen() {
     'auto',
   );
   const [notes, setNotes] = useState('');
+  // Genes picked before the animal exists. Held locally and attached
+  // after createAnimal returns an id — see handleSubmit.
+  const [genes, setGenes] = useState<PickedGene[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Free-tier cap gate. When the create POST returns HTTP 402 we show the
@@ -219,9 +229,34 @@ function AddReptileScreen() {
       // ADR-003: one create call — the taxon discriminator rides in the
       // payload instead of routing to per-taxon endpoints.
       const created = await createAnimal(payload);
+
+      // Genotypes are a second call — the genotype endpoint is keyed on an
+      // animal that must already exist. Deliberately NOT fatal: the animal
+      // is saved at this point, and throwing the keeper back to a form
+      // whose save succeeded would be worse than a missing gene they can
+      // add from the detail screen. Failures are counted, not swallowed
+      // silently — see the alert below.
+      let genesFailed = 0;
+      if (genes.length > 0) {
+        const payloads = pickedGenesToPayloads(genes);
+        const results = await Promise.allSettled(
+          payloads.map((g) => addAnimalGenotype(created.id, g)),
+        );
+        genesFailed = results.filter((r) => r.status === 'rejected').length;
+      }
+
       // Replace so back goes to collection, not back to this form.
       // ADR-003: one detail route for every taxon.
       router.replace(`/reptile/${created.id}` as never);
+
+      if (genesFailed > 0) {
+        Alert.alert(
+          'Saved, but some genes did not attach',
+          `${trimmedName || 'This animal'} was saved. ${genesFailed} of ${
+            genes.length
+          } genes couldn't be recorded — you can add them from the Genetics section.`,
+        );
+      }
     } catch (err) {
       // Free-tier cap: the backend returns HTTP 402 with a structured
       // detail. Surface the upgrade modal instead of a generic error so
@@ -260,10 +295,46 @@ function AddReptileScreen() {
     >
       <AppHeader title="Add reptile" leftAction={<HeaderBackButton />} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // Android needs an explicit 'height' under SDK 54's edge-to-edge
+        // mode; leaving it undefined lets the keyboard cover the field.
+        // Matters more now that Genetics adds a search input low in a
+        // long form.
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          {/* Species leads. It's the field that sets the most other
+              fields — common name, CGD default, care sheet, and (for
+              snakes) which genes are selectable — so asking for it first
+              means everything below it is already narrowed. */}
+          <Field
+            label="Species"
+            hint="Type 2+ letters to search our care-sheet library. Picking a match unlocks prey suggestions and feeding reminders."
+          >
+            <ReptileSpeciesAutocomplete
+              speciesId={speciesId}
+              scientificName={scientificName}
+              onChange={({ id, scientificName: sci }) => {
+                setSpeciesId(id);
+                setScientificName(sci);
+                // Genes are species-scoped, so a species change
+                // invalidates anything already picked. Clearing is the
+                // honest move — silently keeping Pastel on a corn snake
+                // would record a gene that species can't carry.
+                setGenes([]);
+              }}
+              onPick={(species) => {
+                // Auto-fill common name from the matched species when
+                // the keeper hasn't typed one yet — they can still
+                // overwrite if "Royal Python" feels stuffy and they'd
+                // prefer "Ball Python."
+                if (!commonName.trim() && species.common_names[0]) {
+                  setCommonName(species.common_names[0]);
+                }
+              }}
+            />
+          </Field>
+
           <Field label="Taxon" required>
             <ChipGroup
               options={TAXON_OPTIONS}
@@ -278,29 +349,6 @@ function AddReptileScreen() {
               onChangeText={setName}
               placeholder={ex.name}
               autoCapitalize="words"
-            />
-          </Field>
-
-          <Field
-            label="Species"
-            hint="Type 2+ letters to search our care-sheet library. Picking a match unlocks prey suggestions later."
-          >
-            <ReptileSpeciesAutocomplete
-              speciesId={speciesId}
-              scientificName={scientificName}
-              onChange={({ id, scientificName: sci }) => {
-                setSpeciesId(id);
-                setScientificName(sci);
-              }}
-              onPick={(species) => {
-                // Auto-fill common name from the matched species when
-                // the keeper hasn't typed one yet — they can still
-                // overwrite if "Royal Python" feels stuffy and they'd
-                // prefer "Ball Python."
-                if (!commonName.trim() && species.common_names[0]) {
-                  setCommonName(species.common_names[0]);
-                }
-              }}
             />
           </Field>
 
@@ -365,6 +413,22 @@ function AddReptileScreen() {
               onChange={setCgdOverride}
             />
           </Field>
+
+          {/* Genetics — snakes only, matching the detail screen's gate
+              (the gene catalog is ball-python-scoped for now). Without
+              this, recording a morph meant save → reopen → edit. */}
+          {taxon === 'snake' && (
+            <Field
+              label="Genetics"
+              hint="Optional. Tap a gene to change het / visual."
+            >
+              <AddGenesField
+                scientificName={scientificName}
+                picked={genes}
+                onChange={setGenes}
+              />
+            </Field>
+          )}
 
           <Field label="Notes" hint="Optional. Anything that doesn't fit above.">
             <ThemedInput
