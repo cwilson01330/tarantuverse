@@ -454,11 +454,19 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
         </section>
 
         {/* ------------------------------------------------------------- */}
-        {/* Diet override — most keepers leave this on Auto. */}
+        {/* Diet override — only species that eat CGD are offered CGD.     */}
+        {/*                                                                */}
+        {/* Gated on the animal's RESOLVED feeds_on_cgd (override ??       */}
+        {/* species default) rather than the species flag alone, so a      */}
+        {/* record that already carries a wrong override still shows the   */}
+        {/* control and the keeper can turn it off. Hiding it outright     */}
+        {/* would strand bad data out of reach.                            */}
+        {/* See services/snake_feeding_advisory.cgd_applies.               */}
         {/* ------------------------------------------------------------- */}
+        {animal?.feeds_on_cgd && (
         <section className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
           <h2 className={SECTION_HDR_CLS}>Diet</h2>
-          <Field label="Feeds on CGD">
+          <Field label="Feeds on CGD (crested gecko diet)">
             <div className="flex gap-2 mb-2">
               {(['auto', 'yes', 'no'] as const).map((opt) => {
                 const selected = form.cgdOverride === opt
@@ -485,6 +493,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
             </p>
           </Field>
         </section>
+        )}
 
         {/* ------------------------------------------------------------- */}
         {/* Notes */}

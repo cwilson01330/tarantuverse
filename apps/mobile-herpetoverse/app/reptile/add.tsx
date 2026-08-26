@@ -155,6 +155,11 @@ function AddReptileScreen() {
   const [cgdOverride, setCgdOverride] = useState<'auto' | 'yes' | 'no'>(
     'auto',
   );
+  // Whether the PICKED SPECIES eats a complete gecko diet. Only species
+  // that eat CGD are offered the CGD control, so a corn snake keeper is
+  // never asked a question whose answer would rewrite their feeding
+  // schedule. Resets with the species.
+  const [speciesFeedsOnCgd, setSpeciesFeedsOnCgd] = useState(false);
   const [notes, setNotes] = useState('');
   // Genes picked before the animal exists. Held locally and attached
   // after createAnimal returns an id — see handleSubmit.
@@ -322,8 +327,17 @@ function AddReptileScreen() {
                 // honest move — silently keeping Pastel on a corn snake
                 // would record a gene that species can't carry.
                 setGenes([]);
+                // Clearing the species clears its diet claim too, and any
+                // override the keeper set against the old species.
+                if (!id) {
+                  setSpeciesFeedsOnCgd(false);
+                  setCgdOverride('auto');
+                }
               }}
               onPick={(species) => {
+                setSpeciesFeedsOnCgd(species.feeds_on_cgd);
+                // A species that doesn't eat CGD can't carry an override.
+                if (!species.feeds_on_cgd) setCgdOverride('auto');
                 // Auto-fill common name from the matched species when
                 // the keeper hasn't typed one yet — they can still
                 // overwrite if "Royal Python" feels stuffy and they'd
@@ -403,16 +417,37 @@ function AddReptileScreen() {
             />
           </Field>
 
-          <Field
-            label="Feeds on CGD"
-            hint="Auto follows the species default. Override only if this individual is fed differently."
-          >
-            <ChipGroup
-              options={CGD_OVERRIDE_OPTIONS}
-              value={cgdOverride}
-              onChange={setCgdOverride}
-            />
-          </Field>
+          {/* Only species that eat CGD are offered CGD.
+
+              This used to render for every taxon, labelled "Feeds on CGD"
+              with the hint "override only if this individual is fed
+              differently". A keeper feeding shop mice to a corn snake read
+              that as "yes, differently" and answered Yes — and because the
+              flag short-circuits the resolver to a hard 4 days, their
+              weekly-fed snake started reading as overdue every 4. Nothing
+              said CGD meant crested gecko diet or that it rewrote the
+              schedule.
+
+              Gating by taxon isn't enough: a bearded dragon is a lizard
+              and doesn't eat CGD either. The species sheet is the only
+              honest gate, so the control appears only when the picked
+              species eats it — which makes this an opt-OUT for an
+              individual gecko, never a way to invent the diet.
+
+              Matches services/snake_feeding_advisory.cgd_applies, which
+              ignores the flag unless the species carries it. */}
+          {speciesFeedsOnCgd && (
+            <Field
+              label="Feeds on CGD (crested gecko diet)"
+              hint="This species is normally fed a prepared gecko diet. Set No if you feed this individual something else — it changes the feeding reminder."
+            >
+              <ChipGroup
+                options={CGD_OVERRIDE_OPTIONS}
+                value={cgdOverride}
+                onChange={setCgdOverride}
+              />
+            </Field>
+          )}
 
           {/* Genetics — snakes only, matching the detail screen's gate
               (the gene catalog is ball-python-scoped for now). Without

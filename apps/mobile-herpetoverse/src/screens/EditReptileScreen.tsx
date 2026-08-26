@@ -357,16 +357,34 @@ export function EditReptileScreen() {
             />
           </Field>
 
-          <Field
-            label="Feeds on CGD"
-            hint="Auto follows the species default. Override only if this individual is fed differently."
-          >
-            <ChipGroup
-              options={CGD_OVERRIDE_OPTIONS}
-              value={cgdOverride}
-              onChange={setCgdOverride}
-            />
-          </Field>
+          {/* Only species that eat CGD are offered CGD.
+
+              This screen is where a keeper flipped it on a corn snake,
+              reading the old hint "override only if this individual is fed
+              differently" as "yes, I feed mice, which is different". The
+              flag short-circuits the feeding resolver to a hard 4 days, so
+              their weekly-fed snake read as overdue every 4.
+
+              The condition uses the animal's RESOLVED `feeds_on_cgd` (which
+              is `override ?? species default`) rather than the species flag
+              alone, deliberately: if a record already carries a wrong
+              override, the control must stay visible so the keeper can turn
+              it off. Hiding it would strand bad data they can't reach.
+
+              Matches app/reptile/add.tsx and
+              snake_feeding_advisory.cgd_applies. */}
+          {animal?.feeds_on_cgd && (
+            <Field
+              label="Feeds on CGD (crested gecko diet)"
+              hint="Auto follows the species default. Set this only if you feed a prepared gecko diet like Pangea or Repashy — it changes the feeding reminder to every 4 days."
+            >
+              <ChipGroup
+                options={CGD_OVERRIDE_OPTIONS}
+                value={cgdOverride}
+                onChange={setCgdOverride}
+              />
+            </Field>
+          )}
 
           <Field label="Notes" hint="Anything that doesn't fit above.">
             <ThemedInput

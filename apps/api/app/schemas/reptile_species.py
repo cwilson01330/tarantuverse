@@ -332,6 +332,13 @@ class ReptileSpeciesSearchResult(BaseModel):
     image_url: Optional[str] = None
     # Taxon group (ADR-011) — lets the species browser divide by taxon.
     taxon: Optional[str] = None
+    # Whether this species is normally fed a complete gecko diet. The add
+    # forms use it to decide whether to OFFER the CGD control at all —
+    # only species that eat CGD are asked about CGD. Without it on the
+    # autocomplete payload the form would have to guess from taxon, and
+    # taxon is too coarse (a bearded dragon is a lizard that doesn't eat
+    # it). See services/snake_feeding_advisory.cgd_applies.
+    feeds_on_cgd: bool = False
 
     class Config:
         from_attributes = True

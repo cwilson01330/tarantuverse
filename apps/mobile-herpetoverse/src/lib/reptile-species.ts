@@ -32,6 +32,10 @@ export interface ReptileSpeciesSearchResult {
   care_level: CareLevel | null;
   image_url: string | null;
   taxon: HerpTaxon | null;
+  /** Whether this species is normally fed a complete gecko diet. Drives
+   *  whether the add form offers the CGD control at all — only species
+   *  that eat CGD are asked about it. */
+  feeds_on_cgd: boolean;
 }
 
 /**

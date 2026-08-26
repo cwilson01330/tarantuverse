@@ -284,6 +284,13 @@ function AddReptileForm() {
   }
 
   // Placeholder examples for the currently-selected taxon.
+  // Whether the PICKED SPECIES eats a complete gecko diet. Only species
+  // that eat CGD are offered the CGD control, so a keeper adding a corn
+  // snake is never asked a question whose answer rewrites their feeding
+  // schedule. Taxon is too coarse a gate — a bearded dragon is a lizard
+  // that doesn't eat it.
+  const [speciesFeedsOnCgd, setSpeciesFeedsOnCgd] = useState(false)
+
   const ex = taxonExamples(form.taxon)
 
   return (
@@ -359,12 +366,17 @@ function AddReptileForm() {
                       ...prev,
                       speciesId: id,
                       scientificName,
+                      // A species that can't eat CGD can't carry an override.
+                      cgdOverride: id ? prev.cgdOverride : 'auto',
                     }))
+                    if (!id) setSpeciesFeedsOnCgd(false)
                   }}
                   onPick={(species) => {
+                    setSpeciesFeedsOnCgd(species.feeds_on_cgd)
                     // Auto-fill common name only if the keeper hasn't typed one.
                     setForm((prev) => ({
                       ...prev,
+                      cgdOverride: species.feeds_on_cgd ? prev.cgdOverride : 'auto',
                       commonName:
                         prev.commonName.trim() === ''
                           ? species.common_names[0] || prev.commonName
@@ -508,11 +520,31 @@ function AddReptileForm() {
         </section>
 
         {/* ------------------------------------------------------------- */}
-        {/* Diet override — most keepers leave this on Auto. */}
+        {/* Diet override — lizards only.                                  */}
+        {/*                                                                */}
+        {/* This section used to render for every taxon, headed "Diet",    */}
+        {/* asking "Feeds on CGD" with Auto/Yes/No and a hint reading      */}
+        {/* "override only if this individual is fed a different diet than */}
+        {/* its species". Nothing on the screen expanded the acronym.      */}
+        {/*                                                                */}
+        {/* A keeper who buys shop frozen mice for a corn snake reads a    */}
+        {/* section called Diet, an unexplained three-letter acronym, and  */}
+        {/* a prompt about feeding something different — and answers Yes.  */}
+        {/* One did. Because the flag short-circuits the feeding resolver  */}
+        {/* to a hard 4 days, their weekly-fed corn snake then read as     */}
+        {/* overdue every 4 days, with no indication the answer had        */}
+        {/* rewritten the schedule.                                        */}
+        {/*                                                                */}
+        {/* Only species that eat CGD are offered CGD. Taxon is too coarse */}
+        {/* a gate — a bearded dragon is a lizard that doesn't eat it — so */}
+        {/* this keys off the picked species' own flag, making the control */}
+        {/* an opt-OUT for an individual rather than a way to invent the   */}
+        {/* diet. Backend agrees: snake_feeding_advisory.cgd_applies.      */}
         {/* ------------------------------------------------------------- */}
+        {speciesFeedsOnCgd && (
         <section className="p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
           <h2 className={SECTION_HDR_CLS}>Diet</h2>
-          <Field label="Feeds on CGD">
+          <Field label="Feeds on CGD (crested gecko diet)">
             <div className="flex gap-2 mb-2">
               {(['auto', 'yes', 'no'] as const).map((opt) => {
                 const selected = form.cgdOverride === opt
@@ -534,11 +566,13 @@ function AddReptileForm() {
               })}
             </div>
             <p className="text-xs text-neutral-500">
-              Auto follows the species default. Override only if this
-              individual is fed a different diet than its species.
+              Auto follows the species default. Set this only if you feed a
+              prepared gecko diet such as Pangea or Repashy — it changes the
+              feeding reminder to every 4 days.
             </p>
           </Field>
         </section>
+        )}
 
         {/* ------------------------------------------------------------- */}
         {/* Notes */}
