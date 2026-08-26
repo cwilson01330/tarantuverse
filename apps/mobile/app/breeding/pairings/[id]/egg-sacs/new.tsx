@@ -77,6 +77,9 @@ function NewEggSacScreen() {
 
   const [laidDate, setLaidDate] = useState<Date>(new Date());
   const [pulledDate, setPulledDate] = useState<Date | null>(null);
+  // Expected hatch is a projection and is normally weeks out, so it has no
+  // maximumDate. `hatchDate` below is the event and keeps its cap.
+  const [expectedHatchDate, setExpectedHatchDate] = useState<Date | null>(null);
   const [hatchDate, setHatchDate] = useState<Date | null>(null);
   const [spiderlingCount, setSpiderlingCount] = useState('');
   const [viableCount, setViableCount] = useState('');
@@ -119,6 +122,9 @@ function NewEggSacScreen() {
         pairing_id: pairingId as string,
         laid_date: toISODateLocal(laidDate),
         pulled_date: pulledDate ? toISODateLocal(pulledDate) : null,
+        expected_hatch_date: expectedHatchDate
+          ? toISODateLocal(expectedHatchDate)
+          : null,
         hatch_date: hatchDate ? toISODateLocal(hatchDate) : null,
         spiderling_count: spider.value,
         viable_count: viable.value,
@@ -185,6 +191,30 @@ function NewEggSacScreen() {
             )}
             <Text style={[styles.hint, { color: colors.textTertiary }]}>
               Optional. When you pulled the sac from the female.
+            </Text>
+          </View>
+
+          {/* Expected hatch — the number a breeder actually watches for the
+              six to eight weeks after pulling a sac. No maximumDate: it is
+              a projection, and it is normally weeks in the future. */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Expected hatch</Text>
+            <DateInput
+              value={expectedHatchDate ?? laidDate}
+              onChange={setExpectedHatchDate}
+            />
+            {expectedHatchDate && (
+              <TouchableOpacity
+                onPress={() => setExpectedHatchDate(null)}
+                style={styles.clearDateButton}
+              >
+                <Text style={[styles.clearDateText, { color: colors.primary }]}>
+                  Clear expected hatch
+                </Text>
+              </TouchableOpacity>
+            )}
+            <Text style={[styles.hint, { color: colors.textTertiary }]}>
+              Optional. When you expect it to hatch — this can be in the future.
             </Text>
           </View>
 

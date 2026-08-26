@@ -45,6 +45,7 @@ from app.schemas.feeding import (
     AnimalBulkFeedingSkip,
 )
 from app.services.feeding_reminder_service import parse_frequency_string
+from app.services.snake_feeding_advisory import cgd_applies
 from app.utils.dependencies import get_current_user
 from app.utils.feeding_pause import resume_if_accepted
 from app.schemas.death import MarkDiedRequest
@@ -158,7 +159,11 @@ def _animal_feeding_interval(animal: Animal) -> Optional[int]:
         return animal.feeding_interval_days
 
     species = animal.herp_species
-    if bool(getattr(animal, "feeds_on_cgd", False)):
+    # Gated by cgd_applies: the raw flag put a corn snake on a 4-day gecko
+    # cadence because the add form's CGD toggle has no taxon gate. See
+    # services.snake_feeding_advisory.cgd_applies. Keep this in lockstep
+    # with weight_logs._resolve_interval_window.
+    if cgd_applies(animal):
         return 4
     if species is not None and animal.current_weight_g is not None:
         iv = _interval_from_life_stage_feeding(

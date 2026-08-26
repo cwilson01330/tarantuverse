@@ -12,6 +12,9 @@ class EggSacBase(BaseModel):
     pairing_id: uuid.UUID
     laid_date: date
     pulled_date: Optional[date] = None
+    # Projection — legitimately in the future, so NO future-date validator
+    # here. `hatch_date` below is the event and must not be future.
+    expected_hatch_date: Optional[date] = None
     hatch_date: Optional[date] = None
     incubation_temp_min: Optional[int] = Field(None, ge=0, le=200)
     incubation_temp_max: Optional[int] = Field(None, ge=0, le=200)
@@ -33,6 +36,7 @@ class EggSacUpdate(BaseModel):
     pairing_id: Optional[uuid.UUID] = None
     laid_date: Optional[date] = None
     pulled_date: Optional[date] = None
+    expected_hatch_date: Optional[date] = None
     hatch_date: Optional[date] = None
     incubation_temp_min: Optional[int] = None
     incubation_temp_max: Optional[int] = None

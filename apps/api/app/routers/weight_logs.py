@@ -48,6 +48,7 @@ from app.schemas.weight_log import (
     FeedingStatus,
 )
 from app.services.snake_feeding_advisory import (
+    cgd_applies,
     compute_life_stage,
     compute_weight_loss_30d,
     suggest_prey_range,
@@ -130,7 +131,7 @@ def _resolve_interval_window(
 
     Priority matches `routers.animals._animal_feeding_interval` so the two
     surfaces can't drift again:
-      keeper's number → weight bracket → species per-stage frequency → None.
+      keeper's number → CGD → weight bracket → species frequency → None.
     """
     # 1. ADR-017 — a number the keeper stated is the only cadence the app
     #    can be certain of, so it outranks every inference. Exact, so the
@@ -139,13 +140,22 @@ def _resolve_interval_window(
     if keeper:
         return int(keeper), int(keeper)
 
-    # 2. Weight-bracketed schedule — the most precise inference we have,
+    # 2. Complete gecko diet — refreshed every few days, so a hard 4.
+    #    Guarded by `cgd_applies` because CGD is a GECKO diet: a keeper
+    #    who flips the toggle on a snake would otherwise put a colubrid
+    #    on a 4-day cadence. Omitting this branch entirely (as this
+    #    function first did) was also wrong — it made the detail screen
+    #    disagree with the collection screen for real gecko keepers.
+    if cgd_applies(animal):
+        return 4, 4
+
+    # 3. Weight-bracketed schedule — the most precise inference we have,
     #    but only available once the animal has a weight on file.
     lo, hi = suggestion.get("interval_days_min"), suggestion.get("interval_days_max")
     if lo is not None and hi is not None:
         return lo, hi
 
-    # 3. The species sheet's free-text per-stage frequency. Adult-first
+    # 4. The species sheet's free-text per-stage frequency. Adult-first
     #    ordering mirrors _animal_feeding_interval; without a weight we
     #    can't compute a life stage, so there is no better basis to choose.
     if species is not None:

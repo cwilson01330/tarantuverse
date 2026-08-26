@@ -26,6 +26,44 @@ returns the "data unavailable" fallback. Feature degrades gracefully.
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+# ---------------------------------------------------------------------------
+# CGD applicability
+# ---------------------------------------------------------------------------
+
+# Complete gecko diet (Pangea, Repashy et al.) is a prepared food for
+# rhacodactylids and a few other lizards. It is not food for a snake, a
+# turtle or an amphibian.
+CGD_CAPABLE_TAXA = frozenset({"lizard"})
+
+
+def cgd_applies(animal) -> bool:
+    """Whether the CGD feeding cadence (a hard 4 days) should apply.
+
+    The `feeds_on_cgd` flag shortcuts the whole interval resolver to 4
+    days, which is right for a crested gecko on a prepared diet and badly
+    wrong for anything else.
+
+    The toggle is exposed on the add form with no gate, and a keeper flipped
+    it on a corn snake (Pantherophis guttatus) — putting a colubrid that
+    should feed every 7-14 days on a 4-day overdue clock. Following the app
+    would have meant power-feeding it. Found 2026-08-26 in an HV data scan.
+
+    So the flag is honoured only where the diet is physically plausible:
+    the species sheet says the species eats it, or the animal is a lizard
+    (which covers a keeper overriding for an individual gecko the catalog
+    hasn't flagged). A snake keeper's toggle is ignored rather than
+    obeyed — the resolver falls through to the weight bracket and the
+    species cadence, which are correct for that animal.
+    """
+    if not bool(getattr(animal, "feeds_on_cgd", False)):
+        return False
+
+    species = getattr(animal, "herp_species", None)
+    if species is not None and bool(getattr(species, "feeds_on_cgd", False)):
+        return True
+
+    return str(getattr(animal, "taxon", "") or "") in CGD_CAPABLE_TAXA
 from decimal import Decimal
 from typing import Any, Iterable, Optional
 

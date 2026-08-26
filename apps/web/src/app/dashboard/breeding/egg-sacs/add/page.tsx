@@ -60,6 +60,9 @@ function AddEggSacInner() {
     pairing_id: prefilledPairingId,
     laid_date: toISODateLocal(new Date()),
     pulled_date: '',
+    // Projection, normally weeks out. Kept separate from hatch_date so a
+    // prediction is never mistaken for the event.
+    expected_hatch_date: '',
     hatch_date: '',
     incubation_temp_min: '',
     incubation_temp_max: '',
@@ -125,6 +128,7 @@ function AddEggSacInner() {
         pairing_id: formData.pairing_id,
         laid_date: formData.laid_date,
         pulled_date: formData.pulled_date || null,
+        expected_hatch_date: formData.expected_hatch_date || null,
         hatch_date: formData.hatch_date || null,
         incubation_temp_min: formData.incubation_temp_min ? parseInt(formData.incubation_temp_min) : null,
         incubation_temp_max: formData.incubation_temp_max ? parseInt(formData.incubation_temp_max) : null,
@@ -257,6 +261,19 @@ function AddEggSacInner() {
                   onChange={(value) => setFormData({...formData, pulled_date: value})}
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Expected Hatch
+                </label>
+                <DateInput
+                  value={formData.expected_hatch_date}
+                  onChange={(value) => setFormData({...formData, expected_hatch_date: value})}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Optional. Can be in the future.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Hatch Date

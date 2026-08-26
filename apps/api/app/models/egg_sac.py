@@ -17,6 +17,10 @@ class EggSac(Base):
 
     laid_date = Column(Date, nullable=False, index=True)
     pulled_date = Column(Date, nullable=True)
+    # A projection, normally in the future — kept separate from hatch_date
+    # so a prediction is never mistaken for an event. See the
+    # egg_20260826_expected_hatch migration.
+    expected_hatch_date = Column(Date, nullable=True)
     hatch_date = Column(Date, nullable=True)
 
     # Incubation conditions
