@@ -580,11 +580,17 @@ function AddScreen() {
                 pattern in invert/add.tsx. `?? new Date()` only supplies what
                 the picker OPENS on — it doesn't write a value, so leaving
                 the field untouched still sends nothing. */}
+            {/* No maximumDate: an acquisition date is legitimately in the
+                future. Keepers buy an animal that ships later in the week
+                and add it straight away — that's the common case for slings
+                bought at an expo or online. Capping this at today was
+                reported as a regression, and it blocked a real workflow.
+                "Last fed" below KEEPS its cap, because a feeding that
+                hasn't happened yet can't be logged. */}
             <Field label="Date acquired" colors={colors} styles={styles}>
               <DateInput
                 value={parseLocalDate(dateAcquired) ?? new Date()}
                 onChange={(d) => setDateAcquired(toISODateLocal(d))}
-                maximumDate={new Date()}
                 label="Date acquired"
               />
             </Field>

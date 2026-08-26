@@ -344,7 +344,6 @@ export default function AddColonyScreen() {
             <DateInput
               value={parseLocalDate(dateAcquired) ?? new Date()}
               onChange={(d) => setDateAcquired(toISODateLocal(d))}
-              maximumDate={new Date()}
               label="Date acquired"
             />
           </Field>
@@ -352,7 +351,6 @@ export default function AddColonyScreen() {
             <DateInput
               value={parseLocalDate(foundedDate) ?? new Date()}
               onChange={(d) => setFoundedDate(toISODateLocal(d))}
-              maximumDate={new Date()}
               label="Founded date"
             />
           </Field>

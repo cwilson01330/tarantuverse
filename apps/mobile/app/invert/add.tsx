@@ -260,7 +260,6 @@ export default function AddInvertScreen() {
             <DateInput
               value={parseLocalDate(dateAcquired) ?? new Date()}
               onChange={(d) => setDateAcquired(toISODateLocal(d))}
-              maximumDate={new Date()}
               label="Date acquired"
             />
           </Field>

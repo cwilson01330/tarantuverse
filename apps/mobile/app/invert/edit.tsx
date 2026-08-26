@@ -110,7 +110,7 @@ export default function EditInvertScreen() {
           <Field label={meta?.sizeLabel ?? 'Size (mm)'}><TextInput style={styles.input} value={form.current_length_mm ?? ''} onChangeText={(t) => update('current_length_mm', t)} keyboardType="decimal-pad" /></Field>
 
           <SectionHeader title="Acquisition" colors={colors} />
-          <Field label="Date acquired"><DateInput value={parseLocalDate(form.date_acquired) ?? new Date()} onChange={(d) => update('date_acquired', toISODateLocal(d))} maximumDate={new Date()} label="Date acquired" /></Field>
+          <Field label="Date acquired"><DateInput value={parseLocalDate(form.date_acquired) ?? new Date()} onChange={(d) => update('date_acquired', toISODateLocal(d))} label="Date acquired" /></Field>
           <Field label="Source"><ChipGroup options={SOURCE_OPTIONS} value={form.source ?? null} onChange={(v) => update('source', v)} colors={colors} /></Field>
           <Field label="Price paid"><TextInput style={styles.input} value={form.price_paid ?? ''} onChangeText={(t) => update('price_paid', t || null)} keyboardType="decimal-pad" placeholderTextColor={colors.textTertiary} /></Field>
 

@@ -346,10 +346,10 @@ export default function EditColonyScreen() {
           {/* Acquisition */}
           <Text style={styles.sectionHeading}>Acquisition</Text>
           <Field label="Date acquired">
-            <DateInput value={parseLocalDate(dateAcquired) ?? new Date()} onChange={(d) => setDateAcquired(toISODateLocal(d))} maximumDate={new Date()} label="Date acquired" />
+            <DateInput value={parseLocalDate(dateAcquired) ?? new Date()} onChange={(d) => setDateAcquired(toISODateLocal(d))} label="Date acquired" />
           </Field>
           <Field label="Founded date">
-            <DateInput value={parseLocalDate(foundedDate) ?? new Date()} onChange={(d) => setFoundedDate(toISODateLocal(d))} maximumDate={new Date()} label="Founded date" />
+            <DateInput value={parseLocalDate(foundedDate) ?? new Date()} onChange={(d) => setFoundedDate(toISODateLocal(d))} label="Founded date" />
           </Field>
           <Field label="Source">
             <ChipGroup options={SOURCE_OPTIONS} value={source} onChange={setSource} colors={colors} />
