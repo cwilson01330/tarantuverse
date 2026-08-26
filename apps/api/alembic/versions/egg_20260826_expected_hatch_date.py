@@ -1,7 +1,7 @@
 """Add expected_hatch_date to egg_sacs.
 
 Revision ID: egg_20260826_expected_hatch
-Revises: mrg_20260826_merge_heads
+Revises: fcd_20260809_keeper_feeding_cadence
 Create Date: 2026-08-26
 
 `egg_sacs` carried only `hatch_date`, meaning the date a sac actually
@@ -28,7 +28,7 @@ import sqlalchemy as sa
 
 
 revision = "egg_20260826_expected_hatch"
-down_revision = "mrg_20260826_merge_heads"
+down_revision = "fcd_20260809_keeper_feeding_cadence"
 branch_labels = None
 depends_on = None
 
