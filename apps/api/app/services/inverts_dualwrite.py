@@ -440,8 +440,13 @@ def _slugify(name: str) -> str:
 
 # Columns that exist on BOTH Invert and the legacy per-taxon tables and are
 # safe to copy back verbatim. Deliberately explicit rather than introspected:
-# `species_id` is excluded because the two surfaces reference different catalogs
-# (see module docstring), and id/user_id/taxon are immutable.
+# id/user_id/taxon are immutable, so they're excluded.
+#
+# `species_id` is also absent here, but NOT because it shouldn't sync — it
+# is carried explicitly by mirror_invert_update_to_legacy, which runs it
+# through _legacy_species_id() to guard the FK. It can't live in this tuple
+# because every other field copies straight across, and this one needs the
+# existence check. Do not "fix" the omission by adding it here.
 _REVERSE_SHARED_FIELDS = (
     "enclosure_id",
     "name",
@@ -683,6 +688,28 @@ def mirror_invert_update_to_legacy(db: Session, invert: Invert) -> None:
         return  # invert-native animal; nothing legacy to keep in sync
 
     _apply_reverse(row, invert)
+
+    # species_id is NOT in _REVERSE_SHARED_FIELDS, so carry it explicitly.
+    #
+    # It was excluded on the grounds that "the two surfaces reference
+    # different catalogs". That reasoning is stale: Phase B preserved
+    # primary keys, so a given species has the SAME id in `species` /
+    # `scorpion_species` and in `invert_species` — which is why
+    # mirror_invert_create_to_legacy has always set it on create, through
+    # the same guard used here.
+    #
+    # Leaving it off the UPDATE path meant a keeper who corrected an
+    # animal's species on the generic invert screen updated `inverts` and
+    # left the legacy row pointing at the old species forever. Web reads
+    # the legacy tarantula page, so they kept seeing the previous species'
+    # care sheet. Found 2026-09-01: a live Avicularia avicularia whose
+    # legacy row still claimed Grammostola pulchra — an arboreal New World
+    # tarantula showing terrestrial husbandry.
+    #
+    # _legacy_species_id returns None when the id isn't present in the
+    # legacy catalog, so a species that exists only on the unified side
+    # clears the stale link rather than writing a dangling FK.
+    row.species_id = _legacy_species_id(db, invert)
 
 
 def mirror_invert_delete_to_legacy(db: Session, invert: Invert) -> None:

@@ -55,11 +55,22 @@ _LEGITIMATELY_UNMIRRORED = {
     "updated_at",
     # Immutable identity.
     *_IMMUTABLE,
-    # The two surfaces reference DIFFERENT catalog tables — `species.id` vs
-    # `invert_species.id`. Copying the value across would point a row at a
-    # nonexistent species. See the module docstring in inverts_dualwrite.
-    "species_id",
 }
+
+# `species_id` is deliberately NOT listed above. It is asymmetric, and the
+# tests below encode that asymmetry explicitly rather than blanket-excusing it:
+#
+#   forward (legacy -> inverts)  MUST NOT copy it. The legacy PUT sends the
+#     whole row, and copying species_id wiped 22 keepers' backfilled links.
+#   reverse (inverts -> legacy)  MUST copy it, via _legacy_species_id()'s FK
+#     guard. Omitting it left a corrected species on `inverts` while the legacy
+#     row — which the web tarantula page reads — kept the old one. Found
+#     2026-09-01 on a live Avicularia avicularia still linked to Grammostola
+#     pulchra.
+#
+# It previously sat in the exclusion set on the grounds that the catalogs are
+# separate. They share primary keys (Phase B preserved them), so that reasoning
+# was wrong in the reverse direction and this test blessed a real bug.
 
 
 def _shared(legacy_model) -> set:
@@ -81,7 +92,9 @@ def test_forward_map_covers_every_shared_column(model, builder):
     # The builders read attributes off a real instance; an empty one is enough
     # to enumerate the keys, which is all this test is about.
     mapped = set(builder(model()).keys())
-    missing = _shared(model) - mapped
+    # species_id is invert-owned: the forward mirror must leave it alone, or a
+    # legacy PUT wipes the link. _INVERT_OWNED_* enforces that at runtime.
+    missing = _shared(model) - mapped - {"species_id"}
     assert not missing, (
         f"{model.__name__} columns missing from the forward mirror: {sorted(missing)}. "
         "Add them to the kwargs builder, or to _LEGITIMATELY_UNMIRRORED with a reason."
@@ -98,7 +111,14 @@ def test_reverse_map_covers_every_shared_column(model):
     # life_stage and enclosure_type are copied by a separate guarded branch in
     # mirror_invert_update_to_legacy (SQLEnum vs CHECK-string type mismatch), so
     # they're covered even though they're absent from the plain field tuple.
-    handled = set(_REVERSE_SHARED_FIELDS) | {"life_stage", "enclosure_type"}
+    # species_id, life_stage and enclosure_type are each copied by a separate
+    # guarded branch in mirror_invert_update_to_legacy rather than the plain
+    # field tuple — species_id because it needs the catalog FK existence check.
+    handled = set(_REVERSE_SHARED_FIELDS) | {
+        "life_stage",
+        "enclosure_type",
+        "species_id",
+    }
     missing = _shared(model) - handled
     assert not missing, (
         f"{model.__name__} columns missing from _REVERSE_SHARED_FIELDS: {sorted(missing)}. "
@@ -256,3 +276,32 @@ def test_death_columns_are_readable_on_every_surface():
             "POST /inverts/{id}/died writes both rows; this surface would show "
             "a dead animal as alive."
         )
+
+
+def test_reverse_update_carries_species_id_to_the_legacy_row():
+    """A species corrected on the generic invert screen must reach the legacy
+    row, because the web tarantula detail page reads it.
+
+    Regression for 2026-09-01: `species_id` was excluded from
+    _REVERSE_SHARED_FIELDS, so `mirror_invert_update_to_legacy` left the legacy
+    link untouched. A live Avicularia avicularia kept a Grammostola pulchra
+    link on the legacy row — arboreal New World animal showing terrestrial
+    husbandry on web.
+
+    Asserted against the function source rather than a live session so it runs
+    without a database, matching the other structural checks in this file.
+    """
+    import inspect
+    from app.services.inverts_dualwrite import mirror_invert_update_to_legacy
+
+    src = inspect.getsource(mirror_invert_update_to_legacy)
+    assert "species_id" in src, (
+        "mirror_invert_update_to_legacy no longer touches species_id. A species "
+        "change made on the invert surface will not reach the legacy row, and "
+        "the web tarantula page will keep showing the previous species."
+    )
+    assert "_legacy_species_id" in src, (
+        "species_id must go through _legacy_species_id() so a species that "
+        "exists only on the unified catalog clears the link instead of writing "
+        "a dangling foreign key."
+    )
