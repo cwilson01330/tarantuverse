@@ -10,7 +10,32 @@ export type ActionType =
   | 'feeding'
   | 'follow'
   | 'forum_thread'
-  | 'forum_post';
+  | 'forum_post'
+  // Herpetoverse (ADR-019). One feed serves both apps, so a shed or a
+  // weigh-in on a ball python lands in the same stream as a tarantula molt.
+  | 'new_animal'
+  | 'shed'
+  | 'weight';
+
+/**
+ * Glyph for a herp taxon.
+ *
+ * MDI HAS NO `lizard` GLYPH — an unknown name renders an empty box SILENTLY
+ * rather than throwing, so a typo ships and nobody notices. Every name below
+ * is from the design handoff's verified appendix.
+ *
+ * Frogs and salamanders get `paw-outline` rather than being forced into
+ * `turtle`: a neutral animal mark is honest, and calling a frog a turtle is
+ * the kind of small wrongness this app doesn't do.
+ */
+function taxonGlyph(taxon?: string | null): string {
+  switch ((taxon ?? '').toLowerCase()) {
+    case 'snake':    return 'snake';
+    case 'turtle':
+    case 'tortoise': return 'turtle';
+    default:         return 'paw-outline';
+  }
+}
 
 export interface ActivityFeedItemData {
   id: number;
@@ -52,6 +77,13 @@ export default function ActivityFeedItem({ activity }: Props) {
       case 'new_tarantula': return { name: 'spider', color: '#9333ea' };
       case 'molt':          return { name: 'spider', color: '#3b82f6' };
       case 'feeding':       return { name: 'food-apple', color: '#10b981' };
+      // HV. `new_animal` mirrors `new_tarantula` by showing the taxon; shed
+      // and weight show the ACTION, matching the glyphs those events already
+      // use inside Herpetoverse so the feed and the app agree.
+      case 'new_animal':
+        return { name: taxonGlyph(activity.activity_metadata?.taxon), color: '#10B981' };
+      case 'shed':          return { name: 'weather-windy', color: '#F59E0B' };
+      case 'weight':        return { name: 'scale-bathroom', color: '#0EA5E9' };
       case 'follow':        return { name: 'account-plus', color: '#ec4899' };
       case 'forum_thread':  return { name: 'message-text', color: '#f97316' };
       case 'forum_post':    return { name: 'message-reply', color: '#14b8a6' };
@@ -119,6 +151,53 @@ export default function ActivityFeedItem({ activity }: Props) {
           onPress: openTarantulaProfile(),
         };
       }
+
+      // ── Herpetoverse (ADR-019) ────────────────────────────────────────
+      //
+      // NO TAP TARGET, deliberately. The public animal profile route
+      // `/tarantula/public/[username]/[name]` is invert-only, and there is no
+      // public HV animal page on either platform yet. Following the existing
+      // convention in this file, a missing destination means no tap rather
+      // than a route that 404s — a dead card is better than a broken one, and
+      // these land in TV's feed where most viewers keep no reptiles at all.
+      //
+      // When a public HV animal page exists, wire it here and nowhere else.
+
+      case 'new_animal':
+        return {
+          actor: displayName,
+          verb: 'added',
+          tarantulaName: meta.animal_name ?? meta.name,
+          speciesName: meta.species_name ?? meta.scientific_name,
+          thumbnailUrl: meta.thumbnail_url,
+          subtitle: undefined,
+          onPress: undefined,
+        };
+
+      case 'shed':
+        return {
+          actor: displayName,
+          verb: 'logged a shed for',
+          tarantulaName: meta.animal_name,
+          speciesName: meta.species_name,
+          thumbnailUrl: meta.thumbnail_url,
+          // Only claim a complete shed when the log actually says so — a
+          // retained shed is a husbandry problem, not a milestone.
+          subtitle: meta.is_complete_shed === false ? 'Retained shed' : undefined,
+          subtitleColor: meta.is_complete_shed === false ? '#F59E0B' : undefined,
+          onPress: undefined,
+        };
+
+      case 'weight':
+        return {
+          actor: displayName,
+          verb: 'weighed',
+          tarantulaName: meta.animal_name,
+          speciesName: meta.species_name,
+          thumbnailUrl: meta.thumbnail_url,
+          subtitle: meta.weight_g ? `${meta.weight_g} g` : undefined,
+          onPress: undefined,
+        };
 
       case 'follow':
         // Tap target: the user who was followed. Mobile keeper profiles
