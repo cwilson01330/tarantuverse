@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { KeeperSignalsBlock } from '../../src/components/KeeperSignalsBlock';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -373,6 +374,10 @@ export default function SpeciesDetailScreen() {
             {species.feeding_frequency_adult && (
               <CareFact label="Adult Frequency" value={species.feeding_frequency_adult} colors={colors} />
             )}
+            {/* What keepers on this platform actually do (ADR-018). Below the
+                written guidance on purpose: the care sheet advises, this
+                observes. Renders nothing below the evidence gate. */}
+            <KeeperSignalsBlock speciesId={species.id} colors={colors} />
           </CareAccordion>
 
           {/* Behavior */}

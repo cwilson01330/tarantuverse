@@ -9,6 +9,7 @@
  */
 import type { Metadata } from 'next'
 import SpeciesDetailClient, { type Species } from './SpeciesDetailClient'
+import type { KeeperSignals } from '@/components/KeeperSignalsBlock'
 
 // Revalidate cached HTML hourly — care content changes rarely.
 export const revalidate = 3600
@@ -30,6 +31,35 @@ async function getSpecies(id: string): Promise<Species | null> {
     })
     if (!res.ok) return null
     return (await res.json()) as Species
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Keeper-consensus signals (ADR-018), fetched server-side on purpose.
+ *
+ * This page is an ISR/SEO surface, and "what 10 keepers actually do with this
+ * species" is the one thing on it that a competitor cannot scrape from the
+ * same public care-sheet sources everyone else uses. Putting it in the
+ * server-rendered HTML means it's indexable rather than appearing after
+ * hydration.
+ *
+ * Hits the invert-species route with the legacy species id deliberately: the
+ * two catalogs share primary keys (verified 2026-09-04 — zero legacy ids
+ * missing from invert_species), so one endpoint serves both care sheets.
+ *
+ * Returns null on any failure. A missing block reads identically to a species
+ * without enough evidence, which is the honest outcome in both cases — we
+ * never want a care guide degrading into an error state over a nice-to-have.
+ */
+async function getKeeperSignals(id: string): Promise<KeeperSignals | null> {
+  try {
+    const res = await fetch(`${API}/api/v1/invert-species/${id}/keeper-signals`, {
+      next: { revalidate },
+    })
+    if (!res.ok) return null
+    return (await res.json()) as KeeperSignals
   } catch {
     return null
   }
@@ -90,7 +120,11 @@ export default async function SpeciesDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const s = await getSpecies(id)
+  // Parallel — the signals lookup must never add latency to the care guide.
+  const [s, keeperSignals] = await Promise.all([
+    getSpecies(id),
+    getKeeperSignals(id),
+  ])
 
   // JSON-LD for rich results. Article is the safest fit for a care guide;
   // rendered server-side so crawlers see it without executing JS.
@@ -119,7 +153,7 @@ export default async function SpeciesDetailPage({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       )}
-      <SpeciesDetailClient initialSpecies={s} />
+      <SpeciesDetailClient initialSpecies={s} keeperSignals={keeperSignals} />
     </>
   )
 }

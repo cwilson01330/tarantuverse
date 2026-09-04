@@ -28,6 +28,8 @@ from app.models.user import User
 from app.schemas.invert_species import (
     TAXON_PATTERN, InvertSpeciesCreate, InvertSpeciesResponse, InvertSpeciesUpdate,
 )
+from app.schemas.keeper_signals import KeeperSignalsResponse
+from app.services.keeper_signals_service import get_keeper_signals
 from app.utils.dependencies import get_current_user
 
 router = APIRouter()
@@ -138,6 +140,53 @@ async def get_invert_species(
             detail="Species not found",
         )
     return species
+
+
+@router.get(
+    "/{species_id}/keeper-signals",
+    response_model=KeeperSignalsResponse,
+    summary="What keepers on this platform actually do with this species",
+)
+async def get_species_keeper_signals(
+    species_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Keeper-consensus husbandry signals for one species (ADR-018).
+
+    Public, like the rest of the catalog reads — this is most useful to someone
+    deciding whether to acquire a species, which is exactly when they have no
+    account and are reading the care sheet.
+
+    Returns `meets_threshold: false` with real counts rather than 404ing or
+    inventing a figure when the evidence is thin. Clients render nothing in
+    that case; the counts exist so admins can see how close a species is.
+
+    Serves BOTH catalogs: `species` and `invert_species` share primary keys
+    (Phase B preserved them; verified 2026-09-04 — 0 legacy ids missing from
+    invert_species, 0 animals pointing outside it), so the legacy tarantula
+    care sheet can call this with the id it already has.
+    """
+    species = db.query(InvertSpecies.id).filter(
+        InvertSpecies.id == species_id,
+    ).first()
+    if not species:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Species not found",
+        )
+
+    signals = get_keeper_signals(db, species_id)
+    return KeeperSignalsResponse(
+        species_id=signals.species_id,
+        meets_threshold=signals.meets_threshold,
+        median_interval_days=signals.median_interval_days,
+        keeper_count=signals.keeper_count,
+        observation_count=signals.observation_count,
+        animal_count=signals.animal_count,
+        window_days=signals.window_days,
+        min_keepers=signals.min_keepers,
+        min_observations=signals.min_observations,
+    )
 
 
 @router.post(

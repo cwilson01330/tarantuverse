@@ -12,6 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { KeeperSignalsBlock } from '../../src/components/KeeperSignalsBlock';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import {
   getInvertSpecies,
@@ -279,6 +280,8 @@ function InvertSpeciesCareSheetScreen() {
             <CareFact label="Sling cadence" value={species.feeding_frequency_sling} colors={colors} />
             <CareFact label="Juvenile cadence" value={species.feeding_frequency_juvenile} colors={colors} />
             <CareFact label="Adult cadence" value={species.feeding_frequency_adult} colors={colors} />
+            {/* ADR-018 — see the tarantula care sheet for the reasoning. */}
+            <KeeperSignalsBlock speciesId={species.id} colors={colors} />
           </CareAccordion>
 
           <CareAccordion

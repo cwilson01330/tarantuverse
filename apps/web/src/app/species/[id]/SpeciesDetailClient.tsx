@@ -5,6 +5,9 @@ import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import PublicCareShell from '@/components/PublicCareShell'
 import ShortlistButton from '@/components/ShortlistButton'
+import KeeperSignalsBlock, {
+  type KeeperSignals,
+} from '@/components/KeeperSignalsBlock'
 
 export interface Species {
   id: string
@@ -54,8 +57,13 @@ export interface Species {
 
 export default function EnhancedSpeciesDetailPage({
   initialSpecies,
+  keeperSignals,
 }: {
   initialSpecies?: Species | null
+  /** ADR-018. Server-fetched so it lands in the indexed HTML. Null when the
+   *  species is below the evidence threshold OR the lookup failed — the block
+   *  renders nothing either way, which is the honest outcome in both cases. */
+  keeperSignals?: KeeperSignals | null
 } = {}) {
   const router = useRouter()
   const params = useParams()
@@ -550,6 +558,12 @@ export default function EnhancedSpeciesDetailPage({
                   </div>
                 )}
               </div>
+
+              {/* What keepers on this platform actually do (ADR-018). Sits
+                  BELOW the written guidance deliberately — the care sheet is
+                  the advice, this is the observation. Renders nothing when the
+                  species hasn't cleared the evidence gate. */}
+              <KeeperSignalsBlock signals={keeperSignals ?? null} />
             </div>
 
             {/* Additional Care */}
