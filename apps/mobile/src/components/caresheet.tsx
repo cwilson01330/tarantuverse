@@ -349,7 +349,12 @@ export function CareAccordion({
       >
         <View style={styles.accordionTitleGroup}>
           <Ionicons name={icon} size={22} color={colors.primary} />
-          <Text style={[styles.accordionTitle, { color: colors.textPrimary }]}>{title}</Text>
+          <Text
+            style={[styles.accordionTitle, { color: colors.textPrimary }]}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
         </View>
         <View style={styles.accordionRight}>
           {!isExpanded && !!preview && (
@@ -361,6 +366,7 @@ export function CareAccordion({
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
             size={22}
             color={colors.textSecondary}
+            style={styles.accordionChevron}
           />
         </View>
       </TouchableOpacity>
@@ -496,16 +502,38 @@ const styles = StyleSheet.create({
   safetyBody: { fontSize: 12.5, lineHeight: 18 },
 
   accordion: { borderRadius: 14, borderWidth: 1, marginBottom: 12, overflow: 'hidden' },
+  // Collapsed row layout. Both children used to be flexShrink:1 under
+  // space-between, with no numberOfLines on the title — so when a preview was
+  // long ("48x12x18\" or similar vertical enclosure...") neither side would
+  // yield and the preview rendered on top of the title. Short previews
+  // ("heavy webbing", "43 keepers") fit, which is why only some rows looked
+  // broken.
+  //
+  // The fix assigns one job per element:
+  //   title group  — never shrinks. These are fixed, short, app-controlled
+  //                  strings ("Feeding", "Behavior & Safety"); the label is
+  //                  the one thing that must always be readable.
+  //   right group  — takes all remaining width and right-aligns into it.
+  //   preview      — shrinks and ellipsizes inside that remaining width.
+  //   chevron      — never shrinks, or it deforms before the text does.
   accordionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     padding: 14,
+    gap: 12,
   },
-  accordionTitleGroup: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 1 },
+  accordionTitleGroup: { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 0 },
   accordionTitle: { fontSize: 15, fontWeight: '700' },
-  accordionRight: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  accordionRight: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
   accordionPreview: { fontSize: 12, flexShrink: 1, textAlign: 'right' },
+  accordionChevron: { flexShrink: 0 },
   accordionContent: { paddingHorizontal: 14, paddingBottom: 14 },
 
   factRow: {
