@@ -16,6 +16,78 @@ from app.models.molt_log import MoltLog
 from app.models.user import User
 
 
+# Post-molt fasting guard. See evaluate_premolt_likely.
+MIN_PROGRESS_FOR_REFUSAL_ONLY = 25   # percent of the animal's average interval
+MIN_DAYS_FOR_REFUSAL_ONLY = 14       # absolute fallback when no average exists
+
+
+def evaluate_premolt_likely(
+    *,
+    recent_refusal_streak: int,
+    molt_interval_progress: Optional[float],
+    days_since_last_molt: Optional[int],
+) -> bool:
+    """Decide whether an animal is likely in premolt.
+
+    Pure function of three already-computed signals, extracted from
+    predict_premolt so it can be tested without a database. The decision was
+    subtly wrong for a long time precisely because it was buried mid-function
+    with no tests around it.
+
+    Three branches:
+      1. Strong behavioural: 3+ consecutive refusals, once the animal is clear
+         of the post-molt fasting window (see below).
+      2. Behavioural + temporal: 2+ refusals AND past 60% of the average
+         interval.
+      3. Temporal only: meaningfully overdue (>110% of average, >30 days) with
+         no refusals. Some adults — stockier New World females especially —
+         eat straight through premolt, so a strong interval signal still
+         carries information on its own.
+
+    THE POST-MOLT GUARD (branch 1)
+    ------------------------------
+    A spider that has just moulted cannot be entering premolt, however it
+    behaves at the tongs. It refuses food after a moult because its fangs are
+    still hardening — the same observable as premolt refusal, opposite
+    meaning, and only the calendar separates the two.
+
+    Branch 1 previously had no temporal gate at all, while 2 and 3 both did.
+    So three post-molt refusals — a keeper offering food twice a week for a
+    fortnight — declared premolt on an animal that had moulted days earlier.
+
+    The gate is proportional where it can be and absolute where it can't:
+      - with an average interval, require 25% of it elapsed, which scales to
+        the animal (~17 days on a 68-day adult cycle, ~6 on a fast sling)
+        rather than imposing one number on a group whose cycles run from
+        weeks to over a year;
+      - without one (fewer than 3 moults logged), fall back to 14 days;
+      - with no moult history at all, don't gate — nothing contradicts the
+        refusals, and a keeper whose spider is refusing deserves the warning.
+
+    Erring toward suppression is deliberate. A false positive tells a keeper
+    their freshly-moulted spider is about to moult again, which is visibly
+    wrong and costs trust in every other prediction the app makes. A false
+    negative merely withholds a heads-up about something the refusal log
+    already shows them. The failure modes are not symmetric.
+    """
+    if molt_interval_progress is not None:
+        past_post_molt_window = molt_interval_progress >= MIN_PROGRESS_FOR_REFUSAL_ONLY
+    elif days_since_last_molt is not None:
+        past_post_molt_window = days_since_last_molt >= MIN_DAYS_FOR_REFUSAL_ONLY
+    else:
+        past_post_molt_window = True
+
+    if recent_refusal_streak >= 3 and past_post_molt_window:
+        return True
+    if (recent_refusal_streak >= 2 and molt_interval_progress
+            and molt_interval_progress >= 60):
+        return True
+    if (molt_interval_progress and molt_interval_progress >= 110
+            and days_since_last_molt is not None and days_since_last_molt > 30):
+        return True
+    return False
+
+
 def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
     """
     Predict whether a tarantula is likely in premolt.
@@ -120,24 +192,38 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
         else:
             refusal_rate_last_30_days = 0.0
 
-    # Determine if premolt is likely. Three branches:
-    #   1. Strong behavioral signal: 3+ recent consecutive refusals.
-    #   2. Moderate behavioral + temporal signal: 2+ refusals AND >60%
-    #      through the average molt interval.
-    #   3. Temporal-only signal (new): spider is meaningfully overdue
-    #      (>110% of average, and at least 30 days since last molt)
-    #      with no refusals logged. Some adults — particularly stockier
-    #      New World females — eat right through premolt, so a strong
-    #      interval signal with no refusals is still informative.
-    is_premolt_likely = False
-    if recent_refusal_streak >= 3:
-        is_premolt_likely = True
-    elif (recent_refusal_streak >= 2 and molt_interval_progress
-          and molt_interval_progress >= 60):
-        is_premolt_likely = True
-    elif (molt_interval_progress and molt_interval_progress >= 110
-          and days_since_last_molt is not None and days_since_last_molt > 30):
-        is_premolt_likely = True
+    # A spider that has just molted cannot be entering premolt, however it
+    # behaves at the feeding tongs. It refuses food after a molt because its
+    # fangs are still hardening — that is the SAME observable signal as
+    # premolt refusal, with the opposite meaning, and only the calendar
+    # separates them.
+    #
+    # Branch 1 below had no temporal gate (branches 2 and 3 both did), so
+    # three post-molt refusals — a keeper diligently offering food twice a
+    # week for a fortnight — declared premolt on an animal that moulted days
+    # earlier. Nobody had tripped it in production when this was written; it
+    # was found while investigating a different report.
+    #
+    # The gate is proportional where we can be, absolute where we can't:
+    #   - With an average interval, require 25% of it to have elapsed. That
+    #     scales with the animal — ~17 days for a 68-day adult cycle, ~6 for
+    #     a fast sling — instead of imposing one number on a group whose
+    #     cycles range from weeks to over a year.
+    #   - Without one (fewer than 3 molts logged), fall back to 14 days.
+    #   - With no molt history at all, don't gate: there is nothing to
+    #     contradict the refusals, and a keeper whose spider is refusing
+    #     deserves the heads-up.
+    #
+    # Erring toward suppression is deliberate. A false positive here tells a
+    # keeper their freshly-moulted spider is about to moult again, which is
+    # visibly wrong and costs trust in every other prediction. A false
+    # negative just withholds a heads-up about something the refusal log
+    # already shows them. The failure modes are not symmetric.
+    is_premolt_likely = evaluate_premolt_likely(
+        recent_refusal_streak=recent_refusal_streak,
+        molt_interval_progress=molt_interval_progress,
+        days_since_last_molt=days_since_last_molt,
+    )
 
     # Determine confidence level. Refusal + high progress → high.
     # Refusal + moderate progress → medium. Overdue-only (no refusals)
