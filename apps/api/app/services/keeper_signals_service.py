@@ -48,6 +48,29 @@ WINDOW_DAYS = 730
 MIN_INTERVAL_DAYS = 1
 MAX_INTERVAL_DAYS = 120
 
+#: Intervals a single keeper needs before their median counts as one of the
+#: voices in the species median.
+#:
+#: Because the aggregate is a median of per-keeper medians, EVERY keeper gets
+#: exactly one vote regardless of volume — that's what stops a large account
+#: dominating. The flip side, found 2026-09-04, is that a keeper with ONE
+#: interval carried the same weight as a keeper with thirty. One interval is a
+#: single gap between two feedings; it isn't a practice, and it shouldn't get
+#: a vote.
+#:
+#: Two is deliberately low. Measured on production the same day, with the
+#: owner's test account already excluded:
+#:
+#:     floor 1 → 22 species      floor 4 → 8
+#:     floor 2 → 17 species      floor 5 → 8
+#:     floor 3 → 14 species
+#:
+#: The cliff is between 3 and 4. A floor of 5 (the first instinct) would have
+#: cut the feature by 61% to fix a problem the 3-keeper gate already mostly
+#: handles. Two buys the real thing — a keeper has shown a repeated pattern —
+#: at a cost of 5 species rather than 14.
+MIN_INTERVALS_PER_KEEPER = 2
+
 
 @dataclass(frozen=True)
 class KeeperSignals:
@@ -86,31 +109,47 @@ _SIGNALS_SQL = text(
             )) AS gap_days
         FROM feeding_logs f
         JOIN inverts i ON i.id = f.invert_id
+        JOIN users u   ON u.id = i.user_id
         WHERE f.accepted IS TRUE
           AND f.invert_id IS NOT NULL
           AND i.species_id = :species_id
           AND i.died_at IS NULL
           AND i.transferred_out_at IS NULL
+          -- Test and demo accounts don't describe husbandry. Excluded from
+          -- AGGREGATES only; they remain fully visible everywhere else.
+          AND u.exclude_from_aggregates IS NOT TRUE
           AND f.fed_at >= now() - (:window_days || ' days')::interval
     ),
-    eligible AS (
+    all_eligible AS (
         SELECT user_id, invert_id, gap_days
         FROM gaps
         WHERE gap_days IS NOT NULL
           AND gap_days BETWEEN :min_interval AND :max_interval
     ),
-    per_keeper AS (
+    -- A keeper needs a repeated pattern before their median is a voice. One
+    -- interval is a single gap between two feedings, and under median-of-
+    -- medians it would otherwise weigh the same as thirty.
+    voices AS (
         SELECT user_id,
+               COUNT(*) AS obs,
                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY gap_days) AS keeper_median
-        FROM eligible
+        FROM all_eligible
         GROUP BY user_id
+        HAVING COUNT(*) >= :min_per_keeper
+    ),
+    -- Counts describe the evidence actually used, not everything discarded on
+    -- the way. Reporting observations we didn't count would overstate it.
+    counted AS (
+        SELECT e.*
+        FROM all_eligible e
+        JOIN voices v ON v.user_id = e.user_id
     )
     SELECT
-        (SELECT COUNT(*) FROM eligible)                        AS observation_count,
-        (SELECT COUNT(DISTINCT user_id) FROM eligible)         AS keeper_count,
-        (SELECT COUNT(DISTINCT invert_id) FROM eligible)       AS animal_count,
+        (SELECT COUNT(*) FROM counted)                         AS observation_count,
+        (SELECT COUNT(*) FROM voices)                          AS keeper_count,
+        (SELECT COUNT(DISTINCT invert_id) FROM counted)        AS animal_count,
         (SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY keeper_median)
-           FROM per_keeper)                                    AS median_of_medians
+           FROM voices)                                        AS median_of_medians
     """
 )
 
@@ -130,6 +169,7 @@ def get_keeper_signals(db: Session, species_id: UUID | str) -> KeeperSignals:
             "window_days": WINDOW_DAYS,
             "min_interval": MIN_INTERVAL_DAYS,
             "max_interval": MAX_INTERVAL_DAYS,
+            "min_per_keeper": MIN_INTERVALS_PER_KEEPER,
         },
     ).one()
 

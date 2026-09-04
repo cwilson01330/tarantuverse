@@ -16,6 +16,7 @@ from app.schemas.keeper_signals import KeeperSignalsResponse
 from app.services.keeper_signals_service import (
     MAX_INTERVAL_DAYS,
     MIN_INTERVAL_DAYS,
+    MIN_INTERVALS_PER_KEEPER,
     MIN_KEEPERS,
     MIN_OBSERVATIONS,
     WINDOW_DAYS,
@@ -52,6 +53,7 @@ def test_gate_constants_are_not_quietly_relaxed():
     assert MIN_KEEPERS == 3
     assert MIN_OBSERVATIONS == 15
     assert WINDOW_DAYS == 730          # matches ADR-014's staleness window
+    assert MIN_INTERVALS_PER_KEEPER == 2
 
 
 def test_interval_bounds_exclude_logging_artifacts():
@@ -166,3 +168,79 @@ def test_dead_and_transferred_animals_are_excluded():
     src = inspect.getsource(svc)
     assert "i.died_at IS NULL" in src
     assert "i.transferred_out_at IS NULL" in src
+
+
+# ── Per-keeper floor and aggregate exclusion (added 2026-09-04) ──────────────
+
+def test_a_keeper_needs_a_repeated_pattern_to_get_a_voice():
+    """One interval is a single gap between two feedings, not a practice.
+
+    Under median-of-medians every keeper gets one vote regardless of volume —
+    that's what stops a large account dominating. Without a floor it also meant
+    a keeper with ONE interval outweighed nothing and counted as much as a
+    keeper with thirty. Found on production: a single 63-day interval was a
+    full voice in Brachypelma hamorii.
+    """
+    import inspect
+
+    from app.services import keeper_signals_service as svc
+
+    src = inspect.getsource(svc)
+    assert "HAVING COUNT(*) >= :min_per_keeper" in src, (
+        "Per-keeper observations must be floored before a keeper's median "
+        "joins the species median."
+    )
+
+
+def test_the_floor_is_deliberately_low():
+    """Measured 2026-09-04 with the test account already excluded:
+    floor 1 → 22 species, 2 → 17, 3 → 14, 4 → 8, 5 → 8.
+
+    The cliff is between 3 and 4. Raising this is not free — 5 would cut
+    coverage by 61% to solve a problem the 3-keeper gate already mostly
+    handles.
+    """
+    assert MIN_INTERVALS_PER_KEEPER == 2
+
+
+def test_excluded_accounts_are_dropped_from_aggregates():
+    import inspect
+
+    from app.services import keeper_signals_service as svc
+
+    assert "u.exclude_from_aggregates IS NOT TRUE" in inspect.getsource(svc)
+
+
+def test_exclusion_is_scoped_to_aggregates_only():
+    """A guard against scope creep.
+
+    `exclude_from_aggregates` keeps an account out of community STATISTICS. It
+    is not a shadowban: the account stays visible in forums, keeper listings,
+    follows and messages. If something ever needs to hide an account from
+    people, that is a different flag with a different name — reusing this one
+    would silently turn a statistics setting into a moderation action.
+    """
+    from app.models.user import User
+
+    assert hasattr(User, "exclude_from_aggregates")
+    # The flag must not have leaked into visibility logic.
+    import inspect
+
+    from app.routers import keepers
+
+    assert "exclude_from_aggregates" not in inspect.getsource(keepers), (
+        "exclude_from_aggregates must not gate keeper visibility — it is an "
+        "aggregates-only flag."
+    )
+
+
+def test_counts_describe_evidence_actually_used():
+    """Counts come from `counted` (post-floor), not `all_eligible`. Reporting
+    observations we discarded would overstate the evidence behind the figure."""
+    import inspect
+
+    from app.services import keeper_signals_service as svc
+
+    src = inspect.getsource(svc)
+    assert "FROM counted)" in src
+    assert "(SELECT COUNT(*) FROM voices)" in src

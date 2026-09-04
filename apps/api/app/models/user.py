@@ -65,6 +65,16 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
     is_admin = Column(Boolean, default=False, nullable=False)  # For forum moderation
+
+    # Keep this account's data out of COMMUNITY AGGREGATES (ADR-018 keeper
+    # signals, and anything similar later). Test and demo accounts log animals
+    # on whatever schedule a feature needed that day, which is not husbandry,
+    # and it was measurably shifting numbers published as "what keepers do".
+    #
+    # AGGREGATES ONLY. This is not a shadowban and must not grow into one — the
+    # account stays fully visible in forums, keeper listings, follows and
+    # messages. Hiding an account from people is a different flag.
+    exclude_from_aggregates = Column(Boolean, default=False, nullable=False)
     
     # Password Reset
     reset_token = Column(String(255), nullable=True)
