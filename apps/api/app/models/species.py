@@ -71,6 +71,15 @@ class Species(Base):
     webbing_amount = Column(String(50))  # "light", "moderate", "heavy"
     burrowing = Column(Boolean, default=False)
 
+    # Whether the species is kept communally by an established part of the
+    # hobby. Gates colony mode (ADR-010) in the add flow, so a false negative
+    # hides a legitimate feature and a false positive invites someone to house
+    # cannibals together — set it deliberately, per species, never by genus.
+    # Default False: silence is the safe answer. See seed_communal_tarantulas.py.
+    communal_suitable = Column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
+
     # Safety Information
     # IMPORTANT: Defaults are fail-safe. urticating_hairs defaults False so we
     # never claim a species has hairs unless explicitly set; Old World species

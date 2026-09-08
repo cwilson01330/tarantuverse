@@ -21,7 +21,6 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
-import { AddPickerSheet, type AddPickerTaxon } from '../../src/components/AddPickerSheet';
 import { useBreakpoint } from '../../src/hooks/useBreakpoint';
 import { getImageUrl } from '../../src/utils/image-url';
 import { listColonies, formatColonyCount, type ColonyListItem } from '../../src/lib/colonies';
@@ -228,7 +227,6 @@ function DashboardHubScreen() {
   // falls back to tarantulas.length if the call fails.
   const [totalAnimals, setTotalAnimals] = useState<number | null>(null);
   const [speciesCount, setSpeciesCount] = useState<number | null>(null);
-  const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tourChecked, setTourChecked] = useState(false);
@@ -890,13 +888,6 @@ function DashboardHubScreen() {
   // /inverts/ count failed to load.
   const animalCount = totalAnimals ?? tarantulas.length;
 
-  // Retained only to satisfy the AddPickerSheet prop; the sheet is no longer
-  // opened from this screen (see setAddPickerOpen callers → '/add').
-  const handleAddPick = (taxon: AddPickerTaxon) => {
-    setAddPickerOpen(false);
-    if (taxon === 'tarantula') router.push('/tarantula/add');
-    else router.push(`/invert/add?taxon=${taxon}` as any);
-  };
 
   // Empty state — gated on the whole collection, not just tarantulas, so
   // a keeper who owns only scorpions/centipedes/whip spiders doesn't get
@@ -924,11 +915,6 @@ function DashboardHubScreen() {
             <Text style={styles.emptySecondaryText}>📖 Species</Text>
           </TouchableOpacity>
         </View>
-        <AddPickerSheet
-          visible={addPickerOpen}
-          onClose={() => setAddPickerOpen(false)}
-          onPick={handleAddPick}
-        />
       </View>
     );
   }
@@ -1307,12 +1293,6 @@ function DashboardHubScreen() {
         </CopilotStep>
       </ScrollView>
 
-      {/* Add-to-collection taxon picker — shared with the collection tab. */}
-      <AddPickerSheet
-        visible={addPickerOpen}
-        onClose={() => setAddPickerOpen(false)}
-        onPick={handleAddPick}
-      />
     </View>
   );
 }

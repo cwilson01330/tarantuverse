@@ -30,10 +30,6 @@ import { getImageUrl } from '../../src/utils/image-url';
 import { feedingStatusColor } from '../../src/utils/status-colors';
 import { TarantulaActionSheet } from '../../src/components/TarantulaActionSheet';
 import {
-  AddPickerSheet,
-  type AddPickerTaxon,
-} from '../../src/components/AddPickerSheet';
-import {
   listScorpions,
   scorpionDisplayName,
   type Scorpion,
@@ -205,9 +201,6 @@ function CollectionScreen() {
   // while the mark-fed POST is in flight.
   const [actionTarget, setActionTarget] = useState<Tarantula | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
-  // Add-to-collection taxon picker — replaces the native Alert.alert
-  // dialog so the options render left-aligned with their glyphs.
-  const [addPickerOpen, setAddPickerOpen] = useState(false);
 
   /** Show the one-tap "Fed" button on cards. Defaults ON — it was added
    *  because a keeper reported losing that path, so hiding it by default would
@@ -1744,33 +1737,15 @@ function CollectionScreen() {
     );
   }
 
-  // Add-flow disambiguator. Mirrors HV's ADR-003 pattern: one entry
-  // point on the bottom bar, taxon picked inside the add flow.
+  // One entry point: the FAB goes straight to the unified add screen.
   //
-  // Originally this used `Alert.alert` for cross-platform consistency,
-  // but Android's Material AlertDialog right-justifies its options —
-  // with three taxa + a leading emoji glyph, that read awkwardly. The
-  // dedicated AddPickerSheet renders rows left-aligned matching the
-  // existing TarantulaActionSheet shape.
-  // The taxon picker is retired (design handoff, screen 7). Species selection
-  // now sets the taxon, so there's nothing to pick up front — and Colony,
-  // which was row 11 of a sheet with no ScrollView, is a toggle on the add
-  // screen instead of a row people couldn't reach.
+  // The taxon picker sheet it replaced (design handoff, screen 7) stayed
+  // mounted-but-unreachable in this file and in the dashboard for a while
+  // after the rework, which is its own small hazard — reading the source
+  // suggested a Colony row existed that no user could ever tap. Removed
+  // 2026-09-08. `src/components/AddPickerSheet.tsx` now has no importers.
   const openAddPicker = () => {
     router.push('/add' as any);
-  };
-
-  const handleAddPick = (taxon: AddPickerTaxon) => {
-    setAddPickerOpen(false);
-    if (taxon === 'tarantula') {
-      router.push('/tarantula/add');
-    } else if (taxon === 'colony') {
-      // Colony mode (ADR-010) — taxon is chosen inside the colony add form.
-      router.push('/colony/add' as any);
-    } else {
-      // All non-tarantula taxa share the generic invert add screen (ADR-007).
-      router.push(`/invert/add?taxon=${taxon}` as any);
-    }
   };
 
   // Renders the cross-taxon row using the discriminated union — the
@@ -2259,12 +2234,6 @@ function CollectionScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Add-to-collection taxon picker. Same always-mounted pattern. */}
-      <AddPickerSheet
-        visible={addPickerOpen}
-        onClose={() => setAddPickerOpen(false)}
-        onPick={handleAddPick}
-      />
     </View>
   );
 }

@@ -52,6 +52,9 @@ class SpeciesBase(BaseModel):
     water_dish_required: bool = True
     webbing_amount: Optional[str] = None
     burrowing: bool = False
+    # Gates colony mode (ADR-010). Defaults False deliberately: an unset
+    # species must never invite a keeper to house cannibals together.
+    communal_suitable: bool = False
 
     # Safety Information
     urticating_hairs: bool = True  # New World tarantulas
@@ -115,6 +118,7 @@ class SpeciesUpdate(BaseModel):
     water_dish_required: Optional[bool] = None
     webbing_amount: Optional[str] = None
     burrowing: Optional[bool] = None
+    communal_suitable: Optional[bool] = None
     urticating_hairs: Optional[bool] = None
     medically_significant_venom: Optional[bool] = None
     venom_potency: Optional[str] = None

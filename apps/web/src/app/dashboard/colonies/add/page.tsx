@@ -71,10 +71,11 @@ function AddColonyForm() {
   const { user, token } = useAuth()
 
   const taxonParam = searchParams.get('taxon')
-  // NB: isInvertTaxon no longer excludes 'tarantula' — it joined the taxon
-  // union in ADR-013. The COLONY_TAXA membership test below is what keeps a
-  // ?taxon=tarantula link falling through to the default, and it is now
-  // load-bearing rather than belt-and-braces.
+  // As of 2026-09-08 COLONY_TAXA includes tarantula, so ?taxon=tarantula now
+  // resolves instead of falling through to the default — communal tarantulas
+  // are established practice for a handful of species and are two of the three
+  // colonies in production. The membership test is back to belt-and-braces:
+  // it guards against a junk taxon in the query string, nothing more.
   const initialTaxon: ColonyTaxon =
     taxonParam && isInvertTaxon(taxonParam) && COLONY_TAXA.includes(taxonParam as ColonyTaxon)
       ? (taxonParam as ColonyTaxon)

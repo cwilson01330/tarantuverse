@@ -170,8 +170,11 @@ function AddScreen() {
     setQuery('');
     setScientificName(s.scientific_name);
     setCommonName(s.common_names?.[0] ?? '');
-    // Colony mode only makes sense for taxa people actually keep communally.
-    if (s.taxon === 'tarantula') setMode('individual');
+    // Colony mode only makes sense for species people actually keep
+    // communally. Reset on any non-communal pick, not just tarantulas —
+    // otherwise switching from a roach to a centipede leaves "A population"
+    // selected with its control no longer on screen to change it back.
+    if (!s.communal) setMode('individual');
   }, []);
 
   const clearPick = () => {
@@ -513,8 +516,14 @@ function AddScreen() {
             </View>
           )}
 
-          {/* --- individual vs population --------------------------------- */}
-          {!!picked && picked.taxon !== 'tarantula' && (
+          {/* --- individual vs population ---------------------------------
+              Gated on the species' own communal flag, not on taxon. The taxon
+              test this replaced was wrong in both directions: it offered
+              population tracking for centipedes (every one in the catalog is
+              communal_suitable=false — they are reliably cannibalistic) and
+              withheld it from M. balfouri, which is what two of the three
+              colonies in production actually are. */}
+          {!!picked && picked.communal && (
             <>
               <Text style={[styles.sectionLabel, { marginTop: 22 }]}>HOW ARE YOU KEEPING IT?</Text>
               <View style={styles.segment}>
@@ -534,10 +543,21 @@ function AddScreen() {
                 />
               </View>
               {mode === 'colony' && (
-                <Text style={styles.hintLine}>
-                  Tracked as one entry with headcounts rather than individual animals. You can
-                  set the stage counts after it&apos;s created.
-                </Text>
+                <>
+                  <Text style={styles.hintLine}>
+                    Tracked as one entry with headcounts rather than individual animals. You can
+                    set the stage counts after it&apos;s created.
+                  </Text>
+                  {/* The flag says the hobby keeps this species communally. It
+                      does not say any particular group will work out, and a
+                      keeper reading an in-app option as endorsement is exactly
+                      how someone loses animals. Say the quiet part. */}
+                  <Text style={styles.hintLine}>
+                    Communal setups can still fail — cannibalism is possible even in species
+                    kept this way, and it&apos;s most likely when animals are different sizes or
+                    underfed.
+                  </Text>
+                </>
               )}
             </>
           )}

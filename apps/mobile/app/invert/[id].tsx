@@ -877,6 +877,83 @@ function InvertDetailScreen() {
         </CollapsibleRow>
       )}
 
+      {/* End of record (design handoff §14.1).
+
+          Mark as died already existed, but ONLY behind the ⋯ hero button — an
+          unlabeled 38px circle. This is a discoverability fix, not new
+          capability: it puts the action in the body where someone looks for
+          it, and states the consequence in the helper text so "will this
+          delete my logs?" is answered before the tap rather than after.
+
+          The case for it is the brief's, not a reported incident: delete was
+          the only *visible* exit from a record, so the keeper of an animal
+          that died had one obvious button and it was the one that discards
+          every feeding, molt and photo. Reordering that is the point.
+
+          Register per the brief: respectful and out of the way, not tender.
+          The button is `surfaceElevated` with a neutral border — deliberately
+          NOT colors.primary (a user-chosen accent shouldn't celebrate this)
+          and NOT colors.error (red means destructive, and this destroys
+          nothing). Delete keeps the red confirm, but it is no longer the only
+          exit from a record, nor the visually dominant one.
+
+          Hidden once the animal is already dead — the status card above
+          covers that state, and offering it again would be noise. */}
+      {!invert.died_at && (
+        <CollapsibleRow
+          icon="circle-slice-8"
+          title="End of record"
+          preview="Mark as died, or remove this record"
+          expanded={!!openRows.endOfRecord}
+          onToggle={() => toggleRow('endOfRecord')}
+          colors={colors}
+        >
+          <TouchableOpacity
+            onPress={() => setDiedOpen(true)}
+            style={[
+              s.endOfRecordBtn,
+              { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Mark ${headerTitle} as died`}
+            accessibilityHint="Keeps every log. Removes the animal from your collection and reminders."
+          >
+            <Text style={[s.endOfRecordBtnText, { color: colors.textPrimary }]}>
+              Mark as died
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={[s.empty, { color: colors.textTertiary, marginTop: SPACING.sm }]}>
+            {/* Pronoun from recorded sex via the shared helper — the same one
+                MarkDiedSheet uses, so the row and the sheet it opens speak
+                about the animal the same way. Unsexed falls back to "them",
+                which is correct rather than merely neutral for a sling. */}
+            Keeps every feeding, molt and photo. Removes{' '}
+            {pronounsFor(invert.sex).object} from your collection, your
+            reminders, and your plan&rsquo;s animal count.
+          </Text>
+
+          <View
+            style={[s.endOfRecordDivider, { borderTopColor: colors.border }]}
+          />
+
+          {/* Delete stays reachable but demoted — it is the answer to "I added
+              this by mistake", not to "this animal died". Framing it that way
+              is what stops a keeper reaching for it and losing the history. */}
+          <Text style={[s.empty, { color: colors.textTertiary }]}>
+            Added by mistake?{' '}
+            <Text
+              onPress={handleDelete}
+              style={{ color: colors.textTertiary, textDecorationLine: 'underline' }}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${headerTitle} permanently`}
+            >
+              Delete record
+            </Text>
+          </Text>
+        </CollapsibleRow>
+      )}
+
       {/* One interleaved history. Long-press a row to edit or delete it —
           the same gesture the photo strip already uses. Putting a pencil and
           a bin on every row (the old LogSection treatment) meant three tap
@@ -1373,6 +1450,24 @@ function InfoRow({ label, value }: { label: string; value: string; colors?: Retu
 // so there's nothing left that renders a per-type log list.
 
 const s = StyleSheet.create({
+  // End of record (design handoff 14.1). Neutral by design: surfaceElevated
+  // fill with a plain border, never colors.primary (a user-chosen accent
+  // shouldn't celebrate this) and never colors.error (red means destructive
+  // everywhere else, and marking a death destroys nothing).
+  endOfRecordBtn: {
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  endOfRecordBtnText: { fontSize: 15, fontWeight: '600' },
+  endOfRecordDivider: {
+    borderTopWidth: 1,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+
   empty: { ...TYPE.label, fontStyle: 'italic' },
 });
 

@@ -101,7 +101,11 @@ export async function loadSpeciesCatalog(): Promise<CatalogResult> {
 
   const tItems: any[] = Array.isArray(tRes?.data) ? tRes.data : tRes?.data?.items ?? [];
   const tarantulas = tItems.map((s) =>
-    normalise(s, 'tarantula', !!s.medically_significant_venom, false),
+    // `communal` was hardcoded false here until com_20260908 added the column
+    // to `species`. That silently made every tarantula non-communal on any
+    // surface reading this catalog — colony mode among them — regardless of
+    // what the care sheet said. Read the field.
+    normalise(s, 'tarantula', !!s.medically_significant_venom, !!s.communal_suitable),
   );
 
   const iItems: any[] = Array.isArray(iRes?.data) ? iRes.data : iRes?.data?.items ?? [];

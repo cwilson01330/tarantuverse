@@ -277,6 +277,10 @@ def _species_to_invert_species_kwargs(sp: "Species") -> dict:
         # Species.burrowing is a Boolean (legacy); invert_species expects
         # 'none' | 'light' | 'heavy'. Map True → 'heavy', False → None.
         "burrowing": "heavy" if sp.burrowing else None,
+        # Added com_20260908. Before that column existed this key was absent,
+        # so all 197 mirrored tarantula rows defaulted false — which is why
+        # M. balfouri read as non-communal on a surface that gates on the flag.
+        "communal_suitable": bool(sp.communal_suitable),
         # Tarantula safety flags
         "urticating_hairs": bool(sp.urticating_hairs),
         "medically_significant_venom": bool(sp.medically_significant_venom),

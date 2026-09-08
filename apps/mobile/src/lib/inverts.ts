@@ -125,32 +125,28 @@ export const INVERT_TAXON_ORDER: InvertTaxon[] = [
 /**
  * Taxa a COLONY picker should offer.
  *
- * KNOWN INCOMPLETE — 2026-07-29. The blanket tarantula exclusion is wrong and
- * is scheduled to be replaced, just not in the push that added colony feeding.
+ * RESOLVED 2026-09-08 — the blanket tarantula exclusion is gone.
  *
- * The original reasoning was that communal keeping is a fringe practice with a
- * poor survival record. That's true as a generalisation and false at the
- * species level: Monocentropus balfouri, Neoholothele incei and several
- * Hapalopus spp. are kept communally as established practice, not as an
- * experiment. Excluding the whole taxon means a keeper doing something
- * accepted can't record it — and other taxa (some scorpions, whip spiders)
- * have the same species-level split.
+ * The exclusion existed because communal keeping is a fringe practice with a
+ * poor survival record. True as a generalisation, false at the species level:
+ * Monocentropus balfouri, Neoholothele incei and several Hapalopus spp. are
+ * kept communally as established practice, not as an experiment. The cost was
+ * concrete — two of the three colonies in production are tarantulas, so the
+ * app refused to offer the one thing keepers were actually using it for.
  *
- * So the replacement isn't "add tarantula here", it's a per-species
- * communal-suitability signal on invert_species that the picker reads, with
- * unsuitable species carrying an honest warning rather than a hard block.
- * Until that exists, tarantula stays out of the picker but remains fully valid
- * at the DB level (ADR-010) — migrated communals work everywhere else in the
- * app: buckets, cards, photos, feeding.
+ * The fix agreed at the time was NOT "add tarantula here" but a per-species
+ * signal the picker reads. That signal now exists on every catalog:
+ * `communal_suitable` on invert_species and scorpion_species, and on `species`
+ * as of com_20260908. The honesty therefore lives one level down — the add
+ * flow gates its population control on the species flag and shows a
+ * cannibalism warning next to it — and this list no longer needs to carry it.
  *
- * This constant exists so that exclusion is a NAMED, greppable decision. It
- * used to be expressed as tarantula's absence from the taxon union, which
- * meant "we chose not to offer this" and "this doesn't exist" were the same
- * fact — and any lookup of tarantula metadata silently returned undefined.
+ * Kept as a named constant rather than folded back into INVERT_TAXON_ORDER
+ * because "every taxon that exists" and "every taxon a picker offers" are
+ * still different questions, and collapsing them is what made a tarantula
+ * metadata lookup silently return undefined the last time.
  */
-export const PICKER_TAXA: InvertTaxon[] = INVERT_TAXON_ORDER.filter(
-  (t) => t !== 'tarantula',
-);
+export const PICKER_TAXA: InvertTaxon[] = INVERT_TAXON_ORDER;
 
 /**
  * Type guard for "is this a known taxon".

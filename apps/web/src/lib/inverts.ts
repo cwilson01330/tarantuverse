@@ -46,11 +46,15 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
 
 /**
  * Taxa a COLONY picker should offer — mirrors PICKER_TAXA in the mobile lib.
- * Communal tarantula keeping isn't something to suggest, but stays valid at
- * the DB level for setups migrated in under ADR-010.
+ *
+ * The tarantula exclusion was removed 2026-09-08. It was a taxon-level answer
+ * to a species-level question: balfouri and incei are established communals,
+ * and two of the three colonies in production are tarantulas. Suitability is
+ * now carried per species by `communal_suitable`, which exists on all three
+ * catalogs (on `species` as of com_20260908). See the mobile lib for the full
+ * reasoning.
  */
-export const PICKER_TAXA: InvertTaxon[] = (Object.keys(INVERT_TAXA) as InvertTaxon[])
-  .filter((t) => t !== 'tarantula')
+export const PICKER_TAXA: InvertTaxon[] = Object.keys(INVERT_TAXA) as InvertTaxon[]
 
 /**
  * Type guard for "is this a known taxon".
