@@ -23,7 +23,17 @@ export interface CatalogSpecies {
   scientific_name: string;
   common_names: string[];
   care_level: string | null;
-  /** terrestrial / arboreal / fossorial */
+  /**
+   * Free text from the catalog, NOT the `enclosure_type` enum.
+   *
+   * This comment used to claim "terrestrial / arboreal / fossorial" and the
+   * add flow believed it, copying the value straight into `enclosure_type`.
+   * Production disagrees: `semi-arboreal`, `terrestrial/semi-arboreal`,
+   * `terrestrial/fossorial`, `scansorial`, `psammophile`, `orb-weaver (web)`
+   * and `cobweb (terrestrial)` all exist. Anything but the three bare enum
+   * values 422s on create. Run it through `normalizeEnclosureType()` before
+   * it goes anywhere near a payload.
+   */
   type: string | null;
   adult_size: string | null;
   native_region: string | null;
@@ -112,6 +122,50 @@ export async function loadSpeciesCatalog(): Promise<CatalogResult> {
     species: [...tarantulas, ...inverts],
     partial: !tRes || !iRes,
   };
+}
+
+/**
+ * Map the catalog's free-text `type` onto the `enclosure_type` enum, or to
+ * null when no honest mapping exists.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * Brooke could add every tarantula except Psalmopoeus cambridgei, whose
+ * catalog `type` is `semi-arboreal`. The add flow sent that verbatim as
+ * `enclosure_type`, which is CHECK-constrained to terrestrial | arboreal |
+ * fossorial on `tarantulas`, `inverts` AND `colonies`, so the create 422'd —
+ * but only when "Use the care sheet's husbandry" was on, which is why it
+ * looked like one broken species rather than a broken field.
+ *
+ * FIRST TERM WINS. `terrestrial/semi-arboreal` (GBB, OBT) is a terrestrial
+ * animal that webs upward, and `terrestrial/fossorial` (C. elegans) is a
+ * terrestrial animal that burrows — in both the leading word is the primary
+ * habit and the enclosure it wants. Scanning left to right also makes
+ * `cobweb (terrestrial)` and `orb-web (arboreal)` fall out correctly.
+ *
+ * Unrecognised terms return null rather than a guess. `scansorial` and
+ * `psammophile` (scorpions) and `orb-weaver (web)` (true spiders) describe
+ * housing this three-value enum genuinely cannot express; omitting the field
+ * leaves it blank for the keeper to fill, which is honest. Inventing
+ * "terrestrial" for a sand-dwelling scorpion would not be.
+ *
+ * 30 species across four taxa were unaddable-with-prefill before this
+ * existed, not the one Brooke reported — 15 scorpions, 11 true spiders,
+ * 4 tarantulas.
+ */
+export function normalizeEnclosureType(
+  raw: string | null | undefined,
+): 'terrestrial' | 'arboreal' | 'fossorial' | null {
+  if (!raw) return null;
+  const s = raw.toLowerCase();
+  // Index of each term, -1 when absent; the earliest present term wins.
+  // "arboreal" is deliberately matched as a substring so "semi-arboreal"
+  // resolves to arboreal.
+  const found = (['terrestrial', 'arboreal', 'fossorial'] as const)
+    .map((term) => ({ term, at: s.indexOf(term) }))
+    .filter((m) => m.at >= 0)
+    .sort((a, b) => a.at - b.at);
+  return found.length ? found[0].term : null;
 }
 
 /** Case-insensitive match on common OR scientific name. */

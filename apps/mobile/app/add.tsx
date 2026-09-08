@@ -51,11 +51,43 @@ import { INVERT_TAXA } from '../src/lib/inverts';
 import { careLevelMeta } from '../src/components/caresheet';
 import {
   loadSpeciesCatalog,
+  normalizeEnclosureType,
   searchCatalog,
   type CatalogSpecies,
 } from '../src/lib/species-catalog';
 
 const UpgradeModal = React.lazy(() => import('../src/components/UpgradeModal'));
+
+/**
+ * Turn an axios error into something a keeper can act on.
+ *
+ * "Something went wrong. Please try again." is what Brooke saw when the
+ * enclosure_type prefill 422'd, and retrying could never work — the payload
+ * was deterministic. The 422 body named the offending field the whole time;
+ * we just threw it away. A validation failure is a bug on our side, so the
+ * copy says so rather than implying the keeper mistyped something, but it
+ * carries the field name so the next report arrives diagnosed.
+ */
+function describeSaveError(e: any): string {
+  const detail = e?.response?.data?.detail;
+  if (Array.isArray(detail) && detail.length) {
+    const fields = Array.from(
+      new Set(
+        detail
+          // loc is like ["body", "enclosure_type"] — the last element is the
+          // field. Skip entries where it isn't a string (index positions).
+          .map((d: any) => d?.loc?.[d.loc.length - 1])
+          .filter((f: any) => typeof f === 'string' && f !== 'body'),
+      ),
+    );
+    if (fields.length) {
+      return `The server rejected ${fields.join(', ')}. That's a bug on our end — please send this message to support.`;
+    }
+  }
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (!e?.response) return 'No response from the server. Check your connection and try again.';
+  return 'Something went wrong. Please try again.';
+}
 
 type Sex = 'male' | 'female' | 'unknown';
 type LifeStage = 'sling' | 'juvenile' | 'adult';
@@ -154,8 +186,17 @@ function AddScreen() {
   const prefillSummary = useMemo(() => {
     if (!picked) return [];
     const out: string[] = [];
+    // Listed first, and listed at all, because it's the one prefilled value
+    // that isn't verbatim from the care sheet — `semi-arboreal` is applied as
+    // "Arboreal". A keeper who disagrees can see it here and switch prefill
+    // off, which is the whole contract of this summary.
+    const habit = normalizeEnclosureType(picked.type);
+    if (habit) out.push(habit.charAt(0).toUpperCase() + habit.slice(1));
+    // Withheld in colony mode, where it isn't sent — see buildHusbandry.
     const enc =
-      lifeStage === 'sling'
+      mode === 'colony'
+        ? null
+        : lifeStage === 'sling'
         ? picked.enclosure_size_sling
         : lifeStage === 'adult'
         ? picked.enclosure_size_adult
@@ -168,7 +209,7 @@ function AddScreen() {
     if (picked.humidity_min && picked.humidity_max)
       out.push(`${picked.humidity_min}–${picked.humidity_max}%`);
     return out;
-  }, [picked, lifeStage]);
+  }, [picked, lifeStage, mode]);
 
   const displayName = nickname || commonName || scientificName || 'animal';
   const canSave = !!(scientificName.trim() || commonName.trim() || nickname.trim());
@@ -176,14 +217,18 @@ function AddScreen() {
   /**
    * Husbandry defaults from the care sheet.
    *
-   * Target-aware because the two create schemas differ: `ColonyBase` has no
-   * `enclosure_type` / `enclosure_size` fields. Pydantic would silently drop
-   * them (extra='ignore'), so sending them anyway would "work" while quietly
-   * throwing data away — better to be explicit about what each accepts.
+   * Target-aware, but not for the reason this comment used to give. It
+   * claimed `ColonyBase` has no `enclosure_type` / `enclosure_size` fields;
+   * it has both (schemas/colony.py), under the same enum constraint. What
+   * actually differs is `enclosure_size`: it's chosen off `lifeStage`, and a
+   * colony is a mixed-stage population with no single life stage, so a
+   * sling-sized enclosure would be a fabricated number. Habit (terrestrial /
+   * arboreal / fossorial) is stage-independent and does carry over.
    */
   const buildHusbandry = (target: 'animal' | 'colony') => {
     if (!prefill || !picked) return {};
     const shared = {
+      enclosure_type: normalizeEnclosureType(picked.type) ?? undefined,
       substrate_type: picked.substrate_type ?? undefined,
       substrate_depth: picked.substrate_depth ?? undefined,
       target_temp_min: picked.temperature_min ?? undefined,
@@ -205,7 +250,6 @@ function AddScreen() {
         : picked.enclosure_size_juvenile;
     return {
       ...shared,
-      enclosure_type: picked.type ?? undefined,
       enclosure_size: enc ?? undefined,
     };
   };
@@ -278,7 +322,7 @@ function AddScreen() {
     } catch (e: any) {
       // 402 = free-tier cap. Same treatment as every other create path.
       if (e?.response?.status === 402) setShowUpgrade(true);
-      else Alert.alert('Could not save', 'Something went wrong. Please try again.');
+      else Alert.alert('Could not save', describeSaveError(e));
     } finally {
       setSaving(false);
     }
