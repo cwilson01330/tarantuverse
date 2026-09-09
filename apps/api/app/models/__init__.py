@@ -7,6 +7,7 @@ from app.models.species import Species
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.substrate_change import SubstrateChange
+from app.models.care_log import CareLog
 from app.models.enclosure import Enclosure
 from app.models.photo import Photo
 from app.models.follow import Follow
@@ -90,6 +91,7 @@ __all__ = [
     "FeedingLog",
     "MoltLog",
     "SubstrateChange",
+    "CareLog",
     "Enclosure",
     "Photo",
     "Follow",

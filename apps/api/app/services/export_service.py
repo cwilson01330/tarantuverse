@@ -22,6 +22,7 @@ from app.models.tarantula import Tarantula
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.substrate_change import SubstrateChange
+from app.models.care_log import CareLog
 from app.models.photo import Photo
 from app.models.enclosure import Enclosure
 from app.models.pairing import Pairing
@@ -145,6 +146,13 @@ COLONY_EVENT_FIELDS = [
     "occurred_at", "severity", "notes", "created_at",
 ]
 
+# Hydration events (car_20260909). Parented on inverts rather than tarantulas,
+# so this is queried by invert id — unlike the older log exports above, which
+# all still key off legacy tarantula ids.
+CARE_LOG_FIELDS = [
+    "id", "invert_id", "user_id", "log_type", "logged_at", "notes", "created_at",
+]
+
 USER_PROFILE_FIELDS = [
     "id", "email", "username", "display_name", "avatar_url", "bio",
     "profile_bio", "profile_location", "profile_experience_level",
@@ -232,6 +240,23 @@ def _get_substrate_changes(db: Session, tarantula_ids: List[UUID]) -> List[Subst
     if not tarantula_ids:
         return []
     return db.query(SubstrateChange).filter(SubstrateChange.tarantula_id.in_(tarantula_ids)).order_by(SubstrateChange.changed_at).all()
+
+
+def _get_care_logs(db: Session, user_id: UUID) -> List[CareLog]:
+    """Queried by user rather than by animal id.
+
+    Every other log export here filters on a list of tarantula ids, which
+    silently drops anything belonging to a non-tarantula invert. Care logs are
+    invert-parented from the start, and filtering by owner means a keeper's
+    scorpion and centipede hydration records land in the export too — which is
+    the point of a GDPR export.
+    """
+    return (
+        db.query(CareLog)
+        .filter(CareLog.user_id == user_id)
+        .order_by(CareLog.logged_at)
+        .all()
+    )
 
 
 def _get_photos(db: Session, tarantula_ids: List[UUID]) -> List[Photo]:
@@ -367,6 +392,8 @@ class ExportService:
             # --- Colony mode (ADR-010) ---
             "colonies": [_row_to_dict(c, COLONY_FIELDS) for c in colonies],
             "colony_events": [_row_to_dict(e, COLONY_EVENT_FIELDS) for e in _get_colony_events(db, c_ids)],
+            # --- Hydration (car_20260909) ---
+            "care_logs": [_row_to_dict(c, CARE_LOG_FIELDS) for c in _get_care_logs(db, user.id)],
         }
 
     # ---- JSON export ----------------------------------------------------
@@ -385,6 +412,7 @@ class ExportService:
             "feeding_logs": data["feeding_logs"],
             "molt_logs": data["molt_logs"],
             "substrate_changes": data["substrate_changes"],
+            "care_logs": data["care_logs"],
             "photos": data["photos"],
             "enclosures": data["enclosures"],
             "breeding": {
@@ -428,6 +456,7 @@ class ExportService:
                 "reptile_offspring": len(data["reptile_offspring"]),
                 "colonies": len(data["colonies"]),
                 "colony_events": len(data["colony_events"]),
+                "care_logs": len(data["care_logs"]),
             },
         }
 
@@ -456,6 +485,7 @@ class ExportService:
             zf.writestr("feeding_logs.csv", ExportService._to_csv_bytes(data["feeding_logs"], FEEDING_FIELDS))
             zf.writestr("molt_logs.csv", ExportService._to_csv_bytes(data["molt_logs"], MOLT_FIELDS))
             zf.writestr("substrate_changes.csv", ExportService._to_csv_bytes(data["substrate_changes"], SUBSTRATE_CHANGE_FIELDS))
+            zf.writestr("care_logs.csv", ExportService._to_csv_bytes(data["care_logs"], CARE_LOG_FIELDS))
             zf.writestr("photos.csv", ExportService._to_csv_bytes(data["photos"], PHOTO_FIELDS))
             zf.writestr("enclosures.csv", ExportService._to_csv_bytes(data["enclosures"], ENCLOSURE_FIELDS))
             zf.writestr("pairings.csv", ExportService._to_csv_bytes(data["pairings"], PAIRING_FIELDS))
@@ -652,6 +682,7 @@ Files included:
   feeding_logs.csv      – All feeding records
   molt_logs.csv         – All molt records
   substrate_changes.csv – All substrate change records
+  care_logs.csv         – Water dish, overflow and misting records
   photos.csv            – Photo metadata (URLs, captions, dates)
   enclosures.csv        – Enclosure information
   pairings.csv          – Breeding pairing records

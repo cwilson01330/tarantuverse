@@ -17,6 +17,7 @@ import app.routers.species as species
 import app.routers.feedings as feedings
 import app.routers.molts as molts
 import app.routers.substrate_changes as substrate_changes
+import app.routers.care_logs as care_logs
 import app.routers.keepers as keepers
 import app.routers.messages as messages
 import app.routers.photos as photos
@@ -211,6 +212,7 @@ app.include_router(molts.router, prefix="/api/v1", tags=["molts"])
 
 print("[STARTUP] Registering substrate changes router...")
 app.include_router(substrate_changes.router, prefix="/api/v1", tags=["substrate_changes"])
+app.include_router(care_logs.router, prefix="/api/v1", tags=["care_logs"])
 
 print("[STARTUP] Registering keepers/community router...")
 app.include_router(keepers.router, prefix="/api/v1/keepers", tags=["keepers", "community"])
