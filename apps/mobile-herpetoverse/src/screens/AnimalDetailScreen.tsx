@@ -42,17 +42,15 @@ import { FeedingCadenceSheet } from '../components/FeedingCadenceSheet';
 import { ReptileShareSheet } from '../components/ReptileShareSheet';
 import { AnimalTransferSection } from '../components/AnimalTransferSection';
 import {
-  FeedingsList,
   LoadingShell,
-  LogActions,
   PhotosStrip,
-  ReptileHero,
   RetryError,
   Section,
-  ShedsList,
-  WeighInsList,
 } from '../components/reptile-detail/ReptileDetailShared';
+import { AnimalHero } from '../components/reptile-detail/AnimalHero';
+import { AnimalTimeline } from '../components/reptile-detail/AnimalTimeline';
 import {
+  ANIMAL_TAXA,
   type Animal,
   type FeedingLog,
   type ShedLog,
@@ -68,8 +66,14 @@ import { type Photo, listPhotos } from '../lib/photos';
 import { DEFAULT_CGD_FOOD_TYPE } from '../lib/cgd';
 
 /** Empty-state glyph for the hero card when there's no photo. */
+/**
+ * Glyph from the taxon registry. The previous ternary only knew snake and
+ * frog and fell through to a lizard emoji for everything else — so after
+ * ADR-011 widened HV to turtles, tortoises and salamanders, all three
+ * rendered as 🦎. The registry is the one place that knows.
+ */
 function taxonGlyph(taxon: Animal['taxon']): string {
-  return taxon === 'snake' ? '🐍' : taxon === 'frog' ? '🐸' : '🦎';
+  return ANIMAL_TAXA[taxon]?.glyph ?? '🦕';
 }
 
 export function AnimalDetailScreen() {
@@ -166,38 +170,8 @@ export function AnimalDetailScreen() {
       edges={['left', 'right', 'bottom']}
       style={[styles.safeArea, { backgroundColor: colors.background }]}
     >
-      <AppHeader
-        title={animalTitle(animal)}
-        leftAction={<HeaderBackButton />}
-        rightAction={
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              onPress={() => setShareOpen(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Share public profile"
-              hitSlop={8}
-            >
-              <MaterialCommunityIcons
-                name="share-variant"
-                size={22}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push(`/reptile/edit/${animal.id}` as never)}
-              accessibilityRole="button"
-              accessibilityLabel="Edit reptile"
-              hitSlop={8}
-            >
-              <MaterialCommunityIcons
-                name="pencil-outline"
-                size={22}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-          </View>
-        }
-      />
+      {/* No AppHeader — the hero owns the name and the actions. The header
+          used to print the same name ~100px above the hero's copy of it. */}
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -208,17 +182,24 @@ export function AnimalDetailScreen() {
           />
         }
       >
-        <ReptileHero
+        <AnimalHero
           title={animalTitle(animal)}
           scientificName={animal.scientific_name}
           sex={animal.sex}
           photoUrl={animal.photo_url}
-          currentWeightG={animal.current_weight_g}
-          lastFedAt={animal.last_fed_at}
-          lastShedAt={animal.last_shed_at}
-          brumationActive={animal.brumation_active}
           fallbackGlyph={taxonGlyph(animal.taxon)}
+          taxonLabel={ANIMAL_TAXA[animal.taxon]?.label ?? 'Animal'}
+          photoCount={photos?.length ?? 0}
+          brumationActive={animal.brumation_active}
+          onBack={() => router.back()}
+          onShare={() => setShareOpen(true)}
+          onEdit={() => router.push(`/reptile/edit/${animal.id}` as never)}
+          onOpenGallery={() =>
+            router.push(`/reptile/photos/${animal.id}` as never)
+          }
         />
+
+        <View style={styles.belowHero}>
 
         {/* When paused, the banner becomes the resume affordance —
             tappable, with an "Edit" hint. The canonical pause entry point
@@ -265,18 +246,6 @@ export function AnimalDetailScreen() {
           <CgdRefreshSection animal={animal} onRefreshed={onRefresh} />
         )}
 
-        <LogActions
-          onLogFeeding={() =>
-            router.push(`/reptile/log-feeding/${animal.id}` as never)
-          }
-          onLogWeight={() =>
-            router.push(`/reptile/log-weight/${animal.id}` as never)
-          }
-          onLogShed={() =>
-            router.push(`/reptile/log-shed/${animal.id}` as never)
-          }
-        />
-
         <Section title="Photos">
           <PhotosStrip
             photos={photos}
@@ -286,36 +255,23 @@ export function AnimalDetailScreen() {
           />
         </Section>
 
-        <Section title="Recent weigh-ins">
-          <WeighInsList
-            logs={weights}
-            onEditItem={(weightId) =>
-              router.push(
-                `/reptile/log-weight/${animal.id}?weightId=${weightId}` as never,
-              )
-            }
-          />
-        </Section>
-
-        <Section title="Recent feedings">
-          <FeedingsList
+        {/* One merged history replaces the three identically-shaped lists
+            (Recent weigh-ins / Recent feedings / Recent sheds) that each
+            sorted independently. Client-side merge — no new endpoints. */}
+        <Section title="History">
+          <AnimalTimeline
             feedings={feedings}
-            onEditItem={(feedingId) =>
-              router.push(
-                `/reptile/log-feeding/${animal.id}?feedingId=${feedingId}` as never,
-              )
-            }
-          />
-        </Section>
-
-        <Section title="Recent sheds">
-          <ShedsList
+            weights={weights}
             sheds={sheds}
-            onEditItem={(shedId) =>
-              router.push(
-                `/reptile/log-shed/${animal.id}?shedId=${shedId}` as never,
-              )
-            }
+            onOpen={(kind, entryId) => {
+              const route =
+                kind === 'feeding'
+                  ? `/reptile/log-feeding/${animal.id}?feedingId=${entryId}`
+                  : kind === 'weight'
+                    ? `/reptile/log-weight/${animal.id}?weightId=${entryId}`
+                    : `/reptile/log-shed/${animal.id}?shedId=${entryId}`;
+              router.push(route as never);
+            }}
           />
         </Section>
 
@@ -375,6 +331,7 @@ export function AnimalDetailScreen() {
             </TouchableOpacity>
           </Section>
         )}
+        </View>
       </ScrollView>
 
       <ReptileShareSheet
@@ -391,6 +348,48 @@ export function AnimalDetailScreen() {
         onClose={() => setCadenceOpen(false)}
         onSaved={fetchAll}
       />
+
+      {/* Pinned log bar. These four were outlined secondary buttons
+          halfway down the scroll — the most common actions on the screen,
+          reachable only after scrolling past three feeding cards. */}
+      <View
+        style={[
+          styles.logBar,
+          {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            paddingBottom: 10,
+          },
+        ]}
+      >
+        {(
+          [
+            { icon: 'silverware-fork-knife', label: 'Feeding', route: 'log-feeding' },
+            { icon: 'scale-bathroom', label: 'Weight', route: 'log-weight' },
+            { icon: 'weather-windy', label: 'Shed', route: 'log-shed' },
+            { icon: 'camera-outline', label: 'Photo', route: 'photos' },
+          ] as const
+        ).map((a) => (
+          <TouchableOpacity
+            key={a.label}
+            style={styles.logBarItem}
+            onPress={() =>
+              router.push(`/reptile/${a.route}/${animal.id}` as never)
+            }
+            accessibilityRole="button"
+            accessibilityLabel={
+              a.route === 'photos'
+                ? `Photos for ${animalTitle(animal)}`
+                : `Log a ${a.label.toLowerCase()} for ${animalTitle(animal)}`
+            }
+          >
+            <MaterialCommunityIcons name={a.icon} size={20} color={colors.accent} />
+            <Text style={[styles.logBarLabel, { color: colors.textSecondary }]}>
+              {a.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <PauseFeedingSheet
         visible={pauseOpen}
@@ -488,10 +487,29 @@ function CgdRefreshSection({
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 48,
+    // No top padding: the hero is full-bleed and runs under the status
+    // bar. The rest of the content is inset by contentInset below.
+    paddingBottom: 24,
     gap: 16,
   },
+  /** Everything after the hero gets the normal 16pt gutter. */
+  belowHero: { paddingHorizontal: 16, gap: 16 },
+
+  // Pinned log bar
+  logBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    paddingTop: 10,
+    paddingHorizontal: 8,
+  },
+  logBarItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+  },
+  logBarLabel: { fontSize: 10.5, fontWeight: '600' },
+
   calculatorLink: {
     marginTop: 12,
     flexDirection: 'row',
@@ -500,11 +518,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
   },
   cgdCard: {
     flexDirection: 'row',
