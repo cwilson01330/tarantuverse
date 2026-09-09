@@ -392,8 +392,12 @@ async def test_email_sending(
     test_email: str,
 ):
     """
-    Send a test email to verify SendGrid configuration (Admin only)
-    Useful for debugging email delivery issues
+    Send a test email to verify Resend configuration (Admin only).
+    Useful for debugging email delivery issues.
+
+    Said "SendGrid" until 2026-09-09, years after the provider changed. The
+    code always called EmailService, so this was only ever wrong copy — but it
+    was convincing enough to make stale SendGrid DNS records look load-bearing.
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -406,9 +410,9 @@ async def test_email_sending(
             subject="Test Email from Tarantuverse",
             content="""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2>✅ SendGrid Test Email</h2>
+                <h2>✅ Resend Test Email</h2>
                 <p>This is a test email from your Tarantuverse API.</p>
-                <p>If you're seeing this, SendGrid is configured correctly!</p>
+                <p>If you're seeing this, Resend is configured correctly!</p>
                 <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
                 <p style="color: #666; font-size: 12px;">Sent from Tarantuverse Email Service</p>
             </div>
