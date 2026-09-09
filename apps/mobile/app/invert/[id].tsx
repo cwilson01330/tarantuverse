@@ -29,6 +29,8 @@ import {
   type InvertFeedingStats,
   type Invert, type InvertFeedingLog, type InvertMoltLog, type InvertPhoto, type InvertSubstrateChange,
   type InvertGrowthAnalytics, type InvertPairing,
+  listInvertCareLogs, deleteInvertCareLog, CARE_LOG_LABELS,
+  type InvertCareLog,
 } from '../../src/lib/inverts';
 import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { SPACING, TYPE } from '../../src/theme/tokens';
@@ -58,6 +60,7 @@ function InvertDetailScreen() {
   const [feedings, setFeedings] = useState<InvertFeedingLog[]>([]);
   const [molts, setMolts] = useState<InvertMoltLog[]>([]);
   const [substrate, setSubstrate] = useState<InvertSubstrateChange[]>([]);
+  const [careLogs, setCareLogs] = useState<InvertCareLog[]>([]);
   const [photos, setPhotos] = useState<InvertPhoto[]>([]);
   const [events, setEvents] = useState<AnimalEvent[]>([]);
   const [growth, setGrowth] = useState<InvertGrowthAnalytics | null>(null);
@@ -124,7 +127,7 @@ function InvertDetailScreen() {
     try {
       const i = await getInvert(id);
       setInvert(i);
-      const [f, m, sub, p, g, pr, fs, ev] = await Promise.all([
+      const [f, m, sub, p, g, pr, fs, ev, care] = await Promise.all([
         listInvertFeedings(i.taxon, id).catch(() => [] as InvertFeedingLog[]),
         listInvertMolts(i.taxon, id).catch(() => [] as InvertMoltLog[]),
         listInvertSubstrateChanges(i.taxon, id).catch(() => [] as InvertSubstrateChange[]),
@@ -143,9 +146,13 @@ function InvertDetailScreen() {
           ? getInvertFeedingStats(id).catch(() => null)
           : Promise.resolve(null),
         listInvertEvents(id).catch(() => [] as AnimalEvent[]),
+        // Not registry-gated. Every taxon on this screen needs water in some
+        // form, even the ones that never touch a dish — those get misted.
+        listInvertCareLogs(id).catch(() => [] as InvertCareLog[]),
       ]);
       setFeedings(f); setMolts(m); setSubstrate(sub); setPhotos(p); setGrowth(g); setPairings(pr);
       setEvents(ev);
+      setCareLogs(care);
       setFeedingStats(fs);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't load this animal.");
@@ -233,6 +240,10 @@ function InvertDetailScreen() {
   const editMolt = (m: InvertMoltLog) => router.push(
     `/invert/add-molt?id=${id}&logId=${m.id}&molted_at=${encodeURIComponent(m.molted_at)}&notes=${encodeURIComponent(m.notes ?? '')}` as any,
   );
+  const editCareLog = (c: InvertCareLog) => router.push(
+    `/invert/add-care-log?id=${id}&logId=${c.id}&log_type=${c.log_type}&logged_at=${encodeURIComponent(c.logged_at)}&notes=${encodeURIComponent(c.notes ?? '')}` as any,
+  );
+
   const editSubstrate = (c: InvertSubstrateChange) => router.push(
     `/invert/add-substrate-change?id=${id}&logId=${c.id}&changed_at=${encodeURIComponent(c.changed_at)}&substrate_type=${encodeURIComponent(c.substrate_type ?? '')}&substrate_depth=${encodeURIComponent(c.substrate_depth ?? '')}&reason=${encodeURIComponent(c.reason ?? '')}&notes=${encodeURIComponent(c.notes ?? '')}` as any,
   );
@@ -549,6 +560,18 @@ function InvertDetailScreen() {
       trailingTone: 'muted',
       onEdit: () => editSubstrate(c),
       onDelete: () => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id)),
+    })),
+    ...careLogs.map((c): TimelineEntry => ({
+      id: `w-${c.id}`,
+      kind: 'care',
+      at: c.logged_at,
+      title: CARE_LOG_LABELS[c.log_type],
+      // No trailing badge. There's nothing to grade here — a watering isn't
+      // accepted or refused, and it isn't early or late, because this feature
+      // has no schedule to be late against.
+      subtitle: c.notes ?? undefined,
+      onEdit: () => editCareLog(c),
+      onDelete: () => confirmDeleteLog('water log', () => deleteInvertCareLog(c.id)),
     })),
   ].sort(timelineOrder);
 
@@ -967,7 +990,7 @@ function InvertDetailScreen() {
         onAction={() => router.push(`/invert/add-event?id=${id}` as any)}
       >
         <View style={styles.timelineChips}>
-          {(['all', 'feeding', 'molt', 'substrate', 'event'] as const).map((k) => {
+          {(['all', 'feeding', 'molt', 'substrate', 'care', 'event'] as const).map((k) => {
             const active = timelineFilter === k;
             const count = k === 'all' ? timeline.length : timeline.filter((e) => e.kind === k).length;
             if (k !== 'all' && count === 0) return null;
@@ -993,7 +1016,8 @@ function InvertDetailScreen() {
 
         {visibleTimeline.length === 0 ? (
           <Text style={[s.empty, { color: colors.textTertiary }]}>
-            Nothing logged yet. Use the bar at the bottom to record a feeding, molt or substrate change.
+            Nothing logged yet. Use the bar at the bottom to record a feeding, watering, molt or
+            substrate change.
           </Text>
         ) : (
           visibleTimeline.map((e) => (
@@ -1176,6 +1200,7 @@ function InvertDetailScreen() {
       >
         {([
           { icon: 'silverware-fork-knife', label: 'Feed', route: `/invert/add-feeding?id=${id}` },
+          { icon: 'cup-water', label: 'Water', route: `/invert/add-care-log?id=${id}` },
           { icon: 'arrow-expand-vertical', label: 'Molt', route: `/invert/add-molt?id=${id}` },
           { icon: 'layers-outline', label: 'Substrate', route: `/invert/add-substrate-change?id=${id}` },
           { icon: 'camera-outline', label: 'Photo', route: `/invert/add-photo?id=${id}` },
@@ -1188,7 +1213,11 @@ function InvertDetailScreen() {
             accessibilityLabel={`Log ${a.label.toLowerCase()}`}
           >
             <MaterialCommunityIcons name={a.icon as any} size={20} color={colors.accent} />
-            <Text style={styles.actionBarLabel}>{a.label}</Text>
+            {/* Five items now share this bar rather than four, so "Substrate"
+                has ~72dp on a narrow phone. Clamp to one line: ellipsis is
+                recoverable, a wrapped label that changes the bar's height
+                shifts every other tap target. */}
+            <Text style={styles.actionBarLabel} numberOfLines={1}>{a.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -1299,7 +1328,7 @@ function fmtRelative(iso: string): string {
 // logs into one History list, so events join the merge — the Event chip is
 // what stops three rows a year drowning in 38 feedings. Filtering, not
 // placement, is the answer on a merged screen.
-type TimelineKind = 'feeding' | 'molt' | 'substrate' | 'event';
+type TimelineKind = 'feeding' | 'molt' | 'substrate' | 'event' | 'care';
 interface TimelineEntry {
   id: string;
   kind: TimelineKind;
@@ -1419,11 +1448,14 @@ function CollapsibleRow({
   );
 }
 
+// Icon names verified against the installed MaterialCommunityIcons glyphmap —
+// an unknown name renders an empty box with no warning.
 const TIMELINE_META: Record<TimelineKind, { icon: string; label: string }> = {
   feeding: { icon: 'silverware-fork-knife', label: 'Feed' },
   molt: { icon: 'arrow-expand-vertical', label: 'Molt' },
   substrate: { icon: 'layers-outline', label: 'Sub' },
   event: { icon: 'alert-circle-outline', label: 'Event' },
+  care: { icon: 'cup-water', label: 'Water' },
 };
 function hasHusbandry(s: Invert): boolean {
   return Boolean(s.enclosure_type || s.enclosure_size || s.substrate_type || s.substrate_depth || s.target_temp_min || s.target_temp_max || s.target_humidity_min || s.target_humidity_max);

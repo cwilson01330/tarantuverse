@@ -105,6 +105,29 @@ interface SubstrateChange {
   created_at: string
 }
 
+/** Hydration events (car_20260909). `invert_id`, not `tarantula_id` — the
+ *  table is parented on `inverts`, and a tarantula's invert row shares its
+ *  primary key (ADR-005). */
+type CareLogType = 'water_dish' | 'overflow' | 'misted'
+interface CareLog {
+  id: string
+  invert_id: string
+  log_type: CareLogType
+  logged_at: string
+  notes?: string | null
+  created_at: string
+}
+const CARE_LOG_LABELS: Record<CareLogType, string> = {
+  water_dish: 'Water dish refreshed',
+  overflow: 'Dish overflowed',
+  misted: 'Misted',
+}
+const CARE_LOG_HINTS: Record<CareLogType, string> = {
+  water_dish: 'Topped up or replaced the water in the dish.',
+  overflow: 'Deliberately overfilled to damp the substrate — how moisture-dependent species get their humidity.',
+  misted: 'Misted the enclosure, substrate or webbing. Slings drink from the droplets.',
+}
+
 interface Photo {
   id: string
   tarantula_id: string
@@ -233,6 +256,7 @@ export default function TarantulaDetailPage() {
   const [feedings, setFeedings] = useState<FeedingLog[]>([])
   const [molts, setMolts] = useState<MoltLog[]>([])
   const [substrateChanges, setSubstrateChanges] = useState<SubstrateChange[]>([])
+  const [careLogs, setCareLogs] = useState<CareLog[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
   const [growthData, setGrowthData] = useState<GrowthAnalytics | null>(null)
   const [feedingStats, setFeedingStats] = useState<FeedingStats | null>(null)
@@ -278,6 +302,12 @@ export default function TarantulaDetailPage() {
     reason: '',
     notes: '',
   })
+  const [showCareForm, setShowCareForm] = useState(false)
+  const [careFormData, setCareFormData] = useState<{ log_type: CareLogType; logged_at: string; notes: string }>({
+    log_type: 'water_dish',
+    logged_at: new Date().toISOString().slice(0, 10),
+    notes: '',
+  })
   const [showShareModal, setShowShareModal] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showPauseModal, setShowPauseModal] = useState(false)
@@ -309,6 +339,7 @@ export default function TarantulaDetailPage() {
     fetchFeedings(token)
     fetchMolts(token)
     fetchSubstrateChanges(token)
+    fetchCareLogs(token)
     fetchPhotos(token)
     fetchGrowth(token)
     fetchFeedingStats(token)
@@ -654,6 +685,91 @@ export default function TarantulaDetailPage() {
       fetchSubstrateChanges(token)
     } catch (err: any) {
       setError(err.message || 'Failed to delete substrate change')
+    }
+  }
+
+  // --- Water logs (car_20260909) ------------------------------------------
+  //
+  // NOTE THE ENDPOINT: /inverts/{id}/care-logs, not /tarantulas/{id}/....
+  // That is not a mistake. Care logs are parented on `inverts` only, and a
+  // tarantula's row in `inverts` SHARES its primary key (ADR-005), so this
+  // page's `id` is already a valid invert id. There is no tarantula facade
+  // route to add, and there should not be one — the per-taxon facade sprawl
+  // on substrate_changes is what this deliberately avoids.
+
+  const fetchCareLogs = async (token: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/inverts/${id}/care-logs`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (response.ok) {
+        setCareLogs(await response.json())
+      }
+    } catch (err) {
+      console.error('Failed to fetch water logs:', err)
+    }
+  }
+
+  const handleAddCareLog = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      if (!token) return
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+      // The column is a timestamp; the keeper picks a date. Combine the chosen
+      // day with the current time of day rather than stamping a fabricated
+      // midnight, and never display a time for these entries.
+      const chosen = new Date(`${careFormData.logged_at}T00:00:00`)
+      const now = new Date()
+      chosen.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0)
+      const stamp = chosen > now ? now : chosen
+
+      const response = await fetch(`${API_URL}/api/v1/inverts/${id}/care-logs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          log_type: careFormData.log_type,
+          logged_at: stamp.toISOString(),
+          notes: careFormData.notes.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to add water log')
+      }
+
+      setCareFormData({
+        log_type: 'water_dish',
+        logged_at: new Date().toISOString().slice(0, 10),
+        notes: '',
+      })
+      setShowCareForm(false)
+      fetchCareLogs(token)
+      // No fetchTarantula() here, unlike substrate changes — nothing is
+      // denormalised onto the animal, because there is no "last watered".
+    } catch (err: any) {
+      setError(err.message || 'Failed to add water log')
+    }
+  }
+
+  const handleDeleteCareLog = async (logId: string) => {
+    try {
+      if (!token) return
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${API_URL}/api/v1/care-logs/${logId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (!response.ok) {
+        throw new Error('Failed to delete water log')
+      }
+      fetchCareLogs(token)
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete water log')
     }
   }
 
@@ -1979,6 +2095,123 @@ export default function TarantulaDetailPage() {
                             Delete
                           </button>
                         </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Water Logs Section (car_20260909).
+                Placed above substrate because watering happens far more often.
+                There is deliberately NO "last watered" or "days since" line
+                here: no evidence base exists for a hydration cadence, so a
+                derived deadline would be a fabricated number in a warning
+                colour. This section records; it does not judge. */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">💧 Water</h2>
+                <button
+                  onClick={() => setShowCareForm(!showCareForm)}
+                  className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition text-sm font-medium shadow-sm"
+                >
+                  {showCareForm ? 'Cancel' : '+ Log Water'}
+                </button>
+              </div>
+
+              {showCareForm && (
+                <form onSubmit={handleAddCareLog} className="mb-6 p-6 border-2 border-sky-100 dark:border-sky-900 rounded-xl bg-sky-50/50 dark:bg-sky-900/20">
+                  <div className="mb-4">
+                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">What did you do? *</label>
+                    <div className="space-y-2">
+                      {(Object.keys(CARE_LOG_LABELS) as CareLogType[]).map((k) => {
+                        const sel = careFormData.log_type === k
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            aria-pressed={sel}
+                            onClick={() => setCareFormData({ ...careFormData, log_type: k })}
+                            className={`w-full text-left px-4 py-3 rounded-lg border text-sm font-semibold transition ${
+                              sel
+                                ? 'border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
+                                : 'border-gray-300 dark:border-gray-600 bg-white/60 dark:bg-gray-700/60 text-gray-700 dark:text-gray-300'
+                            }`}
+                          >
+                            {CARE_LOG_LABELS[k]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    {/* Top-up vs overflow isn't obvious unless you already keep
+                        something that needs the difference. */}
+                    <p className="mt-2 text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                      {CARE_LOG_HINTS[careFormData.log_type]}
+                    </p>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Date *</label>
+                    <DateInput
+                      value={careFormData.logged_at}
+                      onChange={(value) => setCareFormData({ ...careFormData, logged_at: value })}
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Notes</label>
+                    <textarea
+                      value={careFormData.notes}
+                      onChange={(e) => setCareFormData({ ...careFormData, notes: e.target.value })}
+                      rows={2}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
+                    />
+                  </div>
+                  <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition font-medium">
+                    Save Water Log
+                  </button>
+                </form>
+              )}
+
+              <div className="space-y-3">
+                {careLogs.length === 0 ? (
+                  <div className="bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800 rounded-xl p-8 text-center">
+                    <div className="text-5xl mb-3">💧</div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">No watering logged</h3>
+                    <p className="text-gray-700 dark:text-gray-300 mb-4">Record refills, overflows and mistings alongside feedings.</p>
+                    <button
+                      onClick={() => setShowCareForm(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition font-medium"
+                    >
+                      + Log First Watering
+                    </button>
+                  </div>
+                ) : (
+                  careLogs.map((log) => (
+                    <div key={log.id} className="p-5 border border-gray-200 dark:border-gray-600 rounded-xl hover:shadow-md hover:border-sky-200 dark:hover:border-sky-700 transition-all duration-200 bg-white dark:bg-gray-700">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <span className="text-2xl">💧</span>
+                            <p className="font-bold text-gray-900 dark:text-white">
+                              {CARE_LOG_LABELS[log.log_type] ?? 'Watered'}
+                            </p>
+                          </div>
+                          {/* Date only. The stored timestamp carries a clock
+                              time the keeper never gave us, so showing it
+                              would present a guess as a record. */}
+                          <div className="pl-11 text-sm text-gray-700 dark:text-gray-300">
+                            {formatLocalDate(log.logged_at)}
+                          </div>
+                          {log.notes && (
+                            <div className="pl-11 mt-1 text-sm text-gray-700 dark:text-gray-300">{log.notes}</div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleDeleteCareLog(log.id)}
+                          className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium"
+                          aria-label={`Delete water log from ${formatLocalDate(log.logged_at)}`}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </div>
                   ))

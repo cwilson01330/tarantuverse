@@ -388,6 +388,44 @@ export interface InvertGrowthAnalytics {
 export interface InvertSubstrateChange { id: string; invert_id: string | null; changed_at: string; substrate_type: string | null; substrate_depth: string | null; reason: string | null; notes: string | null; }
 export interface InvertPhoto { id: string; url: string; thumbnail_url: string | null; caption: string | null; }
 
+/**
+ * Hydration events (car_20260909).
+ *
+ * Three types because they're three different acts: `overflow` deliberately
+ * floods the dish to damp the substrate for moisture-dependent species, and
+ * `misted` is what slings and mantids actually drink from — many never have a
+ * dish at all. Collapsing them into "watered" would make the log agree with
+ * itself and disagree with the animal.
+ *
+ * There is deliberately no "due" or "days since" anywhere in this feature. See
+ * the model docstring: we have no evidence base for a hydration cadence, and a
+ * derived deadline in a warning colour would be a fabricated number.
+ */
+export type CareLogType = 'water_dish' | 'overflow' | 'misted';
+
+export interface InvertCareLog {
+  id: string;
+  invert_id: string;
+  log_type: CareLogType;
+  logged_at: string;
+  notes: string | null;
+  created_at: string;
+}
+
+/** Keep in lockstep with CARE_LOG_TYPES in app/models/care_log.py. */
+export const CARE_LOG_LABELS: Record<CareLogType, string> = {
+  water_dish: 'Water dish refreshed',
+  overflow: 'Dish overflowed',
+  misted: 'Misted',
+};
+
+/** Shorter forms for chips and dense rows. */
+export const CARE_LOG_SHORT: Record<CareLogType, string> = {
+  water_dish: 'Water',
+  overflow: 'Overflow',
+  misted: 'Misted',
+};
+
 // ---------------------------------------------------------------------------
 // Animal CRUD
 // ---------------------------------------------------------------------------
@@ -602,6 +640,32 @@ export async function updateInvertSubstrateChange(changeId: string, payload: { c
 }
 export async function deleteInvertSubstrateChange(changeId: string): Promise<void> {
   await apiClient.delete(`/substrate-changes/${changeId}`);
+}
+
+// Care logs (car_20260909). No `_taxon` parameter, unlike the older log
+// helpers — those carry one for signature compatibility with the retired
+// per-taxon facade routes. Care logs only ever had the one invert-parented
+// endpoint, so there's nothing to be compatible with.
+export async function listInvertCareLogs(id: string): Promise<InvertCareLog[]> {
+  const { data } = await apiClient.get<InvertCareLog[]>(`/inverts/${id}/care-logs`);
+  return data;
+}
+export async function createInvertCareLog(
+  id: string,
+  payload: { log_type: CareLogType; logged_at: string; notes?: string | null },
+): Promise<InvertCareLog> {
+  const { data } = await apiClient.post<InvertCareLog>(`/inverts/${id}/care-logs`, payload);
+  return data;
+}
+export async function updateInvertCareLog(
+  logId: string,
+  payload: { log_type?: CareLogType; logged_at?: string; notes?: string | null },
+): Promise<InvertCareLog> {
+  const { data } = await apiClient.put<InvertCareLog>(`/care-logs/${logId}`, payload);
+  return data;
+}
+export async function deleteInvertCareLog(logId: string): Promise<void> {
+  await apiClient.delete(`/care-logs/${logId}`);
 }
 
 /** Promote an existing photo to the invert's hero/primary image. */

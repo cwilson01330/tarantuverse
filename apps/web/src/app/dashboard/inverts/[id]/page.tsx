@@ -102,6 +102,16 @@ interface Invert {
 interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
 interface MoltLog { id: string; molted_at: string; notes?: string | null }
 interface SubstrateChange { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
+/** Hydration events (car_20260909). Three types, because a top-up, a
+ *  deliberate overflow to damp the substrate, and a misting are three
+ *  different acts — see the care_log model docstring. */
+type CareLogType = 'water_dish' | 'overflow' | 'misted'
+interface CareLog { id: string; log_type: CareLogType; logged_at: string; notes?: string | null }
+const CARE_LOG_LABELS: Record<CareLogType, string> = {
+  water_dish: 'Water dish refreshed',
+  overflow: 'Dish overflowed',
+  misted: 'Misted',
+}
 interface Photo { id: string; url: string; thumbnail_url?: string | null; caption?: string | null }
 
 export default function InvertDetailPage() {
@@ -114,9 +124,10 @@ export default function InvertDetailPage() {
   const [feedings, setFeedings] = useState<FeedingLog[]>([])
   const [molts, setMolts] = useState<MoltLog[]>([])
   const [substrate, setSubstrate] = useState<SubstrateChange[]>([])
+  const [careLogs, setCareLogs] = useState<CareLog[]>([])
   const [photos, setPhotos] = useState<Photo[]>([])
-  const [logState, setLogState] = useState<Record<'feedings' | 'molts' | 'substrate' | 'photos', LoadState>>({
-    feedings: 'loading', molts: 'loading', substrate: 'loading', photos: 'loading',
+  const [logState, setLogState] = useState<Record<'feedings' | 'molts' | 'substrate' | 'photos' | 'care', LoadState>>({
+    feedings: 'loading', molts: 'loading', substrate: 'loading', photos: 'loading', care: 'loading',
   })
   const [growth, setGrowth] = useState<any | null>(null)
   // Breeding module (registry-gated, ADR-010 Phase D)
@@ -186,7 +197,7 @@ export default function InvertDetailPage() {
         }
       }
 
-      const [f, m, s, p, g] = await Promise.all([
+      const [f, m, s, p, g, c] = await Promise.all([
         load<any>('feedings'),
         load<any>('molts'),
         load<any>('substrate-changes'),
@@ -195,16 +206,21 @@ export default function InvertDetailPage() {
         taxonHasModule(data.taxon, 'growth')
           ? fetch(`${API_URL}/api/v1/inverts/${id}/growth`, { headers }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
           : Promise.resolve(null),
+        // Not registry-gated: every taxon here needs water in some form, and
+        // the ones that never use a dish get misted instead.
+        load<any>('care-logs'),
       ])
       setFeedings(f.data)
       setMolts(m.data)
       setSubstrate(s.data)
       setPhotos(p.data)
+      setCareLogs(c.data)
       setLogState({
         feedings: f.state,
         molts: m.state,
         substrate: s.state,
         photos: p.state,
+        care: c.state,
       })
       setGrowth(g)
 
@@ -653,6 +669,27 @@ export default function InvertDetailPage() {
                 )}
               </Section>
             )}
+
+            {/* Water. Sits above substrate because it happens far more often —
+                the list order follows frequency, not schema order. There is
+                deliberately no "last watered" or "due" line anywhere on this
+                page: no evidence base for a hydration cadence exists, so a
+                derived deadline would be a fabricated number. */}
+            <LogSection
+              title="Water"
+              cta="Log water"
+              onCta={() => router.push(`/dashboard/inverts/${id}/add-care-log`)}
+              empty="No watering logged yet."
+              state={logState.care}
+              onRetry={fetchAll}
+              rows={careLogs.slice(0, 8).map((x) => ({
+                key: x.id,
+                left: CARE_LOG_LABELS[x.log_type] ?? 'Watered',
+                right: formatLocalDate(x.logged_at),
+                onEdit: () => router.push(`/dashboard/inverts/${id}/add-care-log?${qp({ logId: x.id, log_type: x.log_type, logged_at: x.logged_at, notes: x.notes })}`),
+                onDelete: () => deleteLog(`care-logs/${x.id}`, 'water log'),
+              }))}
+            />
 
             <LogSection
               title="Substrate changes"
