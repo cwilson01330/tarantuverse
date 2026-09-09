@@ -130,7 +130,7 @@ export default function InvertDetailPage() {
     feedings: 'loading', molts: 'loading', substrate: 'loading', photos: 'loading', care: 'loading',
   })
   const [growth, setGrowth] = useState<any | null>(null)
-  // Breeding module (registry-gated, ADR-010 Phase D)
+  // Breeding module (registry-gated, ADR-021 Phase D)
   const [pairings, setPairings] = useState<any[]>([])
   const [mates, setMates] = useState<Invert[]>([])
   const [pairOpen, setPairOpen] = useState(false)
@@ -224,7 +224,7 @@ export default function InvertDetailPage() {
       })
       setGrowth(g)
 
-      // Breeding module (registry-gated — ADR-010 Phase D). Fetch this
+      // Breeding module (registry-gated — ADR-021 Phase D). Fetch this
       // animal's pairings + the same-taxon collection for the mate picker.
       if (taxonHasModule(data.taxon, 'breeding')) {
         const [pr, coll] = await Promise.all([
@@ -647,7 +647,7 @@ export default function InvertDetailPage() {
               <GrowthChart data={growth} lengthLabel={growthLengthLabel(invert.taxon)} />
             )}
 
-            {/* Breeding module (registry-gated — ADR-010 Phase D) */}
+            {/* Breeding module (registry-gated — ADR-021 Phase D) */}
             {invert && taxonHasModule(invert.taxon, 'breeding') && (
               <Section title="Breeding" action={{ label: '+ New pairing', onClick: () => setPairOpen(true) }}>
                 {pairings.length === 0 ? (

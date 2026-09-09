@@ -1,6 +1,6 @@
 # ADR-002: Herpetoverse Data Architecture — Parallel Taxon Tables
 
-**Status:** Proposed
+**Status:** Superseded by [ADR-003](ADR-003-animals-consolidation.md) (2026-05-14)
 **Date:** 2026-04-20
 **Deciders:** Cory (solo — documented for future collaborators)
 **Related docs:** `PRD-herpetoverse-v1.md`, `REVIEW-PRD-herpetoverse-v1.md`, `ADR-001-theme-preset-system.md`

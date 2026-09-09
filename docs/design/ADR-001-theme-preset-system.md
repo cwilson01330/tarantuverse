@@ -1,6 +1,6 @@
 # ADR-001: Multi-Axis Theme Preset System
 
-**Status:** Proposed
+**Status:** Implemented (2026-04-14)
 **Date:** 2026-04-13
 **Deciders:** Cory (solo — but documented for future collaborators)
 **Related audit:** `PLATFORM_DESIGN_AUDIT_2026-04-13.md`

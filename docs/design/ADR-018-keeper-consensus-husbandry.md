@@ -1,6 +1,6 @@
 # ADR-018: Keeper-consensus husbandry signals
 
-- Status: Proposed
+- Status: Implemented (2026-09-04)
 - Date: 2026-09-04
 - Surfaces: Tarantuverse API, web, mobile
 - Decision owner: Product

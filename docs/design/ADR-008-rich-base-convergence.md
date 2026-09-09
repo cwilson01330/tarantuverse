@@ -1,6 +1,6 @@
 # ADR-008 — Converge on the rich (tarantula) base, not the lean one
 
-**Status:** Accepted (2026-06-09)
+**Status:** Implemented (2026-06-09)
 **Supersedes:** ADR-007 step 4 ("converge tarantula onto the shared base" — direction only)
 **Builds on:** ADR-005 (inverts consolidation), ADR-006 (taxa expansion), ADR-007 (generic invert UI + tokens)
 **Related:** `project_styling_convergence_plan`, `feedback_web_mobile_parity`

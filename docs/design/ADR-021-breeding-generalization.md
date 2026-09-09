@@ -1,6 +1,12 @@
-# ADR-010 — Breeding Generalization (Tarantula → Inverts)
+# ADR-021 — Breeding Generalization (Tarantula → Inverts)
 
-**Status:** Proposed — 2026-06-12
+**Status:** Accepted — 2026-06-12. Generic invert pairings are live
+(`/inverts/{id}/pairings`) and Phase D is piloted on scorpion across web and
+mobile; remaining taxa stay gated by the module registry
+(`src/lib/taxon-modules.ts`).
+**Renumbered** from ADR-010 on 2026-09-09. Colony mode kept that number as the
+more widely cited of the two. Code comments reading "ADR-010 Phase D" refer to
+this document and were updated with the rename.
 **Goal:** Rework tarantula breeding so the same engine serves every invert taxon
 (scorpions, mantises, roaches, true spiders…), unlocking breeding panels for other
 inverts with config, not a third silo. Revenue framing: breeding is the premium

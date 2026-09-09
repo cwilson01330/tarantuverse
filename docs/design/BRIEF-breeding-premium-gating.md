@@ -37,7 +37,7 @@ All work items below were implemented, with three deltas from the original plan:
 
 **Note on the duplicate mobile breeding surface:** mobile has TWO breeding entry points —
 the established `app/breeding/*` hub (tarantula-era) and the newer invert-detail breeding
-panel + `app/invert/add-pairing.tsx` (ADR-010 Phase D, scorpion). Both were gated/hardened
+panel + `app/invert/add-pairing.tsx` (ADR-021 Phase D, scorpion). Both were gated/hardened
 this pass. Physically merging them remains a future cleanup, not done here.
 
 Shared mobile helper added: `src/utils/errors.ts` (`getErrorMessage`, `isPaymentRequired`)

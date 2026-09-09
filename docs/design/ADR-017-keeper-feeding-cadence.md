@@ -1,6 +1,6 @@
 # ADR-017 — Keeper-set feeding cadence
 
-**Status:** Proposed — 2026-08-09
+**Status:** Implemented (2026-08-09) — `feeding_interval_days` on `inverts` and `animals`, migration `fcd_20260809_keeper_feeding_cadence`
 **Applies to:** Tarantuverse and Herpetoverse, API + both clients
 **Related:** ADR-014 (evidence-first), SPEC-species-aware-premolt, `feeding_paused_*` (pst_20260502)
 

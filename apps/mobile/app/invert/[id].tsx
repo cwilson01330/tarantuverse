@@ -136,7 +136,7 @@ function InvertDetailScreen() {
         taxonHasModule(i.taxon, 'growth')
           ? getInvertGrowth(id).catch(() => null)
           : Promise.resolve(null),
-        // Breeding module is registry-gated (ADR-010 Phase D)
+        // Breeding module is registry-gated (ADR-021 Phase D)
         taxonHasModule(i.taxon, 'breeding')
           ? listInvertPairings(id).catch(() => [] as InvertPairing[])
           : Promise.resolve([] as InvertPairing[]),
@@ -1113,7 +1113,7 @@ function InvertDetailScreen() {
         </CollapsibleRow>
       )}
 
-      {/* Breeding module (registry-gated — ADR-010 Phase D) */}
+      {/* Breeding module (registry-gated — ADR-021 Phase D) */}
       {taxonHasModule(invert.taxon, 'breeding') && (
         <Section title="Breeding" actionLabel="New pairing" onAction={() => router.push(`/invert/add-pairing?id=${id}` as any)}>
           {pairings.length === 0 ? (

@@ -1,6 +1,6 @@
 # ADR-019: One community across Tarantuverse and Herpetoverse
 
-- Status: Proposed
+- Status: Accepted — Phase 0 shipped 2026-09-04, Phase 1 not started
 - Date: 2026-09-04
 - Surfaces: Tarantuverse API, Herpetoverse mobile + web
 - Decision owner: Product

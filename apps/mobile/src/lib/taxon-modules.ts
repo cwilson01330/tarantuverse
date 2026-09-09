@@ -32,7 +32,7 @@ export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding';
 
 export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   tarantula: ['premolt', 'feedingStats', 'growth', 'breeding'],
-  scorpion: ['feedingStats', 'growth', 'breeding'], // breeding pilot — ADR-010 Phase D (web + mobile)
+  scorpion: ['feedingStats', 'growth', 'breeding'], // breeding pilot — ADR-021 Phase D (web + mobile)
   centipede: ['feedingStats', 'growth'],
   whip_spider: ['feedingStats'],
   vinegaroon: ['feedingStats'],

@@ -563,7 +563,7 @@ export async function getInvertGrowth(id: string): Promise<InvertGrowthAnalytics
   return data;
 }
 
-/** Breeding (ADR-010 Phase D) — taxon-agnostic pairings on the inverts surface. */
+/** Breeding (ADR-021 Phase D) — taxon-agnostic pairings on the inverts surface. */
 export interface InvertPairing {
   id: string;
   male_invert_id: string | null;

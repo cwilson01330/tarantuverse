@@ -1,6 +1,6 @@
 # ADR-003 — Single `animals` table with a taxon discriminator
 
-**Status:** Accepted (2026-05-14)
+**Status:** Implemented (2026-05-14) — fully cut over
 **Supersedes:** ADR-002 §D1 ("separate but consistent" per-taxon tables)
 
 ## Context

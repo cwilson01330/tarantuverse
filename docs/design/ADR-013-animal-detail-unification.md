@@ -1,6 +1,6 @@
 # ADR-013 — One animal detail screen for every taxon
 
-**Status:** Accepted, implemented 2026-07-28
+**Status:** Implemented (2026-07-28)
 **Supersedes:** the deferral recorded in ADR-008 ("merge the tarantula + invert detail screens — deferred, own project")
 
 ## Context

@@ -1,5 +1,5 @@
 /**
- * Generic invert: new pairing — ADR-010 Phase D (breeding module).
+ * Generic invert: new pairing — ADR-021 Phase D (breeding module).
  *
  * Pairs the current invert with another of the same taxon. Male/female is
  * inferred from the current animal's sex (default self→male unless it's

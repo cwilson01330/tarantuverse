@@ -1,6 +1,9 @@
-# ADR-009 — Herpetoverse Temperature/Humidity Sensor Integration
+# ADR-020 — Herpetoverse Temperature/Humidity Sensor Integration
 
-**Status:** Proposed (planning) — 2026-06-12
+**Status:** Proposed — parked 2026-06-12, manual entry first when revisited
+**Renumbered** from ADR-009 on 2026-09-09. Two documents shared that number;
+the notification rework kept it because ~10 code sites cite "ADR-009", and this
+one had no inbound references at all.
 **Supersedes the parked note** `project_sensor_tracking_idea` (2026-06-01, "manual entry first")
 **and the loose CLAUDE.md scoping** (2026-06-04, "SwitchBot Tier 1 + webhook Tier 2").
 **Scope:** Herpetoverse first (reptile/amphibian husbandry is the strongest fit).

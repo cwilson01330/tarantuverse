@@ -1,6 +1,6 @@
 # ADR-005: Inverts consolidation (TV `tarantulas` + `scorpions` → `inverts`)
 
-**Status:** Proposed
+**Status:** Accepted — Phases A and B shipped; C1 read cutover and D table drop still gated
 **Date:** 2026-05-27
 **Owner:** Cory
 **Supersedes:** N/A (companion to scorpion expansion plan)

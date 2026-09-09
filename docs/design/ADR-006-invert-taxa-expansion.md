@@ -1,6 +1,6 @@
 # ADR-006 — Invert taxa expansion + feeding modes
 
-**Status:** Accepted (2026-06-05)
+**Status:** Implemented (2026-06-05)
 **Builds on:** ADR-002 (taxon discriminator), ADR-005 (inverts consolidation)
 **Trigger:** Keeper feature request (Jason Pham) — a catch-all so people can
 add whip spiders, vinegaroons, velvet worms, true spiders, millipedes,

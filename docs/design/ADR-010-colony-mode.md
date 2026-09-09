@@ -1,6 +1,6 @@
 # ADR-010: Colony Mode — population-level tracking for communal/colony keepers
 
-**Status:** BUILT (Phases 1 + 2) — 2026-07-02. Backend + web + mobile shipped; ships OTA (no native deps, no store build). Phase 3 polish (export inclusion, Feeding Day/digest inclusion, migrating dormant communal-enclosure data) deferred. Closes the second competitive parity gap from COMPETITIVE-BRIEF-2026-07 (colony mode + inbound import; both now shipped).
+**Status:** Implemented (Phases 1 + 2) — 2026-07-02. Backend + web + mobile shipped; ships OTA (no native deps, no store build). Phase 3 polish (export inclusion, Feeding Day/digest inclusion, migrating dormant communal-enclosure data) deferred. Closes the second competitive parity gap from COMPETITIVE-BRIEF-2026-07 (colony mode + inbound import; both now shipped).
 
 **What shipped:** `colonies` + `colony_events` tables (migration `col_20260702_colonies`, down_revision `ntf2_20260701_digest`), `/api/v1/colonies` CRUD + events router (events with a `count_delta` adjust `stage_counts` buckets), colonies count 1 each toward the free cap (`utils/limits.py`), web colony pages under `dashboard/colonies/*` + merged into the collection list, mobile `app/colony/*` screens + merged into the Collection tab + AddPickerSheet. Taxon vocab reuses the shared invert registry (tarantula excluded from the colony picker).
 

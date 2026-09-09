@@ -1,6 +1,6 @@
 # ADR-007 — Generic invert UI + design convergence
 
-**Status:** Accepted (2026-06-05)
+**Status:** Implemented (2026-06-05)
 **Builds on:** ADR-005 (inverts consolidation), ADR-006 (invert taxa expansion)
 **Related:** `project_styling_convergence_plan`, `feedback_web_mobile_parity`
 
