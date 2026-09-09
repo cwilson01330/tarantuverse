@@ -628,31 +628,34 @@ function CollectionScreen() {
     }
   };
 
-  // "Mark fed today" — posts an accepted feeding dated now. food_type
-  // is left null on purpose: this is the one-tap path, and the detail
-  // screen renders a null type as "Unknown food" the keeper can edit
-  // later. Endpoint has no trailing slash (named sub-resource).
-  const handleMarkFed = async () => {
+  // Long-press sheet: "Mark fed today" / "Mark refused today". Posts a feeding
+  // dated now with the given outcome. food_type is left null on purpose — this
+  // is the one-tap path, and the detail screen renders a null type as "Unknown
+  // food" the keeper can edit later. Endpoint has no trailing slash (named
+  // sub-resource).
+  const markOutcome = async (accepted: boolean) => {
     if (!actionTarget) return;
     const target = actionTarget;
     setActionBusy(true);
     try {
       await apiClient.post(`/tarantulas/${target.id}/feedings`, {
         fed_at: new Date().toISOString(),
-        accepted: true,
+        accepted,
       });
       await refreshFeedingStatus(target.id);
       setActionTarget(null);
       if (Platform.OS === 'android') {
         ToastAndroid.show(
-          `Logged a feeding for ${getDisplayName(target)}`,
+          accepted
+            ? `Logged a feeding for ${getDisplayName(target)}`
+            : `Logged a refusal for ${getDisplayName(target)}`,
           ToastAndroid.SHORT,
         );
       }
     } catch (error) {
       Alert.alert(
-        'Could not log feeding',
-        `Something went wrong logging a feeding for ${getDisplayName(
+        accepted ? 'Could not log feeding' : 'Could not log refusal',
+        `Something went wrong logging for ${getDisplayName(
           target,
         )}. Please try again.`,
       );
@@ -660,6 +663,9 @@ function CollectionScreen() {
       setActionBusy(false);
     }
   };
+
+  const handleMarkFed = () => markOutcome(true);
+  const handleMarkRefused = () => markOutcome(false);
 
   /** One-tap feed straight from a collection card, for any taxon.
    *
@@ -674,7 +680,22 @@ function CollectionScreen() {
    */
   const [quickFeedingIds, setQuickFeedingIds] = useState<Set<string>>(new Set());
 
-  const handleQuickFeed = async (id: string, taxon: string, displayName: string) => {
+  /**
+   * One write for both outcomes. `accepted` used to be hardcoded true here and
+   * in handleMarkFed, which meant the two cheapest paths in the app could only
+   * ever record the outcome the premolt model doesn't read.
+   *
+   * A refusal is not a failed feeding — it's an observation, and for most of
+   * the collection it's the ONLY observation premolt has. 91% of live
+   * tarantulas have no molt history, so the refusal-streak branch is the only
+   * one that can fire for them.
+   */
+  const logQuickFeeding = async (
+    id: string,
+    taxon: string,
+    displayName: string,
+    accepted: boolean,
+  ) => {
     if (quickFeedingIds.has(id)) return;
     setQuickFeedingIds((prev) => new Set(prev).add(id));
     try {
@@ -682,16 +703,21 @@ function CollectionScreen() {
         taxon === 'tarantula' ? `/tarantulas/${id}/feedings` : `/inverts/${id}/feedings`;
       await apiClient.post(path, {
         fed_at: new Date().toISOString(),
-        accepted: true,
+        accepted,
       });
       await refreshFeedingStatus(id);
       if (Platform.OS === 'android') {
-        ToastAndroid.show(`Logged a feeding for ${displayName}`, ToastAndroid.SHORT);
+        ToastAndroid.show(
+          accepted
+            ? `Logged a feeding for ${displayName}`
+            : `Logged a refusal for ${displayName}`,
+          ToastAndroid.SHORT,
+        );
       }
     } catch (error) {
       Alert.alert(
-        'Could not log feeding',
-        `Something went wrong logging a feeding for ${displayName}. Please try again.`,
+        accepted ? 'Could not log feeding' : 'Could not log refusal',
+        `Something went wrong logging for ${displayName}. Please try again.`,
       );
     } finally {
       setQuickFeedingIds((prev) => {
@@ -701,6 +727,12 @@ function CollectionScreen() {
       });
     }
   };
+
+  const handleQuickFeed = (id: string, taxon: string, displayName: string) =>
+    logQuickFeeding(id, taxon, displayName, true);
+
+  const handleQuickRefuse = (id: string, taxon: string, displayName: string) =>
+    logQuickFeeding(id, taxon, displayName, false);
 
   /** Group feeding from the collection card opens the form instead of writing.
    *
@@ -757,6 +789,11 @@ function CollectionScreen() {
             ? () => handleQuickFeed(item.id, 'tarantula', getDisplayName(item))
             : undefined
         }
+        onQuickRefuse={
+          showFedButton
+            ? () => handleQuickRefuse(item.id, 'tarantula', getDisplayName(item))
+            : undefined
+        }
         quickFeedBusy={quickFeedingIds.has(item.id)}
         colors={colors}
       />
@@ -805,6 +842,16 @@ function CollectionScreen() {
           status && showFedButton
             ? () =>
                 handleQuickFeed(
+                  item.id,
+                  taxon,
+                  item.name || item.common_name || item.scientific_name || 'this animal',
+                )
+            : undefined
+        }
+        onQuickRefuse={
+          status && showFedButton
+            ? () =>
+                handleQuickRefuse(
                   item.id,
                   taxon,
                   item.name || item.common_name || item.scientific_name || 'this animal',
@@ -2126,6 +2173,7 @@ function CollectionScreen() {
           if (!actionBusy) setActionTarget(null);
         }}
         onMarkFed={handleMarkFed}
+        onMarkRefused={handleMarkRefused}
         onLogMolt={handleLogMolt}
         onEdit={handleEditFromSheet}
       />

@@ -263,7 +263,11 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
         "confidence": confidence,
         "days_since_last_molt": days_since_last_molt,
         "average_molt_interval": round(average_molt_interval, 1) if average_molt_interval else None,
-        "molt_interval_progress": round(molt_interval_progress, 1) if molt_interval_progress else None,
+        # `is not None`, not truthiness — an animal that moulted today has
+        # progress 0.0, which is a fact, not a missing value. The truthy test
+        # reported it as unknown. Matches the estimated_molt_window_days line
+        # below, which always got this right.
+        "molt_interval_progress": round(molt_interval_progress, 1) if molt_interval_progress is not None else None,
         "recent_refusal_streak": recent_refusal_streak,
         "refusal_rate_last_30_days": round(refusal_rate_last_30_days, 1) if refusal_rate_last_30_days is not None else None,
         "estimated_molt_window_days": round(estimated_molt_window_days, 1) if estimated_molt_window_days is not None else None,

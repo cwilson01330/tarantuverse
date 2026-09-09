@@ -70,7 +70,19 @@ export interface AnimalCardProps {
    *  The capability never went away — it moved behind a long press, which is
    *  invisible. Feeding Day remains the batch flow; this is the one-off. */
   onQuickFeed?: () => void;
-  /** Disables the feed button while a log is in flight. */
+  /** Logs a REFUSED feeding for this animal, today.
+   *
+   *  Exists because the app was structurally collecting the wrong signal.
+   *  Both one-tap paths hardcoded `accepted: true`, while logging a refusal
+   *  meant opening the animal, opening the feeding form, toggling a switch
+   *  and saving. Acceptances were free; refusals cost four steps.
+   *
+   *  Refusals are the ENTIRE behavioural input to premolt prediction — 91% of
+   *  live tarantulas have no molt history, so the refusal-streak branch is the
+   *  only one that can fire for them. Making the cheap tap the one the model
+   *  can't use was the single biggest constraint on prediction quality. */
+  onQuickRefuse?: () => void;
+  /** Disables both quick buttons while a log is in flight. */
   quickFeedBusy?: boolean;
   colors: any;
   /** Extra style for the root. The default is `flex: 1, margin: 8`, which is
@@ -122,6 +134,7 @@ export function AnimalCard({
   onPress,
   onLongPress,
   onQuickFeed,
+  onQuickRefuse,
   quickFeedBusy,
   colors,
   style,
@@ -256,34 +269,71 @@ export function AnimalCard({
           </View>
         )}
 
-        {/* Visible one-tap feed. Nested Touchable inside the card's own
+        {/* Visible one-tap logging. Nested Touchables inside the card's own
             Touchable: taps here must NOT also open the detail screen, which RN
-            handles because the inner responder wins. */}
-        {!!onQuickFeed && (
-          <TouchableOpacity
-            style={[
-              styles.feedButton,
-              { borderColor: colors.border },
-              quickFeedBusy && { opacity: 0.5 },
-            ]}
-            onPress={onQuickFeed}
-            disabled={quickFeedBusy}
-            accessibilityRole="button"
-            accessibilityLabel={`Log a feeding for ${displayName}`}
-            accessibilityState={{ disabled: !!quickFeedBusy }}
-            // Small control on a dense grid — widen the touch target beyond the
-            // visual bounds rather than making the button itself taller.
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <MaterialCommunityIcons
-              name="silverware-fork-knife"
-              size={13}
-              color={colors.textSecondary}
-            />
-            <Text style={styles.feedButtonText} numberOfLines={1}>
-              {quickFeedBusy ? 'Saving…' : 'Fed'}
-            </Text>
-          </TouchableOpacity>
+            handles because the inner responder wins.
+
+            ASYMMETRIC HIT SLOP, DELIBERATELY. The two buttons sit side by side
+            on a dense grid, so their touch targets must not overlap — the
+            facing edges get 2px, the outer edges keep 8. A mis-tap is not
+            equally bad in both directions: a stray "Fed" is a wrong row in a
+            log, while a stray "Refused" feeds the premolt model a symptom that
+            never happened and can push an animal to "likely in premolt" on
+            fabricated evidence. Refused is the one that must be hard to hit
+            by accident. */}
+        {(!!onQuickFeed || !!onQuickRefuse) && (
+          <View style={styles.quickRow}>
+            {!!onQuickFeed && (
+              <TouchableOpacity
+                style={[
+                  styles.feedButton,
+                  { borderColor: colors.border },
+                  quickFeedBusy && { opacity: 0.5 },
+                ]}
+                onPress={onQuickFeed}
+                disabled={quickFeedBusy}
+                accessibilityRole="button"
+                accessibilityLabel={`Log an accepted feeding for ${displayName}`}
+                accessibilityState={{ disabled: !!quickFeedBusy }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 2 }}
+              >
+                <MaterialCommunityIcons
+                  name="silverware-fork-knife"
+                  size={13}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.feedButtonText} numberOfLines={1}>
+                  {quickFeedBusy ? 'Saving…' : 'Fed'}
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {!!onQuickRefuse && (
+              <TouchableOpacity
+                style={[
+                  styles.feedButton,
+                  { borderColor: colors.border },
+                  quickFeedBusy && { opacity: 0.5 },
+                ]}
+                onPress={onQuickRefuse}
+                disabled={quickFeedBusy}
+                accessibilityRole="button"
+                accessibilityLabel={`Log a refused feeding for ${displayName}`}
+                accessibilityHint="Refusals are what the premolt prediction reads."
+                accessibilityState={{ disabled: !!quickFeedBusy }}
+                hitSlop={{ top: 8, bottom: 8, left: 2, right: 8 }}
+              >
+                <MaterialCommunityIcons
+                  name="food-off-outline"
+                  size={13}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.feedButtonText} numberOfLines={1}>
+                  {quickFeedBusy ? 'Saving…' : 'Refused'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
       </View>
     </TouchableOpacity>
@@ -362,7 +412,13 @@ const makeStyles = (colors: any) =>
       backgroundColor: 'rgba(10,10,15,0.7)',
     },
     countChipText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+    // Both quick buttons share a row and split it evenly (`flex: 1` below).
+    // "Refused" is the longer word and sets the width; equal columns keep the
+    // pair from looking like a primary and a secondary action, because they
+    // aren't — one is not more correct than the other.
+    quickRow: { flexDirection: 'row', gap: 6 },
     feedButton: {
+      flex: 1,
       marginTop: 8,
       flexDirection: 'row',
       alignItems: 'center',

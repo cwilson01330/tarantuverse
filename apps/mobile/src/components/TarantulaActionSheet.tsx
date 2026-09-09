@@ -36,12 +36,16 @@ interface TarantulaActionSheetProps {
   busy?: boolean;
   onClose: () => void;
   onMarkFed: () => void;
+  /** Logs a refused feeding. Sits here as well as on the card because this
+   *  path has no mis-tap risk — you have to long-press and then choose — and a
+   *  stray refusal is the one that corrupts premolt prediction. */
+  onMarkRefused: () => void;
   onLogMolt: () => void;
   onEdit: () => void;
 }
 
 type Row = {
-  key: 'fed' | 'molt' | 'edit';
+  key: 'fed' | 'refused' | 'molt' | 'edit';
   label: string;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   onPress: () => void;
@@ -52,6 +56,7 @@ export function TarantulaActionSheet({
   busy = false,
   onClose,
   onMarkFed,
+  onMarkRefused,
   onLogMolt,
   onEdit,
 }: TarantulaActionSheetProps) {
@@ -64,6 +69,15 @@ export function TarantulaActionSheet({
       label: 'Mark fed today',
       icon: 'silverware-fork-knife',
       onPress: onMarkFed,
+    },
+    {
+      // Adjacent to "Mark fed" because the two are one decision at the tongs,
+      // not a main action and an exception. A keeper who offered food and got
+      // nothing has made an observation worth as much as a feeding.
+      key: 'refused',
+      label: 'Mark refused today',
+      icon: 'food-off-outline',
+      onPress: onMarkRefused,
     },
     { key: 'molt', label: 'Log a molt', icon: 'butterfly', onPress: onLogMolt },
     {
