@@ -27,6 +27,12 @@ import {
   createColonySubstrateChange,
   deleteColonySubstrateChange,
   colonySubstrateReasons,
+  listColonyCareLogs,
+  createColonyCareLog,
+  deleteColonyCareLog,
+  CARE_LOG_LABELS,
+  type ColonyCareLog,
+  type CareLogType,
   createColonyMolt,
   deleteColonyMolt,
   createColonyFeeding,
@@ -102,6 +108,15 @@ export default function ColonyDetailPage() {
   const [subNote, setSubNote] = useState('')
   const [subBusy, setSubBusy] = useState(false)
   const [subError, setSubError] = useState('')
+  // Hydration (cwc_20260910). Defaults to water_dish as the commonest act,
+  // but for a detritivore culture misted/overflow are the load-bearing ones.
+  const [careLogs, setCareLogs] = useState<ColonyCareLog[]>([])
+  const [careOpen, setCareOpen] = useState(false)
+  const [careType, setCareType] = useState<CareLogType>('water_dish')
+  const [careDate, setCareDate] = useState(todayIso())
+  const [careNote, setCareNote] = useState('')
+  const [careBusy, setCareBusy] = useState(false)
+  const [careError, setCareError] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -135,7 +150,7 @@ export default function ColonyDetailPage() {
   const fetchAll = useCallback(async () => {
     if (!token || !colonyId) return
     try {
-      const [c, evs, feeds, mlts, subs] = await Promise.all([
+      const [c, evs, feeds, mlts, subs, care] = await Promise.all([
         getColony(token, colonyId),
         listColonyEvents(token, colonyId).catch(() => [] as ColonyEventResponse[]),
         // Non-fatal: a colony with no feedings is the normal state and must
@@ -145,12 +160,14 @@ export default function ColonyDetailPage() {
         listColonySubstrateChanges(token, colonyId).catch(
           () => [] as ColonySubstrateChange[],
         ),
+        listColonyCareLogs(token, colonyId).catch(() => [] as ColonyCareLog[]),
       ])
       setColony(c)
       setEvents(evs)
       setFeedings(feeds)
       setMolts(mlts)
       setSubstrates(subs)
+      setCareLogs(care)
       setLoadError('')
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -204,6 +221,42 @@ export default function ColonyDetailPage() {
       await fetchAll()
     } catch (e) {
       setSubError(e instanceof Error ? e.message : 'Failed to delete')
+    }
+  }
+
+  const submitCareLog = async () => {
+    if (!token || !colonyId) return
+    setCareBusy(true)
+    setCareError('')
+    try {
+      // Column is a timestamp, the keeper picks a day. Combine the chosen day
+      // with the current time of day rather than stamping a fabricated
+      // midnight, and never display the time.
+      const chosen = new Date(`${careDate}T00:00:00`)
+      const now = new Date()
+      chosen.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0)
+      await createColonyCareLog(token, colonyId, {
+        log_type: careType,
+        logged_at: (chosen > now ? now : chosen).toISOString(),
+        notes: careNote.trim() || null,
+      })
+      setCareOpen(false)
+      setCareNote('')
+      await fetchAll()
+    } catch (e) {
+      setCareError(e instanceof Error ? e.message : 'Failed to log water')
+    } finally {
+      setCareBusy(false)
+    }
+  }
+
+  const removeCareLog = async (id: string) => {
+    if (!token) return
+    try {
+      await deleteColonyCareLog(token, id)
+      await fetchAll()
+    } catch (e) {
+      setCareError(e instanceof Error ? e.message : 'Failed to delete')
     }
   }
 
@@ -802,6 +855,132 @@ export default function ColonyDetailPage() {
               </ul>
             )}
           </div>
+        </section>
+
+        {/* Water (cwc_20260910).
+            ABOVE substrate deliberately. For a detritivore culture — isopods,
+            springtails — hydration IS the husbandry: they're misted or
+            overflowed constantly and fed almost incidentally, so this is closer
+            to what a feeding log is for a tarantula than to a maintenance note.
+            No due date and no overdue state anywhere; there is no evidence base
+            for a watering cadence and a derived deadline would be invented. */}
+        <section aria-labelledby="water-heading" className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2
+              id="water-heading"
+              className="text-sm font-semibold text-theme-tertiary uppercase tracking-wide"
+            >
+              Water
+            </h2>
+            <button
+              type="button"
+              onClick={() => setCareOpen((o) => !o)}
+              aria-expanded={careOpen}
+              className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              {careOpen ? 'Cancel' : '+ Log water'}
+            </button>
+          </div>
+
+          {careError && (
+            <div
+              role="alert"
+              className="mb-3 p-2 text-sm rounded-lg border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+            >
+              {careError}
+            </div>
+          )}
+
+          {careOpen && (
+            <div className="p-4 mb-3 rounded-2xl border border-theme bg-surface space-y-3">
+              <div>
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  What did you do?
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(CARE_LOG_LABELS) as CareLogType[]).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={careType === k}
+                      onClick={() => setCareType(k)}
+                      className={`px-3 py-2 rounded-full text-sm font-semibold ${
+                        careType === k
+                          ? 'bg-gradient-brand text-white'
+                          : 'bg-surface border border-theme text-theme-secondary'
+                      }`}
+                    >
+                      {CARE_LOG_LABELS[k]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <label className="block">
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  Date
+                </span>
+                <input
+                  type="date"
+                  value={careDate}
+                  max={todayIso()}
+                  onChange={(e) => setCareDate(e.target.value)}
+                  className={inputCls}
+                />
+              </label>
+              <label className="block">
+                <span className="block text-sm font-medium text-theme-secondary mb-1">
+                  Notes
+                </span>
+                <textarea
+                  value={careNote}
+                  onChange={(e) => setCareNote(e.target.value)}
+                  rows={2}
+                  className={inputCls}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={submitCareLog}
+                disabled={careBusy}
+                className="px-4 py-2 rounded-xl bg-gradient-brand text-white font-semibold disabled:opacity-60"
+              >
+                {careBusy ? 'Saving…' : 'Save water log'}
+              </button>
+            </div>
+          )}
+
+          {careLogs.length === 0 ? (
+            <p className="text-sm text-theme-tertiary">No watering logged yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {careLogs.slice(0, 10).map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-start justify-between gap-4 p-3 rounded-xl border border-theme bg-surface"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-theme-primary">
+                      {CARE_LOG_LABELS[c.log_type] ?? 'Watered'}
+                    </p>
+                    {/* Date only — the stored clock time is ours, not theirs. */}
+                    <p className="text-xs text-theme-tertiary mt-0.5">
+                      {[new Date(c.logged_at).toLocaleDateString(), c.notes]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeCareLog(c.id)}
+                    className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline shrink-0"
+                    aria-label={`Delete water log from ${new Date(c.logged_at).toLocaleDateString()}`}
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {/* Substrate (csc_20260731). Every colony taxon has substrate — a dubia

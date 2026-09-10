@@ -44,6 +44,12 @@ import {
   listColonyFeedings,
   listColonyMolts,
   listColonySubstrateChanges,
+  listColonyCareLogs,
+  createColonyCareLog,
+  deleteColonyCareLog,
+  CARE_LOG_LABELS,
+  type ColonyCareLog,
+  type CareLogType,
   createColonySubstrateChange,
   deleteColonySubstrateChange,
   substrateReasonsFor,
@@ -119,6 +125,15 @@ export default function ColonyDetailScreen() {
   const [subType, setSubType] = useState('');
   const [subNote, setSubNote] = useState('');
   const [subBusy, setSubBusy] = useState(false);
+  // Hydration (cwc_20260910). Defaults to `water_dish` because that's the
+  // commonest act across taxa, but for a detritivore culture `misted` and
+  // `overflow` are the ones that carry the husbandry.
+  const [careLogs, setCareLogs] = useState<ColonyCareLog[]>([]);
+  const [careFormOpen, setCareFormOpen] = useState(false);
+  const [careType, setCareType] = useState<CareLogType>('water_dish');
+  const [careDate, setCareDate] = useState(toISODateLocal(new Date()));
+  const [careNote, setCareNote] = useState('');
+  const [careBusy, setCareBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -142,7 +157,7 @@ export default function ColonyDetailScreen() {
   const fetchColony = useCallback(async () => {
     if (!colonyId) return;
     try {
-      const [colonyRes, eventsRes, photosRes, feedingsRes, moltsRes, subsRes] = await Promise.all([
+      const [colonyRes, eventsRes, photosRes, feedingsRes, moltsRes, subsRes, careRes] = await Promise.all([
         getColony(colonyId),
         listColonyEvents(colonyId),
         // Non-fatal: a colony with no photos or feedings is the normal state,
@@ -151,6 +166,7 @@ export default function ColonyDetailScreen() {
         listColonyFeedings(colonyId).catch(() => [] as ColonyFeedingLog[]),
         listColonyMolts(colonyId).catch(() => [] as ColonyMoltLog[]),
         listColonySubstrateChanges(colonyId).catch(() => [] as ColonySubstrateChange[]),
+        listColonyCareLogs(colonyId).catch(() => [] as ColonyCareLog[]),
       ]);
       setColony(colonyRes);
       setEvents(eventsRes);
@@ -158,6 +174,7 @@ export default function ColonyDetailScreen() {
       setFeedings(feedingsRes);
       setMolts(moltsRes);
       setSubstrates(subsRes);
+      setCareLogs(careRes);
       setLoadError('');
     } catch (e: any) {
       if (e?.response?.status === 401) return;
@@ -431,6 +448,54 @@ export default function ColonyDetailScreen() {
     }
   };
 
+  /** Log a watering for the whole colony.
+   *
+   *  The date picker only gives a day, but the column is a timestamp — so the
+   *  chosen day is combined with the current time of day rather than stamped
+   *  with a fabricated midnight, and the list below shows the date alone. Same
+   *  handling as the animal screens; the stored clock time is never presented
+   *  as something the keeper told us.
+   */
+  const submitCareLog = async () => {
+    if (!colonyId || careBusy) return;
+    setCareBusy(true);
+    try {
+      const chosen = parseLocalDate(careDate) ?? new Date();
+      const now = new Date();
+      chosen.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+      await createColonyCareLog(colonyId, {
+        log_type: careType,
+        logged_at: (chosen > now ? now : chosen).toISOString(),
+        notes: careNote.trim() || null,
+      });
+      setCareFormOpen(false);
+      setCareNote('');
+      await fetchColony();
+    } catch (e) {
+      Alert.alert('Could not save', getErrorMessage(e));
+    } finally {
+      setCareBusy(false);
+    }
+  };
+
+  const confirmDeleteCareLog = (c: ColonyCareLog) => {
+    Alert.alert('Delete this water log?', formatLocalDate(c.logged_at), [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteColonyCareLog(c.id);
+            await fetchColony();
+          } catch (e) {
+            Alert.alert('Could not delete', getErrorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
   const confirmDeleteSubstrate = (c: ColonySubstrateChange) => {
     Alert.alert('Delete this substrate change?', formatLocalDate(c.changed_at), [
       { text: 'Cancel', style: 'cancel' },
@@ -658,6 +723,103 @@ export default function ColonyDetailScreen() {
                     {new Date(f.fed_at).toLocaleDateString()}
                   </Text>
                 </View>
+              ))
+            )}
+          </View>
+
+          {/* Water (cwc_20260910).
+              ABOVE substrate deliberately. For a detritivore culture —
+              isopods, springtails — hydration is the husbandry: they're
+              misted or overflowed constantly and fed almost incidentally, so
+              this is closer to what a feeding log is for a tarantula than to a
+              maintenance note. No due date and no overdue state here or
+              anywhere; there's no evidence base for a watering cadence. */}
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
+            <View style={styles.eventsHeaderRow}>
+              <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>WATER</Text>
+              <TouchableOpacity
+                onPress={() => setCareFormOpen((o) => !o)}
+                accessibilityRole="button"
+                accessibilityLabel="Log a watering for this colony"
+              >
+                <Text style={[styles.addEventLink, { color: colors.primary }]}>
+                  {careFormOpen ? 'Cancel' : '+ Log water'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {careFormOpen && (
+              <View style={{ marginBottom: 12, gap: 10 }}>
+                <Text style={styles.fieldLabel}>WHAT DID YOU DO?</Text>
+                <View style={styles.chipWrap}>
+                  {(Object.keys(CARE_LOG_LABELS) as CareLogType[]).map((k) => {
+                    const sel = k === careType;
+                    return (
+                      <TouchableOpacity
+                        key={k}
+                        onPress={() => setCareType(k)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: sel }}
+                        style={[
+                          styles.eventChip,
+                          {
+                            borderColor: sel ? colors.primary : colors.border,
+                            backgroundColor: sel ? colors.primary : colors.surface,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: sel ? '#fff' : colors.textPrimary, fontSize: 13, fontWeight: '600' }}>
+                          {CARE_LOG_LABELS[k]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <DateInput
+                  value={parseLocalDate(careDate) ?? new Date()}
+                  onChange={(d) => setCareDate(toISODateLocal(d))}
+                  maximumDate={new Date()}
+                  label="Date watered"
+                />
+                <TextInput
+                  style={styles.textarea}
+                  value={careNote}
+                  onChangeText={setCareNote}
+                  multiline
+                  placeholder="Notes — optional"
+                  placeholderTextColor={colors.textTertiary}
+                />
+                <PrimaryButton
+                  onPress={submitCareLog}
+                  disabled={careBusy}
+                  accessibilityLabel="Save water log"
+                >
+                  {careBusy ? 'Saving…' : 'Save water log'}
+                </PrimaryButton>
+              </View>
+            )}
+
+            {careLogs.length === 0 ? (
+              <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                No watering logged yet.
+              </Text>
+            ) : (
+              careLogs.slice(0, 10).map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  onLongPress={() => confirmDeleteCareLog(c)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${CARE_LOG_LABELS[c.log_type]} on ${formatLocalDate(c.logged_at)}. Long press to delete.`}
+                  style={{ paddingVertical: 8 }}
+                >
+                  <Text style={[styles.detailBody, { color: colors.textPrimary }]}>
+                    {CARE_LOG_LABELS[c.log_type]}
+                  </Text>
+                  {/* Date only — the stored time of day is ours, not theirs. */}
+                  <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
+                    {[formatLocalDate(c.logged_at), c.notes].filter(Boolean).join(' · ')}
+                  </Text>
+                </TouchableOpacity>
               ))
             )}
           </View>

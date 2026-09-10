@@ -382,6 +382,69 @@ export async function deleteColonySubstrateChange(
   if (!res.ok && res.status !== 204) throw new Error('Failed to delete')
 }
 
+// ---------------------------------------------------------------------------
+// Hydration (cwc_20260910)
+//
+// For a detritivore culture this is the PRIMARY husbandry record — isopods and
+// springtails are watered constantly and fed almost incidentally. Three types
+// because they're three different acts: an overflow deliberately damps the
+// substrate, and misting is what animals without a dish actually drink from.
+//
+// No schedule, no due state, deliberately. There is no evidence base for a
+// watering cadence and a derived deadline would be a fabricated number.
+// ---------------------------------------------------------------------------
+
+export type CareLogType = 'water_dish' | 'overflow' | 'misted'
+
+export interface ColonyCareLog {
+  id: string
+  colony_id: string | null
+  log_type: CareLogType
+  logged_at: string
+  notes?: string | null
+  created_at: string
+}
+
+/** Keep in lockstep with CARE_LOG_TYPES in app/models/care_log.py. */
+export const CARE_LOG_LABELS: Record<CareLogType, string> = {
+  water_dish: 'Water dish refreshed',
+  overflow: 'Dish overflowed',
+  misted: 'Misted',
+}
+
+export async function listColonyCareLogs(
+  token: string,
+  colonyId: string,
+): Promise<ColonyCareLog[]> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/care-logs`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Failed to load water logs')
+  return (await res.json()) as ColonyCareLog[]
+}
+
+export async function createColonyCareLog(
+  token: string,
+  colonyId: string,
+  payload: { log_type: CareLogType; logged_at: string; notes?: string | null },
+): Promise<ColonyCareLog> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${colonyId}/care-logs`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) throw new Error('Failed to save water log')
+  return (await res.json()) as ColonyCareLog
+}
+
+export async function deleteColonyCareLog(token: string, logId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/care-logs/${logId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  if (!res.ok && res.status !== 204) throw new Error('Failed to delete')
+}
+
 /**
  * Why a keeper changes substrate, per taxon. Mirrors the mobile lib.
  *

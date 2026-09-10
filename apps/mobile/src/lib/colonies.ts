@@ -377,6 +377,51 @@ export async function deleteColonySubstrateChange(changeId: string): Promise<voi
   await apiClient.delete(`/substrate-changes/${changeId}`);
 }
 
+// ---------------------------------------------------------------------------
+// Hydration (cwc_20260910)
+//
+// For a detritivore culture this is the PRIMARY husbandry record, not a
+// secondary one. Isopods and springtails are watered constantly and fed almost
+// incidentally, so a colony's care log is closer to what a feeding log is for
+// a tarantula. That's why it sits above substrate on the screen.
+//
+// Shares the CareLogType vocabulary with inverts — see src/lib/inverts.ts. Same
+// three acts, same deliberate absence of any schedule or due state.
+// ---------------------------------------------------------------------------
+
+export type { CareLogType } from './inverts';
+export { CARE_LOG_LABELS, CARE_LOG_SHORT } from './inverts';
+
+export interface ColonyCareLog {
+  id: string;
+  colony_id: string | null;
+  log_type: import('./inverts').CareLogType;
+  logged_at: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function listColonyCareLogs(id: string): Promise<ColonyCareLog[]> {
+  const { data } = await apiClient.get<ColonyCareLog[]>(`/colonies/${id}/care-logs`);
+  return data;
+}
+
+export async function createColonyCareLog(
+  id: string,
+  payload: {
+    log_type: import('./inverts').CareLogType;
+    logged_at: string;
+    notes?: string | null;
+  },
+): Promise<ColonyCareLog> {
+  const { data } = await apiClient.post<ColonyCareLog>(`/colonies/${id}/care-logs`, payload);
+  return data;
+}
+
+export async function deleteColonyCareLog(logId: string): Promise<void> {
+  await apiClient.delete(`/care-logs/${logId}`);
+}
+
 /**
  * Why a keeper changes substrate, per taxon.
  *
