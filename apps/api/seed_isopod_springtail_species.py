@@ -34,9 +34,14 @@ HONESTY NOTES
 * Springtails and dwarf whites double as clean-up crew inside other animals'
   enclosures. They're seeded here as keepable colonies in their own right;
   that dual use is mentioned in the care guide rather than modelled.
-* Morph names (Panda King, Powder Orange, Rubber Ducky) are trade names for
+* Morph names (Powder Orange, Powder Blue, Dairy Cow) are trade names for
   colour forms, not species. They're listed as common names under the parent
   species instead of being invented as separate rows.
+  BUT a trade name is not automatically a morph. "Panda King" was listed here
+  as a Porcellio laevis morph and is in fact Cubaris sp. "Panda King" — its own
+  animal, its own genus, roughly 3x the price. Corrected 2026-09-10. Check
+  which genus a trade name belongs to before folding it into a common_names
+  list; black-and-white species in particular get conflated constantly.
 * Counts, temperatures and sizes are given only where confident. Where the
   hobby range is genuinely wide the field is left null rather than fabricated.
 """
@@ -105,7 +110,10 @@ SPECIES_DATA = [
     {
         **_COMMON,
         "scientific_name": "Porcellio laevis",
-        "common_names": ["Dairy Cow Isopod", "Panda King", "Milkback"],
+        # NOT "Panda King" — that is Cubaris sp. "Panda King", a different
+        # genus at roughly 3x the price. Both are black and white, which is how
+        # this got in here. Corrected 2026-09-10; see fix_isopod_species_ids.py.
+        "common_names": ["Dairy Cow Isopod", "Milkback"],
         "genus": "Porcellio", "family": "Porcellionidae",
         "care_level": "beginner", "temperament": "harmless, fast-moving",
         "native_region": "Europe; introduced worldwide",
@@ -119,8 +127,11 @@ SPECIES_DATA = [
         "care_guide": (
             "Large, fast, prolific, and the usual recommendation for a first isopod "
             "colony you actually watch rather than just use as clean-up crew. Dairy "
-            "Cow, Panda King and Milkback are colour morphs of this species, not "
-            "separate species. Give a clear moisture gradient — one end damp, one end "
+            "Cow and Milkback are colour morphs of this species, not separate "
+            "species. Do not confuse it with Cubaris sp. \"Panda King\", which is a "
+            "different genus with different care and a much higher price — the two "
+            "are both black and white and are regularly mixed up. "
+            "Give a clear moisture gradient — one end damp, one end "
             "dry — with good cross-ventilation; laevis is more prone to crashing in "
             "stagnant, uniformly wet setups than Armadillidium. They are hungry for "
             "protein compared with most isopods, and an underfed colony will scavenge "

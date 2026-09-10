@@ -22,11 +22,21 @@ and the practice it models is genuinely ad hoc — dishes kept in most animals,
 topped up on noticing, with some species wanting more. Deriving a deadline
 from that would be a fabricated number wearing a warning colour. See ADR-014.
 
-PARENT IS `inverts`, ALWAYS
----------------------------
+PARENT IS AN INVERT **OR** A COLONY — exactly one
+-------------------------------------------------
 No per-taxon columns. Legacy `tarantulas` / `scorpions` rows share primary keys
 with `inverts` (ADR-005), so a tarantula's logs resolve through invert_id and
 this table needs no migration when Phase D drops those tables.
+
+Colonies joined in cwc_20260910. A detritivore culture is watered constantly
+and fed almost incidentally, so hydration is the *primary* husbandry record
+for it — leaving colonies out meant the one group that needs this most had
+nowhere to put it.
+
+Exactly-one rather than at-least-one (which is what `substrate_changes` uses):
+that table tolerates both parents because ADR-005 dual-write rows carry
+`tarantula_id` and `invert_id` together. This table was born after the
+consolidation and has no such mirror, so it holds the tighter invariant.
 """
 from sqlalchemy import (
     Column,
@@ -58,15 +68,26 @@ class CareLog(Base):
             "log_type IN ('water_dish', 'overflow', 'misted')",
             name="care_logs_log_type_check",
         ),
+        CheckConstraint(
+            "num_nonnulls(invert_id, colony_id) = 1",
+            name="care_logs_exactly_one_parent",
+        ),
         Index("ix_care_logs_invert_logged_at", "invert_id", "logged_at"),
+        Index("ix_care_logs_colony_logged_at", "colony_id", "logged_at"),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    # Indexed by the composite in __table_args__, which leads with this column.
+    # Indexed by the composites in __table_args__, which lead with these.
+    # Nullable since cwc_20260910 — the CHECK above enforces exactly one.
     invert_id = Column(
         UUID(as_uuid=True),
         ForeignKey("inverts.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
+    )
+    colony_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colonies.id", ondelete="CASCADE"),
+        nullable=True,
     )
     user_id = Column(
         UUID(as_uuid=True),
@@ -84,6 +105,7 @@ class CareLog(Base):
     # ondelete CASCADE above is what does the work. Same reasoning as the
     # polymorphic log backrefs.
     invert = relationship("Invert", backref="care_logs", passive_deletes=True)
+    colony = relationship("Colony", backref="care_logs", passive_deletes=True)
 
     def __repr__(self):
         return f"<CareLog {self.log_type} @ {self.logged_at}>"

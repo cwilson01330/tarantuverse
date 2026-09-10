@@ -173,6 +173,18 @@ class ColonyEvent(Base):
     )
     # Only meaningful for aggression/cannibalism: minor | moderate | severe
     severity = Column(String(20), nullable=True)
+    # Where animals went, for `removed` and `split` (cwc_20260910).
+    #
+    # ALWAYS OPTIONAL. Plenty of keepers keep isopods purely as pets and
+    # remove animals for ordinary reasons; a required destination would turn a
+    # neutral event into an interrogation.
+    #
+    # Free text rather than an FK to `enclosures` on purpose — measured before
+    # choosing, that table held 11 rows across 3 keepers with ZERO inverts
+    # linked to one. An FK into a table nobody populates is a field nobody can
+    # fill. This takes "into the GBB's enclosure", "sold 30", "gave to Brooke",
+    # and can be promoted to an FK if enclosures ever earns adoption.
+    destination = Column(String(200), nullable=True)
     notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

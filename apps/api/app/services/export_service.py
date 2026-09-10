@@ -143,14 +143,15 @@ COLONY_FIELDS = [
 
 COLONY_EVENT_FIELDS = [
     "id", "colony_id", "user_id", "event_type", "stage", "count_delta",
-    "occurred_at", "severity", "notes", "created_at",
+    "occurred_at", "severity", "destination", "notes", "created_at",
 ]
 
 # Hydration events (car_20260909). Parented on inverts rather than tarantulas,
 # so this is queried by invert id — unlike the older log exports above, which
 # all still key off legacy tarantula ids.
 CARE_LOG_FIELDS = [
-    "id", "invert_id", "user_id", "log_type", "logged_at", "notes", "created_at",
+    "id", "invert_id", "colony_id", "user_id", "log_type", "logged_at",
+    "notes", "created_at",
 ]
 
 USER_PROFILE_FIELDS = [

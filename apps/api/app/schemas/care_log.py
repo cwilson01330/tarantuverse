@@ -55,5 +55,9 @@ class CareLogResponse(CareLogBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    invert_id: uuid.UUID
+    # Exactly one is set — see the CHECK on the model. Both are Optional here
+    # because a client reading a colony's logs shouldn't have to pretend an
+    # invert id exists, and vice versa.
+    invert_id: Optional[uuid.UUID] = None
+    colony_id: Optional[uuid.UUID] = None
     created_at: datetime

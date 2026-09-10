@@ -216,6 +216,9 @@ class ColonyEventCreate(BaseModel):
     count_delta: Optional[int] = None
     occurred_at: Optional[date] = None
     severity: Optional[str] = Field(None, max_length=20)
+    # Where animals went, for `removed` / `split`. Never required — plenty of
+    # keepers remove animals for ordinary reasons and owe no explanation.
+    destination: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
 
     @field_validator("event_type")
@@ -232,6 +235,7 @@ class ColonyEventUpdate(BaseModel):
     count_delta: Optional[int] = None
     occurred_at: Optional[date] = None
     severity: Optional[str] = Field(None, max_length=20)
+    destination: Optional[str] = Field(None, max_length=200)
     notes: Optional[str] = None
 
     @field_validator("event_type")
@@ -251,6 +255,7 @@ class ColonyEventResponse(BaseModel):
     count_delta: Optional[int] = None
     occurred_at: date
     severity: Optional[str] = None
+    destination: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime
 
