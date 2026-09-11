@@ -62,13 +62,94 @@ async def get_admin_stats(
         ContentReport.status == 'pending'
     ).scalar() or 0
 
+    # FAILED RENEWALS, not churn.
+    #
+    # A row past expires_at that still says status='active', still has
+    # auto_renew on and was never cancelled is someone who INTENDED to keep
+    # paying and whose renewal didn't land — a declined card, a Stripe retry in
+    # flight, or a webhook we never received. They are silently on the free
+    # tier having never asked to be.
+    #
+    # These people are now CARRIED by the renewal grace window rather than
+    # downgraded (utils/subscription.RENEWAL_GRACE_DAYS), so nothing breaks for
+    # them for a fortnight — which makes this list more important, not less.
+    # Grace buys time to fix the card; it doesn't fix it. If the retry never
+    # succeeds they fall off the end of the window silently.
+    #
+    # Deliberately excludes cancelled_at — someone who chose to leave is not a
+    # problem to be chased.
+    now = datetime.now(timezone.utc)
+    failed_renewals = (
+        db.query(func.count(UserSubscription.id))
+        .join(SubscriptionPlan, UserSubscription.plan_id == SubscriptionPlan.id)
+        .filter(
+            SubscriptionPlan.name != "free",
+            UserSubscription.status == "active",
+            UserSubscription.expires_at.isnot(None),
+            UserSubscription.expires_at <= now,
+            UserSubscription.cancelled_at.is_(None),
+            UserSubscription.auto_renew.is_(True),
+        )
+        .scalar()
+    ) or 0
+
     return {
         "total_users": total_users,
         "total_species": total_species,
         "species_by_taxon": species_by_taxon,
         "premium_users": premium_users,
-        "pending_reports": pending_reports
+        "pending_reports": pending_reports,
+        "failed_renewals": failed_renewals,
     }
+
+
+@router.get("/failed-renewals")
+async def list_failed_renewals(
+    db: Session = Depends(get_db),
+):
+    # No admin dependency here — the router itself carries
+    # dependencies=[Depends(get_current_admin)], so every route is gated.
+    """Subscriptions whose period ended while still set to auto-renew.
+
+    The count on the dashboard says how many; this says who, so the next step
+    is opening their customer in Stripe rather than hunting through a user
+    list. Ordered oldest-lapsed first — the longer someone has been silently
+    downgraded, the worse it is.
+
+    NOT a churn report. Anyone with cancelled_at set chose to leave and is
+    excluded; these are people whose payment didn't go through.
+    """
+    now = datetime.now(timezone.utc)
+    rows = (
+        db.query(UserSubscription, User, SubscriptionPlan)
+        .join(User, User.id == UserSubscription.user_id)
+        .join(SubscriptionPlan, SubscriptionPlan.id == UserSubscription.plan_id)
+        .filter(
+            SubscriptionPlan.name != "free",
+            UserSubscription.status == "active",
+            UserSubscription.expires_at.isnot(None),
+            UserSubscription.expires_at <= now,
+            UserSubscription.cancelled_at.is_(None),
+            UserSubscription.auto_renew.is_(True),
+        )
+        .order_by(UserSubscription.expires_at.asc())
+        .all()
+    )
+
+    return [
+        {
+            "user_id": str(u.id),
+            "username": u.username,
+            "email": u.email,
+            "plan": p.name,
+            "payment_provider": s.payment_provider,
+            # The handle to paste into Stripe / App Store Connect.
+            "payment_provider_id": s.payment_provider_id,
+            "expired_at": s.expires_at.date().isoformat() if s.expires_at else None,
+            "days_lapsed": (now - s.expires_at).days if s.expires_at else None,
+        }
+        for s, u, p in rows
+    ]
 
 @router.get("/users")
 async def list_users(
@@ -104,15 +185,33 @@ async def list_users(
     animal_counts: dict = {}
     colony_counts: dict = {}
     if user_ids:
+        # died_at excluded to match utils/limits.active_inverts_query. These
+        # counts drive the "over cap" badge, so if they disagree with the
+        # enforcement query the badge is simply wrong — and it was: a keeper
+        # with 20 inverts, 2 of them deceased, plus 1 colony showed as 21/over
+        # while enforcement saw 19 and would happily have let her add another.
+        #
+        # ADR-015 is explicit that a deceased animal never counts toward the
+        # cap, so an admin view that counts them invites exactly the action the
+        # ADR exists to prevent — telling someone to upgrade, or to delete a
+        # dead animal's history, to make room they already have.
         counts = dict(
             db.query(Invert.user_id, func.count(Invert.id))
-            .filter(Invert.user_id.in_(user_ids), Invert.transferred_out_at.is_(None))
+            .filter(
+                Invert.user_id.in_(user_ids),
+                Invert.transferred_out_at.is_(None),
+                Invert.died_at.is_(None),
+            )
             .group_by(Invert.user_id)
             .all()
         )
         animal_counts = dict(
             db.query(Animal.user_id, func.count(Animal.id))
-            .filter(Animal.user_id.in_(user_ids), Animal.transferred_out_at.is_(None))
+            .filter(
+                Animal.user_id.in_(user_ids),
+                Animal.transferred_out_at.is_(None),
+                Animal.died_at.is_(None),
+            )
             .group_by(Animal.user_id)
             .all()
         )
