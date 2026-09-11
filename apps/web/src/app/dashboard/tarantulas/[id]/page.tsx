@@ -91,6 +91,10 @@ interface MoltLog {
   weight_after?: number
   notes?: string
   image_url?: string
+  /** The molt after which this animal will not molt again (ult_20260911).
+   *  Suppresses premolt prediction — a matured male has hooks and emboli and
+   *  is done. */
+  is_ultimate?: boolean
   created_at: string
 }
 
@@ -294,6 +298,9 @@ export default function TarantulaDetailPage() {
     weight_after: '',
     notes: '',
     image_url: '',
+    // The ultimate molt (ult_20260911). False by default and it must stay
+    // that way — it permanently suppresses premolt prediction for this animal.
+    is_ultimate: false,
   })
   const [substrateFormData, setSubstrateFormData] = useState({
     changed_at: new Date().toISOString().slice(0, 10),
@@ -516,6 +523,9 @@ export default function TarantulaDetailPage() {
         weight_after: moltFormData.weight_after ? parseFloat(moltFormData.weight_after) : null,
         notes: moltFormData.notes || null,
         image_url: moltFormData.image_url || null,
+        // Sent explicitly rather than omitted so an edit can UNSET it, not
+        // just set it — a keeper who ticked this by mistake needs a way back.
+        is_ultimate: moltFormData.is_ultimate,
       }
 
       // Edit mode toggles to PUT /molts/{id}; create stays POST.
@@ -549,6 +559,7 @@ export default function TarantulaDetailPage() {
         weight_after: '',
         notes: '',
         image_url: '',
+        is_ultimate: false,
       })
       setShowMoltForm(false)
       setEditingMoltId(null)
@@ -571,6 +582,9 @@ export default function TarantulaDetailPage() {
       weight_after: molt.weight_after != null ? String(molt.weight_after) : '',
       notes: molt.notes ?? '',
       image_url: molt.image_url ?? '',
+      // Must prefill, or editing any other field on the ultimate molt would
+      // silently clear the flag and switch premolt prediction back on.
+      is_ultimate: Boolean(molt.is_ultimate),
     })
     setShowMoltForm(true)
   }
@@ -587,6 +601,7 @@ export default function TarantulaDetailPage() {
       weight_after: '',
       notes: '',
       image_url: '',
+      is_ultimate: false,
     })
   }
 
@@ -2001,6 +2016,37 @@ export default function TarantulaDetailPage() {
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 text-gray-900 dark:text-white bg-white dark:bg-gray-700"
                       placeholder="https://example.com/molt-photo.jpg"
                     />
+                  </div>
+                  {/* The ultimate molt (ult_20260911). This is the surface that
+                      matters most for it — mature males are tarantulas, and
+                      this is still the bespoke tarantula page (ADR-016).
+                      Ticking it permanently stops premolt prediction, which is
+                      correct for a matured male, so the copy says what it does
+                      rather than leaning on the label. */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                      Was this the final molt?
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setMoltFormData({ ...moltFormData, is_ultimate: !moltFormData.is_ultimate })}
+                      aria-pressed={moltFormData.is_ultimate}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left text-sm font-semibold transition ${
+                        moltFormData.is_ultimate
+                          ? 'border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white'
+                          : 'border-gray-300 dark:border-gray-600 bg-white/60 dark:bg-gray-700/60 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <span aria-hidden="true" className="text-lg leading-none">
+                        {moltFormData.is_ultimate ? '●' : '○'}
+                      </span>
+                      This was the ultimate molt
+                    </button>
+                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                      {moltFormData.is_ultimate
+                        ? 'Recorded as matured — no further molts expected, so premolt predictions stop here. You can untick this later.'
+                        : 'For a male that has matured. Leave off for a female or anything still growing.'}
+                    </p>
                   </div>
                   <div className="mb-4">
                     <label className="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Notes</label>

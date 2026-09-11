@@ -17,6 +17,12 @@ interface PremoltPrediction {
   data_quality: 'good' | 'fair' | 'insufficient'
   last_molt_date: string | null
   last_feeding_date: string | null
+  /** Maturity (ult_20260911). Elapsed only — the API deliberately returns no
+   *  time-remaining figure, because species.lifespan_male is populated on 3 of
+   *  197 rows and a countdown would be invented for almost every animal. */
+  has_matured?: boolean
+  matured_at?: string | null
+  days_since_matured?: number | null
 }
 
 interface Props {
@@ -65,6 +71,36 @@ export default function PremoltPredictionSection({ tarantulaId }: Props) {
 
   if (!prediction) {
     return null
+  }
+
+  // Matured (ult_20260911). Checked BEFORE data quality, because maturity is a
+  // fact about the animal while data quality is a fact about the logs — a
+  // matured male with thin records is still matured, and "log more feedings to
+  // enable predictions" is the wrong sentence for an animal with no molts left.
+  //
+  // Elapsed only. No countdown, no "expect X months": the API returns no such
+  // figure and shouldn't, and inventing one for an animal a keeper may be
+  // about to sell or loan would be worse than saying nothing.
+  if (prediction.has_matured) {
+    const since = prediction.days_since_matured
+    const elapsed =
+      since == null
+        ? null
+        : since < 31
+        ? `${since} day${since === 1 ? '' : 's'} ago`
+        : since < 365
+        ? `${Math.round(since / 30)} months ago`
+        : `${(since / 365).toFixed(1)} years ago`
+    return (
+      <div className="bg-gray-50 dark:bg-gray-900/20 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Matured</h2>
+        <p className="text-gray-700 dark:text-gray-300">
+          {elapsed
+            ? `Ultimate molt recorded ${elapsed}. No further molts expected, so premolt predictions stop here.`
+            : 'Ultimate molt recorded. No further molts expected, so premolt predictions stop here.'}
+        </p>
+      </div>
+    )
   }
 
   // Insufficient data state

@@ -49,6 +49,11 @@ export default function AddInvertMoltPage() {
   // routine, and a pre-selected "Went fine" would record a judgment nobody made.
   const [outcome, setOutcome] = useState('')
   const [complication, setComplication] = useState('')
+  // The ultimate molt (ult_20260911) — the one after which this animal will not
+  // molt again. Off by default and must stay that way: ticking it permanently
+  // suppresses premolt prediction, so a pre-ticked box would switch the feature
+  // off for animals that are still growing.
+  const [isUltimate, setIsUltimate] = useState(false)
   const [saving, setSaving] = useState(false)
   const isEdit = !!logId
 
@@ -74,6 +79,7 @@ export default function AddInvertMoltPage() {
             // prefill on edit or the correction silently reverts.
             if (m.outcome) setOutcome(m.outcome)
             if (m.complication_notes) setComplication(m.complication_notes)
+            if (m.is_ultimate) setIsUltimate(true)
             if (m.weight_before != null) setWeightBefore(String(m.weight_before))
             if (m.weight_after != null) setWeightAfter(String(m.weight_after))
           } catch { /* leave blank */ }
@@ -115,6 +121,7 @@ export default function AddInvertMoltPage() {
             weight_before: parseMeasure(weightBefore),
             weight_after: parseMeasure(weightAfter),
             outcome: outcome || null,
+            is_ultimate: isUltimate,
             complication_notes: complication.trim() || null,
           }),
         },
@@ -191,6 +198,35 @@ export default function AddInvertMoltPage() {
               ready. Saving this molt won&apos;t do it for you.
             </p>
           )}
+          {/* The ultimate molt (ult_20260911). Below outcome because it's rare
+              and consequential rather than part of the routine flow. Ticking it
+              permanently stops premolt prediction for this animal, which is
+              correct — a matured male cannot molt again — so the copy states
+              the effect rather than relying on the label. Not tarantula-only:
+              mantids terminate in both sexes. */}
+          <div>
+            <label className={labelCls}>Was this the final molt?</label>
+            <button
+              type="button"
+              onClick={() => setIsUltimate((v) => !v)}
+              aria-pressed={isUltimate}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left text-sm font-semibold transition ${
+                isUltimate
+                  ? 'border-primary-600 bg-surface-elevated text-theme-primary'
+                  : 'border-theme bg-surface text-theme-secondary hover:bg-surface-elevated'
+              }`}
+            >
+              <span aria-hidden="true" className="text-lg leading-none">
+                {isUltimate ? '●' : '○'}
+              </span>
+              This was the ultimate molt
+            </button>
+            <p className="mt-1 text-xs text-theme-tertiary">
+              {isUltimate
+                ? 'Recorded as matured — no further molts expected, so premolt predictions stop here. You can untick this later.'
+                : 'For a male that has matured, or any animal whose adult molt is its last. Leave off if they’ll keep growing.'}
+            </p>
+          </div>
           <div><label className={labelCls}>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} /></div>
           <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : isEdit ? 'Update molt' : 'Save molt'}</button>
         </div>
