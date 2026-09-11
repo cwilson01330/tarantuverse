@@ -61,6 +61,20 @@ class MoltLog(Base):
     # spiders shed it.
     is_unidentified = Column(Boolean, default=False)
 
+    # --- The ultimate molt (ult_20260911) ------------------------------------
+    # The molt after which this animal will not molt again. For a male
+    # tarantula that's maturity — hooks, emboli, and a lifespan measured in
+    # months. Suppresses premolt prediction entirely: an animal that cannot
+    # molt cannot be entering premolt, and branch 3 would otherwise declare him
+    # "likely in premolt" forever on interval progress alone.
+    #
+    # On the MOLT, not the animal, because terminal molts are taxon- and
+    # sex-dependent — mantids terminate in both sexes, tarantula females never
+    # do, whip spiders keep going as adults. Keeper-set rather than inferred.
+    #
+    # Records that maturity happened, never how long is left. See the migration.
+    is_ultimate = Column(Boolean, default=False, nullable=False, server_default="false")
+
     # Measurements
     leg_span_before = Column(Numeric(5, 2))  # in inches or cm
     leg_span_after = Column(Numeric(5, 2))

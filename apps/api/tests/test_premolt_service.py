@@ -20,11 +20,12 @@ from app.services.premolt_service import (
 )
 
 
-def evaluate(streak=0, progress=None, days=None):
+def evaluate(streak=0, progress=None, days=None, ultimate=False):
     return evaluate_premolt_likely(
         recent_refusal_streak=streak,
         molt_interval_progress=progress,
         days_since_last_molt=days,
+        has_ultimate_molt=ultimate,
     )
 
 
@@ -100,3 +101,35 @@ def test_verushka_is_not_in_premolt():
 @pytest.mark.parametrize("streak", [0, 1, 2])
 def test_short_streaks_never_flag_without_temporal_support(streak):
     assert evaluate(streak=streak, progress=10, days=5) is False
+
+
+# ── The ultimate molt overrides everything (ult_20260911) ────────────────────
+
+def test_a_matured_animal_is_never_in_premolt():
+    """A male tarantula past his ultimate molt has hooks and emboli and will
+    not molt again. No evidence can make premolt true for him.
+
+    Deliberately tested with the STRONGEST possible positive signal — a long
+    refusal streak well past the average interval — because the point is that
+    maturity outranks the evidence, not that it tips a marginal case.
+    """
+    assert evaluate(streak=6, progress=180, days=400, ultimate=True) is False
+
+
+def test_branch_three_is_the_one_maturity_had_to_stop():
+    """Branch 3 needs no refusals at all: past 110% of the average interval and
+    more than 30 days is enough on its own.
+
+    That's why the bug was permanent rather than occasional. A matured male
+    drifts past 110% and never comes back, so the app declared him "likely in
+    premolt" indefinitely with the keeper feeding him normally. Sixteen live
+    male tarantulas with moult history were on that path.
+    """
+    assert evaluate(streak=0, progress=130, days=90) is True          # before
+    assert evaluate(streak=0, progress=130, days=90, ultimate=True) is False
+
+
+def test_maturity_does_not_rewrite_the_unmatured_case():
+    """A guard against over-reach: the flag must change nothing for animals
+    that haven't matured, which is almost all of them."""
+    assert evaluate(streak=3, progress=90, days=60, ultimate=False) is True

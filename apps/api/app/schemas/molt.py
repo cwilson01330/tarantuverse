@@ -24,6 +24,9 @@ class MoltLogBase(BaseModel):
     molted_at: datetime
     premolt_started_at: Optional[datetime] = None
     is_unidentified: bool = False  # For communals: "found a molt but don't know who"
+    # The molt after which this animal will not molt again (ult_20260911).
+    # Suppresses premolt prediction — see premolt_service.
+    is_ultimate: bool = False
     leg_span_before: Optional[Decimal] = Field(None, ge=0, le=999.99)
     leg_span_after: Optional[Decimal] = Field(None, ge=0, le=999.99)
     weight_before: Optional[Decimal] = Field(None, ge=0, le=9999.99)
@@ -58,6 +61,9 @@ class MoltLogUpdate(BaseModel):
     molted_at: Optional[datetime] = None
     premolt_started_at: Optional[datetime] = None
     is_unidentified: Optional[bool] = None
+    # Editable after the fact. A keeper often doesn't realise a molt was the
+    # ultimate one until they see hooks days later.
+    is_ultimate: Optional[bool] = None
     leg_span_before: Optional[Decimal] = None
     leg_span_after: Optional[Decimal] = None
     weight_before: Optional[Decimal] = None

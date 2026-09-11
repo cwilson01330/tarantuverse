@@ -20,6 +20,16 @@ class PremoltPrediction(BaseModel):
     refusal_rate_last_30_days: Optional[float] = None  # Percentage
     estimated_molt_window_days: Optional[float] = None
     data_quality: str  # "good", "fair", or "insufficient"
+    # Maturity (ult_20260911). `has_matured` means an ultimate molt is on
+    # record — the animal will not molt again, and is_premolt_likely is forced
+    # False regardless of refusals or elapsed time.
+    #
+    # ELAPSED ONLY. There is deliberately no "days remaining" here and there
+    # should never be one: species.lifespan_male is populated on 3 of 197
+    # rows, so any countdown would be fabricated for almost the whole catalog.
+    has_matured: bool = False
+    matured_at: Optional[str] = None  # ISO date
+    days_since_matured: Optional[int] = None
     last_molt_date: Optional[str] = None  # ISO format date string
     last_feeding_date: Optional[str] = None  # ISO format date string
     feeding_count: int

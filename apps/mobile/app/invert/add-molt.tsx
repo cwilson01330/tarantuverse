@@ -58,6 +58,11 @@ export default function AddInvertMoltScreen() {
    *  "Successful" would record a judgment nobody made. */
   const [outcome, setOutcome] = useState<MoltOutcome | ''>('');
   const [complication, setComplication] = useState('');
+  /** The ultimate molt (ult_20260911) — the one after which this animal will
+   *  not molt again. Off by default and it must stay that way: it permanently
+   *  suppresses premolt prediction, so a pre-ticked box would silently switch
+   *  the feature off for animals that are still growing. */
+  const [isUltimate, setIsUltimate] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
@@ -71,6 +76,7 @@ export default function AddInvertMoltScreen() {
       if (m.leg_span_after != null) setLengthAfter(String(m.leg_span_after));
       if (m.outcome) setOutcome(m.outcome);
       if (m.complication_notes) setComplication(m.complication_notes);
+      if (m.is_ultimate) setIsUltimate(true);
       if (m.weight_before != null) setWeightBefore(String(m.weight_before));
       if (m.weight_after != null) setWeightAfter(String(m.weight_after));
       if (m.premolt_started_at) {
@@ -106,6 +112,7 @@ export default function AddInvertMoltScreen() {
         weight_after: parseMeasure(weightAfter),
         outcome: outcome || null,
         complication_notes: complication.trim() || null,
+        is_ultimate: isUltimate,
       };
       if (isEdit && logId) {
         await updateInvertMolt(logId, payload);
@@ -223,6 +230,43 @@ export default function AddInvertMoltScreen() {
               Saving this won&apos;t do it for you.
             </Text>
           )}
+          {/* The ultimate molt (ult_20260911).
+              Sits below outcome because it's rare and consequential, not part
+              of the routine flow. Ticking it permanently stops premolt
+              prediction for this animal, which is correct — a matured male
+              cannot molt again — but it's a one-way-feeling change, so the
+              copy says plainly what it does rather than relying on the label.
+              Not restricted to tarantulas: mantids terminate in both sexes. */}
+          <Field label="Was this the final molt?" colors={colors}>
+            <TouchableOpacity
+              onPress={() => setIsUltimate((v) => !v)}
+              style={[
+                styles.ultimateRow,
+                {
+                  borderColor: isUltimate ? colors.primary : colors.border,
+                  backgroundColor: isUltimate ? colors.surfaceElevated : colors.surface,
+                },
+              ]}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isUltimate }}
+              accessibilityLabel="This was the ultimate molt"
+              accessibilityHint="Stops premolt predictions for this animal. Use when a male has matured."
+            >
+              <MaterialCommunityIcons
+                name={isUltimate ? 'check-circle' : 'checkbox-blank-circle-outline'}
+                size={22}
+                color={isUltimate ? colors.primary : colors.textTertiary}
+              />
+              <Text style={[styles.ultimateLabel, { color: colors.textPrimary }]}>
+                This was the ultimate molt
+              </Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 6 }}>
+              {isUltimate
+                ? 'Recorded as matured — no further molts expected, so premolt predictions stop here. You can untick this later.'
+                : 'For a male that has matured, or any animal whose adult molt is its last. Leave off if they’ll keep growing.'}
+            </Text>
+          </Field>
           <Field label="Notes (optional)" colors={colors}><TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} placeholder="How they look post-molt, behavior, etc." placeholderTextColor={colors.textTertiary} multiline /></Field>
           <TouchableOpacity style={[styles.saveButton, (saving || !taxon) && { opacity: 0.6 }]} onPress={handleSave} disabled={saving || !taxon}>
             <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save molt'}</Text>
@@ -240,6 +284,8 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16, paddingBottom: 48 },
   input: { borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface },
+  ultimateRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  ultimateLabel: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
   measureRow: { flexDirection: 'row', gap: 12 },
   measureCol: { flex: 1 },
   textArea: { minHeight: 96, textAlignVertical: 'top' },

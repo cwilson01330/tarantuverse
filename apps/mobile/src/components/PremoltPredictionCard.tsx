@@ -22,6 +22,12 @@ interface PremoltPrediction {
   data_quality: 'good' | 'fair' | 'insufficient';
   last_molt_date: string | null;
   last_feeding_date: string | null;
+  /** Maturity (ult_20260911). Elapsed only — the API deliberately returns no
+   *  time-remaining figure, because species.lifespan_male is populated on 3 of
+   *  197 rows and a countdown would be invented for almost every animal. */
+  has_matured?: boolean;
+  matured_at?: string | null;
+  days_since_matured?: number | null;
 }
 
 interface Props {
@@ -66,6 +72,44 @@ export default function PremoltPredictionCard({ tarantulaId }: Props) {
 
   if (!prediction) {
     return null;
+  }
+
+  // Matured (ult_20260911). Checked BEFORE data quality, because maturity is
+  // a fact about the animal while data quality is a fact about the logs — a
+  // matured male with thin records is still matured, and "need more data to
+  // predict molts" would be the wrong thing to say about an animal that has
+  // none left.
+  //
+  // Deliberately states elapsed time only. No countdown, no "expect X months":
+  // the API doesn't return one and shouldn't, and inventing one here for an
+  // animal a keeper may be about to sell or loan would be worse than silence.
+  if (prediction.has_matured) {
+    const since = prediction.days_since_matured;
+    const elapsed =
+      since == null
+        ? null
+        : since < 31
+        ? `${since} day${since === 1 ? '' : 's'} ago`
+        : since < 365
+        ? `${Math.round(since / 30)} months ago`
+        : `${(since / 365).toFixed(1)} years ago`;
+    return (
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+        ]}
+      >
+        <Text style={[styles.title, { color: colors.textPrimary }]}>Matured</Text>
+        <View style={[styles.insufficientBox, { backgroundColor: 'transparent' }]}>
+          <Text style={[styles.insufficientText, { color: colors.textSecondary }]}>
+            {elapsed
+              ? `Ultimate molt recorded ${elapsed}. No further molts expected, so premolt predictions stop here.`
+              : 'Ultimate molt recorded. No further molts expected, so premolt predictions stop here.'}
+          </Text>
+        </View>
+      </View>
+    );
   }
 
   // Insufficient data state

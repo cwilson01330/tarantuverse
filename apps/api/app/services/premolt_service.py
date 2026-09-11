@@ -26,8 +26,27 @@ def evaluate_premolt_likely(
     recent_refusal_streak: int,
     molt_interval_progress: Optional[float],
     days_since_last_molt: Optional[int],
+    has_ultimate_molt: bool = False,
 ) -> bool:
     """Decide whether an animal is likely in premolt.
+
+    THE ULTIMATE MOLT OVERRIDES EVERYTHING (ult_20260911)
+    ------------------------------------------------------
+    An animal that has had its ultimate molt will not molt again — a matured
+    male tarantula has hooks and emboli and is done. No combination of
+    refusals or elapsed time changes that, so this returns False before any
+    branch is considered.
+
+    It matters most for branch 3, which needs no refusals at all: past 110% of
+    the average interval and more than 30 days since the last molt fires on
+    elapsed time alone. A matured male drifts past 110% and stays there, so
+    without this gate the app declares him "likely in premolt" permanently,
+    about an animal that is biologically incapable of it. Sixteen live male
+    tarantulas with molt history were on that path when this was written.
+
+    Note the refusals are still real and still meaningful — a mature male
+    often stops eating — they just aren't premolt. Suppressing the verdict
+    doesn't hide the refusal streak, which stays in the response.
 
     Pure function of three already-computed signals, extracted from
     predict_premolt so it can be tested without a database. The decision was
@@ -70,6 +89,9 @@ def evaluate_premolt_likely(
     negative merely withholds a heads-up about something the refusal log
     already shows them. The failure modes are not symmetric.
     """
+    if has_ultimate_molt:
+        return False
+
     if molt_interval_progress is not None:
         past_post_molt_window = molt_interval_progress >= MIN_PROGRESS_FOR_REFUSAL_ONLY
     elif days_since_last_molt is not None:
@@ -219,10 +241,19 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
     # visibly wrong and costs trust in every other prediction. A false
     # negative just withholds a heads-up about something the refusal log
     # already shows them. The failure modes are not symmetric.
+    # The ultimate molt, if one has been recorded (ult_20260911). molt_logs is
+    # newest-first, so this also gives us the date maturity happened.
+    ultimate = next((m for m in molt_logs if getattr(m, "is_ultimate", False)), None)
+    matured_at = ultimate.molted_at if ultimate and ultimate.molted_at else None
+    days_since_matured = (
+        (datetime.now(timezone.utc) - matured_at).days if matured_at else None
+    )
+
     is_premolt_likely = evaluate_premolt_likely(
         recent_refusal_streak=recent_refusal_streak,
         molt_interval_progress=molt_interval_progress,
         days_since_last_molt=days_since_last_molt,
+        has_ultimate_molt=ultimate is not None,
     )
 
     # Determine confidence level. Refusal + high progress → high.
@@ -235,9 +266,11 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
     elif recent_refusal_streak >= 2 and molt_interval_progress and molt_interval_progress >= 60:
         confidence = "medium"
 
-    # Estimate molt window (remaining days)
+    # Estimate molt window (remaining days). None once matured — there is no
+    # next molt to be a window toward, and a number here would be nonsense
+    # rather than merely uncertain.
     estimated_molt_window_days = None
-    if average_molt_interval and days_since_last_molt is not None:
+    if ultimate is None and average_molt_interval and days_since_last_molt is not None:
         estimated_molt_window_days = max(0, average_molt_interval - days_since_last_molt)
 
     # Determine data quality
@@ -272,6 +305,13 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
         "refusal_rate_last_30_days": round(refusal_rate_last_30_days, 1) if refusal_rate_last_30_days is not None else None,
         "estimated_molt_window_days": round(estimated_molt_window_days, 1) if estimated_molt_window_days is not None else None,
         "data_quality": data_quality,
+        # Maturity (ult_20260911). ELAPSED ONLY — never time remaining.
+        # species.lifespan_male is populated on 3 of 197 rows, so a "months
+        # left" figure would be invented for 98% of the catalog. Clients
+        # render "Matured 8 months ago", never a countdown.
+        "has_matured": ultimate is not None,
+        "matured_at": matured_at.date().isoformat() if matured_at else None,
+        "days_since_matured": days_since_matured,
         "last_molt_date": last_molt_date.isoformat() if last_molt_date else None,
         "last_feeding_date": last_feeding_date.isoformat() if last_feeding_date else None,
         "feeding_count": feeding_count,

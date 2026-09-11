@@ -330,6 +330,11 @@ export interface InvertMoltLog {
   invert_id: string | null;
   molted_at: string;
   premolt_started_at: string | null;
+  /** The molt after which this animal will not molt again (ult_20260911).
+   *  Suppresses premolt prediction entirely — a matured male tarantula has
+   *  hooks and emboli and is done. Not tarantula-only: mantids terminate in
+   *  both sexes. */
+  is_ultimate?: boolean;
   notes: string | null;
   // Per-molt measurements (ADR-008 growth module). Columns are named
   // leg_span_* for legacy reasons; for non-spider taxa the value is the
@@ -352,6 +357,10 @@ export interface InvertMoltMeasurements {
   /** When premolt was first observed. Optional and often genuinely unknown.
    *  Feeds premolt_service's interval analysis. */
   premolt_started_at?: string | null;
+  /** The ultimate molt (ult_20260911) — permanently suppresses premolt
+   *  prediction for this animal. Sent explicitly rather than omitted so an
+   *  edit can UNSET it, not just set it. */
+  is_ultimate?: boolean;
   leg_span_before?: number | null;
   leg_span_after?: number | null;
   weight_before?: number | null;
