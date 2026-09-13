@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
+import ChangeTaxonDialog, { describeTaxonChangeFailure } from '@/components/ChangeTaxonDialog'
+import type { InvertTaxon } from '@/lib/inverts'
 
 interface SelectedSpecies {
   id: string
@@ -59,6 +61,39 @@ export default function EditTarantulaPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [taxonDialog, setTaxonDialog] = useState(false)
+
+  /**
+   * Move this animal off the tarantula taxon.
+   *
+   * Talks to `/inverts/{id}` even though the rest of this page uses
+   * `/tarantulas/{id}`: under ADR-005 dual-write the two rows SHARE a primary
+   * key, so one id addresses both.
+   *
+   * Redirects to the generic detail page afterwards. The change deletes the
+   * legacy tarantulas row, so /dashboard/tarantulas/{id} would 404 the moment
+   * we returned to it. Unsaved edits on this form are deliberately dropped —
+   * they were headed for a route that no longer has a row to update.
+   */
+  const handleChangeTaxon = async (taxon: InvertTaxon, speciesId: string | null) => {
+    if (!token) return
+    // Declared locally to match the two other fetches on this page — there is
+    // no module-scope API_URL here.
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const res = await fetch(`${API_URL}/api/v1/inverts/${id}/change-taxon`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ taxon, species_id: speciesId }),
+    })
+    if (!res.ok) {
+      // Refusals change nothing server-side, so staying put is correct.
+      setError(await describeTaxonChangeFailure(res))
+      setTaxonDialog(false)
+      return
+    }
+    setTaxonDialog(false)
+    router.push(`/dashboard/inverts/${id}`)
+  }
 
   useEffect(() => {
     if (authLoading) return
@@ -234,6 +269,29 @@ export default function EditTarantulaPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* "It isn't a tarantula" — the most common misfiling, and the
+              reason this row matters more here than on the generic invert
+              form. Jumping spiders in particular get added as tarantulas
+              because that's the app's front door. */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Type</label>
+            <div className="flex items-center gap-3 px-3 py-2 border border-theme rounded-xl bg-surface">
+              <span className="text-xl" aria-hidden="true">🕷️</span>
+              <span className="flex-1 font-semibold text-theme-primary">Tarantula</span>
+              <button
+                type="button"
+                onClick={() => setTaxonDialog(true)}
+                aria-label="Change type"
+                className="px-3.5 py-1.5 rounded-full border border-theme text-primary text-xs font-bold hover:bg-primary-soft transition"
+              >
+                Change
+              </button>
+            </div>
+            <p className="text-xs text-theme-tertiary mt-1">
+              Not actually a tarantula? Refile it without losing its history.
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium mb-1">Species Search</label>
             <SpeciesAutocomplete
@@ -577,6 +635,17 @@ export default function EditTarantulaPage() {
             </button>
           </div>
         </form>
+
+        {/* Outside the <form> on purpose: the dialog has its own text input,
+            and Enter inside a nested input would submit the tarantula form
+            instead of picking a species. */}
+        <ChangeTaxonDialog
+          open={taxonDialog}
+          current="tarantula"
+          animalName={formData.name || formData.common_name || 'this animal'}
+          onClose={() => setTaxonDialog(false)}
+          onConfirm={handleChangeTaxon}
+        />
       </div>
     </DashboardLayout>
   )

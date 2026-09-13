@@ -4,14 +4,18 @@
  * Generic invert edit form (web) — ADR-006 web parity B3.
  *
  * GET /inverts/{id} to prefill, PUT /inverts/{id} to save. Husbandry lives
- * here (added incrementally), matching the mobile edit screen. Taxon is
- * immutable, so it's read-only context.
+ * here (added incrementally), matching the mobile edit screen.
+ *
+ * Taxon is editable as of 2026-09-13, but NOT through this form's PUT — it
+ * goes out through its own endpoint via ChangeTaxonDialog, because the change
+ * rewrites foreign keys across every log table. See that component.
  */
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
-import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
+import ChangeTaxonDialog, { describeTaxonChangeFailure } from '@/components/ChangeTaxonDialog'
+import { INVERT_TAXA, isInvertTaxon, type InvertTaxon } from '@/lib/inverts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -27,6 +31,7 @@ export default function EditInvertPage() {
   const [form, setForm] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [taxonDialog, setTaxonDialog] = useState(false)
 
   useEffect(() => {
     if (isLoading) return
@@ -51,6 +56,37 @@ export default function EditInvertPage() {
   }, [id, token, isAuthenticated, isLoading, router])
 
   const set = (k: string, v: any) => setForm((p: any) => ({ ...p, [k]: v }))
+
+  /**
+   * Apply a taxon change immediately — its own endpoint, its own commit.
+   *
+   * Merges back only the four fields the server rewrites. Replacing the whole
+   * form with the response would silently discard any edit in progress (the
+   * keeper may well have come here to fix a nickname AND the type), and those
+   * unsaved fields still need to go out with the normal Save.
+   */
+  const handleChangeTaxon = async (taxon: InvertTaxon, speciesId: string | null) => {
+    if (!token) return
+    const res = await fetch(`${API_URL}/api/v1/inverts/${id}/change-taxon`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ taxon, species_id: speciesId }),
+    })
+    if (!res.ok) {
+      // Refusals change nothing server-side, so the form is still accurate.
+      alert(await describeTaxonChangeFailure(res))
+      return
+    }
+    const updated = await res.json()
+    setForm((p: any) => ({
+      ...p,
+      taxon: updated.taxon,
+      species_id: updated.species_id,
+      scientific_name: updated.scientific_name,
+      common_name: updated.common_name,
+    }))
+    setTaxonDialog(false)
+  }
 
   const handleSave = async () => {
     if (!token || !form) return
@@ -108,6 +144,31 @@ export default function EditInvertPage() {
               {meta?.glyph} Edit {meta?.label ?? 'animal'}
             </h1>
             <div className="space-y-5">
+              {/* Type leads because it scopes everything under it — the
+                  species catalog, the size label, the care sheet. It's a row
+                  with its own button rather than a select: changing it is a
+                  separate server operation with side effects across every log
+                  table. See ChangeTaxonDialog. */}
+              <Field label="Type">
+                <div className="flex items-center gap-3 px-3 py-2 border border-theme rounded-lg bg-surface">
+                  <span className="text-xl" aria-hidden="true">{meta?.glyph ?? '🐾'}</span>
+                  <span className="flex-1 font-semibold text-theme-primary">{meta?.label ?? form.taxon}</span>
+                  {/* text-primary / bg-primary-soft are the real utilities
+                      (globals.css). `text-primary-600` reads like Tailwind but
+                      this config defines no `primary` palette, so that class
+                      generates nothing — it's dead in ~34 other files. These
+                      read --primary, so they theme themselves: no dark:
+                      variant needed. */}
+                  <button
+                    type="button"
+                    onClick={() => setTaxonDialog(true)}
+                    aria-label="Change type"
+                    className="px-3.5 py-1.5 rounded-full border border-theme text-primary text-xs font-bold hover:bg-primary-soft transition"
+                  >
+                    Change
+                  </button>
+                </div>
+              </Field>
               <Field label="Nickname"><input value={form.name ?? ''} onChange={(e) => set('name', e.target.value)} className={inputCls} /></Field>
               <Field label="Common name"><input value={form.common_name ?? ''} onChange={(e) => set('common_name', e.target.value)} className={inputCls} /></Field>
               <Field label="Scientific name"><input value={form.scientific_name ?? ''} onChange={(e) => set('scientific_name', e.target.value)} className={inputCls} /></Field>
@@ -172,6 +233,16 @@ export default function EditInvertPage() {
                 {saving ? 'Saving…' : 'Save changes'}
               </button>
             </div>
+
+            {isInvertTaxon(formTaxon) && (
+              <ChangeTaxonDialog
+                open={taxonDialog}
+                current={formTaxon}
+                animalName={form.name || 'this animal'}
+                onClose={() => setTaxonDialog(false)}
+                onConfirm={handleChangeTaxon}
+              />
+            )}
           </>
         )}
       </div>

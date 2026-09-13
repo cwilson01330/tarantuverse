@@ -11,9 +11,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { ChangeTaxonSheet } from '../../src/components/ChangeTaxonSheet';
 import DateInput from '../../src/components/DateInput';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
-import { INVERT_TAXA, getInvert, updateInvert, type Invert, type Sex, type Source } from '../../src/lib/inverts';
+import {
+  INVERT_TAXA, changeInvertTaxon, describeTaxonChangeError, getInvert, updateInvert,
+  type Invert, type InvertTaxon, type Sex, type Source,
+} from '../../src/lib/inverts';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
@@ -33,6 +37,8 @@ export default function EditInvertScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Invert | null>(null);
+  const [taxonSheet, setTaxonSheet] = useState(false);
+  const [changingTaxon, setChangingTaxon] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -44,6 +50,43 @@ export default function EditInvertScreen() {
   }, [id, router]);
 
   const update = <K extends keyof Invert>(key: K, value: Invert[K]) => setForm((p) => (p ? { ...p, [key]: value } : p));
+
+  /**
+   * Apply a taxon change immediately — it is its own endpoint and its own
+   * commit, not part of "Save changes".
+   *
+   * Merges back only the four fields the server actually rewrites. Replacing
+   * the whole form with the response would silently discard any edit the
+   * keeper had in progress (they might well have opened this screen to fix a
+   * nickname AND the type), and those unsaved fields still need to go out with
+   * the normal Save.
+   */
+  const handleChangeTaxon = async (taxon: InvertTaxon, speciesId: string | null) => {
+    if (!form || !id) return;
+    try {
+      setChangingTaxon(true);
+      const updated = await changeInvertTaxon(id, taxon, speciesId);
+      setForm((p) => (p ? {
+        ...p,
+        taxon: updated.taxon,
+        species_id: updated.species_id,
+        scientific_name: updated.scientific_name,
+        common_name: updated.common_name,
+      } : p));
+      setTaxonSheet(false);
+      Alert.alert(
+        'Type changed',
+        `${form.name || 'This animal'} is now filed as a ${INVERT_TAXA[taxon].label.toLowerCase()}. Its history came with it.`,
+      );
+    } catch (err) {
+      // Nothing was changed server-side on a refusal, so the form is still
+      // accurate — leave the sheet open on the confirm step so they can retry
+      // or back out.
+      Alert.alert('Could not change type', describeTaxonChangeError(err));
+    } finally {
+      setChangingTaxon(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!form || !id) return;
@@ -73,6 +116,26 @@ export default function EditInvertScreen() {
       <AppHeader title={`Edit ${meta?.label.toLowerCase() ?? 'invert'}`} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={'padding'}>
         <ScrollView contentContainerStyle={styles.scroll}>
+          {/* Type sits above species because it scopes species: the picker
+              below only searches this taxon's catalog. It's a row with its own
+              button rather than a chip group, because changing it is a
+              separate server operation with side effects across every log
+              table — see ChangeTaxonSheet. */}
+          <Field label="Type">
+            <View style={[styles.taxonRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <Text style={styles.taxonGlyph}>{meta?.glyph ?? '🐾'}</Text>
+              <Text style={[styles.taxonLabel, { color: colors.textPrimary }]}>{meta?.label ?? form.taxon}</Text>
+              <TouchableOpacity
+                onPress={() => setTaxonSheet(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Change type"
+                accessibilityHint="Refile this animal as a different kind of invertebrate"
+                style={[styles.taxonChange, { borderColor: colors.primary }]}
+              >
+                <Text style={[styles.taxonChangeText, { color: colors.primary }]}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          </Field>
           {!meta?.freeform && (
             <Field label="Species">
               <InvertSpeciesPicker taxon={form.taxon} valueId={form.species_id} valueScientific={form.scientific_name ?? ''}
@@ -142,6 +205,15 @@ export default function EditInvertScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ChangeTaxonSheet
+        visible={taxonSheet}
+        current={form.taxon}
+        animalName={form.name || 'this animal'}
+        saving={changingTaxon}
+        onClose={() => setTaxonSheet(false)}
+        onConfirm={handleChangeTaxon}
+      />
     </View>
   );
 }
@@ -185,4 +257,11 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, marginBottom: 12 },
     saveButton: { marginTop: 8, backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
     saveText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    taxonRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+    taxonGlyph: { fontSize: 20 },
+    taxonLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
+    // 44pt-ish tap target via padding — this is a small control next to a
+    // static label, and an under-sized one is exactly what an a11y sweep flags.
+    taxonChange: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+    taxonChangeText: { fontSize: 13, fontWeight: '700' },
   });

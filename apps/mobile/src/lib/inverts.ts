@@ -463,6 +463,50 @@ export async function updateInvert(id: string, payload: InvertUpdate): Promise<I
 }
 
 /**
+ * Correct an animal's taxon, keeping its whole history.
+ *
+ * Its own endpoint rather than a field on updateInvert, and deliberately not
+ * part of InvertUpdate: server-side this deletes a legacy mirror row and
+ * rewrites foreign keys across every log table. It has to be asked for on
+ * purpose, never as a side effect of a form echoing back what it fetched.
+ *
+ * Pass `speciesId` whenever the keeper picked one. Omitting it does NOT keep
+ * the old link — the server clears a species belonging to the previous taxon,
+ * because a jumping spider carrying a tarantula's species_id would drive the
+ * wrong care sheet and the wrong feeding cadence.
+ *
+ * Can reject with 409 when records exist that the change would destroy; in
+ * that case nothing was modified. Render `detail.message` — see
+ * describeTaxonChangeError.
+ */
+export async function changeInvertTaxon(
+  id: string,
+  taxon: InvertTaxon,
+  speciesId?: string | null,
+): Promise<Invert> {
+  const { data } = await apiClient.post<Invert>(`/inverts/${id}/change-taxon`, {
+    taxon,
+    species_id: speciesId ?? null,
+  });
+  return data;
+}
+
+/** Human-readable reason a taxon change was refused.
+ *
+ * The 409 body is `{message, orphan_rows}` rather than a bare string, so the
+ * generic "detail is a string" path would show a keeper "[object Object]".
+ */
+export function describeTaxonChangeError(e: any): string {
+  const detail = e?.response?.data?.detail;
+  if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+    return detail.message;
+  }
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  if (!e?.response) return 'No response from the server. Check your connection and try again.';
+  return 'Something went wrong. Your animal was not changed.';
+}
+
+/**
  * ADR-017 Phase 3 — apply one feeding cadence across the collection.
  *
  * `days = null` clears the override everywhere, so a keeper who set a cadence

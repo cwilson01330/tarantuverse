@@ -18,6 +18,10 @@ import SpeciesAutocomplete from '../../src/components/SpeciesAutocomplete';
 import { apiClient } from '../../src/services/api';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { ChangeTaxonSheet } from '../../src/components/ChangeTaxonSheet';
+import {
+  INVERT_TAXA, changeInvertTaxon, describeTaxonChangeError, type InvertTaxon,
+} from '../../src/lib/inverts';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 interface TarantulaData {
@@ -58,6 +62,8 @@ export default function EditTarantulaScreen() {
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [taxonSheet, setTaxonSheet] = useState(false);
+  const [changingTaxon, setChangingTaxon] = useState(false);
 
   const [formData, setFormData] = useState<TarantulaData>({
     name: '',
@@ -124,6 +130,37 @@ export default function EditTarantulaScreen() {
     }
   };
 
+  /**
+   * Move this animal off the tarantula taxon.
+   *
+   * Works on `/inverts/{id}` even though the rest of this screen talks to
+   * `/tarantulas/{id}`: under ADR-005 dual-write the two rows SHARE a primary
+   * key, so the same id addresses both.
+   *
+   * Navigates with `replace` to the generic detail screen rather than
+   * `back()`. The change deletes the legacy tarantulas row, so the screen
+   * behind this one — /tarantula/[id] — would 404 the moment we returned to
+   * it. Any unsaved edits on this form are deliberately dropped: they were
+   * headed for a route that no longer has a row to update.
+   */
+  const handleChangeTaxon = async (taxon: InvertTaxon, speciesId: string | null) => {
+    try {
+      setChangingTaxon(true);
+      await changeInvertTaxon(String(id), taxon, speciesId);
+      setTaxonSheet(false);
+      Alert.alert(
+        'Type changed',
+        `${formData.name || 'This animal'} is now filed as a ${INVERT_TAXA[taxon].label.toLowerCase()}. Its history came with it.`,
+      );
+      router.replace(`/invert/${id}` as any);
+    } catch (error: any) {
+      // Refusals change nothing server-side, so staying put is correct.
+      Alert.alert('Could not change type', describeTaxonChangeError(error));
+    } finally {
+      setChangingTaxon(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -181,6 +218,28 @@ export default function EditTarantulaScreen() {
         {/* Basic Information */}
         <View style={[styles.section, { borderBottomColor: colors.border }]}>
           <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Basic Information</Text>
+
+          {/* "It isn't a tarantula" — the single most common misfiling, and
+              the reason this row matters more here than on the generic invert
+              form. Jumping spiders in particular get added as tarantulas
+              because that's the app's front door; three of one keeper's
+              animals were filed that way (2026-09-13). */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>Type</Text>
+            <View style={[styles.taxonRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+              <Text style={styles.taxonGlyph}>🕷️</Text>
+              <Text style={[styles.taxonLabel, { color: colors.textPrimary }]}>Tarantula</Text>
+              <TouchableOpacity
+                onPress={() => setTaxonSheet(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Change type"
+                accessibilityHint="Refile this animal as a different kind of invertebrate"
+                style={[styles.taxonChange, { borderColor: colors.primary }]}
+              >
+                <Text style={[styles.taxonChangeText, { color: colors.primary }]}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {/* Species link — picking from the autocomplete sets species_id
               (the FK that the cross-species breeding guard and care
@@ -542,11 +601,33 @@ export default function EditTarantulaScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
       </KeyboardAvoidingView>
+
+      <ChangeTaxonSheet
+        visible={taxonSheet}
+        current="tarantula"
+        animalName={formData.name || 'this animal'}
+        saving={changingTaxon}
+        onClose={() => setTaxonSheet(false)}
+        onConfirm={handleChangeTaxon}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  taxonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  taxonGlyph: { fontSize: 20 },
+  taxonLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
+  taxonChange: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7 },
+  taxonChangeText: { fontSize: 13, fontWeight: '700' },
   container: {
     flex: 1,
   },
