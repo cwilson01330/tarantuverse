@@ -8,13 +8,75 @@ route, replacing the old tarantula-only check.
 
 Premium / unlimited plans use a sentinel of -1 and are never capped.
 """
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.invert import Invert
 from app.models.colony import Colony
 from app.models.animal import Animal
+from app.models.subscription import UserSubscription
 from app.models.user import User, FREE_TIER_MAX_ANIMALS, HV_FREE_TIER_MAX_ANIMALS
+
+
+def _lapsed_subscription(db: Session, user_id) -> bool:
+    """True if this user HAD a subscription whose period has ended.
+
+    Used only to word the cap message. Someone who paid and lapsed is in a
+    completely different situation from someone who never subscribed: the
+    first needs to know their subscription ended, the second needs to know a
+    paid tier exists. Telling a lapsed keeper they've "reached the limit of
+    20" invites them to delete animals to solve a billing problem.
+
+    Deliberately does NOT grant or restore entitlement — it only changes
+    copy. Entitlement stays with active_subscription_clause.
+    """
+    return (
+        db.query(UserSubscription.id)
+        .filter(
+            UserSubscription.user_id == user_id,
+            UserSubscription.expires_at.isnot(None),
+            UserSubscription.expires_at <= datetime.now(timezone.utc),
+        )
+        .first()
+        is not None
+    )
+
+
+def _cap_message(*, current_count: int, cap: int, lapsed: bool) -> str:
+    """Say what is actually true of this keeper.
+
+    Three distinct situations that the single old sentence flattened:
+      - at the cap, never subscribed  → the ordinary upsell
+      - OVER the cap                  → "reached the limit of 20" is false to
+                                        someone holding 60, and reads as an
+                                        instruction to start deleting
+      - lapsed subscriber             → the fix is billing, not their collection
+    """
+    if lapsed:
+        over = current_count > cap
+        return (
+            f"Your subscription has ended, so you're back on the free plan's "
+            f"{cap}-animal limit"
+            + (
+                f" — you currently have {current_count}. Nothing has been "
+                f"deleted or hidden, and all of your animals stay editable. "
+                f"You just can't add another until you resubscribe."
+                if over
+                else ". Renew to keep adding animals."
+            )
+        )
+    if current_count > cap:
+        return (
+            f"You have {current_count} animals, above the free plan's limit of "
+            f"{cap}. Everything you've logged stays exactly as it is — you just "
+            f"can't add another on the free plan."
+        )
+    return (
+        f"You've reached the limit of {cap} animals on the free plan. "
+        f"Upgrade to premium for unlimited tracking!"
+    )
 
 
 def active_colonies_query(db: Session, user_id):
@@ -76,16 +138,20 @@ def enforce_collection_limit(db: Session, user: User) -> None:
     )
 
     if current_count >= max_animals:
+        lapsed = _lapsed_subscription(db, user.id)
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
-                "message": (
-                    f"You've reached the limit of {max_animals} animals on the "
-                    f"free plan. Upgrade to premium for unlimited tracking!"
+                "message": _cap_message(
+                    current_count=current_count, cap=max_animals, lapsed=lapsed
                 ),
                 "current_count": current_count,
                 "limit": max_animals,
                 "is_premium": limits.get("is_premium", False),
+                # Lets the client offer "Renew" rather than "Upgrade", and
+                # avoids a lapsed subscriber being sold a plan they already
+                # know about as though they'd never heard of it.
+                "subscription_lapsed": lapsed,
             },
         )
 
@@ -120,16 +186,17 @@ def enforce_animal_limit(db: Session, user: User) -> None:
     current_count = active_animals_query(db, user.id).count()
 
     if current_count >= cap:
+        lapsed = _lapsed_subscription(db, user.id)
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={
-                "message": (
-                    f"You've reached the limit of {cap} animals on the free "
-                    f"plan. Upgrade to premium for unlimited tracking!"
+                "message": _cap_message(
+                    current_count=current_count, cap=cap, lapsed=lapsed
                 ),
                 "current_count": current_count,
                 "limit": cap,
                 "is_premium": False,
+                "subscription_lapsed": lapsed,
             },
         )
 
