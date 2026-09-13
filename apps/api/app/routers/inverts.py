@@ -36,6 +36,7 @@ from app.models.molt_log import MoltLog
 from app.models.scorpion_colony import ScorpionColony
 from app.models.tarantula import Sex, Source  # shared DB enums (UPPERCASE)
 from app.schemas.invert import (
+    ChangeTaxonRequest,
     InvertCreate,
     InvertFeedingStats,
     InvertFeedingStatusItem,
@@ -47,6 +48,7 @@ from app.services.growth_service import compute_growth_fields
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
 from app.utils.limits import active_inverts_query, enforce_collection_limit
+from app.services.retaxon_service import change_invert_taxon
 from app.schemas.death import MarkDiedRequest
 
 router = APIRouter()
@@ -476,8 +478,13 @@ async def update_invert(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Partial update — only fields in the payload are applied. Taxon
-    cannot be changed (intentionally omitted from InvertUpdate)."""
+    """Partial update — only fields in the payload are applied.
+
+    Taxon is intentionally omitted from InvertUpdate and always will be. It IS
+    now changeable, but only through POST /inverts/{id}/change-taxon, because
+    the change deletes a legacy mirror row and rewrites foreign keys across
+    every log table. Allowing it here would let a client move an animal between
+    taxa by echoing back an object it had merely fetched."""
     invert = db.query(Invert).filter(
         Invert.id == invert_id,
         Invert.user_id == current_user.id,
@@ -799,6 +806,42 @@ async def mark_invert_died(
 
     db.commit()
     db.refresh(invert)
+    return invert
+
+
+@router.post("/{invert_id}/change-taxon", response_model=InvertResponse)
+async def change_taxon(
+    invert_id: UUID,
+    payload: ChangeTaxonRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Correct an animal's taxon, keeping its whole history.
+
+    A dedicated route rather than a field on PUT /inverts/{id}, for the same
+    reason mark-died and transfer are: this has side effects well beyond the
+    column it sets. It deletes a legacy mirror row, rewrites foreign keys on
+    every log table, and may create a new mirror row — none of which belongs
+    inside a generic field update where a client could trigger it by echoing
+    back an object it fetched.
+
+    Taxon was immutable before this. The cost was real: a keeper who picked
+    wrong at creation could either delete the animal and lose every feeding,
+    molt and photo, or message the developer, and both happened. Refusing to
+    let someone fix a mis-tap isn't data integrity, it's just a wall.
+
+    See retaxon_service for why the order of operations is not negotiable.
+    """
+    invert = db.query(Invert).filter(
+        Invert.id == invert_id,
+        Invert.user_id == current_user.id,
+    ).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+
+    change_invert_taxon(
+        db, invert, payload.taxon, species_id=payload.species_id
+    )
     return invert
 
 

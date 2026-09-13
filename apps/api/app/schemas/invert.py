@@ -75,8 +75,31 @@ class InvertBase(BaseModel):
     notes: Optional[str] = None
 
 
+class ChangeTaxonRequest(BaseModel):
+    """Correct an animal's taxon (POST /inverts/{id}/change-taxon).
+
+    Its own request model rather than a field on InvertUpdate: the operation
+    rewrites foreign keys across every log table and adds or removes a legacy
+    mirror row, so it must be asked for deliberately and never triggered by a
+    client echoing back an object it fetched.
+
+    `species_id` is optional but strongly wanted — without it an existing link
+    to a species of the OLD taxon is cleared, because a jumping spider carrying
+    a tarantula's species_id would drive the wrong care sheet and the wrong
+    feeding cadence. Better blank than wrong.
+    """
+    taxon: str = Field(..., pattern=TAXON_PATTERN)
+    species_id: Optional[uuid.UUID] = None
+
+
 class InvertCreate(InvertBase):
-    """Create — taxon is required and immutable thereafter."""
+    """Create — taxon is required here.
+
+    No longer immutable: POST /inverts/{id}/change-taxon corrects it while
+    preserving history (see services/retaxon_service). It stays off
+    InvertUpdate deliberately, so an ordinary field edit can't move an animal
+    between taxa as a side effect.
+    """
     taxon: str = Field(..., pattern=TAXON_PATTERN)
     species_id: Optional[uuid.UUID] = None
     enclosure_id: Optional[uuid.UUID] = None
