@@ -29,13 +29,42 @@ scrolls their history.
 
 Hence the fixed order in `change_invert_taxon`:
 
-    1. refuse outright if any child row carries the legacy FK with no invert_id
-    2. NULL the legacy FK on every child row
+    1. refuse outright if any dependent row would be destroyed rather than
+       detached
+    2. NULL the legacy FK on every dependent row that has an invert-side
+       column to fall back on
     3. THEN drop the mirror row — now cascading over nothing
     4. THEN change the taxon, fix the species link, and create the new mirror
        row if the destination taxon has one
 
 Steps 1 and 2 exist only to make step 3 survivable. Do not reorder them.
+
+COVERAGE IS DERIVED FROM THE SCHEMA, NOT FROM MEMORY
+----------------------------------------------------
+The first version of this file listed five log tables — the ones that came to
+mind. It missed `pairings`, which cascades from `tarantulas` through BOTH
+`male_id` and `female_id` and on down to `egg_sacs` and `offspring`. A keeper
+correcting one mis-tapped taxon would have silently lost an entire breeding
+project. It also missed `broods`.
+
+So the lists below are transcribed from this query, not from recall. Re-run it
+whenever a table gains a legacy FK:
+
+    SELECT ccu.table_name AS parent, tc.table_name AS child,
+           kcu.column_name AS child_col, rc.delete_rule
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name
+    JOIN information_schema.constraint_column_usage ccu
+      ON tc.constraint_name = ccu.constraint_name
+    JOIN information_schema.referential_constraints rc
+      ON tc.constraint_name = rc.constraint_name
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND ccu.table_name IN ('tarantulas', 'scorpions')
+      AND rc.delete_rule = 'CASCADE';
+
+Verified against production 2026-09-13. `test_retaxon_ordering` pins the
+resulting set so a silent omission fails a test rather than a keeper's data.
 """
 from __future__ import annotations
 
@@ -59,9 +88,10 @@ from app.services.inverts_dualwrite import (
 LEGACY_TABLES = {"tarantula": ("tarantulas", "tarantula_id"),
                  "scorpion": ("scorpions", "scorpion_id")}
 
-# Child tables whose rows can carry a legacy FK. Verified against the live
-# CHECK constraints 2026-09-13 — each permits a NULL legacy FK while invert_id
-# is set, which is what makes the detach in step 2 legal.
+# Polymorphic log tables — same shape for both legacy taxa: one legacy FK
+# column plus `invert_id`. Verified against the live CHECK constraints
+# 2026-09-13; each permits a NULL legacy FK while invert_id is set, which is
+# what makes the detach in step 2 legal.
 CHILD_TABLES = [
     "feeding_logs",
     "molt_logs",
@@ -70,39 +100,95 @@ CHILD_TABLES = [
     "qr_upload_sessions",
 ]
 
+# Everything else that cascades off a legacy row, per taxon.
+#
+# (table, legacy_column, invert_column). A None invert_column means the row
+# has nowhere to be re-pointed, so its presence REFUSES the whole operation
+# rather than being detached.
+#
+#   pairings — polymorphic (male_invert_id / female_invert_id both exist and
+#     are nullable, no CHECK constraint), so it detaches like a log table. Two
+#     entries because a single animal can be either side. Cascades onward to
+#     egg_sacs → offspring, which is why missing it was expensive.
+#   broods — `mother_scorpion_id` is NOT NULL and has no invert equivalent
+#     (scorpion breeding predates consolidation). A brood mother genuinely
+#     cannot change taxon without losing the brood, so we say so and stop.
+EXTRA_CASCADES: dict[str, list[tuple[str, str, Optional[str]]]] = {
+    "tarantula": [
+        ("pairings", "male_id", "male_invert_id"),
+        ("pairings", "female_id", "female_invert_id"),
+    ],
+    "scorpion": [
+        ("broods", "mother_scorpion_id", None),
+    ],
+}
 
-def _history_counts(db: Session, invert_id: UUID) -> dict:
-    """Child rows reachable by invert_id ONLY.
+
+def _cascade_sources(old_taxon: str) -> list[tuple[str, str, Optional[str]]]:
+    """Every (table, legacy_col, invert_col) that a mirror-row delete reaches."""
+    legacy_col = LEGACY_TABLES[old_taxon][1]
+    sources: list[tuple[str, str, Optional[str]]] = [
+        (t, legacy_col, "invert_id") for t in CHILD_TABLES
+    ]
+    sources += EXTRA_CASCADES.get(old_taxon, [])
+    return sources
+
+
+def _history_counts(db: Session, invert_id: UUID, old_taxon: Optional[str] = None) -> dict:
+    """Dependent rows reachable by the INVERT-side column only.
 
     Deliberately does not also match the legacy FK: the point is to prove rows
     survive once that FK is gone, and a query matching either column would keep
     reporting success right up until it didn't.
+
+    Keyed "table.column" because pairings contributes two entries (an animal
+    can be either side of one). `old_taxon` is optional so the admin script can
+    print log counts before it knows the taxon matters.
     """
-    return {
-        t: db.execute(
+    counts = {
+        f"{t}.invert_id": db.execute(
             text(f"SELECT COUNT(*) FROM {t} WHERE invert_id = :i"), {"i": str(invert_id)}
         ).scalar()
         for t in CHILD_TABLES
     }
-
-
-def _orphan_rows(db: Session, invert_id: UUID, legacy_col: str) -> list[str]:
-    """Child rows holding the legacy FK with no invert_id to fall back on.
-
-    These can be neither detached (the parent CHECK would fail) nor left in
-    place (the cascade would destroy them), so their presence means the whole
-    operation must be refused. Expected to be empty — dual-write sets both —
-    but "expected empty" is exactly the assumption worth testing before a
-    destructive step.
-    """
-    found = []
-    for t in CHILD_TABLES:
-        n = db.execute(
-            text(f"SELECT COUNT(*) FROM {t} WHERE {legacy_col} = :i AND invert_id IS NULL"),
+    for table, _legacy_col, invert_col in EXTRA_CASCADES.get(old_taxon or "", []):
+        if invert_col is None:
+            # Nothing to count — these can't survive, so they're refused
+            # up front rather than tracked through the change.
+            continue
+        counts[f"{table}.{invert_col}"] = db.execute(
+            text(f"SELECT COUNT(*) FROM {table} WHERE {invert_col} = :i"),
             {"i": str(invert_id)},
         ).scalar()
+    return counts
+
+
+def _orphan_rows(db: Session, invert_id: UUID, old_taxon: str) -> list[str]:
+    """Rows the mirror-row delete would destroy rather than detach.
+
+    Two kinds:
+      - a polymorphic row holding the legacy FK with no invert-side value to
+        fall back on. Can be neither detached (nothing left pointing at the
+        animal) nor left in place (the cascade takes it).
+      - a row in a table with no invert-side column at all (broods), which can
+        never be detached.
+
+    Both mean the whole operation must be refused. The first kind is expected
+    to be empty — dual-write sets both columns — but "expected empty" is
+    exactly the assumption worth testing immediately before a destructive step.
+    """
+    found = []
+    for table, legacy_col, invert_col in _cascade_sources(old_taxon):
+        if invert_col is None:
+            sql = f"SELECT COUNT(*) FROM {table} WHERE {legacy_col} = :i"
+        else:
+            sql = (
+                f"SELECT COUNT(*) FROM {table} "
+                f"WHERE {legacy_col} = :i AND {invert_col} IS NULL"
+            )
+        n = db.execute(text(sql), {"i": str(invert_id)}).scalar()
         if n:
-            found.append(f"{t}: {n}")
+            found.append(f"{table}.{legacy_col}: {n}")
     return found
 
 
@@ -127,7 +213,7 @@ def change_invert_taxon(
             detail=f"Already a {new_taxon}.",
         )
 
-    before = _history_counts(db, invert.id)
+    before = _history_counts(db, invert.id, old_taxon)
 
     # --- species link ------------------------------------------------------
     # Resolved before anything is mutated so a bad species id fails clean.
@@ -149,9 +235,7 @@ def change_invert_taxon(
     legacy = LEGACY_TABLES.get(old_taxon)
     detached = {}
     if legacy:
-        legacy_table, legacy_col = legacy
-
-        orphans = _orphan_rows(db, invert.id, legacy_col)
+        orphans = _orphan_rows(db, invert.id, old_taxon)
         if orphans:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -164,13 +248,18 @@ def change_invert_taxon(
                 },
             )
 
-        for t in CHILD_TABLES:
+        for table, legacy_col, invert_col in _cascade_sources(old_taxon):
+            if invert_col is None:
+                # Unreachable: _orphan_rows already refused on any row here.
+                # Skipping rather than NULLing is the safe reading either way,
+                # since these columns are NOT NULL.
+                continue
             n = db.execute(
-                text(f"UPDATE {t} SET {legacy_col} = NULL WHERE {legacy_col} = :i"),
+                text(f"UPDATE {table} SET {legacy_col} = NULL WHERE {legacy_col} = :i"),
                 {"i": str(invert.id)},
             ).rowcount
             if n:
-                detached[t] = n
+                detached[f"{table}.{legacy_col}"] = n
 
         # Only now is this survivable.
         mirror_invert_delete_to_legacy(db, invert)
@@ -203,7 +292,7 @@ def change_invert_taxon(
         mirror_invert_create_to_legacy(db, invert)
 
     db.flush()
-    after = _history_counts(db, invert.id)
+    after = _history_counts(db, invert.id, old_taxon)
     if after != before:
         db.rollback()
         raise HTTPException(

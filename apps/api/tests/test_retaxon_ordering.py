@@ -23,7 +23,12 @@ well-meaning refactor would reorder.
 import inspect
 
 from app.services import retaxon_service
-from app.services.retaxon_service import CHILD_TABLES, LEGACY_TABLES
+from app.services.retaxon_service import (
+    CHILD_TABLES,
+    EXTRA_CASCADES,
+    LEGACY_TABLES,
+    _cascade_sources,
+)
 
 
 SOURCE = inspect.getsource(retaxon_service.change_invert_taxon)
@@ -72,8 +77,13 @@ def test_history_is_verified_after_the_change():
 # ── What must stay covered ───────────────────────────────────────────────────
 
 def test_every_table_that_can_cascade_is_detached():
-    """A child table missing from CHILD_TABLES is a table whose rows get
-    cascade-deleted with no warning. This list is the safety boundary."""
+    """A table missing from this set is a table whose rows get cascade-deleted
+    with no warning. It IS the safety boundary.
+
+    Transcribed from information_schema against production 2026-09-13 — see
+    the query in the service docstring. Do not edit this to make a test pass;
+    re-run the query and edit the service.
+    """
     assert set(CHILD_TABLES) == {
         "feeding_logs",
         "molt_logs",
@@ -81,6 +91,60 @@ def test_every_table_that_can_cascade_is_detached():
         "photos",
         "qr_upload_sessions",
     }
+
+    tarantula = {(t, c) for t, c, _ in _cascade_sources("tarantula")}
+    scorpion = {(t, c) for t, c, _ in _cascade_sources("scorpion")}
+
+    assert tarantula == {
+        ("feeding_logs", "tarantula_id"),
+        ("molt_logs", "tarantula_id"),
+        ("substrate_changes", "tarantula_id"),
+        ("photos", "tarantula_id"),
+        ("qr_upload_sessions", "tarantula_id"),
+        ("pairings", "male_id"),
+        ("pairings", "female_id"),
+    }
+    assert scorpion == {
+        ("feeding_logs", "scorpion_id"),
+        ("molt_logs", "scorpion_id"),
+        ("substrate_changes", "scorpion_id"),
+        ("photos", "scorpion_id"),
+        ("qr_upload_sessions", "scorpion_id"),
+        ("broods", "mother_scorpion_id"),
+    }
+
+
+def test_pairings_is_covered_on_both_sides():
+    """The omission that made this whole mechanism necessary a second time.
+
+    pairings cascades from `tarantulas` through male_id AND female_id, and on
+    to egg_sacs → offspring. Covering one side would still destroy a breeding
+    project for every animal that happened to be the other sex.
+    """
+    pairing_cols = {c for t, c, _ in EXTRA_CASCADES["tarantula"] if t == "pairings"}
+    assert pairing_cols == {"male_id", "female_id"}
+
+    invert_cols = {i for t, _, i in EXTRA_CASCADES["tarantula"] if t == "pairings"}
+    assert invert_cols == {"male_invert_id", "female_invert_id"}, (
+        "pairings is polymorphic — it must be DETACHED, not refused. Both "
+        "invert-side columns are nullable with no CHECK constraint."
+    )
+
+
+def test_a_brood_mother_is_refused_rather_than_detached():
+    """broods.mother_scorpion_id is NOT NULL with no invert equivalent, so
+    there is nowhere to re-point it. Refusing is the only honest answer —
+    NULLing would violate the constraint and detaching is impossible."""
+    broods = [row for row in EXTRA_CASCADES["scorpion"] if row[0] == "broods"]
+    assert broods == [("broods", "mother_scorpion_id", None)]
+
+
+def test_undetachable_tables_never_reach_the_update():
+    """A None invert column must be skipped by the detach loop. Building an
+    `UPDATE ... SET mother_scorpion_id = NULL` would fail the NOT NULL
+    constraint and abort mid-change."""
+    assert "if invert_col is None:" in SOURCE
+    assert SOURCE.find("if invert_col is None:") < SOURCE.find("UPDATE {table}")
 
 
 def test_only_tarantula_and_scorpion_have_legacy_mirrors():
@@ -100,6 +164,7 @@ def test_history_counts_do_not_look_at_the_legacy_key():
     src = inspect.getsource(retaxon_service._history_counts)
     assert "WHERE invert_id = :i" in src
     assert "tarantula_id" not in src
+    assert "scorpion_id" not in src
 
 
 # ── Species linkage ──────────────────────────────────────────────────────────

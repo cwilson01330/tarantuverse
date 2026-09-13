@@ -46,6 +46,18 @@ from app.services.retaxon_service import (
 )
 
 
+def _species_taxon_mismatch(species, new_taxon: str) -> str | None:
+    """The one refusal the dry run used to miss.
+
+    The service rejects a species belonging to a different taxon, but it does
+    that at apply time. Looking the name up here and printing it made a dry run
+    read as clean right up to the point where --apply 400s.
+    """
+    if species is not None and species.taxon != new_taxon:
+        return f"{species.scientific_name} is a {species.taxon}, not a {new_taxon}"
+    return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("invert_id")
@@ -66,7 +78,7 @@ def main() -> int:
         old_taxon = inv.taxon
         print(f"{'APPLY' if args.apply else 'DRY RUN'}")
         print(f"  {inv.name or '(unnamed)'}  {old_taxon} -> {args.new_taxon}")
-        print(f"  history by invert_id: {_history_counts(db, inv.id)}")
+        print(f"  history by invert-side column: {_history_counts(db, inv.id, old_taxon)}")
 
         species = None
         if args.species:
@@ -78,7 +90,11 @@ def main() -> int:
             if not species:
                 print(f"  ! species not found: {args.species}")
                 return 1
-            print(f"  species -> {species.scientific_name}")
+            mismatch = _species_taxon_mismatch(species, args.new_taxon)
+            if mismatch:
+                print(f"  ! WOULD REFUSE — {mismatch}")
+                return 1
+            print(f"  species -> {species.scientific_name} ({species.taxon})")
         else:
             print("  species -> cleared if it belongs to the old taxon")
 
@@ -86,12 +102,12 @@ def main() -> int:
         # the refusal instead of only discovering it on --apply.
         legacy = LEGACY_TABLES.get(old_taxon)
         if legacy:
-            orphans = _orphan_rows(db, inv.id, legacy[1])
+            orphans = _orphan_rows(db, inv.id, old_taxon)
             if orphans:
-                print("  ! WOULD REFUSE — rows hold the legacy FK with no invert_id:")
+                print("  ! WOULD REFUSE — these rows would be destroyed, not moved:")
                 for o in orphans:
                     print(f"      {o}")
-                print("    Backfill invert_id on those first.")
+                print("    Backfill the invert-side column first, or unlink them.")
                 return 1
             print(f"  legacy mirror: {legacy[0]} row will be removed")
 
