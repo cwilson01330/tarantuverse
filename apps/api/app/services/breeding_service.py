@@ -56,8 +56,8 @@ def _summary(
     placeholder; never an empty string, which is what rendered as a blank row.
     """
     display = name or common_name or scientific_name or "Unnamed"
-    # sex is a plain VARCHAR holding UPPERCASE enum names in prod (the shared DB
-    # convention), so normalise for display rather than trusting the column.
+    # Takes .value off the Sex enum; the DB holds the uppercase NAME. Lowered
+    # for display so clients get one consistent casing whatever the layer does.
     sex_value = getattr(sex, "value", sex)
     return {
         "id": str(animal_id),

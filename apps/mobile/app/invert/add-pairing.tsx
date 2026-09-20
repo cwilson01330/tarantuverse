@@ -36,9 +36,12 @@ const TYPE_OPTIONS = [
 ];
 
 /**
- * 'male' | 'female' | null. Case-insensitive because the column is a plain
- * VARCHAR holding UPPERCASE enum names in production, and 'unknown' normalises
- * to null — it's a real answer meaning "no information", not a third sex.
+ * 'male' | 'female' | null. Case-insensitive defensively, not to fix a bug. The DB stores the
+ * enum NAME ('FEMALE') because SQLEnum has no values_callable, but SQLAlchemy
+ * loads it back as the Sex enum and Pydantic serialises .value — so the API
+ * returns lowercase. Normalising means a change at either layer can't silently
+ * make this match nothing. 'unknown' maps to null: it means "no information",
+ * not a third sex.
  */
 function normalisedSex(sex: string | null | undefined): 'male' | 'female' | null {
   const lowered = (sex ?? '').toLowerCase();
@@ -92,10 +95,10 @@ export default function AddInvertPairingScreen() {
     if (!mateId) { Alert.alert('Pick a mate', 'Choose another animal to pair with.'); return; }
     try {
       setSaving(true);
-      // Case-insensitive on purpose. `sex` is a plain VARCHAR holding UPPERCASE
-      // enum names in production (the shared DB convention), so the old
-      // `self.sex === 'female'` was never true — every animal landed in the
-      // MALE slot, including females. Silent until the server started checking.
+      // Case-insensitive defensively. The API serialises the Sex enum's
+      // .value, so this arrives lowercase today and a bare === 'female' would
+      // also work — but the DB stores the uppercase NAME, and normalising means
+      // a change at either layer can't silently match nothing.
       const selfFemale = normalisedSex(self.sex) === 'female';
       const saved = await createInvertPairing({
         male_invert_id: selfFemale ? mateId : id,

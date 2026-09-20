@@ -176,9 +176,9 @@ def test_same_sex_is_refused_but_unknown_is_not():
 
 
 def test_sex_comparison_is_case_insensitive():
-    """The column is a plain VARCHAR holding UPPERCASE enum names in
-    production. A case-sensitive check silently never matches — which is
-    exactly the bug the clients had."""
+    """Defensive, not a fix. The API serialises the enum's lowercase .value
+    while the DB stores the uppercase NAME; normalising means a change at
+    either layer can't silently make every comparison fail."""
     assert ".lower()" in inspect.getsource(pairings_router._sex_of)
 
 

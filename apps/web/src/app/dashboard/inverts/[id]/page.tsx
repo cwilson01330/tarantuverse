@@ -345,10 +345,9 @@ export default function InvertDetailPage() {
     if (!pairMateId) { alert('Pick a mate.'); return }
     setPairBusy(true)
     try {
-      // Case-insensitive on purpose. `sex` is a plain VARCHAR holding UPPERCASE
-      // enum names in production, so `invert.sex === 'female'` was never true —
-      // every animal landed in the MALE slot, females included. Harmless until
-      // the server started rejecting swapped slots.
+      // Case-insensitive defensively. The API serialises the Sex enum's
+      // .value so this arrives lowercase; the DB stores the uppercase NAME.
+      // Normalising means a change at either layer can't silently match nothing.
       const selfFemale = (invert.sex ?? '').toLowerCase() === 'female'
       const body = {
         male_invert_id: selfFemale ? pairMateId : invert.id,

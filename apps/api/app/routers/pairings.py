@@ -24,10 +24,13 @@ router = APIRouter()
 def _sex_of(animal: Invert) -> str | None:
     """Lower-case 'male'/'female', or None when unknown/unset.
 
-    `sex` is a plain VARCHAR holding UPPERCASE enum names in production (the
-    shared DB convention — MALE/FEMALE/UNKNOWN), and 'unknown' is a real
-    answer rather than a missing one, so it normalises to None: callers should
-    treat it as "no information", never as a third sex to compare against.
+    Takes .value off the Sex enum SQLAlchemy hands back. The DB column holds
+    the uppercase enum NAME (SQLEnum without values_callable), but nothing at
+    this layer ever sees that — the lower() is defensive against the two
+    drifting apart, not a fix for a live mismatch.
+
+    'unknown' is a real answer rather than a missing one, so it normalises to
+    None: callers must treat it as "no information", never as a third sex.
     """
     raw = getattr(animal.sex, "value", animal.sex)
     if not isinstance(raw, str):
