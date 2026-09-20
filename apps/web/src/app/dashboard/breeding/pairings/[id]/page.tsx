@@ -27,10 +27,25 @@ import { formatLocalDate } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+/** A parent resolved by the server, for any taxon. See breeding_service.py. */
+interface PairingParent {
+  id: string
+  display_name: string
+  scientific_name: string | null
+  sex: string | null
+  taxon: string
+  photo_url: string | null
+}
+
 interface Pairing {
   id: string
+  // Legacy, tarantula-only: NULL for every other taxon. Use male_parent.
   male_id: string
   female_id: string
+  male_invert_id: string | null
+  female_invert_id: string | null
+  male_parent: PairingParent | null
+  female_parent: PairingParent | null
   paired_date: string
   separated_date: string | null
   pairing_type: string
@@ -101,6 +116,25 @@ const OUTCOME_CHIP: Record<string, string> = {
 function displayName(t: Tarantula | undefined): string {
   if (!t) return 'Unknown'
   return t.name || t.common_name || t.scientific_name || 'Unnamed'
+}
+
+/**
+ * Name a pairing parent, whatever taxon it is.
+ *
+ * Prefers the server-resolved `male_parent`/`female_parent`
+ * (services/breeding_service.py). The tarantulaMap fallback below only ever
+ * worked for tarantulas — male_id/female_id are NULL for every other taxon —
+ * which is why a scorpion or jumping-spider pairing rendered "Unknown" here.
+ * It's kept solely for an older API in front of a newer build.
+ */
+function parentName(
+  pairing: { male_parent?: { display_name?: string } | null; female_parent?: { display_name?: string } | null; male_id: string; female_id: string },
+  slot: 'male' | 'female',
+  fallback: Map<string, Tarantula>,
+): string {
+  const resolved = slot === 'male' ? pairing.male_parent : pairing.female_parent
+  if (resolved?.display_name) return resolved.display_name
+  return displayName(fallback.get(slot === 'male' ? pairing.male_id : pairing.female_id))
 }
 
 function fmtSimple(s: string): string {
@@ -285,12 +319,12 @@ export default function PairingDetailPage() {
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 <span className="text-sky-500 dark:text-sky-400">♂</span>{' '}
-                {displayName(tarantulaMap.get(pairing.male_id))}
+                {parentName(pairing, 'male', tarantulaMap)}
                 <span className="text-gray-400 dark:text-gray-600 mx-2">
                   ×
                 </span>
                 <span className="text-pink-500 dark:text-pink-400">♀</span>{' '}
-                {displayName(tarantulaMap.get(pairing.female_id))}
+                {parentName(pairing, 'female', tarantulaMap)}
               </h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Paired {formatLocalDate(pairing.paired_date)}
@@ -521,8 +555,8 @@ export default function PairingDetailPage() {
             <div className="px-5 py-4">
               <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">
                 <strong>
-                  {displayName(tarantulaMap.get(pairing.male_id))} ×{' '}
-                  {displayName(tarantulaMap.get(pairing.female_id))}
+                  {parentName(pairing, 'male', tarantulaMap)} ×{' '}
+                  {parentName(pairing, 'female', tarantulaMap)}
                 </strong>
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">

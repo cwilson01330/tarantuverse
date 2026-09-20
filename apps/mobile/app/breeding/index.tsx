@@ -52,10 +52,21 @@ import { parseLocalDate } from '../../src/utils/date';
 
 // ─── Inline types — match the response_model shapes on the API ────────
 
+/** Resolved server-side for any taxon — services/breeding_service.py. */
+interface PairingParent {
+  id: string;
+  display_name: string;
+  scientific_name: string | null;
+  taxon: string;
+}
+
 interface Pairing {
   id: string;
+  // Legacy tarantula FKs — NULL for every other taxon. Use *_parent.
   male_id: string;
   female_id: string;
+  male_parent: PairingParent | null;
+  female_parent: PairingParent | null;
   paired_date: string;
   separated_date: string | null;
   pairing_type: string;
@@ -132,6 +143,20 @@ function fmtDate(iso: string | null): string {
     month: 'short',
     day: 'numeric',
   });
+}
+
+/**
+ * "Jack × Coral" — the two animals, for any taxon.
+ *
+ * Uses the server-resolved parents. The row used to be titled with only a
+ * date, so a keeper running several pairings at once couldn't tell them apart
+ * in the list. A null parent means the animal was deleted; "Unknown animal"
+ * says that, where a blank space just looked broken.
+ */
+function pairLabel(p: Pairing): string {
+  const male = p.male_parent?.display_name ?? 'Unknown animal';
+  const female = p.female_parent?.display_name ?? 'Unknown animal';
+  return `${male} × ${female}`;
 }
 
 function BreedingOverviewScreen() {
@@ -394,7 +419,7 @@ function BreedingOverviewScreen() {
                       router.push(`/breeding/pairings/${p.id}` as never)
                     }
                     accessibilityRole="button"
-                    accessibilityLabel={`Pairing from ${fmtDate(p.paired_date)}`}
+                    accessibilityLabel={`${pairLabel(p)}, paired ${fmtDate(p.paired_date)}`}
                     style={[
                       styles.row,
                       {
@@ -407,6 +432,12 @@ function BreedingOverviewScreen() {
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text
                         style={[styles.rowTitle, { color: colors.textPrimary }]}
+                        numberOfLines={1}
+                      >
+                        {pairLabel(p)}
+                      </Text>
+                      <Text
+                        style={[styles.rowMeta, { color: colors.textTertiary }]}
                       >
                         Paired {fmtDate(p.paired_date)}
                       </Text>

@@ -11,10 +11,20 @@ import { toISODateLocal } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
+/** Resolved server-side for any taxon — services/breeding_service.py. */
+interface PairingParent {
+  id: string
+  display_name: string
+  scientific_name: string | null
+  taxon: string
+}
+
 interface Pairing {
   id: string
   male_id: string
   female_id: string
+  male_parent: PairingParent | null
+  female_parent: PairingParent | null
   paired_date: string
   pairing_type: string
   outcome: string
@@ -233,9 +243,15 @@ function AddEggSacInner() {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-600 dark:bg-gray-700 dark:text-white"
               >
                 <option value="">Select a pairing...</option>
+                {/* Named, not just dated. These options used to read
+                    "3/14/2026 - natural (in_progress)", which is unusable for
+                    a keeper running several pairings at once — the whole point
+                    of picking one is knowing WHICH animals it was. */}
                 {pairings.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {new Date(p.paired_date).toLocaleDateString()} - {p.pairing_type} ({p.outcome})
+                    {p.male_parent?.display_name ?? 'Unknown'} × {p.female_parent?.display_name ?? 'Unknown'}
+                    {' — '}
+                    {new Date(p.paired_date).toLocaleDateString()}
                   </option>
                 ))}
               </select>

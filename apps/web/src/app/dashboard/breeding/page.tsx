@@ -10,10 +10,21 @@ import { formatLocalDate } from '@/lib/date'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
 
+/** Resolved server-side for any taxon — see services/breeding_service.py. */
+interface PairingParent {
+  id: string
+  display_name: string
+  scientific_name: string | null
+  taxon: string
+}
+
 interface Pairing {
   id: string
+  // Legacy tarantula FKs — NULL for every other taxon. Use *_parent instead.
   male_id: string
   female_id: string
+  male_parent: PairingParent | null
+  female_parent: PairingParent | null
   paired_date: string
   separated_date: string | null
   pairing_type: string
@@ -598,6 +609,16 @@ export default function BreedingPage() {
                           href={`/dashboard/breeding/pairings/${pairing.id}`}
                           className="min-w-0 flex-1 cursor-pointer"
                         >
+                          <p className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                            {pairing.male_parent?.display_name ?? 'Unknown animal'}
+                            <span className="text-gray-400 dark:text-gray-600 mx-1.5">×</span>
+                            {pairing.female_parent?.display_name ?? 'Unknown animal'}
+                          </p>
+                          {pairing.male_parent?.scientific_name && (
+                            <p className="text-xs italic text-gray-500 dark:text-gray-400 truncate">
+                              {pairing.male_parent.scientific_name}
+                            </p>
+                          )}
                           <p className="text-sm text-gray-600 dark:text-gray-400">Paired: {formatLocalDate(pairing.paired_date)}</p>
                           <p className="text-sm text-gray-900 dark:text-white">Type: <span className="capitalize">{pairing.pairing_type}</span></p>
                           <p className="text-sm text-gray-900 dark:text-white">Outcome: <span className="capitalize">{pairing.outcome.replace(/_/g, ' ')}</span></p>

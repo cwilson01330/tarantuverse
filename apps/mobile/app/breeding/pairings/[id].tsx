@@ -40,10 +40,22 @@ import { parseLocalDate } from '../../../src/utils/date';
 
 // ─── Inline types ─────────────────────────────────────────────────────
 
+/** Resolved server-side for any taxon — services/breeding_service.py. */
+interface PairingParent {
+  id: string;
+  display_name: string;
+  scientific_name: string | null;
+  taxon: string;
+}
+
 interface Pairing {
   id: string;
+  // Legacy tarantula FKs. NULL for every other taxon, which is why the
+  // tarantulaMap lookup below rendered "Unknown" for scorpions and jumpers.
   male_id: string;
   female_id: string;
+  male_parent: PairingParent | null;
+  female_parent: PairingParent | null;
   paired_date: string;
   separated_date: string | null;
   pairing_type: string;
@@ -208,8 +220,8 @@ function PairingDetailScreen() {
         : "\n\nThis can't be undone.";
     Alert.alert(
       'Delete pairing?',
-      `${displayName(tarantulaMap.get(pairing.male_id))} × ${displayName(
-        tarantulaMap.get(pairing.female_id),
+      `${parentName(pairing, 'male', tarantulaMap)} × ${parentName(
+        pairing, 'female', tarantulaMap,
       )}${suffix}`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -303,10 +315,10 @@ function PairingDetailScreen() {
             >
               <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
                 <Text style={styles.male}>♂ </Text>
-                {displayName(tarantulaMap.get(pairing.male_id))}
+                {parentName(pairing, 'male', tarantulaMap)}
                 <Text style={styles.dim}>  ×  </Text>
                 <Text style={styles.female}>♀ </Text>
-                {displayName(tarantulaMap.get(pairing.female_id))}
+                {parentName(pairing, 'female', tarantulaMap)}
               </Text>
 
               <View style={styles.kvGrid}>
@@ -643,6 +655,21 @@ function KVPressable({
 function displayName(t: TarantulaLite | undefined): string {
   if (!t) return 'Unknown';
   return t.name || t.common_name || t.scientific_name || 'Unnamed';
+}
+
+/**
+ * Name a parent for any taxon. Prefers the server-resolved parent; the
+ * tarantulaMap fallback only ever worked for tarantulas, since male_id is NULL
+ * for everything else. Kept for an older API in front of a newer bundle.
+ */
+function parentName(
+  pairing: Pairing,
+  slot: 'male' | 'female',
+  fallback: Map<string, TarantulaLite>,
+): string {
+  const resolved = slot === 'male' ? pairing.male_parent : pairing.female_parent;
+  if (resolved?.display_name) return resolved.display_name;
+  return displayName(fallback.get(slot === 'male' ? pairing.male_id : pairing.female_id));
 }
 
 // Routes through parseLocalDate. A bare "YYYY-MM-DD" from a DATE column is

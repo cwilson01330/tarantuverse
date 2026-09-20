@@ -18,11 +18,15 @@ interface EggSac {
   spiderling_count: number | null
 }
 
-interface Tarantula {
+/** Any animal in the collection — not just tarantulas. The kept-link is
+ *  `invert_id` server-side now, which works for every taxon; passing a
+ *  jumping spider's id as `tarantula_id` used to 404. */
+interface Animal {
   id: string
-  name: string
-  common_name: string
-  scientific_name: string
+  name: string | null
+  common_name: string | null
+  scientific_name: string | null
+  taxon: string
 }
 
 // Next 14 requires useSearchParams() to be inside a <Suspense> boundary
@@ -56,7 +60,7 @@ function AddOffspringInner() {
   const prefilledEggSacId = searchParams?.get('egg_sac_id') ?? ''
   const { user, token, isAuthenticated, isLoading } = useAuth()
   const [eggSacs, setEggSacs] = useState<EggSac[]>([])
-  const [tarantulas, setTarantulas] = useState<Tarantula[]>([])
+  const [animals, setAnimals] = useState<Animal[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showUpgrade, setShowUpgrade] = useState(false)
@@ -64,7 +68,7 @@ function AddOffspringInner() {
   // Form state
   const [formData, setFormData] = useState({
     egg_sac_id: prefilledEggSacId,
-    tarantula_id: '',
+    invert_id: '',
     status: 'unknown',
     status_date: '',
     buyer_info: '',
@@ -98,15 +102,15 @@ function AddOffspringInner() {
         setEggSacs(data)
       }
 
-      // Fetch tarantulas (for linking if kept in collection)
-      const tarantulasRes = await fetch(`${API_URL}/api/v1/tarantulas/`, {
+      // Every taxon — the kept animal might be a jumper, not a tarantula.
+      const tarantulasRes = await fetch(`${API_URL}/api/v1/inverts/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       })
       if (tarantulasRes.ok) {
         const data = await tarantulasRes.json()
-        setTarantulas(data)
+        setAnimals(Array.isArray(data) ? data : [])
       }
     } catch (err) {
       console.error('Error fetching data:', err)
@@ -133,7 +137,7 @@ function AddOffspringInner() {
 
       const submitData = {
         egg_sac_id: formData.egg_sac_id,
-        tarantula_id: formData.tarantula_id || null,
+        invert_id: formData.invert_id || null,
         status: formData.status,
         status_date: formData.status_date || null,
         buyer_info: formData.buyer_info || null,
@@ -269,22 +273,23 @@ function AddOffspringInner() {
             {showTarantulaLink && (
               <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Link to Tarantula in Collection
+                  Link to an animal in your collection
                 </label>
                 <select
-                  value={formData.tarantula_id}
-                  onChange={(e) => setFormData({...formData, tarantula_id: e.target.value})}
+                  value={formData.invert_id}
+                  onChange={(e) => setFormData({...formData, invert_id: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 dark:bg-gray-700 dark:text-white"
                 >
                   <option value="">None (optional)</option>
-                  {tarantulas.map((t) => (
+                  {animals.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name || t.common_name || t.scientific_name}
+                      {t.name || t.common_name || t.scientific_name || 'Unnamed'}
+                      {t.scientific_name && (t.name || t.common_name) ? ` — ${t.scientific_name}` : ''}
                     </option>
                   ))}
                 </select>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                  Link this offspring to an existing tarantula record in your collection
+                  If you kept this one and it&apos;s already in your collection, link it here.
                 </p>
               </div>
             )}
