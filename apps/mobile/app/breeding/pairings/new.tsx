@@ -1,21 +1,32 @@
 /**
  * TV create-pairing form — Sprint 6h.
  *
- * Mirror of the HV create-pairing form, adapted for TV:
- *   - No taxon picker (all tarantulas).
+ * Mirror of the HV create-pairing form, adapted for TV.
+ *
+ * READS /inverts/, NOT /tarantulas/ (2026-09-20). It used to fetch the legacy
+ * tarantula list, so the hub could only ever pair tarantulas — a keeper with
+ * breeding enabled for another taxon found an empty dropdown and no
+ * explanation. Submits to /inverts/pairings, the taxon-agnostic endpoint,
+ * which is also the only one carrying server-side guards.
+ *
+ * Filters, in narrowing order:
  *   - 3 pairing types: natural / assisted / forced (TV's enum).
  *   - Modal parent picker with three filters:
  *       1. Sex — male slot accepts male + unknown; female slot accepts
  *          female + unknown. Plenty of slings get paired before sex
  *          is confirmed.
  *       2. Same tarantula — picker excludes whoever's in the other slot.
- *       3. Species — when one slot has a parent with a non-null
- *          species_id, the other slot only shows candidates with the
- *          matching species. Cross-genus pairings can't produce.
+ *       3. Taxon — once either slot is filled. The server refuses a
+ *          mixed-taxon pairing, so offering one only wastes a tap.
+ *       4. Species — a DEFAULT, not a rule. Same species is what a breeder
+ *          wants almost every time, but ~40% of animals have no linked
+ *          species and hiding those would look like they'd vanished. An
+ *          animal with no species is always offered, and the toggle widens
+ *          to the whole taxon.
  *
  * Required: male, female, paired_date. Everything else optional.
  *
- * Submit → POST /pairings/ → routes to the new pairing's detail.
+ * Submit → POST /inverts/pairings → routes to the new pairing's detail.
  *
  * Inline types match TV mobile's existing convention. DateInput
  * component takes Date objects (different from HV's text inputs).
@@ -56,6 +67,7 @@ interface Tarantula {
   scientific_name: string | null;
   sex: string | null;
   species_id: string | null;
+  taxon: string;
 }
 
 interface ParentOption {
@@ -64,6 +76,20 @@ interface ParentOption {
   sex: string | null;
   scientific_name: string | null;
   species_id: string | null;
+  taxon: string;
+}
+
+/**
+ * 'male' | 'female' | null. Case-insensitive defensively, not to fix a bug. The DB stores the
+ * enum NAME ('FEMALE') because SQLEnum has no values_callable, but SQLAlchemy
+ * loads it back as the Sex enum and Pydantic serialises .value — so the API
+ * returns lowercase. Normalising means a change at either layer can't silently
+ * make this match nothing. 'unknown' maps to null: it means "no information",
+ * not a third sex.
+ */
+function normalisedSex(sex: string | null | undefined): 'male' | 'female' | null {
+  const l = (sex ?? '').toLowerCase();
+  return l === 'male' || l === 'female' ? l : null;
 }
 
 function tarantulaToOption(t: Tarantula): ParentOption {
@@ -74,6 +100,7 @@ function tarantulaToOption(t: Tarantula): ParentOption {
     sex: t.sex,
     scientific_name: t.scientific_name,
     species_id: t.species_id,
+    taxon: t.taxon,
   };
 }
 
@@ -137,6 +164,9 @@ function NewPairingScreen() {
   const [notes, setNotes] = useState('');
 
   const [pickerOpen, setPickerOpen] = useState<'male' | 'female' | null>(null);
+  // Off by default: same species is what a breeder wants almost every time.
+  const [widenSpecies, setWidenSpecies] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -145,7 +175,7 @@ function NewPairingScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiClient.get<Tarantula[]>('/tarantulas/');
+        const res = await apiClient.get<Tarantula[]>('/inverts/');
         if (cancelled) return;
         setTarantulas(res.data.map(tarantulaToOption));
         setLoadError(null);
@@ -161,16 +191,14 @@ function NewPairingScreen() {
 
   const males = useMemo(
     () =>
-      (tarantulas ?? []).filter(
-        (t) => t.sex === 'male' || t.sex === 'unknown' || !t.sex,
-      ),
+      // Unsexed animals stay offerable in both slots — many pairings are set
+      // up before sex is confirmed.
+      (tarantulas ?? []).filter((t) => normalisedSex(t.sex) !== 'female'),
     [tarantulas],
   );
   const females = useMemo(
     () =>
-      (tarantulas ?? []).filter(
-        (t) => t.sex === 'female' || t.sex === 'unknown' || !t.sex,
-      ),
+      (tarantulas ?? []).filter((t) => normalisedSex(t.sex) !== 'male'),
     [tarantulas],
   );
 
@@ -211,8 +239,8 @@ function NewPairingScreen() {
     setSubmitting(true);
     try {
       const payload = {
-        male_id: maleId,
-        female_id: femaleId,
+        male_invert_id: maleId,
+        female_invert_id: femaleId,
         paired_date: toISODateLocal(pairedDate),
         separated_date: separatedDate
           ? toISODateLocal(separatedDate)
@@ -220,7 +248,7 @@ function NewPairingScreen() {
         pairing_type: pairingType,
         notes: notes.trim() || null,
       };
-      const res = await apiClient.post('/pairings/', payload);
+      const res = await apiClient.post('/inverts/pairings', payload);
       router.replace(`/breeding/pairings/${res.data.id}` as never);
     } catch (err: any) {
       if (isPaymentRequired(err)) {
@@ -253,9 +281,18 @@ function NewPairingScreen() {
     const otherSlotId = pickerOpen === 'male' ? femaleId : maleId;
 
     const afterSameTarantula = sourceList.filter((p) => p.id !== otherSlotId);
-    const filteredOptions = afterSameTarantula.filter((p) =>
-      otherParent ? speciesMatches(p, otherParent) : true,
-    );
+    // Taxon is a hard filter — the server refuses a mixed-taxon pairing, so
+    // offering one is purely a wasted tap.
+    const afterTaxon = otherParent
+      ? afterSameTarantula.filter((p) => p.taxon === otherParent.taxon)
+      : afterSameTarantula;
+    // Species is the DEFAULT view, widened by the toggle. speciesMatches
+    // returns true when either side lacks species data, so an unlinked animal
+    // is never hidden.
+    const filteredOptions =
+      otherParent && !widenSpecies
+        ? afterTaxon.filter((p) => speciesMatches(p, otherParent))
+        : afterTaxon;
 
     let emptyOverride: string | null = null;
     if (sourceList.length === 0) {
@@ -268,7 +305,7 @@ function NewPairingScreen() {
       // Species filter took the list to zero.
       const speciesLabel =
         otherParent.scientific_name ?? 'the selected species';
-      emptyOverride = `No ${speciesLabel} candidates in your collection match the other parent's species. Add another ${speciesLabel} to pair this one.`;
+      emptyOverride = `No ${speciesLabel} in your collection match the other parent's species. Turn on "Show other species" to widen the list, or add another ${speciesLabel}.`;
     } else if (filteredOptions.length === 0 && otherSlotId) {
       // Same-tarantula filter took the list to zero.
       emptyOverride =
@@ -276,7 +313,24 @@ function NewPairingScreen() {
           ? 'The only candidate is already picked as the female.'
           : 'The only candidate is already picked as the male.';
     }
-    return { filteredOptions, emptyOverride };
+    const q = pickerSearch.trim().toLowerCase();
+    const searched = q
+      ? filteredOptions.filter((p) =>
+          [p.display_name, p.scientific_name]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(q),
+        )
+      : filteredOptions;
+    if (q && searched.length === 0 && filteredOptions.length > 0) {
+      emptyOverride = `Nothing matches "${pickerSearch.trim()}".`;
+    }
+    return {
+      filteredOptions: searched,
+      emptyOverride,
+      hasOtherParent: otherParent !== null && otherParent !== undefined,
+    };
   })();
 
   const backButton = (
@@ -467,15 +521,21 @@ function NewPairingScreen() {
 
       <ParentPickerModal
         visible={pickerOpen !== null}
-        onClose={() => setPickerOpen(null)}
+        onClose={() => { setPickerOpen(null); setPickerSearch(''); }}
         options={pickerData.filteredOptions}
         selectedId={pickerOpen === 'male' ? maleId : femaleId}
         title={pickerOpen === 'male' ? 'Pick the male' : 'Pick the female'}
         emptyOverride={pickerData.emptyOverride}
+        search={pickerSearch}
+        onSearch={setPickerSearch}
+        widenSpecies={widenSpecies}
+        onWidenSpecies={setWidenSpecies}
+        showWiden={pickerData.hasOtherParent}
         onPick={(id) => {
           if (pickerOpen === 'male') setMaleId(id);
           else if (pickerOpen === 'female') setFemaleId(id);
           setPickerOpen(null);
+          setPickerSearch('');
         }}
       />
 
@@ -592,6 +652,11 @@ function ParentPickerModal({
   title,
   emptyOverride,
   onPick,
+  search,
+  onSearch,
+  widenSpecies,
+  onWidenSpecies,
+  showWiden,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -600,6 +665,13 @@ function ParentPickerModal({
   title: string;
   emptyOverride: string | null;
   onPick: (id: string) => void;
+  search: string;
+  onSearch: (v: string) => void;
+  widenSpecies: boolean;
+  onWidenSpecies: (v: boolean) => void;
+  /** Only meaningful once the other slot is filled — nothing to widen from
+   *  otherwise, and an inert toggle invites a pointless tap. */
+  showWiden: boolean;
 }) {
   const { colors, layout } = useTheme();
   const styles = useStyles();
@@ -639,6 +711,42 @@ function ParentPickerModal({
                 />
               </TouchableOpacity>
             </View>
+            <TextInput
+              value={search}
+              onChangeText={onSearch}
+              placeholder="Search by name or species…"
+              placeholderTextColor={colors.textTertiary}
+              autoCorrect={false}
+              style={{
+                marginHorizontal: 16,
+                marginBottom: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 10,
+                color: colors.textPrimary,
+                backgroundColor: colors.background,
+                fontSize: 15,
+              }}
+            />
+            {showWiden ? (
+              <TouchableOpacity
+                onPress={() => onWidenSpecies(!widenSpecies)}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: widenSpecies }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginBottom: 10 }}
+              >
+                <MaterialCommunityIcons
+                  name={widenSpecies ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                  size={20}
+                  color={widenSpecies ? colors.primary : colors.textTertiary}
+                />
+                <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
+                  Show other species too
+                </Text>
+              </TouchableOpacity>
+            ) : null}
             <ScrollView
               style={{ maxHeight: 420 }}
               keyboardShouldPersistTaps="handled"
