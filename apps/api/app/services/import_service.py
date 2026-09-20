@@ -34,7 +34,7 @@ from app.utils.limits import active_inverts_query
 # Canonical taxa (keep in lockstep with models/invert.py INVERT_TAXON_VALUES).
 TAXA = [
     "tarantula", "scorpion", "centipede", "whip_spider", "vinegaroon",
-    "true_spider", "millipede", "mantis", "roach", "other",
+    "true_spider", "millipede", "mantis", "roach", "isopod", "other",
 ]
 
 # Target fields a column can map to, with a friendly label + coercion type.

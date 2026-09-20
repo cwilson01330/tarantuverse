@@ -46,7 +46,7 @@ class Colony(Base):
         CheckConstraint(
             "taxon IN ('tarantula', 'scorpion', 'centipede', "
             "'whip_spider', 'vinegaroon', 'true_spider', "
-            "'millipede', 'mantis', 'roach', 'other')",
+            "'millipede', 'mantis', 'roach', 'isopod', 'other')",
             name="colonies_taxon_check",
         ),
         CheckConstraint(

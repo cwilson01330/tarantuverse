@@ -28,7 +28,7 @@ from app.database import Base
 INVERT_TAXON_VALUES = (
     'tarantula', 'scorpion', 'centipede',
     'whip_spider', 'vinegaroon', 'true_spider',
-    'millipede', 'mantis', 'roach', 'other',
+    'millipede', 'mantis', 'roach', 'isopod', 'other',
 )
 
 # Species-level feeding mode (ADR-006). Drives husbandry copy and the
@@ -43,7 +43,7 @@ class InvertSpecies(Base):
         CheckConstraint(
             "taxon IN ('tarantula', 'scorpion', 'centipede', "
             "'whip_spider', 'vinegaroon', 'true_spider', "
-            "'millipede', 'mantis', 'roach', 'other')",
+            "'millipede', 'mantis', 'roach', 'isopod', 'other')",
             name='invert_species_taxon_check',
         ),
         CheckConstraint(
