@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { ThemeProvider } from '../src/contexts/ThemeContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { UpdateBanner } from '../src/components/UpdateBanner';
+import { ONBOARDING_COMPLETED } from '../src/lib/onboarding';
 import {
   identifyUser,
   initPostHog,
@@ -91,7 +92,10 @@ function RootLayoutContent() {
   const checkOnboardingStatus = async () => {
     try {
       if (user) {
-        const completed = await AsyncStorage.getItem('onboarding_completed');
+        // Constant, not a literal — this key is also read and written by
+        // src/lib/onboarding.ts, and a typo in one place would silently mean
+        // "never onboarded" forever.
+        const completed = await AsyncStorage.getItem(ONBOARDING_COMPLETED);
         setOnboardingComplete(completed === 'true');
       }
     } catch (error) {

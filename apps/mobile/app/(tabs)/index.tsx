@@ -252,7 +252,15 @@ function DashboardHubScreen() {
     const checkTour = async () => {
       try {
         const completed = await AsyncStorage.getItem(TOUR_KEY);
-        if (!completed && tarantulas.length > 0) {
+        // animalCount, not tarantulas.length. The gate exists because at zero
+        // animals this screen early-returns its empty state and the three
+        // CopilotStep targets don't render — but `tarantulas` counts only the
+        // legacy tarantula route, while the empty state is keyed on the
+        // cross-taxon invert count. A keeper whose first animal was a scorpion
+        // or a mantis therefore left the empty state and still never got the
+        // tour, and Settings' "Replay Tutorial" was a promise that could never
+        // fire for them.
+        if (!completed && animalCount > 0) {
           // Mark as completed before starting (covers both skip and finish)
           await AsyncStorage.setItem(TOUR_KEY, 'true');
           setTourChecked(true);
@@ -268,7 +276,11 @@ function DashboardHubScreen() {
     if (!tourChecked) {
       checkTour();
     }
-  }, [loading, tourChecked, tarantulas.length]);
+    // animalCount is declared lower in the component body, which is fine: the
+    // body runs top-to-bottom before React invokes this effect, so the closure
+    // captures an initialised value. It belongs in the deps so the tour can
+    // fire on the render where the count first becomes non-zero.
+  }, [loading, tourChecked, animalCount]);
 
   const fetchDashboardData = async () => {
     try {

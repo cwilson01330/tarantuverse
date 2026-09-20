@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { resolveColdStartRoute } from '../src/lib/onboarding';
 
 export default function Home() {
   const router = useRouter();
@@ -10,13 +11,23 @@ export default function Home() {
   const { colors } = useTheme();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (user) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/login');
-      }
+    if (isLoading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
     }
+    // Resume an unfinished carousel rather than skipping it forever. There's
+    // no auth event here to read `is_new_user` from, so only the pending
+    // marker can route to onboarding — an existing keeper has none and goes
+    // straight to the tabs, which is the behaviour that must not regress.
+    let cancelled = false;
+    (async () => {
+      const route = await resolveColdStartRoute();
+      if (!cancelled) router.replace(route);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [user, isLoading]);
 
   const styles = StyleSheet.create({

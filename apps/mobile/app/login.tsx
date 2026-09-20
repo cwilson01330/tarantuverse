@@ -16,6 +16,7 @@ import { useAuth, isGoogleSignInAvailable } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
 import GoogleLogo from '../src/components/GoogleLogo';
 import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
+import { resolvePostAuthRoute } from '../src/lib/onboarding';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -49,7 +50,10 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login(trimmedEmail, trimmedPassword);
-      router.replace('/(tabs)');
+      // A password login is never itself a new account, but it IS how someone
+      // who just registered gets their first session — so the pending marker
+      // left by the register screen is consumed here.
+      router.replace(await resolvePostAuthRoute());
     } catch (error: any) {
       Alert.alert('Login Failed', error.message);
     } finally {
@@ -60,8 +64,8 @@ export default function LoginScreen() {
   const handleGoogleLogin = async () => {
     setOauthLoading('google');
     try {
-      await loginWithGoogle();
-      router.replace('/(tabs)');
+      const isNewUser = await loginWithGoogle();
+      router.replace(await resolvePostAuthRoute(isNewUser));
     } catch (error: any) {
       Alert.alert('Google Login Failed', error.message);
     } finally {
@@ -72,8 +76,8 @@ export default function LoginScreen() {
   const handleAppleLogin = async () => {
     setOauthLoading('apple');
     try {
-      await loginWithApple();
-      router.replace('/(tabs)');
+      const isNewUser = await loginWithApple();
+      router.replace(await resolvePostAuthRoute(isNewUser));
     } catch (error: any) {
       Alert.alert('Apple Login Failed', error.message);
     } finally {

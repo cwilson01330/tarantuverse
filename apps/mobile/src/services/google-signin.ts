@@ -130,6 +130,12 @@ export const getAppleIdentity = async (): Promise<ProviderIdentity> => {
  */
 export const signInWithGoogle = async (): Promise<{
   accessToken: string;
+  // True when this sign-in CREATED the account. The server has always sent
+  // this (`is_new_user` in schemas/oauth.py) and we used to drop it on the
+  // floor; first-run routing needs it, because the alternative — "has this
+  // device seen onboarding?" — would show the welcome carousel to every
+  // existing keeper, the flag having never been written for anyone.
+  isNewUser: boolean;
   user: {
     id: string;
     email: string;
@@ -192,6 +198,10 @@ export const signInWithGoogle = async (): Promise<{
 
     return {
       accessToken: data.access_token,
+      // Defaults to false on an older server that omits the field — erring
+      // toward "existing user" keeps the carousel away from people who don't
+      // need it, which is the safer direction to be wrong in.
+      isNewUser: data.is_new_user === true,
       user: data.user,
     };
   } catch (error: any) {
@@ -231,6 +241,8 @@ export const signOutFromGoogle = async (): Promise<void> => {
  */
 export const signInWithApple = async (): Promise<{
   accessToken: string;
+  /** See signInWithGoogle — same field, same reason. */
+  isNewUser: boolean;
   user: {
     id: string;
     email: string;
@@ -306,6 +318,7 @@ export const signInWithApple = async (): Promise<{
 
     return {
       accessToken: data.access_token,
+      isNewUser: data.is_new_user === true,
       user: data.user,
     };
   } catch (error: any) {

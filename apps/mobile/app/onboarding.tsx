@@ -10,10 +10,10 @@ import {
   NativeSyntheticEvent,
   SafeAreaView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { completeOnboarding } from '../src/lib/onboarding';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -25,36 +25,59 @@ interface OnboardingScreen {
   emoji: string;
 }
 
+/**
+ * Copy rewritten 2026-09-18. The original was written when this was a
+ * tarantula-only app and had never actually been shown to anyone, so turning
+ * the carousel on would have pitched a product we stopped shipping — four
+ * screens telling a scorpion keeper they were in the wrong place.
+ *
+ * Two things here are deliberate and worth keeping:
+ *
+ *  - Screen 3 does NOT promise "smart insights". Premolt prediction can only
+ *    compute an interval for a small fraction of animals, because it needs
+ *    molt history the keeper hasn't logged yet. "Built from your own logs, so
+ *    they sharpen the longer you keep them" is true, sets the right
+ *    expectation, and points at the behaviour we actually want.
+ *  - "Hundreds of species care guides" rather than a figure. The real number
+ *    moves every time we seed, and a stale count in onboarding is the same
+ *    mistake as the storefront's "550+".
+ *
+ * Icons are MaterialCommunityIcons names verified against shipping screens.
+ * The originals (clipboard-list, chart-line) only ever appeared in this
+ * unreachable file, so they had never rendered — an unverified MDI name shows
+ * up as a blank box in production.
+ */
 const SCREENS: OnboardingScreen[] = [
   {
     id: 1,
     title: 'Welcome to Tarantuverse',
-    description: 'Track, care for, and connect with other tarantula enthusiasts in one place',
-    icon: 'spider',
-    emoji: '🕷️',
+    description:
+      'A husbandry tracker for the whole invertebrate side of the hobby — tarantulas, scorpions, centipedes, mantises, isopods and more.',
+    icon: 'paw',
+    emoji: '🐾',
   },
   {
     id: 2,
-    title: 'Track Your Collection',
+    title: 'Log it as you go',
     description:
-      'Log feeding times, molts, and substrate changes. Monitor growth and get insights into your tarantulas\' health and behavior.',
-    icon: 'clipboard-list',
-    emoji: '📋',
+      'Feedings, molts, substrate changes and water. Track animals one by one, or a whole colony as headcounts. Already keep a spreadsheet? Import it.',
+    icon: 'silverware-fork-knife',
+    emoji: '🍽️',
   },
   {
     id: 3,
-    title: 'Get Smart Insights',
+    title: 'Care sheets and your own history',
     description:
-      'Discover analytics about your collection, premolt predictions, and growth tracking to help you care better.',
-    icon: 'chart-line',
-    emoji: '📊',
+      'Hundreds of species care guides are built in. Premolt predictions and growth charts are built from your own logs, so they sharpen the longer you keep them.',
+    icon: 'book-open-variant',
+    emoji: '📖',
   },
   {
     id: 4,
-    title: 'Join the Community',
+    title: 'Community, if you want it',
     description:
-      'Connect with other keepers, share knowledge in forums, follow experts, and grow your community.',
-    icon: 'forum',
+      'Forums, keeper profiles and messages for when you want a second opinion. Your collection stays private unless you choose to share it.',
+    icon: 'comment-multiple',
     emoji: '💬',
   },
 ];
@@ -77,13 +100,12 @@ export default function OnboardingScreen() {
   };
 
   const handleGetStarted = async () => {
-    try {
-      await AsyncStorage.setItem('onboarding_completed', 'true');
-      router.replace('/(tabs)');
-    } catch (error) {
-      console.error('Error saving onboarding status:', error);
-      router.replace('/(tabs)');
-    }
+    // completeOnboarding clears the pending marker as well as setting the
+    // completed flag — see src/lib/onboarding.ts for why those are two keys.
+    // It swallows storage errors, so the navigation below always runs: never
+    // trap someone on the carousel because AsyncStorage hiccuped.
+    await completeOnboarding();
+    router.replace('/(tabs)');
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

@@ -47,8 +47,11 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  loginWithApple: () => Promise<void>;
+  // Resolve to true when the sign-in created the account — the caller uses it
+  // to route a new keeper through onboarding. A password login can't be new
+  // (registration is a separate screen), which is why only these two return it.
+  loginWithGoogle: () => Promise<boolean>;
+  loginWithApple: () => Promise<boolean>;
   register: (
     email: string,
     username: string,
@@ -203,29 +206,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
-  const loginWithGoogle = async () => {
+  /**
+   * Returns whether this sign-in created the account, so the caller can route
+   * a genuinely new keeper to the welcome carousel. Deliberately a return
+   * value rather than state: it's true for exactly one navigation and would be
+   * stale (and re-trigger onboarding) if it lived on the context.
+   */
+  const loginWithGoogle = async (): Promise<boolean> => {
     try {
-      const { accessToken, user: userData } = await signInWithGoogle();
+      const { accessToken, user: userData, isNewUser } = await signInWithGoogle();
 
       await AsyncStorage.setItem('auth_token', accessToken);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
 
       setToken(accessToken);
       setUser(userData);
+      return isNewUser;
     } catch (error: any) {
       throw new Error(error.message || 'Google login failed');
     }
   };
 
-  const loginWithApple = async () => {
+  const loginWithApple = async (): Promise<boolean> => {
     try {
-      const { accessToken, user: userData } = await signInWithApple();
+      const { accessToken, user: userData, isNewUser } = await signInWithApple();
 
       await AsyncStorage.setItem('auth_token', accessToken);
       await AsyncStorage.setItem('user', JSON.stringify(userData));
 
       setToken(accessToken);
       setUser(userData);
+      return isNewUser;
     } catch (error: any) {
       throw new Error(error.message || 'Apple login failed');
     }

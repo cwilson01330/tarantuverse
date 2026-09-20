@@ -19,6 +19,7 @@ import { useTheme } from '../src/contexts/ThemeContext';
 import { apiClient } from '../src/services/api';
 import GoogleLogo from '../src/components/GoogleLogo';
 import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
+import { markOnboardingPending, resolvePostAuthRoute } from '../src/lib/onboarding';
 
 interface ReferrerInfo {
   valid: boolean;
@@ -124,6 +125,11 @@ export default function RegisterScreen() {
       // Only include referral code if it's valid
       const validReferralCode = referrerInfo?.valid ? referralCode : undefined;
       const response = await register(email, username, password, displayName || username, validReferralCode);
+      // Registration doesn't establish a session — this screen hands off to
+      // /login — so the "this person is new" signal has to outlive the
+      // navigation. The next successful login consumes this marker and routes
+      // them through onboarding. See src/lib/onboarding.ts.
+      await markOnboardingPending();
       setSuccessMessage(response.message || 'Registration successful. Your account is active and ready to log in.');
       setSuccess(true);
     } catch (error: any) {
@@ -136,8 +142,8 @@ export default function RegisterScreen() {
   const handleGoogleRegister = async () => {
     setOauthLoading('google');
     try {
-      await loginWithGoogle();
-      router.replace('/(tabs)');
+      const isNewUser = await loginWithGoogle();
+      router.replace(await resolvePostAuthRoute(isNewUser));
     } catch (error: any) {
       Alert.alert('Google Sign-In Failed', error.message);
     } finally {
@@ -148,8 +154,8 @@ export default function RegisterScreen() {
   const handleAppleRegister = async () => {
     setOauthLoading('apple');
     try {
-      await loginWithApple();
-      router.replace('/(tabs)');
+      const isNewUser = await loginWithApple();
+      router.replace(await resolvePostAuthRoute(isNewUser));
     } catch (error: any) {
       Alert.alert('Apple Sign-In Failed', error.message);
     } finally {
