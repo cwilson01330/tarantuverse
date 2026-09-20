@@ -85,7 +85,9 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   centipede: ['feedingStats', 'growth'],
   whip_spider: ['feedingStats'],
   vinegaroon: ['feedingStats'],
-  true_spider: ['feedingStats'],
+  // Jumping spiders lay an egg sac like a tarantula, so the pairing → sac →
+  // offspring chain is the same shape. Enabled 2026-09-20 on real demand.
+  true_spider: ['feedingStats', 'breeding'],
   millipede: [], // detritivore — no live-prey cadence, and molts underground
   mantis: ['feedingStats', 'growth'], // instar tracking is core to mantis keeping
   // Omnivore grazer, and kept as a colony far more often than individually —
@@ -107,4 +109,77 @@ export function growthLengthLabel(taxon: string): string {
   return taxon === 'true_spider' || taxon === 'whip_spider' || taxon === 'tarantula'
     ? 'Leg span'
     : 'Body length'
+}
+
+// ---------------------------------------------------------------------------
+// Breeding vocabulary — mirror of
+// apps/mobile/src/lib/taxon-modules.ts::BREEDING_VOCABULARY. Keep in lockstep.
+//
+// The breeding tables were built for tarantulas, so the schema says `egg_sacs`
+// and `spiderling_count`. Those are spider words, and reusing them for another
+// taxon makes the app confidently wrong about the animal in front of the
+// keeper: a mantis lays an OOTHECA that hatches NYMPHS, and a scorpion is
+// viviparous — it has no egg-laying stage at all, so offering its keeper an
+// "egg sac" form asks for something that will never exist.
+//
+// That last case is why `clutch` is nullable rather than just a label. Scorpion
+// breeding is already enabled above and the upgrade copy on the invert detail
+// page still promises "pairings, egg sacs, and offspring", so this isn't
+// hypothetical — it shipped.
+// ---------------------------------------------------------------------------
+
+export interface BreedingVocabulary {
+  /** The egg-laying stage, or null for live-bearing taxa. */
+  clutch: { noun: string; plural: string; offspring: string } | null
+  /** Live-bearers skip from pairing straight to young. */
+  liveBirth: { noun: string; plural: string; offspring: string } | null
+}
+
+export const BREEDING_VOCABULARY: Record<string, BreedingVocabulary> = {
+  tarantula: { clutch: { noun: 'Egg sac', plural: 'egg sacs', offspring: 'spiderlings' }, liveBirth: null },
+  // Jumpers lay a sac like a tarantula, so this is correct rather than merely tolerable.
+  true_spider: { clutch: { noun: 'Egg sac', plural: 'egg sacs', offspring: 'spiderlings' }, liveBirth: null },
+  whip_spider: { clutch: { noun: 'Egg sac', plural: 'egg sacs', offspring: 'young' }, liveBirth: null },
+  mantis: { clutch: { noun: 'Ootheca', plural: 'oothecae', offspring: 'nymphs' }, liveBirth: null },
+  roach: { clutch: { noun: 'Ootheca', plural: 'oothecae', offspring: 'nymphs' }, liveBirth: null },
+  // "plings" is the hobby term, by analogy with tarantula "slings" — worth a
+  // second opinion from someone who keeps them before this ships.
+  centipede: { clutch: { noun: 'Clutch', plural: 'clutches', offspring: 'plings' }, liveBirth: null },
+  millipede: { clutch: { noun: 'Clutch', plural: 'clutches', offspring: 'young' }, liveBirth: null },
+  // Viviparous — no egg stage exists.
+  scorpion: { clutch: null, liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'instars' } },
+  vinegaroon: { clutch: { noun: 'Egg sac', plural: 'egg sacs', offspring: 'young' }, liveBirth: null },
+}
+
+const FALLBACK_VOCABULARY: BreedingVocabulary = {
+  clutch: { noun: 'Clutch', plural: 'clutches', offspring: 'offspring' },
+  liveBirth: null,
+}
+
+export function breedingVocabulary(taxon: string): BreedingVocabulary {
+  return BREEDING_VOCABULARY[taxon] ?? FALLBACK_VOCABULARY
+}
+
+/**
+ * Whether this taxon has an egg-laying stage between pairing and offspring.
+ * False for live-bearers, whose UI must SKIP the clutch step rather than
+ * relabel it.
+ */
+export function taxonLaysClutch(taxon: string): boolean {
+  return breedingVocabulary(taxon).clutch !== null
+}
+
+/**
+ * Reads the stored `plural` rather than appending "s" — that shortcut produced
+ * "Oothecas" and "Clutchs" while the correct forms sat in the table unused.
+ */
+export function clutchSectionLabel(taxon: string): string {
+  const v = breedingVocabulary(taxon)
+  const plural = v.clutch?.plural ?? v.liveBirth?.plural ?? 'clutches'
+  return plural.charAt(0).toUpperCase() + plural.slice(1)
+}
+
+export function offspringNoun(taxon: string): string {
+  const v = breedingVocabulary(taxon)
+  return v.clutch?.offspring ?? v.liveBirth?.offspring ?? 'offspring'
 }
