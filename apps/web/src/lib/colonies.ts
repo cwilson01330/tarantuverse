@@ -199,6 +199,64 @@ export async function getColony(token: string, id: string): Promise<ColonyRespon
   return (await res.json()) as ColonyResponse
 }
 
+
+/**
+ * A colony's population over time, rebuilt server-side from its event log.
+ *
+ * OBSERVED ONLY — no forecast, and there must not be one. Isopod reproduction
+ * depends on species, temperature, humidity, calcium, protein, substrate depth
+ * and founding sex ratio, and that last one is unknowable: most isopods can't
+ * be sexed at a glance and nobody counts a colony living inside substrate.
+ * `count_is_estimated` defaults to true for that reason, so a projection would
+ * be a guess stacked on a guess.
+ *
+ * When the server withholds a trend it says WHY in `growth.reason` — render
+ * that rather than inventing an explanation or showing blank space.
+ */
+export interface PopulationPoint {
+  date: string | null
+  total: number
+  stage_counts: Record<string, number>
+  event_type: string
+  delta: number
+}
+
+export interface PopulationGrowth {
+  has_rate: boolean
+  /** Why no rate yet. Always set when has_rate is false. */
+  reason: string | null
+  first_date: string | null
+  last_date: string | null
+  first_total: number | null
+  last_total: number | null
+  net_change: number | null
+  days_observed: number | null
+  per_30_days: number | null
+}
+
+export interface PopulationHistory {
+  colony_id: string
+  points: PopulationPoint[]
+  current_total: number
+  /** Total the event log alone accounts for. */
+  replayed_total: number
+  /** False when counts were written outside the event log. */
+  history_complete: boolean
+  count_is_estimated: boolean
+  growth: PopulationGrowth
+}
+
+export async function getColonyPopulationHistory(
+  token: string,
+  id: string,
+): Promise<PopulationHistory> {
+  const res = await fetch(`${API_URL}/api/v1/colonies/${id}/population-history`, {
+    headers: authHeaders(token),
+  })
+  if (!res.ok) throw new Error('Failed to load population history')
+  return (await res.json()) as PopulationHistory
+}
+
 export async function createColony(
   token: string,
   payload: ColonyCreate,

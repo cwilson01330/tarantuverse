@@ -33,6 +33,7 @@ import { PrimaryButton } from '../../src/components/PrimaryButton';
 import DateInput from '../../src/components/DateInput';
 import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { ColonyPopulationChart } from '../../src/components/ColonyPopulationChart';
 import { getImageUrl } from '../../src/utils/image-url';
 import { getErrorMessage } from '../../src/utils/errors';
 import { parseLocalDate, toISODateLocal, formatLocalDate } from '../../src/utils/date';
@@ -40,6 +41,8 @@ import { INVERT_TAXA } from '../../src/lib/inverts';
 import {
   getColony,
   listColonyEvents,
+  getColonyPopulationHistory,
+  type PopulationHistory,
   listColonyPhotos,
   listColonyFeedings,
   listColonyMolts,
@@ -129,6 +132,7 @@ export default function ColonyDetailScreen() {
   // commonest act across taxa, but for a detritivore culture `misted` and
   // `overflow` are the ones that carry the husbandry.
   const [careLogs, setCareLogs] = useState<ColonyCareLog[]>([]);
+  const [history, setHistory] = useState<PopulationHistory | null>(null);
   const [careFormOpen, setCareFormOpen] = useState(false);
   const [careType, setCareType] = useState<CareLogType>('water_dish');
   const [careDate, setCareDate] = useState(toISODateLocal(new Date()));
@@ -157,7 +161,7 @@ export default function ColonyDetailScreen() {
   const fetchColony = useCallback(async () => {
     if (!colonyId) return;
     try {
-      const [colonyRes, eventsRes, photosRes, feedingsRes, moltsRes, subsRes, careRes] = await Promise.all([
+      const [colonyRes, eventsRes, photosRes, feedingsRes, moltsRes, subsRes, careRes, historyRes] = await Promise.all([
         getColony(colonyId),
         listColonyEvents(colonyId),
         // Non-fatal: a colony with no photos or feedings is the normal state,
@@ -167,6 +171,9 @@ export default function ColonyDetailScreen() {
         listColonyMolts(colonyId).catch(() => [] as ColonyMoltLog[]),
         listColonySubstrateChanges(colonyId).catch(() => [] as ColonySubstrateChange[]),
         listColonyCareLogs(colonyId).catch(() => [] as ColonyCareLog[]),
+        // Non-fatal for the same reason as the rest: a chart that can't load
+        // must not take the whole colony screen with it.
+        getColonyPopulationHistory(colonyId).catch(() => null),
       ]);
       setColony(colonyRes);
       setEvents(eventsRes);
@@ -175,6 +182,7 @@ export default function ColonyDetailScreen() {
       setMolts(moltsRes);
       setSubstrates(subsRes);
       setCareLogs(careRes);
+      setHistory(historyRes);
       setLoadError('');
     } catch (e: any) {
       if (e?.response?.status === 401) return;
@@ -664,9 +672,12 @@ export default function ColonyDetailScreen() {
                 ))}
               </View>
             )}
-            {colony.count_is_estimated && (
-              <Text style={styles.estimateNote}>This colony's headcount is an estimate.</Text>
-            )}
+            {/* The estimate note lives inside the chart now — it belongs next
+                to the trend it qualifies, not floating above it. */}
+            <View style={[styles.historyBlock, { borderTopColor: colors.border }]}>
+              <Text style={[styles.sectionHeading, { marginBottom: 8 }]}>OVER TIME</Text>
+              <ColonyPopulationChart history={history} taxon={colony.taxon} />
+            </View>
           </View>
 
           {/* Husbandry */}
@@ -1342,6 +1353,7 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     stageLabel: { fontSize: 11, textTransform: 'capitalize', color: colors.textTertiary },
     stageValue: { fontSize: 17, fontWeight: '700', marginTop: 2, color: colors.textPrimary },
     estimateNote: { fontSize: 11, marginTop: 10, color: colors.textTertiary, fontStyle: 'italic' },
+    historyBlock: { marginTop: 16, paddingTop: 14, borderTopWidth: 1 },
     detailBody: { fontSize: 14, lineHeight: 20, color: colors.textPrimary },
     eventsHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     addEventLink: { fontSize: 14, fontWeight: '700' },

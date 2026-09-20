@@ -12,11 +12,14 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import ColonyPopulationChart from '@/components/ColonyPopulationChart'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
   COLONY_EVENT_TYPES,
   colonyEventMeta,
   createColonyEvent,
+  getColonyPopulationHistory,
+  type PopulationHistory,
   deleteColony,
   deleteColonyEvent,
   getColony,
@@ -93,6 +96,7 @@ export default function ColonyDetailPage() {
 
   const [colony, setColony] = useState<ColonyResponse | null>(null)
   const [events, setEvents] = useState<ColonyEventResponse[]>([])
+  const [history, setHistory] = useState<PopulationHistory | null>(null)
   const [feedings, setFeedings] = useState<ColonyFeedingLog[]>([])
   const [molts, setMolts] = useState<ColonyMoltLog[]>([])
   const [moltOpen, setMoltOpen] = useState(false)
@@ -150,7 +154,7 @@ export default function ColonyDetailPage() {
   const fetchAll = useCallback(async () => {
     if (!token || !colonyId) return
     try {
-      const [c, evs, feeds, mlts, subs, care] = await Promise.all([
+      const [c, evs, feeds, mlts, subs, care, hist] = await Promise.all([
         getColony(token, colonyId),
         listColonyEvents(token, colonyId).catch(() => [] as ColonyEventResponse[]),
         // Non-fatal: a colony with no feedings is the normal state and must
@@ -161,6 +165,9 @@ export default function ColonyDetailPage() {
           () => [] as ColonySubstrateChange[],
         ),
         listColonyCareLogs(token, colonyId).catch(() => [] as ColonyCareLog[]),
+        // Non-fatal like the rest: a chart that can't load must not take the
+        // whole colony page with it.
+        getColonyPopulationHistory(token, colonyId).catch(() => null),
       ])
       setColony(c)
       setEvents(evs)
@@ -168,6 +175,7 @@ export default function ColonyDetailPage() {
       setMolts(mlts)
       setSubstrates(subs)
       setCareLogs(care)
+      setHistory(hist)
       setLoadError('')
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Something went wrong')
@@ -578,6 +586,13 @@ export default function ColonyDetailPage() {
               No stage counts yet. Use “Log event” below to record births, additions, etc.
             </p>
           )}
+
+          <div className="mt-6 pt-5 border-t border-theme">
+            <h3 className="text-sm font-semibold text-theme-tertiary uppercase tracking-wide mb-3">
+              Over time
+            </h3>
+            <ColonyPopulationChart history={history} taxon={colony.taxon} />
+          </div>
 
           {colony.species_id && !colony.species_missing && (
             <Link
