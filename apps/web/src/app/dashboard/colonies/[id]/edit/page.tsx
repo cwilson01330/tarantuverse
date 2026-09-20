@@ -14,11 +14,13 @@ import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
+  createColonyEvent,
   getColony,
   updateColony,
   type ColonyResponse,
   type ColonySource,
 } from '@/lib/colonies'
+import { toISODateLocal } from '@/lib/date'
 import { showsEnclosureOrientation, enclosureSizePlaceholder } from '@/lib/colony-presets'
 
 interface StageRow {
@@ -65,6 +67,9 @@ export default function EditColonyPage() {
   // Form state
   const [name, setName] = useState('')
   const [stages, setStages] = useState<StageRow[]>([])
+  // Counts as loaded, so save can emit a delta per bucket rather than
+  // overwriting — see handleSubmit.
+  const [originalCounts, setOriginalCounts] = useState<Record<string, number>>({})
   const [countEstimated, setCountEstimated] = useState(false)
   const [dateAcquired, setDateAcquired] = useState('')
   const [foundedDate, setFoundedDate] = useState('')
@@ -92,6 +97,9 @@ export default function EditColonyPage() {
           ? Object.entries(c.stage_counts).map(([k, v]) => makeStageRow(k, String(v)))
           : [makeStageRow('adults'), makeStageRow('juveniles'), makeStageRow('nymphs')],
       )
+      const baseline: Record<string, number> = {}
+      for (const [k, v] of Object.entries(c.stage_counts ?? {})) baseline[k] = Number(v) || 0
+      setOriginalCounts(baseline)
       setCountEstimated(c.count_is_estimated)
       setDateAcquired(c.date_acquired ?? '')
       setFoundedDate(c.founded_date ?? '')
@@ -166,9 +174,33 @@ export default function EditColonyPage() {
 
     setSaving(true)
     try {
+      // Population changes go out as count_correction EVENTS, not as a
+      // stage_counts overwrite. Writing the map directly bypassed the event
+      // log, so a colony's population could move with nothing in its history
+      // to say when or why. One write path, and a trail worth reading.
+      const corrections = Object.entries(stageCounts)
+        .map(([bucket, next]) => ({ bucket, delta: next - (originalCounts[bucket] ?? 0) }))
+        .filter((c) => c.delta !== 0)
+
+      for (const { bucket, delta } of corrections) {
+        await createColonyEvent(token, colony.id, {
+          event_type: 'count_correction',
+          stage: bucket,
+          count_delta: delta,
+          occurred_at: toISODateLocal(new Date()),
+          notes: 'Adjusted from the edit screen',
+        })
+      }
+
+      // stage_counts only to DROP removed buckets — the events above already
+      // carry every number, so sending it otherwise double-applies the change.
+      const removedBuckets = Object.keys(originalCounts).filter((k) => !(k in stageCounts))
+
       await updateColony(token, colony.id, {
         name: name.trim(),
-        stage_counts: Object.keys(stageCounts).length > 0 ? stageCounts : null,
+        ...(removedBuckets.length > 0
+          ? { stage_counts: Object.keys(stageCounts).length > 0 ? stageCounts : null }
+          : {}),
         count_is_estimated: countEstimated,
         date_acquired: dateAcquired.trim() || null,
         founded_date: foundedDate.trim() || null,

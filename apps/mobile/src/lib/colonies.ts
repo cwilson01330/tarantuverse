@@ -76,10 +76,16 @@ export interface Colony {
   substrate_type: string | null;
   substrate_depth: string | null;
   last_substrate_change: string | null;
-  target_temp_min: string | null;
-  target_temp_max: string | null;
-  target_humidity_min: string | null;
-  target_humidity_max: string | null;
+  // NUMBERS, not strings. The API declares these Optional[float]
+  // (schemas/colony.py), so JSON carries 70.0 — not "70.00". They were typed
+  // as strings here, which meant `tempMin.trim()` on the edit screen threw
+  // TypeError for any colony that had a temperature set, silently killing the
+  // save before it ever reached the network. TypeScript couldn't catch it
+  // because the lie was in this declaration.
+  target_temp_min: number | null;
+  target_temp_max: number | null;
+  target_humidity_min: number | null;
+  target_humidity_max: number | null;
   water_dish: boolean;
   notes: string | null;
   photo_url: string | null;
@@ -108,10 +114,13 @@ export interface ColonyCreate {
   substrate_type?: string | null;
   substrate_depth?: string | null;
   last_substrate_change?: string | null;
-  target_temp_min?: string | null;
-  target_temp_max?: string | null;
-  target_humidity_min?: string | null;
-  target_humidity_max?: string | null;
+  // Numbers on the wire (Optional[float] server-side). Accepts a string too
+  // because Pydantic coerces "70" fine — but send a number and the round-trip
+  // type stays honest.
+  target_temp_min?: number | string | null;
+  target_temp_max?: number | string | null;
+  target_humidity_min?: number | string | null;
+  target_humidity_max?: number | string | null;
   water_dish?: boolean;
   notes?: string | null;
   photo_url?: string | null;

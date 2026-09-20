@@ -33,6 +33,7 @@ import {
   type Source,
 } from '../../../src/lib/inverts';
 import {
+  createColonyEvent,
   getColony,
   updateColony,
   type StageCounts,
@@ -45,6 +46,20 @@ const SOURCE_OPTIONS: { value: Source; label: string }[] = [
   { value: 'bought', label: 'Bought' },
   { value: 'wild_caught', label: 'Wild caught' },
 ];
+
+/** Anything the API sends -> a string safe for a TextInput and .trim(). */
+function toStr(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  return String(v);
+}
+
+/** Text field -> number | null, tolerant of whatever ends up in state. */
+function numOrNull(v: unknown): number | null {
+  const t = toStr(v).trim();
+  if (t === '') return null;
+  const n = Number.parseFloat(t);
+  return Number.isFinite(n) ? n : null;
+}
 
 function parseCount(s: string): number {
   if (s.trim() === '') return 0;
@@ -70,6 +85,10 @@ export default function EditColonyScreen() {
   const [speciesCleared, setSpeciesCleared] = useState(false);
 
   const [stageCounts, setStageCounts] = useState<Record<string, string>>({});
+  // The counts as loaded, so save can compute a delta per bucket. Without a
+  // baseline an edit can only overwrite; with one it can say what CHANGED,
+  // which is what the event log needs.
+  const [originalCounts, setOriginalCounts] = useState<StageCounts>({});
   const [newStageName, setNewStageName] = useState('');
   const [countIsEstimated, setCountIsEstimated] = useState(false);
 
@@ -98,8 +117,13 @@ export default function EditColonyScreen() {
       setSpeciesId(c.species_id);
       setScientificName(c.species_scientific_name ?? '');
       const asStrings: Record<string, string> = {};
-      for (const [k, v] of Object.entries(c.stage_counts ?? {})) asStrings[k] = String(v);
+      const baseline: StageCounts = {};
+      for (const [k, v] of Object.entries(c.stage_counts ?? {})) {
+        asStrings[k] = String(v);
+        baseline[k] = Number(v) || 0;
+      }
       setStageCounts(asStrings);
+      setOriginalCounts(baseline);
       setCountIsEstimated(c.count_is_estimated);
       setDateAcquired(c.date_acquired ?? '');
       setFoundedDate(c.founded_date ?? '');
@@ -108,10 +132,14 @@ export default function EditColonyScreen() {
       setEnclosureSize(c.enclosure_size ?? '');
       setSubstrateType(c.substrate_type ?? '');
       setSubstrateDepth(c.substrate_depth ?? '');
-      setTempMin(c.target_temp_min ?? '');
-      setTempMax(c.target_temp_max ?? '');
-      setHumidityMin(c.target_humidity_min ?? '');
-      setHumidityMax(c.target_humidity_max ?? '');
+      // String(), because the API sends these as NUMBERS (Optional[float]).
+      // Putting a number straight into state is what made `tempMin.trim()`
+      // throw and kill the save silently — the old type said `string | null`
+      // and was simply wrong.
+      setTempMin(toStr(c.target_temp_min));
+      setTempMax(toStr(c.target_temp_max));
+      setHumidityMin(toStr(c.target_humidity_min));
+      setHumidityMax(toStr(c.target_humidity_max));
       setWaterDish(c.water_dish);
       setNotes(c.notes ?? '');
       setIsActive(c.is_active);
@@ -169,38 +197,75 @@ export default function EditColonyScreen() {
   };
 
   const handleSave = async () => {
-    if (!name.trim()) {
+    if (!toStr(name).trim()) {
       Alert.alert('Missing name', 'Colony name is required.');
       return;
     }
-    const buckets: StageCounts = {};
-    for (const [k, v] of Object.entries(stageCounts)) buckets[k] = parseCount(v);
-
-    const payload: Record<string, unknown> = {
-      name: name.trim(),
-      stage_counts: buckets,
-      count_is_estimated: countIsEstimated,
-      date_acquired: dateAcquired.trim() || null,
-      founded_date: foundedDate.trim() || null,
-      source: source ?? null,
-      enclosure_type: enclosureType || null,
-      enclosure_size: enclosureSize.trim() || null,
-      substrate_type: substrateType.trim() || null,
-      substrate_depth: substrateDepth.trim() || null,
-      target_temp_min: tempMin.trim() || null,
-      target_temp_max: tempMax.trim() || null,
-      target_humidity_min: humidityMin.trim() || null,
-      target_humidity_max: humidityMax.trim() || null,
-      water_dish: waterDish,
-      notes: notes.trim() || null,
-      is_active: isActive,
-    };
-    // Species — write only if changed to a new pick or explicitly cleared.
-    if (speciesId) payload.species_id = speciesId;
-    else if (speciesCleared) payload.species_id = null;
 
     setSaving(true);
+    // EVERYTHING inside the try, payload construction included.
+    //
+    // It used to be built above this line, so a throw while assembling it —
+    // `tempMin.trim()` on a value the API had sent as a number — escaped as an
+    // unhandled rejection. No request, no alert, no change on screen: the Save
+    // button simply did nothing, which is impossible to diagnose from the
+    // outside. Anything that can throw belongs where it can be reported.
     try {
+      const edited: StageCounts = {};
+      for (const [k, v] of Object.entries(stageCounts)) edited[k] = parseCount(v);
+
+      // Population changes go out as count_correction EVENTS, not as a
+      // stage_counts overwrite.
+      //
+      // The old behaviour wrote the bucket map straight over the top, which
+      // silently bypassed the event log — a colony's population could move
+      // with nothing in its history to say when or why. (Every colony in
+      // production had zero events despite counts changing.) A correction per
+      // changed bucket keeps one write path and leaves a trail the keeper can
+      // actually read back.
+      const corrections = Object.entries(edited)
+        .map(([bucket, next]) => ({ bucket, delta: next - (originalCounts[bucket] ?? 0) }))
+        .filter((c) => c.delta !== 0);
+
+      for (const { bucket, delta } of corrections) {
+        await createColonyEvent(colonyId, {
+          event_type: 'count_correction',
+          stage: bucket,
+          count_delta: delta,
+          occurred_at: toISODateLocal(new Date()),
+          notes: 'Adjusted from the edit screen',
+        });
+      }
+
+      const payload: Record<string, unknown> = {
+        name: toStr(name).trim(),
+        count_is_estimated: countIsEstimated,
+        date_acquired: toStr(dateAcquired).trim() || null,
+        founded_date: toStr(foundedDate).trim() || null,
+        source: source ?? null,
+        enclosure_type: enclosureType || null,
+        enclosure_size: toStr(enclosureSize).trim() || null,
+        substrate_type: toStr(substrateType).trim() || null,
+        substrate_depth: toStr(substrateDepth).trim() || null,
+        target_temp_min: numOrNull(tempMin),
+        target_temp_max: numOrNull(tempMax),
+        target_humidity_min: numOrNull(humidityMin),
+        target_humidity_max: numOrNull(humidityMax),
+        water_dish: waterDish,
+        notes: toStr(notes).trim() || null,
+        is_active: isActive,
+      };
+
+      // stage_counts is sent ONLY to drop buckets the keeper removed — the
+      // events above already carry every number, so including it otherwise
+      // would apply the same change twice. Sent after them for the same reason.
+      const removed = Object.keys(originalCounts).filter((k) => !(k in edited));
+      if (removed.length > 0) payload.stage_counts = edited;
+
+      // Species — write only if changed to a new pick or explicitly cleared.
+      if (speciesId) payload.species_id = speciesId;
+      else if (speciesCleared) payload.species_id = null;
+
       await updateColony(colonyId, payload as any);
       router.replace(`/colony/${colonyId}` as any);
     } catch (e: any) {
