@@ -617,15 +617,44 @@ export async function getInvertGrowth(id: string): Promise<InvertGrowthAnalytics
 }
 
 /** Breeding (ADR-021 Phase D) — taxon-agnostic pairings on the inverts surface. */
+/**
+ * A pairing parent, resolved server-side.
+ *
+ * Before this existed, every breeding surface fetched the WHOLE tarantula list
+ * and built a lookup map to turn male_id into a name — and since male_id is
+ * NULL for any non-tarantula, a scorpion or jumper pairing rendered blank. The
+ * server now resolves both parents (services/breeding_service.py), so clients
+ * just read them.
+ *
+ * `taxon` is here so the caller can pick the right breeding vocabulary without
+ * a second lookup. A null parent means the animal no longer exists — render
+ * "Unknown animal", not empty space.
+ */
+export interface PairingParent {
+  id: string;
+  display_name: string;
+  name: string | null;
+  common_name: string | null;
+  scientific_name: string | null;
+  sex: string | null;
+  taxon: InvertTaxon;
+  photo_url: string | null;
+}
+
 export interface InvertPairing {
   id: string;
   male_invert_id: string | null;
   female_invert_id: string | null;
+  male_parent: PairingParent | null;
+  female_parent: PairingParent | null;
   paired_date: string;
   separated_date: string | null;
   pairing_type: string;
   outcome: string;
   notes: string | null;
+  /** Advisory notes from the server on create (e.g. a cross-species caution).
+   *  Empty on reads — and never a refusal; see the pairings router. */
+  warnings?: string[];
 }
 export async function listInvertPairings(id: string): Promise<InvertPairing[]> {
   const { data } = await apiClient.get<InvertPairing[]>(`/inverts/${id}/pairings`);

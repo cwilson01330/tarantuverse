@@ -25,7 +25,9 @@ import {
   reviveInvert,
   type DeathCause,
 } from '@/lib/animal-lifecycle'
-import { taxonHasModule, growthLengthLabel } from '@/lib/inverts'
+import {
+  taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch,
+} from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
 
@@ -343,10 +345,11 @@ export default function InvertDetailPage() {
     if (!pairMateId) { alert('Pick a mate.'); return }
     setPairBusy(true)
     try {
-      // Infer male/female from this animal's sex (default self→male unless
-      // explicitly female). The pairing's parents can be refined later; the
-      // backend validates same-taxon, not sex.
-      const selfFemale = invert.sex === 'female'
+      // Case-insensitive on purpose. `sex` is a plain VARCHAR holding UPPERCASE
+      // enum names in production, so `invert.sex === 'female'` was never true —
+      // every animal landed in the MALE slot, females included. Harmless until
+      // the server started rejecting swapped slots.
+      const selfFemale = (invert.sex ?? '').toLowerCase() === 'female'
       const body = {
         male_invert_id: selfFemale ? pairMateId : invert.id,
         female_invert_id: selfFemale ? invert.id : pairMateId,
@@ -360,6 +363,10 @@ export default function InvertDetailPage() {
       })
       if (res.status === 402) { setPairOpen(false); setShowUpgrade(true); return }
       if (!res.ok) throw new Error()
+      // The server advises rather than refuses on a cross-species pairing — it
+      // records what the keeper did. Surface the note; don't suppress it.
+      const saved = await res.json().catch(() => null)
+      if (saved?.warnings?.length) alert(saved.warnings.join('\n\n'))
       setPairOpen(false)
       setPairMateId('')
       fetchAll()
@@ -404,10 +411,16 @@ export default function InvertDetailPage() {
   }
 
   // Resolve the "other parent" name for a pairing row.
+  // Parents now arrive resolved from the server (services/breeding_service.py).
+  // The local `mates` lookup is kept only as a fallback for an older API in
+  // front of a newer build — it was never able to name an animal outside this
+  // taxon, which is why non-tarantula pairings used to read "Unknown mate".
   const mateName = (p: any): string => {
+    const resolved = p.male_parent?.id === id ? p.female_parent : p.male_parent
+    if (resolved?.display_name) return resolved.display_name
     const otherId = p.male_invert_id === id ? p.female_invert_id : p.male_invert_id
     const m = mates.find((x) => x.id === otherId)
-    return m ? displayName(m) : 'Unknown mate'
+    return m ? displayName(m) : 'Unknown animal'
   }
 
   // Build an edit query string (logId triggers edit mode on the add-* page).
@@ -652,7 +665,11 @@ export default function InvertDetailPage() {
               <Section title="Breeding" action={{ label: '+ New pairing', onClick: () => setPairOpen(true) }}>
                 {pairings.length === 0 ? (
                   <p className="text-sm text-theme-tertiary">
-                    No pairings yet. Pair this {meta?.label.toLowerCase()} with another from your collection to start tracking.
+                    No pairings yet. Pair this {meta?.label.toLowerCase()} with another from
+                    your collection to start tracking{' '}
+                    {taxonLaysClutch(invert.taxon)
+                      ? `${clutchSectionLabel(invert.taxon).toLowerCase()} and ${offspringNoun(invert.taxon)}`
+                      : offspringNoun(invert.taxon)}.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -966,11 +983,19 @@ export default function InvertDetailPage() {
         </div>
       )}
 
+      {/* Description is built from the taxon vocabulary rather than fixed:
+          promising "egg sacs" to a scorpion keeper describes a stage their
+          animal doesn't have — it gives live birth. That was the copy that
+          shipped with the scorpion pilot. */}
       <UpgradeModal
         isOpen={showUpgrade}
         onClose={() => setShowUpgrade(false)}
         feature="Breeding Module"
-        description="Track pairings, egg sacs, and offspring across the season. Upgrade to unlock breeding for your whole collection."
+        description={
+          invert && taxonLaysClutch(invert.taxon)
+            ? `Track pairings, ${clutchSectionLabel(invert.taxon).toLowerCase()} and ${offspringNoun(invert.taxon)} across the season. Upgrade to unlock breeding for your whole collection.`
+            : `Track pairings and ${invert ? offspringNoun(invert.taxon) : 'offspring'} across the season. Upgrade to unlock breeding for your whole collection.`
+        }
       />
 
       {transferOpen && (

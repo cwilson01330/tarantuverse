@@ -34,7 +34,9 @@ import {
 } from '../../src/lib/inverts';
 import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { SPACING, TYPE } from '../../src/theme/tokens';
-import { taxonHasModule, growthLengthLabel } from '../../src/lib/taxon-modules';
+import {
+  taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch,
+} from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
 import PhotoViewer from '../../src/components/PhotoViewer';
@@ -1113,18 +1115,39 @@ function InvertDetailScreen() {
         </CollapsibleRow>
       )}
 
-      {/* Breeding module (registry-gated — ADR-021 Phase D) */}
+      {/* Breeding module (registry-gated — ADR-021 Phase D).
+          Copy comes from BREEDING_VOCABULARY so each taxon reads natively: a
+          mantis lays an ootheca of nymphs, a scorpion gives live birth to a
+          brood and has no egg stage at all. Hard-coding "egg sac" here is what
+          made the scorpion pilot feel bolted on. */}
       {taxonHasModule(invert.taxon, 'breeding') && (
         <Section title="Breeding" actionLabel="New pairing" onAction={() => router.push(`/invert/add-pairing?id=${id}` as any)}>
           {pairings.length === 0 ? (
-            <Text style={[s.empty, { color: colors.textTertiary }]}>No pairings yet. Pair this animal with another to start tracking.</Text>
+            <Text style={[s.empty, { color: colors.textTertiary }]}>
+              No pairings yet. Pair this animal with another to start tracking
+              {taxonLaysClutch(invert.taxon)
+                ? ` ${clutchSectionLabel(invert.taxon).toLowerCase()} and ${offspringNoun(invert.taxon)}`
+                : ` ${offspringNoun(invert.taxon)}`}.
+            </Text>
           ) : (
-            pairings.map((p) => (
-              <View key={p.id} style={styles.breedRow}>
-                <Text style={styles.logRowTitle}>Pairing</Text>
-                <Text style={styles.logRowMeta}>{fmtDate(p.paired_date)} · {(p.outcome || '').replace(/_/g, ' ')}</Text>
-              </View>
-            ))
+            pairings.map((p) => {
+              // Parents now arrive resolved from the server (breeding_service),
+              // so this no longer needs the old fetch-all-tarantulas map — which
+              // is exactly why it used to render blank for non-tarantulas.
+              const mate =
+                p.male_parent?.id === id ? p.female_parent : p.male_parent;
+              return (
+                <View key={p.id} style={styles.breedRow}>
+                  <Text style={styles.logRowTitle}>
+                    {mate ? `Paired with ${mate.display_name}` : 'Pairing'}
+                  </Text>
+                  <Text style={styles.logRowMeta}>
+                    {fmtDate(p.paired_date)} · {(p.outcome || '').replace(/_/g, ' ')}
+                    {mate?.scientific_name ? ` · ${mate.scientific_name}` : ''}
+                  </Text>
+                </View>
+              );
+            })
           )}
         </Section>
       )}
