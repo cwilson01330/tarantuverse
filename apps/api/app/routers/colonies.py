@@ -33,6 +33,7 @@ from app.schemas.colony import (
     ColonyEventResponse,
 )
 from app.utils.dependencies import get_current_user
+from app.services.colony_history_service import colony_population_history
 from app.utils.limits import enforce_collection_limit
 
 router = APIRouter()
@@ -239,6 +240,21 @@ async def delete_colony(
     db.delete(colony)
     db.commit()
     return None
+
+
+@router.get("/{colony_id}/population-history")
+async def population_history(
+    colony_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """The colony's population over time, rebuilt from its own events.
+
+    Observed history only — no projection. See colony_history_service for why
+    a breeding forecast would be dishonest here rather than merely hard.
+    """
+    colony = _get_owned(db, colony_id, current_user)
+    return colony_population_history(db, colony)
 
 
 # ---------- events ----------
