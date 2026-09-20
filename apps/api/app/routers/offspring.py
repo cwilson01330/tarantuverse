@@ -9,6 +9,7 @@ import uuid
 from app.database import get_db
 from app.models.user import User
 from app.models.egg_sac import EggSac
+from app.models.invert import Invert
 from app.models.tarantula import Tarantula
 from app.models.offspring import Offspring
 from app.schemas.offspring import (
@@ -34,6 +35,58 @@ def _require_breeding(current_user: User) -> dict:
             },
         )
     return limits
+
+
+def _resolve_kept_link(
+    db: Session,
+    current_user: User,
+    *,
+    invert_id: uuid.UUID | None,
+    tarantula_id: uuid.UUID | None,
+) -> tuple[uuid.UUID | None, uuid.UUID | None]:
+    """Validate the "this sling became a tracked animal" link.
+
+    Returns `(invert_id, tarantula_id)` to store. Shared by create and update
+    so the two can't drift — the previous code validated against `Tarantula` in
+    both places, which is what made a jumping spider impossible to link.
+
+    Rules:
+      - `invert_id` is the real link and works for any taxon. If the animal
+        happens to be a tarantula, `tarantula_id` is written too, because it
+        shares the same primary key (ADR-005) and the legacy breeding hub still
+        reads that column.
+      - `tarantula_id` alone stays supported for existing clients, and mirrors
+        onto `invert_id` exactly as before.
+      - Both supplied and disagreeing is a client bug, not something to
+        silently pick a winner for.
+    """
+    if invert_id and tarantula_id and invert_id != tarantula_id:
+        raise HTTPException(
+            status_code=400,
+            detail="invert_id and tarantula_id refer to different animals. Send invert_id only.",
+        )
+
+    if invert_id:
+        animal = db.query(Invert).filter(
+            Invert.id == invert_id,
+            Invert.user_id == current_user.id,
+        ).first()
+        if not animal:
+            raise HTTPException(status_code=404, detail="Animal not found")
+        # Mirror onto the legacy column only for tarantulas; a jumper has no
+        # row in `tarantulas` and writing its id there would violate the FK.
+        return animal.id, (animal.id if animal.taxon == "tarantula" else None)
+
+    if tarantula_id:
+        tarantula = db.query(Tarantula).filter(
+            Tarantula.id == tarantula_id,
+            Tarantula.user_id == current_user.id,
+        ).first()
+        if not tarantula:
+            raise HTTPException(status_code=404, detail="Tarantula not found")
+        return tarantula.id, tarantula.id
+
+    return None, None
 
 
 @router.get("/offspring/", response_model=List[OffspringResponse])
@@ -95,22 +148,25 @@ async def create_offspring_record(
     if not egg_sac:
         raise HTTPException(status_code=404, detail="Egg sac not found")
 
-    # If tarantula_id provided, verify it belongs to user
-    if offspring_data.tarantula_id:
-        tarantula = db.query(Tarantula).filter(
-            Tarantula.id == offspring_data.tarantula_id,
-            Tarantula.user_id == current_user.id
-        ).first()
-        if not tarantula:
-            raise HTTPException(status_code=404, detail="Tarantula not found")
+    # Validate the kept-link against whichever surface it names. Handles every
+    # taxon — see _resolve_kept_link.
+    invert_id, tarantula_id = _resolve_kept_link(
+        db, current_user,
+        invert_id=offspring_data.invert_id,
+        tarantula_id=offspring_data.tarantula_id,
+    )
 
-    # Create offspring record. ADR-010 dual-write: mirror the kept-link onto
-    # the generic invert ref (a kept offspring's tarantula shares its primary
-    # key with its Invert row).
+    payload = offspring_data.model_dump()
+    # Both FK fields come from the resolver, not from the request, so a
+    # non-tarantula never gets an id written into the legacy column.
+    payload.pop("invert_id", None)
+    payload.pop("tarantula_id", None)
+
     new_offspring = Offspring(
         user_id=current_user.id,
-        invert_id=offspring_data.tarantula_id,
-        **offspring_data.model_dump()
+        invert_id=invert_id,
+        tarantula_id=tarantula_id,
+        **payload
     )
 
     db.add(new_offspring)
@@ -159,17 +215,20 @@ async def update_offspring_record(
         if not egg_sac:
             raise HTTPException(status_code=404, detail="Egg sac not found")
 
-    # If updating tarantula_id, verify ownership
-    if offspring_data.tarantula_id:
-        tarantula = db.query(Tarantula).filter(
-            Tarantula.id == offspring_data.tarantula_id,
-            Tarantula.user_id == current_user.id
-        ).first()
-        if not tarantula:
-            raise HTTPException(status_code=404, detail="Tarantula not found")
-
     # Update offspring record
     update_data = offspring_data.model_dump(exclude_unset=True)
+
+    # Re-resolve the kept-link whenever either id was sent, so an update can't
+    # write a legacy tarantula_id for a non-tarantula.
+    if "invert_id" in update_data or "tarantula_id" in update_data:
+        invert_id, tarantula_id = _resolve_kept_link(
+            db, current_user,
+            invert_id=update_data.get("invert_id"),
+            tarantula_id=update_data.get("tarantula_id"),
+        )
+        update_data["invert_id"] = invert_id
+        update_data["tarantula_id"] = tarantula_id
+
     for field, value in update_data.items():
         setattr(offspring, field, value)
 

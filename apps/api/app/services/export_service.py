@@ -114,20 +114,33 @@ ENCLOSURE_FIELDS = [
     "created_at", "updated_at",
 ]
 
+# The *_invert_id columns are not optional extras — they are the ONLY parent
+# reference a non-tarantula pairing has (male_id/female_id stay NULL for
+# inverts). Omitting them meant a scorpion or jumping spider pairing exported
+# with blank parents: the lineage silently vanished from the keeper's own data,
+# which for a GDPR export is a correctness problem, not a cosmetic one.
 PAIRING_FIELDS = [
-    "id", "user_id", "male_id", "female_id", "paired_date", "separated_date",
+    "id", "user_id", "male_id", "female_id",
+    "male_invert_id", "female_invert_id",
+    "paired_date", "separated_date",
     "pairing_type", "outcome", "notes", "created_at",
 ]
 
 EGG_SAC_FIELDS = [
-    "id", "pairing_id", "user_id", "laid_date", "pulled_date", "hatch_date",
+    "id", "pairing_id", "user_id", "laid_date", "pulled_date",
+    # expected_hatch_date was missing — a real column the keeper fills in and
+    # then couldn't get back out.
+    "expected_hatch_date", "hatch_date",
     "incubation_temp_min", "incubation_temp_max",
     "incubation_humidity_min", "incubation_humidity_max",
     "spiderling_count", "viable_count", "notes", "photo_url", "created_at",
 ]
 
 OFFSPRING_FIELDS = [
-    "id", "egg_sac_id", "user_id", "tarantula_id", "status", "status_date",
+    # invert_id is the kept-link for every taxon; tarantula_id is the legacy
+    # mirror and is NULL for anything else.
+    "id", "egg_sac_id", "user_id", "invert_id", "tarantula_id",
+    "status", "status_date",
     "buyer_info", "price_sold", "notes", "created_at",
 ]
 
