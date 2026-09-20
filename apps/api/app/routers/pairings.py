@@ -16,8 +16,24 @@ from app.schemas.pairing import (
 )
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
+from app.services.breeding_service import attach_parents
 
 router = APIRouter()
+
+
+def _sex_of(animal: Invert) -> str | None:
+    """Lower-case 'male'/'female', or None when unknown/unset.
+
+    `sex` is a plain VARCHAR holding UPPERCASE enum names in production (the
+    shared DB convention — MALE/FEMALE/UNKNOWN), and 'unknown' is a real
+    answer rather than a missing one, so it normalises to None: callers should
+    treat it as "no information", never as a third sex to compare against.
+    """
+    raw = getattr(animal.sex, "value", animal.sex)
+    if not isinstance(raw, str):
+        return None
+    lowered = raw.lower()
+    return lowered if lowered in ("male", "female") else None
 
 
 def _invert_display(inv: Invert) -> str:
@@ -34,7 +50,9 @@ async def get_pairings(
         Pairing.user_id == current_user.id
     ).order_by(Pairing.paired_date.desc()).all()
 
-    return pairings
+    # Resolve parents server-side so a non-tarantula pairing doesn't render
+    # blank — male_id/female_id are NULL for inverts. See breeding_service.
+    return attach_parents(db, pairings)
 
 
 @router.get("/pairings/{pairing_id}", response_model=PairingResponse)
@@ -52,7 +70,7 @@ async def get_pairing(
     if not pairing:
         raise HTTPException(status_code=404, detail="Pairing not found")
 
-    return pairing
+    return attach_parents(db, [pairing])[0]
 
 
 @router.get("/inverts/{invert_id}/pairings", response_model=List[PairingResponse])
@@ -72,10 +90,11 @@ async def get_invert_pairings(
     ).first()
     if not invert:
         raise HTTPException(status_code=404, detail="Animal not found")
-    return db.query(Pairing).filter(
+    pairings = db.query(Pairing).filter(
         Pairing.user_id == current_user.id,
         (Pairing.male_invert_id == invert_id) | (Pairing.female_invert_id == invert_id),
     ).order_by(Pairing.paired_date.desc()).all()
+    return attach_parents(db, pairings)
 
 
 @router.post("/inverts/pairings", response_model=PairingResponse, status_code=status.HTTP_201_CREATED)
@@ -112,6 +131,44 @@ async def create_invert_pairing(
     if male.taxon != female.taxon:
         raise HTTPException(status_code=400, detail="Both animals must be the same taxon")
 
+    # --- sex slots ---------------------------------------------------------
+    # Refuse only when we KNOW both animals are the same sex. `unknown` is the
+    # default and stays common until maturity, so treating it as a mismatch
+    # would block the majority of legitimate pairings — the same evidence-first
+    # rule the rest of the app follows: don't assert what the data doesn't say.
+    male_sex = _sex_of(male)
+    female_sex = _sex_of(female)
+    if male_sex and female_sex and male_sex == female_sex:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Both animals are recorded as {male_sex}. Check the sexes, or "
+                "set one to unknown if you're not sure."
+            ),
+        )
+    if male_sex == "female" or female_sex == "male":
+        raise HTTPException(
+            status_code=400,
+            detail="The male and female look swapped — check which animal is in which slot.",
+        )
+
+    # --- species ------------------------------------------------------------
+    # NOT a refusal. Hybridising is widely frowned on, but this app records what
+    # happened rather than licensing it, and a keeper logging a cross after the
+    # fact needs to be able to write it down. Blocking would also punish the
+    # common case of an unlinked species. So it's surfaced as a warning and the
+    # client decides how loudly to say it.
+    warnings: list[str] = []
+    if (
+        male.species_id is not None
+        and female.species_id is not None
+        and male.species_id != female.species_id
+    ):
+        warnings.append(
+            "These animals are linked to different species. Cross-species "
+            "pairings rarely produce viable young and are discouraged."
+        )
+
     # Tarantulas share their PK with the inverts mirror, so set the legacy
     # FKs too for back-compat with tarantula-side reads/lineage. Pure inverts
     # leave them null.
@@ -145,7 +202,11 @@ async def create_invert_pairing(
             "pairing_type": payload.pairing_type.value,
         },
     )
-    return new_pairing
+    saved = attach_parents(db, [new_pairing])[0]
+    # Advisory only — see the species note above. Set as an unmapped attribute
+    # so Pydantic picks it up via from_attributes.
+    setattr(saved, "warnings", warnings)
+    return saved
 
 
 @router.post("/pairings/", response_model=PairingResponse, status_code=status.HTTP_201_CREATED)
@@ -212,7 +273,7 @@ async def create_pairing(
         }
     )
 
-    return new_pairing
+    return attach_parents(db, [new_pairing])[0]
 
 
 @router.put("/pairings/{pairing_id}", response_model=PairingResponse)
@@ -257,7 +318,7 @@ async def update_pairing(
     db.commit()
     db.refresh(pairing)
 
-    return pairing
+    return attach_parents(db, [pairing])[0]
 
 
 @router.delete("/pairings/{pairing_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -298,9 +359,15 @@ async def get_tarantula_pairings(
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
 
-    # Get pairings where this tarantula is either male or female
+    # Get pairings where this tarantula is either male or female.
+    #
+    # The user_id filter is not redundant with the ownership check above: it was
+    # the only query in this router without one, and defence-in-depth is cheap
+    # here. If the tarantula lookup above is ever refactored or relaxed, this
+    # stays safe on its own.
     pairings = db.query(Pairing).filter(
-        (Pairing.male_id == tarantula_id) | (Pairing.female_id == tarantula_id)
+        Pairing.user_id == current_user.id,
+        (Pairing.male_id == tarantula_id) | (Pairing.female_id == tarantula_id),
     ).order_by(Pairing.paired_date.desc()).all()
 
-    return pairings
+    return attach_parents(db, pairings)
