@@ -65,7 +65,7 @@ import { colonyKindLabel } from '../../src/lib/colony-buckets';
 
 // Taxa that have no per-taxon list lib — fetched generically via /inverts/.
 // (scorpion/centipede/whip_spider keep their existing per-taxon fetches.)
-const GENERIC_TAXA: InvertTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'roach', 'other'];
+const GENERIC_TAXA: InvertTaxon[] = ['vinegaroon', 'true_spider', 'millipede', 'mantis', 'roach', 'isopod', 'other'];
 
 interface Tarantula {
   id: string;
@@ -154,6 +154,7 @@ const TAXON_CHIPS: { value: TaxonFilter; label: string; taxon: string }[] = [
   { value: 'millipede', label: 'Millipedes', taxon: 'millipede' },
   { value: 'mantis', label: 'Mantises', taxon: 'mantis' },
   { value: 'roach', label: 'Roaches', taxon: 'roach' },
+  { value: 'isopod', label: 'Isopods', taxon: 'isopod' },
   { value: 'other', label: 'Other', taxon: 'other' },
 ];
 

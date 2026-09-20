@@ -37,6 +37,7 @@ export type InvertTaxon =
   | 'millipede'
   | 'mantis'
   | 'roach'
+  | 'isopod'
   | 'other';
 
 export type FeedingMode = 'predator' | 'detritivore' | 'omnivore';
@@ -109,6 +110,17 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
     speciesPrefix: 'roach-species', sizeLabel: 'Length (mm)', feedingMode: 'omnivore',
     safety: 'harmless', defaultEnclosureType: 'terrestrial',
   },
+  isopod: {
+    key: 'isopod', label: 'Isopod', glyph: '🪲', prefix: 'isopods',
+    speciesPrefix: 'isopod-species',
+    // Isopods are measured nose-to-tail like any crustacean, not by leg span.
+    sizeLabel: 'Length (mm)',
+    // Detritivores: leaf litter, decaying wood, with calcium and protein
+    // supplemented. No live-prey cadence, so no feeding-status nagging.
+    feedingMode: 'detritivore',
+    safety: 'harmless',
+    defaultEnclosureType: 'terrestrial',
+  },
   other: {
     key: 'other', label: 'Other invertebrate', glyph: '🐾', prefix: 'other-inverts',
     speciesPrefix: 'other-invert-species', sizeLabel: 'Size (mm)', feedingMode: 'predator',
@@ -119,7 +131,7 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
 /** Every taxon, in display order. Tarantula leads — it's the biggest surface. */
 export const INVERT_TAXON_ORDER: InvertTaxon[] = [
   'tarantula', 'scorpion', 'centipede', 'whip_spider', 'vinegaroon',
-  'true_spider', 'millipede', 'mantis', 'roach', 'other',
+  'true_spider', 'millipede', 'mantis', 'roach', 'isopod', 'other',
 ];
 
 /**
@@ -813,6 +825,13 @@ export function taxonMdiIcon(taxon: string): string {
       return 'grass';
     case 'roach':
       return 'dots-hexagon';
+    case 'isopod':
+      // Deliberately the same family as centipede rather than a guessed name
+      // like 'ladybug' or 'shield-bug'. I couldn't verify those against the
+      // bundled glyph map from here, and an unverified MDI name renders as a
+      // blank box in production. Swap it for something more isopod-ish once
+      // you've eyeballed it on a device.
+      return 'bug-outline';
     default:
       return 'paw';
   }

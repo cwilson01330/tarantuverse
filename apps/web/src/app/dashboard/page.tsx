@@ -582,6 +582,7 @@ export default function DashboardHub() {
                     const glyph = t.taxon === 'tarantula' ? '🕷️'
                       : t.taxon === 'scorpion' ? '🦂'
                       : t.taxon === 'roach' ? '🪳'
+                      : t.taxon === 'isopod' ? '🪲'
                       : t.taxon === 'mantis' ? '🦗'
                       : '🐛'
                     const detailHref = t.taxon === 'tarantula'

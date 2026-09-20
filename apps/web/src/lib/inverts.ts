@@ -18,6 +18,7 @@ export type InvertTaxon =
   | 'millipede'
   | 'mantis'
   | 'roach'
+  | 'isopod'
   | 'other'
 
 export interface InvertTaxonMeta {
@@ -41,6 +42,8 @@ export const INVERT_TAXA: Record<InvertTaxon, InvertTaxonMeta> = {
   millipede: { label: 'Millipede', glyph: '🪱', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Length (mm)' },
   mantis: { label: 'Mantis', glyph: '🦗', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Length (mm)' },
   roach: { label: 'Roach', glyph: '🪳', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Length (mm)' },
+  // Detritivore crustacean — measured by length, not leg span.
+  isopod: { label: 'Isopod', glyph: '🪲', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Length (mm)' },
   other: { label: 'Other invertebrate', glyph: '🐾', prefix: 'inverts', speciesPrefix: 'invert-species', sizeLabel: 'Size (mm)' },
 }
 
@@ -93,6 +96,11 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   // Omnivore grazer, and kept as a colony far more often than individually —
   // colonies have their own screen (ADR-010). Not an oversight.
   roach: [],
+  // Detritivores kept as a COLONY, not as individuals — the population is the
+  // unit, and colonies have their own screen (ADR-010). No feeding cadence to
+  // nag about, and no per-animal molt log worth charting: isopods molt in two
+  // halves and nobody records it.
+  isopod: [],
   other: [],
 }
 
@@ -148,6 +156,9 @@ export const BREEDING_VOCABULARY: Record<string, BreedingVocabulary> = {
   millipede: { clutch: { noun: 'Clutch', plural: 'clutches', offspring: 'young' }, liveBirth: null },
   // Viviparous — no egg stage exists.
   scorpion: { clutch: null, liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'instars' } },
+  // No egg stage the keeper sees: eggs are brooded internally in a marsupium
+  // and released as live young. "Mancae" is the correct hobby term.
+  isopod: { clutch: null, liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'mancae' } },
   vinegaroon: { clutch: { noun: 'Egg sac', plural: 'egg sacs', offspring: 'young' }, liveBirth: null },
 }
 

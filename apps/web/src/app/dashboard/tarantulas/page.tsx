@@ -52,7 +52,7 @@ interface PremoltPrediction {
 // (feeding status + premolt); the other taxa render lean cards. Non-tarantula
 // detail/add pages are built in later web batches — until then those routes
 // 404 (collection list parity is this batch's scope).
-type TaxonKey = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider' | 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'roach' | 'other'
+type TaxonKey = 'tarantula' | 'scorpion' | 'centipede' | 'whip_spider' | 'vinegaroon' | 'true_spider' | 'millipede' | 'mantis' | 'roach' | 'isopod' | 'other'
 
 interface Animal {
   id: string
@@ -83,6 +83,7 @@ const TAXA: {
   { key: 'millipede', label: 'Millipedes', glyph: '🪱', listEndpoint: '/api/v1/inverts/?taxon=millipede', addPath: '/dashboard/inverts/add?taxon=millipede', detailPath: (id) => `/dashboard/inverts/${id}` },
   { key: 'mantis', label: 'Mantises', glyph: '🦗', listEndpoint: '/api/v1/inverts/?taxon=mantis', addPath: '/dashboard/inverts/add?taxon=mantis', detailPath: (id) => `/dashboard/inverts/${id}` },
   { key: 'roach', label: 'Roaches', glyph: '🪳', listEndpoint: '/api/v1/inverts/?taxon=roach', addPath: '/dashboard/inverts/add?taxon=roach', detailPath: (id) => `/dashboard/inverts/${id}` },
+  { key: 'isopod', label: 'Isopods', glyph: '🪲', listEndpoint: '/api/v1/inverts/?taxon=isopod', addPath: '/dashboard/inverts/add?taxon=isopod', detailPath: (id) => `/dashboard/inverts/${id}` },
   { key: 'other', label: 'Other', glyph: '🐾', listEndpoint: '/api/v1/inverts/?taxon=other', addPath: '/dashboard/inverts/add?taxon=other', detailPath: (id) => `/dashboard/inverts/${id}` },
 ]
 

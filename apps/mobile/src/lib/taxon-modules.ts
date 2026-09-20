@@ -51,6 +51,11 @@ export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   // colonies are a separate table with their own screen (ADR-010), so an
   // individual roach genuinely has nothing here. Not an oversight.
   roach: [],
+  // Detritivores kept as a COLONY, not as individuals — the population is the
+  // unit, and colonies have their own screen (ADR-010). No feeding cadence to
+  // nag about, and no per-animal molt log worth charting: isopods molt in two
+  // halves and nobody records it.
+  isopod: [],
   other: [],
 };
 
@@ -163,6 +168,15 @@ export const BREEDING_VOCABULARY: Record<string, BreedingVocabulary> = {
     // Viviparous — no egg stage exists. See the note above.
     clutch: null,
     liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'instars' },
+  },
+  isopod: {
+    // No egg stage the keeper ever sees. The female broods eggs internally in
+    // a marsupium and releases live young, so offering an "egg sac" form would
+    // ask for something that never exists outside her.
+    clutch: null,
+    // "Mancae" is the correct and universally used hobby term for newly
+    // released isopods — not nymphs (insects) and not spiderlings.
+    liveBirth: { noun: 'Brood', plural: 'broods', offspring: 'mancae' },
   },
   vinegaroon: {
     // Also carries an egg sac beneath the abdomen, young ride the mother.

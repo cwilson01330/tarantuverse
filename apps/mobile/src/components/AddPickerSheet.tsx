@@ -38,6 +38,7 @@ export type AddPickerTaxon =
   | 'millipede'
   | 'mantis'
   | 'roach'
+  | 'isopod'
   | 'other'
   // Colony mode (ADR-010) — a population entry rather than an individual
   // animal. The taxon is chosen inside the colony add form, so this maps to
@@ -90,6 +91,7 @@ const ROWS: Row[] = [
   { key: 'millipede', glyph: '🪱', label: 'Millipede', hint: 'New millipede record' },
   { key: 'mantis', glyph: '🦗', label: 'Mantis', hint: 'New mantis record' },
   { key: 'roach', glyph: '🪳', label: 'Roach', hint: 'New roach record' },
+  { key: 'isopod', glyph: '🪲', label: 'Isopod', hint: 'New isopod record' },
   { key: 'other', glyph: '🐾', label: 'Other invertebrate', hint: 'New invertebrate record' },
   {
     // Colony mode — a population you track as one entry (headcounts by

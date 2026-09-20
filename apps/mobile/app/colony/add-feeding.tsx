@@ -40,7 +40,9 @@ function foodTypesFor(taxon: string | undefined): string[] {
   // Roaches and millipedes are the colony taxa fed as detritivores today.
   // feeding_mode lives on invert_species, not on the colony, so this reads
   // from taxon — honest for the taxa that can currently BE a colony.
-  return taxon === 'roach' || taxon === 'millipede' ? DETRITIVORE_FOODS : PREDATOR_FOODS;
+  return taxon === 'roach' || taxon === 'millipede' || taxon === 'isopod'
+    ? DETRITIVORE_FOODS
+    : PREDATOR_FOODS;
 }
 
 // Same three values the tarantula form has always used. Kept identical so the

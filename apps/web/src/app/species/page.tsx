@@ -40,6 +40,7 @@ const TAXA = [
   { key: 'millipede', label: '🪱 Millipedes', endpoint: '/api/v1/invert-species/?taxon=millipede', noun: 'millipede' },
   { key: 'mantis', label: '🦗 Mantises', endpoint: '/api/v1/invert-species/?taxon=mantis', noun: 'mantis' },
   { key: 'roach', label: '🪳 Roaches', endpoint: '/api/v1/invert-species/?taxon=roach', noun: 'roach' },
+  { key: 'isopod', label: '🪲 Isopods', endpoint: '/api/v1/invert-species/?taxon=isopod', noun: 'isopod' },
 ] as const;
 
 type TaxonKey = (typeof TAXA)[number]['key'];
