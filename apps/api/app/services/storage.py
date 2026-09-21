@@ -146,6 +146,46 @@ class StorageService:
 
         return buffer.getvalue()
 
+    async def upload_species_image(
+        self, file_data: bytes, slug: str, max_edge: int = 1400,
+    ) -> str:
+        """Store a catalog image for a species. Returns its public URL.
+
+        Separate from `upload_photo` for three reasons:
+
+          - it belongs under `species-images/`, matching the 193 images already
+            in the catalog, not under `photos/` with keepers' animals;
+          - no thumbnail. Existing catalog entries have none, and the care
+            sheet renders the full image;
+          - it downsizes. A photo straight off a phone is often 4-8MB, and the
+            catalog serves the same picture to every keeper who opens that care
+            sheet — the bandwidth is paid over and over.
+
+        The uuid suffix means re-uploading for a species can't collide with the
+        object it supersedes, or be served stale from a cache keyed on the old
+        URL.
+        """
+        img = Image.open(BytesIO(file_data))
+        # JPEG has no alpha channel; P/LA/RGBA all need flattening or the save
+        # raises. Converting via RGB keeps it simple and lossless enough here.
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGB")
+        # Only ever shrink. Upscaling a small photo would add bytes and
+        # invent detail that isn't there.
+        if max(img.size) > max_edge:
+            img.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=88, optimize=True)
+        optimised = buf.getvalue()
+
+        key = f"species-images/{slug}-{uuid.uuid4().hex[:8]}.jpg"
+        if self.use_r2:
+            return await self._upload_to_r2(optimised, key, "image/jpeg")
+        return await self._upload_to_local(
+            optimised, os.path.basename(key), self.upload_dir,
+        )
+
     async def upload_photo(
         self,
         file_data: bytes,

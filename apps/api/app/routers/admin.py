@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 from app.database import get_db
@@ -13,9 +13,13 @@ from app.models.content_report import ContentReport
 from app.utils.subscription import active_subscription_clause
 from app.schemas.user import UserResponse
 from app.utils.dependencies import get_current_admin
+from app.utils.file_validation import validate_image_bytes
+from app.services.storage import StorageService
 from app.services.email import EmailService
 from app.config import settings
 import secrets
+import uuid
+from typing import Optional
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter(
@@ -525,3 +529,121 @@ async def test_email_sending(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send test email: {str(e)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Species catalog images
+#
+# 220 of 413 invert species have no picture, and a care sheet without one
+# reads as unfinished. The shell script (promote_photo_to_species.py) covers
+# "use a photo already in the app"; this covers the commoner case of having a
+# picture on your phone and wanting it on the species page without opening a
+# terminal.
+#
+# Admin-only by virtue of the router-level Depends(get_current_admin) above —
+# no per-route gate needed, and adding one would imply the others lack it.
+# ---------------------------------------------------------------------------
+
+@router.get("/species-images")
+async def list_species_image_status(
+    taxon: Optional[str] = Query(None, description="Filter to one taxon."),
+    missing_only: bool = Query(True, description="Only species without an image."),
+    db: Session = Depends(get_db),
+):
+    """Catalog images, for the admin fill-in screen.
+
+    Defaults to missing_only because that's the working set — the point of the
+    screen is closing gaps, not browsing what's already done.
+    """
+    q = db.query(InvertSpecies)
+    if taxon:
+        q = q.filter(InvertSpecies.taxon == taxon)
+    if missing_only:
+        q = q.filter(
+            (InvertSpecies.image_url.is_(None)) | (InvertSpecies.image_url == "")
+        )
+
+    rows = q.order_by(InvertSpecies.taxon, InvertSpecies.scientific_name).all()
+    return {
+        "species": [
+            {
+                "id": str(s.id),
+                "scientific_name": s.scientific_name,
+                "common_names": s.common_names or [],
+                "taxon": s.taxon,
+                "image_url": s.image_url,
+                "image_attribution": s.image_attribution,
+            }
+            for s in rows
+        ],
+        # Counted across the WHOLE catalog, not the filtered page, so the
+        # screen can show honest progress rather than progress-within-a-filter.
+        "total_species": db.query(func.count(InvertSpecies.id)).scalar(),
+        "total_with_image": db.query(func.count(InvertSpecies.id))
+        .filter(InvertSpecies.image_url.isnot(None), InvertSpecies.image_url != "")
+        .scalar(),
+    }
+
+
+@router.post("/species-images/{species_id}")
+async def upload_species_image(
+    species_id: uuid.UUID,
+    file: UploadFile = File(...),
+    attribution: str = Form(...),
+    replace: bool = Form(False),
+    db: Session = Depends(get_db),
+):
+    """Attach an uploaded image to a species.
+
+    Gap-filling by default: refuses when the species already has an image and
+    reports what it would have discarded. The catalog's existing pictures are
+    curated and attributed, and a tool that can silently overwrite one
+    eventually does.
+
+    Attribution is required, not decorative — 186 of the 193 existing images
+    carry it, and an unattributed entry in a catalog that attributes everything
+    else reads as though its provenance was lost.
+    """
+    species = db.query(InvertSpecies).filter(InvertSpecies.id == species_id).first()
+    if not species:
+        raise HTTPException(status_code=404, detail="Species not found")
+
+    if not attribution.strip():
+        raise HTTPException(status_code=400, detail="Attribution is required.")
+
+    if species.image_url and not replace:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"{species.scientific_name} already has an image. Send replace=true to overwrite it.",
+                "current_image_url": species.image_url,
+                "current_attribution": species.image_attribution,
+            },
+        )
+
+    data = await file.read()
+    if len(data) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image must be under 15MB.")
+
+    # Magic bytes, not the Content-Type header — the header is client-supplied
+    # and trivially forged, and this endpoint accepts arbitrary uploads.
+    try:
+        validate_image_bytes(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    slug = (species.slug or species.scientific_name_lower or "species").replace(" ", "-")
+    slug = "".join(c for c in slug if c.isalnum() or c in "-_") or "species"
+
+    storage = StorageService()
+    species.image_url = await storage.upload_species_image(data, slug)
+    species.image_attribution = attribution.strip()
+    db.commit()
+    db.refresh(species)
+
+    return {
+        "id": str(species.id),
+        "scientific_name": species.scientific_name,
+        "image_url": species.image_url,
+        "image_attribution": species.image_attribution,
+    }

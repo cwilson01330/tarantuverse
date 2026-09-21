@@ -41,6 +41,7 @@ const adminSections: AdminSection[] = [
       { label: 'Care Guides', href: '/dashboard/admin/species/care-guides' },
       { label: 'Manage Species', href: '/dashboard/admin/species/manage' },
       { label: 'Add New Species', href: '/dashboard/admin/species/add' },
+      { label: 'Species Images', href: '/dashboard/admin/species/images' },
       { label: 'Bulk Import', href: '/dashboard/admin/species/bulk-import' },
     ],
   },
