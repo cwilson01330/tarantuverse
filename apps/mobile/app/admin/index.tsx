@@ -73,6 +73,13 @@ export default function AdminIndexScreen() {
       route: '/admin/species',
     },
     {
+      title: 'Species Images',
+      description: 'Photograph a species and fill a gap in the catalog',
+      icon: 'camera' as const,
+      color: '#0ea5e9',
+      route: '/admin/species-images',
+    },
+    {
       title: 'System Settings',
       description: 'Feature flags, limits, maintenance mode',
       icon: 'cog' as const,
