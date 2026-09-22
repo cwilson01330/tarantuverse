@@ -43,6 +43,94 @@ def _invert_display(inv: Invert) -> str:
     return inv.name or inv.common_name or inv.scientific_name or "Unnamed"
 
 
+def _load_parent(db: Session, user_id: uuid.UUID, animal_id: uuid.UUID) -> Invert | None:
+    """Resolve a parent id to an `Invert`, whichever field named it.
+
+    Tarantulas share their primary key with the inverts mirror (ADR-005), so a
+    legacy `male_id` resolves here too and callers don't need to care which
+    field an update arrived in. Returns None when the animal doesn't exist or
+    isn't this keeper's.
+    """
+    return db.query(Invert).filter(
+        Invert.id == animal_id, Invert.user_id == user_id,
+    ).first()
+
+
+def _validate_pair(male: Invert, female: Invert) -> list[str]:
+    """The rules a pairing has to satisfy, whether it's being created or edited.
+
+    Extracted because update used to enforce NONE of this — it validated the
+    two legacy ids against `tarantulas` and wrote whatever it was given. That
+    let an edit land a pairing in a state the create endpoint would have
+    refused outright: two males, mismatched taxa, an animal paired with
+    itself. A rule that only one write path honours isn't a rule.
+
+    Raises HTTPException for the hard refusals. Returns advisory warnings.
+    """
+    if male.id == female.id:
+        raise HTTPException(
+            status_code=400, detail="An animal can't be paired with itself",
+        )
+    if male.taxon != female.taxon:
+        raise HTTPException(
+            status_code=400, detail="Both animals must be the same taxon",
+        )
+
+    # --- sex slots ---------------------------------------------------------
+    # Refuse only when we KNOW both animals are the same sex. `unknown` is the
+    # default and stays common until maturity, so treating it as a mismatch
+    # would block the majority of legitimate pairings — the same evidence-first
+    # rule the rest of the app follows: don't assert what the data doesn't say.
+    male_sex = _sex_of(male)
+    female_sex = _sex_of(female)
+    if male_sex and female_sex and male_sex == female_sex:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Both animals are recorded as {male_sex}. Check the sexes, or "
+                "set one to unknown if you're not sure."
+            ),
+        )
+    if male_sex == "female" or female_sex == "male":
+        raise HTTPException(
+            status_code=400,
+            detail="The male and female look swapped — check which animal is in which slot.",
+        )
+
+    # --- species ------------------------------------------------------------
+    # NOT a refusal. Hybridising is widely frowned on, but this app records what
+    # happened rather than licensing it, and a keeper logging a cross after the
+    # fact needs to be able to write it down. Blocking would also punish the
+    # common case of an unlinked species. So it's surfaced as a warning and the
+    # client decides how loudly to say it.
+    warnings: list[str] = []
+    if (
+        male.species_id is not None
+        and female.species_id is not None
+        and male.species_id != female.species_id
+    ):
+        warnings.append(
+            "These animals are linked to different species. Cross-species "
+            "pairings rarely produce viable young and are discouraged."
+        )
+    return warnings
+
+
+def _set_parent(pairing: Pairing, slot: str, animal: Invert) -> None:
+    """Point one slot at an animal, keeping BOTH foreign keys consistent.
+
+    Writing only the legacy `male_id` was silently broken: `resolve_parents`
+    prefers `male_invert_id`, so an edit that changed the legacy column alone
+    returned 200 and then kept rendering the OLD animal. The update looked
+    like it worked and didn't.
+
+    The legacy column is mirrored only for tarantulas — it's a FK into
+    `tarantulas`, and a mantis has no row there.
+    """
+    setattr(pairing, f"{slot}_invert_id", animal.id)
+    setattr(pairing, f"{slot}_id", animal.id if animal.taxon == "tarantula" else None)
+
+
 @router.get("/pairings/", response_model=List[PairingResponse])
 async def get_pairings(
     db: Session = Depends(get_db),
@@ -129,48 +217,10 @@ async def create_invert_pairing(
         raise HTTPException(status_code=404, detail="Male animal not found")
     if not female:
         raise HTTPException(status_code=404, detail="Female animal not found")
-    if male.id == female.id:
-        raise HTTPException(status_code=400, detail="An animal can't be paired with itself")
-    if male.taxon != female.taxon:
-        raise HTTPException(status_code=400, detail="Both animals must be the same taxon")
 
-    # --- sex slots ---------------------------------------------------------
-    # Refuse only when we KNOW both animals are the same sex. `unknown` is the
-    # default and stays common until maturity, so treating it as a mismatch
-    # would block the majority of legitimate pairings — the same evidence-first
-    # rule the rest of the app follows: don't assert what the data doesn't say.
-    male_sex = _sex_of(male)
-    female_sex = _sex_of(female)
-    if male_sex and female_sex and male_sex == female_sex:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Both animals are recorded as {male_sex}. Check the sexes, or "
-                "set one to unknown if you're not sure."
-            ),
-        )
-    if male_sex == "female" or female_sex == "male":
-        raise HTTPException(
-            status_code=400,
-            detail="The male and female look swapped — check which animal is in which slot.",
-        )
-
-    # --- species ------------------------------------------------------------
-    # NOT a refusal. Hybridising is widely frowned on, but this app records what
-    # happened rather than licensing it, and a keeper logging a cross after the
-    # fact needs to be able to write it down. Blocking would also punish the
-    # common case of an unlinked species. So it's surfaced as a warning and the
-    # client decides how loudly to say it.
-    warnings: list[str] = []
-    if (
-        male.species_id is not None
-        and female.species_id is not None
-        and male.species_id != female.species_id
-    ):
-        warnings.append(
-            "These animals are linked to different species. Cross-species "
-            "pairings rarely produce viable young and are discouraged."
-        )
+    # Shared with update_pairing — see _validate_pair. Raises on the hard
+    # refusals, returns advisory warnings.
+    warnings = _validate_pair(male, female)
 
     # Tarantulas share their PK with the inverts mirror, so set the legacy
     # FKs too for back-compat with tarantula-side reads/lineage. Pure inverts
@@ -286,8 +336,24 @@ async def update_pairing(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Update a pairing"""
-    # Get pairing and verify ownership
+    """Update a pairing, for any taxon.
+
+    WHAT THIS USED TO DO
+    --------------------
+    It validated `male_id`/`female_id` against `tarantulas` and then wrote
+    whatever it was handed. Two consequences, both silent:
+
+      1. A non-tarantula pairing could never be corrected. `PairingUpdate` had
+         no invert fields at all, and the legacy ones are FKs into a table a
+         mantis has no row in — so a jumper pairing with the wrong female was
+         permanent.
+      2. Even for a tarantula it didn't work. `resolve_parents` prefers
+         `male_invert_id`, so changing only the legacy column returned 200 and
+         then kept rendering the OLD animal. The edit appeared to succeed.
+
+    It also enforced none of the create endpoint's rules, so an edit could
+    land a pairing in a state create would have refused.
+    """
     pairing = db.query(Pairing).filter(
         Pairing.id == pairing_id,
         Pairing.user_id == current_user.id
@@ -296,26 +362,69 @@ async def update_pairing(
     if not pairing:
         raise HTTPException(status_code=404, detail="Pairing not found")
 
-    # If updating tarantula IDs, verify ownership
-    if pairing_data.male_id:
-        male = db.query(Tarantula).filter(
-            Tarantula.id == pairing_data.male_id,
-            Tarantula.user_id == current_user.id
-        ).first()
-        if not male:
-            raise HTTPException(status_code=404, detail="Male tarantula not found")
-
-    if pairing_data.female_id:
-        female = db.query(Tarantula).filter(
-            Tarantula.id == pairing_data.female_id,
-            Tarantula.user_id == current_user.id
-        ).first()
-        if not female:
-            raise HTTPException(status_code=404, detail="Female tarantula not found")
-
-    # Update pairing
     update_data = pairing_data.model_dump(exclude_unset=True)
+
+    # Parent columns are handled separately from the scalar fields: they come
+    # in pairs, they need cross-checking against each other, and each one
+    # writes two columns.
+    parent_fields = {"male_invert_id", "female_invert_id", "male_id", "female_id"}
+    requested: dict[str, uuid.UUID | None] = {}
+    for slot in ("male", "female"):
+        # The generic field wins when both are sent — it's the one that works
+        # for every taxon, and for a tarantula they carry the same id anyway.
+        if f"{slot}_invert_id" in update_data:
+            requested[slot] = update_data[f"{slot}_invert_id"]
+        elif f"{slot}_id" in update_data:
+            requested[slot] = update_data[f"{slot}_id"]
+
+    if requested:
+        # Validate the pair this update RESULTS IN, not just the half of it
+        # that changed. Swapping only the male still has to be checked against
+        # the female already on the record.
+        resolved: dict[str, Invert] = {}
+        for slot in ("male", "female"):
+            if slot in requested:
+                animal_id = requested[slot]
+                if animal_id is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"A pairing needs a {slot}; it can't be cleared.",
+                    )
+                animal = _load_parent(db, current_user.id, animal_id)
+                if not animal:
+                    raise HTTPException(
+                        status_code=404, detail=f"{slot.capitalize()} animal not found",
+                    )
+            else:
+                current_id = (
+                    getattr(pairing, f"{slot}_invert_id")
+                    or getattr(pairing, f"{slot}_id")
+                )
+                animal = (
+                    _load_parent(db, current_user.id, current_id)
+                    if current_id
+                    else None
+                )
+                if not animal:
+                    # The unchanged side is gone (deleted since, or a legacy
+                    # row with no mirror). Refusing beats writing a pair we
+                    # can't check — the keeper can set both sides explicitly.
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"The current {slot} can't be found, so this change "
+                            f"can't be checked. Set both animals explicitly."
+                        ),
+                    )
+            resolved[slot] = animal
+
+        _validate_pair(resolved["male"], resolved["female"])
+        for slot in ("male", "female"):
+            _set_parent(pairing, slot, resolved[slot])
+
     for field, value in update_data.items():
+        if field in parent_fields:
+            continue  # already applied, through _set_parent
         setattr(pairing, field, value)
 
     db.commit()

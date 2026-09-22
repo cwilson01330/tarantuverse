@@ -29,7 +29,19 @@ class PairingCreate(PairingBase):
 
 
 class PairingUpdate(BaseModel):
-    """Schema for updating a pairing (all fields optional)"""
+    """Schema for updating a pairing (all fields optional).
+
+    `male_invert_id`/`female_invert_id` are the ones to send. They work for
+    every taxon; the legacy `male_id`/`female_id` are FKs into `tarantulas`,
+    so passing a mantis or jumper id there is a 404 by construction.
+
+    Until these two existed, a non-tarantula pairing could be created and then
+    never corrected — there was no field on this schema that could name its
+    parents. The legacy pair stays accepted so existing clients don't break,
+    and the router keeps both columns in step whichever one you send.
+    """
+    male_invert_id: Optional[uuid.UUID] = None
+    female_invert_id: Optional[uuid.UUID] = None
     male_id: Optional[uuid.UUID] = None
     female_id: Optional[uuid.UUID] = None
     paired_date: Optional[date] = None

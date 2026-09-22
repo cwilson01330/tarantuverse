@@ -165,11 +165,48 @@ def test_export_keeps_the_invert_parent_refs_specifically():
 
 # ── 4. Guards refuse what's wrong, not what's merely unknown ───────────────
 
+class _Animal:
+    """Enough of an `Invert` to exercise the pairing rules."""
+
+    def __init__(self, sex="unknown", taxon="tarantula", species_id=None):
+        import uuid as _uuid
+
+        self.id = _uuid.uuid4()
+        self.sex = sex
+        self.taxon = taxon
+        self.species_id = species_id
+
+
 def test_same_sex_is_refused_but_unknown_is_not():
     """'unknown' is the default and stays common until maturity. Treating it as
-    a mismatch would block most legitimate pairings."""
-    src = inspect.getsource(pairings_router.create_invert_pairing)
-    assert "male_sex and female_sex and male_sex == female_sex" in src
+    a mismatch would block most legitimate pairings.
+
+    Calls the rule directly. This used to grep the source of
+    `create_invert_pairing`, which was a workaround for the logic being buried
+    in an async endpoint that needed a database — it has since moved to
+    `_validate_pair`, shared with the update path, and a source match would
+    have kept passing while asserting nothing about behaviour.
+    """
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as e:
+        pairings_router._validate_pair(_Animal(sex="male"), _Animal(sex="male"))
+    assert e.value.status_code == 400
+    # The same-sex message specifically. Asserting only on the status code
+    # let the swapped-slots guard — which fires on these same inputs — stand
+    # in for this one, so removing the same-sex check kept the test green.
+    assert "recorded as" in e.value.detail, (
+        f"expected the same-sex refusal, got: {e.value.detail!r}"
+    )
+
+    # Unknown on either side is missing information, never a third sex.
+    assert pairings_router._validate_pair(_Animal(), _Animal()) == []
+    assert pairings_router._validate_pair(
+        _Animal(sex="male"), _Animal()
+    ) == []
+    assert pairings_router._validate_pair(
+        _Animal(), _Animal(sex="female")
+    ) == []
 
     sex_of = inspect.getsource(pairings_router._sex_of)
     assert 'lowered if lowered in ("male", "female") else None' in sex_of
@@ -186,12 +223,21 @@ def test_a_cross_species_pairing_warns_rather_than_refuses():
     """This app records what a keeper did rather than licensing it. Someone
     logging a cross after the fact still needs to write it down, and blocking
     would also punish the common case of an unlinked species."""
-    src = inspect.getsource(pairings_router.create_invert_pairing)
-    assert "warnings.append(" in src
+    import uuid as _uuid
 
-    warn_at = src.index("warnings.append(")
-    # Everything before the warning may raise; the species block itself must not.
-    species_block = src[src.index("male.species_id is not None") : warn_at]
-    assert "HTTPException" not in species_block
+    # Two known-different species must WARN, not raise.
+    warnings = pairings_router._validate_pair(
+        _Animal(sex="male", species_id=_uuid.uuid4()),
+        _Animal(sex="female", species_id=_uuid.uuid4()),
+    )
+    assert len(warnings) == 1
+    assert "different species" in warnings[0]
+
+    # An unlinked species is missing data, not evidence of a cross — roughly
+    # 40% of animals have no species_id, and warning on all of them would
+    # train keepers to ignore the warning that matters.
+    assert pairings_router._validate_pair(
+        _Animal(sex="male"), _Animal(sex="female", species_id=_uuid.uuid4())
+    ) == []
 
     assert "warnings" in PairingResponse.model_fields
