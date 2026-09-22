@@ -22,6 +22,11 @@ VENOM_SEVERITY_PATTERN = "^(mild|moderate|medically_significant)$"
 SPECIES_TYPE_PATTERN = "^(terrestrial|arboreal|fossorial|scansorial|psammophile)$"
 BURROWING_PATTERN = "^(none|light|heavy)$"
 DEVELOPMENTAL_CLASS_PATTERN = "^(anamorphic|epimorphic)$"
+# Keep in lockstep with the CHECK constraints in models/invert_species.py.
+# 'none' is a real, useful value here — "we checked, it doesn't" is different
+# information from "nobody recorded it", which is NULL.
+DEFENSIVE_SECRETION_PATTERN = "^(none|benzoquinone|acetic_acid|hydrogen_cyanide|other)$"
+STAGE_SCHEME_PATTERN = "^(sling_juvenile_adult|instar|none)$"
 
 
 class InvertSpeciesBase(BaseModel):
@@ -78,6 +83,24 @@ class InvertSpeciesBase(BaseModel):
     )
     typical_segment_count: Optional[int] = Field(None, ge=1)
     typical_leg_pair_count: Optional[int] = Field(None, ge=1)
+
+    # Safety for the taxa that have no venom and are still worth warning
+    # about — millipede benzoquinones, vinegaroon acetic-acid spray — plus the
+    # two escape facts that decide a roach enclosure's lid and barrier.
+    defensive_secretion: Optional[str] = Field(None, pattern=DEFENSIVE_SECRETION_PATTERN)
+    defensive_secretion_notes: Optional[str] = None
+    can_fly: Optional[bool] = None
+    can_climb_smooth: Optional[bool] = None
+
+    # Growth staging. sling/juvenile/adult fits three of eleven taxa; this
+    # says which scheme a species actually uses.
+    stage_scheme: Optional[str] = Field(None, pattern=STAGE_SCHEME_PATTERN)
+    typical_instars_to_maturity: Optional[int] = Field(None, ge=1, le=40)
+
+    # Detritivore husbandry — the facts that decide whether a culture lives.
+    supplemental_calcium_required: Optional[bool] = None
+    moisture_gradient_required: Optional[bool] = None
+    bioactive_suitable: Optional[bool] = None
 
     care_guide: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=500)
@@ -140,6 +163,15 @@ class InvertSpeciesUpdate(BaseModel):
     )
     typical_segment_count: Optional[int] = Field(None, ge=1)
     typical_leg_pair_count: Optional[int] = Field(None, ge=1)
+    defensive_secretion: Optional[str] = Field(None, pattern=DEFENSIVE_SECRETION_PATTERN)
+    defensive_secretion_notes: Optional[str] = None
+    can_fly: Optional[bool] = None
+    can_climb_smooth: Optional[bool] = None
+    stage_scheme: Optional[str] = Field(None, pattern=STAGE_SCHEME_PATTERN)
+    typical_instars_to_maturity: Optional[int] = Field(None, ge=1, le=40)
+    supplemental_calcium_required: Optional[bool] = None
+    moisture_gradient_required: Optional[bool] = None
+    bioactive_suitable: Optional[bool] = None
     care_guide: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=500)
     image_attribution: Optional[str] = None

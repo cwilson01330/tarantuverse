@@ -60,6 +60,21 @@ class InvertSpecies(Base):
             name='invert_species_venom_severity_check',
         ),
         CheckConstraint(
+            "defensive_secretion IS NULL OR defensive_secretion IN "
+            "('none', 'benzoquinone', 'acetic_acid', 'hydrogen_cyanide', 'other')",
+            name='invert_species_defensive_secretion_check',
+        ),
+        CheckConstraint(
+            "stage_scheme IS NULL OR stage_scheme IN "
+            "('sling_juvenile_adult', 'instar', 'none')",
+            name='invert_species_stage_scheme_check',
+        ),
+        CheckConstraint(
+            "typical_instars_to_maturity IS NULL OR "
+            "typical_instars_to_maturity BETWEEN 1 AND 40",
+            name='invert_species_instars_range_check',
+        ),
+        CheckConstraint(
             "developmental_class IS NULL OR "
             "developmental_class IN ('anamorphic', 'epimorphic')",
             name='invert_species_developmental_class_check',
@@ -132,6 +147,44 @@ class InvertSpecies(Base):
     developmental_class = Column(String(20))  # anamorphic | epimorphic
     typical_segment_count = Column(Integer)
     typical_leg_pair_count = Column(Integer)
+
+    # ---- Safety for the non-venomous taxa -------------------------------
+    # `venom_severity` is the wrong frame for most of the platform. A
+    # millipede has no venom and is still capable of a chemical burn; a roach
+    # is entirely harmless and will still empty your tub across the room. The
+    # facts a keeper needs before opening an enclosure differ by group, and
+    # until now eight of eleven taxa had nowhere to record them.
+    #
+    # defensive_secretion: benzoquinones (millipedes) stain skin brown for
+    # days and genuinely hurt in the eyes; vinegaroons spray concentrated
+    # acetic acid; some millipedes release hydrogen cyanide. None of this is
+    # venom and none of it fits the venom fields.
+    defensive_secretion = Column(String(30))  # millipede, vinegaroon
+    defensive_secretion_notes = Column(Text)
+    # The two escape facts, which for roaches are THE husbandry question:
+    # a flying species needs a lid, a smooth-climbing one needs a barrier.
+    # Also true of adult male mantids, which fly readily.
+    can_fly = Column(Boolean)  # roach, mantis
+    can_climb_smooth = Column(Boolean)  # roach, isopod
+
+    # ---- Growth staging -------------------------------------------------
+    # sling/juvenile/adult is tarantula vocabulary and fits three of eleven
+    # taxa. A mantis is L1–L7, a scorpion 2i–7i, an isopod has no stages a
+    # keeper tracks at all. This says which scheme the species uses so the
+    # client can stop forcing spider words onto everything.
+    stage_scheme = Column(String(20))  # sling_juvenile_adult | instar | none
+    typical_instars_to_maturity = Column(Integer)  # mantis, scorpion
+
+    # ---- Detritivore husbandry ------------------------------------------
+    # The three facts that decide whether an isopod or millipede culture
+    # thrives or quietly dies. Calcium deficiency and a tub that's wet or dry
+    # end to end are the two commonest ways a beginner loses a colony, and
+    # neither had anywhere to live in this schema.
+    supplemental_calcium_required = Column(Boolean)  # isopod, millipede
+    moisture_gradient_required = Column(Boolean)  # isopod, millipede
+    # Whether this is a clean-up-crew species — how most keepers find isopods
+    # in the first place.
+    bioactive_suitable = Column(Boolean)  # isopod, springtail-likes
 
     # Documentation
     care_guide = Column(Text)
