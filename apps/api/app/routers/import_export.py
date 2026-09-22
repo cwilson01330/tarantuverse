@@ -435,8 +435,8 @@ async def export_preview(
     their export before requesting it.
     """
     tarantulas = db.query(Tarantula).filter(Tarantula.user_id == current_user.id).all()
-    t_ids = [t.id for t in tarantulas]
 
+    from sqlalchemy import or_, select
     from app.models.feeding_log import FeedingLog
     from app.models.molt_log import MoltLog
     from app.models.substrate_change import SubstrateChange
@@ -445,11 +445,29 @@ async def export_preview(
     from app.models.pairing import Pairing
     from app.models.egg_sac import EggSac
     from app.models.offspring import Offspring
+    from app.models.invert import Invert
+    from app.models.colony import Colony
 
-    feeding_count = db.query(FeedingLog).filter(FeedingLog.tarantula_id.in_(t_ids)).count() if t_ids else 0
-    molt_count = db.query(MoltLog).filter(MoltLog.tarantula_id.in_(t_ids)).count() if t_ids else 0
-    substrate_count = db.query(SubstrateChange).filter(SubstrateChange.tarantula_id.in_(t_ids)).count() if t_ids else 0
-    photo_count = db.query(Photo).filter(Photo.tarantula_id.in_(t_ids)).count() if t_ids else 0
+    inverts = db.query(Invert).filter(Invert.user_id == current_user.id).all()
+
+    def _owned(model):
+        """Count this user's log rows via any parent — see export_service.
+
+        The preview has to use the same rule as the export itself, or it
+        promises a keeper fewer records than they actually receive.
+        """
+        return db.query(model).filter(
+            or_(
+                model.invert_id.in_(select(Invert.id).where(Invert.user_id == current_user.id)),
+                model.tarantula_id.in_(select(Tarantula.id).where(Tarantula.user_id == current_user.id)),
+                model.colony_id.in_(select(Colony.id).where(Colony.user_id == current_user.id)),
+            )
+        ).count()
+
+    feeding_count = _owned(FeedingLog)
+    molt_count = _owned(MoltLog)
+    substrate_count = _owned(SubstrateChange)
+    photo_count = _owned(Photo)
     enclosure_count = db.query(Enclosure).filter(Enclosure.user_id == current_user.id).count()
     pairing_count = db.query(Pairing).filter(Pairing.user_id == current_user.id).count()
     egg_sac_count = db.query(EggSac).filter(EggSac.user_id == current_user.id).count()
@@ -477,6 +495,7 @@ async def export_preview(
     return {
         "username": current_user.username,
         "counts": {
+            "animals": len(inverts),
             "tarantulas": len(tarantulas),
             "feeding_logs": feeding_count,
             "molt_logs": molt_count,

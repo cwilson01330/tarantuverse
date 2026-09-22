@@ -15,10 +15,15 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 import httpx
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.models.tarantula import Tarantula
+# The unified multi-taxon animal table (ADR-005). Exporting from `tarantulas`
+# alone meant a keeper whose collection was mantises or isopods received an
+# export with no animals in it.
+from app.models.invert import Invert
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.substrate_change import SubstrateChange
@@ -84,25 +89,57 @@ TARANTULA_FIELDS = [
     "created_at", "updated_at",
 ]
 
+# `invert_id` and `colony_id` are not decoration: a mantis or isopod log
+# carries NO `tarantula_id`, so without them every non-tarantula log row would
+# export with a null parent — an orphan the keeper couldn't match to an animal
+# and the importer couldn't re-attach.
 FEEDING_FIELDS = [
-    "id", "tarantula_id", "animal_id", "enclosure_id", "fed_at", "food_type",
-    "food_size", "quantity", "accepted", "notes", "created_at",
+    "id", "tarantula_id", "invert_id", "colony_id", "animal_id", "enclosure_id",
+    "fed_at", "food_type", "food_size", "quantity", "accepted", "notes",
+    "created_at",
 ]
 
 MOLT_FIELDS = [
-    "id", "tarantula_id", "enclosure_id", "molted_at", "premolt_started_at",
+    "id", "tarantula_id", "invert_id", "colony_id", "enclosure_id",
+    "molted_at", "premolt_started_at",
     "is_unidentified", "leg_span_before", "leg_span_after",
     "weight_before", "weight_after", "notes", "image_url", "created_at",
 ]
 
 SUBSTRATE_CHANGE_FIELDS = [
-    "id", "tarantula_id", "enclosure_id", "changed_at", "substrate_type",
+    "id", "tarantula_id", "invert_id", "colony_id", "enclosure_id",
+    "changed_at", "substrate_type",
     "substrate_depth", "reason", "notes", "created_at",
 ]
 
 PHOTO_FIELDS = [
-    "id", "tarantula_id", "animal_id", "url", "thumbnail_url", "caption",
-    "taken_at", "created_at",
+    "id", "tarantula_id", "invert_id", "colony_id", "animal_id", "url",
+    "thumbnail_url", "caption", "taken_at", "created_at",
+]
+
+# The unified animal surface (ADR-005). Every taxon lives here, including
+# tarantulas — `inverts` is a SUPERSET of the legacy `tarantulas` export
+# section, not a sibling of it.
+INVERT_FIELDS = [
+    "id", "user_id", "taxon", "name", "common_name", "scientific_name",
+    "species_id", "sex", "date_acquired", "source", "price_paid",
+    "photo_url", "notes", "is_public", "visibility", "enclosure_id",
+    "colony_id",
+    # Growth / stage — instar and length carry the taxa that don't use
+    # sling/juvenile/adult.
+    "life_stage", "current_instar", "current_length_mm",
+    "current_segment_count", "current_leg_pair_count",
+    # Husbandry
+    "enclosure_type", "enclosure_size", "substrate_type", "substrate_depth",
+    "last_substrate_change", "target_temp_min", "target_temp_max",
+    "target_humidity_min", "target_humidity_max", "water_dish",
+    "misting_schedule", "last_enclosure_cleaning", "enclosure_notes",
+    # Feeding cadence (ADR-017) + pause state
+    "feeding_interval_days", "feeding_paused_reason", "feeding_paused_until",
+    # Provenance / lifecycle
+    "bred_by_user_id", "origin_keeper_name", "source_transfer_id",
+    "transferred_out_at", "died_at", "death_cause", "death_notes",
+    "created_at", "updated_at",
 ]
 
 ENCLOSURE_FIELDS = [
@@ -234,26 +271,61 @@ def _get_user_tarantulas(db: Session, user_id: UUID) -> List[Tarantula]:
     return db.query(Tarantula).filter(Tarantula.user_id == user_id).order_by(Tarantula.created_at).all()
 
 
+def _get_user_inverts(db: Session, user_id: UUID) -> List[Invert]:
+    """Every animal the keeper owns, across all eleven taxa.
+
+    This is the complete list; `_get_user_tarantulas` returns a subset of the
+    same rows (shared primary keys, ADR-005).
+    """
+    return db.query(Invert).filter(Invert.user_id == user_id).order_by(Invert.created_at).all()
+
+
 def _get_tarantula_ids(tarantulas: List[Tarantula]) -> List[UUID]:
     return [t.id for t in tarantulas]
 
 
-def _get_feeding_logs(db: Session, tarantula_ids: List[UUID]) -> List[FeedingLog]:
-    if not tarantula_ids:
-        return []
-    return db.query(FeedingLog).filter(FeedingLog.tarantula_id.in_(tarantula_ids)).order_by(FeedingLog.fed_at).all()
+def _owned_logs(db: Session, model, user_id: UUID, order_col):
+    """Every row of a polymorphic log table belonging to this user.
+
+    Filtering by OWNER rather than by a list of tarantula ids is the whole
+    fix. The old form dropped, silently and completely, every log belonging to
+    a scorpion, mantis, jumper, isopod or colony — which for a keeper with no
+    tarantulas meant an export containing none of their husbandry records at
+    all. `_get_care_logs` below already worked this way and says why.
+
+    `or_` over one table, rather than joins, so a dual-written tarantula log
+    carrying both `tarantula_id` and `invert_id` appears exactly once.
+    """
+    return (
+        db.query(model)
+        .filter(
+            or_(
+                model.invert_id.in_(
+                    select(Invert.id).where(Invert.user_id == user_id)
+                ),
+                model.tarantula_id.in_(
+                    select(Tarantula.id).where(Tarantula.user_id == user_id)
+                ),
+                model.colony_id.in_(
+                    select(Colony.id).where(Colony.user_id == user_id)
+                ),
+            )
+        )
+        .order_by(order_col)
+        .all()
+    )
 
 
-def _get_molt_logs(db: Session, tarantula_ids: List[UUID]) -> List[MoltLog]:
-    if not tarantula_ids:
-        return []
-    return db.query(MoltLog).filter(MoltLog.tarantula_id.in_(tarantula_ids)).order_by(MoltLog.molted_at).all()
+def _get_feeding_logs(db: Session, user_id: UUID) -> List[FeedingLog]:
+    return _owned_logs(db, FeedingLog, user_id, FeedingLog.fed_at)
 
 
-def _get_substrate_changes(db: Session, tarantula_ids: List[UUID]) -> List[SubstrateChange]:
-    if not tarantula_ids:
-        return []
-    return db.query(SubstrateChange).filter(SubstrateChange.tarantula_id.in_(tarantula_ids)).order_by(SubstrateChange.changed_at).all()
+def _get_molt_logs(db: Session, user_id: UUID) -> List[MoltLog]:
+    return _owned_logs(db, MoltLog, user_id, MoltLog.molted_at)
+
+
+def _get_substrate_changes(db: Session, user_id: UUID) -> List[SubstrateChange]:
+    return _owned_logs(db, SubstrateChange, user_id, SubstrateChange.changed_at)
 
 
 def _get_care_logs(db: Session, user_id: UUID) -> List[CareLog]:
@@ -273,10 +345,8 @@ def _get_care_logs(db: Session, user_id: UUID) -> List[CareLog]:
     )
 
 
-def _get_photos(db: Session, tarantula_ids: List[UUID]) -> List[Photo]:
-    if not tarantula_ids:
-        return []
-    return db.query(Photo).filter(Photo.tarantula_id.in_(tarantula_ids)).order_by(Photo.created_at).all()
+def _get_photos(db: Session, user_id: UUID) -> List[Photo]:
+    return _owned_logs(db, Photo, user_id, Photo.created_at)
 
 
 def _get_enclosures(db: Session, user_id: UUID) -> List[Enclosure]:
@@ -370,7 +440,11 @@ class ExportService:
     @staticmethod
     def _gather(db: Session, user: User) -> Dict[str, Any]:
         tarantulas = _get_user_tarantulas(db, user.id)
-        t_ids = _get_tarantula_ids(tarantulas)
+
+        # The complete animal list, every taxon. `tarantulas` above is a
+        # subset of these same rows (shared primary keys) and is kept only so
+        # existing consumers of the export format don't break.
+        inverts = _get_user_inverts(db, user.id)
 
         # Herpetoverse reptiles/amphibians (the `animals` table). Included
         # unconditionally so a keeper who uses both apps gets one complete
@@ -385,10 +459,11 @@ class ExportService:
         return {
             "profile": _row_to_dict(user, USER_PROFILE_FIELDS),
             "tarantulas": [_row_to_dict(t, TARANTULA_FIELDS) for t in tarantulas],
-            "feeding_logs": [_row_to_dict(f, FEEDING_FIELDS) for f in _get_feeding_logs(db, t_ids)],
-            "molt_logs": [_row_to_dict(m, MOLT_FIELDS) for m in _get_molt_logs(db, t_ids)],
-            "substrate_changes": [_row_to_dict(s, SUBSTRATE_CHANGE_FIELDS) for s in _get_substrate_changes(db, t_ids)],
-            "photos": [_row_to_dict(p, PHOTO_FIELDS) for p in _get_photos(db, t_ids)],
+            "inverts": [_row_to_dict(i, INVERT_FIELDS) for i in inverts],
+            "feeding_logs": [_row_to_dict(f, FEEDING_FIELDS) for f in _get_feeding_logs(db, user.id)],
+            "molt_logs": [_row_to_dict(m, MOLT_FIELDS) for m in _get_molt_logs(db, user.id)],
+            "substrate_changes": [_row_to_dict(s, SUBSTRATE_CHANGE_FIELDS) for s in _get_substrate_changes(db, user.id)],
+            "photos": [_row_to_dict(p, PHOTO_FIELDS) for p in _get_photos(db, user.id)],
             "enclosures": [_row_to_dict(e, ENCLOSURE_FIELDS) for e in _get_enclosures(db, user.id)],
             "pairings": [_row_to_dict(p, PAIRING_FIELDS) for p in _get_pairings(db, user.id)],
             "egg_sacs": [_row_to_dict(e, EGG_SAC_FIELDS) for e in _get_egg_sacs(db, user.id)],
@@ -422,6 +497,10 @@ class ExportService:
             "exported_at": datetime.utcnow().isoformat(),
             "platform": "tarantuverse",
             "user": data["profile"],
+            # `inverts` is the complete animal list across all eleven taxa.
+            # `tarantulas` is the legacy tarantula-only view of the same rows,
+            # retained for consumers written before the multi-taxon move.
+            "inverts": data["inverts"],
             "tarantulas": data["tarantulas"],
             "feeding_logs": data["feeding_logs"],
             "molt_logs": data["molt_logs"],
@@ -450,6 +529,7 @@ class ExportService:
             "colonies": data["colonies"],
             "colony_events": data["colony_events"],
             "counts": {
+                "inverts": len(data["inverts"]),
                 "tarantulas": len(data["tarantulas"]),
                 "feeding_logs": len(data["feeding_logs"]),
                 "molt_logs": len(data["molt_logs"]),
@@ -495,6 +575,9 @@ class ExportService:
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Every animal, every taxon. Written first because for most
+            # keepers this is now the file they actually want.
+            zf.writestr("animals_all_taxa.csv", ExportService._to_csv_bytes(data["inverts"], INVERT_FIELDS))
             zf.writestr("tarantulas.csv", ExportService._to_csv_bytes(data["tarantulas"], TARANTULA_FIELDS))
             zf.writestr("feeding_logs.csv", ExportService._to_csv_bytes(data["feeding_logs"], FEEDING_FIELDS))
             zf.writestr("molt_logs.csv", ExportService._to_csv_bytes(data["molt_logs"], MOLT_FIELDS))

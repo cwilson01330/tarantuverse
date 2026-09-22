@@ -107,7 +107,12 @@ def parse_bytes(content: bytes, filename: str) -> Tuple[List[str], List[Dict[str
     if name.endswith(".json"):
         raw = json.loads(content.decode("utf-8"))
         if isinstance(raw, dict):
-            raw = raw.get("tarantulas") or raw.get("animals") or raw.get("inverts") or [raw]
+            # `inverts` FIRST: in a Tarantuverse export it is the complete
+            # animal list across all taxa, and `tarantulas` is a subset of the
+            # very same rows. Reading `tarantulas` first would silently import
+            # only the tarantulas out of a mixed collection — and nothing at
+            # all for a keeper who has none.
+            raw = raw.get("inverts") or raw.get("tarantulas") or raw.get("animals") or [raw]
         rows = [dict(r) for r in raw if isinstance(r, dict)]
         headers = list({k for r in rows for k in r.keys()})
         return headers, rows

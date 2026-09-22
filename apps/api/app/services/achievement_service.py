@@ -1,8 +1,32 @@
 """
 Achievement checking and awarding service
+
+CROSS-TAXON BY CONSTRUCTION
+---------------------------
+Every count here used to run through `tarantulas`, which meant a keeper whose
+collection was mantises, jumpers or isopods earned nothing — not one badge —
+no matter how diligently they logged. That wasn't a cosmetic gap: the first
+premium subscriber had 21 animals, 22 feedings and 28 molts recorded and zero
+achievements, because only 2 of the 21 were tarantulas and none of the feeding
+logs carried the legacy `tarantula_id`.
+
+The rule now: count the UNIFIED surface. Animals come from `inverts` (every
+taxon lives there, ADR-005); logs are matched on whichever parent they carry.
+
+WHY `or_` AND NOT A JOIN
+------------------------
+Dual-write means a tarantula's feeding log can carry BOTH `tarantula_id` and
+`invert_id` — those two ids are the same value, since the tables share primary
+keys. Joining against both tables would count that log twice and hand out
+`dedicated_feeder_50` at 25 real feedings. Filtering one `FeedingLog` row
+against a set of owned parent ids counts it exactly once however many parent
+columns happen to be populated.
+
+The legacy `tarantula_id` arm is still needed: logs written before the ADR-005
+backfill, or by a legacy code path, may carry only that column.
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_, select
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 import uuid
@@ -10,33 +34,64 @@ from app.models.achievement import AchievementDefinition, UserAchievement
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.tarantula import Tarantula
+from app.models.invert import Invert
+from app.models.colony import Colony
 from app.models.pairing import Pairing, PairingOutcome
 from app.models.forum import ForumPost
 from app.models.follow import Follow
 
 
+def _owned_log_filter(model, user_id: uuid.UUID):
+    """
+    Rows of a polymorphic log table belonging to this user, via ANY parent.
+
+    Covers colonies as well as individuals: an isopod or roach keeper logs
+    against a colony, and a keeper who never opens an individual record is
+    exactly the keeper this service used to ignore.
+    """
+    return or_(
+        model.invert_id.in_(
+            select(Invert.id).where(Invert.user_id == user_id)
+        ),
+        model.tarantula_id.in_(
+            select(Tarantula.id).where(Tarantula.user_id == user_id)
+        ),
+        model.colony_id.in_(
+            select(Colony.id).where(Colony.user_id == user_id)
+        ),
+    )
+
+
 def get_tarantula_count(db: Session, user_id: uuid.UUID) -> int:
-    """Get total number of tarantulas user owns"""
-    return db.query(func.count(Tarantula.id)).filter(
-        Tarantula.user_id == user_id
+    """
+    Total animals the user keeps, across every taxon.
+
+    Deceased animals still count. Achievements record what you have kept, not
+    what is currently alive — the free-tier cap is the thing that excludes the
+    dead (ADR-015), and borrowing that rule here would quietly revoke progress
+    from a keeper who just lost an animal. Transferred-out animals are excluded
+    because that record now belongs to the buyer.
+
+    Name kept as-is: `first_tarantula` and friends are seeded achievement keys
+    and several callers import this symbol.
+    """
+    return db.query(func.count(Invert.id)).filter(
+        Invert.user_id == user_id,
+        Invert.transferred_out_at.is_(None),
     ).scalar() or 0
 
 
 def get_feeding_count(db: Session, user_id: uuid.UUID) -> int:
-    """Get total feeding logs user has created"""
-    return db.query(func.count(FeedingLog.id)).join(
-        Tarantula, FeedingLog.tarantula_id == Tarantula.id
-    ).filter(
-        Tarantula.user_id == user_id
+    """Total feeding logs the user has recorded, on any animal or colony."""
+    return db.query(func.count(FeedingLog.id)).filter(
+        _owned_log_filter(FeedingLog, user_id)
     ).scalar() or 0
 
 
 def get_molt_count(db: Session, user_id: uuid.UUID) -> int:
-    """Get total molt logs user has created"""
-    return db.query(func.count(MoltLog.id)).join(
-        Tarantula, MoltLog.tarantula_id == Tarantula.id
-    ).filter(
-        Tarantula.user_id == user_id
+    """Total molt logs the user has recorded, on any animal or colony."""
+    return db.query(func.count(MoltLog.id)).filter(
+        _owned_log_filter(MoltLog, user_id)
     ).scalar() or 0
 
 
@@ -77,11 +132,10 @@ def get_feeding_streak(db: Session, user_id: uuid.UUID) -> int:
     """
     Calculate current feeding streak: consecutive calendar days with at least one feeding logged
     """
-    # Get all feeding logs for user's tarantulas, sorted by date DESC
-    feedings = db.query(FeedingLog.fed_at).join(
-        Tarantula, FeedingLog.tarantula_id == Tarantula.id
-    ).filter(
-        Tarantula.user_id == user_id
+    # Every animal and colony, not just tarantulas — a streak is about the
+    # keeper's habit, and feeding a mantis on Tuesday is feeding on Tuesday.
+    feedings = db.query(FeedingLog.fed_at).filter(
+        _owned_log_filter(FeedingLog, user_id)
     ).order_by(FeedingLog.fed_at.desc()).all()
 
     if not feedings:
