@@ -8,10 +8,11 @@
  *   - Egg sacs list filtered to this pairing
  *   - Delete affordance in the header (cascades to egg sacs + offspring)
  *
- * Backend's `PairingResponse` only returns parent IDs, so we fetch
- * `/tarantulas/` once and resolve names client-side. Single
- * round-trip; the keeper's collection is already cached by other
- * screens so this is usually warm.
+ * Parent names come from `male_parent`/`female_parent` on the pairing,
+ * resolved server-side for every taxon. The collection fetch is only a
+ * fallback for an older API in front of a newer bundle — and it reads
+ * `/inverts/`, because `/tarantulas/` returns nothing for a scorpion,
+ * jumper or mantis.
  *
  * Inline types match TV mobile's existing pattern.
  *
@@ -37,6 +38,7 @@ import { withErrorBoundary } from '../../../src/components/ErrorBoundary';
 import { useTheme } from '../../../src/contexts/ThemeContext';
 import { apiClient } from '../../../src/services/api';
 import { parseLocalDate } from '../../../src/utils/date';
+import { ChangePairingAnimalsSheet } from '../../../src/components/ChangePairingAnimalsSheet';
 
 // ─── Inline types ─────────────────────────────────────────────────────
 
@@ -54,6 +56,9 @@ interface Pairing {
   // tarantulaMap lookup below rendered "Unknown" for scorpions and jumpers.
   male_id: string;
   female_id: string;
+  // The unified FKs — populated for every taxon, including tarantulas.
+  male_invert_id: string | null;
+  female_invert_id: string | null;
   male_parent: PairingParent | null;
   female_parent: PairingParent | null;
   paired_date: string;
@@ -76,11 +81,14 @@ interface EggSac {
   created_at: string;
 }
 
+/** A row from `/inverts/` — every taxon, not just tarantulas. */
 interface TarantulaLite {
   id: string;
   name: string | null;
   common_name: string | null;
   scientific_name: string | null;
+  taxon?: string | null;
+  sex?: string | null;
 }
 
 // ─── Outcome model ────────────────────────────────────────────────────
@@ -152,24 +160,31 @@ function PairingDetailScreen() {
   const [outcomeError, setOutcomeError] = useState<string | null>(null);
 
   const [deleting, setDeleting] = useState(false);
+  const [animalsOpen, setAnimalsOpen] = useState(false);
+  // Populated from the same `/inverts/` fetch that backs the name fallback,
+  // so opening the picker costs no extra request.
+  const [animals, setAnimals] = useState<TarantulaLite[]>([]);
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
     try {
-      // The pairing endpoint doesn't include parent names; fetch the
-      // whole tarantula list once and resolve names client-side. We
-      // also fetch egg sacs and filter to this pairing on the client
-      // since the API only exposes a flat list.
+      // Parent names come from the pairing itself now (male_parent /
+      // female_parent, resolved server-side for any taxon). The collection
+      // fetch is only a fallback — and it reads /inverts/, because
+      // /tarantulas/ returns nothing for a scorpion, jumper or mantis.
+      // Egg sacs are filtered to this pairing client-side since the API only
+      // exposes a flat list.
       const [pRes, sRes, tRes] = await Promise.all([
         apiClient.get<Pairing>(`/pairings/${id}`),
         apiClient.get<EggSac[]>('/egg-sacs/').catch(() => ({ data: [] })),
-        apiClient.get<TarantulaLite[]>('/tarantulas/').catch(() => ({ data: [] })),
+        apiClient.get<TarantulaLite[]>('/inverts/').catch(() => ({ data: [] })),
       ]);
       setPairing(pRes.data);
       setEggSacs(sRes.data.filter((s) => s.pairing_id === id));
       const m = new Map<string, TarantulaLite>();
       for (const t of tRes.data) m.set(t.id, t);
       setTarantulaMap(m);
+      setAnimals(tRes.data);
       setLoadError(null);
     } catch (err: any) {
       setLoadError(
@@ -207,6 +222,38 @@ function PairingDetailScreen() {
     } finally {
       setSavingOutcome(false);
     }
+  }
+
+  /**
+   * Correct which animals this pairing records.
+   *
+   * Sends BOTH slots. The server validates the resulting pair, and sending
+   * only the half that changed would make the request depend on what's
+   * currently stored — fine until two devices disagree.
+   *
+   * `male_invert_id`/`female_invert_id`, not the legacy pair: those are FKs
+   * into `tarantulas` and 404 for any other taxon. The server mirrors them
+   * itself where they apply.
+   */
+  async function handleChangeAnimals(args: { maleId: string; femaleId: string }) {
+    if (!pairing) return;
+    const res = await apiClient
+      .put<Pairing>(`/pairings/${pairing.id}`, {
+        male_invert_id: args.maleId,
+        female_invert_id: args.femaleId,
+      })
+      .catch((err: any) => {
+        // Rethrow with the server's own wording — it explains a refusal
+        // (same sex, mixed taxon, paired with itself) better than anything
+        // this screen could invent. The sheet renders it inline.
+        const detail = err?.response?.data?.detail;
+        throw new Error(
+          (typeof detail === 'string' ? detail : detail?.message) ||
+            err?.message ||
+            "Couldn't change the animals.",
+        );
+      });
+    setPairing(res.data);
   }
 
   function handleDelete() {
@@ -320,6 +367,18 @@ function PairingDetailScreen() {
                 <Text style={styles.female}>♀ </Text>
                 {parentName(pairing, 'female', tarantulaMap)}
               </Text>
+
+              <TouchableOpacity
+                onPress={() => setAnimalsOpen(true)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Change the animals in this pairing"
+                style={styles.changeAnimals}
+              >
+                <Text style={[styles.changeAnimalsText, { color: colors.primary }]}>
+                  Change animals
+                </Text>
+              </TouchableOpacity>
 
               <View style={styles.kvGrid}>
                 <KV label="Paired" value={fmtDate(pairing.paired_date)} />
@@ -473,6 +532,22 @@ function PairingDetailScreen() {
           error={outcomeError}
           onClose={() => setOutcomeOpen(false)}
           onPick={handlePickOutcome}
+        />
+      )}
+
+      {pairing && (
+        <ChangePairingAnimalsSheet
+          visible={animalsOpen}
+          onClose={() => setAnimalsOpen(false)}
+          onSubmit={handleChangeAnimals}
+          candidates={animals}
+          currentMaleId={pairing.male_invert_id || pairing.male_id || null}
+          currentFemaleId={pairing.female_invert_id || pairing.female_id || null}
+          // The server refuses a mixed-taxon pair, so offering the other taxa
+          // would only produce a 400 the keeper can't act on.
+          pairTaxon={
+            pairing.male_parent?.taxon || pairing.female_parent?.taxon || null
+          }
         />
       )}
     </SafeAreaView>
@@ -658,9 +733,13 @@ function displayName(t: TarantulaLite | undefined): string {
 }
 
 /**
- * Name a parent for any taxon. Prefers the server-resolved parent; the
- * tarantulaMap fallback only ever worked for tarantulas, since male_id is NULL
- * for everything else. Kept for an older API in front of a newer bundle.
+ * Name a parent for any taxon. Prefers the server-resolved parent, which is
+ * populated for every taxon.
+ *
+ * The map fallback (for an older API in front of a newer bundle) must try
+ * `male_invert_id` BEFORE `male_id`: the legacy column is NULL for everything
+ * that isn't a tarantula, which is what made scorpion and jumper pairings
+ * render "Unknown".
  */
 function parentName(
   pairing: Pairing,
@@ -669,7 +748,11 @@ function parentName(
 ): string {
   const resolved = slot === 'male' ? pairing.male_parent : pairing.female_parent;
   if (resolved?.display_name) return resolved.display_name;
-  return displayName(fallback.get(slot === 'male' ? pairing.male_id : pairing.female_id));
+  const key =
+    slot === 'male'
+      ? pairing.male_invert_id || pairing.male_id
+      : pairing.female_invert_id || pairing.female_id;
+  return displayName(fallback.get(key));
 }
 
 // Routes through parseLocalDate. A bare "YYYY-MM-DD" from a DATE column is
@@ -711,6 +794,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heroTitle: { fontSize: 16, fontWeight: '700' },
+  changeAnimals: { marginTop: 6, alignSelf: 'flex-start' },
+  changeAnimalsText: { fontSize: 12, fontWeight: '700' },
   male: { color: '#38bdf8' },
   female: { color: '#f472b6' },
   dim: { color: '#525252' },

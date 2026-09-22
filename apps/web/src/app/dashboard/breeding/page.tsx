@@ -7,8 +7,31 @@ import { useSubscription } from '@/hooks/useSubscription'
 import Link from 'next/link'
 import DashboardLayout from '@/components/DashboardLayout'
 import { formatLocalDate } from '@/lib/date'
+import { clutchSectionLabel, clutchSingularLabel, offspringNoun } from '@/lib/inverts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL
+
+/**
+ * Which taxon's words this hub should speak.
+ *
+ * The hub spans everything the keeper breeds, so there isn't always one right
+ * answer. When every pairing is the same taxon — which is the common case —
+ * use that taxon's vocabulary, so a mantis breeder sees "Oothecae" and
+ * "nymphs" instead of a spider's "Egg sacs" and "spiderlings". When they're
+ * mixed, fall through to the neutral fallback ("Clutches", "offspring")
+ * rather than picking one taxon's words and being wrong about the others.
+ *
+ * Returns '' for the mixed/empty case, which is deliberately not a valid
+ * taxon key — the vocabulary helpers fall back on it.
+ */
+function hubTaxon(pairings: Pairing[]): string {
+  const taxa = new Set(
+    pairings
+      .map((p) => p.male_parent?.taxon || p.female_parent?.taxon)
+      .filter((t): t is string => Boolean(t)),
+  )
+  return taxa.size === 1 ? [...taxa][0] : ''
+}
 
 /** Resolved server-side for any taxon — see services/breeding_service.py. */
 interface PairingParent {
@@ -90,6 +113,14 @@ export default function BreedingPage() {
   const [analytics, setAnalytics] = useState<BreedingAnalytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // What this keeper's animals actually produce. A mantis lays an ootheca of
+  // nymphs; a scorpion gives live birth to a brood and never lays anything at
+  // all. Hardcoding "Egg sacs" / "spiderlings" told those keepers the app had
+  // the wrong animal in mind.
+  const taxonWords = hubTaxon(pairings)
+  const clutchLabel = clutchSectionLabel(taxonWords)   // "Egg sacs" | "Oothecae" | "Broods"
+  const clutchOne = clutchSingularLabel(taxonWords)    // "Egg sac"  | "Ootheca"  | "Brood"
+  const youngNoun = offspringNoun(taxonWords)          // "spiderlings" | "nymphs" | "mancae"
   // Bulk offspring actions
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkAddOpen, setBulkAddOpen] = useState(false)
@@ -166,9 +197,9 @@ export default function BreedingPage() {
     if (!token) return false
     const labels = {
       pairing:
-        'Delete this pairing? Any egg sacs and offspring records under it will also be deleted. This can’t be undone.',
+        `Delete this pairing? Any ${clutchLabel.toLowerCase()} and offspring records under it will also be deleted. This can’t be undone.`,
       'egg-sac':
-        'Delete this egg sac? Any offspring records under it will also be deleted. This can’t be undone.',
+        `Delete this ${clutchOne.toLowerCase()}? Any offspring records under it will also be deleted. This can’t be undone.`,
       offspring: 'Delete this offspring record? This can’t be undone.',
     } as const
     if (!window.confirm(labels[kind])) return false
@@ -362,7 +393,7 @@ export default function BreedingPage() {
 
             {/* Description */}
             <p className="text-gray-700 dark:text-gray-300 mb-8 max-w-2xl mx-auto text-lg">
-              Unlock the complete breeding management system to track pairings, egg sacs, and offspring. Perfect for serious breeders who want to maintain detailed breeding records.
+              Unlock the complete breeding management system to track pairings, clutches, and offspring — whatever your animals produce, whether that&rsquo;s an egg sac, an ootheca, or a live-born brood.
             </p>
 
             {/* Features list */}
@@ -375,7 +406,7 @@ export default function BreedingPage() {
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-green-500 text-xl mt-0.5">✓</span>
-                  <span className="text-gray-700 dark:text-gray-300">Egg sac monitoring and development tracking</span>
+                  <span className="text-gray-700 dark:text-gray-300">Clutch and brood monitoring with development tracking</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-green-500 text-xl mt-0.5">✓</span>
@@ -429,7 +460,7 @@ export default function BreedingPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Breeding Records 💎</h1>
-          <p className="text-gray-600 dark:text-gray-400">Track pairings, egg sacs, and offspring</p>
+          <p className="text-gray-600 dark:text-gray-400">Track pairings, {clutchLabel.toLowerCase()}, and offspring</p>
         </div>
 
         {error && (
@@ -445,7 +476,7 @@ export default function BreedingPage() {
             <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">{pairings.length}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Egg Sacs</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{clutchLabel}</h3>
             <p className="text-4xl font-bold text-green-600 dark:text-green-400">{eggSacs.length}</p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border border-gray-200 dark:border-gray-700">
@@ -485,7 +516,7 @@ export default function BreedingPage() {
                   : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
-              Egg Sacs ({eggSacs.length})
+              {clutchLabel} ({eggSacs.length})
             </button>
             <button
               onClick={() => setActiveTab('offspring')}
@@ -511,17 +542,17 @@ export default function BreedingPage() {
                   <div className="text-5xl mb-4">📊</div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No breeding data yet</h3>
                   <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                    Record a pairing, egg sac, and offspring, and your success rates, survival rates, and revenue will appear here.
+                    Record a pairing, {clutchOne.toLowerCase()}, and offspring, and your success rates, survival rates, and revenue will appear here.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-8">
                   {/* Metric cards */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Metric label="Pairing success" value={pctLabel(analytics.pairing_success_rate)} sub="produced an egg sac" />
-                    <Metric label="Hatch rate" value={pctLabel(analytics.egg_sacs.hatch_rate)} sub={`${analytics.egg_sacs.hatched} of ${analytics.totals.egg_sacs} sacs`} />
-                    <Metric label="Avg survival" value={pctLabel(analytics.egg_sacs.avg_survival_rate)} sub="viable ÷ clutch" />
-                    <Metric label="Avg clutch size" value={analytics.egg_sacs.avg_clutch_size != null ? String(analytics.egg_sacs.avg_clutch_size) : '—'} sub="spiderlings" />
+                    <Metric label="Pairing success" value={pctLabel(analytics.pairing_success_rate)} sub={`produced ${/^[aeiou]/i.test(clutchOne) ? 'an' : 'a'} ${clutchOne.toLowerCase()}`} />
+                    <Metric label="Hatch rate" value={pctLabel(analytics.egg_sacs.hatch_rate)} sub={`${analytics.egg_sacs.hatched} of ${analytics.totals.egg_sacs} ${clutchLabel.toLowerCase()}`} />
+                    <Metric label="Avg survival" value={pctLabel(analytics.egg_sacs.avg_survival_rate)} sub="viable ÷ total" />
+                    <Metric label="Avg clutch size" value={analytics.egg_sacs.avg_clutch_size != null ? String(analytics.egg_sacs.avg_clutch_size) : '—'} sub={youngNoun} />
                     <Metric label="Avg days to hatch" value={analytics.egg_sacs.avg_days_to_hatch != null ? `${analytics.egg_sacs.avg_days_to_hatch}d` : '—'} sub="laid → hatched" />
                     <Metric label="Total revenue" value={`$${analytics.offspring.total_revenue.toLocaleString()}`} sub={`${analytics.offspring.sold_count} sold`} />
                     <Metric label="Avg sale price" value={analytics.offspring.avg_sale_price != null ? `$${analytics.offspring.avg_sale_price.toLocaleString()}` : '—'} sub="per offspring" />
@@ -658,26 +689,26 @@ export default function BreedingPage() {
           {activeTab === 'egg-sacs' && (
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Egg Sac Records</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{clutchOne} Records</h2>
                 <Link
                   href="/dashboard/breeding/egg-sacs/add"
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                 >
-                  + New Egg Sac
+                  + New {clutchOne}
                 </Link>
               </div>
               {eggSacs.length === 0 ? (
                 <div className="text-center py-12 px-4">
                   <div className="text-5xl mb-4">🥚</div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No egg sacs recorded</h3>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No {clutchLabel.toLowerCase()} recorded</h3>
                   <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                    Log egg sacs from a successful pairing — track laid date, spiderling count, and hatch outcome.
+                    Log {clutchLabel.toLowerCase()} from a successful pairing — track the date, number of {youngNoun}, and outcome.
                   </p>
                   <Link
                     href="/dashboard/breeding/egg-sacs/add"
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
                   >
-                    + Log First Egg Sac
+                    + Log First {clutchOne}
                   </Link>
                 </div>
               ) : (
@@ -690,7 +721,7 @@ export default function BreedingPage() {
                           className="min-w-0 flex-1 cursor-pointer"
                         >
                           <p className="text-sm text-gray-600 dark:text-gray-400">Laid: {formatLocalDate(sac.laid_date)}</p>
-                          {sac.spiderling_count && <p className="text-sm text-gray-900 dark:text-white">Count: {sac.spiderling_count} spiderlings</p>}
+                          {sac.spiderling_count && <p className="text-sm text-gray-900 dark:text-white">Count: {sac.spiderling_count} {youngNoun}</p>}
                           {sac.viable_count && <p className="text-sm text-gray-900 dark:text-white">Viable: {sac.viable_count}</p>}
                           {sac.hatch_date && <p className="text-sm text-gray-600 dark:text-gray-400">Hatched: {formatLocalDate(sac.hatch_date)}</p>}
                           {(() => {
@@ -714,8 +745,8 @@ export default function BreedingPage() {
                         </button>
                         <button
                           onClick={() => handleDelete('egg-sac', sac.id)}
-                          aria-label="Delete egg sac"
-                          title="Delete egg sac"
+                          aria-label={`Delete ${clutchOne.toLowerCase()}`}
+                          title={`Delete ${clutchOne.toLowerCase()}`}
                           className="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors p-1 -m-1 flex-shrink-0"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
@@ -789,10 +820,10 @@ export default function BreedingPage() {
               )}
               {offspring.length === 0 ? (
                 <div className="text-center py-12 px-4">
-                  <div className="text-5xl mb-4">🕷️</div>
+                  <div className="text-5xl mb-4">🐣</div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No offspring recorded</h3>
                   <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                    Track individual slings after hatching — status (available, sold, kept), sale prices, and buyer notes.
+                    Track individual {youngNoun} after hatching — status (available, sold, kept), sale prices, and buyer notes.
                   </p>
                   <Link
                     href="/dashboard/breeding/offspring/add"
@@ -862,18 +893,18 @@ export default function BreedingPage() {
           >
             <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Bulk add offspring</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-              Create many records at once from one egg sac.
+              Create many records at once from one {clutchOne.toLowerCase()}.
             </p>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Egg sac</label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">{clutchOne}</label>
             <select
               value={bulkAdd.egg_sac_id}
               onChange={(e) => setBulkAdd({ ...bulkAdd, egg_sac_id: e.target.value })}
               className="w-full mb-4 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
-              <option value="">Select an egg sac…</option>
+              <option value="">Select {/^[aeiou]/i.test(clutchOne) ? 'an' : 'a'} {clutchOne.toLowerCase()}…</option>
               {eggSacs.map((s) => (
                 <option key={s.id} value={s.id}>
-                  Laid {formatLocalDate(s.laid_date)}{s.spiderling_count ? ` · ${s.spiderling_count} slings` : ''}
+                  Laid {formatLocalDate(s.laid_date)}{s.spiderling_count ? ` · ${s.spiderling_count} ${youngNoun}` : ''}
                 </option>
               ))}
             </select>

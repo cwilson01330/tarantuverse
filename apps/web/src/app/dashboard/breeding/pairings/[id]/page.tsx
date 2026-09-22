@@ -13,9 +13,11 @@
  *     dependent egg sacs + offspring count so the keeper knows what
  *     gets nuked
  *
- * Parent names come from a single /tarantulas/ fetch since the
- * backend Pairing schema only returns IDs. The keeper's collection
- * is cached by Collection screen anyway so this is usually warm.
+ * Parent names come from the server-resolved `male_parent`/`female_parent`
+ * on the Pairing schema (services/breeding_service.py), which works for every
+ * taxon. The collection fetch below is only a fallback for an older API in
+ * front of a newer build — and it reads /inverts/, not /tarantulas/, because
+ * the latter returns nothing for a scorpion, jumper or mantis pairing.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -73,11 +75,15 @@ interface Offspring {
   status: string
 }
 
+/** A row from `/inverts/` — every taxon, not just tarantulas. */
 interface Tarantula {
   id: string
   name: string | null
   common_name: string | null
   scientific_name: string | null
+  taxon?: string
+  sex?: string | null
+  species_id?: string | null
 }
 
 const OUTCOME_ORDER = [
@@ -122,19 +128,32 @@ function displayName(t: Tarantula | undefined): string {
  * Name a pairing parent, whatever taxon it is.
  *
  * Prefers the server-resolved `male_parent`/`female_parent`
- * (services/breeding_service.py). The tarantulaMap fallback below only ever
- * worked for tarantulas — male_id/female_id are NULL for every other taxon —
- * which is why a scorpion or jumping-spider pairing rendered "Unknown" here.
- * It's kept solely for an older API in front of a newer build.
+ * (services/breeding_service.py), which is populated for every taxon.
+ *
+ * The map fallback is for an older API in front of a newer build. It has to
+ * try `male_invert_id` BEFORE `male_id`: the legacy column is NULL for every
+ * non-tarantula, so keying the lookup on it alone is what made a scorpion or
+ * jumping-spider pairing render "Unknown".
  */
 function parentName(
-  pairing: { male_parent?: { display_name?: string } | null; female_parent?: { display_name?: string } | null; male_id: string; female_id: string },
+  pairing: {
+    male_parent?: { display_name?: string } | null
+    female_parent?: { display_name?: string } | null
+    male_id: string
+    female_id: string
+    male_invert_id?: string | null
+    female_invert_id?: string | null
+  },
   slot: 'male' | 'female',
   fallback: Map<string, Tarantula>,
 ): string {
   const resolved = slot === 'male' ? pairing.male_parent : pairing.female_parent
   if (resolved?.display_name) return resolved.display_name
-  return displayName(fallback.get(slot === 'male' ? pairing.male_id : pairing.female_id))
+  const key =
+    slot === 'male'
+      ? pairing.male_invert_id || pairing.male_id
+      : pairing.female_invert_id || pairing.female_id
+  return displayName(fallback.get(key))
 }
 
 function fmtSimple(s: string): string {
@@ -156,6 +175,18 @@ export default function PairingDetailPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
+  // Change-animals flow. The server accepts the correction for any taxon
+  // (PairingUpdate.male_invert_id / female_invert_id); until this UI existed
+  // there was no way to reach it, so a pairing recorded against the wrong
+  // animal stayed wrong.
+  const [animals, setAnimals] = useState<Tarantula[]>([])
+  const [parentsOpen, setParentsOpen] = useState(false)
+  const [pickMale, setPickMale] = useState<string | null>(null)
+  const [pickFemale, setPickFemale] = useState<string | null>(null)
+  const [savingParents, setSavingParents] = useState(false)
+  const [parentsError, setParentsError] = useState<string | null>(null)
+  const [parentSearch, setParentSearch] = useState('')
+
   const [outcomeOpen, setOutcomeOpen] = useState(false)
   const [savingOutcome, setSavingOutcome] = useState(false)
   const [outcomeError, setOutcomeError] = useState<string | null>(null)
@@ -173,7 +204,10 @@ export default function PairingDetailPage() {
         fetch(`${API_URL}/api/v1/pairings/${id}`, { headers }),
         fetch(`${API_URL}/api/v1/egg-sacs/`, { headers }).catch(() => null),
         fetch(`${API_URL}/api/v1/offspring/`, { headers }).catch(() => null),
-        fetch(`${API_URL}/api/v1/tarantulas/`, { headers }).catch(() => null),
+        // Fallback name source only — see parentName(). Must be the unified
+        // list: /tarantulas/ omits every other taxon, so a mantis pairing
+        // whose server-resolved parent was missing would render "Unknown".
+        fetch(`${API_URL}/api/v1/inverts/`, { headers }).catch(() => null),
       ])
       if (!pRes.ok) {
         throw new Error(`Couldn't load pairing (${pRes.status})`)
@@ -190,6 +224,8 @@ export default function PairingDetailPage() {
       const map = new Map<string, Tarantula>()
       for (const t of tList) map.set(t.id, t)
       setTarantulaMap(map)
+      // Same list also feeds the change-animals picker — no second fetch.
+      setAnimals(tList)
     } catch (err: any) {
       setLoadError(err?.message || "Couldn't load this pairing.")
     } finally {
@@ -237,6 +273,61 @@ export default function PairingDetailPage() {
     }
   }
 
+  function openChangeAnimals() {
+    if (!pairing) return
+    setPickMale(pairing.male_invert_id || pairing.male_id || null)
+    setPickFemale(pairing.female_invert_id || pairing.female_id || null)
+    setParentSearch('')
+    setParentsError(null)
+    setParentsOpen(true)
+  }
+
+  async function handleSaveParents() {
+    if (!pairing || !token || savingParents) return
+    if (!pickMale || !pickFemale) {
+      setParentsError('Pick both animals.')
+      return
+    }
+    setParentsError(null)
+    setSavingParents(true)
+    try {
+      // Always send BOTH slots. The server validates the resulting pair, and
+      // sending only the half that changed would make the request depend on
+      // what's currently stored — fine until two tabs disagree.
+      const res = await fetch(`${API_URL}/api/v1/pairings/${pairing.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          // The generic fields — these work for every taxon. The legacy
+          // male_id/female_id are FKs into `tarantulas` and 404 for anything
+          // else; the server mirrors them itself where they apply.
+          male_invert_id: pickMale,
+          female_invert_id: pickFemale,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        const d = body?.detail
+        throw new Error(
+          typeof d === 'string' ? d : d?.message || `Update failed (${res.status})`,
+        )
+      }
+      const updated: Pairing = await res.json()
+      setPairing(updated)
+      setParentsOpen(false)
+    } catch (err: any) {
+      // Server-side refusals (same sex, mixed taxon, paired with itself) land
+      // here and are shown verbatim — they explain the problem better than a
+      // generic message would, and the client shouldn't duplicate the rules.
+      setParentsError(err?.message || "Couldn't change the animals.")
+    } finally {
+      setSavingParents(false)
+    }
+  }
+
   async function handleDelete() {
     if (!pairing || !token || deleting) return
     setDeleting(true)
@@ -260,6 +351,29 @@ export default function PairingDetailPage() {
   const outcomeChip = pairing
     ? OUTCOME_CHIP[pairing.outcome] ?? OUTCOME_CHIP.unknown
     : ''
+
+  // The taxon this pairing is locked to. The server refuses a mixed-taxon
+  // pair, so offering the other taxa in the picker would only produce a 400
+  // the keeper can't act on.
+  const pairTaxon =
+    pairing?.male_parent?.taxon || pairing?.female_parent?.taxon || null
+
+  const candidates = animals
+    .filter((a) => !pairTaxon || !a.taxon || a.taxon === pairTaxon)
+    .filter((a) => {
+      const q = parentSearch.trim().toLowerCase()
+      if (!q) return true
+      return [a.name, a.common_name, a.scientific_name]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
+
+  /** Sex is advisory here — the server decides. Shown so a keeper can see
+   *  why a pick might be refused before they try it. */
+  const sexMark = (a: Tarantula) =>
+    a.sex === 'male' ? '♂' : a.sex === 'female' ? '♀' : '?'
 
   // Cascade preview for the confirm dialog — be explicit about what
   // gets nuked so keepers don't lose offspring data by accident.
@@ -332,6 +446,13 @@ export default function PairingDetailPage() {
                   ? ` · separated ${formatLocalDate(pairing.separated_date)}`
                   : ''}
               </p>
+              <button
+                type="button"
+                onClick={openChangeAnimals}
+                className="mt-2 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Change animals
+              </button>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -465,6 +586,135 @@ export default function PairingDetailPage() {
           )}
         </section>
       </div>
+
+      {/* Change-animals modal. Both slots in one dialog because the server
+          validates the resulting PAIR — editing one at a time would let a
+          keeper stage a half-change that gets refused for a reason sitting in
+          the other half. */}
+      {parentsOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Change the animals in this pairing"
+          onClick={() => !savingParents && setParentsOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-2xl rounded-lg bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 flex flex-col max-h-[85vh]"
+          >
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                Change animals
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Egg sacs and offspring already recorded under this pairing stay
+                attached.
+                {pairTaxon
+                  ? ' Only animals of the same type are listed — a pairing can’t span two.'
+                  : ''}
+              </p>
+            </div>
+
+            <div className="px-5 pt-4">
+              <input
+                value={parentSearch}
+                onChange={(e) => setParentSearch(e.target.value)}
+                placeholder="Search by name…"
+                aria-label="Search animals"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white bg-white dark:bg-gray-900"
+              />
+            </div>
+
+            <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-4 overflow-y-auto">
+              {(['male', 'female'] as const).map((slot) => {
+                const picked = slot === 'male' ? pickMale : pickFemale
+                const setPicked = slot === 'male' ? setPickMale : setPickFemale
+                const other = slot === 'male' ? pickFemale : pickMale
+                return (
+                  <div key={slot} className="min-w-0">
+                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                      {slot === 'male' ? '♂ Male' : '♀ Female'}
+                    </p>
+                    <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                      {candidates.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          No animals match.
+                        </p>
+                      ) : (
+                        candidates.map((a) => {
+                          // An animal can't be paired with itself; the server
+                          // refuses it, so don't offer it.
+                          const isOther = a.id === other
+                          const on = a.id === picked
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              disabled={isOther}
+                              onClick={() => setPicked(a.id)}
+                              aria-pressed={on}
+                              className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition ${
+                                on
+                                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-gray-900 dark:text-white'
+                                  : isOther
+                                    ? 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white hover:border-blue-300'
+                              }`}
+                            >
+                              <span className="font-semibold">
+                                {displayName(a)}
+                              </span>{' '}
+                              <span className="text-gray-500 dark:text-gray-400">
+                                {sexMark(a)}
+                              </span>
+                              {a.scientific_name && (
+                                <span className="block text-xs italic text-gray-500 dark:text-gray-400 truncate">
+                                  {a.scientific_name}
+                                </span>
+                              )}
+                              {isOther && (
+                                <span className="block text-xs text-gray-400">
+                                  already in the other slot
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {parentsError && (
+              <div className="px-5 pb-2">
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {parentsError}
+                </p>
+              </div>
+            )}
+
+            <div className="px-5 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+              <button
+                onClick={() => setParentsOpen(false)}
+                disabled={savingParents}
+                className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveParents}
+                disabled={savingParents || !pickMale || !pickFemale}
+                className="px-4 py-2 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                {savingParents ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Outcome edit modal */}
       {outcomeOpen && (

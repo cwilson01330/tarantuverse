@@ -92,7 +92,11 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   // offspring chain is the same shape. Enabled 2026-09-20 on real demand.
   true_spider: ['feedingStats', 'breeding'],
   millipede: [], // detritivore — no live-prey cadence, and molts underground
-  mantis: ['feedingStats', 'growth'], // instar tracking is core to mantis keeping
+  // Instar tracking is core to mantis keeping. Breeding enabled 2026-09-22:
+  // the ootheca → nymphs vocabulary below is correct and now actually read by
+  // the hubs, so a mantis breeder is no longer offered a spider's "egg sac".
+  // Demand is real — the first premium subscriber keeps 15 mantids.
+  mantis: ['feedingStats', 'growth', 'breeding'],
   // Omnivore grazer, and kept as a colony far more often than individually —
   // colonies have their own screen (ADR-010). Not an oversight.
   roach: [],
@@ -188,6 +192,21 @@ export function clutchSectionLabel(taxon: string): string {
   const v = breedingVocabulary(taxon)
   const plural = v.clutch?.plural ?? v.liveBirth?.plural ?? 'clutches'
   return plural.charAt(0).toUpperCase() + plural.slice(1)
+}
+
+/**
+ * Singular form for buttons and one-record headings — "Egg sac", "Ootheca",
+ * "Brood".
+ *
+ * Reads the stored `noun` for the same reason clutchSectionLabel reads the
+ * stored `plural`: deriving it by stripping an "s" gives "Clutche", and
+ * "Oothecae" doesn't end in one at all. The correct forms are in the table.
+ *
+ * KEEP IN LOCKSTEP with apps/mobile/src/lib/taxon-modules.ts.
+ */
+export function clutchSingularLabel(taxon: string): string {
+  const v = breedingVocabulary(taxon)
+  return v.clutch?.noun ?? v.liveBirth?.noun ?? 'Clutch'
 }
 
 export function offspringNoun(taxon: string): string {

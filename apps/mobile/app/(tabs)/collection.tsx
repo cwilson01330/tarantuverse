@@ -593,36 +593,58 @@ function CollectionScreen() {
     setRefreshing(false);
   }, []);
 
-  // Re-fetch one tarantula's feeding stats and patch it into the map,
-  // so a quick "mark fed" flips that card's badge without a full
-  // collection reload. Falls back to an optimistic "fed today" if the
-  // stats call itself fails.
-  const refreshFeedingStatus = async (tarantulaId: string) => {
+  // Re-fetch one animal's feeding stats and patch it into the map, so a quick
+  // "mark fed" flips that card's badge without a full collection reload.
+  //
+  // USE THE GENERIC ENDPOINT. This used to call `/tarantulas/{id}/feeding-stats`,
+  // which broke twice over:
+  //
+  //   1. A mantis, jumper or isopod has no row in `tarantulas`, so the call
+  //      404'd into the catch below and the card fell back to a fabricated
+  //      "fed today" — the keeper saw a plausible badge built from nothing.
+  //   2. Even for tarantulas it was wrong: that response has no `is_overdue`,
+  //      so patching it in DROPPED the species-and-life-stage-aware flag that
+  //      `loadFeedingStatuses` fetched. The card silently reverted to the flat
+  //      day-count semantics this screen deliberately abandoned, and Home, the
+  //      Feeding Day screen and the digest could then disagree about the same
+  //      animal.
+  //
+  // `/inverts/{id}/feeding-stats` is taxon-agnostic (matched on invert_id) and
+  // returns the same cadence fields as the bulk `/inverts/feeding-status`, so
+  // the patched entry stays the same shape as the ones it sits beside.
+  const refreshFeedingStatus = async (animalId: string) => {
     const tzOffset = new Date().getTimezoneOffset();
     try {
       const response = await apiClient.get(
-        `/tarantulas/${tarantulaId}/feeding-stats`,
+        `/inverts/${animalId}/feeding-stats`,
         { params: { tz_offset_minutes: tzOffset } },
       );
       setFeedingStatuses((prev) => {
         const next = new Map(prev);
-        next.set(tarantulaId, {
-          tarantula_id: tarantulaId,
+        next.set(animalId, {
+          tarantula_id: animalId,
           days_since_last_feeding: response.data.days_since_last_feeding,
           acceptance_rate: response.data.acceptance_rate,
           is_feeding_paused: response.data.is_feeding_paused,
+          is_overdue: response.data.is_overdue ?? false,
+          interval_days: response.data.interval_days ?? null,
         });
         return next;
       });
     } catch (error) {
+      // The feeding itself already succeeded — only the badge refresh failed.
+      // Keep the animal's known cadence rather than blanking it, and clear
+      // `is_overdue`, which is the one thing we can assert: it was just fed.
       setFeedingStatuses((prev) => {
         const next = new Map(prev);
-        const existing = next.get(tarantulaId);
-        next.set(tarantulaId, {
-          tarantula_id: tarantulaId,
+        const existing = next.get(animalId);
+        next.set(animalId, {
+          tarantula_id: animalId,
           days_since_last_feeding: 0,
           acceptance_rate: existing?.acceptance_rate ?? 0,
           is_feeding_paused: existing?.is_feeding_paused,
+          is_overdue: false,
+          interval_days: existing?.interval_days ?? null,
         });
         return next;
       });

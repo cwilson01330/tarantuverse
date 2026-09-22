@@ -47,7 +47,10 @@ import { parseLocalDate } from '../../../src/utils/date';
 interface Offspring {
   id: string;
   egg_sac_id: string;
+  // Legacy link, only ever set for tarantulas. `invert_id` is the one that
+  // works for every taxon — prefer it when reading.
   tarantula_id: string | null;
+  invert_id: string | null;
   status: string;
   status_date: string | null;
   buyer_info: string | null;
@@ -65,8 +68,11 @@ interface EggSac {
 
 interface Pairing {
   id: string;
-  male_id: string;
-  female_id: string;
+  // Legacy FKs — NULL for every taxon except tarantula.
+  male_id: string | null;
+  female_id: string | null;
+  male_invert_id: string | null;
+  female_invert_id: string | null;
 }
 
 interface Tarantula {
@@ -76,6 +82,7 @@ interface Tarantula {
   scientific_name?: string | null;
   species_id?: string | null;
   sex?: string | null;
+  taxon?: string | null;
 }
 
 /**
@@ -86,6 +93,9 @@ interface Tarantula {
 interface ParentPrefill {
   scientific_name: string | null;
   species_id: string | null;
+  // The offspring of a mantis is a mantis. Carried so the created record
+  // lands on the right taxon instead of defaulting to tarantula.
+  taxon: string;
   hatch_date: string | null;
   laid_date: string;
 }
@@ -192,12 +202,15 @@ function OffspringDetailScreen() {
       const res = await apiClient.get<Offspring>(`/offspring/${id}`);
       setOffspring(res.data);
       setLoadError(null);
-      // Best-effort fetch of the linked tarantula so we can display
-      // its name in the linked card. Silent failure — if it 404s
-      // (tarantula was deleted) we just skip the name.
-      if (res.data.tarantula_id) {
+      // Best-effort fetch of the linked animal so we can display its name in
+      // the linked card. `/inverts/{id}` answers for every taxon; the old
+      // `/tarantulas/{id}` 404'd for anything else, so a jumper or mantis
+      // showed as "no longer exists" while sitting in the collection.
+      // `invert_id` first — for a non-tarantula it is the only link written.
+      const linkedId = res.data.invert_id || res.data.tarantula_id;
+      if (linkedId) {
         apiClient
-          .get<Tarantula>(`/tarantulas/${res.data.tarantula_id}`)
+          .get<Tarantula>(`/inverts/${linkedId}`)
           .then((tRes) => setLinkedTarantula(tRes.data))
           .catch(() => setLinkedTarantula(null));
       } else {
@@ -237,17 +250,22 @@ function OffspringDetailScreen() {
       const pRes = await apiClient.get<Pairing>(`/pairings/${sac.pairing_id}`);
       const pairing = pRes.data;
 
+      // Resolve via `/inverts/` and prefer the `*_invert_id` columns. The
+      // legacy `male_id`/`female_id` are NULL for every non-tarantula, so the
+      // old code fetched `/tarantulas/undefined` and the prefill came back
+      // empty for exactly the keepers who needed it most.
+      const maleKey = pairing.male_invert_id || pairing.male_id;
+      const femaleKey = pairing.female_invert_id || pairing.female_id;
+
       let parent: Tarantula | null = null;
       try {
-        const maleRes = await apiClient.get<Tarantula>(
-          `/tarantulas/${pairing.male_id}`,
-        );
+        if (!maleKey) throw new Error('no male link');
+        const maleRes = await apiClient.get<Tarantula>(`/inverts/${maleKey}`);
         parent = maleRes.data;
       } catch {
         try {
-          const femRes = await apiClient.get<Tarantula>(
-            `/tarantulas/${pairing.female_id}`,
-          );
+          if (!femaleKey) throw new Error('no female link');
+          const femRes = await apiClient.get<Tarantula>(`/inverts/${femaleKey}`);
           parent = femRes.data;
         } catch {
           parent = null;
@@ -257,6 +275,10 @@ function OffspringDetailScreen() {
       setAddParent({
         scientific_name: parent?.scientific_name ?? null,
         species_id: parent?.species_id ?? null,
+        // The offspring of a mantis is a mantis. Only fall back to tarantula
+        // when the parent couldn't be read at all — guessing a taxon is how
+        // wrong-species rows got created.
+        taxon: parent?.taxon || 'tarantula',
         hatch_date: sac.hatch_date,
         laid_date: sac.laid_date,
       });
@@ -279,7 +301,7 @@ function OffspringDetailScreen() {
   async function handleCreateAndLink() {
     if (!offspring || addCreating) return;
     if (!addName.trim()) {
-      setAddError('Give your new tarantula a name first.');
+      setAddError('Give your new animal a name first.');
       return;
     }
     setAddError(null);
@@ -296,6 +318,9 @@ function OffspringDetailScreen() {
       }
       const payload: Record<string, unknown> = {
         name: addName.trim(),
+        // The generic create takes the taxon in the body — this is the line
+        // that keeps a mantis nymph from being filed as a tarantula.
+        taxon: addParent?.taxon || 'tarantula',
         sex: addSex,
         source: 'bred',
         date_acquired: dateAcquired,
@@ -308,16 +333,24 @@ function OffspringDetailScreen() {
         payload.species_id = addParent.species_id;
       }
 
-      const tarRes = await apiClient.post<Tarantula>('/tarantulas/', payload);
+      // POST to the generic create, NOT `/tarantulas/`. The old call meant
+      // breeding a jumping spider and tapping "Add to collection" produced a
+      // tarantula record — wrong species, wrong care sheet — from the one
+      // button whose job is to capture what the keeper just bred.
+      const tarRes = await apiClient.post<Tarantula>('/inverts/', payload);
       const newTar = tarRes.data;
 
-      // Link the new tarantula to this offspring. If this fails we
-      // leave the tarantula in place — better to orphan the link than
-      // delete a freshly created record. Keeper can fix in the API.
+      // Link via `invert_id`: the server accepts it for any taxon and mirrors
+      // it onto `tarantula_id` itself when the animal is a tarantula
+      // (routers/offspring.py::_resolve_kept_link). Sending `tarantula_id`
+      // here would 404 for a jumper, which has no row in that table.
+      //
+      // If this fails we leave the animal in place — better to orphan the
+      // link than delete a freshly created record.
       try {
         const linkRes = await apiClient.put<Offspring>(
           `/offspring/${offspring.id}`,
-          { tarantula_id: newTar.id },
+          { invert_id: newTar.id },
         );
         setOffspring(linkRes.data);
         setLinkedTarantula(newTar);
@@ -328,7 +361,7 @@ function OffspringDetailScreen() {
         throw new Error(
           err?.response?.data?.detail ||
             err?.message ||
-            "Tarantula created, but couldn't link it to this offspring. You can link it manually later.",
+            "Animal created, but couldn't link it to this offspring. You can link it manually later.",
         );
       }
     } catch (err: any) {
@@ -473,7 +506,7 @@ function OffspringDetailScreen() {
                   style={[styles.heroValue, { color: colors.textPrimary }]}
                   numberOfLines={2}
                 >
-                  {offspring.tarantula_id
+                  {offspring.invert_id || offspring.tarantula_id
                     ? 'Linked to collection'
                     : 'Unlinked record'}
                 </Text>
@@ -526,11 +559,12 @@ function OffspringDetailScreen() {
                 1. Already linked → tap to navigate to the tarantula.
                 2. status === 'kept' but no link → "Add to collection".
                 3. Anything else → render nothing. */}
-            {offspring.tarantula_id ? (
+            {offspring.invert_id || offspring.tarantula_id ? (
               <TouchableOpacity
                 onPress={() => {
                   if (linkedTarantula?.id) {
-                    router.push(`/tarantula/${linkedTarantula.id}` as never);
+                    // The unified detail screen handles every taxon.
+                    router.push(`/invert/${linkedTarantula.id}` as never);
                   }
                 }}
                 disabled={!linkedTarantula}
@@ -553,7 +587,7 @@ function OffspringDetailScreen() {
                 >
                   {linkedTarantula
                     ? tarantulaName(linkedTarantula)
-                    : 'Linked tarantula no longer exists.'}
+                    : 'The linked animal no longer exists.'}
                 </Text>
               </TouchableOpacity>
             ) : offspring.status === 'kept' ? (
