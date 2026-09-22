@@ -49,6 +49,16 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { apiClient } from '../../src/services/api';
 import { getErrorMessage } from '../../src/utils/errors';
 import { parseLocalDate } from '../../src/utils/date';
+import {
+  clutchSectionLabel,
+  clutchSingularLabel,
+  offspringNoun,
+} from '../../src/lib/taxon-modules';
+import {
+  BulkAddOffspringSheet,
+  BulkUpdateOffspringSheet,
+  type ClutchOption,
+} from '../../src/components/BulkOffspringSheets';
 
 // ─── Inline types — match the response_model shapes on the API ────────
 
@@ -159,6 +169,24 @@ function pairLabel(p: Pairing): string {
   return `${male} × ${female}`;
 }
 
+/**
+ * Which taxon's words this hub should speak.
+ *
+ * The hub spans everything the keeper breeds, so there isn't always one right
+ * answer. When every pairing is the same taxon — the common case — use that
+ * taxon's vocabulary. When they're mixed (or nothing has loaded yet), return
+ * '' so the vocabulary helpers fall through to their neutral wording, rather
+ * than picking one taxon's words and being wrong about the others.
+ */
+function hubTaxon(pairings: Pairing[] | null): string {
+  const taxa = new Set(
+    (pairings ?? [])
+      .map((p) => p.male_parent?.taxon || p.female_parent?.taxon)
+      .filter((t): t is string => Boolean(t)),
+  );
+  return taxa.size === 1 ? [...taxa][0] : '';
+}
+
 function BreedingOverviewScreen() {
   const router = useRouter();
   const { colors, layout } = useTheme();
@@ -176,6 +204,24 @@ function BreedingOverviewScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // null = entitlement not yet known; true/false once /limits resolves.
   const [canBreed, setCanBreed] = useState<boolean | null>(null);
+
+  // What this keeper's animals actually produce. A mantis lays an ootheca of
+  // nymphs; a scorpion gives live birth to a brood and never lays anything at
+  // all. Hardcoding "Egg sacs" / "spiderlings" told those keepers the app had
+  // the wrong animal in mind. Mixed collections fall back to neutral wording
+  // rather than picking one taxon's words and being wrong about the rest.
+  // Bulk offspring. A successful sac is 50–200 animals; one form per animal
+  // is why a breeder keeps their real numbers in a spreadsheet. The API has
+  // supported both of these for a while — only mobile was missing them.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [bulkAddClutch, setBulkAddClutch] = useState<string | null>(null);
+  const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
+
+  const taxonWords = hubTaxon(pairings);
+  const clutchLabel = clutchSectionLabel(taxonWords);  // "Egg sacs" | "Oothecae" | "Broods"
+  const clutchOne = clutchSingularLabel(taxonWords);   // "Egg sac"  | "Ootheca"  | "Brood"
+  const youngNoun = offspringNoun(taxonWords);         // "spiderlings" | "nymphs" | "mancae"
 
   const fetchAll = useCallback(async () => {
     try {
@@ -245,14 +291,14 @@ function BreedingOverviewScreen() {
   ) {
     const copy = {
       pairing:
-        'Any egg sacs and offspring records under it will also be deleted. This can’t be undone.',
+        `Any ${clutchLabel.toLowerCase()} and offspring records under it will also be deleted. This can’t be undone.`,
       'egg-sac':
         'Any offspring records under it will also be deleted. This can’t be undone.',
       offspring: 'This can’t be undone.',
     } as const;
     const label = {
       pairing: 'Delete pairing?',
-      'egg-sac': 'Delete egg sac?',
+      'egg-sac': `Delete ${clutchOne.toLowerCase()}?`,
       offspring: 'Delete offspring?',
     } as const;
     const paths = {
@@ -281,6 +327,57 @@ function BreedingOverviewScreen() {
     ]);
   }
 
+  // ─── Bulk offspring ─────────────────────────────────────────────────
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelected(new Set());
+
+  /** Options for the bulk-add picker, newest first — that's the one you just logged. */
+  const clutchOptions: ClutchOption[] = (eggSacs ?? []).map((s) => ({
+    id: s.id,
+    label: `Laid ${fmtDate(s.laid_date)}${
+      s.spiderling_count != null ? ` · ${s.spiderling_count} ${youngNoun}` : ''
+    }`,
+    count: s.viable_count ?? s.spiderling_count ?? null,
+  }));
+
+  async function handleBulkAdd(args: {
+    eggSacId: string;
+    count: number;
+    status: string;
+  }) {
+    // Errors propagate to the sheet, which shows them inline — a native
+    // Alert on top of an open sheet buries the field you need to fix.
+    await apiClient.post('/offspring/bulk', {
+      egg_sac_id: args.eggSacId,
+      count: args.count,
+      status: args.status,
+    });
+    await fetchAll();
+  }
+
+  async function handleBulkUpdate(args: {
+    status: string;
+    price: number | null;
+  }) {
+    const body: Record<string, unknown> = {
+      ids: Array.from(selected),
+      status: args.status,
+    };
+    if (args.price != null) body.price_sold = args.price;
+    await apiClient.post('/offspring/bulk-update', body);
+    clearSelection();
+    await fetchAll();
+  }
+
   const allLoaded =
     pairings !== null && eggSacs !== null && offspring !== null;
 
@@ -302,7 +399,7 @@ function BreedingOverviewScreen() {
             Breeding is a Premium feature
           </Text>
           <Text style={[styles.gateSubtitle, { color: colors.textSecondary }]}>
-            Track pairings, egg sacs, and offspring across the whole season —
+            Track pairings, clutches, and offspring across the whole season —
             plus breeding analytics — with Tarantuverse Premium.
           </Text>
 
@@ -313,8 +410,10 @@ function BreedingOverviewScreen() {
             ]}
           >
             {[
-              'Unlimited pairings, egg sacs & offspring',
-              'Egg-sac → offspring lifecycle tracking',
+              'Unlimited pairings, clutches & offspring',
+              // Named for what each animal actually produces — an egg sac, an
+              // ootheca, or a live-born brood.
+              'Egg sac, ootheca or brood → offspring tracking',
               'Bulk offspring records & status updates',
               'Breeding success analytics',
             ].map((line) => (
@@ -375,9 +474,9 @@ function BreedingOverviewScreen() {
         }
       >
         <Text style={[styles.intro, { color: colors.textSecondary }]}>
-          Track pairings, egg sacs, and offspring across the season. Tap
-          + to record a new pairing, or tap an existing row to view + add
-          egg sacs and offspring.
+          Track pairings, {clutchLabel.toLowerCase()}, and offspring across the
+          season. Tap + to record a new pairing, or tap an existing row to view
+          and add {clutchLabel.toLowerCase()} and offspring.
         </Text>
 
         {loadError && (
@@ -483,9 +582,9 @@ function BreedingOverviewScreen() {
             </Section>
 
             <Section
-              title="EGG SACS"
+              title={clutchLabel.toUpperCase()}
               emptyEmoji="🥚"
-              emptyText="No egg sacs recorded. Open a pairing to log when she drops one."
+              emptyText={`No ${clutchLabel.toLowerCase()} recorded. Open a pairing to log when she produces one.`}
               rows={eggSacs.length}
             >
               {eggSacs.map((s) => (
@@ -495,7 +594,7 @@ function BreedingOverviewScreen() {
                     router.push(`/breeding/egg-sacs/${s.id}` as never)
                   }
                   accessibilityRole="button"
-                  accessibilityLabel={`Egg sac laid ${fmtDate(s.laid_date)}`}
+                  accessibilityLabel={`${clutchOne} laid ${fmtDate(s.laid_date)}`}
                   style={[
                     styles.row,
                     {
@@ -521,7 +620,7 @@ function BreedingOverviewScreen() {
                       numberOfLines={1}
                     >
                       {s.spiderling_count != null
-                        ? `${s.spiderling_count} spiderlings`
+                        ? `${s.spiderling_count} ${youngNoun}`
                         : ''}
                       {s.spiderling_count != null && s.viable_count != null
                         ? ' · '
@@ -534,11 +633,34 @@ function BreedingOverviewScreen() {
                         : ''}
                     </Text>
                   </View>
+                  {/* Straight from "she dropped a sac" to "here are the 60
+                      records", prefilled with this sac and its count — the
+                      trip a breeder actually makes. */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      setBulkAddClutch(s.id);
+                      setBulkAddOpen(true);
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${youngNoun} from this ${clutchOne.toLowerCase()} in bulk`}
+                    style={styles.trashButton}
+                  >
+                    {/* plus-circle, not playlist-plus: this one is already
+                        used elsewhere in the app, so it's confirmed present
+                        in the bundled glyph map. An unverified MDI name
+                        renders as a blank box in production. */}
+                    <MaterialCommunityIcons
+                      name="plus-circle"
+                      size={18}
+                      color={colors.primary}
+                    />
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => handleDelete('egg-sac', s.id)}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel="Delete egg sac"
+                    accessibilityLabel={`Delete ${clutchOne.toLowerCase()}`}
                     style={styles.trashButton}
                   >
                     <MaterialCommunityIcons
@@ -553,31 +675,85 @@ function BreedingOverviewScreen() {
 
             <Section
               title="OFFSPRING"
-              emptyEmoji="🕷️"
-              emptyText="No offspring recorded. Open an egg sac to add individual spiderlings — status, sale price, buyer notes."
+              emptyEmoji="🐣"
+              emptyText={`No offspring recorded. Add ${youngNoun} in bulk from ${/^[aeiou]/i.test(clutchOne) ? 'an' : 'a'} ${clutchOne.toLowerCase()} — a sac of 60 is one step, not 60.`}
               rows={offspring.length}
+              action={
+                <TouchableOpacity
+                  onPress={() => {
+                    setBulkAddClutch(null);
+                    setBulkAddOpen(true);
+                  }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add many offspring at once"
+                  style={[
+                    styles.sectionAction,
+                    { borderColor: colors.border },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="plus"
+                    size={14}
+                    color={colors.primary}
+                  />
+                  <Text
+                    style={[styles.sectionActionText, { color: colors.primary }]}
+                  >
+                    Bulk add
+                  </Text>
+                </TouchableOpacity>
+              }
             >
-              {offspring.map((o) => (
+              {offspring.map((o) => {
+                const picked = selected.has(o.id);
+                const selecting = selected.size > 0;
+                return (
                 <TouchableOpacity
                   key={o.id}
+                  // Long-press to start selecting, then tap to toggle — the
+                  // platform convention (Photos, Mail). Tapping still opens
+                  // the record when nothing is selected, so the common
+                  // single-record path is unchanged.
                   onPress={() =>
-                    router.push(`/breeding/offspring/${o.id}` as never)
+                    selecting
+                      ? toggleSelect(o.id)
+                      : router.push(`/breeding/offspring/${o.id}` as never)
                   }
+                  onLongPress={() => toggleSelect(o.id)}
+                  delayLongPress={250}
                   accessibilityRole="button"
+                  accessibilityState={selecting ? { selected: picked } : undefined}
                   accessibilityLabel={`Offspring — ${fmtOutcome(o.status)}`}
+                  accessibilityHint={
+                    selecting
+                      ? 'Double tap to change selection'
+                      : 'Double tap to open, or press and hold to select several'
+                  }
                   style={[
                     styles.row,
                     {
-                      borderColor: colors.border,
-                      backgroundColor: colors.surface,
+                      borderColor: picked ? colors.primary : colors.border,
+                      backgroundColor: picked
+                        ? colors.surfaceElevated
+                        : colors.surface,
                       borderRadius: layout.radius.md,
                     },
                   ]}
                 >
+                  {/* check-circle / check-circle-outline / paw — all three
+                      are used elsewhere in the app, so all three are
+                      confirmed present in the bundled glyph map. */}
                   <MaterialCommunityIcons
-                    name="paw"
+                    name={
+                      selecting
+                        ? picked
+                          ? 'check-circle'
+                          : 'check-circle-outline'
+                        : 'paw'
+                    }
                     size={18}
-                    color={colors.primary}
+                    color={picked ? colors.primary : colors.textTertiary}
                   />
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text
@@ -595,25 +771,86 @@ function BreedingOverviewScreen() {
                       {o.buyer_info ? ` · ${o.buyer_info}` : ''}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => handleDelete('offspring', o.id)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Delete offspring record"
-                    style={styles.trashButton}
-                  >
-                    <MaterialCommunityIcons
-                      name="trash-can-outline"
-                      size={18}
-                      color={colors.textTertiary}
-                    />
-                  </TouchableOpacity>
+                  {/* Hidden while selecting: a delete target sitting inside a
+                      row whose whole job is now "tap to toggle" is a mis-tap
+                      that destroys data. Static branch — Hermes-prod safety. */}
+                  {selecting ? null : (
+                    <TouchableOpacity
+                      onPress={() => handleDelete('offspring', o.id)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete offspring record"
+                      style={styles.trashButton}
+                    >
+                      <MaterialCommunityIcons
+                        name="trash-can-outline"
+                        size={18}
+                        color={colors.textTertiary}
+                      />
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </Section>
           </>
         )}
       </ScrollView>
+
+      {/* Selection bar — only while something is selected. Sits above the
+          safe-area inset so it clears the home indicator. */}
+      {selected.size > 0 ? (
+        <View
+          style={[
+            styles.selectionBar,
+            { backgroundColor: colors.surface, borderTopColor: colors.border },
+          ]}
+        >
+          <Text
+            style={[styles.selectionCount, { color: colors.textPrimary }]}
+            accessibilityLiveRegion="polite"
+          >
+            {selected.size} selected
+          </Text>
+          <TouchableOpacity
+            onPress={clearSelection}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Clear selection"
+          >
+            <Text style={[styles.selectionClear, { color: colors.textSecondary }]}>
+              Clear
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setBulkUpdateOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Update ${selected.size} records`}
+            style={[
+              styles.selectionPrimary,
+              { backgroundColor: colors.primary, borderRadius: layout.radius.md },
+            ]}
+          >
+            <Text style={styles.selectionPrimaryText}>Update</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      <BulkAddOffspringSheet
+        visible={bulkAddOpen}
+        onClose={() => setBulkAddOpen(false)}
+        onSubmit={handleBulkAdd}
+        clutches={clutchOptions}
+        initialClutchId={bulkAddClutch}
+        clutchOne={clutchOne}
+        youngNoun={youngNoun}
+      />
+      <BulkUpdateOffspringSheet
+        visible={bulkUpdateOpen}
+        onClose={() => setBulkUpdateOpen(false)}
+        onSubmit={handleBulkUpdate}
+        count={selected.size}
+      />
     </SafeAreaView>
   );
 }
@@ -623,23 +860,34 @@ function Section({
   emptyEmoji,
   emptyText,
   rows,
+  action,
   children,
 }: {
   title: string;
   emptyEmoji: string;
   emptyText: string;
   rows: number;
+  /** Optional trailing control on the header row (e.g. "Bulk add"). */
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const { colors, layout } = useTheme();
   return (
     <View>
-      <Text style={[styles.sectionTitle, { color: colors.textTertiary }]}>
-        {title}{' '}
-        <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>
-          ({rows})
+      <View style={styles.sectionHeader}>
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: colors.textTertiary, marginBottom: 0, flex: 1 },
+          ]}
+        >
+          {title}{' '}
+          <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>
+            ({rows})
+          </Text>
         </Text>
-      </Text>
+        {action}
+      </View>
       {rows === 0 ? (
         <View
           style={[
@@ -692,6 +940,53 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.6,
     marginBottom: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  sectionAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  sectionActionText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Selection bar — pinned below the scroll, above the home indicator.
+  selectionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderTopWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  selectionCount: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  selectionClear: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectionPrimary: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  selectionPrimaryText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 
   emptyCard: {
