@@ -48,6 +48,61 @@ const HARMLESS_COPY: Record<string, { title: string; body: string }> = {
 };
 const DEFAULT_HARMLESS = { title: 'No medically significant venom', body: 'This species is not considered dangerous to humans. Always research individual care before keeping.' };
 
+/**
+ * Chemical defences — the hazard the venom fields can't describe.
+ *
+ * A millipede has no venom and can still burn you. The taxon-level
+ * HARMLESS_COPY above says "many do secrete defensive chemicals", which is
+ * the best a hardcoded per-taxon string can manage; this is the per-species
+ * version, so a keeper learns which chemical and how much to care. Hydrogen
+ * cyanide in particular is a different hazard class from a staining quinone
+ * and deserves to be named.
+ *
+ * 'none' is a real, recorded answer — "we checked, it doesn't" — and renders
+ * nothing rather than a reassurance the data doesn't support.
+ */
+const SECRETION_COPY: Record<string, { title: string; body: string; accent: string }> = {
+  benzoquinone: {
+    title: 'Secretes benzoquinones',
+    body: "Stains skin brown for several days and stings badly in the eyes or on broken skin. Wash your hands after handling, don't rub your face, and keep it well away from small children.",
+    accent: '#f97316',
+  },
+  hydrogen_cyanide: {
+    title: 'Secretes hydrogen cyanide',
+    body: 'Releases small amounts of hydrogen cyanide when stressed. Harmless in an open room and in the quantities involved, but handle in ventilated space, never in a closed container held to your face, and wash your hands afterwards.',
+    accent: '#ef4444',
+  },
+  acetic_acid: {
+    title: 'Sprays acetic acid',
+    body: 'Can spray a fine, concentrated vinegar mist when threatened. Not dangerous to skin, but genuinely painful in the eyes — keep it below face level when handling.',
+    accent: '#f97316',
+  },
+  other: {
+    title: 'Has a chemical defence',
+    body: 'Produces a defensive secretion when stressed. Wash your hands after handling and avoid contact with your eyes.',
+    accent: '#f97316',
+  },
+};
+
+const STAGE_SCHEME_LABELS: Record<string, string> = {
+  sling_juvenile_adult: 'Sling → juvenile → adult',
+  instar: 'Numbered instars',
+  none: 'No distinct stages',
+};
+
+const DEVELOPMENTAL_CLASS_LABELS: Record<string, string> = {
+  anamorphic: 'Anamorphic — gains segments with each moult',
+  epimorphic: 'Epimorphic — hatches with its full segment count',
+};
+
+/** Boolean facts render only when RECORDED. `null` means nobody has checked,
+ *  and "No" would assert something the data doesn't say. */
+function yesNo(v: boolean | null | undefined): string | null {
+  if (v === true) return 'Yes';
+  if (v === false) return 'No';
+  return null;
+}
+
 function InvertSpeciesCareSheetScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -129,6 +184,11 @@ function InvertSpeciesCareSheetScreen() {
   }
 
   const harmless = !species.venom_severity;
+  // 'none' is a recorded "we checked, it doesn't" — render nothing for it.
+  const secretion =
+    species.defensive_secretion && species.defensive_secretion !== 'none'
+      ? SECRETION_COPY[species.defensive_secretion] ?? SECRETION_COPY.other
+      : null;
 
   const care = careLevelMeta(species.care_level, colors.textSecondary);
   const harmlessCopy = HARMLESS_COPY[species.taxon] ?? DEFAULT_HARMLESS;
@@ -223,6 +283,23 @@ function InvertSpeciesCareSheetScreen() {
             />
           )}
 
+          {/* Chemical defence sits ALONGSIDE the venom line, not instead of
+              it. A millipede is genuinely non-venomous and genuinely able to
+              burn you; collapsing those into one verdict is how the sheet
+              ended up calling it simply "harmless". */}
+          {!!secretion && (
+            <SafetyLine
+              accent={secretion.accent}
+              // `flask`, not `hand-water`: this one is used elsewhere in the
+              // app, so it's confirmed present in the bundled glyph map. An
+              // unverified MDI name renders as a blank box in production.
+              icon="flask"
+              title={secretion.title}
+              body={species.defensive_secretion_notes || secretion.body}
+              colors={colors}
+            />
+          )}
+
           {!!species.care_guide && (
             <CareAccordion
               title="About"
@@ -258,6 +335,30 @@ function InvertSpeciesCareSheetScreen() {
               value={species.water_dish_required ? 'Required' : 'Optional'}
               colors={colors}
             />
+            {/* The escape facts. For a roach these decide the enclosure more
+                than its dimensions do — a flying species needs a locking lid,
+                a smooth-climber needs a barrier. */}
+            <CareFact label="Can fly" value={yesNo(species.can_fly)} colors={colors} />
+            <CareFact
+              label="Climbs smooth surfaces"
+              value={yesNo(species.can_climb_smooth)}
+              colors={colors}
+            />
+            {/* The two commonest ways a beginner loses a detritivore culture. */}
+            <CareFact
+              label="Moisture gradient"
+              value={
+                species.moisture_gradient_required === true
+                  ? 'Required — keep one end damp, one end dry'
+                  : yesNo(species.moisture_gradient_required)
+              }
+              colors={colors}
+            />
+            <CareFact
+              label="Bioactive clean-up crew"
+              value={yesNo(species.bioactive_suitable)}
+              colors={colors}
+            />
           </CareAccordion>
 
           <CareAccordion
@@ -280,6 +381,17 @@ function InvertSpeciesCareSheetScreen() {
             <CareFact label="Sling cadence" value={species.feeding_frequency_sling} colors={colors} />
             <CareFact label="Juvenile cadence" value={species.feeding_frequency_juvenile} colors={colors} />
             <CareFact label="Adult cadence" value={species.feeding_frequency_adult} colors={colors} />
+            {/* Calcium deficiency kills isopod and millipede cultures slowly
+                enough that keepers usually blame something else. */}
+            <CareFact
+              label="Supplemental calcium"
+              value={
+                species.supplemental_calcium_required === true
+                  ? 'Required — cuttlebone or a calcium powder'
+                  : yesNo(species.supplemental_calcium_required)
+              }
+              colors={colors}
+            />
             {/* ADR-018 — see the tarantula care sheet for the reasoning. */}
             <KeeperSignalsBlock speciesId={species.id} colors={colors} />
           </CareAccordion>
@@ -301,6 +413,37 @@ function InvertSpeciesCareSheetScreen() {
               />
             )}
             <CareFact label="Growth rate" value={species.growth_rate} colors={colors} />
+            {/* sling/juvenile/adult is tarantula vocabulary and fits three of
+                eleven taxa. Saying which scheme this species uses means a
+                mantis keeper isn't left translating L4 into "juvenile". */}
+            <CareFact
+              label="Life stages"
+              value={
+                species.stage_scheme
+                  ? STAGE_SCHEME_LABELS[species.stage_scheme] ?? species.stage_scheme
+                  : null
+              }
+              colors={colors}
+            />
+            <CareFact
+              label="Instars to maturity"
+              value={
+                species.typical_instars_to_maturity != null
+                  ? `~${species.typical_instars_to_maturity}`
+                  : null
+              }
+              colors={colors}
+            />
+            <CareFact
+              label="Development"
+              value={
+                species.developmental_class
+                  ? DEVELOPMENTAL_CLASS_LABELS[species.developmental_class] ??
+                    species.developmental_class
+                  : null
+              }
+              colors={colors}
+            />
           </CareAccordion>
 
           <CareAccordion
@@ -316,6 +459,27 @@ function InvertSpeciesCareSheetScreen() {
             <CareFact label="Native region" value={species.native_region} colors={colors} />
             <CareFact label="Type" value={cap(species.type)} colors={colors} />
             <CareFact label="Temperament" value={species.temperament} colors={colors} />
+            {/* Myriapod anatomy — seeded for centipedes and millipedes since
+                launch, rendered until now only on a legacy per-taxon screen
+                that nothing links to. */}
+            <CareFact
+              label="Body segments"
+              value={
+                species.typical_segment_count != null
+                  ? String(species.typical_segment_count)
+                  : null
+              }
+              colors={colors}
+            />
+            <CareFact
+              label="Leg pairs"
+              value={
+                species.typical_leg_pair_count != null
+                  ? String(species.typical_leg_pair_count)
+                  : null
+              }
+              colors={colors}
+            />
           </CareAccordion>
 
           <CareAccordion

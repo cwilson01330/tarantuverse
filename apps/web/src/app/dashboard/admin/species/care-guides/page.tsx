@@ -69,6 +69,23 @@ interface Species {
   medically_significant_venom?: boolean | null
   venom_severity?: string | null
   venom_notes?: string | null
+
+  // Per-taxon fields (spx_20260922). Nullable THREE-state booleans: null is
+  // "nobody has recorded this", which is different from false and must stay
+  // different — the care sheets render nothing for null and "No" for false.
+  defensive_secretion?: string | null
+  defensive_secretion_notes?: string | null
+  can_fly?: boolean | null
+  can_climb_smooth?: boolean | null
+  stage_scheme?: string | null
+  typical_instars_to_maturity?: number | null
+  supplemental_calcium_required?: boolean | null
+  moisture_gradient_required?: boolean | null
+  bioactive_suitable?: boolean | null
+  developmental_class?: string | null
+  typical_segment_count?: number | null
+  typical_leg_pair_count?: number | null
+
   care_guide?: string | null
   image_url?: string | null
   image_attribution?: string | null
@@ -431,6 +448,121 @@ export default function CareGuideEditorPage() {
               </div>
             </Section>
 
+            {/* Per-taxon facts.
+
+                These are the things `venom_severity` can't say. A millipede
+                has no venom and can still give you a chemical burn; a roach
+                is harmless and will still empty itself across the room. Eight
+                of eleven taxa had nowhere to record any of it.
+
+                Every control here is THREE-state on purpose. "Not recorded"
+                is not the same claim as "no", and the care sheets treat them
+                differently — blank renders nothing, No renders "No". A plain
+                checkbox would collapse the two and quietly assert that every
+                unreviewed roach doesn't fly. */}
+            <Section title="Per-taxon facts" subtitle="Leave blank when nobody has checked — that reads differently from “No”.">
+              <Two>
+                <Field label="Defensive secretion" hint="Millipedes, vinegaroons. Not venom.">
+                  <select
+                    value={form.defensive_secretion ?? ''}
+                    onChange={(e) => set('defensive_secretion', e.target.value || null)}
+                    className={inputCls}
+                  >
+                    <option value="">— not recorded</option>
+                    <option value="none">none (checked, has none)</option>
+                    <option value="benzoquinone">benzoquinone (stains, burns)</option>
+                    <option value="hydrogen_cyanide">hydrogen cyanide</option>
+                    <option value="acetic_acid">acetic acid (vinegaroon spray)</option>
+                    <option value="other">other</option>
+                  </select>
+                </Field>
+                <Field label="Life stages" hint="sling/juvenile/adult fits 3 of 11 taxa.">
+                  <select
+                    value={form.stage_scheme ?? ''}
+                    onChange={(e) => set('stage_scheme', e.target.value || null)}
+                    className={inputCls}
+                  >
+                    <option value="">— not recorded</option>
+                    <option value="sling_juvenile_adult">sling → juvenile → adult</option>
+                    <option value="instar">numbered instars</option>
+                    <option value="none">no distinct stages</option>
+                  </select>
+                </Field>
+              </Two>
+
+              <Field label="Secretion notes" hint="Shown instead of the stock warning when set.">
+                <textarea
+                  rows={2}
+                  value={form.defensive_secretion_notes ?? ''}
+                  onChange={(e) => set('defensive_secretion_notes', e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+
+              <Two>
+                <Tri label="Can fly" hint="Roaches, adult male mantids." value={form.can_fly ?? null} onChange={(v) => set('can_fly', v)} />
+                <Tri label="Climbs smooth surfaces" hint="Decides whether a barrier is needed." value={form.can_climb_smooth ?? null} onChange={(v) => set('can_climb_smooth', v)} />
+              </Two>
+              <Two>
+                <Tri label="Needs supplemental calcium" hint="Isopods, millipedes." value={form.supplemental_calcium_required ?? null} onChange={(v) => set('supplemental_calcium_required', v)} />
+                <Tri label="Needs a moisture gradient" hint="One end damp, one end dry." value={form.moisture_gradient_required ?? null} onChange={(v) => set('moisture_gradient_required', v)} />
+              </Two>
+              <Two>
+                <Tri label="Bioactive clean-up crew" hint="How most keepers find isopods." value={form.bioactive_suitable ?? null} onChange={(v) => set('bioactive_suitable', v)} />
+                <Field label="Instars to maturity" hint="Mantids and scorpions.">
+                  <input
+                    type="number"
+                    min={1}
+                    max={40}
+                    value={form.typical_instars_to_maturity ?? ''}
+                    onChange={(e) =>
+                      set(
+                        'typical_instars_to_maturity',
+                        e.target.value === '' ? null : Number(e.target.value),
+                      )
+                    }
+                    className={inputCls}
+                  />
+                </Field>
+              </Two>
+
+              <Two>
+                <Field label="Development" hint="Myriapods.">
+                  <select
+                    value={form.developmental_class ?? ''}
+                    onChange={(e) => set('developmental_class', e.target.value || null)}
+                    className={inputCls}
+                  >
+                    <option value="">— not recorded</option>
+                    <option value="anamorphic">anamorphic (gains segments)</option>
+                    <option value="epimorphic">epimorphic (full count at hatch)</option>
+                  </select>
+                </Field>
+                <Field label="Body segments">
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.typical_segment_count ?? ''}
+                    onChange={(e) =>
+                      set('typical_segment_count', e.target.value === '' ? null : Number(e.target.value))
+                    }
+                    className={inputCls}
+                  />
+                </Field>
+              </Two>
+              <Field label="Leg pairs">
+                <input
+                  type="number"
+                  min={1}
+                  value={form.typical_leg_pair_count ?? ''}
+                  onChange={(e) =>
+                    set('typical_leg_pair_count', e.target.value === '' ? null : Number(e.target.value))
+                  }
+                  className={inputCls}
+                />
+              </Field>
+            </Section>
+
             {/* Save bar. Sticky because the form is long and the button should
                 never be something you have to scroll to find. */}
             <div className="sticky bottom-0 mt-6 -mx-6 border-t border-theme bg-surface px-6 py-4">
@@ -463,14 +595,63 @@ export default function CareGuideEditorPage() {
 const inputCls =
   'w-full rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-gray-900 dark:text-white focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500'
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+}) {
   return (
     <section className="mt-4 rounded-xl border border-theme bg-surface p-4">
-      <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {title}
       </h2>
+      {subtitle && (
+        <p className="mb-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+      )}
+      {!subtitle && <div className="mb-3" />}
       <div className="space-y-3">{children}</div>
     </section>
+  )
+}
+
+/**
+ * A boolean that can also be "nobody checked".
+ *
+ * A checkbox has two states and the data has three. Using one here would mean
+ * every species nobody has reviewed silently asserts `false` — that the roach
+ * doesn't fly, that the isopod doesn't need calcium. The care sheets render
+ * null as nothing and false as "No", so the distinction is visible to keepers
+ * and has to be expressible here.
+ */
+function Tri({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string
+  hint?: string
+  value: boolean | null
+  onChange: (v: boolean | null) => void
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      <select
+        value={value === null || value === undefined ? '' : value ? 'yes' : 'no'}
+        onChange={(e) =>
+          onChange(e.target.value === '' ? null : e.target.value === 'yes')
+        }
+        className={inputCls}
+      >
+        <option value="">— not recorded</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </Field>
   )
 }
 

@@ -1,10 +1,18 @@
 'use client'
 
 /**
- * QRModal — shown on a tarantula detail page.
+ * QRModal — shown on an animal's detail page.
  * Lets the owner:
  *  1. Generate a short-lived upload session and scan with their phone to add photos.
- *  2. View/print the permanent enclosure label (QR linking to /t/{id}).
+ *  2. View/print the permanent enclosure label (QR linking to the public profile).
+ *
+ * WORKS FOR EVERY TAXON
+ * ---------------------
+ * This used to hardcode `/tarantulas/{id}` for both the upload session and the
+ * photo poll, so it could only ever be mounted on the tarantula detail page —
+ * and the web invert page consequently had no QR at all, while mobile's
+ * QRSheet has had a `resource` prop for months. This is that prop, same shape,
+ * so the two clients agree about which endpoint serves which animal.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -45,6 +53,13 @@ interface QRModalProps {
   scientificName: string | null
   sex: string | null
   molts?: LabelMolt[]
+  /**
+   * Which API surface owns this animal. Defaults to the legacy tarantula
+   * routes so existing call sites keep working unchanged; pass 'inverts' for
+   * anything else, which is the only path that resolves for a mantis or
+   * jumper. Mirrors QRSheet's prop of the same name on mobile.
+   */
+  resource?: 'tarantulas' | 'inverts'
   onClose: () => void
   onPhotoAdded?: () => void
 }
@@ -286,6 +301,7 @@ export default function QRModal({
   scientificName,
   sex,
   molts = [],
+  resource = 'tarantulas',
   onClose,
   onPhotoAdded,
 }: QRModalProps) {
@@ -308,7 +324,11 @@ export default function QRModal({
   const previewRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const profileUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://tarantuverse.com'}/t/${tarantulaId}`
+  // A printed label outlives the app, so the URL has to be right the first
+  // time: `/t/` reads the legacy tarantula table and errors for every other
+  // taxon. `/i/` resolves any of them.
+  const profilePath = resource === 'inverts' ? 'i' : 't'
+  const profileUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://tarantuverse.com'}/${profilePath}/${tarantulaId}`
 
   // Restore saved label preferences on mount
   useEffect(() => {
@@ -358,7 +378,7 @@ export default function QRModal({
     setGenerateError(null)
     try {
       const token = await getAuthToken()
-      const res = await fetch(`${API}/api/v1/tarantulas/${tarantulaId}/upload-session`, {
+      const res = await fetch(`${API}/api/v1/${resource}/${tarantulaId}/upload-session`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -388,7 +408,7 @@ export default function QRModal({
       pollRef.current = setInterval(async () => {
         try {
           const pollToken = await getAuthToken()
-          const pr = await fetch(`${API}/api/v1/tarantulas/${tarantulaId}/photos`, {
+          const pr = await fetch(`${API}/api/v1/${resource}/${tarantulaId}/photos`, {
             headers: { Authorization: `Bearer ${pollToken}` },
           })
           if (!pr.ok) return

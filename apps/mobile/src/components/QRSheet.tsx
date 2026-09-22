@@ -60,7 +60,11 @@ export default function QRSheet({
   const [uploadCount, setUploadCount] = useState(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const profileUrl = `${WEB_BASE}/t/${tarantulaId}`
+  // `/t/` reads the legacy tarantula table and errors for every other taxon.
+  // This sheet has been handing out `/t/` links for inverts since it gained
+  // the `resource` prop — meaning a keeper could print a mantis label, scan
+  // it, and get an error on the one page that exists to identify the animal.
+  const profileUrl = `${WEB_BASE}/${resource === 'inverts' ? 'i' : 't'}/${tarantulaId}`
 
   const stopPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -236,7 +240,7 @@ export default function QRSheet({
                   <View style={styles.qrWrap}>
                     <QRCode value={profileUrl} size={200} />
                   </View>
-                  <Text style={styles.statusText}>Permanent profile QR — links to this spider's public page.</Text>
+                  <Text style={styles.statusText}>Permanent profile QR — links to this animal&apos;s public page.</Text>
                   <Text style={styles.linkText} numberOfLines={1}>{profileUrl}</Text>
                   <Text style={styles.descText}>
                     Anyone who scans this can see public info, care requirements, and lineage. Print it on an enclosure label using the web app.

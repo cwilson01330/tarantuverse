@@ -34,6 +34,7 @@ from app.models.tarantula import Tarantula
 from app.models.animal import Animal
 from app.models.scorpion import Scorpion
 from app.models.invert import Invert
+from app.models.invert_species import InvertSpecies
 from app.models.photo import Photo
 from app.models.user import User
 from app.models.follow import Follow
@@ -790,6 +791,160 @@ async def get_public_tarantula_profile(
         base["date_acquired"] = tarantula.date_acquired.isoformat() if tarantula.date_acquired else None
         base["source"] = tarantula.source.value if tarantula.source else None
         base["notes"] = tarantula.notes
+
+    return base
+
+
+# ─── Public Invert Profile (/i/{id}) ─────────────────────────────────────────
+
+@router.get("/i/{invert_id}")
+async def get_public_invert_profile(
+    invert_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(_optional_user),
+):
+    """Permanent public profile for any invert — the QR destination.
+
+    WHY THIS EXISTS
+    ---------------
+    `/t/{id}` reads the legacy `tarantulas` table, so it 404s for a mantis,
+    jumper or isopod. Mobile's QRSheet has been generating enclosure labels
+    for every taxon and pointing them all at `/t/{id}` — meaning a keeper
+    could print a label, stick it on a mantis tub, scan it, and get an error.
+    This is the honest destination for those codes.
+
+    Mirrors the `/t/{id}` shape so the two public pages can stay recognisably
+    the same thing, with `taxon` added and the species block sourced from
+    `invert_species` (which carries the per-taxon safety fields a tarantula
+    care sheet has no column for).
+
+    Access levels match `/t/{id}`: the owner sees husbandry and notes;
+    everyone else sees the public card, and only when the collection is
+    public.
+    """
+    try:
+        i_uuid = uuid.UUID(invert_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid animal ID")
+
+    invert = db.query(Invert).filter(Invert.id == i_uuid).first()
+    if not invert:
+        raise HTTPException(status_code=404, detail="Animal not found")
+
+    is_owner = current_user and str(current_user.id) == str(invert.user_id)
+
+    owner = db.query(User).filter(User.id == invert.user_id).first()
+    collection_public = owner and owner.collection_visibility == "public"
+    if not is_owner and not collection_public:
+        raise HTTPException(status_code=403, detail="This collection is private")
+
+    species_data = None
+    if invert.species_id:
+        sp = db.query(InvertSpecies).filter(
+            InvertSpecies.id == invert.species_id
+        ).first()
+        if sp:
+            species_data = {
+                "id": str(sp.id),
+                "taxon": sp.taxon,
+                "scientific_name": sp.scientific_name,
+                "common_names": sp.common_names or [],
+                "care_level": sp.care_level,
+                "temperament": sp.temperament,
+                "type": sp.type,
+                "temperature_min": float(sp.temperature_min) if sp.temperature_min else None,
+                "temperature_max": float(sp.temperature_max) if sp.temperature_max else None,
+                "humidity_min": float(sp.humidity_min) if sp.humidity_min else None,
+                "humidity_max": float(sp.humidity_max) if sp.humidity_max else None,
+                # The safety fields that actually apply across eleven taxa.
+                # `urticating_hairs` is a tarantula fact; a millipede's hazard
+                # is a chemical secretion and has its own column.
+                "venom_severity": sp.venom_severity,
+                "defensive_secretion": sp.defensive_secretion,
+                "can_fly": sp.can_fly,
+                "can_climb_smooth": sp.can_climb_smooth,
+                "image_url": sp.image_url,
+            }
+
+    # Logs match on invert_id — taxon-agnostic by construction. Refused offers
+    # don't reset "last fed", same rule as the tarantula profile.
+    last_feeding = db.query(FeedingLog).filter(
+        FeedingLog.invert_id == i_uuid,
+        FeedingLog.accepted.is_(True),
+    ).order_by(FeedingLog.fed_at.desc()).first()
+
+    last_molt = db.query(MoltLog).filter(
+        MoltLog.invert_id == i_uuid
+    ).order_by(MoltLog.molted_at.desc()).first()
+
+    photos = db.query(Photo).filter(
+        Photo.invert_id == i_uuid
+    ).order_by(Photo.created_at.desc()).limit(10).all()
+
+    display_name = (
+        invert.name or invert.common_name or invert.scientific_name or "Unnamed"
+    )
+
+    base = {
+        "id": str(invert.id),
+        "taxon": invert.taxon,
+        "name": invert.name,
+        "common_name": invert.common_name,
+        "scientific_name": invert.scientific_name,
+        "display_name": display_name,
+        "sex": invert.sex.value if invert.sex else None,
+        "photo_url": invert.photo_url,
+        "is_owner": bool(is_owner),
+        "owner_username": owner.username if owner else None,
+        "is_following": (
+            db.query(Follow).filter(
+                Follow.follower_id == current_user.id,
+                Follow.followed_id == owner.id,
+            ).first() is not None
+        ) if (current_user and owner and not is_owner) else False,
+        "species": species_data,
+        "photos": [
+            {
+                "id": str(p.id),
+                "url": p.url,
+                "thumbnail_url": p.thumbnail_url,
+                "caption": p.caption,
+                "taken_at": p.taken_at.isoformat() if p.taken_at else None,
+            }
+            for p in photos
+        ],
+        # The transfer snapshot never holds sale_price, so it's public-safe.
+        "provenance": invert.provenance,
+        "last_feeding": {
+            "date": last_feeding.fed_at.isoformat(),
+            "food_type": last_feeding.food_type,
+            "food_size": last_feeding.food_size,
+            "accepted": last_feeding.accepted,
+        } if last_feeding else None,
+        "last_molt": {
+            "date": last_molt.molted_at.isoformat(),
+            "leg_span_after": float(last_molt.leg_span_after) if last_molt and last_molt.leg_span_after else None,
+            "weight_after": float(last_molt.weight_after) if last_molt and last_molt.weight_after else None,
+        } if last_molt else None,
+    }
+
+    if is_owner:
+        base["husbandry"] = {
+            "enclosure_type": invert.enclosure_type,
+            "enclosure_size": invert.enclosure_size,
+            "substrate_type": invert.substrate_type,
+            "substrate_depth": invert.substrate_depth,
+            "last_substrate_change": invert.last_substrate_change.isoformat() if invert.last_substrate_change else None,
+            "target_temp_min": float(invert.target_temp_min) if invert.target_temp_min else None,
+            "target_temp_max": float(invert.target_temp_max) if invert.target_temp_max else None,
+            "target_humidity_min": float(invert.target_humidity_min) if invert.target_humidity_min else None,
+            "target_humidity_max": float(invert.target_humidity_max) if invert.target_humidity_max else None,
+            "water_dish": invert.water_dish,
+            "misting_schedule": invert.misting_schedule,
+        }
+        base["date_acquired"] = invert.date_acquired.isoformat() if invert.date_acquired else None
+        base["source"] = invert.source.value if invert.source else None
+        base["notes"] = invert.notes
 
     return base
 

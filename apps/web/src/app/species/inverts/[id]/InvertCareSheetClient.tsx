@@ -54,6 +54,27 @@ export interface InvertSpecies {
   communal_suitable: boolean
   venom_severity: string | null
   venom_notes: string | null
+
+  // Safety for the taxa that have no venom. A millipede has no venom and can
+  // still give you a chemical burn; `venom_severity` is the wrong frame, so
+  // until these existed the sheet called it "harmless".
+  defensive_secretion: string | null
+  defensive_secretion_notes: string | null
+  // The escape facts — for a roach these decide the enclosure.
+  can_fly: boolean | null
+  can_climb_smooth: boolean | null
+  // Growth staging: sling/juvenile/adult fits three of eleven taxa.
+  stage_scheme: string | null
+  typical_instars_to_maturity: number | null
+  // Detritivore husbandry — the two commonest ways a culture dies.
+  supplemental_calcium_required: boolean | null
+  moisture_gradient_required: boolean | null
+  bioactive_suitable: boolean | null
+  // Myriapod anatomy — seeded since launch, never rendered here.
+  developmental_class: string | null
+  typical_segment_count: number | null
+  typical_leg_pair_count: number | null
+
   care_guide: string | null
   image_url: string | null
   is_verified: boolean
@@ -116,6 +137,62 @@ const DEFAULT_HARMLESS = {
   body: 'This species is considered harmless to humans, with no medically significant venom or sting. Handle gently and wash your hands afterward.',
 }
 
+/**
+ * Chemical defences — the hazard the venom fields can't describe.
+ *
+ * Shown ALONGSIDE the harmless line, never instead of it: a millipede is
+ * genuinely non-venomous and genuinely able to burn you, and collapsing those
+ * into one verdict is how this sheet ended up saying only "harmless".
+ * Hydrogen cyanide is a different hazard class from a staining quinone and
+ * is named as such.
+ *
+ * KEEP IN LOCKSTEP with apps/mobile/app/invert-species/[id].tsx.
+ */
+const SECRETION_COPY: Record<
+  string,
+  { title: string; body: string; tone: 'red' | 'amber' }
+> = {
+  benzoquinone: {
+    title: 'Secretes benzoquinones',
+    body: "Stains skin brown for several days and stings badly in the eyes or on broken skin. Wash your hands after handling, don't rub your face, and keep it well away from small children.",
+    tone: 'amber',
+  },
+  hydrogen_cyanide: {
+    title: 'Secretes hydrogen cyanide',
+    body: 'Releases small amounts of hydrogen cyanide when stressed. Harmless in an open room and in the quantities involved, but handle in ventilated space, never in a closed container held to your face, and wash your hands afterwards.',
+    tone: 'red',
+  },
+  acetic_acid: {
+    title: 'Sprays acetic acid',
+    body: 'Can spray a fine, concentrated vinegar mist when threatened. Not dangerous to skin, but genuinely painful in the eyes — keep it below face level when handling.',
+    tone: 'amber',
+  },
+  other: {
+    title: 'Has a chemical defence',
+    body: 'Produces a defensive secretion when stressed. Wash your hands after handling and avoid contact with your eyes.',
+    tone: 'amber',
+  },
+}
+
+const STAGE_SCHEME_LABELS: Record<string, string> = {
+  sling_juvenile_adult: 'Sling → juvenile → adult',
+  instar: 'Numbered instars',
+  none: 'No distinct stages',
+}
+
+const DEVELOPMENTAL_CLASS_LABELS: Record<string, string> = {
+  anamorphic: 'Anamorphic — gains segments with each moult',
+  epimorphic: 'Epimorphic — hatches with its full segment count',
+}
+
+/** Boolean facts render only when RECORDED. `null` means nobody has checked,
+ *  and "No" would assert something the data doesn't say. */
+function yesNo(v: boolean | null | undefined): string | null {
+  if (v === true) return 'Yes'
+  if (v === false) return 'No'
+  return null
+}
+
 const FEEDING_MODE_LABELS: Record<string, string> = {
   predator: 'Predator (live prey)',
   detritivore: 'Detritivore (decaying matter)',
@@ -158,6 +235,12 @@ export default function InvertCareSheetClient({
   }, [fetchSpecies])
 
   const harmless = species?.taxon === 'whip_spider' || !species?.venom_severity
+
+  // 'none' is a recorded "we checked, it doesn't" — render nothing for it.
+  const secretion =
+    species?.defensive_secretion && species.defensive_secretion !== 'none'
+      ? SECRETION_COPY[species.defensive_secretion] ?? SECRETION_COPY.other
+      : null
 
   return (
     <PublicCareShell authUser={user}>
@@ -253,6 +336,15 @@ export default function InvertCareSheetClient({
               )
             )}
 
+            {/* Chemical defence sits ALONGSIDE the verdict above, not instead
+                of it. A millipede is genuinely non-venomous and genuinely
+                able to burn you. */}
+            {secretion && (
+              <Callout color={secretion.tone} title={secretion.title}>
+                {species.defensive_secretion_notes || secretion.body}
+              </Callout>
+            )}
+
             {/* About */}
             {species.care_guide && (
               <Section title="About">
@@ -269,6 +361,25 @@ export default function InvertCareSheetClient({
               <Fact label="Native region" value={species.native_region} />
               <Fact label="Type" value={cap(species.type)} />
               <Fact label="Temperament" value={species.temperament} />
+              {/* Myriapod anatomy — seeded for centipedes and millipedes
+                  since launch, rendered until now only on a legacy per-taxon
+                  screen nothing links to. */}
+              <Fact
+                label="Body segments"
+                value={
+                  species.typical_segment_count != null
+                    ? String(species.typical_segment_count)
+                    : null
+                }
+              />
+              <Fact
+                label="Leg pairs"
+                value={
+                  species.typical_leg_pair_count != null
+                    ? String(species.typical_leg_pair_count)
+                    : null
+                }
+              />
             </Section>
 
             {/* Size & growth */}
@@ -281,6 +392,34 @@ export default function InvertCareSheetClient({
                 />
               )}
               <Fact label="Growth rate" value={species.growth_rate} />
+              {/* sling/juvenile/adult is tarantula vocabulary and fits three
+                  of eleven taxa. Saying which scheme this species uses means
+                  a mantis keeper isn't translating L4 into "juvenile". */}
+              <Fact
+                label="Life stages"
+                value={
+                  species.stage_scheme
+                    ? STAGE_SCHEME_LABELS[species.stage_scheme] ?? species.stage_scheme
+                    : null
+                }
+              />
+              <Fact
+                label="Instars to maturity"
+                value={
+                  species.typical_instars_to_maturity != null
+                    ? `~${species.typical_instars_to_maturity}`
+                    : null
+                }
+              />
+              <Fact
+                label="Development"
+                value={
+                  species.developmental_class
+                    ? DEVELOPMENTAL_CLASS_LABELS[species.developmental_class] ??
+                      species.developmental_class
+                    : null
+                }
+              />
             </Section>
 
             {/* Climate */}
@@ -310,6 +449,28 @@ export default function InvertCareSheetClient({
                 label="Water dish"
                 value={species.water_dish_required ? 'Required' : 'Optional'}
               />
+              {/* The escape facts. For a roach these decide the enclosure
+                  more than its dimensions do — a flying species needs a
+                  locking lid, a smooth-climber needs a barrier. */}
+              <Fact label="Can fly" value={yesNo(species.can_fly)} />
+              <Fact
+                label="Climbs smooth surfaces"
+                value={yesNo(species.can_climb_smooth)}
+              />
+              {/* The two commonest ways a beginner loses a detritivore
+                  culture. */}
+              <Fact
+                label="Moisture gradient"
+                value={
+                  species.moisture_gradient_required === true
+                    ? 'Required — keep one end damp, one end dry'
+                    : yesNo(species.moisture_gradient_required)
+                }
+              />
+              <Fact
+                label="Bioactive clean-up crew"
+                value={yesNo(species.bioactive_suitable)}
+              />
             </Section>
 
             {/* Feeding */}
@@ -326,6 +487,16 @@ export default function InvertCareSheetClient({
               <Fact label="Sling cadence" value={species.feeding_frequency_sling} />
               <Fact label="Juvenile cadence" value={species.feeding_frequency_juvenile} />
               <Fact label="Adult cadence" value={species.feeding_frequency_adult} />
+              {/* Calcium deficiency kills isopod and millipede cultures
+                  slowly enough that keepers usually blame something else. */}
+              <Fact
+                label="Supplemental calcium"
+                value={
+                  species.supplemental_calcium_required === true
+                    ? 'Required — cuttlebone or a calcium powder'
+                    : yesNo(species.supplemental_calcium_required)
+                }
+              />
             </Section>
 
             <p className="text-xs text-gray-400 text-center mt-6">
@@ -398,14 +569,19 @@ function Callout({
   title,
   children,
 }: {
-  color: 'green' | 'red'
+  // `amber` exists so a staining quinone doesn't have to borrow red from
+  // medically-significant venom. If everything cautionary is the same colour,
+  // the colour stops carrying information.
+  color: 'green' | 'red' | 'amber'
   title: string
   children: React.ReactNode
 }) {
   const styles =
     color === 'green'
       ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-800 dark:text-green-300'
-      : 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-800 dark:text-red-300'
+      : color === 'amber'
+        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-500 text-amber-800 dark:text-amber-300'
+        : 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-800 dark:text-red-300'
   return (
     <div className={`border-l-4 rounded-r-lg p-4 mb-4 ${styles}`}>
       <p className="font-bold text-sm mb-1">{title}</p>

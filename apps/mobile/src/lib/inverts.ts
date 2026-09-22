@@ -320,6 +320,40 @@ export interface InvertSpecies {
   communal_suitable: boolean;
   venom_severity: string | null;
   venom_notes: string | null;
+
+  // ── Safety for the taxa that have no venom ───────────────────────────────
+  // A millipede has no venom and can still give you a chemical burn —
+  // benzoquinones stain skin brown for days and hurt badly in the eyes. A
+  // vinegaroon sprays concentrated acetic acid. `venom_severity` is the wrong
+  // frame for both, so until these existed the care sheet called them
+  // "harmless", which is the kind of true-sounding wrong that gets someone hurt.
+  defensive_secretion: string | null;
+  defensive_secretion_notes: string | null;
+  // The two escape facts. For a roach these ARE the husbandry question: a
+  // flying species needs a locking lid, a smooth-climber needs a barrier.
+  can_fly: boolean | null;
+  can_climb_smooth: boolean | null;
+
+  // ── Growth staging ───────────────────────────────────────────────────────
+  // sling/juvenile/adult is tarantula vocabulary that fits three of eleven
+  // taxa. A mantis is L1–L7, a scorpion 2i–7i.
+  stage_scheme: string | null;
+  typical_instars_to_maturity: number | null;
+
+  // ── Detritivore husbandry ────────────────────────────────────────────────
+  // Calcium deficiency and a tub that's wet or dry end to end are the two
+  // commonest ways a beginner loses an isopod or millipede culture.
+  supplemental_calcium_required: boolean | null;
+  moisture_gradient_required: boolean | null;
+  bioactive_suitable: boolean | null;
+
+  // ── Myriapod anatomy ─────────────────────────────────────────────────────
+  // Seeded for centipedes AND millipedes, but until now rendered only on a
+  // legacy per-taxon screen nothing links to.
+  developmental_class: string | null;
+  typical_segment_count: number | null;
+  typical_leg_pair_count: number | null;
+
   care_guide: string | null;
   image_url: string | null;
   /** CC-BY credit line. The column has existed on invert_species all along;

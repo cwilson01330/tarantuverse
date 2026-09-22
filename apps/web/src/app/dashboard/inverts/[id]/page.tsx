@@ -30,6 +30,10 @@ import {
 } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
+import InvertFeedingStatus, {
+  type InvertFeedingStats,
+} from '@/components/InvertFeedingStatus'
+import QRModal from '@/components/QRModal'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -132,6 +136,8 @@ export default function InvertDetailPage() {
     feedings: 'loading', molts: 'loading', substrate: 'loading', photos: 'loading', care: 'loading',
   })
   const [growth, setGrowth] = useState<any | null>(null)
+  const [feedingStats, setFeedingStats] = useState<InvertFeedingStats | null>(null)
+  const [qrOpen, setQrOpen] = useState(false)
   // Breeding module (registry-gated, ADR-021 Phase D)
   const [pairings, setPairings] = useState<any[]>([])
   const [mates, setMates] = useState<Invert[]>([])
@@ -199,7 +205,7 @@ export default function InvertDetailPage() {
         }
       }
 
-      const [f, m, s, p, g, c] = await Promise.all([
+      const [f, m, s, p, g, c, fs] = await Promise.all([
         load<any>('feedings'),
         load<any>('molts'),
         load<any>('substrate-changes'),
@@ -211,6 +217,15 @@ export default function InvertDetailPage() {
         // Not registry-gated: every taxon here needs water in some form, and
         // the ones that never use a dish get misted instead.
         load<any>('care-logs'),
+        // Feeding status. Registry-gated like growth — the detritivores that
+        // graze rather than take prey on a cadence are deliberately off, and
+        // "12 days since fed" would be a number without a meaning for them.
+        taxonHasModule(data.taxon, 'feedingStats')
+          ? fetch(
+              `${API_URL}/api/v1/inverts/${id}/feeding-stats?tz_offset_minutes=${new Date().getTimezoneOffset()}`,
+              { headers },
+            ).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+          : Promise.resolve(null),
       ])
       setFeedings(f.data)
       setMolts(m.data)
@@ -225,6 +240,7 @@ export default function InvertDetailPage() {
         care: c.state,
       })
       setGrowth(g)
+      setFeedingStats(fs)
 
       // Breeding module (registry-gated — ADR-021 Phase D). Fetch this
       // animal's pairings + the same-taxon collection for the mate picker.
@@ -488,9 +504,7 @@ export default function InvertDetailPage() {
                   </button>
                 )}
                 {/* ADR-017 — an offer, not a setting. Once set it reports the
-                    value, so the control doubles as the indicator. This page
-                    has no feeding-stats card (an ADR-016 gap), so the animal
-                    record is the only source for the current value here. */}
+                    value, so the control doubles as the indicator. */}
                 <button
                   onClick={() => setCadenceOpen(true)}
                   className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
@@ -498,6 +512,15 @@ export default function InvertDetailPage() {
                   {invert?.feeding_interval_days
                     ? `Every ${invert.feeding_interval_days}d`
                     : 'Feeding schedule'}
+                </button>
+                {/* QR was tarantula-only on web until QRModal gained a
+                    `resource` prop — mobile's QRSheet has had one for
+                    months. */}
+                <button
+                  onClick={() => setQrOpen(true)}
+                  className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
+                >
+                  QR
                 </button>
                 <button
                   onClick={handleDelete}
@@ -507,6 +530,16 @@ export default function InvertDetailPage() {
                 </button>
               </div>
             </div>
+
+            {/* Feeding status. Registry-gated, so the detritivores that graze
+                rather than take prey on a cadence don't get a countdown that
+                would mean nothing for them. */}
+            {taxonHasModule(invert.taxon, 'feedingStats') && (
+              <InvertFeedingStatus
+                stats={feedingStats}
+                onSetCadence={() => setCadenceOpen(true)}
+              />
+            )}
 
             {/* Identity */}
             <div className="mb-6">
@@ -782,6 +815,20 @@ export default function InvertDetailPage() {
         onClose={() => setCadenceOpen(false)}
         onSaved={fetchAll}
       />
+
+      {/* `resource="inverts"` is the whole point — the default tarantula
+          routes 404 for every other taxon. */}
+      {qrOpen && invert && (
+        <QRModal
+          tarantulaId={invert.id}
+          tarantulaName={invert.name || invert.common_name || 'Unnamed'}
+          scientificName={invert.scientific_name ?? null}
+          sex={invert.sex ?? null}
+          resource="inverts"
+          onClose={() => setQrOpen(false)}
+          onPhotoAdded={fetchAll}
+        />
+      )}
 
       {/* New pairing modal (breeding module) */}
       {/* Mark as died. The dialog IS the confirm — the date is already
