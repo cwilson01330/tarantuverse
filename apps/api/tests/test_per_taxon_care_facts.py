@@ -128,9 +128,27 @@ def test_cubaris_are_not_advertised_as_clean_up_crew(name):
 # Stage vocabulary
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("taxon", ["mantis", "scorpion", "centipede", "vinegaroon"])
+@pytest.mark.parametrize(
+    "taxon",
+    ["mantis", "scorpion", "centipede", "vinegaroon", "whip_spider", "roach"],
+)
 def test_instar_taxa_are_not_left_in_spider_vocabulary(taxon):
+    """Roach and whip_spider were missed on the first pass — the dry run
+    showed 39 species getting no stage_scheme, and 38 of them count in
+    instars. Only `other` has a legitimate reason to be blank."""
     assert seed.facts_for(S(taxon, "X"))["stage_scheme"] == "instar"
+
+
+def test_only_the_unknown_taxon_is_left_without_a_stage_scheme():
+    """A missing stage_scheme should mean "we can't say", not "we forgot"."""
+    known = [
+        "tarantula", "scorpion", "centipede", "whip_spider", "vinegaroon",
+        "true_spider", "millipede", "mantis", "roach", "isopod",
+    ]
+    for taxon in known:
+        f = seed.facts_for(S(taxon, "X", order_name="Spirobolida"))
+        assert "stage_scheme" in f, f"{taxon} would ship with no stage vocabulary"
+    assert "stage_scheme" not in seed.facts_for(S("other", "X"))
 
 
 @pytest.mark.parametrize("taxon", ["tarantula", "true_spider"])
@@ -163,15 +181,22 @@ def test_instar_counts_are_never_guessed(taxon):
     assert "typical_instars_to_maturity" not in seed.facts_for(S(taxon, "X"))
 
 
-def test_roaches_get_nothing_at_all():
-    """Every roach-relevant fact is species-specific. An empty dict is the
-    honest output, not a gap to be filled with defaults."""
-    assert seed.facts_for(S("roach", "Blaptica dubia")) == {}
+def test_roaches_get_their_stage_vocabulary_and_nothing_else():
+    """A roach's stage scheme is a fact about the whole group — they're
+    hemimetabolous and develop through nymphal instars.
+
+    Everything else a roach keeper needs (does it fly, does it climb glass)
+    is species-specific and stays blank. This test previously asserted an
+    empty dict, which conflated "we can't generalise the husbandry" with
+    "we can't even say what its life stages are called".
+    """
+    assert seed.facts_for(S("roach", "Blaptica dubia")) == {"stage_scheme": "instar"}
 
 
-@pytest.mark.parametrize("taxon", ["whip_spider", "other"])
-def test_unhandled_taxa_produce_no_claims(taxon):
-    assert seed.facts_for(S(taxon, "X")) == {}
+def test_the_catch_all_taxon_produces_no_claims():
+    """`other` is by definition unmodellable — anything asserted about it
+    would be asserted about an unknown animal."""
+    assert seed.facts_for(S("other", "X")) == {}
 
 
 def test_every_value_is_a_legal_column_value():

@@ -102,15 +102,15 @@ def facts_for(s: InvertSpecies) -> dict:
         if name in CUC_ISOPODS:
             out["bioactive_suitable"] = True
 
-    elif s.taxon in ("mantis", "scorpion"):
-        # L1–L7 and 2i–7i respectively; neither uses sling/juvenile/adult.
+    elif s.taxon in ("mantis", "scorpion", "centipede", "whip_spider", "roach"):
+        # L1–L7, 2i–7i, and nymphal instars respectively — none of these use
+        # sling/juvenile/adult. Roaches and whip spiders were missed on the
+        # first pass, which showed up as 39 species getting no stage_scheme
+        # at all in the dry run; 38 of those genuinely count in instars.
         out["stage_scheme"] = "instar"
 
     elif s.taxon in ("tarantula", "true_spider"):
         out["stage_scheme"] = "sling_juvenile_adult"
-
-    elif s.taxon == "centipede":
-        out["stage_scheme"] = "instar"
 
     return out
 
