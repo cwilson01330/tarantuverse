@@ -25,6 +25,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import TarantulaCardSkeleton from '../../src/components/TarantulaCardSkeleton';
 import PremoltAlertCard from '../../src/components/PremoltAlertCard';
+import CollectionCapNotice from '../../src/components/CollectionCapNotice';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
 import { getImageUrl } from '../../src/utils/image-url';
 import { feedingStatusColor } from '../../src/utils/status-colors';
@@ -2133,6 +2134,14 @@ function CollectionScreen() {
             contentContainerStyle={styles.list}
             ListHeaderComponent={
               <>
+                {/* The cap notice lives here rather than only on the
+                    subscription screen, which is the one place a lapsed
+                    keeper has no reason to open. Renders nothing for premium
+                    keepers and for anyone comfortably under the cap. */}
+                {/* `totalAnimals`, not the filtered rows — the cap counts
+                    the whole collection including colonies, and filtering to
+                    one taxon must not make the notice disappear. */}
+                <CollectionCapNotice count={totalAnimals} />
                 <PremoltAlertCard />
                 {/* The only chrome left in the body. Search moved into the
                     header, sort into the ⚙ sheet, layout into the header

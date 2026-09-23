@@ -231,6 +231,18 @@ function DashboardHubScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [tourChecked, setTourChecked] = useState(false);
 
+  // Cross-taxon collection total — falls back to tarantulas.length if the
+  // /inverts/ count failed to load.
+  //
+  // DECLARED HERE, NOT FURTHER DOWN. The tour effect below lists this in its
+  // dependency array, and a deps array is an ordinary argument evaluated
+  // inline during render — not deferred like the effect callback is. With the
+  // declaration below the effect, every render of this screen hit the
+  // temporal dead zone and threw "Cannot access 'animalCount' before
+  // initialization". tsc caught it (TS2448/TS2454); a comment I left claiming
+  // it was safe did not.
+  const animalCount = totalAnimals ?? tarantulas.length;
+
   // getImageUrl moved to src/utils/image-url.ts so dev/staging builds
   // honor EXPO_PUBLIC_API_URL instead of always hitting prod.
 
@@ -276,10 +288,9 @@ function DashboardHubScreen() {
     if (!tourChecked) {
       checkTour();
     }
-    // animalCount is declared lower in the component body, which is fine: the
-    // body runs top-to-bottom before React invokes this effect, so the closure
-    // captures an initialised value. It belongs in the deps so the tour can
-    // fire on the render where the count first becomes non-zero.
+    // animalCount is in the deps so the tour can fire on the render where the
+    // count first becomes non-zero. It is declared above this effect — see the
+    // note there for why that placement is load-bearing.
   }, [loading, tourChecked, animalCount]);
 
   const fetchDashboardData = async () => {
@@ -895,11 +906,6 @@ function DashboardHubScreen() {
       </View>
     );
   }
-
-  // Cross-taxon collection total — falls back to tarantulas.length if the
-  // /inverts/ count failed to load.
-  const animalCount = totalAnimals ?? tarantulas.length;
-
 
   // Empty state — gated on the whole collection, not just tarantulas, so
   // a keeper who owns only scorpions/centipedes/whip spiders doesn't get

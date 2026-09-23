@@ -83,3 +83,15 @@ class SubscriptionLimitsResponse(BaseModel):
     max_photos_per_tarantula: int
     has_priority_support: bool
     is_premium: bool
+
+    # Whether this keeper HAD a subscription that has since ended.
+    #
+    # The clients need it to word the cap prompt honestly: someone who paid
+    # and lapsed needs "your subscription ended — renew", while someone who
+    # never subscribed needs "a paid tier exists". The 402 raised on create
+    # already carries this; the collection screen never sees a 402, so
+    # without it here the prompt has to guess, and guessing means selling a
+    # lapsed subscriber a plan they already know about.
+    #
+    # Deliberately does NOT grant entitlement — it only changes copy.
+    subscription_lapsed: bool = False

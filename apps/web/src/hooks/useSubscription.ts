@@ -8,6 +8,9 @@ interface SubscriptionLimits {
   can_use_breeding: boolean
   max_photos_per_tarantula: number
   has_priority_support: boolean
+  /** Had a subscription that has since ended — changes cap copy from
+   *  "Upgrade" to "Renew". Optional so an older API response still parses. */
+  subscription_lapsed?: boolean
 }
 
 export function useSubscription() {
@@ -34,11 +37,23 @@ export function useSubscription() {
         const data = await response.json()
         setLimits(data)
       } else {
-        // Default to free tier if endpoint fails
+        // Default to free tier if endpoint fails.
+        //
+        // 15, not 20. Tarantuverse's free cap is FREE_TIER_MAX_ANIMALS = 15
+        // (apps/api models/user.py, and the `free` plan row). The 20 that used
+        // to be here is the COMBINED free allowance across both apps — 15
+        // Tarantuverse inverts plus 5 Herpetoverse animals — which nothing
+        // enforces, because the two caps are separate checks over separate
+        // tables.
+        //
+        // The consequence of getting it wrong was narrow but real: every
+        // consumer of this hook falls back to 15, so on an API failure the
+        // dashboard told a free keeper they had "X of 20" and then the server
+        // refused their 16th animal.
         setLimits({
           is_premium: false,
           max_tarantulas: 15,
-          max_animals: 20,
+          max_animals: 15,
           can_use_breeding: false,
           max_photos_per_tarantula: 5,
           has_priority_support: false,
@@ -46,11 +61,11 @@ export function useSubscription() {
       }
     } catch (error) {
       console.error('Failed to fetch subscription limits:', error)
-      // Default to free tier on error
+      // Default to free tier on error — see the note above on 15 vs 20.
       setLimits({
         is_premium: false,
         max_tarantulas: 15,
-        max_animals: 20,
+        max_animals: 15,
         can_use_breeding: false,
         max_photos_per_tarantula: 5,
         has_priority_support: false,
@@ -68,7 +83,7 @@ export function useSubscription() {
   // Collection cap is now cross-taxon (animals), counted server-side
   // against `inverts`. Fall back to the legacy tarantula field if an
   // older API response omits max_animals.
-  const animalLimit = (): number => limits?.max_animals ?? limits?.max_tarantulas ?? 20
+  const animalLimit = (): number => limits?.max_animals ?? limits?.max_tarantulas ?? 15
 
   const canAddTarantula = (currentCount: number): boolean => {
     if (!limits) return false

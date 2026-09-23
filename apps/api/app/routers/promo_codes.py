@@ -321,7 +321,17 @@ async def get_my_limits(
     Get current user's subscription limits
     """
     limits = current_user.get_subscription_limits()
-    return limits
+    # Reuses the same helper the 402 path uses, so the collection screen and
+    # the create-blocked error can't end up telling the keeper two different
+    # stories about why they're capped.
+    from app.utils.limits import _lapsed_subscription
+
+    return {
+        **limits,
+        "subscription_lapsed": (
+            False if limits.get("is_premium") else _lapsed_subscription(db, current_user.id)
+        ),
+    }
 
 
 @router.get("/me/debug")

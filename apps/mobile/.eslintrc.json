@@ -1,4 +1,10 @@
 {
   "extends": ["expo"],
-  "ignorePatterns": ["dist/", ".expo/", "node_modules/"]
+  "ignorePatterns": ["dist/", ".expo/", "node_modules/"],
+  "overrides": [
+    {
+      "files": ["scripts/**/*.js", "*.config.js", "jest.setup.js"],
+      "env": { "node": true }
+    }
+  ]
 }

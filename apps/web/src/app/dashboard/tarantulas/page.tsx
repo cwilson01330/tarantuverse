@@ -8,6 +8,7 @@ import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonCard } from '@/components/ui/skeleton'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
+import CollectionCapNotice from '@/components/CollectionCapNotice'
 import { formatLocalDate } from '@/lib/date'
 import { listColonies, type ColonyListItem } from '@/lib/colonies'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
@@ -440,56 +441,17 @@ export default function TarantulasPage() {
       userAvatar={user.image ?? undefined}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Tarantula Count Warning */}
-        {!subscriptionLimits?.is_premium &&
-         totalCollectionCount >= (subscriptionLimits?.max_animals ?? 15) - 5 &&
-         totalCollectionCount < (subscriptionLimits?.max_animals ?? 15) &&
-         showWarning && (
-          <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 shadow-lg">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3 flex-1">
-                <div className="text-2xl">⚠️</div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-gray-900 dark:text-white mb-1">
-                    Approaching Free Tier Limit
-                  </h3>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    You have <strong>{totalCollectionCount} of {subscriptionLimits?.max_animals ?? 15}</strong> animals on the free plan.
-                    Upgrade to Premium for unlimited tracking!
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => router.push('/pricing')}
-                      className="px-4 py-2 bg-gradient-brand text-white rounded-lg hover:brightness-90 transition font-semibold text-sm"
-                    >
-                      View Premium Plans
-                    </button>
-                    <button
-                      onClick={() => router.push('/dashboard/settings')}
-                      className="px-4 py-2 bg-white dark:bg-gray-800 border-2 border-purple-600 dark:border-purple-500 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition font-semibold text-sm"
-                    >
-                      Redeem Promo Code
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowWarning(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 ml-2"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            {/* Progress bar */}
-            <div className="mt-3 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(totalCollectionCount / (subscriptionLimits?.max_animals ?? 15)) * 100}%` }}
-              />
-            </div>
-          </div>
+        {/* Free-tier cap notice.
+            Shared with the dashboard so the two can't drift, and — unlike
+            the inline block it replaces — it still appears once a keeper is
+            AT or OVER the cap, which is when it matters most. */}
+        {showWarning && (
+          <CollectionCapNotice
+            isPremium={!!subscriptionLimits?.is_premium}
+            cap={subscriptionLimits?.max_animals ?? 15}
+            count={totalCollectionCount}
+            lapsed={!!subscriptionLimits?.subscription_lapsed}
+          />
         )}
 
         {/* Page Header */}

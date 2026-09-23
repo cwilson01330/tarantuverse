@@ -115,7 +115,16 @@ export default function AdminSpeciesImagesScreen() {
     // 4:3 and quality 0.8 match the rest of the app's photo flows. The server
     // downsizes to 1400px anyway, so shipping a 12MP original would only buy a
     // slower upload on mobile data.
-    const opts = { mediaTypes: ['images'] as const, allowsEditing: true, aspect: [4, 3] as [number, number], quality: 0.8 };
+    // Annotated rather than `as const`: the readonly tuple `as const` produces
+    // isn't assignable to the mutable MediaType[] the SDK expects, so hoisting
+    // these options into a variable broke a shape that type-checks fine when
+    // written inline at the call site (as every other photo flow does).
+    const opts: ImagePicker.ImagePickerOptions = {
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    };
     const r = source === 'camera'
       ? await ImagePicker.launchCameraAsync(opts)
       : await ImagePicker.launchImageLibraryAsync(opts);

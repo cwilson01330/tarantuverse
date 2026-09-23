@@ -10,6 +10,7 @@ import DashboardLayout from '@/components/DashboardLayout'
 import DashboardTour from '@/components/DashboardTour'
 import AnnouncementBanner from '@/components/AnnouncementBanner'
 import UpgradeModal from '@/components/UpgradeModal'
+import CollectionCapNotice from '@/components/CollectionCapNotice'
 import PremoltAlertsCard from '@/components/PremoltAlertsCard'
 import { PlusCircle, LayoutGrid, LineChart, BookOpen, Egg, Upload, Utensils } from 'lucide-react'
 import type { ColonyListItem } from '@/lib/colonies'
@@ -391,53 +392,16 @@ export default function DashboardHub() {
       userAvatar={user.image ?? undefined}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Free Tier Warning Banner */}
-        {!subscriptionLimits?.is_premium &&
-         animalCount >= (subscriptionLimits?.max_animals ?? 15) - 5 &&
-         animalCount < (subscriptionLimits?.max_animals ?? 15) &&
-         showWarning && (
-          <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-2 border-yellow-400 dark:border-yellow-600 rounded-xl p-4 shadow-lg">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3 flex-1">
-                <div className="text-2xl">⚠️</div>
-                <div className="flex-1">
-                  <h3 className="font-bold text-theme-primary mb-1">Approaching Free Tier Limit</h3>
-                  <p className="text-sm text-theme-secondary mb-3">
-                    You have <strong>{animalCount} of {subscriptionLimits?.max_animals ?? 15}</strong> animals on the free plan.
-                    Upgrade to Premium for unlimited tracking!
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => router.push('/pricing')}
-                      className="px-4 py-2 bg-gradient-brand text-white rounded-lg hover:brightness-90 transition font-semibold text-sm"
-                    >
-                      View Premium Plans
-                    </button>
-                    <button
-                      onClick={() => router.push('/dashboard/settings')}
-                      className="px-4 py-2 bg-surface border-2 border-purple-600 dark:border-purple-500 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-surface-elevated transition font-semibold text-sm"
-                    >
-                      Redeem Promo Code
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowWarning(false)}
-                className="text-theme-tertiary hover:text-theme-primary ml-2"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="mt-3 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${(animalCount / (subscriptionLimits?.max_animals ?? 15)) * 100}%` }}
-              />
-            </div>
-          </div>
+        {/* Free-tier cap notice — shared component so this and the
+            collection page can't drift, and so it still appears once a
+            keeper is AT or OVER the cap rather than vanishing there. */}
+        {showWarning && (
+          <CollectionCapNotice
+            isPremium={!!subscriptionLimits?.is_premium}
+            cap={subscriptionLimits?.max_animals ?? 15}
+            count={animalCount}
+            lapsed={!!subscriptionLimits?.subscription_lapsed}
+          />
         )}
 
         {/* Announcement Banner */}

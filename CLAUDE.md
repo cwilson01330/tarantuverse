@@ -1941,7 +1941,7 @@ This includes:
 - (Deferred, own project) Merge the tarantula + invert detail screens into one literal shared `<DetailBase>` component. Currently they're separate screen files sharing building blocks (tokens, primitives, `InfoGrid`, `AppHeader`, `PremoltPredictionCard`, the module registry) — composition got ~90% of the maintenance benefit; the physical merge is the risky last 10%.
 - `seed_new_invert_species.py` must be run on Render shell to populate the new taxa's care sheets (autocomplete/care sheets are empty until then).
 
-**Done this cycle (ADR-006/007/008 — see changelog):** nine-taxon expansion, `feeding_mode`, generic config-driven invert UI, cross-taxon 20-animal free cap, inline log edit/delete + hero photo on inverts, shared token/primitive design system, single premolt module, registry-gated feature modules, hero-photo mirror fix.
+**Done this cycle (ADR-006/007/008 — see changelog):** nine-taxon expansion, `feeding_mode`, generic config-driven invert UI, cross-taxon free animal cap, inline log edit/delete + hero photo on inverts, shared token/primitive design system, single premolt module, registry-gated feature modules, hero-photo mirror fix.
 
 ### Future Enhancements:
 - Offline mode with local storage and sync
@@ -1966,7 +1966,28 @@ This includes:
 - 🐾 **TAXA EXPANSION — ADR-006** (`docs/design/ADR-006-invert-taxa-expansion.md`): Five new taxa added on the consolidated surface to fulfill Jason's request — `whip_spider`, `vinegaroon`, `true_spider`, `millipede`, `mantis`, plus an `other` freeform catch-all. Taxon CHECK widened on `inverts` + `invert_species` (itx_20260605). New `feeding_mode` column (predator | detritivore | omnivore) — millipedes are detritivores (no live-prey cadence nudges). Canonical taxon regex lives in `schemas/invert.py::TAXON_PATTERN` and `models/invert.py::INVERT_TAXON_VALUES` (keep these in lockstep — a stale copy in `schemas/invert_species.py` / `routers/invert_species.py` caused a 422 on the species browser, since fixed). Honest species seeds via `seed_new_invert_species.py`.
 - 🧩 **GENERIC INVERT UI — ADR-007** (`docs/design/ADR-007-generic-invert-ui.md`): Adding a taxon is now config-only on BOTH platforms. Generic backend endpoints — `POST /inverts/` (taxon in body), `/inverts/{id}` CRUD, generic log endpoints `/inverts/{id}/{feedings,molts,substrate-changes,photos}`, `/invert-species/?taxon=` + `/search`. Mobile registry `src/lib/inverts.ts::INVERT_TAXA` + one set of taxon-driven screens (`app/invert/[id|add|edit|add-*].tsx`, `app/invert-species/[id].tsx`). Web uses `lib/inverts.ts` + generic `dashboard/inverts/*` pages. Per-taxon scorpion/centipede/whip-spider screens are retired (collection routes to `/invert/[id]`).
 - 🎨 **RICH-BASE CONVERGENCE — ADR-008** (`docs/design/ADR-008-rich-base-convergence.md`): Converge UP onto the rich tarantula interaction model, NOT down to lean. Inverts gained inline feeding/molt/substrate **log edit + delete** and **hero photo set/change** (web + mobile) — backend was already polymorphic (`_*_owner_parent` cover `invert_id`; `set-main` works for any taxon). Tarantula keeps its depth; premolt / feeding-stats / growth / breeding are opt-in **feature modules** gated by `src/lib/taxon-modules.ts` (only tarantula enabled today). Shared design tokens (`src/theme/tokens.ts` spacing + type) + shared primitives (`src/components/ui/index.tsx`: Card, SectionCard, InfoRow, Chip, Badge, AppText, **InfoGrid**). Husbandry now renders through the shared `InfoGrid` on tarantula AND every invert, with full field parity (water dish / temperature / humidity — the mobile tarantula screen previously omitted these). Personalized gradient `AppHeader` (animal name, not "Details") on every detail screen.
-- 💎 **CROSS-TAXON FREE LIMIT**: Free tier cap moved from tarantula-only to a cross-taxon **20 total animals** counted against `inverts` (`utils/limits.py::enforce_collection_limit`, wired into invert create). `subscription_plans.max_animals` column (sub_20260605); `useSubscription` hook + pricing/limit copy read `max_animals`.
+- 💎 **CROSS-TAXON FREE LIMIT**: Free tier cap moved from tarantula-only to a cross-taxon total counted against `inverts` (`utils/limits.py::enforce_collection_limit`, wired into invert create). `subscription_plans.max_animals` column (sub_20260605); `useSubscription` hook + pricing/limit copy read `max_animals`.
+
+  **There are TWO free caps, not one, and they don't add up to a single
+  number you can enforce.**
+
+  | app | cap | constant | counted against |
+  | --- | --- | --- | --- |
+  | Tarantuverse | **15** | `FREE_TIER_MAX_ANIMALS` | `inverts` |
+  | Herpetoverse | **5** | `HV_FREE_TIER_MAX_ANIMALS` | `animals` |
+
+  A keeper using both free tiers therefore holds **20 animals across the two
+  apps** — which is where the "20" in this file came from. It is a *combined
+  allowance*, not a limit anything enforces: `enforce_collection_limit` and
+  `enforce_animal_limit` are separate checks over separate tables, and neither
+  one ever sees 20. Quoting 20 as "the free cap" in TV copy would be wrong by
+  five.
+
+  Premium is shared — any active subscription lifts both. The `free` plan row
+  carries `max_animals = 15`, and the plan wins at runtime over the constant
+  whenever a subscription row exists, so read the plan rather than this file.
+  (Legacy `max_tarantulas = 10` on the same row is dead — superseded by
+  `max_animals`.)
 - 🖼️ **HERO PHOTO MIRROR FIX**: `set-main`, first-upload default, and photo delete now sync `photo_url` onto the unified `Invert` row (keyed on shared PK), so scorpion/tarantula heroes — whose photos resolve to the legacy parent first — show on the generic invert detail/collection. Delete promotes the next photo as hero. Reconciliation SQL available for pre-fix rows.
 - 🌐 **LANDING + COLLECTION**: Web landing page reworked for the multi-taxon story (scorpions + centipedes + the new taxa). Web collection list + species browser + mobile collection/species browser show all nine taxa with filter chips.
 
