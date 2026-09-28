@@ -366,7 +366,7 @@ Phases 1 and 2 don't depend on 3a. Phase 3a can start any time and ship silently
 **Independent security review (2026-09-28):** no Critical/High findings. Fixed: revoke/rotate exempt from maintenance mode; open passes never capped in the list; row lock on the free-tier count; token-shaped fragments only; premolt failures isolated in a savepoint; deactivated owners' links die; username fallback removed; PostHog `sanitize_properties` strips fragments site-wide.
 
 **Open:**
-- **Rate-limit keying behind Render (pre-existing, affects login too).** SlowAPI keys on `request.client.host`. Uvicorn only trusts `X-Forwarded-For` from 127.0.0.1 by default, so behind Render's proxy every request may share one bucket. Verify before relying on per-IP limits; see hand-over notes.
+- ~~**Rate-limit keying behind Render.**~~ **Checked 2026-09-28, not an issue.** Render's API logs show uvicorn receiving varied real client IPs (only the internal health check is 127.0.0.1), so SlowAPI's per-IP buckets are per visitor, for sitter links and login alike. No `FORWARDED_ALLOW_IPS` change needed.
 - Per-pass payload cost scales with animals (a premolt prediction per tarantula). Consider a ~60s payload cache if large passes become common.
 
 ## Adjacent hardening found while scoping

@@ -1,7 +1,7 @@
 {
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
-  "installCommand": "npm install",
+  "installCommand": "cd ../.. && npx -y pnpm@10.18.0 install --frozen-lockfile --filter web-herpetoverse...",
   "framework": "nextjs",
   "outputDirectory": ".next"
 }
