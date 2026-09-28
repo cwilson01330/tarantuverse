@@ -134,6 +134,7 @@ function VerifyEmailContent() {
                 key={email.trim()}
                 email={email}
                 intro="We'll email a new confirmation link to this address."
+                showPromptTitle={false}
               />
               <Link
                 href="/login"

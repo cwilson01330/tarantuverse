@@ -21,10 +21,16 @@ type State = 'idle' | 'sending' | 'sent' | 'error'
 export default function ResendVerification({
   email,
   intro,
+  showPromptTitle = true,
 }: {
   email: string
   /** Lead-in shown before anything is sent. */
   intro?: string
+  /** Show the "Confirm your email first" heading before sending. Turn off
+   *  where the page already says what's wrong (e.g. /verify-email's "This
+   *  link didn't work"), so the two headings don't stack. "New link sent"
+   *  always shows — it's the confirmation. */
+  showPromptTitle?: boolean
 }) {
   const [state, setState] = useState<State>('idle')
 
@@ -53,10 +59,12 @@ export default function ResendVerification({
       aria-live="polite"
       className="p-3 rounded-md border border-amber-500/40 bg-amber-500/10 text-sm text-amber-100"
     >
-      <p className="font-semibold text-neutral-100">
-        {state === 'sent' ? 'New link sent' : 'Confirm your email first'}
-      </p>
-      <p className="mt-1 text-neutral-300">
+      {(state === 'sent' || showPromptTitle) && (
+        <p className="font-semibold text-neutral-100 mb-1">
+          {state === 'sent' ? 'New link sent' : 'Confirm your email first'}
+        </p>
+      )}
+      <p className="text-neutral-300">
         {state === 'sent'
           ? `Check the inbox for ${email.trim()} — and the spam folder, just in case. The link works for 3 days.`
           : state === 'error'
