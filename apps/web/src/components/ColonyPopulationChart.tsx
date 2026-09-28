@@ -84,7 +84,11 @@ export default function ColonyPopulationChart({
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="currentColor" className="text-theme-tertiary" />
               <Tooltip
                 contentStyle={{ fontSize: 13, borderRadius: 8 }}
-                formatter={(v: number) => [v.toLocaleString(), 'Population']}
+                // Untyped param on purpose: recharts 3 types the value as
+                // ValueType | undefined, so `(v: number)` fails `next build` on
+                // Vercel (which resolves ^3.x fresh) even where a local, older
+                // install type-checks clean.
+                formatter={(v) => [typeof v === 'number' ? v.toLocaleString() : String(v ?? ''), 'Population']}
               />
               <Line
                 type="monotone"

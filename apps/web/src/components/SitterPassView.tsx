@@ -6,6 +6,7 @@
  * Renders only what /sitter/pass returns; it never fetches or writes anything.
  */
 
+import Link from 'next/link'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export type Source = 'safety' | 'keeper' | 'record' | 'species' | 'default'
@@ -137,9 +138,9 @@ export default function SitterPassView({ data }: { data: Payload }) {
 
       <footer className="text-center text-sm text-gray-500 dark:text-gray-400 pb-8">
         Kept with Tarantuverse.{' '}
-        <a href="/" rel="noreferrer" className="text-purple-700 dark:text-purple-300 underline">
+        <Link href="/" className="text-purple-700 dark:text-purple-300 underline">
           Track your own collection free
-        </a>
+        </Link>
       </footer>
     </>
   )

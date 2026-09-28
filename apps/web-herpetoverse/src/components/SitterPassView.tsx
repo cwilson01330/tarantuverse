@@ -6,6 +6,7 @@
  * Renders only what /sitter/pass returns; it never fetches or writes anything.
  */
 
+import Link from 'next/link'
 import { API_URL } from '@/lib/apiClient'
 
 export type Source = 'safety' | 'keeper' | 'record' | 'species' | 'default'
@@ -137,9 +138,9 @@ export default function SitterPassView({ data }: { data: Payload }) {
 
       <footer className="text-center text-sm text-neutral-400 pb-8">
         Kept with Herpetoverse.{' '}
-        <a href="/" rel="noreferrer" className="text-herp-teal underline">
+        <Link href="/" className="text-herp-teal underline">
           Track your own collection free
-        </a>
+        </Link>
       </footer>
     </>
   )
