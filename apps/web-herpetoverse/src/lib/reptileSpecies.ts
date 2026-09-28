@@ -300,6 +300,11 @@ export interface ReptileSpeciesSearchResult {
   care_level: CareLevel | null
   image_url: string | null
   taxon: AnimalTaxon
+  /** Whether this species normally eats a complete gecko diet — decides
+   *  whether the add form offers the CGD control at all. The API has sent
+   *  this on search results since the CGD work (schemas/reptile_species.py
+   *  ReptileSpeciesSearchResult); the type just never caught up. */
+  feeds_on_cgd: boolean
 }
 
 /**
