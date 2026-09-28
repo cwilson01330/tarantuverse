@@ -13,6 +13,7 @@ from app.models.content_report import ContentReport
 from app.utils.subscription import active_subscription_clause
 from app.schemas.user import UserResponse
 from app.utils.dependencies import get_current_admin
+from app.utils.auth import new_email_verification_token
 from app.utils.file_validation import validate_image_bytes
 from app.services.storage import StorageService
 from app.services.email import EmailService
@@ -390,9 +391,8 @@ async def resend_verification_email(
             detail="User is already verified"
         )
 
-    # Generate new verification token
-    verification_token = secrets.token_urlsafe(32)
-    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    # Same helper as register and self-serve resend, so all three share one TTL.
+    verification_token, verification_token_expires_at = new_email_verification_token()
 
     user.verification_token = verification_token
     user.verification_token_expires_at = verification_token_expires_at

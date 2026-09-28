@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 from app.database import get_db
 from app.models.user import User
 from app.models.user_oauth_account import UserOAuthAccount
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest, ForgotPasswordRequest, UsernameChangeRequest, UsernameAvailabilityResponse
+from app.schemas.user import UserCreate, UserLogin, UserResponse, Token, UserProfileUpdate, UserVisibilityUpdate, ResetPasswordRequest, ForgotPasswordRequest, UsernameChangeRequest, UsernameAvailabilityResponse, ResendVerificationRequest
 from app.schemas.oauth import GoogleOAuthCallback, AppleOAuthCallback, OAuthLoginResponse, LinkedAccountResponse, LinkAccountRequest, LinkAccountDirectRequest
-from app.utils.auth import get_password_hash, verify_password, create_access_token, revoke_token, decode_access_token
+from app.utils.auth import get_password_hash, verify_password, create_access_token, revoke_token, decode_access_token, new_email_verification_token
 from app.utils.dependencies import get_current_user
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.utils.oauth import (
@@ -126,8 +126,7 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
     verification_token = None
     verification_token_expires_at = None
     if verification_required:
-        verification_token = secrets.token_urlsafe(32)
-        verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        verification_token, verification_token_expires_at = new_email_verification_token()
 
     new_user = User(
         email=user_data.email,
@@ -1444,42 +1443,61 @@ async def verify_email(
     return {"message": "Email verified successfully"}
 
 
+RESEND_VERIFICATION_MESSAGE = (
+    "If that account exists and still needs verifying, a new link is on its way."
+)
+
+
 @router.post("/resend-verification")
 @limiter.limit("3/minute")
 async def resend_verification(
     request: Request,
-    email: str,
+    payload: Optional[ResendVerificationRequest] = None,
+    email: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
-    Resend verification email
+    Resend verification email.
+
+    Takes `{"email": ...}` as a JSON body. The `?email=` query parameter is
+    still accepted so app builds already in the field keep working, but new
+    clients must not use it: an address in a URL ends up in every access log
+    between the device and the API, and the web client never URL-encoded it,
+    so any address containing `+` arrived with a space in it and silently
+    matched nobody.
+
+    Every outcome returns the same message. The old endpoint answered
+    differently for "no such account", "already verified" and "sent", which
+    let anyone probe which addresses are registered.
     """
     if not settings.EMAIL_VERIFICATION_REQUIRED:
         return {"message": "Email verification is currently disabled. Accounts are activated automatically."}
 
-    user = db.query(User).filter(User.email == email).first()
+    address = (payload.email if payload else email) or ""
+    address = address.strip()
+    if not address:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Email is required",
+        )
 
-    if not user:
-         # Return success even if user not found to prevent user enumeration
-        return {"message": "If an account exists, a verification email has been sent."}
+    user = db.query(User).filter(User.email == address).first()
 
-    if user.is_verified:
-        return {"message": "Account is already verified"}
+    if user and not user.is_verified:
+        verification_token, verification_token_expires_at = new_email_verification_token()
+        user.verification_token = verification_token
+        user.verification_token_expires_at = verification_token_expires_at
+        db.commit()
 
-    # Generate new token
-    verification_token = secrets.token_urlsafe(32)
-    verification_token_expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
+        try:
+            await EmailService.send_verification_email(user.email, verify_link)
+        except Exception:
+            # Logged inside EmailService. Swallowed here so a Resend outage
+            # can't turn this into an oracle either (500 = "account exists").
+            pass
 
-    user.verification_token = verification_token
-    user.verification_token_expires_at = verification_token_expires_at
-    db.commit()
-
-    # Send email
-    verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-
-    await EmailService.send_verification_email(user.email, verify_link)
-
-    return {"message": "Verification email sent"}
+    return {"message": RESEND_VERIFICATION_MESSAGE}
 
 
 @router.delete("/me", status_code=status.HTTP_200_OK)

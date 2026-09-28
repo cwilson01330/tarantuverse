@@ -81,6 +81,13 @@ class ResetPasswordRequest(BaseModel):
         return _validate_password_complexity(v)
 
 
+class ResendVerificationRequest(BaseModel):
+    # Plain str, not EmailStr: EmailStr normalizes (lowercases the domain),
+    # and the lookup is an exact match on the stored address. Normalizing
+    # here would make the resend silently miss accounts stored as typed.
+    email: str = Field(..., min_length=3, max_length=320)
+
+
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
     # Optional caller-specified base URL for the reset link in the email.

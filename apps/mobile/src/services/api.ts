@@ -46,6 +46,7 @@ const AUTH_ENDPOINTS_NO_AUTO_LOGOUT = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/auth/verify-email',
+  '/auth/resend-verification',
 ]
 
 export const apiClient = axios.create({

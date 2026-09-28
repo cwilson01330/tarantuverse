@@ -158,7 +158,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setToken(access_token);
       setUser(userData);
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Login failed');
+      const err: Error & { code?: string } = new Error(
+        error.response?.data?.detail || 'Login failed',
+      );
+      // Tagged so the login screen can offer a fresh link instead of a
+      // dead-end alert. Keyed on status + wording because the API reports
+      // this case as a plain 403 detail string.
+      if (
+        error.response?.status === 403 &&
+        /not verified/i.test(String(error.response?.data?.detail ?? ''))
+      ) {
+        err.code = 'email_not_verified';
+      }
+      throw err;
     }
   };
 

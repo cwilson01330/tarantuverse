@@ -66,12 +66,17 @@ function LoginForm() {
     setResendLoading(true)
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}/api/v1/auth/resend-verification?email=${formData.email}`, {
+      // JSON body, not ?email=. The address used to go into the URL
+      // un-encoded, so any address with a `+` arrived with a space in it and
+      // matched no account — the resend silently did nothing.
+      const response = await fetch(`${API_URL}/api/v1/auth/resend-verification`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: formData.email.trim() }),
       });
 
       if (response.ok) {
-        alert('Verification email sent! Please check your inbox.');
+        alert('If that account still needs verifying, a new link is on its way. Check your spam folder too — the link works for 3 days.');
       } else {
         alert('Failed to send verification email.');
       }

@@ -10,6 +10,17 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _verification_window() -> str:
+    """Human wording for the verification-link lifetime, read from the TTL
+    itself so the email can never promise a window the server doesn't honor."""
+    from app.utils.auth import EMAIL_VERIFICATION_TTL
+
+    hours = int(EMAIL_VERIFICATION_TTL.total_seconds() // 3600)
+    if hours % 24 == 0 and hours >= 48:
+        return f"{hours // 24} days"
+    return f"{hours} hours"
+
+
 class EmailService:
     API_URL = "https://api.resend.com/emails"
 
@@ -90,6 +101,8 @@ class EmailService:
             </p>
             <p>Or copy and paste this link into your browser:</p>
             <p><a href="{verify_link}">{verify_link}</a></p>
+            <p>This link works for {_verification_window()}. If it runs out, just try logging in and tap
+               <strong>Send a new link</strong>.</p>
             <p>If you did not create an account, please ignore this email.</p>
             <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
             <p style="color: #666; font-size: 12px;">Tarantuverse Team</p>

@@ -17,15 +17,47 @@ import { useTheme } from '../src/contexts/ThemeContext';
 import GoogleLogo from '../src/components/GoogleLogo';
 import { warmupApi, useColdStartIndicator } from '../src/utils/cold-start';
 import { resolvePostAuthRoute } from '../src/lib/onboarding';
+import { apiClient } from '../src/services/api';
+import { TYPE } from '../src/theme/tokens';
+
+type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithGoogle, loginWithApple } = useAuth();
-  const { colors, theme } = useTheme();
+  const { colors, theme, layout } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
+  // Set when login fails because the address was never verified. Before this,
+  // that case was an alert saying "check your inbox" — and since links expire,
+  // anyone who came back late had nothing in their inbox that still worked and
+  // no way to ask for another. Every unverified account in Sept 2026 was
+  // stuck exactly there.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<ResendState>('idle');
+
+  const onEmailChange = (value: string) => {
+    setEmail(value);
+    // The card is about one specific address; editing it makes the card stale.
+    if (unverifiedEmail) {
+      setUnverifiedEmail(null);
+      setResendState('idle');
+    }
+  };
+
+  const handleResend = async () => {
+    if (!unverifiedEmail) return;
+    setResendState('sending');
+    try {
+      // JSON body, never ?email= — see the API's resend_verification docstring.
+      await apiClient.post('/auth/resend-verification', { email: unverifiedEmail });
+      setResendState('sent');
+    } catch {
+      setResendState('error');
+    }
+  };
 
   // Kick the Render container awake the moment this screen mounts. By the
   // time the user finishes typing credentials, the API is likely warm and
@@ -48,6 +80,8 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+    setUnverifiedEmail(null);
+    setResendState('idle');
     try {
       await login(trimmedEmail, trimmedPassword);
       // A password login is never itself a new account, but it IS how someone
@@ -55,7 +89,12 @@ export default function LoginScreen() {
       // left by the register screen is consumed here.
       router.replace(await resolvePostAuthRoute());
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message);
+      if (error?.code === 'email_not_verified') {
+        // Inline card with a way forward, not a dismissible dead end.
+        setUnverifiedEmail(trimmedEmail);
+      } else {
+        Alert.alert('Login Failed', error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -199,6 +238,22 @@ export default function LoginScreen() {
       alignItems: 'center',
       gap: 10,
     },
+    // Verification card — theme tokens only (radius/colors applied inline
+    // from useTheme), so this screen doesn't grow the design-token backlog.
+    verifyCard: {
+      marginTop: 16,
+      padding: 14,
+      borderWidth: 1.5,
+      backgroundColor: colors.surface,
+    },
+    verifyTitle: { ...TYPE.bodyStrong },
+    verifyBody: { ...TYPE.caption, lineHeight: 18, marginTop: 4 },
+    verifyButton: {
+      marginTop: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    verifyButtonText: { ...TYPE.bodyStrong, color: '#fff' },
     warmingText: {
       flex: 1,
       color: colors.textSecondary,
@@ -223,7 +278,7 @@ export default function LoginScreen() {
             placeholder="Email"
             placeholderTextColor={colors.textTertiary}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={onEmailChange}
             autoCapitalize="none"
             keyboardType="email-address"
             editable={!loading}
@@ -249,6 +304,47 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>Login</Text>
             )}
           </TouchableOpacity>
+
+          {unverifiedEmail && (
+            <View
+              style={[
+                styles.verifyCard,
+                { borderColor: colors.warning, borderRadius: layout.radius.md },
+              ]}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+            >
+              <Text style={[styles.verifyTitle, { color: colors.textPrimary }]}>
+                {resendState === 'sent' ? 'New link sent' : 'Confirm your email first'}
+              </Text>
+              <Text style={[styles.verifyBody, { color: colors.textSecondary }]}>
+                {resendState === 'sent'
+                  ? `Check the inbox for ${unverifiedEmail} — and the spam folder, just in case. The link works for 3 days.`
+                  : resendState === 'error'
+                    ? "We couldn't send that just now. Check your connection and try again."
+                    : `We sent a confirmation link to ${unverifiedEmail} when you signed up. If you can't find it, or it's stopped working, we'll send a fresh one.`}
+              </Text>
+              {resendState !== 'sent' && (
+                <TouchableOpacity
+                  style={[
+                    styles.verifyButton,
+                    { backgroundColor: colors.warning, borderRadius: layout.radius.md },
+                    resendState === 'sending' && styles.buttonDisabled,
+                  ]}
+                  onPress={handleResend}
+                  disabled={resendState === 'sending'}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send a new verification link"
+                >
+                  {resendState === 'sending' ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.verifyButtonText}>Send a new link</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {showColdStartHint && (
             <View style={styles.warmingHint} accessibilityLiveRegion="polite">

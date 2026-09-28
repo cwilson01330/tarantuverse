@@ -3,6 +3,7 @@ Authentication utilities - password hashing and JWT tokens
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import secrets
 import uuid
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -11,6 +12,31 @@ from app.config import settings
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+# How long an email-verification link stays valid.
+#
+# 72 hours, up from 24. At 24h, a keeper who signed up on a Friday evening
+# and opened the email on Sunday found a dead link — and the mobile app had
+# no way to ask for a new one. Every unverified account in Sept 2026 was
+# exactly that: email delivered, link expired, zero animals. A verification
+# link only proves inbox ownership; it isn't a credential that grants access
+# on its own, so the longer window costs little.
+#
+# Password-reset links deliberately stay at 24h — those DO grant access.
+EMAIL_VERIFICATION_TTL = timedelta(hours=72)
+
+
+def new_email_verification_token() -> tuple[str, datetime]:
+    """Mint a verification token and its expiry.
+
+    Every path that issues one (register, self-serve resend, admin resend)
+    goes through here, so the lifetime can't drift between them again.
+    """
+    return (
+        secrets.token_urlsafe(32),
+        datetime.now(timezone.utc) + EMAIL_VERIFICATION_TTL,
+    )
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
