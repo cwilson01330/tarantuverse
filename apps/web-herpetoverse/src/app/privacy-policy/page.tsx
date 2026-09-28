@@ -34,7 +34,7 @@ export default function HerpetoversePrivacyPolicyPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">Privacy Policy</h1>
         <p className="text-gray-600 dark:text-gray-400 mb-8">
-          <strong>Last Updated:</strong> April 21, 2026 &nbsp;·&nbsp; <strong>Effective:</strong> upon public launch of Herpetoverse
+          <strong>Last Updated:</strong> September 28, 2026 &nbsp;·&nbsp; <strong>Effective:</strong> upon public launch of Herpetoverse
         </p>
 
         <div className="prose prose-lg dark:prose-invert max-w-none">
@@ -139,6 +139,14 @@ export default function HerpetoversePrivacyPolicyPage() {
               <li>Contents of your direct messages (beyond the intended recipient);</li>
               <li>Payment card numbers (handled directly by our payment processor).</li>
             </ul>
+
+            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">5.4 Sitter Links</h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              If you create a sitter link, anyone who has that link (or scans its QR code) can see a feeding list for the animals you chose, until the link ends or you end it. The list shows each animal&rsquo;s name, photo and species; feeding and care information from your records and from the species care sheet; any note you wrote for the sitter; and your routine and contact line, if you added them. It never shows your email address, the prices you paid, where your animals came from, or your private notes. A link lasts at most 30 days, you choose when it ends, and you can end it at any time.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              The sitter does not need an account, and we do not ask for their name, email address or phone number. If you type a name for the sitter, it is stored with the link and shown to them. When a link is opened we record how many times it has been opened and when it was last used, so you can see that in the app; we do not record who opened it. As with any request to our servers, opening a link passes through our standard security measures, which use IP addresses briefly for rate limiting and abuse prevention. The link&rsquo;s access code is never stored in readable form &mdash; we keep only a one-way fingerprint of it &mdash; and our analytics tools are switched off on sitter pages.
+            </p>
           </section>
 
           <section className="mb-8">
@@ -179,6 +187,9 @@ export default function HerpetoversePrivacyPolicyPage() {
             </p>
             <p className="text-gray-700 dark:text-gray-300">
               Aggregated or de-identified information that can no longer reasonably be linked to you may be retained and used indefinitely. Log data and backups are rotated on normal operational schedules.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300 mt-4">
+              Sitter links you create, and their open counts, are kept with your account so you can see past links, and are deleted along with your account.
             </p>
           </section>
 

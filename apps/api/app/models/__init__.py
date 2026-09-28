@@ -75,6 +75,8 @@ from app.models.animal_transfer import AnimalTransfer
 # communal/colony keepers. Depends on InvertSpecies + Enclosure being
 # imported first (FK targets), which they are above.
 from app.models.colony import Colony, ColonyEvent
+# Sitter passes reference inverts, colonies and animals — imported after all three.
+from app.models.sitter_pass import KeeperPass, KeeperPassAnimal, SitterGuide
 
 # Species shortlist (shl_20260727) — species a keeper is considering.
 # Server-side rather than device-local so it survives a reinstall and is the
@@ -148,5 +150,8 @@ __all__ = [
     "AnimalTransfer",
     "Colony",
     "ColonyEvent",
+    "KeeperPass",
+    "KeeperPassAnimal",
+    "SitterGuide",
     "SpeciesShortlist",
 ]

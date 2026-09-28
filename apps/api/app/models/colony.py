@@ -113,6 +113,8 @@ class Colony(Base):
     water_dish = Column(Boolean, nullable=True)
 
     notes = Column(Text, nullable=True)
+    # Written FOR a sitter; `notes` stays private (PRD-shared-keeping).
+    sitter_note = Column(Text, nullable=True)
     photo_url = Column(String(500), nullable=True)
 
     visibility = Column(String(10), nullable=False, default="private")

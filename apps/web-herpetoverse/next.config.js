@@ -34,6 +34,24 @@ const nextConfig = {
         source: '/.well-known/apple-app-site-association',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
       },
+      {
+        // Site-wide: send only the origin to other sites, never full paths.
+        source: '/:path*',
+        headers: [{ key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' }],
+      },
+      {
+        // Sitter passes carry a live token in the URL fragment. Browsers never
+        // send fragments anyway; these make the page itself as quiet as
+        // possible: no Referer at all, never indexed, never cached.
+        // Declared AFTER the site-wide rule so its Referrer-Policy wins.
+        // (PRD-shared-keeping, T3.)
+        source: '/sit',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
     ]
   },
   async rewrites() {

@@ -400,6 +400,26 @@ function SettingsScreen() {
           />
         </View>
 
+        <SectionLabel text="Going away" colors={colors} />
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: layout.radius.lg,
+            },
+          ]}
+        >
+          {/* `link` is already used across this app — a proven MDI glyph. */}
+          <ActionRow
+            icon="link"
+            label="Sitter links"
+            onPress={() => router.push('/sitter' as never)}
+            colors={colors}
+          />
+        </View>
+
         <SectionLabel text="Your data" colors={colors} />
         <View
           style={[

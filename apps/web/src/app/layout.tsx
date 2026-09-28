@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/Providers'
-import { Analytics } from '@vercel/analytics/react'
+import SafeAnalytics from '@/components/SafeAnalytics'
 import AppStructuredData from '@/components/AppStructuredData'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -33,7 +33,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           {children}
-          <Analytics />
+          <SafeAnalytics />
         </Providers>
       </body>
     </html>

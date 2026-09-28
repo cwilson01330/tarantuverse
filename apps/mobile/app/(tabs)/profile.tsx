@@ -697,6 +697,31 @@ function ProfileScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.menuItem}
+          onPress={() => router.push('/sitter' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Sitter and sharing"
+          accessibilityHint="Make a feeding-list link for someone looking after your animals"
+        >
+          {/* account-group: already used elsewhere in this app, so it's a
+              proven glyph (an unverified MDI name renders as an empty box). */}
+          <MaterialCommunityIcons
+            name="account-group"
+            size={24}
+            color={colors.textSecondary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+          <Text style={styles.menuText}>Sitter &amp; Sharing</Text>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={24}
+            color={colors.textTertiary}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.menuItem}
           onPress={() => router.push('/settings/data-export')}
           accessibilityRole="button"
           accessibilityLabel="Export my data"

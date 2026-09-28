@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
+import SafeAnalytics from '@/components/SafeAnalytics'
 import './globals.css'
 import { PostHogProvider } from '@/components/PostHogProvider'
 
@@ -54,7 +54,7 @@ export default function RootLayout({
       <body>
         <PostHogProvider>
           {children}
-          <Analytics />
+          <SafeAnalytics />
         </PostHogProvider>
       </body>
     </html>

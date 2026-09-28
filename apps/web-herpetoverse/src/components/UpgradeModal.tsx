@@ -34,6 +34,7 @@ const TITLES: Partial<Record<UpgradeSource, string>> = {
   collection_cap: 'Free plan limit reached',
   breeding: 'Breeding is a Premium feature',
   feeders: 'Feeder tracking is a Premium feature',
+  shared_keeping: 'More sitter links',
 }
 
 // Matches the server gates: enforce_animal_limit, the reptile_pairings 402,

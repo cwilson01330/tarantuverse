@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 import os
+import re
 from app.config import settings
 from app.utils.rate_limit import limiter  # shared limiter instance
 import app.routers.auth as auth
@@ -56,6 +57,7 @@ import app.routers.feeder_colonies as feeder_colonies
 import app.routers.hv_feeder_species as hv_feeder_species
 import app.routers.hv_feeder_stocks as hv_feeder_stocks
 import app.routers.colonies as colonies  # ADR-010 pet colony mode
+import app.routers.sitter_passes as sitter_passes  # PRD-shared-keeping
 import app.routers.animal_events as animal_events  # ADR-015 per-animal events
 import app.routers.species_shortlist as species_shortlist  # care-sheet bookmarks
 import app.routers.waitlist as waitlist
@@ -157,8 +159,20 @@ async def maintenance_middleware(request: Request, call_next):
             # and we'd risk dropping entitlement events.
             "/api/v1/subscriptions/webhook",
             "/api/v1/subscriptions/apple-notifications",
+            # A sitter opening a feeding list mid-trip must never be 503'd —
+            # animals still need feeding during maintenance. The exchange only
+            # trades a link for a READ session (plus an open counter); it
+            # writes no keeper data. (PRD-shared-keeping, welfare rule.)
+            "/api/v1/sitter/exchange",
         }
-        if path not in safe_paths:
+        # A keeper must always be able to CUT OFF a sitter link, maintenance
+        # or not — otherwise a leaked link stays usable (reads are never
+        # blocked) while the keeper is 503'd trying to end it. Only revoke and
+        # rotate; creating links still waits for maintenance to end.
+        is_pass_cutoff = bool(
+            re.fullmatch(r"/api/v1/sitter-passes/[0-9a-fA-F-]{36}/(revoke|rotate)", path)
+        )
+        if path not in safe_paths and not is_pass_cutoff:
             try:
                 from app.services import settings_service
                 from app.database import SessionLocal
@@ -304,6 +318,11 @@ print("[STARTUP] Registering discover router...")
 app.include_router(discover.router, prefix="/api/v1", tags=["discover", "community"])
 app.include_router(qr.router, prefix="/api/v1", tags=["qr", "identity"])
 app.include_router(transfers.router, prefix="/api/v1", tags=["transfers", "provenance"])
+
+# Sitter passes (PRD-shared-keeping). Two routers on purpose: the keeper's
+# (user auth) and the sitter's (pass-session auth only, an allowlist).
+app.include_router(sitter_passes.keeper_router, prefix="/api/v1/sitter-passes", tags=["sitter-passes"])
+app.include_router(sitter_passes.sitter_router, prefix="/api/v1/sitter", tags=["sitter-passes"])
 
 print("[STARTUP] Registering feeder routers...")
 app.include_router(feeder_species.router, prefix="/api/v1/feeder-species", tags=["feeders"])

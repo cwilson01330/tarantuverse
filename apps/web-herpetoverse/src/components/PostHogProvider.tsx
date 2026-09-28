@@ -39,11 +39,21 @@ const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST || "/relay"
 const POSTHOG_UI_HOST =
   process.env.NEXT_PUBLIC_POSTHOG_UI_HOST || "https://us.posthog.com"
 
+// Sitter pass pages carry a live access token in the URL fragment
+// (/sit#<token>). posthog-js attaches $current_url — fragment included — to
+// every event, and capture_pageleave is on, so a sitter closing the tab would
+// ship the token to analytics. PostHog is therefore never started on /sit,
+// and no pageview is sent for it. (PRD-shared-keeping, T3.)
+function isSitterPage(path: string | null | undefined): boolean {
+  return !!path && (path === "/sit" || path.startsWith("/sit/"))
+}
+
 let initialized = false
 
 function initPostHog() {
   if (initialized) return
   if (typeof window === "undefined") return
+  if (isSitterPage(window.location.pathname)) return
   if (!POSTHOG_KEY) return
 
   posthog.init(POSTHOG_KEY, {
@@ -57,6 +67,17 @@ function initPostHog() {
     // admin-panel flag system). Disable the flag poll to remove a
     // blocker-targeted request and skip a round-trip.
     advanced_disable_feature_flags: true,
+    // Defence in depth for sitter links (/sit#<token>): strip the fragment
+    // from every URL property PostHog attaches, on every event, on every
+    // page. The /sit guard below stops PostHog starting there on a direct
+    // load; this covers any path to /sit it might not.
+    sanitize_properties: (props) => {
+      for (const k of ["$current_url", "$referrer", "$initial_current_url", "$initial_referrer"]) {
+        const v = props[k]
+        if (typeof v === "string") props[k] = v.split("#")[0]
+      }
+      return props
+    },
     advanced_disable_feature_flags_on_first_load: true,
     persistence: "localStorage+cookie",
   })
@@ -72,6 +93,7 @@ function PostHogPageviews() {
   useEffect(() => {
     if (!POSTHOG_KEY || typeof window === "undefined") return
     if (!pathname) return
+    if (isSitterPage(pathname)) return
     void searchParams // fire on query changes too, but don't log them
     posthog.capture("$pageview", { $pathname: pathname })
   }, [pathname, searchParams])

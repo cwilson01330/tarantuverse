@@ -178,6 +178,8 @@ class Animal(Base):
 
     # Notes
     notes = Column(Text)
+    # Written FOR a sitter; `notes` stays private (PRD-shared-keeping).
+    sitter_note = Column(Text, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

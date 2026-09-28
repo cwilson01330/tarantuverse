@@ -137,6 +137,10 @@ class Invert(Base):
     is_public = Column(Boolean, default=False)
     visibility = Column(String(20), default='private')
     notes = Column(Text)
+    # Written FOR a sitter (PRD-shared-keeping). Deliberately separate from
+    # `notes`/`enclosure_notes`, which are private and never reach a pass —
+    # a keeper's own notes routinely hold prices, sources and addresses.
+    sitter_note = Column(Text, nullable=True)
 
     # Provenance / transfer ("rehome") — BRIEF-animal-transfer-provenance.
     # bred_by_user_id: on-platform breeder if known. origin_keeper_name: free-text
