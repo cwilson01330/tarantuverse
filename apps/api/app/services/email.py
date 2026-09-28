@@ -6,6 +6,7 @@ import logging
 import httpx
 
 from app.config import settings
+from app.utils.frontend_origin import TARANTUVERSE, Brand
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 def _verification_window() -> str:
     """Human wording for the verification-link lifetime, read from the TTL
     itself so the email can never promise a window the server doesn't honor."""
-    from app.utils.auth import EMAIL_VERIFICATION_TTL
+    from app.utils.auth import EMAIL_VERIFICATION_TTL  # lazy: utils.auth imports config
 
     hours = int(EMAIL_VERIFICATION_TTL.total_seconds() // 3600)
     if hours % 24 == 0 and hours >= 48:
@@ -64,15 +65,16 @@ class EmailService:
             raise
 
     @staticmethod
-    async def send_password_reset_email(to_email: str, reset_link: str):
-        subject = "Reset Your Password - Tarantuverse"
+    async def send_password_reset_email(to_email: str, reset_link: str, brand: "Brand | None" = None):
+        brand = brand or TARANTUVERSE
+        subject = f"Reset Your Password - {brand.name}"
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>Reset Your Password</h2>
             <p>Hello,</p>
-            <p>You have requested to reset your password. Please click the button below to reset it:</p>
+            <p>You have requested to reset your {brand.name} password. Please click the button below to reset it:</p>
             <p style="margin: 20px 0;">
-                <a href="{reset_link}" style="background-color: #7c3aed; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                <a href="{reset_link}" style="background-color: {brand.button_hex}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
                     Reset Password
                 </a>
             </p>
@@ -81,21 +83,26 @@ class EmailService:
             <p>If you did not request this, please ignore this email.</p>
             <p>The link will expire in 24 hours.</p>
             <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
-            <p style="color: #666; font-size: 12px;">Tarantuverse Team</p>
+            <p style="color: #666; font-size: 12px;">{brand.name} Team</p>
         </div>
         """
         await EmailService.send_email(to_email, subject, html_content)
 
     @staticmethod
-    async def send_verification_email(to_email: str, verify_link: str):
-        subject = "Verify Your Email - Tarantuverse"
+    async def send_verification_email(to_email: str, verify_link: str, brand: "Brand | None" = None):
+        # Named after the app the keeper actually signed up in. Tarantuverse
+        # and Herpetoverse share one API; a reptile keeper getting a
+        # "Tarantuverse" email that links to tarantuverse.com reasonably
+        # assumes it's spam.
+        brand = brand or TARANTUVERSE
+        subject = f"Verify Your Email - {brand.name}"
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>Verify Your Email Address</h2>
             <p>Hello,</p>
-            <p>Thanks for signing up for Tarantuverse! Please confirm your email address by clicking the button below:</p>
+            <p>Thanks for signing up for {brand.name}! Please confirm your email address by clicking the button below:</p>
             <p style="margin: 20px 0;">
-                <a href="{verify_link}" style="background-color: #7c3aed; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                <a href="{verify_link}" style="background-color: {brand.button_hex}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
                     Verify Email
                 </a>
             </p>
@@ -105,7 +112,7 @@ class EmailService:
                <strong>Send a new link</strong>.</p>
             <p>If you did not create an account, please ignore this email.</p>
             <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
-            <p style="color: #666; font-size: 12px;">Tarantuverse Team</p>
+            <p style="color: #666; font-size: 12px;">{brand.name} Team</p>
         </div>
         """
         await EmailService.send_email(to_email, subject, html_content)

@@ -29,6 +29,10 @@ import {
   isGoogleSignInAvailable,
   isAppleSignInAvailable,
 } from '../src/services/google-signin';
+import { apiClient } from '../src/services/api';
+import { HV_WEB_ORIGIN } from '../src/lib/web-origin';
+
+type ResendState = 'idle' | 'sending' | 'sent' | 'error';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -40,6 +44,37 @@ export default function LoginScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [appleAvailable, setAppleAvailable] = useState(false);
+  // Set when sign-in fails because the address was never verified. Before
+  // this the screen just printed "Email not verified" — and since links
+  // expire, a keeper who came back late had no working link and no way to
+  // ask for one.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<ResendState>('idle');
+
+  function onEmailChange(value: string) {
+    setEmail(value);
+    if (unverifiedEmail) {
+      setUnverifiedEmail(null);
+      setResendState('idle');
+    }
+  }
+
+  async function handleResend() {
+    if (!unverifiedEmail) return;
+    setResendState('sending');
+    try {
+      // JSON body, never ?email=. frontend_url makes the email say
+      // "Herpetoverse" and link back to herpetoverse.com.
+      await apiClient.post('/auth/resend-verification', {
+        email: unverifiedEmail,
+        frontend_url: HV_WEB_ORIGIN,
+      });
+      captureEvent('verification_resent', { source: 'login' });
+      setResendState('sent');
+    } catch {
+      setResendState('error');
+    }
+  }
 
   useEffect(() => {
     isAppleSignInAvailable().then(setAppleAvailable).catch(() => setAppleAvailable(false));
@@ -59,14 +94,22 @@ export default function LoginScreen() {
   async function handleSubmit() {
     if (submitting) return;
     setError(null);
+    setUnverifiedEmail(null);
+    setResendState('idle');
     setSubmitting(true);
     try {
       await login(email.trim(), password);
       captureEvent('login_success', { method: 'email' });
       router.replace('/(tabs)/dashboard');
     } catch (err: any) {
-      captureEvent('login_failed', { method: 'email' });
-      setError(err.message || 'Could not sign in.');
+      if (err?.code === 'email_not_verified') {
+        captureEvent('login_failed', { method: 'email', reason: 'unverified' });
+        // The resend card replaces the red error box for this case.
+        setUnverifiedEmail(email.trim());
+      } else {
+        captureEvent('login_failed', { method: 'email' });
+        setError(err.message || 'Could not sign in.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -117,7 +160,7 @@ export default function LoginScreen() {
             <Text style={[styles.label, { color: colors.textSecondary }]}>Email</Text>
             <TextInput
               value={email}
-              onChangeText={setEmail}
+              onChangeText={onEmailChange}
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
@@ -179,6 +222,55 @@ export default function LoginScreen() {
                 ]}
               >
                 <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+              </View>
+            )}
+
+            {unverifiedEmail && (
+              <View
+                style={[
+                  styles.errorBox,
+                  {
+                    backgroundColor: `${colors.warning}1A`,
+                    borderColor: colors.warning,
+                    borderRadius: layout.radius.md,
+                  },
+                ]}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                <Text style={[styles.verifyTitle, { color: colors.textPrimary }]}>
+                  {resendState === 'sent' ? 'New link sent' : 'Confirm your email first'}
+                </Text>
+                <Text style={[styles.verifyBody, { color: colors.textSecondary }]}>
+                  {resendState === 'sent'
+                    ? `Check the inbox for ${unverifiedEmail} — and the spam folder, just in case. The link works for 3 days.`
+                    : resendState === 'error'
+                      ? "We couldn't send that just now. Check your connection and try again."
+                      : `We sent a confirmation link to ${unverifiedEmail} when you signed up. If you can't find it, or it's stopped working, we'll send a fresh one.`}
+                </Text>
+                {resendState !== 'sent' && (
+                  <TouchableOpacity
+                    onPress={handleResend}
+                    disabled={resendState === 'sending'}
+                    style={[
+                      styles.verifyButton,
+                      {
+                        backgroundColor: colors.warning,
+                        borderRadius: layout.radius.md,
+                        opacity: resendState === 'sending' ? 0.6 : 1,
+                      },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Send a new verification link"
+                  >
+                    {resendState === 'sending' ? (
+                      <ActivityIndicator color="#0B0B0B" />
+                    ) : (
+                      // Dark text on amber: white on #F59E0B fails contrast.
+                      <Text style={styles.verifyButtonText}>Send a new link</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
@@ -318,6 +410,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   errorText: { fontSize: 14 },
+  verifyTitle: { fontSize: 14, fontWeight: '700' },
+  verifyBody: { fontSize: 13, lineHeight: 18, marginTop: 4 },
+  verifyButton: { marginTop: 12, paddingVertical: 12, alignItems: 'center' },
+  verifyButtonText: { color: '#0B0B0B', fontSize: 15, fontWeight: '700' },
   primaryButton: {
     marginTop: 24,
     paddingVertical: 14,

@@ -94,12 +94,18 @@ function VerifyEmailContent() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </div>
-                                <p className="text-red-600 dark:text-red-400 font-medium mb-6">{message}</p>
+                                <p className="text-red-600 dark:text-red-400 font-medium mb-2">{message}</p>
+                                {/* Not "Back to Register": the account already
+                                    exists, so registering again just fails on
+                                    the taken email. Sign-in offers a fresh link. */}
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                                    Sign in and we&apos;ll offer to send you a fresh link.
+                                </p>
                                 <Link
-                                    href="/register"
-                                    className="text-purple-600 hover:text-purple-500 font-medium"
+                                    href="/login"
+                                    className="text-purple-600 hover:text-purple-500 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
                                 >
-                                    Back to Register
+                                    Go to sign in
                                 </Link>
                             </div>
                         )}

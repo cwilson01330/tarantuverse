@@ -72,8 +72,8 @@ def _user(verified: bool):
 def sent(monkeypatch):
     calls = []
 
-    async def fake_send(to_email, link):
-        calls.append((to_email, link))
+    async def fake_send(to_email, link, brand=None):
+        calls.append((to_email, link, brand))
 
     monkeypatch.setattr(settings, "EMAIL_VERIFICATION_REQUIRED", True)
     monkeypatch.setattr(auth_router.EmailService, "send_verification_email", fake_send)
@@ -206,6 +206,87 @@ def test_a_verified_account_is_left_alone(sent):
 def test_every_outcome_says_the_same_thing(sent, user):
     out = _resend(_DB(user), body=ResendVerificationRequest(email="a@example.com"))
     assert out == {"message": auth_router.RESEND_VERIFICATION_MESSAGE}
+
+
+# ── 4. per-app branding (Herpetoverse shares this API) ────────────────────────
+
+from app.utils.frontend_origin import (  # noqa: E402
+    HERPETOVERSE,
+    TARANTUVERSE,
+    brand_for_origin,
+    resolve_frontend_origin,
+)
+
+
+@pytest.mark.parametrize(
+    "requested,expected",
+    [
+        ("https://herpetoverse.com", "https://herpetoverse.com"),
+        ("https://www.herpetoverse.com/", "https://www.herpetoverse.com"),
+        ("https://tarantuverse.com", "https://tarantuverse.com"),
+        # Anything off the allowlist falls back — never an open redirect,
+        # never an error on a sensitive flow.
+        ("https://evil.example.com", None),
+        ("https://herpetoverse.com.evil.example", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_only_allowlisted_origins_are_honored(requested, expected):
+    default = settings.FRONTEND_URL.rstrip("/")
+    assert resolve_frontend_origin(requested) == (expected or default)
+
+
+def test_the_brand_follows_the_origin():
+    assert brand_for_origin("https://herpetoverse.com") is HERPETOVERSE
+    assert brand_for_origin("https://www.herpetoverse.com") is HERPETOVERSE
+    assert brand_for_origin("https://tarantuverse.com") is TARANTUVERSE
+    # A lookalike host must not borrow the HV brand.
+    assert brand_for_origin("https://nothetopherpetoverse.com") is TARANTUVERSE
+
+
+def test_an_hv_resend_links_to_herpetoverse_and_says_herpetoverse(sent):
+    _resend(
+        _DB(_user(verified=False)),
+        body=ResendVerificationRequest(
+            email="keeper@example.com", frontend_url="https://herpetoverse.com"
+        ),
+    )
+    _to, link, brand = sent[0]
+    assert link.startswith("https://herpetoverse.com/verify-email?token=")
+    assert brand is HERPETOVERSE
+
+
+def test_a_resend_with_no_hint_stays_tarantuverse(sent):
+    _resend(_DB(_user(verified=False)), body=ResendVerificationRequest(email="k@example.com"))
+    _to, link, brand = sent[0]
+    assert link.startswith(settings.FRONTEND_URL.rstrip("/"))
+    assert brand is TARANTUVERSE
+
+
+def test_the_email_names_the_app_the_keeper_signed_up_in(monkeypatch):
+    from app.services.email import EmailService
+
+    captured = {}
+
+    async def fake_send_email(to, subject, html):
+        captured.update(subject=subject, html=html)
+
+    monkeypatch.setattr(EmailService, "send_email", staticmethod(fake_send_email))
+    asyncio.run(EmailService.send_verification_email("k@example.com", "https://x/y", brand=HERPETOVERSE))
+
+    assert captured["subject"] == "Verify Your Email - Herpetoverse"
+    assert "Tarantuverse" not in captured["html"]
+    assert HERPETOVERSE.button_hex in captured["html"]
+
+
+def test_forgot_password_shares_the_one_allowlist():
+    """The allowlist used to be an inline set in forgot-password only. Two
+    copies is how one app's origin ends up trusted by one flow and not the
+    other."""
+    src = (APP / "routers/auth.py").read_text(encoding="utf-8")
+    assert "allowed_reset_origins" not in src
+    assert src.count("resolve_frontend_origin(") >= 3  # register, resend, forgot
 
 
 def test_a_mail_outage_does_not_leak_that_the_account_exists(monkeypatch):

@@ -18,11 +18,17 @@ import { Suspense, useEffect, useState } from 'react'
 import { apiFetch, ApiError } from '@/lib/apiClient'
 import { AuthUser, getToken, setSession } from '@/lib/auth'
 import GoogleSignInButton, { googleSignInEnabled } from '@/components/GoogleSignInButton'
+import ResendVerification from '@/components/ResendVerification'
 
 interface LoginResponse {
   access_token: string
   token_type: string
   user: AuthUser
+}
+
+/** The API reports an unverified address as a plain 403 detail string. */
+function isUnverified(err: ApiError): boolean {
+  return err.status === 403 && /not verified/i.test(err.message)
 }
 
 function LoginForm() {
@@ -34,6 +40,9 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Set when sign-in is refused because the address isn't verified yet —
+  // shown as a way forward rather than a red error.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
 
   // Already signed in? Bounce straight through.
   useEffect(() => {
@@ -44,6 +53,7 @@ function LoginForm() {
     e.preventDefault()
     if (submitting) return
     setError(null)
+    setUnverifiedEmail(null)
     setSubmitting(true)
     try {
       const data = await apiFetch<LoginResponse>('/api/v1/auth/login', {
@@ -54,7 +64,9 @@ function LoginForm() {
       setSession(data.access_token, data.user)
       router.replace(next)
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && isUnverified(err)) {
+        setUnverifiedEmail(email.trim())
+      } else if (err instanceof ApiError) {
         setError(err.status === 401 ? 'Incorrect email or password.' : err.message)
       } else {
         setError('Could not sign in. Check your connection and try again.')
@@ -107,7 +119,11 @@ function LoginForm() {
               autoComplete="email"
               required
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                // The card is about one specific address.
+                if (unverifiedEmail) setUnverifiedEmail(null)
+              }}
               className="w-full px-3 py-2.5 rounded-md bg-neutral-950 border border-neutral-800 focus:border-herp-teal focus:outline-none focus:ring-1 focus:ring-herp-teal/50 text-neutral-100 placeholder-neutral-600"
               placeholder="you@example.com"
             />
@@ -148,6 +164,8 @@ function LoginForm() {
               {error}
             </div>
           )}
+
+          {unverifiedEmail && <ResendVerification email={unverifiedEmail} />}
 
           <button
             type="submit"

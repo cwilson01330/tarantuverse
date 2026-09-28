@@ -22,9 +22,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { apiClient } from '../src/services/api';
-
-// Apex host — the backend allowlist accepts this for the reset link.
-const HV_WEB_ORIGIN = 'https://herpetoverse.com';
+import { HV_WEB_ORIGIN } from '../src/lib/web-origin';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();

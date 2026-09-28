@@ -328,7 +328,9 @@ export default function LoginScreen() {
                 <TouchableOpacity
                   style={[
                     styles.verifyButton,
-                    { backgroundColor: colors.warning, borderRadius: layout.radius.md },
+                    // Primary, not warning: white text on the amber warning
+                    // colour is ~2:1 contrast. Amber stays on the border.
+                    { backgroundColor: colors.primary, borderRadius: layout.radius.md },
                     resendState === 'sending' && styles.buttonDisabled,
                   ]}
                   onPress={handleResend}

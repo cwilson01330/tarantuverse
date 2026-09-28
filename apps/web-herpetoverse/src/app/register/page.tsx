@@ -22,11 +22,17 @@ import { Suspense, useState } from 'react'
 import { apiFetch, ApiError } from '@/lib/apiClient'
 import { AuthUser, setSession } from '@/lib/auth'
 import GoogleSignInButton, { googleSignInEnabled } from '@/components/GoogleSignInButton'
+import ResendVerification from '@/components/ResendVerification'
 
 interface LoginResponse {
   access_token: string
   token_type: string
   user: AuthUser
+}
+
+interface RegisterResponse {
+  message: string
+  requires_email_verification: boolean
 }
 
 function RegisterForm() {
@@ -40,6 +46,8 @@ function RegisterForm() {
   const [displayName, setDisplayName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The address the account was created for, once it needs confirming.
+  const [awaitingVerification, setAwaitingVerification] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -48,7 +56,7 @@ function RegisterForm() {
     setSubmitting(true)
     try {
       // Step 1: register.
-      await apiFetch('/api/v1/auth/register', {
+      const reg = await apiFetch<RegisterResponse>('/api/v1/auth/register', {
         method: 'POST',
         auth: false,
         json: {
@@ -56,8 +64,30 @@ function RegisterForm() {
           username: username.trim(),
           password,
           display_name: displayName.trim() || undefined,
+          // So the verification email says "Herpetoverse" and links here.
+          frontend_url:
+            typeof window !== 'undefined' ? window.location.origin : undefined,
         },
       })
+
+      // With verification on, the auto-login below is refused with a 403 —
+      // which used to surface as a red "Email not verified" error on an
+      // account that had just been created successfully. Show the
+      // check-your-email state instead.
+      if (reg?.requires_email_verification) {
+        // Still a known new signup for the transfer funnel — the keeper
+        // signs in from this tab after confirming, and lands on the claim.
+        if (next.startsWith('/claim/')) {
+          try {
+            sessionStorage.setItem('hv_claim_new_signup', next)
+          } catch {
+            // ignore — private mode
+          }
+        }
+        setAwaitingVerification(email.trim())
+        setSubmitting(false)
+        return
+      }
 
       // Step 2: log in with the same credentials so the keeper lands in the
       // app without re-entering anything.
@@ -113,7 +143,7 @@ function RegisterForm() {
           </Link>
           <h1 className="text-2xl font-bold mb-2">Create your account</h1>
           <p className="text-sm text-neutral-400">
-            Free forever for up to 15 animals · No credit card required
+            Free forever for up to 5 animals · No credit card required
           </p>
           {next.startsWith('/claim/') && (
             <p className="mt-2 text-sm text-herp-teal">
@@ -122,6 +152,28 @@ function RegisterForm() {
           )}
         </div>
 
+        {awaitingVerification ? (
+          <div className="space-y-4 p-6 rounded-lg border border-neutral-800 bg-neutral-900/40">
+            <div role="status">
+              <h2 className="text-lg font-semibold">Check your email</h2>
+              <p className="mt-2 text-sm text-neutral-300">
+                Your account is created. We sent a confirmation link to{' '}
+                <span className="text-neutral-100 font-medium">{awaitingVerification}</span>{' '}
+                — tap it, then sign in. The link works for 3 days.
+              </p>
+            </div>
+            <ResendVerification
+              email={awaitingVerification}
+              intro="Nothing there? Check your spam folder, or we can send a fresh link."
+            />
+            <Link
+              href={loginHref}
+              className="block text-center text-sm text-herp-teal hover:text-herp-lime transition-colors"
+            >
+              I&apos;ve confirmed it — sign in
+            </Link>
+          </div>
+        ) : (
         <form
           onSubmit={handleSubmit}
           className="space-y-4 p-6 rounded-lg border border-neutral-800 bg-neutral-900/40"
@@ -232,6 +284,7 @@ function RegisterForm() {
             </Link>
           </p>
         </form>
+        )}
 
         <p className="text-center text-xs text-neutral-600 mt-6">
           <Link href="/" className="hover:text-neutral-400 transition-colors">

@@ -21,6 +21,7 @@ import {
 } from '../services/api';
 import { getExpoPushToken } from '../services/notifications';
 import { signInWithGoogle, signInWithApple } from '../services/google-signin';
+import { HV_WEB_ORIGIN } from '../lib/web-origin';
 import { getErrorMessage } from '../utils/errors';
 
 export interface AuthUser {
@@ -143,7 +144,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(access_token);
       setUser(userData);
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Login failed');
+      const err: Error & { code?: string } = new Error(
+        error.response?.data?.detail || 'Login failed',
+      );
+      // Tagged so the login screen can offer a fresh link instead of just
+      // printing the error. Mirrors Tarantuverse mobile.
+      if (
+        error.response?.status === 403 &&
+        /not verified/i.test(String(error.response?.data?.detail ?? ''))
+      ) {
+        err.code = 'email_not_verified';
+      }
+      throw err;
     }
   }
 
@@ -185,6 +197,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username,
         password,
         display_name: display_name || username,
+        // So the verification email says "Herpetoverse" and links to
+        // herpetoverse.com, not the Tarantuverse default.
+        frontend_url: HV_WEB_ORIGIN,
       });
       return response.data;
     } catch (error: any) {

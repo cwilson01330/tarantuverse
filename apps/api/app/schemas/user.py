@@ -40,6 +40,10 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=8, max_length=100)
     display_name: Optional[str] = Field(None, max_length=100)
     referral_code: Optional[str] = Field(None, max_length=12)  # Optional referral code
+    # Which app the keeper signed up from, so the verification email names the
+    # right product and links back to the right site. Allowlisted in
+    # utils/frontend_origin.py; unknown values fall back to the default.
+    frontend_url: Optional[str] = Field(None, max_length=200)
 
     @field_validator("password")
     @classmethod
@@ -86,6 +90,8 @@ class ResendVerificationRequest(BaseModel):
     # and the lookup is an exact match on the stored address. Normalizing
     # here would make the resend silently miss accounts stored as typed.
     email: str = Field(..., min_length=3, max_length=320)
+    # Same allowlisted origin hint as registration and forgot-password.
+    frontend_url: Optional[str] = Field(None, max_length=200)
 
 
 class ForgotPasswordRequest(BaseModel):

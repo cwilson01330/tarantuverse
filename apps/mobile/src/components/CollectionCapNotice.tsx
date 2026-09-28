@@ -157,7 +157,10 @@ export function CollectionCapNotice({ count }: { count: number }) {
         accessibilityLabel={lapsed ? 'Renew premium' : 'See premium plans'}
         style={[
           styles.cta,
-          { backgroundColor: accent, borderRadius: layout.radius.md },
+          // Always primary: in the "approaching" state `accent` is the amber
+          // warning colour, and white text on it is ~2:1 — unreadable in
+          // sunlight. The amber stays on the border and icon.
+          { backgroundColor: colors.primary, borderRadius: layout.radius.md },
         ]}
       >
         <Text style={styles.ctaText}>

@@ -35,6 +35,7 @@ from app.services.oauth_verification import (
 from app.config import settings
 from app.utils.username_validation import validate_username
 from app.utils.rate_limit import limiter
+from app.utils.frontend_origin import resolve_frontend_origin, brand_for_origin
 from app.utils.file_validation import validate_image_bytes
 
 router = APIRouter()
@@ -146,8 +147,11 @@ async def register(request: Request, user_data: UserCreate, db: Session = Depend
     db.refresh(new_user)
 
     if verification_required:
-        verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
-        await EmailService.send_verification_email(new_user.email, verify_link)
+        origin = resolve_frontend_origin(user_data.frontend_url)
+        verify_link = f"{origin}/verify-email?token={verification_token}"
+        await EmailService.send_verification_email(
+            new_user.email, verify_link, brand=brand_for_origin(origin)
+        )
         response_message = "Registration successful. Please check your email to verify your account."
         if referrer:
             response_message = (
@@ -1327,25 +1331,13 @@ async def forgot_password(
         user.reset_token_expires_at = expires
         db.commit()
 
-        # Allowlist of trusted frontend origins for the reset link so
-        # Herpetoverse can route users back to herpetoverse.com instead
-        # of the default tarantuverse.com FRONTEND_URL. Anything outside
-        # the list falls back to the default — never raises, so a stale
-        # client can't cause a 4xx on a sensitive flow.
-        allowed_reset_origins = {
-            "https://tarantuverse.com",
-            "https://www.tarantuverse.com",
-            "https://herpetoverse.com",
-            "https://www.herpetoverse.com",
-        }
-        requested = (forgot_data.frontend_url or "").rstrip("/")
-        base_url = (
-            requested
-            if requested in allowed_reset_origins
-            else settings.FRONTEND_URL.rstrip("/")
-        )
+        # Allowlisted in one place (utils/frontend_origin.py) and shared with
+        # verification, so HV keepers are routed back to herpetoverse.com.
+        base_url = resolve_frontend_origin(forgot_data.frontend_url)
         reset_link = f"{base_url}/reset-password?token={token}"
-        await EmailService.send_password_reset_email(user.email, reset_link)
+        await EmailService.send_password_reset_email(
+            user.email, reset_link, brand=brand_for_origin(base_url)
+        )
 
     return {"message": "If an account exists for that email, a password reset link has been sent."}
 
@@ -1489,9 +1481,12 @@ async def resend_verification(
         user.verification_token_expires_at = verification_token_expires_at
         db.commit()
 
-        verify_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
+        origin = resolve_frontend_origin(payload.frontend_url if payload else None)
+        verify_link = f"{origin}/verify-email?token={verification_token}"
         try:
-            await EmailService.send_verification_email(user.email, verify_link)
+            await EmailService.send_verification_email(
+                user.email, verify_link, brand=brand_for_origin(origin)
+            )
         except Exception:
             # Logged inside EmailService. Swallowed here so a Resend outage
             # can't turn this into an oracle either (500 = "account exists").
