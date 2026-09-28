@@ -19,8 +19,9 @@ const MANAGE_SUBSCRIPTIONS_URL = Platform.select({
   default: 'https://play.google.com/store/account/subscriptions',
 });
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { sourceFromParam, trackUpgrade, UPGRADE_EVENTS } from '../src/lib/upgrade-tracking';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
@@ -67,6 +68,14 @@ export default function SubscriptionScreen() {
   // billing portal, not the App Store / Play Store subscription pages.
   const [paymentProvider, setPaymentProvider] = useState<string | null>(null);
   const [openingPortal, setOpeningPortal] = useState(false);
+  // Which upgrade prompt sent the keeper here ('direct' if none). Carried
+  // into the purchase event so a subscription can be traced to its prompt.
+  const source = sourceFromParam(useLocalSearchParams().source);
+
+  useEffect(() => {
+    trackUpgrade(UPGRADE_EVENTS.pricingViewed, source);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setIapAvailable(isIAPAvailable());
@@ -186,6 +195,12 @@ export default function SubscriptionScreen() {
         throw new Error('No purchase data received');
       }
 
+      trackUpgrade(UPGRADE_EVENTS.purchased, source, {
+        product_id: productId,
+        product_type: productType,
+        provider: Platform.OS === 'ios' ? 'apple' : 'google',
+      });
+
       // Refresh user data
       await refreshUser();
       await loadSubscriptionStatus();
@@ -298,7 +313,9 @@ export default function SubscriptionScreen() {
     storefrontCurrency === 'USD';
 
   const handleWebCheckout = () => {
-    Linking.openURL('https://www.tarantuverse.com/pricing');
+    trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'web_checkout' });
+    // Forward the source so the web pricing page attributes the checkout too.
+    Linking.openURL(`https://www.tarantuverse.com/pricing?source=${encodeURIComponent(source)}`);
   };
 
   const handleRevokePremium = () => {

@@ -205,7 +205,7 @@ export default function AddInvertPairingScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <UpgradeModal
+      <UpgradeModal source="breeding"
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         title="Upgrade to Premium"

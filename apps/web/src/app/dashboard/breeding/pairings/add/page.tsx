@@ -396,7 +396,7 @@ export default function AddPairingPage() {
           </form>
         )}
 
-        <UpgradeModal
+        <UpgradeModal source="breeding"
           isOpen={showUpgrade}
           onClose={() => setShowUpgrade(false)}
           feature="Breeding Module"

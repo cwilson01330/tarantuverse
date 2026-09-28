@@ -445,7 +445,7 @@ function AddEggSacInner() {
         )}
       </div>
 
-      <UpgradeModal
+      <UpgradeModal source="breeding"
         isOpen={showUpgrade}
         onClose={() => setShowUpgrade(false)}
         feature="Breeding Module"

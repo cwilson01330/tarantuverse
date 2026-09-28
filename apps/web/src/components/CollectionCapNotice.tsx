@@ -39,6 +39,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { trackUpgrade, UPGRADE_EVENTS } from '@/lib/upgrade-tracking'
 
 interface Props {
   isPremium: boolean
@@ -80,9 +81,25 @@ export default function CollectionCapNotice({
     }
   }, [])
 
+  // Once per variant actually on screen (not per render). Hook placed before
+  // the early return so hook order is stable.
+  const shownKey = state && key && dismissedState !== key ? key : null
+  useEffect(() => {
+    if (shownKey) {
+      trackUpgrade(UPGRADE_EVENTS.shown, 'collection_cap', {
+        surface: 'collection_notice',
+        variant: shownKey,
+      })
+    }
+  }, [shownKey])
+
   if (!state || !key || dismissedState === key) return null
 
   const dismiss = () => {
+    trackUpgrade(UPGRADE_EVENTS.dismissed, 'collection_cap', {
+      surface: 'collection_notice',
+      variant: key,
+    })
     setDismissedState(key)
     try {
       localStorage.setItem(DISMISS_KEY, key)
@@ -149,7 +166,14 @@ export default function CollectionCapNotice({
             </p>
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => router.push('/pricing')}
+                onClick={() => {
+                  trackUpgrade(UPGRADE_EVENTS.clicked, 'collection_cap', {
+                    surface: 'collection_notice',
+                    variant: key,
+                    action: 'pricing',
+                  })
+                  router.push('/pricing?source=collection_cap')
+                }}
                 className="px-4 py-2 bg-gradient-brand text-white rounded-lg hover:brightness-90 transition font-semibold text-sm"
               >
                 {/* A lapsed subscriber knows what premium is. Selling it to

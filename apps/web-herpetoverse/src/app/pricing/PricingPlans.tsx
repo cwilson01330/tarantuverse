@@ -14,9 +14,15 @@
  * is the Stripe price you configure — keep these in sync if you change prices.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { API_URL } from '@/lib/apiClient'
 import { getToken } from '@/lib/auth'
+import {
+  sourceFromParam,
+  trackUpgrade,
+  UPGRADE_EVENTS,
+  type UpgradeSource,
+} from '@/lib/upgrade-tracking'
 
 type Period = 'monthly' | 'yearly' | 'lifetime'
 
@@ -67,13 +73,25 @@ export default function PricingPlans() {
   const [period, setPeriod] = useState<Period>('yearly')
   const [busy, setBusy] = useState<string | null>(null) // plan key currently checking out
   const [error, setError] = useState<string | null>(null)
+  // Which upgrade prompt sent the keeper here ('direct' if none). Read from
+  // window so this component needs no Suspense boundary; validated, never raw.
+  const [source, setSource] = useState<UpgradeSource | 'direct'>('direct')
+
+  useEffect(() => {
+    const s = sourceFromParam(new URLSearchParams(window.location.search).get('source'))
+    setSource(s)
+    trackUpgrade(UPGRADE_EVENTS.pricingViewed, s)
+  }, [])
 
   async function checkout(plan: 'herpetoverse_premium' | 'bundle_premium') {
     setError(null)
+    trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'checkout', plan, price_type: period })
 
-    // Must be signed in to attach the purchase to an account.
+    // Must be signed in to attach the purchase to an account. The source
+    // survives the login detour.
+    const pricingReturn = `/pricing?source=${source}`
     if (!getToken()) {
-      const next = encodeURIComponent('/pricing')
+      const next = encodeURIComponent(pricingReturn)
       window.location.href = `/login?next=${next}`
       return
     }
@@ -89,13 +107,15 @@ export default function PricingPlans() {
         body: JSON.stringify({
           plan,
           price_type: period,
-          success_url: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${window.location.origin}/pricing`,
+          // source/plan/period ride through Stripe so the success page can
+          // attribute the purchase to the prompt that started it.
+          success_url: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&source=${source}&plan=${plan}&price_type=${period}`,
+          cancel_url: `${window.location.origin}${pricingReturn}`,
         }),
       })
 
       if (res.status === 401) {
-        const next = encodeURIComponent('/pricing')
+        const next = encodeURIComponent(pricingReturn)
         window.location.href = `/login?next=${next}`
         return
       }

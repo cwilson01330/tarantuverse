@@ -520,7 +520,7 @@ function AddTarantulaContent() {
       </div>
 
       {/* Upgrade Modal - shown when free tier limit is reached */}
-      <UpgradeModal
+      <UpgradeModal source="collection_cap"
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         feature="Unlimited Animals"

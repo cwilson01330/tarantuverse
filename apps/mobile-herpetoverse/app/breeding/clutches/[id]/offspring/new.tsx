@@ -252,7 +252,7 @@ function NewOffspringScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <UpgradeModal
+      <UpgradeModal source="breeding"
         visible={showUpgrade}
         onClose={() => setShowUpgrade(false)}
         message={

@@ -487,7 +487,7 @@ function AddReptileScreen() {
       </KeyboardAvoidingView>
 
       {/* Free-tier cap gate — informational, no in-app purchase yet. */}
-      <UpgradeModal
+      <UpgradeModal source="collection_cap"
         visible={showUpgrade}
         onClose={() => setShowUpgrade(false)}
         message={

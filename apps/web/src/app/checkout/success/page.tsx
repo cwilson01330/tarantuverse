@@ -4,11 +4,31 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { TarantuverseLogoTransparent } from '@/components/TarantuverseLogo'
+import { sourceFromParam, trackUpgrade, UPGRADE_EVENTS } from '@/lib/upgrade-tracking'
 
 function CheckoutSuccessContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const [countdown, setCountdown] = useState(5)
+
+  // Stripe only redirects here after a completed checkout. Attribute the
+  // purchase to the prompt that started it — once, and only with a session
+  // (a hand-typed visit to this URL isn't a purchase).
+  useEffect(() => {
+    if (!sessionId) return
+    const onceKey = `upgrade_purchased_${sessionId}`
+    try {
+      if (sessionStorage.getItem(onceKey)) return
+      sessionStorage.setItem(onceKey, '1')
+    } catch {
+      // private mode — worst case a reload double-counts
+    }
+    trackUpgrade(UPGRADE_EVENTS.purchased, sourceFromParam(searchParams.get('source')), {
+      provider: 'stripe',
+      price_type: searchParams.get('price_type'),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
 
   useEffect(() => {
     const timer = setInterval(() => {

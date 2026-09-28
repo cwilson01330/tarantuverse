@@ -21,7 +21,7 @@
  * OTA-safe. The pricing page (https://herpetoverse.com/pricing) is being
  * created by the web team.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -47,11 +47,15 @@ import {
   type IapProduct,
 } from '../services/iap';
 
+import { trackUpgrade, UPGRADE_EVENTS, type UpgradeSource } from '../lib/upgrade-tracking';
+
 const PRICING_URL = 'https://herpetoverse.com/pricing';
 
 interface UpgradeModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Why this prompt opened. Required so no prompt ships unattributed. */
+  source: UpgradeSource;
   /** Headline; defaults to the collection-cap message. */
   title?: string;
   /** Sub-line under the title; server 402 `detail.message` fits well here. */
@@ -61,15 +65,22 @@ interface UpgradeModalProps {
   limit?: number | null;
 }
 
+// What premium actually unlocks, matching the server gates: the animal cap
+// (enforce_animal_limit), breeding (reptile_pairings 402) and feeder tracking
+// (enforce_hv_premium). This list used to offer spreadsheet import — which is
+// free — and claim premium "only lifts the count cap", while the breeding and
+// feeder prompts that open this same sheet said otherwise.
 const PREMIUM_PERKS = [
   'Unlimited animals in your collection',
-  'Import your whole collection from a spreadsheet',
-  'Every tracking feature stays free — this only lifts the count cap',
+  'Breeding: pairings, clutches & offspring',
+  'Feeder inventory tracking',
+  'Feeding, weight, shed and health logs stay free, always',
 ];
 
 export default function UpgradeModal({
   visible,
   onClose,
+  source,
   title = "You've reached the free limit",
   message = 'The free plan tracks up to 5 animals. Premium keepers get unlimited animals.',
   currentCount,
@@ -83,21 +94,60 @@ export default function UpgradeModal({
   const [products, setProducts] = useState<IapProduct[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  // True once the store has answered for this open (success or failure).
+  // Separate from loadingProducts, which starts false and would otherwise read
+  // as "done" on the very first render of an open.
+  const [productsResolved, setProductsResolved] = useState(false);
 
   // Fetch live products when the sheet opens (only in a real build).
   useEffect(() => {
     let active = true;
     if (visible && iapOn) {
+      setProductsResolved(false);
       setLoadingProducts(true);
       getAvailableProducts()
         .then((p) => { if (active) setProducts(p); })
         .catch(() => { if (active) setProducts([]); })
-        .finally(() => { if (active) setLoadingProducts(false); });
+        .finally(() => {
+          if (active) {
+            setLoadingProducts(false);
+            setProductsResolved(true);
+          }
+        });
     }
     return () => { active = false; };
   }, [visible, iapOn]);
 
   const showStore = iapOn && products.length > 0;
+
+  // Set on any purchase/restore/learn-more action, so the close that follows
+  // isn't also counted as a dismissal.
+  const acted = useRef(false);
+  // One "shown" per open. Deferred until the store has answered, so the event
+  // can say whether this keeper had any way to pay: on iOS there are no HV
+  // store products yet, and "prompt shown with no purchase path" should be a
+  // number in PostHog rather than something nobody can see.
+  const shownLogged = useRef(false);
+  useEffect(() => {
+    if (!visible) {
+      shownLogged.current = false;
+      return;
+    }
+    if (!shownLogged.current && !(iapOn && !productsResolved)) {
+      shownLogged.current = true;
+      acted.current = false;
+      const webLinkAllowed = Platform.OS !== 'ios' || !iapOn; // mirrors canLinkToWebCheckout
+      trackUpgrade(UPGRADE_EVENTS.shown, source, {
+        platform: Platform.OS,
+        purchase_path: showStore ? 'store' : webLinkAllowed ? 'web_link' : 'none',
+      });
+    }
+  }, [visible, iapOn, productsResolved, showStore, source]);
+
+  const handleDismiss = () => {
+    if (!acted.current) trackUpgrade(UPGRADE_EVENTS.dismissed, source);
+    onClose();
+  };
 
   // ---------------------------------------------------------------------
   // App Store Guideline 3.1.1 — never point iOS users at a web checkout.
@@ -139,12 +189,19 @@ export default function UpgradeModal({
 
   const handleBuy = async (product: IapProduct) => {
     if (purchasingId) return;
+    acted.current = true;
+    trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'buy', product_id: product.id });
     setPurchasingId(product.id);
     try {
       const purchase = await purchaseProduct(product.id, product.type);
       if (!purchase) return; // user cancelled — no-op
       if (!token) throw new Error('Please sign in again to complete your purchase.');
       await validateReceiptWithBackend(purchase, token);
+      trackUpgrade(UPGRADE_EVENTS.purchased, source, {
+        product_id: product.id,
+        product_type: product.type,
+        provider: Platform.OS === 'ios' ? 'apple' : 'google',
+      });
       await refreshUser();
       Alert.alert("You're all set", 'Premium is now active — thanks for supporting Herpetoverse!');
       onClose();
@@ -161,6 +218,8 @@ export default function UpgradeModal({
 
   const handleRestore = async () => {
     if (!token) return;
+    acted.current = true;
+    trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'restore' });
     try {
       const ok = await restorePurchases(token);
       if (ok) {
@@ -178,7 +237,10 @@ export default function UpgradeModal({
   const handleLearnMore = () => {
     // Fire-and-forget: if the browser can't open we simply leave the
     // modal up rather than crashing. Nothing here charges the keeper.
-    Linking.openURL(PRICING_URL).catch(() => {
+    acted.current = true;
+    trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'web_pricing' });
+    // Source forwarded so the web pricing page can attribute the checkout.
+    Linking.openURL(`${PRICING_URL}?source=${encodeURIComponent(source)}`).catch(() => {
       /* no-op — keep the modal open so they can dismiss */
     });
   };
@@ -193,7 +255,7 @@ export default function UpgradeModal({
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleDismiss}
     >
       <View style={styles.backdrop}>
         <View
@@ -228,7 +290,7 @@ export default function UpgradeModal({
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{message}</Text>
               </View>
               <TouchableOpacity
-                onPress={onClose}
+                onPress={handleDismiss}
                 hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel="Dismiss"
@@ -422,7 +484,7 @@ export default function UpgradeModal({
 
             {/* Dismiss */}
             <TouchableOpacity
-              onPress={onClose}
+              onPress={handleDismiss}
               style={styles.dismissBtn}
               accessibilityRole="button"
               accessibilityLabel="Dismiss"

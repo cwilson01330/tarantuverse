@@ -632,7 +632,7 @@ function AddFeederScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <UpgradeModal
+      <UpgradeModal source="feeders"
         visible={showUpgrade}
         onClose={() => setShowUpgrade(false)}
         message={

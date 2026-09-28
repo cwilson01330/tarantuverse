@@ -1033,7 +1033,7 @@ export default function InvertDetailPage() {
           promising "egg sacs" to a scorpion keeper describes a stage their
           animal doesn't have — it gives live birth. That was the copy that
           shipped with the scorpion pilot. */}
-      <UpgradeModal
+      <UpgradeModal source="breeding"
         isOpen={showUpgrade}
         onClose={() => setShowUpgrade(false)}
         feature="Breeding Module"

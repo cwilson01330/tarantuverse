@@ -351,7 +351,7 @@ export default function AdvancedAnalyticsScreen() {
             </Text>
           </TouchableOpacity>
         </ScrollView>
-        <UpgradeModal
+        <UpgradeModal source="advanced_analytics"
           visible={showUpgradeModal}
           onClose={() => setShowUpgradeModal(false)}
           title="Upgrade to Premium"

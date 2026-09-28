@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { API_URL } from '@/lib/apiClient'
 import { getToken } from '@/lib/auth'
+import { sourceFromParam, trackUpgrade, UPGRADE_EVENTS } from '@/lib/upgrade-tracking'
 
 type Status = {
   is_premium: boolean
@@ -27,6 +28,26 @@ function SuccessInner() {
   const hasSession = !!params.get('session_id')
   const [status, setStatus] = useState<Status | null>(null)
   const [checking, setChecking] = useState(true)
+
+  // Attribute the purchase to the prompt that started it — once per Stripe
+  // session, and only with one (a hand-typed visit here isn't a purchase).
+  useEffect(() => {
+    const sessionId = params.get('session_id')
+    if (!sessionId) return
+    const onceKey = `upgrade_purchased_${sessionId}`
+    try {
+      if (sessionStorage.getItem(onceKey)) return
+      sessionStorage.setItem(onceKey, '1')
+    } catch {
+      // private mode — worst case a reload double-counts
+    }
+    trackUpgrade(UPGRADE_EVENTS.purchased, sourceFromParam(params.get('source')), {
+      provider: 'stripe',
+      plan: params.get('plan'),
+      price_type: params.get('price_type'),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let cancelled = false

@@ -1,18 +1,37 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { trackUpgrade, UPGRADE_EVENTS, type UpgradeSource } from '@/lib/upgrade-tracking'
 
 interface UpgradeModalProps {
   isOpen: boolean
   onClose: () => void
+  /** Why this prompt opened. Required so no prompt ships unattributed. */
+  source: UpgradeSource
   feature: string
   description: string
 }
 
-export default function UpgradeModal({ isOpen, onClose, feature, description }: UpgradeModalProps) {
+export default function UpgradeModal({ isOpen, onClose, source, feature, description }: UpgradeModalProps) {
   const router = useRouter()
+  // Set when the keeper takes an action, so the close that follows isn't
+  // also counted as a dismissal.
+  const acted = useRef(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      acted.current = false
+      trackUpgrade(UPGRADE_EVENTS.shown, source)
+    }
+  }, [isOpen, source])
 
   if (!isOpen) return null
+
+  const dismiss = () => {
+    if (!acted.current) trackUpgrade(UPGRADE_EVENTS.dismissed, source)
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -68,8 +87,11 @@ export default function UpgradeModal({ isOpen, onClose, feature, description }: 
         <div className="flex flex-col gap-3">
           <button
             onClick={() => {
+              acted.current = true
+              trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'pricing' })
               onClose()
-              router.push('/pricing')
+              // The source rides along so /pricing can attribute the checkout.
+              router.push(`/pricing?source=${encodeURIComponent(source)}`)
             }}
             className="w-full px-6 py-3 bg-gradient-brand text-white rounded-xl hover:shadow-lg hover:brightness-90 transition font-semibold"
           >
@@ -77,6 +99,8 @@ export default function UpgradeModal({ isOpen, onClose, feature, description }: 
           </button>
           <button
             onClick={() => {
+              acted.current = true
+              trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'promo_code' })
               onClose()
               router.push('/dashboard/settings')
             }}
@@ -85,7 +109,7 @@ export default function UpgradeModal({ isOpen, onClose, feature, description }: 
             Redeem Promo Code
           </button>
           <button
-            onClick={onClose}
+            onClick={dismiss}
             className="w-full px-6 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition font-medium"
           >
             Maybe Later

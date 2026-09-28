@@ -956,7 +956,7 @@ export default function TarantulasPage() {
       )}
 
       {/* Upgrade Modal */}
-      <UpgradeModal
+      <UpgradeModal source="collection_cap"
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         feature="Unlimited Animals"

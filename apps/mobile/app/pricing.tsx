@@ -3,6 +3,13 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { useRouter } from 'expo-router';
 import { useTheme } from '../src/contexts/ThemeContext';
 
+// Tarantuverse's free cap — mirrors FREE_TIER_MAX_ANIMALS (apps/api
+// models/user.py) and the `free` plan row. One constant for both places this
+// screen states it: the plan card said 15 while the comparison table below
+// said 20, and a buyer who spots one wrong number stops trusting the table.
+// (20 is the combined TV + Herpetoverse free allowance, which nothing enforces.)
+const FREE_ANIMAL_CAP = 15;
+
 export default function PricingScreen() {
   const router = useRouter();
   // useTheme exposes `colors` (the token map) and `theme` (a string —
@@ -22,12 +29,13 @@ export default function PricingScreen() {
       period: '/forever',
       description: 'Perfect for casual keepers with small collections',
       features: [
-        'Up to 15 animals',
+        `Up to ${FREE_ANIMAL_CAP} animals`,
         '5 photos per animal',
         'Feeding & molt tracking',
         'Basic analytics',
         'Community access',
         'Mobile app access',
+        'Full data export',
       ],
       cta: 'Get Started Free',
       popular: false,
@@ -81,12 +89,15 @@ export default function PricingScreen() {
   };
 
   const comparisonFeatures = [
-    { name: 'Animals (all taxa)', free: '20', premium: 'Unlimited' },
+    { name: 'Animals (all taxa)', free: String(FREE_ANIMAL_CAP), premium: 'Unlimited' },
     { name: 'Photos per animal', free: '5', premium: 'Unlimited' },
     { name: 'Breeding module', free: '-', premium: '✓' },
     { name: 'Analytics', free: 'Basic', premium: 'Advanced' },
     { name: 'Priority support', free: '-', premium: '✓' },
-    { name: 'Data export (CSV/PDF)', free: '-', premium: '✓' },
+    // Free, and staying free: a keeper's records are theirs. This row used to
+    // say premium-only, and named a PDF export that doesn't exist. Matches
+    // the web pricing table and /settings/data-export.
+    { name: 'Data export (JSON/CSV/backup)', free: '✓', premium: '✓' },
   ];
 
   return (

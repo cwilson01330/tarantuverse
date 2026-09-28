@@ -359,7 +359,7 @@ export default function AddInvertScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <UpgradeModal
+      <UpgradeModal source="collection_cap"
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         title="Upgrade to Premium"

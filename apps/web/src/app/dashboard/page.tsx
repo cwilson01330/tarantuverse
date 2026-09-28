@@ -736,7 +736,7 @@ export default function DashboardHub() {
       <DashboardTour />
 
       {/* Upgrade Modal */}
-      <UpgradeModal
+      <UpgradeModal source="collection_cap"
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         feature="Unlimited Animals"

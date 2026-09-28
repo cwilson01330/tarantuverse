@@ -768,7 +768,7 @@ function AddScreen() {
 
       {showUpgrade && (
         <React.Suspense fallback={null}>
-          <UpgradeModal visible={showUpgrade} onClose={() => setShowUpgrade(false)} />
+          <UpgradeModal source="collection_cap" visible={showUpgrade} onClose={() => setShowUpgrade(false)} />
         </React.Suspense>
       )}
     </View>

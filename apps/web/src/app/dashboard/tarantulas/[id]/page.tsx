@@ -2995,7 +2995,7 @@ export default function TarantulaDetailPage() {
       )}
 
       {/* Upgrade Modal */}
-      <UpgradeModal
+      <UpgradeModal source="photo_cap"
         isOpen={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         feature="Unlimited Photos"

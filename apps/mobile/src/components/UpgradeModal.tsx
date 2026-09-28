@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Modal, View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../contexts/ThemeContext';
+import { trackUpgrade, UPGRADE_EVENTS, type UpgradeSource } from '../lib/upgrade-tracking';
 
 interface UpgradeModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Why this prompt opened. Required so no prompt ships unattributed. */
+  source: UpgradeSource;
   title?: string;
   message?: string;
   feature?: string;
@@ -14,16 +17,35 @@ interface UpgradeModalProps {
 export default function UpgradeModal({
   visible,
   onClose,
+  source,
   title = 'Upgrade to Premium',
   message = 'Unlock unlimited tracking and breeding features',
   feature,
 }: UpgradeModalProps) {
   const { colors } = useTheme();
   const router = useRouter();
+  // Set when the keeper taps upgrade, so the close that follows isn't also
+  // counted as a dismissal (which would make every conversion look like one).
+  const acted = useRef(false);
+
+  useEffect(() => {
+    if (visible) {
+      acted.current = false;
+      trackUpgrade(UPGRADE_EVENTS.shown, source);
+    }
+  }, [visible, source]);
+
+  const handleDismiss = () => {
+    if (!acted.current) trackUpgrade(UPGRADE_EVENTS.dismissed, source);
+    onClose();
+  };
 
   const handleUpgrade = () => {
+    acted.current = true;
+    trackUpgrade(UPGRADE_EVENTS.clicked, source);
     onClose();
-    router.push('/subscription');
+    // The source rides along so the purchase itself can be attributed.
+    router.push({ pathname: '/subscription', params: { source } } as never);
   };
 
   const plans = [
@@ -60,7 +82,8 @@ export default function UpgradeModal({
     'Unlimited photo uploads',
     'Full breeding module (pairings, egg sacs, offspring)',
     'Advanced analytics & insights',
-    'Data export (CSV/PDF)',
+    // No "Data export" here: export is free and stays free. This list used
+    // to sell it as premium — at the exact moment a keeper was deciding.
     'Priority support',
     'Early access to new features',
   ];
@@ -70,7 +93,7 @@ export default function UpgradeModal({
       visible={visible}
       animationType="slide"
       transparent={true}
-      onRequestClose={onClose}
+      onRequestClose={handleDismiss}
     >
       <View style={[styles.backdrop, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}>
         <View style={[styles.container, { backgroundColor: colors.surface }]}>
@@ -86,7 +109,7 @@ export default function UpgradeModal({
                   {message}
                 </Text>
               </View>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleDismiss} style={styles.closeButton}>
                 <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -195,7 +218,7 @@ export default function UpgradeModal({
                 Have a promo code?{' '}
                 <Text style={styles.footerLink}>Redeem in settings</Text>
               </Text>
-              <TouchableOpacity onPress={onClose} style={styles.maybeLaterButton}>
+              <TouchableOpacity onPress={handleDismiss} style={styles.maybeLaterButton}>
                 <Text style={[styles.maybeLaterText, { color: colors.textSecondary }]}>
                   Maybe Later
                 </Text>

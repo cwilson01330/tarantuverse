@@ -423,7 +423,7 @@ export default function NewPairingPage() {
         </div>
       </form>
 
-      <UpgradeModal
+      <UpgradeModal source="breeding"
         isOpen={capInfo !== null}
         onClose={() => setCapInfo(null)}
         message={capInfo?.message}

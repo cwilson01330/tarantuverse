@@ -618,7 +618,7 @@ function AddReptileForm() {
         </div>
       </form>
 
-      <UpgradeModal
+      <UpgradeModal source="collection_cap"
         isOpen={capInfo !== null}
         onClose={() => setCapInfo(null)}
         message={capInfo?.message}

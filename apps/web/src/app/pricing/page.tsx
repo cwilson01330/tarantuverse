@@ -1,15 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TarantuverseLogoTransparent } from '@/components/TarantuverseLogo'
 import { useAuth } from '@/hooks/useAuth'
+import {
+  sourceFromParam,
+  trackUpgrade,
+  UPGRADE_EVENTS,
+  type UpgradeSource,
+} from '@/lib/upgrade-tracking'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export default function PricingPage() {
   const { token, isAuthenticated, isLoading } = useAuth()
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  // Which upgrade prompt sent the keeper here ('direct' if none). Read from
+  // window rather than useSearchParams so this page needs no Suspense
+  // boundary. Validated against the known list — never forwarded raw.
+  const [source, setSource] = useState<UpgradeSource | 'direct'>('direct')
+
+  useEffect(() => {
+    const s = sourceFromParam(new URLSearchParams(window.location.search).get('source'))
+    setSource(s)
+    trackUpgrade(UPGRADE_EVENTS.pricingViewed, s)
+  }, [])
 
   const handleCheckout = async (priceType: 'monthly' | 'yearly' | 'lifetime') => {
     // If still loading auth, wait
@@ -17,9 +33,12 @@ export default function PricingPage() {
       return
     }
 
+    trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'checkout', price_type: priceType })
+
     if (!isAuthenticated || !token) {
-      // Redirect to login with return URL - use callbackUrl for NextAuth
-      const callbackUrl = encodeURIComponent(`/pricing?plan=${priceType}`)
+      // Redirect to login with return URL - use callbackUrl for NextAuth.
+      // The source survives the login detour.
+      const callbackUrl = encodeURIComponent(`/pricing?plan=${priceType}&source=${source}`)
       window.location.href = `/login?callbackUrl=${callbackUrl}`
       return
     }
@@ -35,7 +54,9 @@ export default function PricingPage() {
         },
         body: JSON.stringify({
           price_type: priceType,
-          success_url: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+          // source + price_type ride through Stripe so the success page can
+          // attribute the purchase to the prompt that started it.
+          success_url: `${window.location.origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}&source=${source}&price_type=${priceType}`,
           cancel_url: `${window.location.origin}/checkout/cancel`,
         }),
       })

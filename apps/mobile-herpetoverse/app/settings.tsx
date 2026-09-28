@@ -492,7 +492,7 @@ function SettingsScreen() {
       </ScrollView>
 
       {/* Plans / purchase sheet (reused from the cap gate). */}
-      <UpgradeModal
+      <UpgradeModal source="settings"
         visible={upgradeOpen}
         onClose={() => {
           setUpgradeOpen(false);

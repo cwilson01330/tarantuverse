@@ -708,7 +708,7 @@ export default function AddTarantulaScreen() {
       </KeyboardAvoidingView>
 
       <Suspense fallback={null}>
-        <UpgradeModal
+        <UpgradeModal source="collection_cap"
           visible={showUpgradeModal}
           onClose={() => setShowUpgradeModal(false)}
           title="Collection Limit Reached"

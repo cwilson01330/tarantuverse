@@ -275,7 +275,7 @@ function AddInvertForm() {
         </div>
       </div>
 
-      <UpgradeModal
+      <UpgradeModal source="collection_cap"
         isOpen={upgradeMsg !== null}
         onClose={() => setUpgradeMsg(null)}
         feature="Unlimited Animals"

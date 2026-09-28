@@ -539,7 +539,7 @@ function NewPairingScreen() {
         }}
       />
 
-      <UpgradeModal
+      <UpgradeModal source="breeding"
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         title="Upgrade to Premium"

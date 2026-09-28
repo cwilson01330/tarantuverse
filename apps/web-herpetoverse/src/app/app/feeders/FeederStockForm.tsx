@@ -635,7 +635,7 @@ export default function FeederStockForm({
         </div>
       </form>
 
-      <UpgradeModal
+      <UpgradeModal source="feeders"
         isOpen={capInfo !== null}
         onClose={() => setCapInfo(null)}
         message={capInfo?.message}

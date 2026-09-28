@@ -23,7 +23,7 @@
  * premium is, and selling it to them from scratch reads as the app not
  * knowing who they are.
  */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -32,6 +32,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
 import { TYPE } from '../theme/tokens';
 import { apiClient } from '../services/api';
+import { trackUpgrade, UPGRADE_EVENTS } from '../lib/upgrade-tracking';
 
 const DISMISS_KEY = 'collection_cap_notice_dismissed_v1';
 
@@ -74,6 +75,28 @@ export function CollectionCapNotice({ count }: { count: number }) {
     }, []),
   );
 
+  // Which variant (if any) is on screen — computed before the early returns
+  // below so the "shown" event can live in a hook. Fires once per variant,
+  // not on every render.
+  const shownKey = (() => {
+    if (!limits || limits.is_premium) return null;
+    const c = limits.max_animals ?? limits.max_tarantulas ?? 15;
+    if (c === -1) return null;
+    const s = count >= c ? 'over' : count >= c - 5 ? 'approaching' : null;
+    if (!s) return null;
+    const k = `${s}:${limits.subscription_lapsed ? 'lapsed' : 'new'}`;
+    return dismissed === k ? null : k;
+  })();
+
+  useEffect(() => {
+    if (shownKey) {
+      trackUpgrade(UPGRADE_EVENTS.shown, 'collection_cap', {
+        surface: 'collection_notice',
+        variant: shownKey,
+      });
+    }
+  }, [shownKey]);
+
   if (!limits || limits.is_premium) return null;
 
   const cap = limits.max_animals ?? limits.max_tarantulas ?? 15;
@@ -89,6 +112,10 @@ export function CollectionCapNotice({ count }: { count: number }) {
   if (dismissed === key) return null;
 
   const dismiss = async () => {
+    trackUpgrade(UPGRADE_EVENTS.dismissed, 'collection_cap', {
+      surface: 'collection_notice',
+      variant: key,
+    });
     setDismissed(key);
     try {
       await AsyncStorage.setItem(DISMISS_KEY, key);
@@ -152,7 +179,13 @@ export function CollectionCapNotice({ count }: { count: number }) {
       </View>
 
       <TouchableOpacity
-        onPress={() => router.push('/subscription' as never)}
+        onPress={() => {
+          trackUpgrade(UPGRADE_EVENTS.clicked, 'collection_cap', {
+            surface: 'collection_notice',
+            variant: key,
+          });
+          router.push({ pathname: '/subscription', params: { source: 'collection_cap' } } as never);
+        }}
         accessibilityRole="button"
         accessibilityLabel={lapsed ? 'Renew premium' : 'See premium plans'}
         style={[

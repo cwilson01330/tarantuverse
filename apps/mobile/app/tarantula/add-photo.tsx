@@ -258,7 +258,7 @@ export default function AddPhotoScreen() {
       </ScrollView>
       </KeyboardAvoidingView>
 
-      <UpgradeModal
+      <UpgradeModal source="photo_cap"
         visible={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         title="Upgrade to Premium"
