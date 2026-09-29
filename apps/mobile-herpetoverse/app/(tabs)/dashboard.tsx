@@ -307,7 +307,7 @@ function DashboardScreen() {
     // an empty box silently, so prefer names already shipping here.
     { icon: 'heart-multiple', label: 'Breeding', route: '/(tabs)/breeding' },
     { icon: 'tray-arrow-down', label: 'Import', route: '/import' },
-    { icon: 'cog-outline', label: 'Settings', route: '/settings' },
+    { icon: 'cog-outline', label: 'Settings', route: '/(tabs)/profile' },
   ];
 
   const header = (
@@ -613,7 +613,7 @@ function DashboardScreen() {
         {isFree && (
           <TouchableOpacity
             style={styles.upgradeRow}
-            onPress={() => router.push('/settings' as never)}
+            onPress={() => router.push('/(tabs)/profile' as never)}
             activeOpacity={0.7}
             accessibilityRole="button"
             accessibilityLabel={`Upgrade. Using ${limits!.current_count} of ${

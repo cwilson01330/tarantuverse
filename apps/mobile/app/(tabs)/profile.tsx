@@ -1,19 +1,46 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, Switch, ActivityIndicator, TextInput, Modal, ScrollView } from 'react-native';
-import { useAuth } from '../../src/contexts/AuthContext';
-import { useTheme } from '../../src/contexts/ThemeContext';
+/**
+ * "You" tab — the account hub.
+ *
+ * Same sections, order, labels and icons as Herpetoverse's "You" tab (see
+ * src/components/YouMenu.tsx for the shared structure). Rows differ only where
+ * the feature does: sign-in methods, collection privacy, appearance,
+ * achievements, referrals and the tutorial exist here and not (yet) in HV.
+ */
+import { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
 import { apiClient } from '../../src/services/api';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
-import * as Updates from 'expo-updates';
+import { MenuRow, MenuSection } from '../../src/components/YouMenu';
+import { TYPE } from '../../src/theme/tokens';
+
+const PRIVACY_POLICY_URL = 'https://www.tarantuverse.com/privacy-policy';
+const DELETE_CONFIRM_WORD = 'DELETE';
 
 function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
-  const { theme, toggleTheme, colors } = useTheme();
+  const { theme, toggleTheme, colors, layout } = useTheme();
   const router = useRouter();
   const { isUpdatePending } = Updates.useUpdates();
 
@@ -21,6 +48,7 @@ function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshUser();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 
@@ -29,23 +57,28 @@ function ProfileScreen() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const appVersion = Constants.expoConfig?.version ?? '';
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/login');
-          },
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'You can sign back in any time.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/login');
         },
-      ]
-    );
+      },
+    ]);
+  };
+
+  const openLink = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Could not open link', 'Please try again later.');
+    }
   };
 
   const handleCheckForUpdate = async () => {
@@ -54,14 +87,10 @@ function ProfileScreen() {
       return;
     }
     const offerRestart = () =>
-      Alert.alert(
-        'Update ready',
-        'A new version has been downloaded. Restart now to apply it?',
-        [
-          { text: 'Later', style: 'cancel' },
-          { text: 'Restart', onPress: () => { Updates.reloadAsync(); } },
-        ],
-      );
+      Alert.alert('Update ready', 'A new version has been downloaded. Restart now to apply it?', [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Restart', onPress: () => { Updates.reloadAsync(); } },
+      ]);
     // A bundle may already be downloaded (expo-updates fetches on launch), in
     // which case checkForUpdateAsync reports "not available" — offer restart.
     if (isUpdatePending) {
@@ -88,21 +117,19 @@ function ProfileScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission denied', 'We need camera roll permissions to upload an avatar.');
+        Alert.alert('Photo access needed', 'Tarantuverse needs photo library access to set your profile picture.');
         return;
       }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
-
       if (!result.canceled && result.assets[0]) {
         await uploadAvatar(result.assets[0]);
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to pick image');
     }
   };
@@ -111,37 +138,33 @@ function ProfileScreen() {
     try {
       setUploading(true);
       const formData = new FormData();
-
-      const fileData = {
+      formData.append('file', {
         uri: asset.uri,
         name: asset.fileName || 'avatar.jpg',
         type: asset.mimeType || 'image/jpeg',
-      } as any;
-
-      formData.append('file', fileData);
-
+      } as any);
       await apiClient.post('/auth/me/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-
       await refreshUser();
-      Alert.alert('Success', 'Avatar updated successfully');
     } catch (error: any) {
-      console.error('Upload error:', error);
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to upload avatar');
+      Alert.alert('Could not update photo', error.response?.data?.detail || 'Please try again.');
     } finally {
       setUploading(false);
     }
   };
 
+  const closeDeleteModal = () => {
+    if (deleting) return;
+    setShowDeleteModal(false);
+    setDeleteConfirmation('');
+  };
+
   const handleDeleteAccount = async () => {
-    if (deleteConfirmation !== 'DELETE') {
-      Alert.alert('Error', 'Please type DELETE to confirm account deletion');
+    if (deleteConfirmation.trim().toUpperCase() !== DELETE_CONFIRM_WORD) {
+      Alert.alert('Type DELETE to confirm', 'Type DELETE in the box to permanently delete your account.');
       return;
     }
-
     setDeleting(true);
     try {
       await apiClient.delete('/auth/me');
@@ -149,762 +172,181 @@ function ProfileScreen() {
       await logout();
       router.replace('/login');
     } catch (error: any) {
-      console.error('Delete account error:', error);
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to delete account');
+      Alert.alert('Could not delete account', error.response?.data?.detail || 'Please try again, or contact support.');
     } finally {
       setDeleting(false);
     }
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    scrollContent: {
-      paddingBottom: 40,
-    },
-    header: {
-      alignItems: 'center',
-      padding: 32,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    avatarContainer: {
-      marginBottom: 16,
-    },
-    avatar: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-    },
-    avatarPlaceholder: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-      backgroundColor: colors.primary + '33',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    displayName: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: colors.textPrimary,
-      marginBottom: 4,
-    },
-    username: {
-      fontSize: 16,
-      color: colors.textTertiary,
-    },
-    sectionLabel: {
-      fontSize: 12,
-      fontWeight: '600',
-      letterSpacing: 0.5,
-      textTransform: 'uppercase',
-      color: colors.textTertiary,
-      marginTop: 24,
-      marginBottom: 4,
-      marginHorizontal: 16,
-    },
-    section: {
-      backgroundColor: colors.surface,
-      borderTopWidth: 1,
-      borderBottomWidth: 1,
-      borderColor: colors.border,
-    },
-    menuItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    menuText: {
-      flex: 1,
-      fontSize: 16,
-      color: colors.textSecondary,
-      marginLeft: 12,
-    },
-    logoutText: {
-      color: colors.error,
-    },
-    editBadge: {
-      position: 'absolute',
-      bottom: 0,
-      right: 0,
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderWidth: 2,
-      borderColor: colors.surface,
-    },
-    deleteText: {
-      color: colors.error,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-    },
-    modalContent: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 24,
-      width: '100%',
-      maxWidth: 400,
-    },
-    modalTitle: {
-      fontSize: 20,
-      fontWeight: '700',
-      color: colors.error,
-      marginBottom: 12,
-      textAlign: 'center',
-    },
-    modalText: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginBottom: 16,
-      lineHeight: 20,
-      textAlign: 'center',
-    },
-    modalWarning: {
-      fontSize: 13,
-      color: colors.error,
-      marginBottom: 16,
-      fontWeight: '600',
-      textAlign: 'center',
-    },
-    modalInput: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 8,
-      padding: 14,
-      fontSize: 16,
-      color: colors.textPrimary,
-      marginBottom: 16,
-      textAlign: 'center',
-      fontWeight: '600',
-    },
-    modalButtons: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    modalButton: {
-      flex: 1,
-      padding: 14,
-      borderRadius: 8,
-      alignItems: 'center',
-    },
-    modalCancelButton: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    modalDeleteButton: {
-      backgroundColor: colors.error,
-    },
-    modalCancelButtonText: {
-      color: colors.textPrimary,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    modalDeleteButtonText: {
-      color: 'white',
-      fontSize: 16,
-      fontWeight: '600',
-    },
-  });
+  const canConfirmDelete = deleteConfirmation.trim().toUpperCase() === DELETE_CONFIRM_WORD && !deleting;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <ScrollView style={{ backgroundColor: colors.background }} contentContainerStyle={styles.scrollContent}>
+      {/* ── Profile header ── */}
       <View style={styles.header}>
         <TouchableOpacity
-          style={styles.avatarContainer}
+          style={styles.avatarWrap}
           onPress={handleAvatarPress}
           disabled={uploading}
           accessibilityRole="button"
-          accessibilityLabel={uploading ? 'Uploading avatar' : 'Change profile picture'}
-          accessibilityHint={uploading ? undefined : 'Opens your photo library to select a new avatar'}
+          accessibilityLabel={uploading ? 'Uploading profile picture' : 'Change profile picture'}
+          accessibilityHint={uploading ? undefined : 'Opens your photo library to pick a new picture'}
           accessibilityState={{ disabled: uploading, busy: uploading }}
         >
           {uploading ? (
-            <View style={styles.avatarPlaceholder}>
+            <View style={[styles.avatar, styles.avatarPlaceholder, { borderRadius: layout.radius.full, backgroundColor: colors.surface, borderColor: colors.border }]}>
               <ActivityIndicator color={colors.primary} />
             </View>
           ) : user?.avatar_url ? (
-            <Image
-              source={{ uri: user.avatar_url }}
-              style={styles.avatar}
-              accessibilityIgnoresInvertColors
-              accessibilityLabel="Your current avatar"
-            />
+            <Image source={{ uri: user.avatar_url }} style={[styles.avatar, { borderRadius: layout.radius.full }]} accessibilityIgnoresInvertColors />
           ) : (
-            <View style={styles.avatarPlaceholder} accessibilityElementsHidden importantForAccessibility="no">
-              <MaterialCommunityIcons name="camera" size={32} color={colors.primary} />
+            <View style={[styles.avatar, styles.avatarPlaceholder, { borderRadius: layout.radius.full, backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <MaterialCommunityIcons name="camera-plus-outline" size={28} color={colors.primary} />
             </View>
           )}
           {!uploading && (
             <View
-              style={[styles.editBadge, { backgroundColor: colors.primary }]}
+              style={[styles.avatarBadge, { borderRadius: layout.radius.full, backgroundColor: colors.primary, borderColor: colors.background }]}
               accessibilityElementsHidden
               importantForAccessibility="no"
             >
-              <MaterialCommunityIcons name="pencil" size={12} color="white" />
+              <MaterialCommunityIcons name="pencil" size={12} color="#fff" />
             </View>
           )}
         </TouchableOpacity>
-        <Text style={styles.displayName} accessibilityRole="header">
-          {user?.display_name}
+        <Text style={[TYPE.title, { color: colors.textPrimary }]} accessibilityRole="header">
+          {user?.display_name || user?.username || 'Keeper'}
         </Text>
-        <Text style={styles.username} accessibilityLabel={`Username, at ${user?.username}`}>
-          @{user?.username}
-        </Text>
-      </View>
-
-      {/* Account */}
-      <Text style={styles.sectionLabel} accessibilityRole="header">
-        Account
-      </Text>
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/notification-center')}
-          accessibilityRole="button"
-          accessibilityLabel="Notifications"
-          accessibilityHint="Opens your notification center"
-        >
-          <MaterialCommunityIcons
-            name="bell"
-            size={24}
-            color={colors.primary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Notifications</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/settings')}
-          accessibilityRole="button"
-          accessibilityLabel="Edit profile"
-          accessibilityHint="Opens profile editor"
-        >
-          <MaterialCommunityIcons
-            name="account-edit"
-            size={24}
-            color={colors.primary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Edit Profile</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/settings/notifications')}
-          accessibilityRole="button"
-          accessibilityLabel="Notifications"
-          accessibilityHint="Opens notification settings"
-        >
-          <MaterialCommunityIcons
-            name="bell"
-            size={24}
-            color={colors.primary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Notifications</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/privacy')}
-          accessibilityRole="button"
-          accessibilityLabel="Privacy"
-          accessibilityHint="Opens privacy settings"
-        >
-          <MaterialCommunityIcons
-            name="shield-account"
-            size={24}
-            color={colors.primary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Privacy</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/linked-accounts')}
-          accessibilityRole="button"
-          accessibilityLabel="Sign-in methods"
-          accessibilityHint="Manage which accounts you can sign in with"
-        >
-          <MaterialCommunityIcons
-            name="key-variant"
-            size={24}
-            color={colors.primary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Sign-in Methods</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Customization */}
-      <Text style={styles.sectionLabel} accessibilityRole="header">
-        Customization
-      </Text>
-      <View style={styles.section}>
-        <View style={styles.menuItem}>
-          <MaterialCommunityIcons
-            name={theme === 'dark' ? 'weather-night' : 'weather-sunny'}
-            size={24}
-            color={colors.secondary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>
-            {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
-          </Text>
-          <Switch
-            value={theme === 'dark'}
-            onValueChange={toggleTheme}
-            trackColor={{ false: '#767577', true: colors.primary }}
-            thumbColor="#ffffff"
-            accessibilityLabel="Dark mode"
-            accessibilityHint="Toggles between light and dark theme"
-            accessibilityState={{ checked: theme === 'dark' }}
-          />
-        </View>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/settings/appearance')}
-          accessibilityRole="button"
-          accessibilityLabel="Customize theme"
-          accessibilityHint="Opens theme customization options"
-        >
-          <MaterialCommunityIcons
-            name="palette"
-            size={24}
-            color={colors.secondary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Customize Theme</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Subscription */}
-      <Text style={styles.sectionLabel} accessibilityRole="header">
-        Subscription
-      </Text>
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/subscription')}
-          accessibilityRole="button"
-          accessibilityLabel="Premium"
-          accessibilityHint="Opens premium subscription options"
-        >
-          <MaterialCommunityIcons
-            name="crown"
-            size={24}
-            color="#fbbf24"
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Premium</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/achievements')}
-          accessibilityRole="button"
-          accessibilityLabel="Achievements"
-          accessibilityHint="Opens the achievement gallery"
-        >
-          <MaterialCommunityIcons
-            name="trophy"
-            size={24}
-            color="#fbbf24"
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Achievements</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/settings/referrals')}
-          accessibilityRole="button"
-          accessibilityLabel="Refer friends"
-          accessibilityHint="Opens the referral program"
-        >
-          <MaterialCommunityIcons
-            name="gift"
-            size={24}
-            color="#fbbf24"
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Refer Friends</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-      </View>
-
-      {/* Help */}
-      <Text style={styles.sectionLabel} accessibilityRole="header">
-        Help
-      </Text>
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={handleCheckForUpdate}
-          disabled={checkingUpdate}
-          accessibilityRole="button"
-          accessibilityLabel="Check for updates"
-          accessibilityHint="Checks for and downloads the latest app update"
-        >
-          <MaterialCommunityIcons
-            name="cloud-download"
-            size={24}
-            color={colors.textSecondary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Check for Updates</Text>
-          {checkingUpdate ? (
-            <ActivityIndicator color={colors.textTertiary} />
-          ) : (
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={24}
-              color={colors.textTertiary}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/support')}
-          accessibilityRole="button"
-          accessibilityLabel="Contact support"
-          accessibilityHint="Opens support contact form"
-        >
-          <MaterialCommunityIcons
-            name="lifebuoy"
-            size={24}
-            color={colors.textSecondary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Contact Support</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/import')}
-          accessibilityRole="button"
-          accessibilityLabel="Import collection"
-          accessibilityHint="Opens the collection importer to bring in animals from a sheet"
-        >
-          <MaterialCommunityIcons
-            name="database-import"
-            size={24}
-            color={colors.primary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Import Collection</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/sitter' as never)}
-          accessibilityRole="button"
-          accessibilityLabel="Sitter and sharing"
-          accessibilityHint="Make a feeding-list link for someone looking after your animals"
-        >
-          {/* account-group: already used elsewhere in this app, so it's a
-              proven glyph (an unverified MDI name renders as an empty box). */}
-          <MaterialCommunityIcons
-            name="account-group"
-            size={24}
-            color={colors.textSecondary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Sitter &amp; Sharing</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/settings/data-export')}
-          accessibilityRole="button"
-          accessibilityLabel="Export my data"
-          accessibilityHint="Opens data export options"
-        >
-          <MaterialCommunityIcons
-            name="database-export"
-            size={24}
-            color={colors.textSecondary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Export My Data</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={async () => {
-            await AsyncStorage.removeItem('dashboard_tour_completed');
-            router.push('/(tabs)');
-            Alert.alert('Tutorial Reset', 'The dashboard tutorial will play on your next visit.');
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Replay tutorial"
-          accessibilityHint="Resets the dashboard tutorial so it plays again"
-        >
-          <MaterialCommunityIcons
-            name="school"
-            size={24}
-            color={colors.textSecondary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Replay Tutorial</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        {user?.is_superuser && (
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push('/admin')}
-            accessibilityRole="button"
-            accessibilityLabel="Admin panel"
-            accessibilityHint="Opens the admin dashboard"
-          >
-            <MaterialCommunityIcons
-              name="shield-crown"
-              size={24}
-              color="#a855f7"
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-            <Text style={styles.menuText}>Admin Panel</Text>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={24}
-              color={colors.textTertiary}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-          </TouchableOpacity>
+        {!!user?.username && (
+          <Text style={[TYPE.body, { color: colors.textTertiary }]}>@{user.username}</Text>
         )}
       </View>
 
-      {/* Danger Zone */}
-      <Text style={styles.sectionLabel} accessibilityRole="header">
-        Account Actions
-      </Text>
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={handleLogout}
-          accessibilityRole="button"
-          accessibilityLabel="Log out"
-          accessibilityHint="Signs you out of your account"
-        >
-          <MaterialCommunityIcons
-            name="logout"
-            size={24}
-            color={colors.textSecondary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={styles.menuText}>Log Out</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => setShowDeleteModal(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Delete account"
-          accessibilityHint="Opens a confirmation dialog to permanently delete your account"
-        >
-          <MaterialCommunityIcons
-            name="delete-forever"
-            size={24}
-            color={colors.error}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-          <Text style={[styles.menuText, styles.deleteText]}>Delete Account</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={24}
-            color={colors.textTertiary}
-            accessibilityElementsHidden
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-      </View>
+      <MenuSection title="Account">
+        <MenuRow icon="account-edit-outline" label="Edit profile" onPress={() => router.push('/settings')} />
+        <MenuRow icon="key-variant" label="Sign-in methods" onPress={() => router.push('/linked-accounts')}
+          accessibilityHint="Manage which accounts you can sign in with" />
+        <MenuRow icon="shield-account-outline" label="Collection privacy" onPress={() => router.push('/privacy')}
+          accessibilityHint="Choose whether your collection is public" />
+      </MenuSection>
 
-      {/* Delete Account Confirmation Modal */}
-      <Modal
-        visible={showDeleteModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowDeleteModal(false)}
-      >
+      <MenuSection title="Notifications">
+        <MenuRow icon="bell-outline" label="Inbox" onPress={() => router.push('/notification-center')}
+          accessibilityHint="Opens your notifications" />
+        <MenuRow icon="bell-cog-outline" label="Notification settings" onPress={() => router.push('/settings/notifications')} />
+      </MenuSection>
+
+      <MenuSection title="Your collection">
+        <MenuRow icon="link" label="Sitter links" onPress={() => router.push('/sitter' as never)}
+          accessibilityHint="Make a feeding-list link for someone looking after your animals" />
+        <MenuRow icon="tray-arrow-down" label="Import collection" onPress={() => router.push('/import')} />
+        <MenuRow icon="download-outline" label="Export your data" onPress={() => router.push('/settings/data-export')} />
+      </MenuSection>
+
+      <MenuSection title="Premium">
+        <MenuRow icon="star-four-points-outline" label="Premium" onPress={() => router.push('/subscription')}
+          accessibilityHint="See your plan, or upgrade" />
+        <MenuRow icon="trophy-outline" label="Achievements" onPress={() => router.push('/achievements')} />
+        <MenuRow icon="gift-outline" label="Refer friends" onPress={() => router.push('/settings/referrals')} />
+      </MenuSection>
+
+      <MenuSection title="Appearance">
+        <MenuRow
+          icon={theme === 'dark' ? 'weather-night' : 'weather-sunny'}
+          label="Dark mode"
+          accessory={
+            <Switch
+              value={theme === 'dark'}
+              onValueChange={toggleTheme}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              accessibilityLabel="Dark mode"
+              accessibilityState={{ checked: theme === 'dark' }}
+            />
+          }
+        />
+        <MenuRow icon="palette-outline" label="Customize theme" onPress={() => router.push('/settings/appearance')} />
+      </MenuSection>
+
+      <MenuSection title="Help & legal">
+        <MenuRow icon="lifebuoy" label="Contact support" onPress={() => router.push('/support')} />
+        <MenuRow icon="refresh" label="Check for updates" busy={checkingUpdate} onPress={handleCheckForUpdate} />
+        <MenuRow
+          icon="school-outline"
+          label="Replay tutorial"
+          onPress={async () => {
+            await AsyncStorage.removeItem('dashboard_tour_completed');
+            router.push('/(tabs)');
+            Alert.alert('Tutorial reset', 'The dashboard tutorial will play on your next visit.');
+          }}
+        />
+        <MenuRow icon="shield-lock-outline" label="Privacy policy" external onPress={() => openLink(PRIVACY_POLICY_URL)} />
+        <MenuRow icon="file-document-outline" label="Terms of service" onPress={() => router.push('/terms')} />
+        {user?.is_superuser ? (
+          <MenuRow icon="shield-crown-outline" label="Admin panel" onPress={() => router.push('/admin')} />
+        ) : null}
+      </MenuSection>
+
+      <MenuSection title="About">
+        <MenuRow icon="information-outline" label="Version" accessory={
+          <Text style={[TYPE.body, { color: colors.textSecondary }]}>{appVersion}</Text>
+        } />
+      </MenuSection>
+
+      <MenuSection>
+        <MenuRow icon="logout" label="Sign out" onPress={handleSignOut} />
+        <MenuRow icon="trash-can-outline" label="Delete account" danger onPress={() => setShowDeleteModal(true)}
+          accessibilityHint="Opens a confirmation to permanently delete your account" />
+      </MenuSection>
+
+      {/* Delete-account confirmation — typed DELETE so a stray tap can't do it. */}
+      <Modal visible={showDeleteModal} transparent animationType="fade" onRequestClose={closeDeleteModal}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Delete Account</Text>
-            <Text style={styles.modalText}>
-              This action is permanent and cannot be undone. All your data including tarantulas, photos, logs, and messages will be permanently deleted.
+          <View style={[styles.modalContent, { backgroundColor: colors.surface, borderRadius: layout.radius.lg }]}>
+            <Text style={[TYPE.heading, styles.center, { color: colors.error }]}>Delete your account?</Text>
+            <Text style={[TYPE.body, styles.center, styles.gap, { color: colors.textSecondary }]}>
+              This permanently deletes your account and every animal, log, photo and message tied to it — across
+              Tarantuverse and Herpetoverse. This cannot be undone.
             </Text>
-            <Text style={styles.modalWarning}>
-              Type DELETE to confirm
+            <Text style={[TYPE.bodyStrong, styles.center, styles.gap, { color: colors.error }]}>
+              Type {DELETE_CONFIRM_WORD} to confirm
             </Text>
             <TextInput
-              style={styles.modalInput}
-              placeholder="Type DELETE"
+              style={[TYPE.subheading, styles.modalInput, {
+                backgroundColor: colors.background, borderColor: colors.border,
+                borderRadius: layout.radius.md, color: colors.textPrimary,
+              }]}
+              placeholder={DELETE_CONFIRM_WORD}
               placeholderTextColor={colors.textTertiary}
               value={deleteConfirmation}
               onChangeText={setDeleteConfirmation}
               autoCapitalize="characters"
+              autoCorrect={false}
               editable={!deleting}
-              accessibilityLabel="Delete confirmation input"
-              accessibilityHint="Type the word DELETE in all caps to confirm account deletion"
+              accessibilityLabel="Type DELETE to confirm account deletion"
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalCancelButton]}
-                onPress={() => {
-                  setShowDeleteModal(false);
-                  setDeleteConfirmation('');
-                }}
+                style={[styles.modalButton, { borderWidth: 1, borderColor: colors.border, borderRadius: layout.radius.md }]}
+                onPress={closeDeleteModal}
                 disabled={deleting}
                 accessibilityRole="button"
                 accessibilityLabel="Cancel"
-                accessibilityHint="Closes the delete confirmation dialog without deleting"
-                accessibilityState={{ disabled: deleting }}
               >
-                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+                <Text style={[TYPE.subheading, { color: colors.textPrimary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalDeleteButton, { opacity: deleting ? 0.6 : 1 }]}
+                style={[styles.modalButton, {
+                  backgroundColor: colors.error, borderRadius: layout.radius.md,
+                  opacity: canConfirmDelete ? 1 : 0.4,
+                }]}
                 onPress={handleDeleteAccount}
-                disabled={deleting}
+                disabled={!canConfirmDelete}
                 accessibilityRole="button"
-                accessibilityLabel={deleting ? 'Deleting account' : 'Confirm delete account'}
-                accessibilityHint="Permanently deletes your account and all your data"
-                accessibilityState={{ disabled: deleting, busy: deleting }}
+                accessibilityLabel={deleting ? 'Deleting account' : 'Permanently delete account'}
+                accessibilityState={{ disabled: !canConfirmDelete, busy: deleting }}
               >
-                {deleting ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Text style={styles.modalDeleteButtonText}>Delete</Text>
+                {deleting ? <ActivityIndicator color="#fff" size="small" /> : (
+                  <Text style={[TYPE.subheading, { color: '#fff' }]}>Delete</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -915,5 +357,23 @@ function ProfileScreen() {
   );
 }
 
-export default withErrorBoundary(ProfileScreen, 'profile');
+const styles = StyleSheet.create({
+  scrollContent: { paddingBottom: 40 },
+  header: { alignItems: 'center', paddingTop: 24, paddingBottom: 4, gap: 2 },
+  avatarWrap: { marginBottom: 12 },
+  avatar: { width: 96, height: 96 },
+  avatarPlaceholder: { borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  avatarBadge: {
+    position: 'absolute', right: -2, bottom: -2, width: 26, height: 26,
+    borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+  },
+  center: { textAlign: 'center' },
+  gap: { marginTop: 8 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { padding: 24, width: '100%', maxWidth: 400 },
+  modalInput: { borderWidth: 1, padding: 14, marginTop: 12, textAlign: 'center' },
+  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  modalButton: { flex: 1, padding: 14, alignItems: 'center', justifyContent: 'center', minHeight: 48 },
+});
 
+export default withErrorBoundary(ProfileScreen, 'profile');
