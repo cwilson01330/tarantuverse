@@ -402,7 +402,8 @@
 - **Rate Limiting**:
   - SlowAPI middleware with shared `Limiter` in `utils/rate_limit.py`
   - Auth endpoints: register (5/min), login (10/min), forgot-password (5/min), reset-password (5/min)
-  - Global default: 200/min
+  - Global default: 200/min is declared but NOT enforced — no SlowAPIMiddleware is installed, so only routes with an explicit `@limiter.limit` are limited. Deliberate for now: a global limit would bucket Vercel's server-side requests (shared AWS addresses) together.
+  - Key: `utils/rate_limit.py::client_ip` — Cloudflare's CF-Connecting-IP, else the rightmost X-Forwarded-For. Never `request.client.host` (uvicorn fills it from the client-controlled leftmost entry).
 
 - **Token Revocation (Logout)**:
   - `token_blocklist` table stores revoked JWT JTIs

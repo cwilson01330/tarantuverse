@@ -19,12 +19,8 @@ So `client_ip` ignores `request.client.host` and reads, in order:
   2. The RIGHTMOST X-Forwarded-For entry — the one our own proxy appended.
   3. The socket peer, as a last resort (local dev, tests).
 """
-import logging
-
 from slowapi import Limiter
 from starlette.requests import Request
-
-logger = logging.getLogger(__name__)
 
 # A few one-line diagnostics per process so the header shape can be confirmed
 # from the logs after a deploy, without logging every request.
@@ -45,11 +41,14 @@ def client_ip(request: Request) -> str:
     else:
         ip, source = peer or "unknown", "peer"
 
-    if _DIAG_LEFT > 0 and len(xff) > 1:
+    if _DIAG_LEFT > 0 and (xff or cf):
         _DIAG_LEFT -= 1
-        logger.info(
-            "[client-ip] key=%s via=%s xff_hops=%d has_cf=%s has_true_client=%s",
-            ip, source, len(xff), bool(cf), "true-client-ip" in headers,
+        # print, not logger.info: the app configures no logging, so INFO from
+        # app modules never reaches Render's logs (same reason [STARTUP] prints).
+        print(
+            f"[client-ip] key={ip} via={source} xff_hops={len(xff)} "
+            f"has_cf={bool(cf)} has_true_client={'true-client-ip' in headers}",
+            flush=True,
         )
     return ip
 
