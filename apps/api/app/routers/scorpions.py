@@ -33,6 +33,7 @@ from app.services.inverts_dualwrite import (
     mirror_scorpion_update,
 )
 from app.utils.access import policy, require_own_enclosure
+from app.utils.photo_cleanup import collect_for_animal, delete_files
 
 router = APIRouter()
 
@@ -265,8 +266,12 @@ async def delete_scorpion(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Scorpion not found",
         )
+    _photo_files = collect_for_animal(db, scorpion_id)
     db.delete(scorpion)
     # ADR-005 A2 mirror — drop the unified row too.
     mirror_scorpion_delete(db, scorpion_id)
     db.commit()
+    # Photo FILES don't cascade with the rows (R2) — remove them now the
+    # delete is committed. Best-effort; see utils/photo_cleanup.
+    await delete_files(db, _photo_files)
     return None

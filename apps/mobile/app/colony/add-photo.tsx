@@ -9,13 +9,14 @@
  * one place the two genuinely differ.
  */
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { PhotoPickPreview } from '../../src/components/PhotoPickPreview';
 import { uploadColonyPhoto } from '../../src/lib/colonies';
 
 export default function AddColonyPhotoScreen() {
@@ -66,10 +67,7 @@ export default function AddColonyPhotoScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {imageUri ? (
-          <View style={styles.preview}>
-            <Image source={{ uri: imageUri }} style={styles.previewImage} />
-            <TouchableOpacity style={styles.removeButton} onPress={() => setImageUri(null)} accessibilityLabel="Remove photo"><MaterialCommunityIcons name="close" size={20} color="#fff" /></TouchableOpacity>
-          </View>
+          <PhotoPickPreview uri={imageUri} onRemove={() => setImageUri(null)} />
         ) : (
           <View style={styles.placeholder}><MaterialCommunityIcons name="image-outline" size={64} color={colors.textTertiary} /><Text style={styles.placeholderText}>Take or choose a photo</Text></View>
         )}
@@ -90,9 +88,6 @@ export default function AddColonyPhotoScreen() {
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16, paddingBottom: 48 },
-  preview: { position: 'relative', borderRadius: 12, overflow: 'hidden', marginBottom: 16 },
-  previewImage: { width: '100%', height: 280 },
-  removeButton: { position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   placeholder: { height: 280, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 16 },
   placeholderText: { color: colors.textTertiary, fontSize: 14 },
   actions: { flexDirection: 'row', gap: 12, marginBottom: 20 },

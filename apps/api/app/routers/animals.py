@@ -50,6 +50,7 @@ from app.utils.dependencies import get_current_user
 from app.utils.access import load_animal, policy, require_own_enclosure, scope_collection, strip_owner_only
 from app.utils.feeding_pause import resume_if_accepted
 from app.schemas.death import MarkDiedRequest
+from app.utils.photo_cleanup import collect_for_animal, delete_files
 
 router = APIRouter()
 
@@ -216,6 +217,15 @@ async def get_animals(
         description="Filter to a single taxon. Omit for the whole collection.",
     ),
     collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
+    status: Optional[str] = Query(
+        None,
+        pattern="^(active|transferred|deceased)$",
+        description=(
+            "Lifecycle view, same vocabulary as /inverts/. 'active' (default) "
+            "is the living collection; 'transferred' and 'deceased' are the "
+            "history views — records kept in full, every log intact."
+        ),
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -231,8 +241,17 @@ async def get_animals(
     query = (
         db.query(Animal)
         .options(selectinload(Animal.herp_species))
-        .filter(
-            Animal.user_id == access.owner.id,
+        .filter(Animal.user_id == access.owner.id)
+    )
+    view = status or "active"
+    if view == "transferred":
+        query = query.filter(Animal.transferred_out_at.isnot(None))
+    elif view == "deceased":
+        # The "Died" archive (handoff §14.5). Before this param existed the
+        # records ADR-015 promises to keep had no way back into any client.
+        query = query.filter(Animal.died_at.isnot(None))
+    else:
+        query = query.filter(
             # Handed-off animals (transferred to another keeper) drop out of
             # the active collection — see htr_20260707.
             Animal.transferred_out_at.is_(None),
@@ -240,7 +259,6 @@ async def get_animals(
             # full; it just isn't part of the living collection.
             Animal.died_at.is_(None),
         )
-    )
     if taxon:
         query = query.filter(Animal.taxon == taxon)
     return query.order_by(Animal.created_at.desc()).all()
@@ -320,13 +338,12 @@ async def list_feeding_status(
     cadence can't be determined.
     """
     access = scope_collection(db, current_user, "herpetoverse", collection)
+    # The shared "active" definition — which excludes died animals (ADR-015).
+    # This inlined filter only excluded transfers, so a reptile marked died
+    # kept appearing in Feeding Day, going redder every week.
     animals = (
-        db.query(Animal)
+        active_animals_query(db, access.owner.id)
         .options(selectinload(Animal.herp_species))
-        .filter(
-            Animal.user_id == access.owner.id,
-            Animal.transferred_out_at.is_(None),
-        )
         .all()
     )
     if not animals:
@@ -579,6 +596,7 @@ async def delete_animal(
             status_code=status.HTTP_404_NOT_FOUND, detail="Animal not found"
         )
 
+    _photo_files = collect_for_animal(db, animal_id)
     db.query(ShedLog).filter(ShedLog.animal_id == animal_id).delete()
     db.query(WeightLog).filter(WeightLog.animal_id == animal_id).delete()
     db.query(AnimalGenotype).filter(AnimalGenotype.animal_id == animal_id).delete()
@@ -588,6 +606,9 @@ async def delete_animal(
 
     db.delete(animal)
     db.commit()
+    # Photo FILES don't cascade with the rows (R2) — remove them now the
+    # delete is committed. Best-effort; see utils/photo_cleanup.
+    await delete_files(db, _photo_files)
     return None
 
 

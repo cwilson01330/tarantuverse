@@ -553,6 +553,16 @@ async def upload_photo_via_token(
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
 
+    # Free-plan photo limit for Tarantuverse animals. A QR upload used to be a
+    # way round it. Herpetoverse animals ('animal' sessions) aren't capped.
+    qr_kind, _ = _session_parent(session)
+    if qr_kind in ("tarantula", "scorpion", "invert") and session.user is not None:
+        from app.utils.limits import enforce_photo_cap
+        enforce_photo_cap(
+            db, session.user,
+            session.invert_id or session.tarantula_id or session.scorpion_id,
+        )
+
     file_data = await file.read()
 
     # Enforce size cap to prevent storage abuse via a leaked token.
@@ -564,7 +574,7 @@ async def upload_photo_via_token(
 
     # Validate by magic bytes — do not trust the client-supplied Content-Type.
     try:
-        validate_image_bytes(file_data)
+        detected_mime = validate_image_bytes(file_data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -572,7 +582,9 @@ async def upload_photo_via_token(
         photo_url, thumbnail_url = await storage_service.upload_photo(
             file_data=file_data,
             filename=file.filename or "upload.jpg",
-            content_type=file.content_type,
+            # The detected type, never the client's claim (the storage layer
+            # re-derives it from the bytes anyway).
+            content_type=detected_mime,
         )
 
         # Photo has a CHECK constraint enforcing exactly-one-parent
@@ -647,6 +659,9 @@ async def upload_photo_via_token(
 
     except HTTPException:
         raise
+    except ValueError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That file isn't a readable image. Try another photo.")
     except Exception:
         db.rollback()
         logger.exception("QR upload failed for session %s", session.id)

@@ -484,9 +484,15 @@ async def delete_user(
     from app.models.collection_member import end_memberships_of
     end_memberships_of(db, user.id)
 
+    # Photo rows cascade with the user; their files don't. Read them first,
+    # remove them after the commit (best-effort) — see utils/photo_cleanup.
+    from app.utils.photo_cleanup import collect_for_user, delete_files
+    photo_files = collect_for_user(db, user.id)
+
     # Delete the user (CASCADE will handle related records)
     db.delete(user)
     db.commit()
+    await delete_files(db, photo_files)
 
     return {
         "message": f"Successfully deleted user {username} ({email})",

@@ -36,6 +36,7 @@ from app.utils.dependencies import get_current_user
 from app.services.colony_history_service import colony_population_history
 from app.utils.limits import enforce_collection_limit
 from app.utils.access import access_helper, load_colony, policy, require_can_change, scope_collection
+from app.utils.photo_cleanup import collect_for_colony, delete_files
 
 router = APIRouter()
 
@@ -282,8 +283,12 @@ async def delete_colony(
     )
     if colony is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Colony not found")
+    _photo_files = collect_for_colony(db, colony_id)
     db.delete(colony)
     db.commit()
+    # Photo FILES don't cascade with the rows (R2) — remove them now the
+    # delete is committed. Best-effort; see utils/photo_cleanup.
+    await delete_files(db, _photo_files)
     return None
 
 

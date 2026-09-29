@@ -222,3 +222,52 @@ def enforce_hv_premium(user: User, feature: str = "This") -> None:
             "is_premium": False,
         },
     )
+
+
+# ── Photos per animal (Tarantuverse) ─────────────────────────────────────────
+#
+# The pricing pages promise "5 photos per animal" on the free plan. Until
+# 2026-09-29 only the legacy POST /tarantulas/{id}/photos checked it — and the
+# mobile app uploads through /inverts/{id}/photos, so on the phone the limit
+# didn't exist. Every TV upload route now calls this one check.
+#
+# Herpetoverse is deliberately NOT capped: HV's plans have never advertised a
+# photo limit, and adding one would be a new policy, not a fix.
+FREE_TIER_MAX_PHOTOS_PER_ANIMAL = 5
+
+
+def count_animal_photos(db: Session, animal_id) -> int:
+    """Photos of one TV animal. The inverts row shares its id with any legacy
+    tarantula/scorpion twin, and older photo rows may carry only the legacy
+    id — so match all three, counting each row once."""
+    from sqlalchemy import or_
+    from app.models.photo import Photo
+
+    aid = str(animal_id)
+    return db.query(Photo).filter(or_(
+        Photo.invert_id == aid,
+        Photo.tarantula_id == aid,
+        Photo.scorpion_id == aid,
+    )).count()
+
+
+def enforce_photo_cap(db: Session, owner: User, animal_id) -> None:
+    """Raise 402 when the animal's OWNER is on the free plan and the animal
+    already has the free number of photos. The owner's plan decides, not the
+    uploader's — a co-keeper or QR upload fills the owner's animal."""
+    if owner.is_premium_for_app("tarantuverse"):
+        return
+    current = count_animal_photos(db, animal_id)
+    if current >= FREE_TIER_MAX_PHOTOS_PER_ANIMAL:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "message": (
+                    f"The free plan keeps up to {FREE_TIER_MAX_PHOTOS_PER_ANIMAL} photos per animal. "
+                    "Remove one, or upgrade for unlimited photos."
+                ),
+                "current_count": current,
+                "limit": FREE_TIER_MAX_PHOTOS_PER_ANIMAL,
+                "is_premium": False,
+            },
+        )

@@ -5,7 +5,7 @@ it out of the general update schemas is deliberate: `died_at` must not be
 settable by an incidental PATCH that happens to include the field. Retiring an
 animal is grave enough to deserve its own endpoint.
 """
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -30,6 +30,11 @@ DEATH_CAUSES = (
     "unknown",
     "other",
 )
+
+
+def latest_local_today() -> date:
+    """Today's date in the easternmost timezone (UTC+14)."""
+    return (datetime.now(timezone.utc) + timedelta(hours=14)).date()
 
 
 class MarkDiedRequest(BaseModel):
@@ -63,7 +68,12 @@ class MarkDiedRequest(BaseModel):
         # A future death date is always a typo, and it would quietly corrupt
         # ordering in the memorial view. Reject rather than silently clamp:
         # clamping would record a date the keeper didn't choose.
-        if v is not None and v > date.today():
+        #
+        # "Future" is judged against the latest calendar day anywhere on earth
+        # (UTC+14), not the server's UTC date. Otherwise a keeper in Sydney
+        # recording a death at 8am on their today gets told it hasn't happened
+        # yet — the server is still on yesterday.
+        if v is not None and v > latest_local_today():
             raise ValueError("died_at cannot be in the future")
         return v
 

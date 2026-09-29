@@ -9,7 +9,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import DateInput from '../../src/components/DateInput';
-import { getInvert, getInvertMolt, createInvertMolt, updateInvertMolt, type InvertTaxon, type MoltOutcome } from '../../src/lib/inverts';
+import { getInvert, getInvertMolt, createInvertMolt, updateInvertMolt, invertDisplayName, type Invert, type InvertTaxon, type MoltOutcome } from '../../src/lib/inverts';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { can, useCollectionRole } from '../../src/lib/co-keepers';
+import { COPY as LIFECYCLE_COPY, pronounsFor } from '../../src/lib/lifecycle-copy';
+import { requestMarkDied } from '../../src/lib/pending-intent';
 import { growthLengthLabel } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
@@ -26,13 +30,16 @@ export default function AddInvertMoltScreen() {
   const router = useRouter();
   // logId present ⇒ edit mode. On edit we prefill notes verbatim (the molt
   // number, if any, is embedded there) and leave the molt-number input blank.
-  const { id, logId, molted_at, notes: notesParam } =
-    useLocalSearchParams<{ id?: string; logId?: string; molted_at?: string; notes?: string }>();
+  const { id, logId, molted_at, notes: notesParam, from } =
+    useLocalSearchParams<{ id?: string; logId?: string; molted_at?: string; notes?: string; from?: string }>();
   const isEdit = !!logId;
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [taxon, setTaxon] = useState<InvertTaxon | null>(null);
+  const [animal, setAnimal] = useState<Invert | null>(null);
+  const { user } = useAuth();
+  const { role } = useCollectionRole(user?.id, animal?.user_id);
   const [date, setDate] = useState(molted_at ? toISODateLocal(new Date(molted_at)) : toISODateLocal(new Date()));
   const [moltNum, setMoltNum] = useState('');
   const [notes, setNotes] = useState(notesParam || '');
@@ -65,7 +72,7 @@ export default function AddInvertMoltScreen() {
   const [isUltimate, setIsUltimate] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
+  useEffect(() => { if (id) getInvert(id).then((i) => { setTaxon(i.taxon); setAnimal(i); }).catch(() => {}); }, [id]);
 
   // Edit mode: prefill measurements from the existing log (params only
   // carry date + notes).
@@ -118,6 +125,33 @@ export default function AddInvertMoltScreen() {
         await updateInvertMolt(logId, payload);
       } else {
         await createInvertMolt(taxon, id, payload);
+      }
+      // Handoff §14.9: offer the path AFTER the molt saves — never before,
+      // never automatically. A fatal outcome still doesn't set died_at
+      // (ADR-015 D6); this only makes the next step one tap. Only for new
+      // logs by someone allowed to mark the animal died.
+      if (!isEdit && outcome === 'fatal' && animal && !animal.died_at && can(role, 'keeper')) {
+        const p = pronounsFor(animal.sex);
+        Alert.alert(
+          'Molt saved',
+          LIFECYCLE_COPY.afterFatalMolt(invertDisplayName(animal), p.object),
+          [
+            { text: 'Not now', style: 'cancel', onPress: () => router.back() },
+            {
+              text: 'Mark as died',
+              onPress: () => {
+                requestMarkDied(id);
+                // From the detail screen: go back to it. From anywhere else
+                // (the collection's quick "Log molt"): there's no detail
+                // screen beneath us, so open it in this one's place.
+                if (from === 'detail') router.back();
+                else router.replace(`/invert/${id}` as any);
+              },
+            },
+          ],
+          { cancelable: true, onDismiss: () => router.back() },
+        );
+        return;
       }
       router.back();
     } catch (err) { Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.'); }
@@ -226,8 +260,8 @@ export default function AddInvertMoltScreen() {
                log entry and silently retiring the animal would be the app
                deciding something that grave on the keeper's behalf. */
             <Text style={{ color: colors.textTertiary, fontSize: 12, marginBottom: 16 }}>
-              You can mark {'\u2018'}died{'\u2019'} on the animal itself when you&apos;re ready.
-              Saving this won&apos;t do it for you.
+              Saving this won&apos;t mark the animal as died.
+              {!isEdit && can(role, 'keeper') ? ' After it saves you\u2019ll be offered that step, if you want it.' : ''}
             </Text>
           )}
           {/* The ultimate molt (ult_20260911).

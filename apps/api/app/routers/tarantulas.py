@@ -38,6 +38,7 @@ from app.services.inverts_dualwrite import (
     mirror_tarantula_update,
 )
 from app.utils.access import policy
+from app.utils.photo_cleanup import collect_for_animal, delete_files
 
 router = APIRouter()
 
@@ -265,6 +266,7 @@ async def delete_tarantula(
     db.query(FeedingLog).filter(FeedingLog.tarantula_id == tarantula_id).delete()
     db.query(MoltLog).filter(MoltLog.tarantula_id == tarantula_id).delete()
     db.query(SubstrateChange).filter(SubstrateChange.tarantula_id == tarantula_id).delete()
+    _photo_files = collect_for_animal(db, tarantula_id)
     db.query(Photo).filter(Photo.tarantula_id == tarantula_id).delete()
     # Pricing, offspring and pairing references — shared with DELETE
     # /inverts/{id} so both routes leave the same state behind. Also covers the
@@ -279,6 +281,9 @@ async def delete_tarantula(
     # deletes doesn't matter for log/photo cleanup.
     mirror_tarantula_delete(db, tarantula_id)
     db.commit()
+    # Photo FILES don't cascade with the rows (R2) — remove them now the
+    # delete is committed. Best-effort; see utils/photo_cleanup.
+    await delete_files(db, _photo_files)
 
     return None
 

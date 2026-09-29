@@ -21,6 +21,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -37,6 +39,15 @@ import { PauseFeedingSheet } from '../components/PauseFeedingSheet';
 import { FeedingCadenceSheet } from '../components/FeedingCadenceSheet';
 import { ReptileShareSheet } from '../components/ReptileShareSheet';
 import { AnimalTransferSection } from '../components/AnimalTransferSection';
+import { MarkDiedSheet } from '../components/MarkDiedSheet';
+import {
+  COPY as LIFE,
+  fmtDay,
+  historicalRecordLine,
+  pronounsFor,
+  reviveAnimal,
+  tenureLabel,
+} from '../lib/lifecycle';
 import {
   LoadingShell,
   PhotosStrip,
@@ -95,6 +106,9 @@ export function AnimalDetailScreen() {
   const [geneSummary, setGeneSummary] = useState<string | null>(null);
   // A failed history fetch must not read as "nothing logged" (§14).
   const [historyError, setHistoryError] = useState(false);
+  const [diedOpen, setDiedOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
+  const [reviving, setReviving] = useState(false);
 
   // Co-keepers (rung 3): what the viewer may do here. Hides controls that
   // would fail — the API checks every request. Nothing write-shaped shows
@@ -102,12 +116,17 @@ export function AnimalDetailScreen() {
   const { user } = useAuth();
   const { role, ownerName } = useCollectionRole(user?.id, animal?.user_id);
   const isOwner = role === 'owner';
-  const canLog = can(role, 'logger');
+  // A died animal is a historical record (ADR-015, handoff §14.3): readable,
+  // exportable, and closed to new logs and edits. `canKeep` stays true so the
+  // keeper can still Undo.
+  const dead = !!animal?.died_at;
+  const canLog = can(role, 'logger') && !dead;
   const canKeep = can(role, 'keeper');
   const mayChange = useCallback(
-    (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e),
-    [role, user?.id],
+    (e: { logged_by_user_id?: string | null }) => !dead && canChangeEntry(role, user?.id, e),
+    [role, user?.id, dead],
   );
+
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -134,6 +153,19 @@ export function AnimalDetailScreen() {
     );
     if (photosR.status === 'fulfilled') setPhotos(photosR.value);
   }, [id]);
+
+  const undoDied = useCallback(async () => {
+    if (!animal || reviving) return;
+    setReviving(true);
+    try {
+      await reviveAnimal(animal.id);
+      await fetchAll();
+    } catch {
+      Alert.alert('Couldn’t undo that', 'Nothing has changed — try again.');
+    } finally {
+      setReviving(false);
+    }
+  }, [animal, reviving, fetchAll]);
 
   // useFocusEffect re-fires when the user returns from a log-entry
   // screen, so the just-saved row shows up without a manual pull-to-refresh.
@@ -211,8 +243,8 @@ export function AnimalDetailScreen() {
           photoCount={photos?.length ?? 0}
           brumationActive={animal.brumation_active}
           onBack={() => router.back()}
-          onShare={isOwner ? () => setShareOpen(true) : undefined}
-          onEdit={canKeep ? () => router.push(`/reptile/edit/${animal.id}` as never) : undefined}
+          onShare={isOwner && !dead ? () => setShareOpen(true) : undefined}
+          onEdit={canKeep && !dead ? () => router.push(`/reptile/edit/${animal.id}` as never) : undefined}
           onOpenGallery={() =>
             router.push(`/reptile/photos/${animal.id}` as never)
           }
@@ -226,10 +258,51 @@ export function AnimalDetailScreen() {
           </Text>
         )}
 
+        {/* Handoff §14.3 — the screen mutates in place after marking died.
+            No toast, no checkmark, no success colour: this card IS the
+            acknowledgement. A neutral dot, never red. */}
+        {dead && (
+          <View
+            style={[styles.diedCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            accessible
+            accessibilityLabel={`Died ${fmtDay(animal.died_at)}`}
+          >
+            <View style={styles.diedHead}>
+              <View style={[styles.diedDot, { backgroundColor: colors.textTertiary }]} />
+              <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>Died {fmtDay(animal.died_at)}</Text>
+            </View>
+            {(() => {
+              const t = tenureLabel(animal.date_acquired, animal.died_at);
+              return t ? <Text style={[TYPE.body, { color: colors.textSecondary }]}>In your care {t}</Text> : null;
+            })()}
+            <Text style={[TYPE.body, { color: colors.textSecondary }]}>
+              {historicalRecordLine(animal.death_cause, pronounsFor(animal.sex))}
+            </Text>
+            {animal.death_notes ? (
+              <Text style={[TYPE.body, { color: colors.textPrimary }]}>{animal.death_notes}</Text>
+            ) : null}
+            {canKeep && (
+              <TouchableOpacity
+                onPress={() => void undoDied()}
+                disabled={reviving}
+                style={styles.textAction}
+                accessibilityRole="button"
+                accessibilityHint="Returns this animal to your collection"
+              >
+                {reviving ? (
+                  <ActivityIndicator color={colors.accent} />
+                ) : (
+                  <Text style={[TYPE.bodyStrong, { color: colors.accent }]}>{LIFE.undo}</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {/* One feeding card — replaces the status banner, the feeding
             intelligence panel and the CGD refresh card (design handoff,
             screen 9). Pause, schedule and CGD live inside it. */}
-        <FeedingCard
+        {!dead && <FeedingCard
           animal={animal}
           feedings={feedings}
           refreshKey={`${feedings.length}-${weights.length}-${animal.current_weight_g ?? ''}-${animal.feeding_paused_reason ?? ''}-${animal.feeding_paused_until ?? ''}-${animal.feeding_interval_days ?? ''}`}
@@ -239,7 +312,7 @@ export function AnimalDetailScreen() {
           onFullForm={() => router.push(`/reptile/log-feeding/${animal.id}` as never)}
           onPause={() => setPauseOpen(true)}
           onSetCadence={() => setCadenceOpen(true)}
-        />
+        />}
 
         <StatStrip animal={animal} weights={weights} feedings={feedings} />
 
@@ -293,13 +366,49 @@ export function AnimalDetailScreen() {
             screen. onTransferred refetches so the badge flips after a link is
             generated. */}
         {/* Owner-only: co-keepers never transfer (rung 3). */}
-        {isOwner && <AnimalTransferSection animal={animal} onTransferred={onRefresh} />}
+        {isOwner && !dead && <AnimalTransferSection animal={animal} onTransferred={onRefresh} />}
+
+        {dead && (
+          <Text style={[TYPE.caption, { color: colors.textTertiary }]}>{LIFE.logsClosed}</Text>
+        )}
+
+        {/* End of record (§14.1) — collapsed, after transfer. Marking died is
+            the exit for an animal that's gone; Delete (on the edit screen)
+            stays for records added by mistake. Neutral fill, never red. */}
+        {canKeep && !dead && (
+          <View style={[styles.collapsible, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <TouchableOpacity
+              onPress={() => setEndOpen((o) => !o)}
+              style={styles.collapsibleHead}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: endOpen }}
+            >
+              <MaterialCommunityIcons name="circle-slice-8" size={18} color={colors.textSecondary} />
+              <Text style={[TYPE.bodyStrong, { color: colors.textPrimary, flex: 1 }]}>{LIFE.endOfRecord}</Text>
+              <MaterialCommunityIcons name={endOpen ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
+            {endOpen && (
+              <View style={styles.collapsibleBody}>
+                <TouchableOpacity
+                  onPress={() => setDiedOpen(true)}
+                  style={[styles.diedButton, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]}
+                  accessibilityRole="button"
+                >
+                  <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>{LIFE.menuItem}</Text>
+                </TouchableOpacity>
+                <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
+                  {LIFE.menuItemSub(pronounsFor(animal.sex))}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Genetics — gated to snakes for now: the gene catalog is
             ball-python-scoped. When the catalog gains lizard/frog genes
             this `taxon === 'snake'` check loosens. */}
         {/* Genetics stay with the owner for now (rung 3 v1 surface). */}
-        {isOwner && animal.taxon === 'snake' && (
+        {isOwner && !dead && animal.taxon === 'snake' && (
           <View style={[styles.collapsible, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity
               onPress={() => setGeneticsOpen((o) => !o)}
@@ -346,6 +455,15 @@ export function AnimalDetailScreen() {
         )}
         </View>
       </ScrollView>
+
+      <MarkDiedSheet
+        visible={diedOpen}
+        onClose={() => setDiedOpen(false)}
+        animalId={animal.id}
+        name={animalTitle(animal)}
+        sex={animal.sex}
+        onDone={() => { setDiedOpen(false); setEndOpen(false); void fetchAll(); }}
+      />
 
       <ReptileShareSheet
         visible={shareOpen}
@@ -430,6 +548,11 @@ const styles = StyleSheet.create({
   collapsibleHead: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 11, paddingHorizontal: 14 },
   collapsibleBody: { paddingHorizontal: 14, paddingBottom: 14, gap: 10 },
   hidden: { display: 'none' },
+  diedCard: { borderWidth: 1, borderRadius: 13, padding: 14, gap: 6 },
+  diedHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  diedDot: { width: 9, height: 9, borderRadius: 4.5 },
+  textAction: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
+  diedButton: { borderWidth: 1, borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   /** Everything after the hero gets the normal 16pt gutter. */
   belowHero: { paddingHorizontal: 16, gap: 16 },
 

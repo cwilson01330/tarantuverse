@@ -18,6 +18,7 @@ import { CopilotProvider, CopilotStep, walkthroughable, useCopilot } from 'react
 import { apiClient } from '../../src/services/api';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import { TYPE } from '../../src/theme/tokens';
 import TourTooltip from '../../src/components/TourTooltip';
 import AnnouncementBanner from '../../src/components/AnnouncementBanner';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -196,7 +197,7 @@ function StatChip({
 function DashboardHubScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
   const insets = useSafeAreaInsets();
   const { unreadCount } = useUnreadMessages();
 
@@ -636,6 +637,14 @@ function DashboardHubScreen() {
     statChipFooter: { fontSize: 11, fontWeight: '400', color: colors.textTertiary },
 
     // --- Feeding hero (design handoff screen 1, step 3) ---
+    overline: {
+      ...TYPE.caption,
+      fontWeight: '600',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      color: colors.textTertiary,
+      marginBottom: 12,
+    },
     heroHead: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1065,7 +1074,15 @@ function DashboardHubScreen() {
           order={2}
           name="Feeding Alerts"
         >
-        <WalkthroughableView style={styles.sectionCard}>
+        <WalkthroughableView
+          style={[
+            styles.sectionCard,
+            // Handoff: the large radius, and a red-tinted border while anything is
+            // overdue, so the card reads as "needs you" before its text does.
+            { borderRadius: layout.radius.lg },
+            overdueFeedings.length > 0 ? { borderColor: colors.error + '59' } : null,
+          ]}
+        >
           <Text style={styles.sectionTitle}>
             <MaterialCommunityIcons name="silverware-fork-knife" size={18} color={colors.textPrimary} />
             {'  '}Feeding
@@ -1267,7 +1284,9 @@ function DashboardHubScreen() {
           name="Tools"
         >
         <WalkthroughableView style={styles.sectionCard}>
-          <Text style={[styles.sectionTitle, { marginBottom: 14 }]}>Tools</Text>
+          {/* Handoff: a quiet overline, not a heading — the feeding card
+              above is the page's headline; this is the drawer of the rest. */}
+          <Text style={styles.overline} accessibilityRole="header">Everything else</Text>
           <View style={styles.actionsGrid}>
             {([
               { icon: 'plus-circle-outline', label: 'Add', picker: true },

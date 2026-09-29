@@ -50,6 +50,16 @@ const FEATURES: { emoji: string; title: string; body: string }[] = [
     body: 'Log pairings, track clutches through incubation, and manage offspring from hatch to placement.',
   },
   {
+    emoji: '🧳',
+    title: 'Sitter links',
+    body: 'Going away? Send whoever is feeding a link to a care card for each animal — no account needed, and it ends on the date you pick. Premium lets them mark feedings with a PIN you share.',
+  },
+  {
+    emoji: '👥',
+    title: 'Co-keepers',
+    body: 'Keep a collection with a partner or family: invite up to 10 people with their own accounts and choose who can look, who can log, and who can add animals. Every entry shows who made it.',
+  },
+  {
     emoji: '🔔',
     title: 'Reminders that respect your routine',
     body: 'Feeding reminders, low-feeder-stock alerts, and a daily digest — so nothing slips, without the app nagging.',
@@ -193,7 +203,7 @@ export default function Home() {
           </h2>
           <p className="text-neutral-300 max-w-2xl mx-auto mb-8">
             Every tracking feature is free. Go Premium for unlimited animals, feeder
-            inventory, and breeding tracking — or get <span className="text-herp-lime font-medium">All-Access</span> to
+            inventory, breeding tracking, and sharing your collection with co-keepers — or get <span className="text-herp-lime font-medium">All-Access</span> to
             unlock Tarantuverse too, with one subscription.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">

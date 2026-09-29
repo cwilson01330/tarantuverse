@@ -37,6 +37,7 @@ from app.utils.username_validation import validate_username
 from app.utils.rate_limit import limiter
 from app.utils.frontend_origin import resolve_frontend_origin, brand_for_origin
 from app.utils.file_validation import validate_image_bytes
+from app.utils.photo_cleanup import collect_for_user, delete_files
 
 router = APIRouter()
 
@@ -410,16 +411,22 @@ async def upload_avatar(
             file.filename or "avatar.jpg",
             detected_mime,
         )
-    except Exception as e:
+    except Exception:
+        # Never hand storage/decoder internals to the client.
+        logger.exception("avatar upload failed for %s", current_user.id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload avatar: {str(e)}"
+            detail="Couldn't upload that picture. Try another image.",
         )
 
-    # Update user's avatar_url
+    # Update user's avatar_url, then remove the file it replaces (it used to
+    # stay in storage forever). Only our own avatars/ area is ever deleted.
+    old_avatar = current_user.avatar_url
     current_user.avatar_url = avatar_url
     db.commit()
     db.refresh(current_user)
+    if old_avatar and old_avatar != avatar_url:
+        await delete_files(db, [(old_avatar, None)])
 
     return UserResponse.from_orm(current_user)
 
@@ -1543,12 +1550,19 @@ async def delete_account(
         from app.models.collection_member import end_memberships_of
         end_memberships_of(db, uid)
 
+        # Read the photo files BEFORE the cascade removes their rows. A failure
+        # here must never block the deletion itself — worst case some files
+        # outlive the account, which is what always happened before.
+        try:
+            _photo_files = collect_for_user(db, uid)
+        except Exception:
+            logger.exception("photo file collection failed for %s", uid)
+            _photo_files = []
+
         # Bulk delete bypasses ORM relationship handling and relies on the
         # DB's ON DELETE CASCADE for all dependent rows.
         db.query(User).filter(User.id == uid).delete(synchronize_session=False)
         db.commit()
-
-        return {"message": "Account deleted successfully"}
     except Exception:
         db.rollback()
         # Log the cause; never hand raw database errors to the client.
@@ -1557,3 +1571,8 @@ async def delete_account(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="We couldn't delete your account just now. Please try again, or contact support.",
         )
+
+    # "Permanently deleted" has to include the photos. The rows went with the
+    # cascade; the files are removed here, after the commit. Best-effort.
+    await delete_files(db, _photo_files)
+    return {"message": "Account deleted successfully"}

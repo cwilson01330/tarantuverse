@@ -81,6 +81,8 @@ export default function UpgradeModal({
     'Unlimited animals',
     'Unlimited photo uploads',
     'Full breeding module (pairings, egg sacs, offspring)',
+    'Co-keepers — share your collection with up to 10 people',
+    'Sitter logging + unlimited sitter links',
     'Advanced analytics & insights',
     // No "Data export" here: export is free and stays free. This list used
     // to sell it as premium — at the exact moment a keeper was deciding.

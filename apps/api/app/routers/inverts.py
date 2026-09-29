@@ -54,6 +54,7 @@ from app.utils.access import (
 )
 from app.services.retaxon_service import change_invert_taxon
 from app.schemas.death import MarkDiedRequest
+from app.utils.photo_cleanup import collect_for_animal, delete_files
 
 router = APIRouter()
 
@@ -625,6 +626,7 @@ async def delete_invert(
     from app.utils.animal_delete import clear_dependent_references
 
     clear_dependent_references(db, invert_id)
+    _photo_files = collect_for_animal(db, invert_id)
 
     # Remove the legacy twin too. GET /tarantulas/ reads the legacy table until
     # the C1 read cutover, so deleting only the invert row leaves the animal
@@ -633,6 +635,9 @@ async def delete_invert(
 
     db.delete(invert)
     db.commit()
+    # Photo FILES don't cascade with the rows (R2) — remove them now the
+    # delete is committed. Best-effort; see utils/photo_cleanup.
+    await delete_files(db, _photo_files)
     return None
 
 

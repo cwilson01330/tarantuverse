@@ -122,7 +122,7 @@
   },
   "app/colony/add-photo.tsx": {
     "fontSize": 5,
-    "borderRadius": 5
+    "borderRadius": 3
   },
   "app/colony/add.tsx": {
     "fontSize": 12,
@@ -251,7 +251,7 @@
   },
   "app/invert/add-photo.tsx": {
     "fontSize": 5,
-    "borderRadius": 5
+    "borderRadius": 3
   },
   "app/invert/add-substrate-change.tsx": {
     "fontSize": 4,
@@ -369,10 +369,6 @@
     "hex": 4,
     "fontSize": 12,
     "borderRadius": 5
-  },
-  "app/tarantula/add-photo.tsx": {
-    "fontSize": 9,
-    "borderRadius": 7
   },
   "app/tarantula/add-substrate-change.tsx": {
     "fontSize": 8,

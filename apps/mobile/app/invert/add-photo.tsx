@@ -2,13 +2,15 @@
  * Generic invert: add photo — ADR-007.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
+import { PhotoPickPreview } from '../../src/components/PhotoPickPreview';
+import UpgradeModal from '../../src/components/UpgradeModal';
 import { getInvert, uploadInvertPhoto, type InvertTaxon } from '../../src/lib/inverts';
 
 export default function AddInvertPhotoScreen() {
@@ -20,6 +22,7 @@ export default function AddInvertPhotoScreen() {
   const [taxon, setTaxon] = useState<InvertTaxon | null>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
+  const [upgrade, setUpgrade] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => { if (id) getInvert(id).then((i) => setTaxon(i.taxon)).catch(() => {}); }, [id]);
@@ -47,8 +50,17 @@ export default function AddInvertPhotoScreen() {
       await uploadInvertPhoto(taxon, id, form);
       router.back();
     } catch (err: any) {
-      const detail = err?.response?.data?.detail ?? (err instanceof Error ? err.message : 'Upload failed.');
-      Alert.alert('Could not upload', String(detail));
+      const detail = err?.response?.data?.detail;
+      // 402 = the free plan's photos-per-animal limit. The detail is an
+      // object ({ message, limit, … }); String() of it read "[object Object]".
+      if (err?.response?.status === 402) {
+        setUpgrade(typeof detail?.message === 'string' ? detail.message : 'The free plan keeps up to 5 photos per animal.');
+        return;
+      }
+      const msg = typeof detail === 'string' ? detail
+        : typeof detail?.message === 'string' ? detail.message
+          : err instanceof Error ? err.message : 'Upload failed.';
+      Alert.alert('Could not upload', msg);
     } finally { setUploading(false); }
   };
 
@@ -62,10 +74,7 @@ export default function AddInvertPhotoScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {imageUri ? (
-          <View style={styles.preview}>
-            <Image source={{ uri: imageUri }} style={styles.previewImage} />
-            <TouchableOpacity style={styles.removeButton} onPress={() => setImageUri(null)} accessibilityLabel="Remove photo"><MaterialCommunityIcons name="close" size={20} color="#fff" /></TouchableOpacity>
-          </View>
+          <PhotoPickPreview uri={imageUri} onRemove={() => setImageUri(null)} />
         ) : (
           <View style={styles.placeholder}><MaterialCommunityIcons name="image-outline" size={64} color={colors.textTertiary} /><Text style={styles.placeholderText}>Take or choose a photo</Text></View>
         )}
@@ -79,6 +88,14 @@ export default function AddInvertPhotoScreen() {
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
+      <UpgradeModal
+        visible={upgrade !== null}
+        onClose={() => setUpgrade(null)}
+        source="photo_cap"
+        title="Photo limit"
+        message={upgrade ?? ''}
+        feature="Unlimited photos per animal"
+      />
     </View>
   );
 }
@@ -86,9 +103,6 @@ export default function AddInvertPhotoScreen() {
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16, paddingBottom: 48 },
-  preview: { position: 'relative', borderRadius: 12, overflow: 'hidden', marginBottom: 16 },
-  previewImage: { width: '100%', height: 280 },
-  removeButton: { position: 'absolute', top: 12, right: 12, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   placeholder: { height: 280, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 16 },
   placeholderText: { color: colors.textTertiary, fontSize: 14 },
   actions: { flexDirection: 'row', gap: 12, marginBottom: 20 },

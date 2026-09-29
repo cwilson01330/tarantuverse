@@ -187,6 +187,35 @@ export default function FeaturesPage() {
             </ul>
           </div>
 
+          {/* Sitters & sharing */}
+          <div className="bg-white rounded-3xl p-8 shadow-lg">
+            <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mb-6">
+              <span className="text-4xl">🤝</span>
+            </div>
+            <h2 className="text-3xl font-bold mb-4">Sitters, Co-keepers & Colonies</h2>
+            <p className="text-gray-600 mb-6">
+              Keep your animals covered when you&apos;re away, and keep a collection with someone else.
+            </p>
+            <ul className="space-y-3 text-gray-600">
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 mt-1">✓</span>
+                <span>Sitter links — a care card per animal, no account needed, ends when you say</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 mt-1">✓</span>
+                <span>Sitter logging with a PIN you share (Premium)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 mt-1">✓</span>
+                <span>Co-keepers with viewer, logger and keeper roles (Premium to invite)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-500 mt-1">✓</span>
+                <span>Colonies tracked as populations — headcounts by stage over time</span>
+              </li>
+            </ul>
+          </div>
+
           {/* Community Features */}
           <div className="bg-white rounded-3xl p-8 shadow-lg">
             <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mb-6">
@@ -225,7 +254,7 @@ export default function FeaturesPage() {
             Ready to Get Started?
           </h2>
           <p className="text-xl text-purple-100 mb-10">
-            Join thousands of keepers managing their collections with Tarantuverse
+            Free to start, on web and both phones — your collection, your data
           </p>
           <Link
             href="/register"

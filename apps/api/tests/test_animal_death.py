@@ -75,7 +75,16 @@ def test_future_death_date_is_rejected():
     Rejected rather than silently clamped: clamping would record a date the
     keeper never chose."""
     with pytest.raises(ValidationError):
-        MarkDiedRequest(died_at=TODAY + timedelta(days=1))
+        MarkDiedRequest(died_at=TODAY + timedelta(days=2))
+
+
+def test_a_keepers_today_east_of_utc_is_allowed():
+    """The server runs on UTC. A keeper in Sydney marking a death at 8am on
+    their today is a day ahead of it — that's today, not the future."""
+    from app.schemas.death import latest_local_today
+    assert MarkDiedRequest(died_at=latest_local_today()).died_at == latest_local_today()
+    with pytest.raises(ValidationError):
+        MarkDiedRequest(died_at=latest_local_today() + timedelta(days=1))
 
 
 def test_today_is_allowed():

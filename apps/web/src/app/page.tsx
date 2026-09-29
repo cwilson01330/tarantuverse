@@ -46,6 +46,7 @@ export default function Home() {
             <div className="hidden md:flex items-center gap-6 text-sm text-gray-400">
               <a href="#keepers" className="hover:text-electric-blue-400 transition">For Keepers</a>
               <a href="#breeders" className="hover:text-electric-blue-400 transition">For Breeders</a>
+              <a href="#together" className="hover:text-electric-blue-400 transition">Sitters & Sharing</a>
               <a href="#feeders" className="hover:text-amber-400 transition">Feeders</a>
               <a href="#community" className="hover:text-electric-blue-400 transition">Community</a>
               <a href="#pricing" className="hover:text-electric-blue-400 transition">Pricing</a>
@@ -234,7 +235,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div>
-              <div className="text-2xl md:text-3xl font-bold text-electric-blue-400">270+</div>
+              <div className="text-2xl md:text-3xl font-bold text-electric-blue-400">400+</div>
               <div className="text-xs md:text-sm text-gray-400 mt-1">Species Care Sheets</div>
             </div>
             <div>
@@ -405,9 +406,9 @@ export default function Home() {
 
           <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 hover:shadow-lg hover:shadow-electric-blue-500/10 transition">
             <div className="text-3xl mb-3">📚</div>
-            <h3 className="text-lg font-bold mb-2 text-gray-100">270+ Species Care Sheets</h3>
+            <h3 className="text-lg font-bold mb-2 text-gray-100">400+ Species Care Sheets</h3>
             <p className="text-gray-300 text-sm leading-relaxed">
-              Link any animal — across all ten taxa — to our species database and get instant
+              Link any animal — across all eleven taxa — to our species database and get instant
               care requirements — temperature, humidity, enclosure size, feeding frequency, and
               safety warnings for Old World species and medically significant venom.
             </p>
@@ -528,6 +529,73 @@ export default function Home() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Keep it together: sitters, co-keepers, colonies ─────── */}
+      {/* Everything in this section is live on web and both apps. Free vs
+          premium is stated per card and must match the API gates:
+          sitter_passes.FREE_ACTIVE_PASS_LIMIT (2) + _require_logging_premium,
+          collection_members invite (premium), colonies (free; one colony counts
+          as one animal toward the cap). */}
+      <section id="together" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-3xl">🤝</span>
+          <span className="text-electric-blue-400 font-bold text-lg uppercase tracking-widest">Keep It Together</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-neon-pink-500/10 border border-neon-pink-500/30 text-neon-pink-300 rounded-full text-xs font-bold">
+            NEW
+          </span>
+        </div>
+        <h2 className="text-4xl md:text-5xl font-bold mb-6 text-gray-100">
+          Going away? Sharing a room?<br />
+          <span className="bg-gradient-primary bg-clip-text text-transparent">Your animals are covered.</span>
+        </h2>
+        <p className="text-xl text-gray-300 mb-16 max-w-2xl">
+          Hand a sitter exactly what they need, keep a collection with a partner, and track a
+          whole colony as one population — without spreadsheets, screenshots or group chats.
+        </p>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 transition">
+            <div className="text-3xl mb-3">🧳</div>
+            <h3 className="text-lg font-bold mb-2 text-gray-100">Sitter links</h3>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Send whoever&apos;s feeding while you&apos;re away a link to a care card for each
+              animal — what to feed, what not to, and your routine. No account needed, and it
+              ends on the date you pick.
+            </p>
+            <ul className="mt-4 space-y-1.5 text-sm text-gray-300">
+              <li><span className="text-electric-blue-400 font-bold">✓</span> Free: 2 open links at a time</li>
+              <li><span className="text-neon-pink-400 font-bold">★</span> Premium: your sitter marks feedings with a PIN you share</li>
+            </ul>
+          </div>
+
+          <div className="bg-dark-50 border-2 border-neon-pink-500/30 rounded-2xl p-6 hover:border-neon-pink-500/50 transition">
+            <div className="text-3xl mb-3">👥</div>
+            <h3 className="text-lg font-bold mb-2 text-gray-100">Co-keepers</h3>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Share your collection with up to 10 people, each on their own account. Choose who
+              can just look, who can log feedings and molts, and who can add and edit animals.
+              Every entry shows who made it.
+            </p>
+            <ul className="mt-4 space-y-1.5 text-sm text-gray-300">
+              <li><span className="text-neon-pink-400 font-bold">★</span> Premium to invite — joining someone&apos;s collection is free</li>
+              <li><span className="text-electric-blue-400 font-bold">✓</span> Only you can delete, transfer or export</li>
+            </ul>
+          </div>
+
+          <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-6 hover:border-electric-blue-500/40 transition">
+            <div className="text-3xl mb-3">🪳</div>
+            <h3 className="text-lg font-bold mb-2 text-gray-100">Colonies as populations</h3>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Isopods, roaches, communal tarantulas: track a colony as one entry with headcounts by
+              stage. Log births, deaths, removals and recounts (a couple of taps in the app) and watch the
+              population over time — what you logged, never a guess.
+            </p>
+            <ul className="mt-4 space-y-1.5 text-sm text-gray-300">
+              <li><span className="text-electric-blue-400 font-bold">✓</span> Free — a colony counts as one animal</li>
+            </ul>
           </div>
         </div>
       </section>
@@ -978,7 +1046,7 @@ export default function Home() {
               <div className="mb-4"><span className="text-5xl font-bold bg-gradient-primary bg-clip-text text-transparent">$0</span></div>
               <p className="text-gray-400 mb-6 text-sm">Perfect for casual keepers</p>
               <ul className="space-y-3 mb-6 text-sm">
-                {['Up to 15 animals', '5 photos per animal', 'Feeding & molt tracking', 'Growth analytics', 'Web + mobile apps', 'Species care database', 'Community access'].map(f => (
+                {['Up to 15 animals', '5 photos per animal', 'Feeding & molt tracking', 'Colony population tracking', 'Sitter links (2 at a time)', 'Growth analytics', 'Web + mobile apps', 'Species care database', 'Community access'].map(f => (
                   <li key={f} className="flex items-start gap-2">
                     <span className="text-electric-blue-400 font-bold">✓</span>
                     <span className="text-gray-300">{f}</span>
@@ -1002,7 +1070,7 @@ export default function Home() {
               </div>
               <p className="text-neon-pink-300 mb-6 text-sm font-semibold">Cancel anytime</p>
               <ul className="space-y-3 mb-6 text-sm">
-                {['Everything in Free, plus:', 'Unlimited animals', 'Unlimited photos', 'Breeding module (pairings, egg sacs, offspring)', 'Advanced analytics & predictions', 'Priority support'].map((f, i) => (
+                {['Everything in Free, plus:', 'Unlimited animals', 'Unlimited photos', 'Co-keepers — share with up to 10 people', 'Sitter logging + unlimited sitter links', 'Breeding module (pairings, egg sacs, offspring)', 'Advanced analytics & predictions', 'Priority support'].map((f, i) => (
                   <li key={f} className="flex items-start gap-2">
                     <span className="text-neon-pink-400 font-bold">{i === 0 ? '→' : '✓'}</span>
                     <span className={i === 0 ? 'text-gray-200 font-semibold' : 'text-gray-200'}>{f}</span>

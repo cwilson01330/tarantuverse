@@ -116,7 +116,7 @@ export default function PricingPage() {
         </h1>
         <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
           Track tarantulas, scorpions, centipedes, mantises, and more — all in one collection.
-          Start free with generous limits. Upgrade for unlimited tracking and breeding features.
+          Start free with generous limits. Upgrade for unlimited tracking, breeding, and keeping your collection with co-keepers and sitters.
         </p>
       </section>
 
@@ -155,6 +155,18 @@ export default function PricingPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span className="text-gray-700 dark:text-gray-300">Basic analytics</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-gray-700 dark:text-gray-300">Colony population tracking</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-gray-700 dark:text-gray-300">Sitter links (2 at a time)</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-green-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -209,6 +221,18 @@ export default function PricingPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span className="text-gray-700 dark:text-gray-300">Full breeding module</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-gray-700 dark:text-gray-300">Co-keepers — share with up to 10 people</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-gray-700 dark:text-gray-300">Sitter logging + unlimited sitter links</span>
               </li>
               <li className="flex items-start gap-2">
                 <svg className="w-5 h-5 text-purple-500 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -360,13 +384,33 @@ export default function PricingPage() {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               <tr>
                 <td className="px-6 py-4 text-gray-900 dark:text-white">Animals (tarantulas, scorpions, centipedes & more)</td>
-                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">20</td>
+                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">15</td>
                 <td className="px-6 py-4 text-center text-purple-600 dark:text-purple-400 font-semibold">Unlimited</td>
               </tr>
               <tr className="bg-gray-50 dark:bg-gray-700/30">
                 <td className="px-6 py-4 text-gray-900 dark:text-white">Photos per animal</td>
                 <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">5</td>
                 <td className="px-6 py-4 text-center text-purple-600 dark:text-purple-400 font-semibold">Unlimited</td>
+              </tr>
+              <tr>
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Colony population tracking</td>
+                <td className="px-6 py-4 text-center text-green-500">✓</td>
+                <td className="px-6 py-4 text-center text-green-500">✓</td>
+              </tr>
+              <tr className="bg-gray-50 dark:bg-gray-700/30">
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Sitter links (open at once)</td>
+                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">2</td>
+                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">Unlimited</td>
+              </tr>
+              <tr>
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Sitter logging (PIN)</td>
+                <td className="px-6 py-4 text-center text-gray-400">-</td>
+                <td className="px-6 py-4 text-center text-green-500">✓</td>
+              </tr>
+              <tr className="bg-gray-50 dark:bg-gray-700/30">
+                <td className="px-6 py-4 text-gray-900 dark:text-white">Co-keepers</td>
+                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">Join others free</td>
+                <td className="px-6 py-4 text-center text-gray-600 dark:text-gray-400">Invite up to 10</td>
               </tr>
               <tr>
                 <td className="px-6 py-4 text-gray-900 dark:text-white">Breeding module</td>
@@ -408,6 +452,17 @@ export default function PricingPage() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow">
             <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">Do you offer promo codes?</h3>
             <p className="text-gray-600 dark:text-gray-400">Yes! Early adopters may receive promo codes for free premium access. If you have a code, you can redeem it in your account settings.</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow">
+            <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">Do my sitter and co-keepers need Premium?</h3>
+            <p className="text-gray-600 dark:text-gray-400">No. A sitter doesn&apos;t need an account at all, and joining someone else&apos;s collection as a co-keeper is free. Premium is only needed to invite co-keepers to your collection and to let a sitter log feedings.</p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow">
+            <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">Does this cover Herpetoverse too?</h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Tarantuverse Premium covers Tarantuverse. If you keep reptiles or amphibians as well, the All-Access plan covers both apps with one subscription — see{' '}
+              <a href="https://herpetoverse.com/pricing" className="text-purple-600 dark:text-purple-400 underline">Herpetoverse pricing</a>.
+            </p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow">
             <h3 className="font-bold text-lg mb-2 text-gray-900 dark:text-white">Can I cancel my monthly subscription?</h3>

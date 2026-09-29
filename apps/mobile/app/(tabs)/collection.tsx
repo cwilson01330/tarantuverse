@@ -18,7 +18,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiClient } from '../../src/services/api';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -47,6 +47,7 @@ import {
 } from '../../src/lib/whip-spiders';
 import {
   listInverts,
+  listDeceasedInverts,
   invertDisplayName,
   INVERT_TAXA,
   taxonMdiIcon,
@@ -54,6 +55,7 @@ import {
   type InvertTaxon,
 } from '../../src/lib/inverts';
 import { AppHeader } from '../../src/components/AppHeader';
+import DeceasedArchive from '../../src/components/DeceasedArchive';
 import {
   listColonies,
   type ColonyListItem,
@@ -125,7 +127,10 @@ interface PremoltPrediction {
 // those features ship for the additional surfaces. New taxa land
 // here when added.
 // 'due' is a cross-taxon slice (everything overdue), not a taxon.
-type TaxonFilter = 'all' | 'due' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | InvertTaxon;
+/** The Died chip's status mark (handoff §14.4: a dot, not a symbol). */
+const CHIP_DOT = 7;
+
+type TaxonFilter = 'all' | 'due' | 'died' | 'tarantulas' | 'scorpions' | 'centipedes' | 'whip_spiders' | InvertTaxon;
 
 /**
  * Chip key for a taxon.
@@ -256,15 +261,22 @@ function CollectionScreen() {
   // getImageUrl now lives in src/utils/image-url.ts so dev/staging
   // builds use EXPO_PUBLIC_API_URL instead of the hardcoded prod host.
 
-  useEffect(() => {
-    fetchTarantulas();
-    fetchScorpions();
-    fetchCentipedes();
-    fetchWhipSpiders();
-    fetchOtherInverts();
-    fetchColonies();
-    loadFeedingStatuses();
-  }, []);
+  // On focus, not just on mount: coming back from a detail screen where an
+  // animal was marked died (or revived) must move it between the grid and the
+  // Died archive. Mount-only fetching left both stale until a manual pull.
+  useFocusEffect(
+    useCallback(() => {
+      fetchTarantulas();
+      fetchScorpions();
+      fetchCentipedes();
+      fetchWhipSpiders();
+      fetchOtherInverts();
+      fetchColonies();
+      fetchDeceased();
+      loadFeedingStatuses();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   /**
    * Feeding status for EVERY animal in one request.
@@ -356,6 +368,24 @@ function CollectionScreen() {
       setOtherInverts([]);
     }
   };
+
+  // The "Died" archive (handoff §14.5). Fetched alongside the rest so the
+  // chip can show its count; a failure just leaves the chip off — the living
+  // collection is what this screen is for.
+  const [deceased, setDeceased] = useState<GenericInvert[]>([]);
+  const fetchDeceased = async () => {
+    try {
+      setDeceased(await listDeceasedInverts());
+    } catch {
+      /* keep whatever we had */
+    }
+  };
+
+  // Last record revived (Undo on its detail) → the chip disappears; don't
+  // leave the keeper on a filter they can no longer see or leave.
+  useEffect(() => {
+    if (taxonFilter === 'died' && deceased.length === 0) setTaxonFilter('all');
+  }, [taxonFilter, deceased.length]);
 
   const fetchColonies = async () => {
     // Colony mode (ADR-010) — a separate first-class collection source merged
@@ -589,6 +619,7 @@ function CollectionScreen() {
       fetchWhipSpiders(),
       fetchOtherInverts(),
       fetchColonies(),
+      fetchDeceased(),
       loadFeedingStatuses(),
     ]);
     setRefreshing(false);
@@ -762,7 +793,10 @@ function CollectionScreen() {
     if (!actionTarget) return;
     const tarantulaId = actionTarget.id;
     setActionTarget(null);
-    router.push(`/tarantula/add-molt?id=${tarantulaId}`);
+    // The generic molt form — same one the detail screen uses (outcome,
+    // final molt, measurements, and the §14.9 offer after a fatal molt).
+    // Tarantulas share their id with the inverts row, so this is the same animal.
+    router.push(`/invert/add-molt?id=${tarantulaId}` as any);
   };
 
   const handleEditFromSheet = () => {
@@ -1579,6 +1613,8 @@ function CollectionScreen() {
     },
 
     // --- Filter chips ---
+    emptyArchiveLink: { marginTop: 16, minHeight: 44, justifyContent: 'center' },
+    filterChipDot: { width: CHIP_DOT, height: CHIP_DOT, borderRadius: CHIP_DOT / 2 },
     filterChipRow: {
       flexDirection: 'row',
       gap: 7,
@@ -1757,7 +1793,7 @@ function CollectionScreen() {
       value: TaxonFilter,
       label: string,
       count: number,
-      opts?: { icon?: string; iconColor?: string },
+      opts?: { icon?: string; iconColor?: string; dot?: boolean },
     ) => {
       const active = taxonFilter === value;
       return (
@@ -1779,6 +1815,9 @@ function CollectionScreen() {
               size={14}
               color={active ? '#fff' : opts.iconColor ?? colors.textSecondary}
             />
+          ) : null}
+          {opts?.dot ? (
+            <View style={[styles.filterChipDot, { backgroundColor: active ? '#fff' : colors.textTertiary }]} />
           ) : null}
           <Text
             style={[
@@ -1809,6 +1848,8 @@ function CollectionScreen() {
           if (count === 0) return null;
           return chip(value, label, count, { icon: taxonMdiIcon(taxon) });
         })}
+        {/* Last, after the living taxa: a status, not a kind of animal. */}
+        {deceased.length > 0 ? chip('died', 'Died', deceased.length, { dot: true }) : null}
       </ScrollView>
     );
   };
@@ -1973,7 +2014,16 @@ function CollectionScreen() {
         ) : null}
       </AppHeader>
 
-      {collectionEmpty ? (
+      {taxonFilter === 'died' ? (
+        <DeceasedArchive
+          items={deceased}
+          search={searchQuery}
+          header={<TaxonFilterChips />}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          onOpen={(a) => router.push(`/invert/${a.id}` as any)}
+        />
+      ) : collectionEmpty ? (
         <View style={styles.empty}>
           <MaterialCommunityIcons name="paw" size={64} color={colors.textTertiary} />
           <Text style={styles.emptyTitle}>No animals yet</Text>
@@ -2008,6 +2058,20 @@ function CollectionScreen() {
               Browse Species
             </Text>
           </TouchableOpacity>
+          {/* A keeper whose last animal died lands here, and the Died chip
+              lives in a row this state doesn't render. Without this link
+              the records we promised to keep would be unreachable. */}
+          {deceased.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setTaxonFilter('died')}
+              style={styles.emptyArchiveLink}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.filteredEmptyAction, { color: colors.accent }]}>
+                {deceased.length} {deceased.length === 1 ? 'record' : 'records'} kept — view
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <>

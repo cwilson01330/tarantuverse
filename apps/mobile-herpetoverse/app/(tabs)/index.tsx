@@ -38,7 +38,10 @@ import {
   quickFeedAnimal,
   getAnimalLimits,
   listAnimals,
+  type Animal,
 } from '../../src/lib/animals';
+import { listDeceasedAnimals } from '../../src/lib/lifecycle';
+import { DeceasedArchive } from '../../src/components/DeceasedArchive';
 import { GradientBand } from '../../src/components/GradientBand';
 import { AnimalActionSheet } from '../../src/components/AnimalActionSheet';
 import { withErrorBoundary } from '../../src/components/ErrorBoundary';
@@ -113,6 +116,10 @@ function CollectionScreen() {
   // Taxon filter — null = "All". Only taxa the keeper actually owns get
   // a chip (see ownedTaxa below), so the bar never shows empty buckets.
   const [taxonFilter, setTaxonFilter] = useState<AnimalTaxon | null>(null);
+  // The "Died" archive (handoff §14.5) — a status view, not a taxon, so it's
+  // its own flag. Best-effort fetch: a failure just leaves the chip off.
+  const [deceased, setDeceased] = useState<Animal[]>([]);
+  const [showDied, setShowDied] = useState(false);
   // Long-press quick-actions sheet. `actionTarget` holds the animal
   // whose sheet is open (null = closed); `actionBusy` gates the rows
   // while a write is in flight, and `actionBusyKey` says which row
@@ -207,6 +214,9 @@ function CollectionScreen() {
     getAnimalLimits()
       .then(setLimits)
       .catch(() => setLimits(null));
+    listDeceasedAnimals()
+      .then(setDeceased)
+      .catch(() => {});
 
     // ADR-003: one unified animals endpoint — every taxon in a single
     // call. The `taxon` discriminator rides on each row.
@@ -398,6 +408,43 @@ function CollectionScreen() {
   if (taxonFilter && ownedTaxa.length > 0 && !ownedTaxa.includes(taxonFilter)) {
     setTaxonFilter(null);
   }
+  // Last record revived → the chip disappears; don't strand the keeper on it.
+  if (showDied && deceased.length === 0) {
+    setShowDied(false);
+  }
+
+  const filterBar =
+    ownedTaxa.length > 1 || deceased.length > 0 ? (
+      <TaxonFilterBar
+        ownedTaxa={ownedTaxa}
+        active={showDied ? undefined : taxonFilter}
+        onChange={(t) => { setShowDied(false); setTaxonFilter(t); }}
+        diedCount={deceased.length}
+        diedActive={showDied}
+        onDied={() => setShowDied(true)}
+      />
+    ) : null;
+
+  // ---------- Died archive ----------
+  if (showDied) {
+    return (
+      <SafeAreaView
+        edges={['left', 'right', 'bottom']}
+        style={[styles.safeArea, { backgroundColor: colors.background }]}
+      >
+        {collectionHeader}
+        <DeceasedArchive
+          items={deceased}
+          query={query}
+          header={filterBar ?? <View />}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          onOpen={(a) => router.push(`/reptile/${a.id}` as never)}
+          contentStyle={styles.listContent}
+        />
+      </SafeAreaView>
+    );
+  }
 
   // ---------- Loading skeleton ----------
   if (rows === null) {
@@ -448,6 +495,19 @@ function CollectionScreen() {
             <MaterialCommunityIcons name="plus" size={18} color="#0B0B0B" />
             <Text style={styles.emptyButtonText}>Add your first reptile</Text>
           </TouchableOpacity>
+          {/* A keeper whose last animal died lands here; the chip row isn't
+              rendered in this state, so the kept records need a way in. */}
+          {deceased.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setShowDied(true)}
+              style={styles.archiveLink}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.emptyText, { color: colors.accent }]}>
+                {deceased.length} {deceased.length === 1 ? 'record' : 'records'} kept — view
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -480,13 +540,7 @@ function CollectionScreen() {
             {/* Taxon filter — only when the keeper owns 2+ taxa. Chips are
                 generated from the registry (glyph + plural) for the taxa
                 actually present. */}
-            {ownedTaxa.length > 1 && (
-              <TaxonFilterBar
-                ownedTaxa={ownedTaxa}
-                active={taxonFilter}
-                onChange={setTaxonFilter}
-              />
-            )}
+            {filterBar}
           </View>
         }
         renderItem={({ item }) => (
@@ -560,10 +614,17 @@ function TaxonFilterBar({
   ownedTaxa,
   active,
   onChange,
+  diedCount,
+  diedActive,
+  onDied,
 }: {
   ownedTaxa: AnimalTaxon[];
-  active: AnimalTaxon | null;
+  /** undefined = no taxon chip selected (the Died view is showing). */
+  active: AnimalTaxon | null | undefined;
   onChange: (t: AnimalTaxon | null) => void;
+  diedCount: number;
+  diedActive: boolean;
+  onDied: () => void;
 }) {
   const { colors, layout } = useTheme();
 
@@ -607,6 +668,29 @@ function TaxonFilterBar({
           </TouchableOpacity>
         );
       })}
+      {/* Last: a status, not a kind of animal. A neutral dot (§14.4). */}
+      {diedCount > 0 && (
+        <TouchableOpacity
+          onPress={onDied}
+          style={[
+            styles.filterChip,
+            styles.diedChip,
+            {
+              backgroundColor: diedActive ? colors.primary : colors.surface,
+              borderColor: diedActive ? colors.primary : colors.border,
+              borderRadius: layout.radius.sm,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: diedActive }}
+          accessibilityLabel={`Died, ${diedCount}`}
+        >
+          <View style={[styles.diedDot, { backgroundColor: diedActive ? '#0B0B0B' : colors.textTertiary }]} />
+          <Text style={[styles.filterChipText, { color: diedActive ? '#0B0B0B' : colors.textSecondary }]}>
+            Died {diedCount}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -886,6 +970,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderWidth: 1,
   },
+  diedChip: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  diedDot: { width: 7, height: 7, borderRadius: 3.5 },
+  archiveLink: { marginTop: 16, minHeight: 44, justifyContent: 'center' },
   filterChipText: {
     fontSize: 13,
     fontWeight: '600',

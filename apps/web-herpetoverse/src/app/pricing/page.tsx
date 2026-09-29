@@ -35,8 +35,9 @@ export default function PricingPage() {
             Free to keep. Free to grow.
           </h1>
           <p className="text-neutral-400 max-w-2xl mx-auto">
-            Herpetoverse is free, and every tracking feature stays free. The
-            only limit on the free plan is how many animals you can add.
+            Herpetoverse is free, and every tracking feature — feedings, weights,
+            sheds, photos, care sheets — stays free. Premium lifts the animal cap
+            and adds breeding, feeder inventory, and sharing.
           </p>
         </header>
 

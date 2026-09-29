@@ -869,6 +869,14 @@ export default function SubscriptionScreen() {
                 </View>
                 <View style={styles.featureItem}>
                   <MaterialCommunityIcons name="check-circle" size={18} color="white" />
+                  <Text style={styles.featureText}>Co-keepers — share with up to 10 people</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <MaterialCommunityIcons name="check-circle" size={18} color="white" />
+                  <Text style={styles.featureText}>Sitter logging + unlimited sitter links</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <MaterialCommunityIcons name="check-circle" size={18} color="white" />
                   <Text style={styles.featureText}>Priority support</Text>
                 </View>
               </View>

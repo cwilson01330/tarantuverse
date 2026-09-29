@@ -2,14 +2,16 @@
 Storage service abstraction layer for handling file uploads.
 Supports both local filesystem and Cloudflare R2/S3-compatible storage.
 """
+import asyncio
 import os
 import uuid
 from typing import Optional, Tuple
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageOps
 import boto3
 from botocore.client import Config
 from app.config import settings
+from app.utils.image_sanitize import sanitize_image
 
 
 class StorageService:
@@ -58,11 +60,12 @@ class StorageService:
             print("⚠️  Using local filesystem storage (development mode)")
     
     def _create_thumbnail(self, image_data: bytes, max_size: int = 300) -> bytes:
-        """Create a thumbnail from image data."""
+        """Create a thumbnail from image data (orientation applied, no EXIF)."""
         img = Image.open(BytesIO(image_data))
-        
-        # Convert RGBA to RGB if necessary
-        if img.mode == 'RGBA':
+        img = ImageOps.exif_transpose(img) or img
+
+        # JPEG can't hold alpha or palette modes.
+        if img.mode not in ('RGB', 'L'):
             img = img.convert('RGB')
         
         # Calculate thumbnail size maintaining aspect ratio
@@ -93,8 +96,8 @@ class StorageService:
             Avatar URL
         """
         # Generate unique filename
-        file_extension = os.path.splitext(filename)[1] or '.jpg'
-        unique_filename = f"avatar_{uuid.uuid4()}{file_extension}"
+        # Always JPEG (see _create_square_avatar), whatever the client named it.
+        unique_filename = f"avatar_{uuid.uuid4()}.jpg"
 
         # Create square avatar (200x200)
         avatar_data = self._create_square_avatar(file_data, size=200)
@@ -119,11 +122,15 @@ class StorageService:
         return avatar_url
 
     def _create_square_avatar(self, image_data: bytes, size: int = 200) -> bytes:
-        """Create a square avatar from image data (crops to center)."""
-        img = Image.open(BytesIO(image_data))
+        """Create a square avatar from image data (crops to center).
 
-        # Convert RGBA to RGB if necessary
-        if img.mode == 'RGBA':
+        Orientation is applied BEFORE the crop — otherwise a portrait photo
+        taken on a phone is cropped sideways. Re-encoding drops all EXIF.
+        """
+        img = Image.open(BytesIO(image_data))
+        img = ImageOps.exif_transpose(img) or img
+
+        if img.mode not in ('RGB', 'L'):
             img = img.convert('RGB')
 
         # Crop to square (center crop)
@@ -166,6 +173,7 @@ class StorageService:
         URL.
         """
         img = Image.open(BytesIO(file_data))
+        img = ImageOps.exif_transpose(img) or img
         # JPEG has no alpha channel; P/LA/RGBA all need flattening or the save
         # raises. Converting via RGB keeps it simple and lossless enough here.
         if img.mode in ("RGBA", "LA", "P"):
@@ -203,13 +211,18 @@ class StorageService:
         Returns:
             Tuple of (photo_url, thumbnail_url)
         """
-        # Generate unique filename
-        file_extension = os.path.splitext(filename)[1] or '.jpg'
+        # Strip EXIF/GPS, apply orientation, cap the size — see
+        # utils/image_sanitize.py. `filename` and `content_type` come from the
+        # client and are NOT trusted: the stored type and extension follow the
+        # bytes. Raises ValueError for anything that isn't a decodable image.
+        # CPU-bound decoding runs in a worker thread so one big photo can't
+        # stall every other request on the event loop.
+        file_data, content_type, file_extension = await asyncio.to_thread(sanitize_image, file_data)
         unique_filename = f"{uuid.uuid4()}{file_extension}"
-        thumbnail_filename = f"thumb_{unique_filename}"
+        thumbnail_filename = f"thumb_{uuid.uuid4()}.jpg"
 
-        # Create thumbnail
-        thumbnail_data = self._create_thumbnail(file_data)
+        # Create thumbnail (from the clean, upright image)
+        thumbnail_data = await asyncio.to_thread(self._create_thumbnail, file_data)
 
         if self.use_r2:
             # Upload to R2
@@ -342,13 +355,27 @@ class StorageService:
             await self._delete_from_local(photo_url)
             await self._delete_from_local(thumbnail_url)
     
+    async def delete_file(self, url: str) -> None:
+        """Delete one stored file by its URL (R2 or local dev)."""
+        if not url:
+            return
+        if self.use_r2:
+            await self._delete_from_r2(url)
+        else:
+            await self._delete_from_local(url)
+
     async def _delete_from_r2(self, url: str) -> None:
         """Delete file from R2."""
         try:
-            # Extract key from URL
-            # Format: https://pub-xxx.r2.dev/photos/filename.jpg
-            key = url.replace(f"{self.public_url_base}/", "")
-            
+            # Only a URL that STARTS with our public base maps to a key.
+            # (`str.replace` used to strip the base anywhere in the string, so
+            # a crafted URL could be steered at any object in the bucket.)
+            prefix = f"{self.public_url_base}/"
+            if not url.startswith(prefix):
+                print(f"⚠️  Refusing to delete non-R2 URL: {url}")
+                return
+            key = url[len(prefix):]
+
             self.s3_client.delete_object(
                 Bucket=self.bucket_name,
                 Key=key
@@ -361,9 +388,14 @@ class StorageService:
     async def _delete_from_local(self, url: str) -> None:
         """Delete file from local filesystem."""
         try:
-            # Convert URL to file path
+            # Convert URL to file path — and refuse anything that resolves
+            # outside the uploads directory (e.g. /uploads/photos/../../x).
             file_path = url.lstrip('/')
-            
+            root = os.path.realpath("uploads")
+            if not os.path.realpath(file_path).startswith(root + os.sep):
+                print(f"⚠️  Refusing to delete outside uploads/: {url}")
+                return
+
             if os.path.exists(file_path):
                 os.remove(file_path)
                 print(f"✅ Deleted local file: {file_path}")

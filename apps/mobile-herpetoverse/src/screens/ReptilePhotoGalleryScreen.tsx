@@ -71,15 +71,18 @@ export function ReptilePhotoGalleryScreen() {
   // can't be shown here). QR upload links stay with the owner.
   const { user } = useAuth();
   const [ownerId, setOwnerId] = useState<string | null>(null);
+  // A died animal's photos are part of its kept record — viewable, not
+  // editable (ADR-015 §14.3).
+  const [dead, setDead] = useState(false);
   useEffect(() => {
     if (!id) return;
     let alive = true;
-    getAnimal(id).then((a) => { if (alive) setOwnerId(a.user_id); }).catch(() => {});
+    getAnimal(id).then((a) => { if (alive) { setOwnerId(a.user_id); setDead(!!a.died_at); } }).catch(() => {});
     return () => { alive = false; };
   }, [id]);
   const { role } = useCollectionRole(user?.id, ownerId);
-  const canUpload = can(role, 'logger');
-  const canManage = can(role, 'keeper');
+  const canUpload = can(role, 'logger') && !dead;
+  const canManage = can(role, 'keeper') && !dead;
   const isOwner = role === 'owner';
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);

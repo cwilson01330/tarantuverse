@@ -422,6 +422,12 @@
   - Validates raw bytes instead of trusting `Content-Type` header
   - Applied to avatar upload and photo upload endpoints
 
+- **Photo Privacy & Storage (2026-09-29)**:
+  - Every photo upload goes through `StorageService.upload_photo` → `utils/image_sanitize.py::sanitize_image`: EXIF orientation applied, then re-encoded with NO EXIF/GPS/XMP/comments (ICC kept only if colour mode unchanged). Stored type + extension follow the bytes, never the client. Dimension/frame limits are checked from the header before decoding (decompression bombs). MPO (multi-picture phone JPEGs) is treated as JPEG. Never store uploaded bytes directly.
+  - Backfill for pre-fix originals: `apps/api/strip_photo_exif.py` (Render shell, `--dry-run` first; purge the Cloudflare cache afterwards).
+  - Deleting an animal, colony, photo or account removes its files after the commit via `utils/photo_cleanup.py`. Only exact generated keys (`photos/<uuid>.<ext>`, `thumbnails/thumb_<uuid>…`, `avatars/avatar_<uuid>…`) are ever deletable, and only when no row still references them — `avatar_url` is free text, so a loose check lets users delete others' files. `_delete_from_r2` only strips a LEADING base URL.
+  - Free TV plan = 5 photos per animal, enforced by `utils/limits.py::enforce_photo_cap` on every TV upload route incl. `/inverts/{id}/photos` and QR (owner's plan decides). HV and colony photos are uncapped by design.
+
 - **Password & Secret Management**:
   - Password complexity validator (uppercase, lowercase, digit, special char)
   - Dev secret detection — refuses to start in production with default key
@@ -1984,7 +1990,14 @@ This includes:
   one ever sees 20. Quoting 20 as "the free cap" in TV copy would be wrong by
   five.
 
-  Premium is shared — any active subscription lifts both. The `free` plan row
+  Premium is **per-app** (`User.is_premium_for_app(app)`): `premium` covers
+  TV, `herpetoverse_premium` covers HV, and `bundle_premium` ("All-Access",
+  `app='both'`) covers both. It is NOT shared — a TV subscriber is free on HV.
+  Premium also gates: co-keeper invites (joining is free; max 10 per
+  collection), sitter logging, and sitter links beyond 2 open at a time
+  (`FREE_ACTIVE_PASS_LIMIT`). Colonies are free and count as 1 animal. Keep
+  landing/pricing copy (web + both mobile UpgradeModals + mobile
+  `pricing.tsx`/`subscription.tsx`) in step with these. The `free` plan row
   carries `max_animals = 15`, and the plan wins at runtime over the constant
   whenever a subscription row exists, so read the plan rather than this file.
   (Legacy `max_tarantulas = 10` on the same row is dead — superseded by

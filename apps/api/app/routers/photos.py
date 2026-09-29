@@ -27,6 +27,8 @@ from app.services.storage import storage_service
 from app.config import settings
 from app.utils.file_validation import validate_image_bytes
 from app.utils.hero_photo import sync_hero_photo
+from app.utils.photo_cleanup import delete_files
+from app.utils.limits import enforce_photo_cap
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 
 
@@ -81,21 +83,8 @@ async def upload_photo(
     if not tarantula:
         raise HTTPException(status_code=404, detail="Tarantula not found")
 
-    # Check photo count limit
-    limits = current_user.get_subscription_limits()
-    current_photo_count = db.query(Photo).filter(Photo.tarantula_id == tarantula_id).count()
-
-    # -1 means unlimited (premium)
-    if limits["max_photos_per_tarantula"] != -1 and current_photo_count >= limits["max_photos_per_tarantula"]:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail={
-                "message": f"You've reached the limit of {limits['max_photos_per_tarantula']} photos per tarantula on the free plan. Upgrade to premium for unlimited photos!",
-                "current_count": current_photo_count,
-                "limit": limits["max_photos_per_tarantula"],
-                "is_premium": limits["is_premium"]
-            }
-        )
+    # Free-plan photo limit — one shared check for every TV upload route.
+    enforce_photo_cap(db, current_user, tarantula_id)
 
     try:
         # Read file data before any other validation
@@ -154,6 +143,11 @@ async def upload_photo(
 
     except HTTPException:
         raise
+    except ValueError:
+        # The bytes passed the magic-number check but aren\'t a decodable image
+        # (truncated, corrupt). That\'s the upload\'s fault, not ours: 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That file isn\'t a readable image. Try another photo.")
     except Exception:
         db.rollback()
         logger.exception("Photo upload failed for tarantula %s", tarantula_id)
@@ -260,6 +254,11 @@ async def upload_animal_photo(
 
     except HTTPException:
         raise
+    except ValueError:
+        # The bytes passed the magic-number check but aren\'t a decodable image
+        # (truncated, corrupt). That\'s the upload\'s fault, not ours: 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That file isn\'t a readable image. Try another photo.")
     except Exception:
         db.rollback()
         logger.exception("Photo upload failed for animal %s", animal_id)
@@ -320,6 +319,7 @@ async def upload_scorpion_photo(
 
     if not scorpion:
         raise HTTPException(status_code=404, detail="Scorpion not found")
+    enforce_photo_cap(db, current_user, scorpion_id)
 
     try:
         file_data = await file.read()
@@ -373,6 +373,11 @@ async def upload_scorpion_photo(
 
     except HTTPException:
         raise
+    except ValueError:
+        # The bytes passed the magic-number check but aren\'t a decodable image
+        # (truncated, corrupt). That\'s the upload\'s fault, not ours: 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That file isn\'t a readable image. Try another photo.")
     except Exception:
         db.rollback()
         logger.exception("Photo upload failed for scorpion %s", scorpion_id)
@@ -438,6 +443,7 @@ async def upload_centipede_photo(
     ).first()
     if not centipede:
         raise HTTPException(status_code=404, detail="Centipede not found")
+    enforce_photo_cap(db, current_user, centipede_id)
 
     try:
         file_data = await file.read()
@@ -485,6 +491,11 @@ async def upload_centipede_photo(
 
     except HTTPException:
         raise
+    except ValueError:
+        # The bytes passed the magic-number check but aren\'t a decodable image
+        # (truncated, corrupt). That\'s the upload\'s fault, not ours: 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That file isn\'t a readable image. Try another photo.")
     except Exception:
         db.rollback()
         logger.exception("Photo upload failed for centipede %s", centipede_id)
@@ -546,6 +557,7 @@ async def upload_whip_spider_photo(
     ).first()
     if not whip_spider:
         raise HTTPException(status_code=404, detail="Whip spider not found")
+    enforce_photo_cap(db, current_user, whip_spider_id)
 
     try:
         file_data = await file.read()
@@ -593,6 +605,11 @@ async def upload_whip_spider_photo(
 
     except HTTPException:
         raise
+    except ValueError:
+        # The bytes passed the magic-number check but aren\'t a decodable image
+        # (truncated, corrupt). That\'s the upload\'s fault, not ours: 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That file isn\'t a readable image. Try another photo.")
     except Exception:
         db.rollback()
         logger.exception("Photo upload failed for whip spider %s", whip_spider_id)
@@ -650,6 +667,9 @@ async def upload_invert_photo(
 ):
     """Upload a photo for any invert the caller owns. Sets only invert_id."""
     invert, access = load_invert(db, current_user, invert_id, "logger", not_found="Animal not found")
+    # The mobile app uploads here — where the free limit mattered most, and
+    # was missing. The owner's plan decides, whoever uploads.
+    enforce_photo_cap(db, access.owner, invert_id)
 
     try:
         file_data = await file.read()
@@ -694,6 +714,11 @@ async def upload_invert_photo(
         }
     except HTTPException:
         raise
+    except ValueError:
+        # The bytes passed the magic-number check but aren\'t a decodable image
+        # (truncated, corrupt). That\'s the upload\'s fault, not ours: 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That file isn\'t a readable image. Try another photo.")
     except Exception:
         db.rollback()
         logger.exception("Photo upload failed for invert %s", invert_id)
@@ -760,6 +785,11 @@ async def upload_colony_photo(
         }
     except HTTPException:
         raise
+    except ValueError:
+        # The bytes passed the magic-number check but aren\'t a decodable image
+        # (truncated, corrupt). That\'s the upload\'s fault, not ours: 400.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="That file isn\'t a readable image. Try another photo.")
     except Exception:
         db.rollback()
         logger.exception("Photo upload failed for colony %s", colony_id)
@@ -855,8 +885,9 @@ async def delete_photo(
             else None
         )
 
-        # Delete files from storage service (R2 or local)
-        await storage_service.delete_photo(photo.url, photo.thumbnail_url)
+        # Files are removed AFTER the commit (below). Deleting them first meant
+        # a failed commit left the row pointing at an image that was gone.
+        files = [(photo.url, photo.thumbnail_url)]
 
         # Delete from database
         db.delete(photo)
@@ -875,13 +906,14 @@ async def delete_photo(
             sync_hero_photo(db, parent, new_url)
 
         db.commit()
-
-        return {"message": "Photo deleted successfully"}
-
     except Exception:
         db.rollback()
         logger.exception("Photo delete failed for photo %s", photo_id)
         raise HTTPException(status_code=500, detail="Failed to delete photo. Please try again.")
+
+    # Best-effort, never raises; skips a file another row still uses.
+    await delete_files(db, files)
+    return {"message": "Photo deleted successfully"}
 
 
 @router.patch("/photos/{photo_id}")

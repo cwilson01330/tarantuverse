@@ -74,6 +74,8 @@ const PREMIUM_PERKS = [
   'Unlimited animals in your collection',
   'Breeding: pairings, clutches & offspring',
   'Feeder inventory tracking',
+  'Co-keepers — share your collection with up to 10 people',
+  'Sitter logging + unlimited sitter links',
   'Feeding, weight, shed and health logs stay free, always',
 ];
 

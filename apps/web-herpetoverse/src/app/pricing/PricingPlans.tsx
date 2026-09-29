@@ -52,6 +52,8 @@ const FREE_FEATURES = [
   'Photos, sheds, and growth trends',
   'Collection import & data export',
   'Notifications & feeding reminders',
+  'Sitter links (2 at a time)',
+  'Join a collection shared with you',
 ]
 
 const PREMIUM_FEATURES = [
@@ -59,6 +61,8 @@ const PREMIUM_FEATURES = [
   'Unlimited animals — no collection cap',
   'Feeder inventory tracking',
   'Breeding: pairings, clutches & offspring',
+  'Co-keepers — share with up to 10 people',
+  'Sitter logging + unlimited sitter links',
   'Supports ongoing development',
 ]
 

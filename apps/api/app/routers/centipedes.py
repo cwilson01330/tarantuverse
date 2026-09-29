@@ -38,6 +38,7 @@ from app.schemas.centipede import (
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_collection_limit
 from app.utils.access import policy, require_own_enclosure
+from app.utils.photo_cleanup import collect_for_animal, delete_files
 
 router = APIRouter()
 
@@ -219,6 +220,10 @@ async def delete_centipede(
     """Delete. Cascades to feeding/molt/substrate logs, photos, and QR
     sessions via the FK ON DELETE CASCADE clauses on `invert_id`."""
     centipede = _owned_centipede(db, centipede_id, current_user)
+    _photo_files = collect_for_animal(db, centipede_id)
     db.delete(centipede)
     db.commit()
+    # Photo FILES don't cascade with the rows (R2) — remove them now the
+    # delete is committed. Best-effort; see utils/photo_cleanup.
+    await delete_files(db, _photo_files)
     return None

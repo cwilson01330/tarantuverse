@@ -57,10 +57,17 @@ export default function AddInvertPhotoPage() {
         headers: { Authorization: `Bearer ${token}` }, // no Content-Type — browser sets multipart boundary
         body: form,
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        // Say WHY: 402 = free photo limit, 400 = unreadable image. Both carry
+        // a message the keeper can act on; a generic "try again" can't be.
+        const body = await res.json().catch(() => null)
+        const d = body?.detail
+        const msg = typeof d === 'string' ? d : typeof d?.message === 'string' ? d.message : null
+        throw new Error(msg ?? 'Could not upload photo. Please try again.')
+      }
       router.push(`/dashboard/inverts/${id}`)
-    } catch {
-      alert('Could not upload photo. Please try again.')
+    } catch (e) {
+      alert(e instanceof Error && e.message ? e.message : 'Could not upload photo. Please try again.')
     } finally {
       setUploading(false)
     }

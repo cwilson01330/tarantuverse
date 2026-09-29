@@ -149,6 +149,12 @@ export interface Animal {
   // The rest populate a CLAIMED record's provenance block. `provenance` is
   // the frozen snapshot dict — see AnimalProvenance.
   transferred_out_at?: string | null;
+  /** Death (ADR-015). A non-null died_at makes this a historical record:
+   *  kept in full, out of the collection, the cap and every reminder. Set via
+   *  markAnimalDied (lib/lifecycle), never a plain edit. YYYY-MM-DD. */
+  died_at?: string | null;
+  death_cause?: import('./lifecycle').DeathCause | null;
+  death_notes?: string | null;
   origin_keeper_name?: string | null;
   bred_by_user_id?: string | null;
   source_transfer_id?: string | null;

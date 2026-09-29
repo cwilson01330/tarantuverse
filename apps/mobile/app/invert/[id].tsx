@@ -51,6 +51,7 @@ import {
 } from '../../src/components/OverflowMenuSheet';
 import { COPY as LIFECYCLE_COPY, historicalRecordLine, pronounsFor, tenureLabel } from '../../src/lib/lifecycle-copy';
 import { parseLocalDate } from '../../src/utils/date';
+import { clearMarkDied, hasMarkDied } from '../../src/lib/pending-intent';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { ROLE_HELP, ROLE_LABEL, attribution, can, canChangeEntry, useCollectionRole } from '../../src/lib/co-keepers';
 
@@ -103,7 +104,9 @@ function InvertDetailScreen() {
   const { user } = useAuth();
   const { role, ownerName } = useCollectionRole(user?.id, invert?.user_id);
   const isOwner = role === 'owner';
-  const canLog = can(role, 'logger');
+  // A died animal is a historical record (ADR-015 §14.3): readable, closed to
+  // new logs. canKeep stays so Undo / Edit details remain available.
+  const canLog = can(role, 'logger') && !invert?.died_at;
   const canKeep = can(role, 'keeper');
   const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
 
@@ -186,6 +189,16 @@ function InvertDetailScreen() {
   }, [id]);
 
   useFocusEffect(useCallback(() => { fetchAll(); }, [fetchAll]));
+
+  // Arriving from a molt logged as fatal whose keeper chose "Mark as died"
+  // (handoff §14.9). Waits for the animal AND the viewer's role before acting
+  // — consuming the note while either is still loading would drop it. The
+  // sheet itself is still the confirm.
+  useFocusEffect(useCallback(() => {
+    if (!invert || role === null || !hasMarkDied(id)) return;
+    clearMarkDied();
+    if (canKeep && !invert.died_at) setDiedOpen(true);
+  }, [id, canKeep, invert, role]));
 
   /** Undo a mark-as-died.
    *
@@ -765,7 +778,9 @@ function InvertDetailScreen() {
       {/* Feeding card — the question the keeper opened the screen to answer,
           answered first. Registry-gated: a millipede has no feeding cadence,
           so it gets no card rather than a fabricated one. */}
-      {feedingVerdict && (
+      {/* Not for a died animal — "Feed now, 40 days overdue" on a record of
+          one that's gone is exactly the nudge ADR-015 exists to stop. */}
+      {feedingVerdict && !invert.died_at && (
         <SectionCard>
           <View style={styles.feedHead}>
             <View
@@ -1118,6 +1133,10 @@ function InvertDetailScreen() {
                     (2026-07-29). */}
                 <Text style={styles.timelineDate}>
                   {fmtRelative(e.at)} · {fmtDate(e.at)}
+                  {/* Handoff §14.7: say so rather than imply one. Timed rows
+                      don't show a clock either — form-logged feedings carry a
+                      noon placeholder, and printing it would be a fabrication. */}
+                  {hasClockTime(e.at) ? '' : ' · No time recorded'}
                 </Text>
                 {/* The keeper's own words. On an event row this is usually the
                     most useful thing in the list — "lost most of leg III right
@@ -1291,7 +1310,7 @@ function InvertDetailScreen() {
         {([
           { icon: 'silverware-fork-knife', label: 'Feed', route: `/invert/add-feeding?id=${id}` },
           { icon: 'cup-water', label: 'Water', route: `/invert/add-care-log?id=${id}` },
-          { icon: 'arrow-expand-vertical', label: 'Molt', route: `/invert/add-molt?id=${id}` },
+          { icon: 'arrow-expand-vertical', label: 'Molt', route: `/invert/add-molt?id=${id}&from=detail` },
           { icon: 'layers-outline', label: 'Substrate', route: `/invert/add-substrate-change?id=${id}` },
           { icon: 'camera-outline', label: 'Photo', route: `/invert/add-photo?id=${id}` },
         ] as const).map((a) => (
@@ -1409,7 +1428,11 @@ function fmtDate(iso: string): string {
  */
 function fmtRelative(iso: string): string {
   try {
-    const then = new Date(iso);
+    // parseLocalDate, not new Date(): a date-only value ('2026-09-29') parses
+    // to UTC midnight, which west of Greenwich is the PREVIOUS evening — so a
+    // substrate change logged today read "Yesterday".
+    const then = parseLocalDate(iso);
+    if (!then) return '';
     const a = new Date(then.getFullYear(), then.getMonth(), then.getDate());
     const n = new Date();
     const b = new Date(n.getFullYear(), n.getMonth(), n.getDate());
@@ -1476,9 +1499,17 @@ function hasClockTime(at: string): boolean {
  * row sinks to the bottom of its day — "sometime that day" is what we actually
  * know, and the bottom is where it makes the fewest false claims.
  */
+/** The keeper's calendar day for a value. Slicing a UTC timestamp gives the
+ *  UTC day — a 9pm feeding in Tennessee would land on tomorrow. */
+function localDayKey(at: string): string {
+  const d = parseLocalDate(at);
+  if (!d) return at.slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function timelineOrder(a: TimelineEntry, b: TimelineEntry): number {
-  const dayA = a.at.slice(0, 10);
-  const dayB = b.at.slice(0, 10);
+  const dayA = localDayKey(a.at);
+  const dayB = localDayKey(b.at);
   if (dayA !== dayB) return dayA < dayB ? 1 : -1;
 
   const timedA = hasClockTime(a.at);
