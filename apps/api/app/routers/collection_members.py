@@ -29,6 +29,7 @@ SECURITY SHAPE
 # NOTE: no `from __future__ import annotations` — slowapi wraps the rate-limited
 # endpoints, and FastAPI then can't resolve string annotations (see sitter_passes).
 import hashlib
+import hmac
 import logging
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -44,6 +45,7 @@ from app.database import get_db
 from app.models.collection_member import MAX_MEMBERS_PER_COLLECTION, CollectionMember
 from app.models.user import User
 from app.schemas.collection_member import (
+    AcceptByCode,
     AcceptByToken,
     InviteCreate,
     InviteCreated,
@@ -95,6 +97,47 @@ def _hash(token: str) -> str:
 def _new_token() -> tuple[str, str]:
     raw = secrets.token_urlsafe(32)
     return raw, _hash(raw)
+
+
+# ── invite codes ──────────────────────────────────────────────────────────────
+# Some mail filters (Mimecast "browser isolation", Safe Links, school filters)
+# rewrite every link, and some then refuse to open it. Plain text survives, so
+# the email also carries a short code the invitee can type in the app.
+#
+# The code isn't stored. It's derived from the invite's token hash with a
+# server-side key, so it changes on resend and dies on accept like the link,
+# and a database read alone can't produce it. Accepting still needs a signed-in
+# account whose (verified) email matches the invite, and codes are only matched
+# against invites sent to that address — 50 bits against 10 tries a minute.
+
+CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"  # Crockford base32: no I, L, O, U
+CODE_LEN = 10
+CODE_NO_MATCH = (
+    "That code doesn't match an open invite for your email address. "
+    "Check it, or ask the keeper to resend the invite."
+)
+
+
+def _code_key() -> bytes:
+    return hashlib.sha256(b"collection-invite-code|" + settings.API_SECRET_KEY.encode("utf-8")).digest()
+
+
+def _code_for(token_hash: str) -> str:
+    """XXXXX-XXXXX for an invite's current token hash."""
+    digest = hmac.new(_code_key(), token_hash.encode("utf-8"), hashlib.sha256).digest()
+    n = int.from_bytes(digest[:8], "big") >> (64 - 5 * CODE_LEN)
+    chars = "".join(CODE_ALPHABET[(n >> (5 * i)) & 31] for i in reversed(range(CODE_LEN)))
+    return f"{chars[:5]}-{chars[5:]}"
+
+
+def _normalize_code(raw: str) -> Optional[str]:
+    """Forgiving input: any case, spaces or dashes, and the usual lookalikes
+    (O→0, I/L→1). None when it can't be a code at all."""
+    s = "".join(ch for ch in raw.upper() if ch.isalnum())
+    s = s.translate(str.maketrans({"O": "0", "I": "1", "L": "1"}))
+    if len(s) != CODE_LEN or any(ch not in CODE_ALPHABET for ch in s):
+        return None
+    return f"{s[:5]}-{s[5:]}"
 
 
 def _name(u: User) -> str:
@@ -164,6 +207,7 @@ async def _send_invite(owner: User, m: CollectionMember, raw: str) -> bool:
         await EmailService.send_collection_invite_email(
             to_email=m.invited_email, inviter_name=_name(owner), role=m.role, accept_link=url,
             valid_days=INVITE_TTL.days, brand=APP_BRAND[m.app],
+            invite_code=_code_for(m.invite_token_hash),
         )
         return True
     except Exception:
@@ -299,6 +343,41 @@ async def accept_by_token(
         .with_for_update()
         .first()
     )
+    m = _activate(db, _check_can_accept(m, current_user), current_user)
+    owner = db.query(User).filter(User.id == m.owner_user_id).first()
+    return SharedCollection(membership_id=m.id, owner=_person(owner), app=m.app, role=m.role,
+                            read_only=m.role == "viewer", accepted_at=m.accepted_at)
+
+
+@router.post("/accept-code", response_model=SharedCollection)
+@limiter.limit("10/minute")
+async def accept_by_code(
+    request: Request,
+    body: AcceptByCode,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Accept by typing the code from the invite email — for inboxes whose
+    filters mangle links. Like the link it proves the invitee read that email,
+    so it works whether or not in-app invites are enabled. Only invites sent
+    to the caller's own address are considered."""
+    code = _normalize_code(body.code)
+    email = (current_user.email or "").strip().lower()
+    if code is None or not email:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=CODE_NO_MATCH)
+    candidates = (
+        db.query(CollectionMember)
+        .filter(CollectionMember.status == "pending", CollectionMember.invited_email == email)
+        .with_for_update()
+        .all()
+    )
+    m = next(
+        (c for c in candidates
+         if c.invite_token_hash and hmac.compare_digest(_code_for(c.invite_token_hash), code)),
+        None,
+    )
+    if m is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=CODE_NO_MATCH)
     m = _activate(db, _check_can_accept(m, current_user), current_user)
     owner = db.query(User).filter(User.id == m.owner_user_id).first()
     return SharedCollection(membership_id=m.id, owner=_person(owner), app=m.app, role=m.role,
@@ -444,7 +523,8 @@ async def invite(
                 f"As a {body.role}. Open Shared with me to accept.",
                 {"membership_id": str(m.id), "app": body.app})
     return InviteCreated(**_member_out(db, m).model_dump(),
-                         accept_url=f"{APP_ORIGIN[m.app]}/invite#{raw}", email_sent=sent)
+                         accept_url=f"{APP_ORIGIN[m.app]}/invite#{raw}", email_sent=sent,
+                         invite_code=_code_for(m.invite_token_hash))
 
 
 @router.post("/{membership_id}/resend", response_model=InviteCreated)
@@ -506,7 +586,8 @@ async def resend_invite(
     db.refresh(m)
     sent = await _send_invite(current_user, m, raw)
     return InviteCreated(**_member_out(db, m).model_dump(),
-                         accept_url=f"{APP_ORIGIN[m.app]}/invite#{raw}", email_sent=sent)
+                         accept_url=f"{APP_ORIGIN[m.app]}/invite#{raw}", email_sent=sent,
+                         invite_code=_code_for(m.invite_token_hash))
 
 
 @router.patch("/{membership_id}", response_model=MemberOut)

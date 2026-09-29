@@ -35,6 +35,12 @@ class AcceptByToken(BaseModel):
     token: str = Field(..., min_length=20, max_length=128)
 
 
+class AcceptByCode(BaseModel):
+    """The short code printed in the invite email — for inboxes whose
+    security filters rewrite or block links (Mimecast and friends)."""
+    code: str = Field(..., min_length=8, max_length=32)
+
+
 class PersonBrief(BaseModel):
     id: UUID
     name: str                      # display name, else username
@@ -61,6 +67,9 @@ class InviteCreated(MemberOut):
     verified email to match."""
     accept_url: str
     email_sent: bool
+    # Same invite, typeable: the invitee can enter it on the Sharing screen
+    # instead of clicking. Shown to the owner once, like accept_url.
+    invite_code: str
 
 
 class SharedCollection(BaseModel):

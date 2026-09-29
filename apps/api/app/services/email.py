@@ -125,6 +125,7 @@ class EmailService:
         accept_link: str,
         valid_days: int,
         brand: "Brand | None" = None,
+        invite_code: "str | None" = None,
     ):
         """Co-keeper invite (PRD-shared-keeping rung 3).
 
@@ -161,6 +162,8 @@ class EmailService:
                     Accept invite
                 </a>
             </p>
+            {f'''<p>Link not opening? Some work and school email filters block links. Open {brand.name}, go to <strong>Sharing</strong>, and enter this code instead:</p>
+            <p style="font-family: 'Courier New', monospace; font-size: 22px; letter-spacing: 3px; font-weight: bold; margin: 12px 0;">{html.escape(invite_code)}</p>''' if invite_code else ''}
             <p>This invite works for {valid_days} days. If you weren't expecting it, you can ignore this email — nothing is shared until you accept.</p>
             <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
             <p style="color: #666; font-size: 12px;">{brand.name} Team</p>

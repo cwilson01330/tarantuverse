@@ -27,7 +27,7 @@ export interface Member {
   accepted_at: string | null
   invite_expires_at: string | null
 }
-export interface InviteCreated extends Member { accept_url: string; email_sent: boolean }
+export interface InviteCreated extends Member { accept_url: string; email_sent: boolean; invite_code: string }
 export interface SharedCollection {
   membership_id: string
   owner: Person
@@ -89,6 +89,9 @@ export const coKeeperApi = {
   leave: (t: string, id: string) => call<void>(t, `/${id}/leave`, { method: 'POST' }),
   acceptToken: (t: string, token: string) =>
     call<SharedCollection>(t, '/accept', { method: 'POST', body: JSON.stringify({ token }) }),
+  /** The code printed in the invite email, for inboxes whose filters block links. */
+  acceptCode: (t: string, code: string) =>
+    call<SharedCollection>(t, '/accept-code', { method: 'POST', body: JSON.stringify({ code }) }),
   acceptInvite: (t: string, id: string) => call<SharedCollection>(t, `/invites/${id}/accept`, { method: 'POST' }),
   declineInvite: (t: string, id: string) => call<void>(t, `/invites/${id}/decline`, { method: 'POST' }),
 }

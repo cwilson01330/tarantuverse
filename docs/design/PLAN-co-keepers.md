@@ -130,5 +130,16 @@ Left as-is, deliberately:
 - **L4** — a deleted co-keeper's entries read as the owner's (SET NULL). Documented above and in the privacy policy ("their name is removed from those entries").
 - **What members see** — co-keepers see each other's names and the owner's notes and prices on animal records. Stated in the privacy policy (§5.5).
 - **Emails are case-sensitive at registration** (`User.email ==`, case-sensitive unique index). Not exploitable for invites after H1, but worth normalising platform-wide.
-- **Rate limiting was spoofable (fixed 2026-09-29):** Render only appends to `X-Forwarded-For` and uvicorn reported the leftmost (client-supplied) entry — a request with `X-Forwarded-For: 1.2.3.4` was logged as 1.2.3.4, so any limit could be dodged by rotating the header. The limiter now keys on `CF-Connecting-IP`, else the rightmost forwarded entry (`utils/rate_limit.py::client_ip`); waitlist IP hashing uses the same. A few `[client-ip]` log lines per process confirm the header shape after deploy.
+- **Rate limiting was spoofable (fixed 2026-09-29):** Render only appends to `X-Forwarded-For` and uvicorn reported the leftmost (client-supplied) entry — a request with `X-Forwarded-For: 1.2.3.4` was logged as 1.2.3.4, so any limit could be dodged by rotating the header. The limiter now keys on `CF-Connecting-IP`, else the rightmost forwarded entry (`utils/rate_limit.py::client_ip`); waitlist IP hashing uses the same. Verified live after deploy: a login sent with `X-Forwarded-For: 1.2.3.4` was keyed on the real address via `CF-Connecting-IP` (forwarded chain had 3 hops: the fake, the real client, Cloudflare). A request carrying a client-set `CF-Connecting-IP` never reached the app.
 - **Residual H1 risk once verification is switched on**: accounts created while it was off are still flagged verified. Low — an attacker would have had to register the victim's address before the switch.
+
+## Invite codes (2026-09-29)
+
+First live test hit Mimecast: the invitee's work inbox rewrote the invite link into a "browser isolation" page that refused the phone's browser, so the link never reached us. Any keeper on filtered work or school email would be stuck.
+
+The invite email now also prints a 10-character code (`XXXXX-XXXXX`, Crockford base32 — no I/L/O/U, lookalikes forgiven on input). The invitee enters it under **Have an invite code?** on the Sharing screen (all four clients) → `POST /collection-members/accept-code`.
+
+- **Not stored.** HMAC of the invite's token hash under a key derived from `API_SECRET_KEY`: it changes on resend and dies on accept with the link, and a database read alone can't produce it.
+- **Same rules as the link:** live, single-use, not your own collection, signed-in account with a verified email matching the invite. Codes are only compared against pending invites sent to the caller's own address (constant-time), 10 tries/minute per client — 50 bits of code.
+- **Works with in-app invites off** (like the link, the code proves the invitee read that email).
+- The owner also sees the code once after inviting/resending, and the mobile Share text includes it.

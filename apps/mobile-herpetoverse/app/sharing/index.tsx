@@ -41,6 +41,7 @@ function SharingScreen() {
   const [justInvited, setJustInvited] = useState<InviteCreated | null>(null);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('logger');
+  const [code, setCode] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -147,7 +148,7 @@ function SharingScreen() {
           </View>
         ))}
         {shared && collections.length === 0 && invites.length === 0 && (
-          <Text style={[TYPE.body, { color: colors.textSecondary }]}>Nothing shared with you yet. Invited by someone? Open the link in the invite email to accept.</Text>
+          <Text style={[TYPE.body, { color: colors.textSecondary }]}>Nothing shared with you yet. Invited by someone? Open the link in the invite email, or enter the code from it below.</Text>
         )}
         {collections.map((c) => (
           <View key={c.membership_id} style={card}>
@@ -169,6 +170,32 @@ function SharingScreen() {
             </View>
           </View>
         ))}
+
+        {/* For invite emails whose links a mail filter blocked: type the code instead. */}
+        <View style={card}>
+          <Text style={[TYPE.subheading, { color: colors.textPrimary }]}>Have an invite code?</Text>
+          <Text style={[TYPE.caption, { color: colors.textSecondary }]}>
+            If the link in your invite email won&apos;t open, enter the code printed under it.
+          </Text>
+          <TextInput style={[...input, styles.code]} value={code} onChangeText={setCode} placeholder="XXXXX-XXXXX"
+            placeholderTextColor={colors.textTertiary} autoCapitalize="characters" autoCorrect={false}
+            maxLength={20} accessibilityLabel="Invite code" />
+          <SitterButton label="Accept code" busy={busy === 'code'} disabled={!!busy}
+            onPress={() => {
+              if (code.replace(/[^a-z0-9]/gi, '').length < 10) {
+                Alert.alert('Check the code', 'Enter the 10-character code from your invite email.');
+                return;
+              }
+              void run('code', async () => {
+                const joined = await coKeeperApi.acceptCode(code);
+                setCode('');
+                Alert.alert("You're in", `You joined ${joined.owner.name}'s collection.`, [
+                  { text: 'Later', style: 'cancel' },
+                  { text: 'Open it', onPress: () => router.push({ pathname: '/shared/[ownerId]', params: { ownerId: joined.owner.id } } as never) },
+                ]);
+              });
+            }} />
+        </View>
 
         {/* ── Your co-keepers ── */}
         <Text style={[TYPE.heading, styles.h, { color: colors.textPrimary }]}>Your co-keepers</Text>
@@ -211,10 +238,13 @@ function SharingScreen() {
             <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
               It only works for an account verified with that email address.
             </Text>
+            <Text style={[TYPE.body, { color: colors.textPrimary }]} selectable>
+              Invite code: <Text style={[TYPE.bodyStrong, styles.codeText]}>{justInvited.invite_code}</Text>
+            </Text>
             <View style={styles.row}>
               <View style={styles.flexBtn}>
                 <SitterButton label="Share link" variant="secondary"
-                  onPress={() => { void Share.share({ message: `Help me keep my collection on Herpetoverse: ${justInvited.accept_url}` }); }} />
+                  onPress={() => { void Share.share({ message: `Help me keep my collection on Herpetoverse: ${justInvited.accept_url}\n\nIf the link won't open, enter this code on the Sharing screen: ${justInvited.invite_code}` }); }} />
               </View>
               <View style={styles.flexBtn}>
                 <SitterButton label="Done" variant="secondary" onPress={() => setJustInvited(null)} />
@@ -266,6 +296,8 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   chips: { flexDirection: 'row', gap: 8 },
   chip: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+  code: { letterSpacing: 3 },
+  codeText: { letterSpacing: 2 },
 });
 
 export default withErrorBoundary(SharingScreen, 'sharing');

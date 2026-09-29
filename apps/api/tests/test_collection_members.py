@@ -444,3 +444,88 @@ def test_invite_subject_quotes_and_cleans_the_inviters_name(monkeypatch):
     subject = seen.get("subject", "")
     assert subject.startswith('"Tarantuverse Security Team') and "\n" not in subject and "\r" not in subject
     assert len(subject.split('"')[1]) <= 40
+
+
+# ── invite codes (for inboxes whose filters block links) ────────────────────
+
+class TestInviteCode:
+    def setup_method(self):
+        self.owner = person()
+        self.row = invite_row(self.owner)
+        self.code = cm._code_for(self.row.invite_token_hash)
+
+    def accept(self, user, code, rows=None):
+        db = DB({CollectionMember: Q(rows=rows if rows is not None else [self.row]), User: SeqQ(None, self.owner)})
+        # _activate looks up an existing membership (none) via CollectionMember.first();
+        db.by_model[CollectionMember]._first = None
+        return run(cm.accept_by_code, request=None, body=cm.AcceptByCode(code=code), current_user=user, db=db)
+
+    def test_code_shape_is_typeable(self):
+        assert len(self.code) == 11 and self.code[5] == "-"
+        assert all(c in cm.CODE_ALPHABET for c in self.code.replace("-", ""))
+
+    def test_code_follows_the_token_and_the_server_secret(self, monkeypatch):
+        other = cm._code_for(cm._hash("u" * 43))
+        assert other != self.code
+        monkeypatch.setattr(cm.settings, "API_SECRET_KEY", "a-different-secret")
+        assert cm._code_for(self.row.invite_token_hash) != self.code  # a DB read alone can't derive it
+
+    def test_matching_account_accepts_with_a_messily_typed_code(self):
+        messy = " " + self.code.lower().replace("-", " ").replace("0", "o").replace("1", "l") + " "
+        self.accept(person("Alex@example.com"), messy)
+        assert self.row.status == "active" and self.row.invite_token_hash is None
+
+    def test_wrong_code_is_a_404(self):
+        wrong = cm._code_for(cm._hash("z" * 43))
+        with pytest.raises(HTTPException) as e:
+            self.accept(person("alex@example.com"), wrong)
+        assert (e.value.status_code, e.value.detail) == (404, cm.CODE_NO_MATCH)
+        assert self.row.status == "pending"
+
+    def test_garbage_is_a_404(self):
+        with pytest.raises(HTTPException) as e:
+            self.accept(person("alex@example.com"), "not a code!!")
+        assert e.value.status_code == 404
+
+    def test_only_invites_to_your_own_address_are_considered(self):
+        src = inspect.getsource(inspect.unwrap(cm.accept_by_code))
+        assert "CollectionMember.invited_email == email" in src
+        assert "CollectionMember.status == \"pending\"" in src
+        assert "hmac.compare_digest" in src
+
+    def test_the_right_code_for_a_different_email_still_fails(self):
+        with pytest.raises(HTTPException) as e:
+            self.accept(person("mallory@example.com"), self.code)
+        assert e.value.status_code == 403  # _check_can_accept: WRONG_EMAIL
+
+    def test_unverified_accounts_cannot_use_a_code(self):
+        with pytest.raises(HTTPException) as e:
+            self.accept(person("alex@example.com", verified=False), self.code)
+        assert (e.value.status_code, e.value.detail) == (403, cm.VERIFY_FIRST)
+
+    def test_works_with_in_app_invites_off(self, monkeypatch):
+        monkeypatch.setattr(cm.settings, "EMAIL_VERIFICATION_REQUIRED", False)
+        self.accept(person("alex@example.com"), self.code)
+        assert self.row.status == "active"
+
+    def test_resend_changes_the_code(self):
+        owner = self.owner
+        out = run(cm.resend_invite, request=None, membership_id=self.row.id, current_user=owner,
+                  db=DB({CollectionMember: Q(self.row), User: Q(None)}))
+        assert out.invite_code != self.code and out.invite_code == cm._code_for(self.row.invite_token_hash)
+
+
+def test_the_invite_email_carries_the_code(monkeypatch):
+    from app.services.email import EmailService
+
+    seen = {}
+
+    async def capture(to_email, subject, content):
+        seen["html"] = content
+
+    monkeypatch.setattr(EmailService, "send_email", staticmethod(capture))
+    asyncio.run(EmailService.send_collection_invite_email(
+        to_email="a@example.com", inviter_name="Sam", role="logger",
+        accept_link="https://example.com/invite#t", valid_days=7, invite_code="ABCDE-12345",
+    ))
+    assert "ABCDE-12345" in seen["html"] and "Sharing" in seen["html"]

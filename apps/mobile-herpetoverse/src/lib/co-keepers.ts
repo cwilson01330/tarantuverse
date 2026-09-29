@@ -28,7 +28,7 @@ export interface Member {
   accepted_at: string | null;
   invite_expires_at: string | null;
 }
-export interface InviteCreated extends Member { accept_url: string; email_sent: boolean }
+export interface InviteCreated extends Member { accept_url: string; email_sent: boolean; invite_code: string }
 export interface SharedCollection {
   membership_id: string;
   owner: Person;
@@ -82,6 +82,9 @@ export const coKeeperApi = {
   changeRole: async (id: string, role: Role) => (await apiClient.patch<Member>(`${base}/${id}`, { role })).data,
   remove: async (id: string) => { await apiClient.delete(`${base}/${id}`); },
   leave: async (id: string) => { await apiClient.post(`${base}/${id}/leave`); },
+  /** The code printed in the invite email, for inboxes whose filters block links. */
+  acceptCode: async (code: string) =>
+    (await apiClient.post<SharedCollection>(`${base}/accept-code`, { code })).data,
   acceptInvite: async (id: string) => (await apiClient.post<SharedCollection>(`${base}/invites/${id}/accept`)).data,
   declineInvite: async (id: string) => { await apiClient.post(`${base}/invites/${id}/decline`); },
 };

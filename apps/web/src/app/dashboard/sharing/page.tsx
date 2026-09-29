@@ -25,6 +25,7 @@ import {
   type InviteCreated,
   type Member,
   type Role,
+  type SharedCollection,
   type SharedWithMe,
 } from '@/lib/coKeepers'
 
@@ -128,7 +129,7 @@ export default function SharingPage() {
           ))}
           {shared && shared.collections.filter((c) => c.app === 'tarantuverse').length === 0
             && shared.invites.filter((i) => i.app === 'tarantuverse').length === 0 && (
-            <p className="text-theme-secondary">Nothing shared with you yet. Invited by someone? Open the link in the invite email to accept.</p>
+            <p className="text-theme-secondary">Nothing shared with you yet. Invited by someone? Open the link in the invite email, or enter the code from it below.</p>
           )}
           {shared?.collections.filter((c) => c.app === 'tarantuverse').map((c) => (
             <div key={c.membership_id} className="p-4 rounded-2xl bg-surface border border-theme flex items-center justify-between gap-3 flex-wrap">
@@ -151,6 +152,7 @@ export default function SharingPage() {
               </div>
             </div>
           ))}
+          {token && <CodeForm token={token} onAccepted={refresh} />}
         </section>
 
         {/* ── Your co-keepers ── */}
@@ -211,6 +213,9 @@ export default function SharingPage() {
                 You can also text them this link. It only works for an account verified with that email address.
               </p>
               <input readOnly className={`${INPUT} font-mono text-xs`} value={justInvited.accept_url} onFocus={(e) => e.currentTarget.select()} />
+            <p className="text-sm text-theme-secondary">
+              Or they can enter this code on their Sharing page: <span className="font-mono font-semibold tracking-widest">{justInvited.invite_code}</span>
+            </p>
               <button className={BTN_SECONDARY} onClick={() => setJustInvited(null)}>Done</button>
             </div>
           )}
@@ -263,6 +268,49 @@ function InviteForm({ disabled, ownEmail, onInvite }: {
       <p className="text-xs text-theme-tertiary">{ROLE_HELP[role]}</p>
       {err && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{err}</p>}
       <button type="submit" className={BTN_PRIMARY} disabled={disabled}>Send invite</button>
+    </form>
+  )
+}
+
+/** For invite emails whose links a mail filter blocked: type the code instead. */
+function CodeForm({ token, onAccepted }: { token: string; onAccepted: () => Promise<void> }) {
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [joined, setJoined] = useState<SharedCollection | null>(null)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (code.replace(/[^a-z0-9]/gi, '').length < 10) return setErr('Enter the 10-character code from your invite email.')
+    setBusy(true)
+    setErr(null)
+    try {
+      setJoined(await coKeeperApi.acceptCode(token, code))
+      setCode('')
+      await onAccepted()
+    } catch (x) {
+      setErr(x instanceof Error ? x.message : 'That code didn\'t work.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <form onSubmit={submit} className="p-4 rounded-2xl bg-surface border border-theme space-y-2">
+      <h3 className="font-semibold text-theme-primary">Have an invite code?</h3>
+      <p className="text-sm text-theme-secondary">If the link in your invite email won&apos;t open, enter the code printed under it.</p>
+      <div className="flex gap-2 flex-wrap">
+        <label className="sr-only" htmlFor="invite-code">Invite code</label>
+        <input id="invite-code" className={`${INPUT} font-mono uppercase tracking-widest max-w-xs`} value={code}
+          onChange={(e) => setCode(e.target.value)} placeholder="XXXXX-XXXXX" autoComplete="one-time-code"
+          autoCapitalize="characters" spellCheck={false} maxLength={20} />
+        <button type="submit" className={BTN_PRIMARY} disabled={busy}>{busy ? 'Checking…' : 'Accept'}</button>
+      </div>
+      {err && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{err}</p>}
+      {joined && (
+        <p role="status" className="text-sm text-green-700 dark:text-green-300">
+          You joined {joined.owner.name}&apos;s collection.{' '}
+          <Link href={`/dashboard/shared/${joined.owner.id}`} className="underline">Open it</Link>
+        </p>
+      )}
     </form>
   )
 }
