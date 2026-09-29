@@ -16,12 +16,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     if (!r.ok) return { title: 'Tarantuverse' }
     const p = await r.json()
     const title = p.name || p.scientific_name || 'A specimen'
+    // Whatever the title doesn't already say: common name, plus the species
+    // when the animal has its own name.
+    const description = [p.scientific_name, p.common_name].filter((v) => v && v !== title).join(' · ') || undefined
     const image = `${RENDERER}/api/og/tarantuverse/${encodeURIComponent(id)}`
     return {
       title,
-      description: p.scientific_name ?? undefined,
-      openGraph: { title, url: `https://www.tarantuverse.com/t/${encodeURIComponent(id)}`, images: [{ url: image, width: 1200, height: 630 }] },
-      twitter: { card: 'summary_large_image', title, images: [image] },
+      description,
+      openGraph: { title, description, url: `https://www.tarantuverse.com/t/${encodeURIComponent(id)}`, images: [{ url: image, width: 1200, height: 630 }] },
+      twitter: { card: 'summary_large_image', title, description, images: [image] },
     }
   } catch {
     return { title: 'Tarantuverse' }
