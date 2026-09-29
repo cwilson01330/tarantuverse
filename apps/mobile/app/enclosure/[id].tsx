@@ -334,8 +334,8 @@ export default function EnclosureDetailScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Add New Tarantula',
-          onPress: () => router.push(`/tarantula/add?enclosure_id=${id}` as any),
+          text: 'Add a new animal',
+          onPress: () => router.push({ pathname: '/add', params: { enclosureId: id } } as never),
         },
       ]
     );

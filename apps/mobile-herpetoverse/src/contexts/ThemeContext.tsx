@@ -13,7 +13,7 @@
  *   border          → neutral-800/70
  *   textPrimary     → neutral-100 (#F5F5F5)
  *   textSecondary   → neutral-400 (#A3A3A3)
- *   textTertiary    → neutral-500 (#737373)
+ *   textTertiary    → #8F8F8F (was neutral-500; raised for AA contrast)
  *   primary (accent)→ emerald-500 (#10B981) — reptile-forward green
  *   danger          → rose-500 (#F43F5E)
  *   warning         → amber-500 (#F59E0B)
@@ -61,7 +61,11 @@ const darkTheme: Theme = {
     border: 'rgba(38, 38, 38, 0.7)',
     textPrimary: '#F5F5F5',
     textSecondary: '#A3A3A3',
-    textTertiary: '#737373',
+    // #737373 (neutral-500) measured 3.8:1 on `surface` — under WCAG AA's 4.5:1
+    // for the small caption text it's mostly used for. #8F8F8F clears AA on
+    // background, surface and surfaceRaised and still sits clearly below
+    // textSecondary. Accessibility review, 2026-09-29.
+    textTertiary: '#8F8F8F',
     primary: '#10B981',
     secondary: '#059669',
     accent: '#34D399',

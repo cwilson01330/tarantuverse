@@ -151,7 +151,7 @@ function SharedCollectionScreen() {
             <Text style={[TYPE.heading, styles.h, { color: colors.textPrimary }]}>Animals</Text>
             {canKeep && (
               <SitterButton label="Add an animal" variant="secondary"
-                onPress={() => router.push({ pathname: '/invert/add', params: { taxon: 'tarantula', collection: ownerId } } as never)} />
+                onPress={() => router.push({ pathname: '/add', params: { collection: ownerId } } as never)} />
             )}
             {inverts === null && <ActivityIndicator color={colors.primary} />}
             {(inverts ?? []).map((r) => (

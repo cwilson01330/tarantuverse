@@ -21,8 +21,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -34,8 +32,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { AppHeader } from '../components/AppHeader';
 import { HeaderBackButton } from '../components/HeaderBackButton';
-import { FeedingIntelligence } from '../components/FeedingIntelligence';
-import { FeedingStatusBanner } from '../components/FeedingStatusBanner';
 import { GenotypeSection } from '../components/GenotypeSection';
 import { PauseFeedingSheet } from '../components/PauseFeedingSheet';
 import { FeedingCadenceSheet } from '../components/FeedingCadenceSheet';
@@ -49,6 +45,8 @@ import {
 } from '../components/reptile-detail/ReptileDetailShared';
 import { AnimalHero } from '../components/reptile-detail/AnimalHero';
 import { AnimalTimeline } from '../components/reptile-detail/AnimalTimeline';
+import { FeedingCard } from '../components/reptile-detail/FeedingCard';
+import { StatStrip } from '../components/reptile-detail/StatStrip';
 import {
   ANIMAL_TAXA,
   type Animal,
@@ -56,14 +54,12 @@ import {
   type ShedLog,
   type WeightLog,
   animalTitle,
-  createFeeding,
   getAnimal,
   listFeedings,
   listSheds,
   listWeightLogs,
 } from '../lib/animals';
 import { type Photo, listPhotos } from '../lib/photos';
-import { DEFAULT_CGD_FOOD_TYPE } from '../lib/cgd';
 import { useAuth } from '../contexts/AuthContext';
 import { TYPE } from '../theme/type';
 import { ROLE_HELP, ROLE_LABEL, can, canChangeEntry, useCollectionRole } from '../lib/co-keepers';
@@ -95,6 +91,10 @@ export function AnimalDetailScreen() {
   const [shareOpen, setShareOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [cadenceOpen, setCadenceOpen] = useState(false);
+  const [geneticsOpen, setGeneticsOpen] = useState(false);
+  const [geneSummary, setGeneSummary] = useState<string | null>(null);
+  // A failed history fetch must not read as "nothing logged" (§14).
+  const [historyError, setHistoryError] = useState(false);
 
   // Co-keepers (rung 3): what the viewer may do here. Hides controls that
   // would fail — the API checks every request. Nothing write-shaped shows
@@ -129,6 +129,9 @@ export function AnimalDetailScreen() {
     if (weightsR.status === 'fulfilled') setWeights(weightsR.value);
     if (feedingsR.status === 'fulfilled') setFeedings(feedingsR.value);
     if (shedsR.status === 'fulfilled') setSheds(shedsR.value);
+    setHistoryError(
+      weightsR.status === 'rejected' || feedingsR.status === 'rejected' || shedsR.status === 'rejected',
+    );
     if (photosR.status === 'fulfilled') setPhotos(photosR.value);
   }, [id]);
 
@@ -223,50 +226,22 @@ export function AnimalDetailScreen() {
           </Text>
         )}
 
-        {/* When paused, the banner becomes the resume affordance —
-            tappable, with an "Edit" hint. The canonical pause entry point
-            lives inside Log Feeding (the natural moment to think "it's
-            been refusing for weeks, mute reminders"). */}
-        {/* ADR-017 — when overdue against a cadence the keeper never chose,
-            the banner is also the way to state their own. Suppressed once
-            they have, so a red banner then means past THEIR schedule. */}
-        <FeedingStatusBanner
-          animalId={animal.id}
-          refreshKey={`${feedings.length}-${animal.feeding_paused_reason ?? ''}-${animal.feeding_paused_until ?? ''}-${animal.feeding_interval_days ?? ''}`}
-          onPausedPress={canKeep ? () => setPauseOpen(true) : undefined}
-          onSetCadence={canKeep ? () => setCadenceOpen(true) : undefined}
-          hasKeeperCadence={!!animal.feeding_interval_days}
+        {/* One feeding card — replaces the status banner, the feeding
+            intelligence panel and the CGD refresh card (design handoff,
+            screen 9). Pause, schedule and CGD live inside it. */}
+        <FeedingCard
+          animal={animal}
+          feedings={feedings}
+          refreshKey={`${feedings.length}-${weights.length}-${animal.current_weight_g ?? ''}-${animal.feeding_paused_reason ?? ''}-${animal.feeding_paused_until ?? ''}-${animal.feeding_interval_days ?? ''}`}
+          canLog={canLog}
+          canKeep={canKeep}
+          onLogged={onRefresh}
+          onFullForm={() => router.push(`/reptile/log-feeding/${animal.id}` as never)}
+          onPause={() => setPauseOpen(true)}
+          onSetCadence={() => setCadenceOpen(true)}
         />
 
-        {/* Species-aware feeding intelligence — prey range, interval,
-            next feed window, power-feeding flag. We compute lastAccepted
-            client-side (newest fed_at where accepted=true) rather than
-            trusting server order. */}
-        {(() => {
-          const lastAccepted = feedings
-            .filter((f) => f.accepted)
-            .sort(
-              (a, b) =>
-                new Date(b.fed_at).getTime() - new Date(a.fed_at).getTime(),
-            )[0];
-          return (
-            <FeedingIntelligence
-              animalId={animal.id}
-              lastFedAt={animal.last_fed_at}
-              lastAcceptedPreyWeightG={lastAccepted?.prey_weight_g ?? null}
-              lastAcceptedFedAt={lastAccepted?.fed_at ?? null}
-              refreshKey={`${feedings.length}-${weights.length}-${animal.current_weight_g ?? ''}`}
-            />
-          );
-        })()}
-
-        {/* CGD refresh — one-tap log of a fresh Pangea dish, only for
-            animals whose species (or per-animal override) feeds on a
-            complete gecko diet. Logging via the full feeding form is
-            still available via the Feeding action below. */}
-        {canLog && animal.feeds_on_cgd && (
-          <CgdRefreshSection animal={animal} onRefreshed={onRefresh} />
-        )}
+        <StatStrip animal={animal} weights={weights} feedings={feedings} />
 
         <Section title="Photos">
           <PhotosStrip
@@ -281,6 +256,19 @@ export function AnimalDetailScreen() {
             (Recent weigh-ins / Recent feedings / Recent sheds) that each
             sorted independently. Client-side merge — no new endpoints. */}
         <Section title="History">
+          {historyError ? (
+            <View
+              style={[styles.historyError, { borderColor: colors.danger + '55', backgroundColor: colors.danger + '12' }]}
+              accessibilityRole="alert"
+            >
+              <Text style={[TYPE.body, { color: colors.textPrimary }]}>
+                Some of this animal&apos;s history didn&apos;t load, so the list below may be incomplete.
+              </Text>
+              <TouchableOpacity onPress={onRefresh} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+                <Text style={[TYPE.bodyStrong, { color: colors.accent }]}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
           <AnimalTimeline
             feedings={feedings}
             weights={weights}
@@ -312,49 +300,49 @@ export function AnimalDetailScreen() {
             this `taxon === 'snake'` check loosens. */}
         {/* Genetics stay with the owner for now (rung 3 v1 surface). */}
         {isOwner && animal.taxon === 'snake' && (
-          <Section title="Genetics">
-            <GenotypeSection
-              snakeId={animal.id}
-              scientificName={animal.scientific_name}
-            />
+          <View style={[styles.collapsible, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity
-              onPress={() =>
-                router.push(
-                  `/morph-calculator?snakeId=${animal.id}` as never,
-                )
-              }
-              style={[
-                styles.calculatorLink,
-                {
-                  borderColor: colors.border,
-                  borderRadius: 8,
-                },
-              ]}
+              onPress={() => setGeneticsOpen((o) => !o)}
+              style={styles.collapsibleHead}
               accessibilityRole="button"
-              accessibilityLabel="Open the morph calculator with this animal as Parent A"
+              accessibilityState={{ expanded: geneticsOpen }}
+              accessibilityLabel={`Genetics${geneSummary ? `: ${geneSummary}` : ''}`}
             >
+              <MaterialCommunityIcons name="dna" size={18} color={colors.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>Genetics</Text>
+                {!geneticsOpen && geneSummary !== null ? (
+                  <Text style={[TYPE.caption, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {geneSummary || 'No genes recorded'}
+                  </Text>
+                ) : null}
+              </View>
               <MaterialCommunityIcons
-                name="calculator-variant"
-                size={18}
-                color={colors.primary}
-              />
-              <Text
-                style={{
-                  color: colors.primary,
-                  fontSize: 14,
-                  fontWeight: '600',
-                  flex: 1,
-                }}
-              >
-                Open morph calculator
-              </Text>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={18}
+                name={geneticsOpen ? 'chevron-up' : 'chevron-down'}
+                size={20}
                 color={colors.textTertiary}
               />
             </TouchableOpacity>
-          </Section>
+            {/* Mounted while collapsed (just hidden) so it can report the
+                preview line — it owns the genotype + gene-catalog fetch. */}
+            <View style={geneticsOpen ? styles.collapsibleBody : styles.hidden}>
+              <GenotypeSection
+                snakeId={animal.id}
+                scientificName={animal.scientific_name}
+                onSummary={setGeneSummary}
+              />
+              <TouchableOpacity
+                onPress={() => router.push(`/morph-calculator?snakeId=${animal.id}` as never)}
+                style={[styles.calculatorLink, { borderColor: colors.border, borderRadius: 8 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Open the morph calculator with this animal as Parent A"
+              >
+                <MaterialCommunityIcons name="calculator-variant" size={18} color={colors.primary} />
+                <Text style={[TYPE.bodyStrong, { color: colors.primary, flex: 1 }]}>Open morph calculator</Text>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            </View>
+          </View>
         )}
         </View>
       </ScrollView>
@@ -429,86 +417,6 @@ export function AnimalDetailScreen() {
   );
 }
 
-/**
- * Inline card that lets the keeper log a CGD refresh in one tap.
- * Posts a feeding with the default brand and bumps the parent's
- * onRefreshed so the FeedingStatusBanner / FeedingIntelligence /
- * collection card pill update.
- */
-function CgdRefreshSection({
-  animal,
-  onRefreshed,
-}: {
-  animal: Animal;
-  onRefreshed: () => Promise<void> | void;
-}) {
-  const { colors, layout } = useTheme();
-  const [busy, setBusy] = useState(false);
-
-  async function handleRefresh() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await createFeeding(animal.id, {
-        fed_at: new Date().toISOString(),
-        food_type: DEFAULT_CGD_FOOD_TYPE,
-        accepted: true,
-      });
-      await onRefreshed();
-    } catch {
-      Alert.alert(
-        'Could not log refresh',
-        'Something went wrong. Please try again in a moment.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <TouchableOpacity
-      onPress={handleRefresh}
-      disabled={busy}
-      style={[
-        styles.cgdCard,
-        {
-          backgroundColor: colors.surfaceRaised,
-          borderColor: colors.border,
-          borderRadius: layout.radius.lg,
-          opacity: busy ? 0.7 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel="Log a CGD refresh"
-    >
-      <View style={[styles.cgdIcon, { backgroundColor: colors.surface }]}>
-        <MaterialCommunityIcons name="leaf" size={22} color={colors.primary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.cgdTitle, { color: colors.textPrimary }]}>
-          Refreshed CGD
-        </Text>
-        <Text
-          style={[styles.cgdSubtitle, { color: colors.textSecondary }]}
-          numberOfLines={2}
-        >
-          Logs a fresh dish with the default brand. Adjust later in the full
-          feeding form.
-        </Text>
-      </View>
-      {busy ? (
-        <ActivityIndicator color={colors.primary} />
-      ) : (
-        <MaterialCommunityIcons
-          name="plus-circle"
-          size={22}
-          color={colors.primary}
-        />
-      )}
-    </TouchableOpacity>
-  );
-}
-
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   scrollContent: {
@@ -517,6 +425,11 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     gap: 16,
   },
+  historyError: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 6, marginBottom: 8 },
+  collapsible: { borderWidth: 1, borderRadius: 13, overflow: 'hidden' },
+  collapsibleHead: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48, paddingVertical: 11, paddingHorizontal: 14 },
+  collapsibleBody: { paddingHorizontal: 14, paddingBottom: 14, gap: 10 },
+  hidden: { display: 'none' },
   /** Everything after the hero gets the normal 16pt gutter. */
   belowHero: { paddingHorizontal: 16, gap: 16 },
 
@@ -543,30 +456,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-  },
-  cgdCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderWidth: 1,
-  },
-  cgdIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cgdTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  cgdSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-    lineHeight: 16,
   },
 });
 

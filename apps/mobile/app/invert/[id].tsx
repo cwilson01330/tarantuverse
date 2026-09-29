@@ -72,6 +72,8 @@ function InvertDetailScreen() {
   const [transferring, setTransferring] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Slices that failed to load on the last fetch (empty = all good). */
+  const [partialFailure, setPartialFailure] = useState<string[]>([]);
   // Lets the hero's photo-count chip jump to the gallery section.
   const scrollRef = useRef<ScrollView | null>(null);
   const photosY = useRef<number | null>(null);
@@ -141,29 +143,37 @@ function InvertDetailScreen() {
     try {
       const i = await getInvert(id);
       setInvert(i);
+      // Each slice still degrades on its own so one bad endpoint doesn't blank
+      // the screen — but a failure is RECORDED, not swallowed. `.catch(() => [])`
+      // on its own made a failed load indistinguishable from "nothing logged"
+      // (design handoff §14.8: three states — loading, empty, error).
+      const failed: string[] = [];
+      const soft = <T,>(p: Promise<T>, fallback: T, what: string): Promise<T> =>
+        p.catch(() => { failed.push(what); return fallback; });
       const [f, m, sub, p, g, pr, fs, ev, care] = await Promise.all([
-        listInvertFeedings(i.taxon, id).catch(() => [] as InvertFeedingLog[]),
-        listInvertMolts(i.taxon, id).catch(() => [] as InvertMoltLog[]),
-        listInvertSubstrateChanges(i.taxon, id).catch(() => [] as InvertSubstrateChange[]),
-        listInvertPhotos(i.taxon, id).catch(() => [] as InvertPhoto[]),
+        soft(listInvertFeedings(i.taxon, id), [] as InvertFeedingLog[], 'feedings'),
+        soft(listInvertMolts(i.taxon, id), [] as InvertMoltLog[], 'molts'),
+        soft(listInvertSubstrateChanges(i.taxon, id), [] as InvertSubstrateChange[], 'substrate changes'),
+        soft(listInvertPhotos(i.taxon, id), [] as InvertPhoto[], 'photos'),
         // Growth module is registry-gated (ADR-008) — only fetch where enabled
         taxonHasModule(i.taxon, 'growth')
-          ? getInvertGrowth(id).catch(() => null)
+          ? soft(getInvertGrowth(id), null, 'growth')
           : Promise.resolve(null),
         // Breeding module is registry-gated (ADR-021 Phase D)
         taxonHasModule(i.taxon, 'breeding')
-          ? listInvertPairings(id).catch(() => [] as InvertPairing[])
+          ? soft(listInvertPairings(id), [] as InvertPairing[], 'pairings')
           : Promise.resolve([] as InvertPairing[]),
         // Registry-gated: detritivores/omnivores have no feeding cadence, so
         // a "next feeding" verdict would be fabricated for them.
         taxonHasModule(i.taxon, 'feedingStats')
-          ? getInvertFeedingStats(id).catch(() => null)
+          ? soft(getInvertFeedingStats(id), null, 'feeding status')
           : Promise.resolve(null),
-        listInvertEvents(id).catch(() => [] as AnimalEvent[]),
+        soft(listInvertEvents(id), [] as AnimalEvent[], 'events'),
         // Not registry-gated. Every taxon on this screen needs water in some
         // form, even the ones that never touch a dish — those get misted.
-        listInvertCareLogs(id).catch(() => [] as InvertCareLog[]),
+        soft(listInvertCareLogs(id), [] as InvertCareLog[], 'water logs'),
       ]);
+      setPartialFailure(failed);
       setFeedings(f); setMolts(m); setSubstrate(sub); setPhotos(p); setGrowth(g); setPairings(pr);
       setEvents(ev);
       setCareLogs(care);
@@ -731,6 +741,20 @@ function InvertDetailScreen() {
             </View>
           </View>
         </View>
+
+      {partialFailure.length > 0 && (
+        <View
+          style={[styles.partialFail, { borderColor: colors.error + '66', backgroundColor: colors.error + '14' }]}
+          accessibilityRole="alert"
+        >
+          <Text style={[TYPE.body, { color: colors.textPrimary }]}>
+            Couldn&apos;t load {joinList(partialFailure)}, so parts of this page may be missing or out of date.
+          </Text>
+          <TouchableOpacity onPress={fetchAll} accessibilityRole="button" style={styles.partialFailRetry}>
+            <Text style={[TYPE.bodyStrong, { color: colors.accent }]}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {role && !isOwner && (
         <Text style={[s.empty, { color: colors.textSecondary, marginHorizontal: SPACING.lg, marginTop: SPACING.sm, fontStyle: 'normal' }]}>
@@ -1352,6 +1376,12 @@ function InvertDetailScreen() {
   );
 }
 
+/** "feedings, molts and photos" */
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
 /** Two optional lines as one subtitle — the keeper's note, then who logged it. */
 function joinLines(...parts: (string | null | undefined)[]): string | undefined {
   const kept = parts.filter((p): p is string => !!p && !!p.trim());
@@ -1579,6 +1609,15 @@ const s = StyleSheet.create({
 
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
+    partialFail: {
+      marginHorizontal: SPACING.lg,
+      marginTop: SPACING.md,
+      padding: SPACING.md,
+      borderWidth: 1,
+      borderRadius: SPACING.md,
+      gap: SPACING.xs,
+    },
+    partialFailRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
     // Death treatment — one mark, replacing 💀 / ✝️ / ☠. A filled dot reads as
     // a full stop: neutral, secular, carrying no opinion about how anyone
     // should feel. Slate, never colors.error.

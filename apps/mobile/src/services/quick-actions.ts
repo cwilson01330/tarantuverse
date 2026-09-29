@@ -57,13 +57,13 @@ function loadModule(): QuickActionsAPI | null {
 const SHORTCUTS: Item[] = [
   {
     id: 'add-tarantula',
-    title: 'Add Tarantula',
-    subtitle: 'Quick-add a new spider',
+    title: 'Add animal',
+    subtitle: 'Add to your collection',
     icon: Platform.select({
       ios: 'symbol:plus.circle.fill',
       android: 'add_circle',
     }),
-    params: { href: '/tarantula/add' },
+    params: { href: '/add' },
   },
   {
     id: 'my-collection',

@@ -49,12 +49,15 @@ import {
 const FALLBACK_SPECIES = 'Python regius';
 
 interface Props {
+  /** Reports a one-line summary ("Pastel · het Clown") for a collapsed row's
+   *  preview; '' when nothing is recorded, null while loading or on error. */
+  onSummary?: (summary: string | null) => void;
   snakeId: string;
   /** Snake's scientific_name from the parent. Fallback to ball python. */
   scientificName?: string | null;
 }
 
-export function GenotypeSection({ snakeId, scientificName }: Props) {
+export function GenotypeSection({ snakeId, scientificName, onSummary }: Props) {
   const { colors, layout } = useTheme();
 
   const [rows, setRows] = useState<AnimalGenotype[] | null>(null);
@@ -93,6 +96,23 @@ export function GenotypeSection({ snakeId, scientificName }: Props) {
     });
     return map;
   }, [genes]);
+
+  useEffect(() => {
+    if (!onSummary) return;
+    if (rows === null || genes === null) {
+      onSummary(null);
+      return;
+    }
+    const parts = [...rows]
+      .map((r) => {
+        const name = geneById[r.gene_id]?.common_name ?? 'Unknown gene';
+        if (r.zygosity === 'visual') return name;
+        if (r.zygosity === 'super') return `Super ${name}`;
+        return `${zygosityLabel(r.zygosity, r.poss_het_percentage)} ${name}`;
+      })
+      .sort((a, b) => a.localeCompare(b));
+    onSummary(parts.join(' · '));
+  }, [rows, genes, geneById, onSummary]);
 
   const handleDelete = (row: AnimalGenotype) => {
     const gene = geneById[row.gene_id];

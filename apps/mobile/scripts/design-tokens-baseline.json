@@ -257,10 +257,6 @@
     "fontSize": 4,
     "borderRadius": 3
   },
-  "app/invert/add.tsx": {
-    "fontSize": 8,
-    "borderRadius": 4
-  },
   "app/invert/edit.tsx": {
     "fontSize": 10,
     "borderRadius": 6
@@ -382,10 +378,6 @@
     "fontSize": 8,
     "borderRadius": 5
   },
-  "app/tarantula/add.tsx": {
-    "fontSize": 17,
-    "borderRadius": 7
-  },
   "app/tarantula/edit.tsx": {
     "fontSize": 14,
     "borderRadius": 5
@@ -417,10 +409,6 @@
     "hex": 12,
     "fontSize": 6,
     "borderRadius": 4
-  },
-  "src/components/AddPickerSheet.tsx": {
-    "fontSize": 5,
-    "borderRadius": 3
   },
   "src/components/AnimalCard.tsx": {
     "hex": 2,

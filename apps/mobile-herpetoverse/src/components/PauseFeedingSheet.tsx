@@ -5,7 +5,7 @@
  *
  * Why this exists: ball pythons go on multi-month hunger strikes as
  * normal behavior. Without a way to tell the app "I know, leave me
- * alone," the FeedingStatusBanner escalates to overdue and the keeper
+ * alone," the feeding card escalates to overdue and the keeper
  * tunes out the alerts entirely. This is the mute-button.
  *
  * UX:

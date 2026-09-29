@@ -20,6 +20,15 @@
  *
  * The old wizard's `quickMode` toggle and `currentStep` state are gone; they
  * existed because the form was too long in either mode.
+ *
+ * EVERY ADD STARTS HERE. `/tarantula/add` (the wizard) and `/invert/add` are
+ * redirects to this screen. Two optional params ride along:
+ *   - `collection` — the owner's id when a co-keeper adds to a collection
+ *     shared with them. Everything goes through the collection-aware generic
+ *     endpoints (/inverts/, /colonies/), belongs to the owner, and counts
+ *     against the owner's plan.
+ *   - `enclosureId` — "Add inhabitant" from an enclosure screen; the new
+ *     animal is filed into that enclosure (the API checks it's yours).
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -49,6 +58,9 @@ import { parseLocalDate, toISODateLocal } from '../src/utils/date';
 import { getImageUrl } from '../src/utils/image-url';
 import { INVERT_TAXA } from '../src/lib/inverts';
 import { careLevelMeta } from '../src/components/caresheet';
+import { useAuth } from '../src/contexts/AuthContext';
+import { SPACING, TYPE } from '../src/theme/tokens';
+import { MEMBER_APP, loadSharedWithMe } from '../src/lib/co-keepers';
 import {
   loadSpeciesCatalog,
   normalizeEnclosureType,
@@ -113,10 +125,30 @@ function taxonName(taxon: string): string {
 }
 
 function AddScreen() {
-  const { colors } = useTheme();
+  const { colors, layout } = useTheme();
   const insets = useSafeAreaInsets();
   // Entry from a care sheet's "Add to collection" preselects the species.
-  const { speciesId: preselectId } = useLocalSearchParams<{ speciesId?: string }>();
+  const {
+    speciesId: preselectId,
+    collection: collectionParam,
+    enclosureId: enclosureParam,
+  } = useLocalSearchParams<{ speciesId?: string; collection?: string; enclosureId?: string }>();
+  const collection = typeof collectionParam === 'string' && collectionParam ? collectionParam : null;
+  const enclosureId = !collection && typeof enclosureParam === 'string' && enclosureParam ? enclosureParam : null;
+  const { user } = useAuth();
+  // Whose collection this lands in, for the banner. Null = your own.
+  const [ownerName, setOwnerName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!collection) return;
+    let alive = true;
+    loadSharedWithMe(false, user?.id ?? null).then((s) => {
+      const c = s?.collections.find((x) => x.owner.id === collection && x.app === MEMBER_APP);
+      if (alive) setOwnerName(c ? c.owner.name : null);
+    });
+    return () => { alive = false; };
+  }, [collection, user?.id]);
+  /** `?collection=` for co-keeper adds; empty for your own. */
+  const scoped = collection ? `?collection=${encodeURIComponent(collection)}` : '';
 
   const [catalog, setCatalog] = useState<CatalogSpecies[]>([]);
   const [catalogPartial, setCatalogPartial] = useState(false);
@@ -268,7 +300,8 @@ function AddScreen() {
         // Colonies are a different endpoint AND a different concept — this
         // toggle is how the feature becomes discoverable now that the taxon
         // picker (where it was row 11, below the fold) is retired.
-        await apiClient.post('/colonies/', {
+        await apiClient.post(`/colonies/${scoped}`, {
+          enclosure_id: enclosureId,
           name: nickname || commonName || scientificName,
           taxon,
           species_id: picked?.id ?? null,
@@ -277,7 +310,7 @@ function AddScreen() {
           notes: notes || null,
           ...husbandry,
         });
-      } else if (taxon === 'tarantula') {
+      } else if (taxon === 'tarantula' && !collection && !enclosureId) {
         const created = await apiClient.post('/tarantulas/', {
           name: nickname || null,
           common_name: commonName || '',
@@ -293,8 +326,13 @@ function AddScreen() {
         });
         await seedFirstFeeding(`/tarantulas/${created.data?.id}/feedings`);
       } else {
-        const created = await apiClient.post('/inverts/', {
+        // Tarantulas take this path too when adding to a shared collection
+        // (the legacy /tarantulas/ route is owner-only) or into an enclosure
+        // (/tarantulas/ has no enclosure field). /inverts/ mirrors a
+        // tarantula onto the legacy table, so nothing downstream notices.
+        const created = await apiClient.post(`/inverts/${scoped}`, {
           taxon,
+          enclosure_id: enclosureId,
           name: nickname || null,
           common_name: commonName || null,
           scientific_name: scientificName || null,
@@ -319,12 +357,20 @@ function AddScreen() {
         setPricePaid('');
         setLastFed('');
         Alert.alert('Added', `${displayName} saved. Add another?`);
+      } else if (collection) {
+        router.replace({ pathname: '/shared/[ownerId]', params: { ownerId: collection } } as never);
+      } else if (enclosureId) {
+        router.back();
       } else {
         router.replace('/(tabs)/collection' as any);
       }
     } catch (e: any) {
-      // 402 = free-tier cap. Same treatment as every other create path.
-      if (e?.response?.status === 402) setShowUpgrade(true);
+      // 402 = free-tier cap. Same treatment as every other create path —
+      // except in a shared collection, where the cap is the OWNER's and an
+      // upgrade pitch to the co-keeper would sell them nothing useful.
+      if (e?.response?.status === 402 && collection) {
+        Alert.alert('Collection is full', 'This collection is at its free-plan limit. The owner can upgrade to add more.');
+      } else if (e?.response?.status === 402) setShowUpgrade(true);
       else Alert.alert('Could not save', describeSaveError(e));
     } finally {
       setSaving(false);
@@ -361,14 +407,16 @@ function AddScreen() {
           <MaterialCommunityIcons name="close" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Add to collection</Text>
-        <TouchableOpacity
+        {/* Import is owner-only and lands in YOUR collection — not offered
+            while adding to someone else's. The spacer keeps the title centred. */}
+        {collection ? <View style={{ width: 22 }} /> : <TouchableOpacity
           onPress={() => router.push('/import' as any)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
           accessibilityLabel="Import from a spreadsheet"
         >
           <MaterialCommunityIcons name="tray-arrow-down" size={22} color="#fff" />
-        </TouchableOpacity>
+        </TouchableOpacity>}
       </LinearGradient>
 
       <KeyboardAvoidingView
@@ -383,6 +431,20 @@ function AddScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* ---------------------------------------------------------- */}
+          {(collection || enclosureId) && (
+            <View style={[styles.contextBanner, { borderRadius: layout.radius.md }]} accessibilityRole="text">
+              <MaterialCommunityIcons
+                name={collection ? 'account-multiple-outline' : 'home-variant-outline'}
+                size={18}
+                color={colors.accent}
+              />
+              <Text style={styles.contextBannerText}>
+                {collection
+                  ? `Adding to ${ownerName ? `${ownerName}'s` : 'a shared'} collection. It counts toward their plan.`
+                  : 'Adding to this enclosure.'}
+              </Text>
+            </View>
+          )}
           <Text style={styles.sectionLabel}>WHAT IS IT?</Text>
 
           {picked ? (
@@ -629,7 +691,7 @@ function AddScreen() {
           {/* "Acquisition", not "Provenance" — the app already uses
               provenance for the transfer chain-of-custody feature
               (animal_transfers), and this section is just where/when you got
-              it. Matches the section heading in invert/add.tsx. */}
+              it. */}
           <Collapsed
             title="Acquisition"
             icon="tag-outline"
@@ -640,8 +702,7 @@ function AddScreen() {
             styles={styles}
           >
             {/* State stays an ISO string (what the API wants); DateInput
-                works in Date objects. Convert at the boundary, matching the
-                pattern in invert/add.tsx. `?? new Date()` only supplies what
+                works in Date objects. Convert at the boundary. `?? new Date()` only supplies what
                 the picker OPENS on — it doesn't write a value, so leaving
                 the field untouched still sends nothing. */}
             {/* No maximumDate: an acquisition date is legitimately in the
@@ -891,6 +952,17 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     },
     headerTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: '#fff', textAlign: 'center' },
 
+    contextBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      padding: SPACING.md,
+      marginBottom: SPACING.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    contextBannerText: { ...TYPE.label, flex: 1, color: colors.textSecondary },
     sectionLabel: {
       fontSize: 12,
       fontWeight: '600',

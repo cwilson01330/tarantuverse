@@ -168,24 +168,29 @@ export default function ColonyDetailScreen() {
   const canKeep = can(role, 'keeper');
   const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
   const [deleting, setDeleting] = useState(false);
+  /** Slices that failed to load on the last fetch (empty = all good). */
+  const [partialFailure, setPartialFailure] = useState<string[]>([]);
 
   const fetchColony = useCallback(async () => {
     if (!colonyId) return;
     try {
+      // Non-fatal slices: one bad endpoint mustn't break the whole screen —
+      // but the failure is RECORDED, not swallowed, so an error never reads
+      // as "nothing logged" (design handoff §14.8).
+      const failed: string[] = [];
+      const soft = <T,>(p: Promise<T>, fallback: T, what: string): Promise<T> =>
+        p.catch(() => { failed.push(what); return fallback; });
       const [colonyRes, eventsRes, photosRes, feedingsRes, moltsRes, subsRes, careRes, historyRes] = await Promise.all([
         getColony(colonyId),
         listColonyEvents(colonyId),
-        // Non-fatal: a colony with no photos or feedings is the normal state,
-        // and neither should be able to break the whole screen.
-        listColonyPhotos(colonyId).catch(() => [] as ColonyPhoto[]),
-        listColonyFeedings(colonyId).catch(() => [] as ColonyFeedingLog[]),
-        listColonyMolts(colonyId).catch(() => [] as ColonyMoltLog[]),
-        listColonySubstrateChanges(colonyId).catch(() => [] as ColonySubstrateChange[]),
-        listColonyCareLogs(colonyId).catch(() => [] as ColonyCareLog[]),
-        // Non-fatal for the same reason as the rest: a chart that can't load
-        // must not take the whole colony screen with it.
-        getColonyPopulationHistory(colonyId).catch(() => null),
+        soft(listColonyPhotos(colonyId), [] as ColonyPhoto[], 'photos'),
+        soft(listColonyFeedings(colonyId), [] as ColonyFeedingLog[], 'feedings'),
+        soft(listColonyMolts(colonyId), [] as ColonyMoltLog[], 'molts'),
+        soft(listColonySubstrateChanges(colonyId), [] as ColonySubstrateChange[], 'substrate changes'),
+        soft(listColonyCareLogs(colonyId), [] as ColonyCareLog[], 'water logs'),
+        soft(getColonyPopulationHistory(colonyId), null, 'population history'),
       ]);
+      setPartialFailure(failed);
       setColony(colonyRes);
       setEvents(eventsRes);
       setPhotos(photosRes);
@@ -618,6 +623,19 @@ export default function ColonyDetailScreen() {
         leftAction={backAction}
         rightAction={editAction}
       />
+      {partialFailure.length > 0 && (
+        <View
+          style={[styles.partialFail, { borderColor: colors.error + '66', backgroundColor: colors.error + '14', borderRadius: layout.radius.md }]}
+          accessibilityRole="alert"
+        >
+          <Text style={[styles.detailBody, { color: colors.textPrimary }]}>
+            Couldn&apos;t load {partialFailure.length === 1 ? partialFailure[0] : `${partialFailure.slice(0, -1).join(', ')} and ${partialFailure[partialFailure.length - 1]}`}, so parts of this page may be missing or out of date.
+          </Text>
+          <TouchableOpacity onPress={onRefresh} accessibilityRole="button" style={styles.partialFailRetry}>
+            <Text style={[styles.addEventLink, { color: colors.primary }]}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {role && !isOwner && (
         <Text style={[styles.detailBody, { color: colors.textSecondary, paddingHorizontal: 16, paddingTop: 8 }]}>
           {ownerName ? `${ownerName}'s colony. ` : ''}You're a {ROLE_LABEL[role]} — {ROLE_HELP[role]}
@@ -1334,6 +1352,8 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     content: { flex: 1 },
+    partialFail: { marginHorizontal: 16, marginTop: 12, padding: 12, borderWidth: 1, gap: 4 },
+    partialFailRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },
     contentInner: { padding: 16 },
     loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
