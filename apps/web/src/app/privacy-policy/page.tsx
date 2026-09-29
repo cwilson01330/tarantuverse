@@ -32,7 +32,7 @@ export default function PrivacyPolicyPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">Privacy Policy</h1>
         <p className="text-gray-600 dark:text-gray-400 mb-8">
-          <strong>Last Updated:</strong> September 28, 2026 &nbsp;·&nbsp; <strong>Effective:</strong> April 21, 2026
+          <strong>Last Updated:</strong> September 29, 2026 &nbsp;·&nbsp; <strong>Effective:</strong> April 21, 2026
         </p>
 
         <div className="prose prose-lg dark:prose-invert max-w-none">
@@ -145,6 +145,13 @@ export default function PrivacyPolicyPage() {
             <p className="text-gray-700 dark:text-gray-300 mb-4">
               If you turn on logging for a link (a premium feature), the person using it can mark the animals on that link as fed or refused, after entering a PIN that you set and share with them separately. Those entries become part of your feeding records, labelled with the sitter name you typed for the link, and count toward your feeding history and statistics like entries you make yourself. The sitter can add a short note and can undo their own entry within an hour; they cannot see or change anything else in your account. The PIN is stored only as a one-way fingerprint, and after five wrong PINs, logging on that link pauses (the feeding list stays available) and we notify you.
             </p>
+            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">5.5 Co-keepers</h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              If you invite someone to help keep your collection (a premium feature), we email the address you type an invite that shows your name, and we keep that address with the invite so you can see who is pending. The invite works for 7 days, only once, and only for an account whose email address has been verified and matches it. You choose each person&rsquo;s role: a viewer can see the collection, a logger can also add feedings, molts, weights, sheds, photos and care entries and change their own, and a keeper can also add and edit animals. Co-keepers see the animal records in the collection you shared, including your notes and any prices you entered; they never see your email address, your account settings or billing, your sitter links, or your other app&rsquo;s collection. Only you can delete or transfer animals, export your data, or change who has access.
+            </p>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              You and your co-keepers see each other&rsquo;s names (display name or username). Entries a co-keeper makes become part of your records, labelled with their name. You can change a role or remove someone at any time, and a co-keeper can leave at any time; either way their access ends straight away. If your premium plan lapses, co-keepers can still view but not change anything.
+            </p>
           </section>
 
           <section className="mb-8">
@@ -187,7 +194,7 @@ export default function PrivacyPolicyPage() {
               Aggregated or de-identified information that can no longer reasonably be linked to you may be retained and used indefinitely. Log data and backups are rotated on normal operational schedules.
             </p>
             <p className="text-gray-700 dark:text-gray-300 mt-4">
-              Sitter links you create, and their open counts, are kept with your account so you can see past links, and are deleted along with your account. Feedings a sitter logs are kept as part of your records, like any other feeding log.
+              Sitter links you create, and their open counts, are kept with your account so you can see past links, and are deleted along with your account. Feedings a sitter logs are kept as part of your records, like any other feeding log. Invites and co-keeper memberships are kept with your account and are deleted along with it. Entries a co-keeper made stay in your records; if that person deletes their account, their name is removed from those entries.
             </p>
           </section>
 

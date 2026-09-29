@@ -302,6 +302,8 @@ function YouScreen() {
         <MenuSection title="Your collection">
           <MenuRow icon="link" label="Sitter links" onPress={() => router.push('/sitter' as never)}
             accessibilityHint="Make a feeding-list link for someone looking after your animals" />
+          <MenuRow icon="account-multiple-outline" label="Sharing" onPress={() => router.push('/sharing' as never)}
+            accessibilityHint="Co-keepers: collections shared with you, and people who help keep yours" />
           <MenuRow icon="tray-arrow-down" label="Import collection" onPress={() => router.push('/import' as never)} />
           <MenuRow icon="download-outline" label="Export your data" external onPress={() => openLink(EXPORT_URL)} />
           <MenuRow icon="calculator-variant" label="Morph calculator" detail="Predict offspring from any pairing."

@@ -88,8 +88,8 @@ Legacy per-taxon routers (`tarantulas`, `scorpions`, `centipedes`, `whip_spiders
 | 2. Migrate v1 routers | ✅ 258/258 collection routes tagged; the structural test now **enforces**. ~130 co-keeper-reachable, the rest `owner_only` (or `public` for share tokens / public profiles). Both existing bugs fixed |
 | 3. Attribution | ✅ `logged_by_user_id` on 8 more log tables (`cka_20260929`), written on every co-keeper log; responses carry `logged_by_name` |
 | 4. Invites & membership API | ✅ `routers/collection_members.py` at `/api/v1/collection-members` |
-| 5. Clients | ⏳ next |
-| 6. Verify & review | ⏳ (per-router tests + mutation tests already done for steps 1–4) |
+| 5. Clients | ✅ TV web, HV web, TV mobile, HV mobile: Sharing screen (shared with me + your co-keepers + invite), shared-collection screen (due list, Fed/Refused, animals), `/invite` link pages on both sites, role-aware detail screens, attribution on history |
+| 6. Verify & review | ✅ independent security review (below), fixes + tests + mutation checks, privacy policy §5.5 + retention on all three policy pages |
 
 ### Decisions made while building (2026-09-29)
 
@@ -110,3 +110,25 @@ Legacy per-taxon routers (`tarantulas`, `scorpions`, `centipedes`, `whip_spiders
 4. **Invites & membership API** + emails + notifications + lapse rule.
 5. **Clients (both apps, both sites):** "Shared with me" collection switcher, members screen (invite / role / remove / leave), invite accept page + deep link, role-aware UI (hide what a role can't do), "by Alex" on history.
 6. **Verify:** per-role tests for every migrated router (allowed / 403 / other keeper's → 404), mutation tests on the resolver, independent security review, privacy policy + terms copy (co-keepers see each other's names), PRD notes.
+
+## Security review (2026-09-29) and what changed
+
+An independent review of steps 1–5 found the resolver, per-app split, 404/403 split, owner-scoped writes and the logger own-entry rule sound. Findings and fixes:
+
+| # | Finding | Fix |
+|---|---|---|
+| H1 | With `EMAIL_VERIFICATION_REQUIRED` off (the default), every account is marked verified at sign-up, so anyone could register the invitee's address and take the invite in-app (no token needed). | In-app listing / accept / decline and the in-app invite notification only run when verification is enforced (`_in_app_invites`). Otherwise invites are accepted only through the emailed link, which proves inbox access. Sharing screens now say "open the link in the invite email". |
+| M1 | `safeRedirect` bypass: `/\t/evil.com` and `/..//evil.com` normalise to `//evil.com`. | Reject control characters and backslashes, resolve against a placeholder origin, require the same origin, re-check the normalised path. Both sites. |
+| M2 | An active co-keeper couldn't delete their account (SET NULL vs the active-has-member CHECK), and the 500 returned the raw DB error. | `end_memberships_of()` marks active memberships `left` before the user row is deleted (self-delete and admin delete). The error message is generic; the cause is logged. |
+| L1 | Resending an expired invite skipped the cap and duplicate checks. | Revival takes the owner lock, lazily expires dead invites, and enforces the cap and one-open-invite-per-address. |
+| L2 | Keepers could make the owner's animals public or set `photo_url` to an outside image (IP beacon). | `strip_owner_only()` drops `is_public` / `visibility` / `photo_url` from keeper creates and edits. Hero photos from uploads still go through set-main. |
+| L3 | The invite email subject used the raw display name. | Control characters collapsed, 40-char cap, name quoted. |
+| — | (Found while building step 5) Any account could file its own animal into another user's enclosure by UUID; a co-keeper could move the owner's animal into the co-keeper's enclosure. | `require_own_enclosure()` on every animal create/update path that accepts `enclosure_id` (HV animals, inverts, legacy scorpions / centipedes / whip spiders). |
+
+Left as-is, deliberately:
+
+- **L4** — a deleted co-keeper's entries read as the owner's (SET NULL). Documented above and in the privacy policy ("their name is removed from those entries").
+- **What members see** — co-keepers see each other's names and the owner's notes and prices on animal records. Stated in the privacy policy (§5.5).
+- **Emails are case-sensitive at registration** (`User.email ==`, case-sensitive unique index). Not exploitable for invites after H1, but worth normalising platform-wide.
+- **Rate limiting is probably not per client** (pre-existing, platform-wide): the limiter keys on `request.client.host`, and uvicorn only trusts forwarded headers from 127.0.0.1, so behind Render's proxy many users may share one bucket. Needs a check of Render's forwarding headers before changing the key function.
+- **Residual H1 risk once verification is switched on**: accounts created while it was off are still flagged verified. Low — an attacker would have had to register the victim's address before the switch.

@@ -58,7 +58,9 @@ export default function AddInvertScreen() {
     speciesId: speciesIdParam,
     scientificName: scientificNameParam,
     commonName: commonNameParam,
+    collection,
   } = useLocalSearchParams<{
+    collection?: string;
     taxon?: string;
     speciesId?: string;
     scientificName?: string;
@@ -150,7 +152,7 @@ export default function AddInvertScreen() {
         last_substrate_change: lastSubstrateChange.trim() || null,
         enclosure_notes: enclosureNotes.trim() || null,
         notes: notes.trim() || null,
-      });
+      }, collection);
 
       // Seed the first feeding if the keeper told us when they last fed.
       // Deliberately non-fatal: the animal is already saved, and losing the
@@ -168,7 +170,10 @@ export default function AddInvertScreen() {
 
       router.replace(`/invert/${created.id}` as any);
     } catch (err: any) {
-      if (isPaymentRequired(err)) {
+      if (isPaymentRequired(err) && collection) {
+        // The cap is the OWNER's — don't sell the co-keeper an upgrade that doesn't help.
+        Alert.alert('Collection is full', 'This collection is at its free-plan limit. The owner can upgrade to add more.');
+      } else if (isPaymentRequired(err)) {
         setShowUpgradeModal(true);
       } else {
         Alert.alert('Could not save', getErrorMessage(err, 'Something went wrong saving.'));

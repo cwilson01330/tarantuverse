@@ -39,6 +39,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models.collection_member import MAX_MEMBERS_PER_COLLECTION, CollectionMember
 from app.models.user import User
@@ -133,6 +134,22 @@ def _owned_membership(db: Session, membership_id: UUID, owner: User) -> Collecti
     if m is None or m.status not in ("pending", "active"):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Member not found")
     return m
+
+
+def _in_app_invites() -> bool:
+    """Whether invites may be seen / accepted / declined from inside the app,
+    i.e. without the emailed token.
+
+    That path trusts `is_verified` as proof the account holder owns the
+    invited address. With EMAIL_VERIFICATION_REQUIRED off, registration marks
+    every account verified, so anyone could register the invitee's address and
+    take the invite. Then only the emailed link — which proves inbox access —
+    can accept. (Security review 2026-09-29, H1.)
+    """
+    return bool(settings.EMAIL_VERIFICATION_REQUIRED)
+
+
+IN_APP_OFF = "Open the link in your invite email to accept."
 
 
 def _email_matches(user: User, m: CollectionMember) -> bool:
@@ -246,7 +263,7 @@ async def shared_with_me(
 
     verified = bool(getattr(current_user, "is_verified", False))
     invites: List[PendingInvite] = []
-    if verified and current_user.email:
+    if verified and current_user.email and _in_app_invites():
         pending = (
             db.query(CollectionMember)
             .filter(
@@ -298,6 +315,8 @@ async def accept_in_app(
 ):
     """Accept an invite listed in Shared with me — same checks as the link:
     live, not your own, verified email that matches."""
+    if not _in_app_invites():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=IN_APP_OFF)
     m = db.query(CollectionMember).filter(CollectionMember.id == invite_id).with_for_update().first()
     if m is not None and not _email_matches(current_user, m):
         m = None  # someone else's invite: indistinguishable from no invite
@@ -313,6 +332,8 @@ async def decline_invite(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if not _in_app_invites():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=IN_APP_OFF)
     m = db.query(CollectionMember).filter(CollectionMember.id == invite_id).first()
     if m is None or m.status != "pending" or not getattr(current_user, "is_verified", False) \
             or not _email_matches(current_user, m):
@@ -414,7 +435,10 @@ async def invite(
         .filter(func.lower(User.email) == body.email, User.is_verified.is_(True))
         .first()
     )
-    if invitee is not None and invitee.id != owner.id:
+    # Only when the invite can actually be accepted in-app: otherwise this
+    # would tell whoever registered that address (see _in_app_invites) who is
+    # inviting them, and point them at a screen with nothing to accept.
+    if invitee is not None and invitee.id != owner.id and _in_app_invites():
         _notify(db, invitee.id, "collection_invite",
                 f"{_name(owner)} invited you to their {APP_NAME[body.app]} collection",
                 f"As a {body.role}. Open Shared with me to accept.",
@@ -445,6 +469,37 @@ async def resend_invite(
             detail={"message": "Inviting co-keepers is a premium feature.", "is_premium": False,
                     "source": "shared_keeping"},
         )
+    if m.status == "expired":
+        # Reviving an expired invite adds a live one, so it gets the same
+        # checks as a new invite: the owner lock, the cap, and no second
+        # pending invite to the same address (which the unique index would
+        # otherwise turn into a 500). Review 2026-09-29, L1.
+        now = _now()
+        db.query(User).filter(User.id == current_user.id).with_for_update().first()
+        others = (
+            db.query(CollectionMember)
+            .filter(
+                CollectionMember.owner_user_id == current_user.id,
+                CollectionMember.app == m.app,
+                CollectionMember.status.in_(("active", "pending")),
+                CollectionMember.id != m.id,
+            )
+            .all()
+        )
+        live = [o for o in others if o.status == "active" or _is_live_pending(o, now)]
+        for o in others:
+            if o not in live:  # lazy expiry, so a dead invite can't block this one
+                o.status, o.ended_at, o.invite_token_hash = "expired", now, None
+        db.flush()
+        if any(o.status == "pending" and o.invited_email == m.invited_email for o in live):
+            raise HTTPException(status.HTTP_409_CONFLICT,
+                                detail="There's already an open invite to that address.")
+        if len(live) >= MAX_MEMBERS_PER_COLLECTION:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                detail=f"A collection can have up to {MAX_MEMBERS_PER_COLLECTION} co-keepers and invites. "
+                       "Remove someone first.",
+            )
     raw, token_hash = _new_token()
     m.invite_token_hash, m.invite_expires_at, m.status, m.ended_at = token_hash, _now() + INVITE_TTL, "pending", None
     db.commit()

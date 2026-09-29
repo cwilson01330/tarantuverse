@@ -1539,15 +1539,21 @@ async def delete_account(
         db.query(ReptileSpecies).filter(ReptileSpecies.verified_by == uid).update(
             {ReptileSpecies.verified_by: None}, synchronize_session=False)
 
+        # Co-keeper memberships must end before the SET NULL can apply.
+        from app.models.collection_member import end_memberships_of
+        end_memberships_of(db, uid)
+
         # Bulk delete bypasses ORM relationship handling and relies on the
         # DB's ON DELETE CASCADE for all dependent rows.
         db.query(User).filter(User.id == uid).delete(synchronize_session=False)
         db.commit()
 
         return {"message": "Account deleted successfully"}
-    except Exception as e:
+    except Exception:
         db.rollback()
+        # Log the cause; never hand raw database errors to the client.
+        logger.exception("account deletion failed for %s", uid)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete account: {str(e)}"
+            detail="We couldn't delete your account just now. Please try again, or contact support.",
         )

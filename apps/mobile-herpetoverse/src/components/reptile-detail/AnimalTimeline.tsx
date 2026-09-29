@@ -38,6 +38,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { FeedingLog, ShedLog, WeightLog } from '../../lib/animals';
+import { attribution } from '../../lib/co-keepers';
 
 export type TimelineKind = 'feeding' | 'weight' | 'shed';
 
@@ -51,8 +52,10 @@ interface TimelineEntry {
   /** False when `at` carried no time component — see the tiebreak note. */
   hasTime: boolean;
   title: string;
-  /** Who logged it, when it wasn't the keeper (sitter links). */
+  /** Who logged it, when it wasn't the owner (sitter links, co-keepers). */
   attribution?: string;
+  /** Whether the viewer may open it for editing (co-keepers: loggers only their own). */
+  canChange: boolean;
   /** Right-aligned outcome or delta. */
   trailing?: string;
   /** Colour for `trailing`; falls back to textTertiary. */
@@ -134,12 +137,15 @@ export function AnimalTimeline({
   weights,
   sheds,
   onOpen,
+  canChange = () => true,
 }: {
   feedings: FeedingLog[];
   weights: WeightLog[];
   sheds: ShedLog[];
   /** Opens the matching edit form for a row. */
   onOpen: (kind: TimelineKind, id: string) => void;
+  /** Co-keepers: rows the viewer can't change read as plain history. Defaults to all. */
+  canChange?: (entry: { logged_by_user_id?: string | null }) => boolean;
 }) {
   const { colors } = useTheme();
   const [filter, setFilter] = useState<TimelineKind | null>(null);
@@ -156,7 +162,8 @@ export function AnimalTimeline({
         day: localDay(f.fed_at),
         hasTime: hasTimeComponent(f.fed_at),
         title: feedingTitle(f),
-        attribution: f.sitter_name ? `Logged by ${f.sitter_name} (sitter link)` : undefined,
+        attribution: attribution(f),
+        canChange: canChange(f),
         trailing: f.accepted ? undefined : 'Refused',
         trailingTone: f.accepted ? undefined : 'danger',
       });
@@ -191,6 +198,8 @@ export function AnimalTimeline({
                 Math.round(delta),
               ).toLocaleString()} g`,
         trailingTone: delta == null || delta === 0 ? 'muted' : delta > 0 ? 'success' : 'danger',
+        attribution: attribution(w),
+        canChange: canChange(w),
       });
     });
 
@@ -204,6 +213,8 @@ export function AnimalTimeline({
         title: shedTitle(s),
         trailing: s.has_retained_shed ? 'Retained' : undefined,
         trailingTone: s.has_retained_shed ? 'danger' : undefined,
+        attribution: attribution(s),
+        canChange: canChange(s),
       });
     }
 
@@ -216,7 +227,7 @@ export function AnimalTimeline({
     });
 
     return out;
-  }, [feedings, weights, sheds]);
+  }, [feedings, weights, sheds, canChange]);
 
   const counts = useMemo(() => {
     const c: Record<TimelineKind, number> = { feeding: 0, weight: 0, shed: 0 };
@@ -284,11 +295,12 @@ export function AnimalTimeline({
             key={`${e.kind}:${e.id}`}
             style={[styles.row, { backgroundColor: colors.surfaceRaised }]}
             onPress={() => onOpen(e.kind, e.id)}
+            disabled={!e.canChange}
             activeOpacity={0.7}
-            accessibilityRole="button"
+            accessibilityRole={e.canChange ? 'button' : 'text'}
             accessibilityLabel={`${e.title}, ${relativeDay(e.at)}${
               e.trailing ? `, ${e.trailing}` : ''
-            }. Opens for editing.`}
+            }${e.canChange ? '. Opens for editing.' : ''}`}
           >
             <View
               style={[styles.rowIcon, { backgroundColor: colors.primary + '1F' }]}

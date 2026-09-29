@@ -26,7 +26,7 @@
  */
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   CartesianGrid,
   Line,
@@ -80,6 +80,45 @@ import {
   type InitiateTransferResponse,
   initiateTransfer,
 } from '@/lib/transfers'
+import { useAuth } from '@/lib/auth'
+import { ROLE_HELP, ROLE_LABEL, attribution, can, useCollectionRole } from '@/lib/coKeepers'
+
+// ---------------------------------------------------------------------------
+// What the viewer can do here (co-keepers, PRD-shared-keeping rung 3).
+//
+// Only ever hides controls that would fail — the API checks every request.
+// Until the role resolves everything write-shaped stays hidden.
+// ---------------------------------------------------------------------------
+
+interface Access {
+  isOwner: boolean
+  /** Logger or above: log feedings / weights / sheds, upload photos. */
+  canLog: boolean
+  /** Keeper or above: edit the animal, pause, cadence, any entry, hero photo. */
+  canKeep: boolean
+  myId: string | null
+}
+
+const AccessContext = createContext<Access>({ isOwner: false, canLog: false, canKeep: false, myId: null })
+
+function useAccess(): Access {
+  return useContext(AccessContext)
+}
+
+/** Loggers may change only their own entries; keepers and the owner, any. */
+function canChangeEntry(a: Access, entry: { logged_by_user_id?: string | null }): boolean {
+  return a.canKeep || (a.canLog && !!a.myId && entry.logged_by_user_id === a.myId)
+}
+
+function AttributionChip({ entry }: { entry: { sitter_name?: string | null; logged_by_name?: string | null } }) {
+  const text = attribution(entry)
+  if (!text) return null
+  return (
+    <span className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 bg-herp-teal/15 text-herp-teal">
+      {text}
+    </span>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Page
@@ -89,6 +128,16 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   // Animal record
   const [animal, setAnimal] = useState<Animal | null>(null)
   const [animalError, setAnimalError] = useState<string | null>(null)
+
+  // Whose animal this is, and what we may do with it.
+  const { user, token } = useAuth()
+  const { role, ownerName } = useCollectionRole(token, user?.id, animal?.user_id)
+  const access = useMemo<Access>(() => ({
+    isOwner: role === 'owner',
+    canLog: can(role, 'logger'),
+    canKeep: can(role, 'keeper'),
+    myId: user?.id ?? null,
+  }), [role, user?.id])
 
   // Weight slice
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([])
@@ -245,9 +294,17 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
   }
   if (!animal) return null
 
+  const sharedBack = !access.isOwner && role ? `/app/shared/${animal.user_id}` : undefined
+
   return (
+    <AccessContext.Provider value={access}>
     <article className="max-w-4xl mx-auto space-y-8">
-      <BackLink />
+      <BackLink href={sharedBack} label={sharedBack ? `${ownerName ?? 'Shared'}'s collection` : undefined} />
+      {role && role !== 'owner' && (
+        <p className="text-sm text-neutral-400 p-3 rounded-md border border-herp-teal/30 bg-herp-teal/5">
+          {ownerName ? `${ownerName}'s animal. ` : ''}You&apos;re a <strong className="text-neutral-200">{ROLE_LABEL[role]}</strong> — {ROLE_HELP[role]}
+        </p>
+      )}
       <AnimalHeader animal={animal} suggestion={preySuggestion} />
 
       {/* Photos section — heading + QR action live in a flex row so the
@@ -259,7 +316,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           <h2 className="text-sm uppercase tracking-[0.2em] text-herp-lime font-medium">
             Photos
           </h2>
-          <button
+          {access.isOwner && <button
             type="button"
             onClick={() => setQrOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-800 text-xs font-medium text-neutral-300 hover:text-herp-lime hover:border-herp-teal/40 transition-colors"
@@ -267,13 +324,15 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           >
             <span aria-hidden="true">📱</span>
             QR upload
-          </button>
+          </button>}
         </div>
         <PhotoGallery
           animalId={animal.id}
           taxon={animal.taxon}
           mainPhotoUrl={animal.photo_url}
           onMainChanged={refetchAnimalOnly}
+          canUpload={access.canLog}
+          canManage={access.canKeep}
         />
       </section>
 
@@ -296,12 +355,12 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
         {trend && <WeightLossBanner trend={trend} />}
         <WeightChart logs={weightLogs} />
         <WeightStats animal={animal} logs={weightLogs} trend={trend} />
-        <LogWeightForm
+        {access.canLog && <LogWeightForm
           animalId={animal.id}
           onCreated={refetchWeights}
           editing={editingWeight}
           onEditDone={() => setEditingWeight(null)}
-        />
+        />}
         <WeightLogList
           logs={weightLogs}
           onDelete={refetchWeights}
@@ -323,14 +382,14 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
       </Section>
 
       <Section title="Feeding log">
-        <LogFeedingForm
+        {access.canLog && <LogFeedingForm
           animal={animal}
           suggestion={preySuggestion}
           onCreated={refetchFeedings}
           onPauseChanged={refetchAll}
           editing={editingFeeding}
           onEditDone={() => setEditingFeeding(null)}
-        />
+        />}
         <FeedingList
           feedings={feedings}
           animalWeightG={animal.current_weight_g}
@@ -341,12 +400,12 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
 
       <Section title="Sheds">
         {shedError && <InlineError message={shedError} />}
-        <LogShedForm
+        {access.canLog && <LogShedForm
           animalId={animal.id}
           onCreated={refetchSheds}
           editing={editingShed}
           onEditDone={() => setEditingShed(null)}
-        />
+        />}
         <ShedList sheds={sheds} onDelete={refetchSheds} onEdit={setEditingShed} />
       </Section>
 
@@ -360,8 +419,9 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
         </Section>
       )}
 
-      {/* Owner actions — transfer / rehome. Suppressed once handed off. */}
-      <Section title="Owner actions">
+      {/* Owner actions — transfer / rehome. Suppressed once handed off.
+          Owner-only: co-keepers never transfer (rung 3). */}
+      {access.isOwner && <Section title="Owner actions">
         {animal.transferred_out_at ? (
           <div className="p-4 rounded-md border border-neutral-800 bg-neutral-900/40 text-sm text-neutral-400 flex items-center gap-2 flex-wrap">
             <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300">
@@ -375,8 +435,9 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
         ) : (
           <TransferSection animal={animal} />
         )}
-      </Section>
+      </Section>}
     </article>
+    </AccessContext.Provider>
   )
 }
 
@@ -652,6 +713,7 @@ function AnimalHeader({
     ? STAGE_LABEL[suggestion.stage]
     : null
   const hatched = fmtDate(animal.hatch_date)
+  const { canKeep } = useAccess()
 
   return (
     <header>
@@ -659,12 +721,12 @@ function AnimalHeader({
         <p className="text-xs tracking-[0.2em] uppercase text-herp-lime font-medium">
           Reptile
         </p>
-        <Link
+        {canKeep && <Link
           href={`/app/reptiles/${animal.id}/edit`}
           className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider px-3 py-1.5 rounded-md border border-neutral-800 text-neutral-400 hover:text-neutral-100 hover:border-neutral-700 transition-colors"
         >
           <span aria-hidden="true">✎</span> Edit
-        </Link>
+        </Link>}
       </div>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
@@ -1034,6 +1096,7 @@ function WeightLogList({
   onDelete: () => void
   onEdit?: (log: WeightLog) => void
 }) {
+  const access = useAccess()
   const sorted = useMemo(
     () =>
       [...logs].sort(
@@ -1072,11 +1135,14 @@ function WeightLogList({
             <span className="text-neutral-400 text-xs truncate flex-1">
               {l.notes}
             </span>
-            {onEdit && <EditRowButton label="weight" onEdit={() => onEdit(l)} />}
-            <DeleteRowButton
-              label="weight"
-              onDelete={() => deleteWeightLog(l.id).then(onDelete)}
-            />
+            <AttributionChip entry={l} />
+            {canChangeEntry(access, l) && <>
+              {onEdit && <EditRowButton label="weight" onEdit={() => onEdit(l)} />}
+              <DeleteRowButton
+                label="weight"
+                onDelete={() => deleteWeightLog(l.id).then(onDelete)}
+              />
+            </>}
           </li>
         ))}
       </ul>
@@ -1344,6 +1410,8 @@ function LogFeedingForm({
   const [error, setError] = useState<string | null>(null)
   const [pauseOpen, setPauseOpen] = useState(false)
   const [cadenceOpen, setCadenceOpen] = useState(false)
+  // Pausing and cadence change the animal itself — keeper and up.
+  const { canKeep } = useAccess()
   const [pauseHelpOpen, setPauseHelpOpen] = useState(false)
   // One-tap "Refresh CGD" — separate busy/error state so the button
   // can show progress without forcing the full form open.
@@ -1519,7 +1587,10 @@ function LogFeedingForm({
             )}
           </>
         )}
-        {pauseLabel && (
+        {pauseLabel && !canKeep && (
+          <span className="text-xs text-indigo-300">⏸ {pauseLabel}</span>
+        )}
+        {pauseLabel && canKeep && (
           <button
             onClick={() => setPauseOpen(true)}
             className="text-xs text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
@@ -1531,7 +1602,7 @@ function LogFeedingForm({
         {/* ADR-017 — sits beside pause because both answer "how is this animal
             handled". An offer when unset; once set it reports the value, so the
             control doubles as the indicator. */}
-        <button
+        {canKeep && <button
           onClick={() => setCadenceOpen(true)}
           className="text-xs text-indigo-300 hover:text-indigo-200 underline-offset-2 hover:underline"
           title="Set how often you feed this animal"
@@ -1539,7 +1610,7 @@ function LogFeedingForm({
           {animal.feeding_interval_days
             ? `🗓 Every ${animal.feeding_interval_days}d — tap to edit`
             : '🗓 Feed on my own schedule'}
-        </button>
+        </button>}
         <PauseFeedingDialog
           open={pauseOpen}
           onClose={() => setPauseOpen(false)}
@@ -1679,7 +1750,7 @@ function LogFeedingForm({
       {/* Pause feedings — surfaces in-context with logging because
           "it just refused" is the natural moment to mute reminders.
           Mirrors the mobile pattern. Migration pse_20260502. */}
-      <div className="rounded-md border border-neutral-800 bg-neutral-900/40 p-3 space-y-2">
+      {canKeep && <div className="rounded-md border border-neutral-800 bg-neutral-900/40 p-3 space-y-2">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">
             {pauseLabel ? 'Feeding paused' : 'Going off feed?'}
@@ -1728,7 +1799,7 @@ function LogFeedingForm({
           </span>
           <span className="text-neutral-600">›</span>
         </button>
-      </div>
+      </div>}
 
       <div className="flex items-center gap-2">
         <button
@@ -1771,6 +1842,7 @@ function FeedingList({
   onDelete: () => void
   onEdit?: (log: FeedingLog) => void
 }) {
+  const access = useAccess()
   const sorted = useMemo(
     () =>
       [...feedings].sort(
@@ -1819,11 +1891,7 @@ function FeedingList({
               {f.food_type && (
                 <span className="text-neutral-200 text-xs">{f.food_type}</span>
               )}
-              {f.sitter_name && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 bg-herp-teal/15 text-herp-teal">
-                  Logged by {f.sitter_name} (sitter link)
-                </span>
-              )}
+              <AttributionChip entry={f} />
               {preyG != null && (
                 <span className="text-neutral-400 text-xs">
                   {fmtDecimal(preyG, 1)} g
@@ -1837,13 +1905,15 @@ function FeedingList({
               <span className="text-neutral-400 text-xs truncate flex-1 min-w-0">
                 {f.notes}
               </span>
-              {onEdit && (
-                <EditRowButton label="feeding" onEdit={() => onEdit(f)} />
-              )}
-              <DeleteRowButton
-                label="feeding"
-                onDelete={() => deleteFeeding(f.id).then(onDelete)}
-              />
+              {canChangeEntry(access, f) && <>
+                {onEdit && (
+                  <EditRowButton label="feeding" onEdit={() => onEdit(f)} />
+                )}
+                <DeleteRowButton
+                  label="feeding"
+                  onDelete={() => deleteFeeding(f.id).then(onDelete)}
+                />
+              </>}
             </li>
           )
         })}
@@ -2029,6 +2099,7 @@ function ShedList({
   onDelete: () => void
   onEdit?: (log: ShedLog) => void
 }) {
+  const access = useAccess()
   const sorted = useMemo(
     () =>
       [...sheds].sort(
@@ -2076,11 +2147,14 @@ function ShedList({
             <span className="text-neutral-400 text-xs truncate flex-1 min-w-0">
               {s.notes}
             </span>
-            {onEdit && <EditRowButton label="shed" onEdit={() => onEdit(s)} />}
-            <DeleteRowButton
-              label="shed"
-              onDelete={() => deleteShed(s.id).then(onDelete)}
-            />
+            <AttributionChip entry={s} />
+            {canChangeEntry(access, s) && <>
+              {onEdit && <EditRowButton label="shed" onEdit={() => onEdit(s)} />}
+              <DeleteRowButton
+                label="shed"
+                onDelete={() => deleteShed(s.id).then(onDelete)}
+              />
+            </>}
           </li>
         ))}
       </ul>
@@ -2206,13 +2280,13 @@ function DeleteRowButton({
   )
 }
 
-function BackLink() {
+function BackLink({ href, label }: { href?: string; label?: string } = {}) {
   return (
     <Link
-      href="/app/reptiles"
+      href={href ?? '/app/reptiles'}
       className="inline-flex items-center gap-1.5 text-sm text-herp-teal hover:text-herp-lime transition-colors"
     >
-      <span aria-hidden="true">←</span> Collection
+      <span aria-hidden="true">←</span> {label ?? 'Collection'}
     </Link>
   )
 }

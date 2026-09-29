@@ -69,6 +69,9 @@ class DB:
     def rollback(self):
         pass
 
+    def flush(self):
+        pass
+
 
 def person(email="owner@example.com", premium=True, verified=True):
     return NS(id=uuid.uuid4(), email=email, username=email.split("@")[0], display_name=None,
@@ -85,6 +88,13 @@ def invite_row(owner, email="alex@example.com", role="logger", status="pending",
 
 def run(fn, **kw):
     return asyncio.run(inspect.unwrap(fn)(**kw))
+
+
+@pytest.fixture
+def in_app_on(monkeypatch):
+    """Email verification enforced — the only setting where is_verified means
+    the account holder has proven they own the address."""
+    monkeypatch.setattr(cm.settings, "EMAIL_VERIFICATION_REQUIRED", True)
 
 
 @pytest.fixture(autouse=True)
@@ -214,7 +224,7 @@ class TestAccept:
             self.by_token(self.owner)
         assert e.value.status_code == 409
 
-    def test_in_app_accept_of_someone_elses_invite_is_a_404(self):
+    def test_in_app_accept_of_someone_elses_invite_is_a_404(self, in_app_on):
         db = DB({CollectionMember: Q(self.row), User: Q(self.owner)})
         with pytest.raises(HTTPException) as e:
             run(cm.accept_in_app, request=None, invite_id=self.row.id, current_user=person("mallory@example.com"), db=db)
@@ -293,3 +303,144 @@ class TestManagement:
             run(cm.resend_invite, request=None, membership_id=row.id, current_user=person(premium=False),
                 db=DB({CollectionMember: Q(row)}))
         assert e.value.status_code == 402
+
+
+# ── security review 2026-09-29 ──────────────────────────────────────────────
+
+class TestInAppNeedsRealVerification:
+    """H1: with EMAIL_VERIFICATION_REQUIRED off, every account is "verified" at
+    sign-up, so anyone could register the invitee's address. Only the emailed
+    link (proof of inbox) may accept then."""
+
+    def setup_method(self):
+        self.owner = person()
+        self.row = invite_row(self.owner)
+
+    def test_flag_off_hides_invites_from_shared_with_me(self, monkeypatch):
+        monkeypatch.setattr(cm.settings, "EMAIL_VERIFICATION_REQUIRED", False)
+        db = DB({CollectionMember: Q(rows=[self.row]), User: Q(self.owner)})
+        out = run(cm.shared_with_me, current_user=person("alex@example.com"), db=db)
+        assert out.invites == []
+
+    def test_flag_off_refuses_in_app_accept_even_for_a_matching_account(self, monkeypatch):
+        monkeypatch.setattr(cm.settings, "EMAIL_VERIFICATION_REQUIRED", False)
+        db = DB({CollectionMember: SeqQ(self.row, None), User: Q(self.owner)})
+        with pytest.raises(HTTPException) as e:
+            run(cm.accept_in_app, request=None, invite_id=self.row.id, current_user=person("ALEX@example.com"), db=db)
+        assert (e.value.status_code, e.value.detail) == (404, cm.IN_APP_OFF)
+        assert self.row.status == "pending"
+
+    def test_flag_off_refuses_in_app_decline(self, monkeypatch):
+        monkeypatch.setattr(cm.settings, "EMAIL_VERIFICATION_REQUIRED", False)
+        with pytest.raises(HTTPException) as e:
+            run(cm.decline_invite, invite_id=self.row.id, current_user=person("alex@example.com"),
+                db=DB({CollectionMember: Q(self.row)}))
+        assert e.value.status_code == 404 and self.row.status == "pending"
+
+    def test_flag_off_still_accepts_by_emailed_link(self, monkeypatch):
+        monkeypatch.setattr(cm.settings, "EMAIL_VERIFICATION_REQUIRED", False)
+        alex = person("alex@example.com")
+        db = DB({CollectionMember: SeqQ(self.row, None), User: Q(self.owner)})
+        run(cm.accept_by_token, request=None, body=AcceptByToken(token="t" * 43), current_user=alex, db=db)
+        assert self.row.status == "active"
+
+    def test_flag_on_lists_and_accepts_in_app(self, in_app_on):
+        alex = person("alex@example.com")
+        out = run(cm.shared_with_me, current_user=alex,
+                  db=DB({CollectionMember: Q(rows=[self.row]), User: Q(self.owner)}))
+        assert [i.id for i in out.invites] == [self.row.id]
+        run(cm.accept_in_app, request=None, invite_id=self.row.id, current_user=alex,
+            db=DB({CollectionMember: SeqQ(self.row, None), User: Q(self.owner)}))
+        assert self.row.status == "active" and self.row.member_user_id == alex.id
+
+    def test_flag_off_sends_no_in_app_notification(self, monkeypatch):
+        monkeypatch.setattr(cm.settings, "EMAIL_VERIFICATION_REQUIRED", False)
+        calls = []
+        monkeypatch.setattr(cm, "_notify", lambda *a, **k: calls.append(a))
+        someone = person("alex@example.com")
+        owner = person()
+        db = DB({CollectionMember: Q(rows=[]), User: Q(someone)})
+        run(cm.invite, request=None, body=InviteCreate(app="tarantuverse", email="alex@example.com", role="logger"),
+            current_user=owner, db=db)
+        assert calls == []
+
+
+class TestResendRevival:
+    """L1: reviving an expired invite is a new live invite — same cap and
+    no-duplicate rules as inviting."""
+
+    def test_reviving_is_refused_when_the_collection_is_full(self):
+        owner = person()
+        row = invite_row(owner, status="expired")
+        others = [invite_row(owner, email=f"p{i}@example.com", status="active") for i in range(MAX_MEMBERS_PER_COLLECTION)]
+        db = DB({CollectionMember: Q(row, rows=others), User: Q(owner)})
+        with pytest.raises(HTTPException) as e:
+            run(cm.resend_invite, request=None, membership_id=row.id, current_user=owner, db=db)
+        assert e.value.status_code == 409 and row.status == "expired"
+
+    def test_reviving_is_refused_when_that_address_already_has_an_open_invite(self):
+        owner = person()
+        row = invite_row(owner, status="expired")
+        dupe = invite_row(owner, email=row.invited_email, token="u" * 43)
+        db = DB({CollectionMember: Q(row, rows=[dupe]), User: Q(owner)})
+        with pytest.raises(HTTPException) as e:
+            run(cm.resend_invite, request=None, membership_id=row.id, current_user=owner, db=db)
+        assert e.value.status_code == 409
+
+    def test_a_dead_invite_to_the_same_address_does_not_block_revival(self):
+        owner = person()
+        row = invite_row(owner, status="expired")
+        dead = invite_row(owner, email=row.invited_email, token="u" * 43, expires=NOW - timedelta(days=1))
+        db = DB({CollectionMember: Q(row, rows=[dead]), User: Q(owner)})
+        run(cm.resend_invite, request=None, membership_id=row.id, current_user=owner, db=db)
+        assert row.status == "pending" and dead.status == "expired"
+
+
+class TestAccountDeletion:
+    """M2: an active co-keeper's account must be deletable (SET NULL vs the
+    active-has-member CHECK), and failures must not leak database errors."""
+
+    def test_active_memberships_end_before_the_user_row_goes(self):
+        from app.models.collection_member import end_memberships_of
+
+        captured = {}
+
+        class UQ(Q):
+            def update(self, values, **_):
+                captured.update({getattr(k, "key", k): v for k, v in values.items()})
+                return 1
+
+        end_memberships_of(DB({CollectionMember: UQ()}), uuid.uuid4())
+        assert captured["status"] == "left" and captured["ended_at"] is not None
+
+    def test_both_deletion_paths_end_memberships_first(self):
+        from app.routers import admin, auth
+
+        for fn, delete_stmt in ((auth.delete_account, "User.id == uid).delete("), (admin.delete_user, "db.delete(user)")):
+            src = inspect.getsource(inspect.unwrap(fn))
+            assert "end_memberships_of(db," in src
+            assert src.index("end_memberships_of(db,") < src.index(delete_stmt)
+
+    def test_account_deletion_never_returns_the_raw_error(self):
+        from app.routers import auth
+
+        src = inspect.getsource(inspect.unwrap(auth.delete_account))
+        assert "str(e)" not in src
+
+
+def test_invite_subject_quotes_and_cleans_the_inviters_name(monkeypatch):
+    from app.services.email import EmailService
+
+    seen = {}
+
+    async def capture(to_email, subject, content):
+        seen["subject"] = subject
+
+    monkeypatch.setattr(EmailService, "send_email", staticmethod(capture))
+    asyncio.run(EmailService.send_collection_invite_email(
+        to_email="a@example.com", inviter_name="Tarantuverse\r\nSecurity  Team" + "x" * 80, role="viewer",
+        accept_link="https://example.com/invite#t", valid_days=7,
+    ))
+    subject = seen.get("subject", "")
+    assert subject.startswith('"Tarantuverse Security Team') and "\n" not in subject and "\r" not in subject
+    assert len(subject.split('"')[1]) <= 40

@@ -75,6 +75,8 @@ import {
   type ColonyEvent,
   type ColonyEventType,
 } from '../../src/lib/colonies';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { ROLE_HELP, ROLE_LABEL, attribution, can, canChangeEntry, useCollectionRole } from '../../src/lib/co-keepers';
 
 const EVENT_TYPES: ColonyEventType[] = [
   'birth',
@@ -156,6 +158,15 @@ export default function ColonyDetailScreen() {
   // Delete state
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDeleteEventId, setConfirmDeleteEventId] = useState<string | null>(null);
+
+  // Co-keepers (rung 3): what the viewer may do here. Hides controls that
+  // would fail — the API checks every request.
+  const { user } = useAuth();
+  const { role, ownerName } = useCollectionRole(user?.id, colony?.user_id);
+  const isOwner = role === 'owner';
+  const canLog = can(role, 'logger');
+  const canKeep = can(role, 'keeper');
+  const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
   const [deleting, setDeleting] = useState(false);
 
   const fetchColony = useCallback(async () => {
@@ -311,7 +322,7 @@ export default function ColonyDetailScreen() {
     </TouchableOpacity>
   );
 
-  const editAction = colony ? (
+  const editAction = colony && canKeep ? (
     <TouchableOpacity
       onPress={() => router.push(`/colony/${colony.id}/edit` as any)}
       accessibilityLabel="Edit colony"
@@ -607,6 +618,11 @@ export default function ColonyDetailScreen() {
         leftAction={backAction}
         rightAction={editAction}
       />
+      {role && !isOwner && (
+        <Text style={[styles.detailBody, { color: colors.textSecondary, paddingHorizontal: 16, paddingTop: 8 }]}>
+          {ownerName ? `${ownerName}'s colony. ` : ''}You're a {ROLE_LABEL[role]} — {ROLE_HELP[role]}
+        </Text>
+      )}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
         <ScrollView
@@ -696,13 +712,13 @@ export default function ColonyDetailScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>FEEDING</Text>
-              <TouchableOpacity
+              {canLog && <TouchableOpacity
                 onPress={openFeedingForm}
                 accessibilityRole="button"
                 accessibilityLabel="Log a feeding for this colony"
               >
                 <Text style={[styles.addEventLink, { color: colors.primary }]}>+ Log feeding</Text>
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </View>
             {feedings.length === 0 ? (
               <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
@@ -729,6 +745,9 @@ export default function ColonyDetailScreen() {
                       .join(' ') || 'Fed'}
                     {f.accepted ? '' : ' — refused'}
                   </Text>
+                  {attribution(f) ? (
+                    <Text style={[styles.detailBody, { color: colors.textTertiary }]}>{attribution(f)}</Text>
+                  ) : null}
                   {/* Relative AND absolute, same as the animal timeline. */}
                   <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
                     {new Date(f.fed_at).toLocaleDateString()}
@@ -748,7 +767,7 @@ export default function ColonyDetailScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>WATER</Text>
-              <TouchableOpacity
+              {canLog && <TouchableOpacity
                 onPress={() => setCareFormOpen((o) => !o)}
                 accessibilityRole="button"
                 accessibilityLabel="Log a watering for this colony"
@@ -756,7 +775,7 @@ export default function ColonyDetailScreen() {
                 <Text style={[styles.addEventLink, { color: colors.primary }]}>
                   {careFormOpen ? 'Cancel' : '+ Log water'}
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </View>
 
             {careFormOpen && (
@@ -818,6 +837,7 @@ export default function ColonyDetailScreen() {
               careLogs.slice(0, 10).map((c) => (
                 <TouchableOpacity
                   key={c.id}
+                  disabled={!mayChange(c)}
                   onLongPress={() => confirmDeleteCareLog(c)}
                   accessibilityRole="button"
                   accessibilityLabel={`${CARE_LOG_LABELS[c.log_type]} on ${formatLocalDate(c.logged_at)}. Long press to delete.`}
@@ -844,7 +864,7 @@ export default function ColonyDetailScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>SUBSTRATE</Text>
-              <TouchableOpacity
+              {canLog && <TouchableOpacity
                 onPress={() => setSubFormOpen((o) => !o)}
                 accessibilityRole="button"
                 accessibilityLabel="Log a substrate change for this colony"
@@ -852,7 +872,7 @@ export default function ColonyDetailScreen() {
                 <Text style={[styles.addEventLink, { color: colors.primary }]}>
                   {subFormOpen ? 'Cancel' : '+ Log change'}
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </View>
 
             {subFormOpen && (
@@ -923,6 +943,7 @@ export default function ColonyDetailScreen() {
                 <TouchableOpacity
                   key={c.id}
                   style={styles.feedRow}
+                  disabled={!mayChange(c)}
                   onPress={() => confirmDeleteSubstrate(c)}
                   onLongPress={() => confirmDeleteSubstrate(c)}
                   accessibilityRole="button"
@@ -956,7 +977,7 @@ export default function ColonyDetailScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>MOLTS</Text>
-              <TouchableOpacity
+              {canLog && <TouchableOpacity
                 onPress={() => setMoltFormOpen((o) => !o)}
                 accessibilityRole="button"
                 accessibilityLabel="Record a molt found in this colony"
@@ -964,7 +985,7 @@ export default function ColonyDetailScreen() {
                 <Text style={[styles.addEventLink, { color: colors.primary }]}>
                   {moltFormOpen ? 'Cancel' : '+ Found a molt'}
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </View>
 
             {moltFormOpen && (
@@ -1011,6 +1032,7 @@ export default function ColonyDetailScreen() {
                 <TouchableOpacity
                   key={m.id}
                   style={styles.feedRow}
+                  disabled={!mayChange(m)}
                   onLongPress={() => confirmDeleteMolt(m)}
                   onPress={() => confirmDeleteMolt(m)}
                   accessibilityRole="button"
@@ -1035,13 +1057,13 @@ export default function ColonyDetailScreen() {
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
             <View style={styles.eventsHeaderRow}>
               <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>PHOTOS</Text>
-              <TouchableOpacity
+              {canLog && <TouchableOpacity
                 onPress={() => router.push(`/colony/add-photo?id=${colonyId}` as any)}
                 accessibilityRole="button"
                 accessibilityLabel="Add a photo to this colony"
               >
                 <Text style={[styles.addEventLink, { color: colors.primary }]}>+ Add photo</Text>
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </View>
             {photos.length === 0 ? (
               <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
@@ -1064,7 +1086,7 @@ export default function ColonyDetailScreen() {
                         </View>
                       )}
                       {/* Visible control, not a long-press. */}
-                      <TouchableOpacity
+                      {canKeep && <TouchableOpacity
                         style={styles.colonyPhotoManage}
                         onPress={() => handlePhotoOptions(ph)}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -1073,7 +1095,7 @@ export default function ColonyDetailScreen() {
                         accessibilityHint="Set as hero photo or delete"
                       >
                         <MaterialCommunityIcons name="dots-horizontal" size={16} color="#fff" />
-                      </TouchableOpacity>
+                      </TouchableOpacity>}
                     </View>
                   );
                 })}
@@ -1092,9 +1114,9 @@ export default function ColonyDetailScreen() {
           {/* Events */}
           <View style={styles.eventsHeaderRow}>
             <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>EVENTS</Text>
-            <TouchableOpacity onPress={formOpen ? closeForm : openForm} accessibilityRole="button" accessibilityLabel={formOpen ? 'Cancel add event' : 'Add event'}>
+            {canLog && <TouchableOpacity onPress={formOpen ? closeForm : openForm} accessibilityRole="button" accessibilityLabel={formOpen ? 'Cancel add event' : 'Add event'}>
               <Text style={[styles.addEventLink, { color: colors.primary }]}>{formOpen ? 'Cancel' : '+ Add event'}</Text>
-            </TouchableOpacity>
+            </TouchableOpacity>}
           </View>
 
           {formOpen && (
@@ -1241,26 +1263,27 @@ export default function ColonyDetailScreen() {
                     </View>
                     {ev.severity ? <Text style={styles.logSeverity}>{`Severity: ${ev.severity}`}</Text> : null}
                     {ev.notes ? <Text style={styles.logNotes} numberOfLines={6}>{ev.notes}</Text> : null}
+                    {attribution(ev) ? <Text style={styles.logSeverity}>{attribution(ev)}</Text> : null}
                   </View>
-                  <TouchableOpacity
+                  {mayChange(ev) && <TouchableOpacity
                     onPress={() => setConfirmDeleteEventId(ev.id)}
                     accessibilityLabel={`Delete ${COLONY_EVENT_LABELS[ev.event_type]} event`}
                     style={{ padding: 6 }}
                   >
                     <MaterialCommunityIcons name="close" size={18} color={colors.textTertiary} />
-                  </TouchableOpacity>
+                  </TouchableOpacity>}
                 </View>
               ))}
             </View>
           )}
 
           {/* Delete colony */}
-          <TouchableOpacity
+          {isOwner && <TouchableOpacity
             onPress={() => setConfirmDelete(true)}
             style={[styles.deleteBtn, { borderColor: colors.error, borderRadius: layout.radius.md }]}
           >
             <Text style={[styles.deleteText, { color: colors.error }]}>Delete colony</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
 
           <View style={{ height: 32 }} />
         </ScrollView>

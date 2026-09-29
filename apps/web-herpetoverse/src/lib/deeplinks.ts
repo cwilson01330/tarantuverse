@@ -20,6 +20,7 @@ const EXACT_MAP: Record<string, string> = {
   '/feeding-day': '/app/feeding-day',
   '/transfers': '/app/transfers',
   '/sitter': '/app/sitter',
+  '/shared': '/app/sharing',
 }
 
 export function resolveDeeplink(deeplink: string | null | undefined): string | null {

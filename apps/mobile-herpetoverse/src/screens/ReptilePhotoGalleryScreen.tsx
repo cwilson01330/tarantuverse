@@ -21,7 +21,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   Image,
@@ -36,6 +36,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
+import { getAnimal } from '../lib/animals';
+import { can, useCollectionRole } from '../lib/co-keepers';
 import { AppHeader } from '../components/AppHeader';
 import { HeaderBackButton } from '../components/HeaderBackButton';
 import {
@@ -62,6 +65,22 @@ export function ReptilePhotoGalleryScreen() {
   const { colors, layout } = useTheme();
 
   const [photos, setPhotos] = useState<Photo[] | null>(null);
+
+  // Co-keepers (rung 3): loggers upload; keepers also pick the main photo,
+  // re-caption and delete (photo rows don't say who took them, so "your own"
+  // can't be shown here). QR upload links stay with the owner.
+  const { user } = useAuth();
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    getAnimal(id).then((a) => { if (alive) setOwnerId(a.user_id); }).catch(() => {});
+    return () => { alive = false; };
+  }, [id]);
+  const { role } = useCollectionRole(user?.id, ownerId);
+  const canUpload = can(role, 'logger');
+  const canManage = can(role, 'keeper');
+  const isOwner = role === 'owner';
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -274,7 +293,7 @@ export function ReptilePhotoGalleryScreen() {
         }
       >
         {/* Add-photo card */}
-        <View
+        {canUpload && <View
           style={[
             styles.addCard,
             {
@@ -316,7 +335,7 @@ export function ReptilePhotoGalleryScreen() {
               {/* QR upload session — for handing off to another device.
                   Pinned below the picker so it's discoverable but doesn't
                   crowd the primary path (camera/library). */}
-              <TouchableOpacity
+              {isOwner && <TouchableOpacity
                 onPress={() => {
                   if (!id) return;
                   router.push(`/reptile/qr/${id}` as never);
@@ -335,7 +354,7 @@ export function ReptilePhotoGalleryScreen() {
                 >
                   Share a 20-min upload link →
                 </Text>
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </>
           )}
 
@@ -360,7 +379,7 @@ export function ReptilePhotoGalleryScreen() {
               />
             </View>
           )}
-        </View>
+        </View>}
 
         {/* Existing photos */}
         {loadError && <FormErrorBanner message={loadError} />}
@@ -480,7 +499,7 @@ export function ReptilePhotoGalleryScreen() {
                       No caption.
                     </Text>
                   )}
-                  <View style={styles.lightboxActions}>
+                  {canManage && <View style={styles.lightboxActions}>
                     <LightboxAction
                       icon="pencil"
                       label="Edit caption"
@@ -500,7 +519,7 @@ export function ReptilePhotoGalleryScreen() {
                       destructive
                       onPress={handleDelete}
                     />
-                  </View>
+                  </View>}
                 </>
               )}
             </View>

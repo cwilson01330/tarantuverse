@@ -23,6 +23,7 @@ import { apiFetch, ApiError } from '@/lib/apiClient'
 import { AuthUser, setSession } from '@/lib/auth'
 import GoogleSignInButton, { googleSignInEnabled } from '@/components/GoogleSignInButton'
 import ResendVerification from '@/components/ResendVerification'
+import { safeRedirect } from '@/lib/safeRedirect'
 
 interface LoginResponse {
   access_token: string
@@ -38,7 +39,7 @@ interface RegisterResponse {
 function RegisterForm() {
   const router = useRouter()
   const search = useSearchParams()
-  const next = search.get('next') || '/app/reptiles'
+  const next = safeRedirect(search.get('next'), '/app/reptiles')
 
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')

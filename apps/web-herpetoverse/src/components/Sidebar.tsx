@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: '📖', label: 'Species', path: '/app/species' },
   { icon: '🥚', label: 'Breeding', path: '/app/breeding' },
   { icon: '🧳', label: 'Sitter', path: '/app/sitter' },
+  { icon: '👥', label: 'Sharing', path: '/app/sharing' },
   { icon: '↪', label: 'Transfers', path: '/app/transfers' },
   { icon: '🌐', label: 'Community', path: '/app/community', disabled: true },
   { icon: '⚙️', label: 'Settings', path: '/app/settings' },

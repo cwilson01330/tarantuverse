@@ -186,6 +186,9 @@ export interface WeightLog {
   context: WeightContext
   notes: string | null
   created_at: string
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
 }
 
 export interface WeightTrendPoint {
@@ -229,6 +232,9 @@ export interface FeedingLog {
   created_at: string
   /** Set only when a sitter logged it via a sitter link. */
   sitter_name?: string | null
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
 }
 
 export interface ShedLog {
@@ -246,6 +252,9 @@ export interface ShedLog {
   notes: string | null
   image_url: string | null
   created_at: string
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -313,8 +322,11 @@ export function bulkSetFeedingCadence(days: number | null): Promise<{ updated: n
   })
 }
 
-export function createAnimal(payload: CreateAnimalPayload): Promise<Animal> {
-  return apiFetch<Animal>('/api/v1/animals/', {
+/** `collection` = the owner's user id when adding to a collection shared with
+ *  you (co-keepers). The animal then belongs to — and counts against — them. */
+export function createAnimal(payload: CreateAnimalPayload, collection?: string | null): Promise<Animal> {
+  const q = collection ? `?collection=${encodeURIComponent(collection)}` : ''
+  return apiFetch<Animal>(`/api/v1/animals/${q}`, {
     method: 'POST',
     json: payload,
   })

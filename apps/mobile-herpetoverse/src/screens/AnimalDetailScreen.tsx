@@ -64,6 +64,9 @@ import {
 } from '../lib/animals';
 import { type Photo, listPhotos } from '../lib/photos';
 import { DEFAULT_CGD_FOOD_TYPE } from '../lib/cgd';
+import { useAuth } from '../contexts/AuthContext';
+import { TYPE } from '../theme/type';
+import { ROLE_HELP, ROLE_LABEL, can, canChangeEntry, useCollectionRole } from '../lib/co-keepers';
 
 /** Empty-state glyph for the hero card when there's no photo. */
 /**
@@ -92,6 +95,19 @@ export function AnimalDetailScreen() {
   const [shareOpen, setShareOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [cadenceOpen, setCadenceOpen] = useState(false);
+
+  // Co-keepers (rung 3): what the viewer may do here. Hides controls that
+  // would fail — the API checks every request. Nothing write-shaped shows
+  // until the role resolves.
+  const { user } = useAuth();
+  const { role, ownerName } = useCollectionRole(user?.id, animal?.user_id);
+  const isOwner = role === 'owner';
+  const canLog = can(role, 'logger');
+  const canKeep = can(role, 'keeper');
+  const mayChange = useCallback(
+    (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e),
+    [role, user?.id],
+  );
 
   const fetchAll = useCallback(async () => {
     if (!id) return;
@@ -192,14 +208,20 @@ export function AnimalDetailScreen() {
           photoCount={photos?.length ?? 0}
           brumationActive={animal.brumation_active}
           onBack={() => router.back()}
-          onShare={() => setShareOpen(true)}
-          onEdit={() => router.push(`/reptile/edit/${animal.id}` as never)}
+          onShare={isOwner ? () => setShareOpen(true) : undefined}
+          onEdit={canKeep ? () => router.push(`/reptile/edit/${animal.id}` as never) : undefined}
           onOpenGallery={() =>
             router.push(`/reptile/photos/${animal.id}` as never)
           }
         />
 
         <View style={styles.belowHero}>
+
+        {role && !isOwner && (
+          <Text style={[TYPE.body, { color: colors.textSecondary }]}>
+            {ownerName ? `${ownerName}'s animal. ` : ''}You're a {ROLE_LABEL[role]} — {ROLE_HELP[role]}
+          </Text>
+        )}
 
         {/* When paused, the banner becomes the resume affordance —
             tappable, with an "Edit" hint. The canonical pause entry point
@@ -211,8 +233,8 @@ export function AnimalDetailScreen() {
         <FeedingStatusBanner
           animalId={animal.id}
           refreshKey={`${feedings.length}-${animal.feeding_paused_reason ?? ''}-${animal.feeding_paused_until ?? ''}-${animal.feeding_interval_days ?? ''}`}
-          onPausedPress={() => setPauseOpen(true)}
-          onSetCadence={() => setCadenceOpen(true)}
+          onPausedPress={canKeep ? () => setPauseOpen(true) : undefined}
+          onSetCadence={canKeep ? () => setCadenceOpen(true) : undefined}
           hasKeeperCadence={!!animal.feeding_interval_days}
         />
 
@@ -242,7 +264,7 @@ export function AnimalDetailScreen() {
             animals whose species (or per-animal override) feeds on a
             complete gecko diet. Logging via the full feeding form is
             still available via the Feeding action below. */}
-        {animal.feeds_on_cgd && (
+        {canLog && animal.feeds_on_cgd && (
           <CgdRefreshSection animal={animal} onRefreshed={onRefresh} />
         )}
 
@@ -263,6 +285,7 @@ export function AnimalDetailScreen() {
             feedings={feedings}
             weights={weights}
             sheds={sheds}
+            canChange={mayChange}
             onOpen={(kind, entryId) => {
               const route =
                 kind === 'feeding'
@@ -281,12 +304,14 @@ export function AnimalDetailScreen() {
             transferred_out_at. Claiming is web-first — no mobile claim
             screen. onTransferred refetches so the badge flips after a link is
             generated. */}
-        <AnimalTransferSection animal={animal} onTransferred={onRefresh} />
+        {/* Owner-only: co-keepers never transfer (rung 3). */}
+        {isOwner && <AnimalTransferSection animal={animal} onTransferred={onRefresh} />}
 
         {/* Genetics — gated to snakes for now: the gene catalog is
             ball-python-scoped. When the catalog gains lizard/frog genes
             this `taxon === 'snake'` check loosens. */}
-        {animal.taxon === 'snake' && (
+        {/* Genetics stay with the owner for now (rung 3 v1 surface). */}
+        {isOwner && animal.taxon === 'snake' && (
           <Section title="Genetics">
             <GenotypeSection
               snakeId={animal.id}
@@ -352,7 +377,7 @@ export function AnimalDetailScreen() {
       {/* Pinned log bar. These four were outlined secondary buttons
           halfway down the scroll — the most common actions on the screen,
           reachable only after scrolling past three feeding cards. */}
-      <View
+      {canLog && <View
         style={[
           styles.logBar,
           {
@@ -389,7 +414,7 @@ export function AnimalDetailScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </View>}
 
       <PauseFeedingSheet
         visible={pauseOpen}

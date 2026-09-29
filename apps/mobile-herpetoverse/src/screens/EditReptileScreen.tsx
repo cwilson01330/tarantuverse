@@ -43,6 +43,7 @@ import {
   extractErrorMessage,
 } from '../components/forms/FormPrimitives';
 import { EnclosurePicker } from '../components/forms/EnclosurePicker';
+import { useAuth } from '../contexts/AuthContext';
 import { ReptileSpeciesAutocomplete } from '../components/forms/ReptileSpeciesAutocomplete';
 import {
   type Animal,
@@ -81,6 +82,10 @@ export function EditReptileScreen() {
   const { colors, layout } = useTheme();
 
   const [animal, setAnimal] = useState<Animal | null>(null);
+  // A co-keeper (keeper role) can edit a shared animal, but deleting it and
+  // arranging enclosures stay with the owner (rung 3). The API enforces both.
+  const { user } = useAuth();
+  const isOwner = !!animal && !!user && animal.user_id === user.id;
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -338,12 +343,12 @@ export function EditReptileScreen() {
             />
           </Field>
 
-          <Field
+          {isOwner && <Field
             label="Enclosure"
             hint="Optional. Link to a setup so feedings + sheds roll up there."
           >
             <EnclosurePicker value={enclosureId} onChange={setEnclosureId} />
-          </Field>
+          </Field>}
 
           <Field
             label="Current weight (g)"
@@ -409,7 +414,7 @@ export function EditReptileScreen() {
               so a fat-finger doesn't trash a year of records. The
               confirm modal is the real safeguard but the visual gap
               helps. */}
-          <View style={[styles.dangerZone, { borderTopColor: colors.border }]}>
+          {isOwner && <View style={[styles.dangerZone, { borderTopColor: colors.border }]}>
             <Text
               style={[
                 styles.dangerLabel,
@@ -443,7 +448,7 @@ export function EditReptileScreen() {
             >
               Permanently removes weigh-ins, feedings, sheds, and photos.
             </Text>
-          </View>
+          </View>}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -31,6 +31,9 @@ function AddInvertForm() {
   const { user, token } = useAuth()
 
   const taxonParam = searchParams.get('taxon')
+  // Set when a keeper adds to a collection shared with them (co-keepers).
+  // The animal belongs to that owner and counts toward the owner's plan.
+  const collection = searchParams.get('collection')
   const taxon: InvertTaxon = isInvertTaxon(taxonParam) ? taxonParam : 'scorpion'
   const meta = INVERT_TAXA[taxon]
 
@@ -108,7 +111,7 @@ function AddInvertForm() {
     try {
       // Generic create — taxon in the body. TAXON_PATTERN now covers every
       // taxon, so this works without per-taxon routers (ADR-007 parity).
-      const res = await fetch(`${API_URL}/api/v1/inverts/`, {
+      const res = await fetch(`${API_URL}/api/v1/inverts/${collection ? `?collection=${encodeURIComponent(collection)}` : ''}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -138,6 +141,11 @@ function AddInvertForm() {
           notes: notes.trim() || null,
         }),
       })
+      if (res.status === 402 && collection) {
+        // The cap is the OWNER's — don't sell the co-keeper an upgrade that doesn't help.
+        alert('This collection is at its free-plan limit. The owner can upgrade to add more.')
+        return
+      }
       if (res.status === 402) {
         // Pull the cap from the 402 payload so this copy never drifts from
         // the server's actual limit. detail = { message, current_count, limit, is_premium }

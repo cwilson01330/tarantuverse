@@ -27,6 +27,11 @@ const PASSTHROUGH_PREFIXES = [
 
 const PASSTHROUGH_EXACT = ['/feeding-day', '/sitter'];
 
+/** Canonical route → this app's route, where the shapes differ. */
+const EXACT_MAP: Record<string, string> = {
+  '/shared': '/sharing', // co-keeper invites / membership changes
+};
+
 export function resolveDeeplink(deeplink: string | null | undefined): string | null {
   if (!deeplink) return null;
 
@@ -35,6 +40,7 @@ export function resolveDeeplink(deeplink: string | null | undefined): string | n
   if (!deeplink.startsWith('/') || deeplink.startsWith('//')) return null;
 
   if (PASSTHROUGH_EXACT.includes(deeplink)) return deeplink;
+  if (EXACT_MAP[deeplink]) return EXACT_MAP[deeplink];
 
   for (const prefix of PASSTHROUGH_PREFIXES) {
     if (deeplink.startsWith(prefix) && deeplink.length > prefix.length) {

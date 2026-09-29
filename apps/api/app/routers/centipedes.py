@@ -37,7 +37,7 @@ from app.schemas.centipede import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_collection_limit
-from app.utils.access import policy
+from app.utils.access import policy, require_own_enclosure
 
 router = APIRouter()
 
@@ -132,6 +132,7 @@ async def create_centipede(
     # Cross-taxon collection cap (counts inverts: tarantulas + scorpions + centipedes).
     enforce_collection_limit(db, current_user)
     _validate_species(db, payload.species_id)
+    require_own_enclosure(db, payload.enclosure_id, current_user)
 
     data = _coerce_enums(payload.model_dump())
 
@@ -191,6 +192,8 @@ async def update_centipede(
     centipede = _owned_centipede(db, centipede_id, current_user)
 
     data = payload.model_dump(exclude_unset=True)
+    if "enclosure_id" in data:
+        require_own_enclosure(db, data["enclosure_id"], current_user)
 
     if "species_id" in data:
         _validate_species(db, data["species_id"])

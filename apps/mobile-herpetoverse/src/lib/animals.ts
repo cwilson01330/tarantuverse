@@ -182,6 +182,9 @@ export interface AnimalProvenance {
 
 export interface WeightLog {
   id: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   animal_id: string;
   weighed_at: string;
   weight_g: string;
@@ -192,6 +195,9 @@ export interface WeightLog {
 
 export interface FeedingLog {
   id: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   animal_id: string | null;
   fed_at: string;
   food_type: string | null;
@@ -207,6 +213,9 @@ export interface FeedingLog {
 
 export interface ShedLog {
   id: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   animal_id: string;
   shed_at: string;
   in_blue_started_at: string | null;
@@ -318,10 +327,13 @@ export interface CreateAnimalPayload {
   notes?: string | null;
 }
 
+/** `collection` = the owner's user id when adding to a collection shared with
+ *  you (co-keepers); the animal then belongs to — and counts against — them. */
 export async function createAnimal(
   payload: CreateAnimalPayload,
+  collection?: string | null,
 ): Promise<Animal> {
-  const { data } = await apiClient.post<Animal>('/animals/', payload);
+  const { data } = await apiClient.post<Animal>('/animals/', payload, collection ? { params: { collection } } : undefined);
   return data;
 }
 

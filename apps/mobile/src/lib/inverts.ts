@@ -364,7 +364,7 @@ export interface InvertSpecies {
   times_kept: number;
 }
 
-export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; food_size: string | null; accepted: boolean; notes: string | null; /** Set only when a sitter logged it via a sitter link. */ sitter_name?: string | null; }
+export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; food_size: string | null; accepted: boolean; notes: string | null; /** Set only when a sitter logged it via a sitter link. */ sitter_name?: string | null; /** Set when a co-keeper logged it (null = the owner). */ logged_by_user_id?: string | null; logged_by_name?: string | null; }
 /** successful | stuck | lost_limb | fatal — the backend vocabulary.
  *  Deliberately small: finer gradations would be guesses about a process the
  *  keeper mostly didn't watch. `fatal` records a death IN the molt and does
@@ -374,6 +374,9 @@ export type MoltOutcome = 'successful' | 'stuck' | 'lost_limb' | 'fatal';
 export interface InvertMoltLog {
   id: string;
   invert_id: string | null;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   molted_at: string;
   premolt_started_at: string | null;
   /** The molt after which this animal will not molt again (ult_20260911).
@@ -440,7 +443,7 @@ export interface InvertGrowthAnalytics {
   last_molt_date: string | null;
   days_since_last_molt: number | null;
 }
-export interface InvertSubstrateChange { id: string; invert_id: string | null; changed_at: string; substrate_type: string | null; substrate_depth: string | null; reason: string | null; notes: string | null; }
+export interface InvertSubstrateChange { id: string; invert_id: string | null; changed_at: string; substrate_type: string | null; substrate_depth: string | null; reason: string | null; notes: string | null; /** Set when a co-keeper logged it (null = the owner). */ logged_by_user_id?: string | null; logged_by_name?: string | null; }
 export interface InvertPhoto { id: string; url: string; thumbnail_url: string | null; caption: string | null; }
 
 /**
@@ -465,6 +468,9 @@ export interface InvertCareLog {
   logged_at: string;
   notes: string | null;
   created_at: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
 }
 
 /** Keep in lockstep with CARE_LOG_TYPES in app/models/care_log.py. */
@@ -498,8 +504,10 @@ export async function getInvert(id: string): Promise<Invert> {
 
 /** Create via the generic surface — taxon goes in the body (works for
  * every taxon; no per-taxon router required). */
-export async function createInvert(taxon: InvertTaxon, payload: InvertCreate): Promise<Invert> {
-  const { data } = await apiClient.post<Invert>('/inverts/', { taxon, ...payload });
+export async function createInvert(taxon: InvertTaxon, payload: InvertCreate, collection?: string | null): Promise<Invert> {
+  // `collection` = the owner's id when adding to a collection shared with you
+  // (co-keepers); the animal then belongs to — and counts against — them.
+  const { data } = await apiClient.post<Invert>('/inverts/', { taxon, ...payload }, collection ? { params: { collection } } : undefined);
   return data;
 }
 
@@ -935,6 +943,9 @@ export interface AnimalEvent {
   severity: AnimalEventSeverity | null;
   notes: string | null;
   created_at: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
 }
 
 export const ANIMAL_EVENT_LABELS: Record<AnimalEventType, string> = {

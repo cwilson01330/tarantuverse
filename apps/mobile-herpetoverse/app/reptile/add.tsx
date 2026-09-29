@@ -126,12 +126,15 @@ function AddReptileScreen() {
   // initializer reads them once so the user can still edit the values
   // afterward without us clobbering them on re-render.
   const params = useLocalSearchParams<{
+    /** Set when a keeper adds to a collection shared with them (co-keepers). */
+    collection?: string;
     taxon?: string;
     species_id?: string;
     scientific_name?: string;
     common_name?: string;
   }>();
 
+  const collection = typeof params.collection === 'string' && params.collection ? params.collection : null;
   const [taxon, setTaxon] = useState<AnimalTaxon>(
     isAnimalTaxon(params.taxon) ? params.taxon : 'snake',
   );
@@ -233,7 +236,7 @@ function AddReptileScreen() {
     try {
       // ADR-003: one create call — the taxon discriminator rides in the
       // payload instead of routing to per-taxon endpoints.
-      const created = await createAnimal(payload);
+      const created = await createAnimal(payload, collection);
 
       // Genotypes are a second call — the genotype endpoint is keyed on an
       // animal that must already exist. Deliberately NOT fatal: the animal
@@ -269,6 +272,12 @@ function AddReptileScreen() {
       // behaves as before (inline banner).
       const status = (err as { response?: { status?: number } })?.response
         ?.status;
+      if (status === 402 && collection) {
+        // The cap is the OWNER's — don't sell the co-keeper an upgrade that doesn't help.
+        setError('This collection is at its free-plan limit. The owner can upgrade to add more.');
+        setSubmitting(false);
+        return;
+      }
       if (status === 402) {
         const detail = (
           err as {
@@ -398,12 +407,14 @@ function AddReptileScreen() {
             />
           </Field>
 
-          <Field
+          {/* Enclosures (and genetics) are the owner's to arrange — not offered
+              when adding to a collection shared with you. */}
+          {!collection && <Field
             label="Enclosure"
             hint="Optional. Link to a setup so feedings + sheds roll up there."
           >
             <EnclosurePicker value={enclosureId} onChange={setEnclosureId} />
-          </Field>
+          </Field>}
 
           <Field
             label="Current weight (g)"
@@ -452,7 +463,7 @@ function AddReptileScreen() {
           {/* Genetics — snakes only, matching the detail screen's gate
               (the gene catalog is ball-python-scoped for now). Without
               this, recording a morph meant save → reopen → edit. */}
-          {taxon === 'snake' && (
+          {taxon === 'snake' && !collection && (
             <Field
               label="Genetics"
               hint="Optional. Tap a gene to change het / visual."

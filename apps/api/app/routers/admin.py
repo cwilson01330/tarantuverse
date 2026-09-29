@@ -480,6 +480,10 @@ async def delete_user(
     username = user.username
     email = user.email
 
+    # Co-keeper memberships must end before the SET NULL can apply.
+    from app.models.collection_member import end_memberships_of
+    end_memberships_of(db, user.id)
+
     # Delete the user (CASCADE will handle related records)
     db.delete(user)
     db.commit()

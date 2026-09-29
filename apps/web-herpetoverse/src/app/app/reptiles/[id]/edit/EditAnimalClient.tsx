@@ -27,6 +27,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import EnclosurePicker from '@/components/EnclosurePicker'
+import { useAuth } from '@/lib/auth'
 import ReptileSpeciesAutocomplete from '@/components/ReptileSpeciesAutocomplete'
 import { ApiError } from '@/lib/apiClient'
 import {
@@ -122,6 +123,10 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // A co-keeper (keeper role) can edit a shared animal, but deleting it and
+  // arranging enclosures stay with the owner (rung 3). The API enforces both.
+  const { user } = useAuth()
+  const isOwner = !!animal && !!user && animal.user_id === user.id
 
   // Load the animal once on mount. The auth layout above has already gated
   // on sign-in, so 401s here mean the token went stale — the apiClient
@@ -341,7 +346,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
               />
             </Field>
 
-            <div className="sm:col-span-2">
+            {isOwner && <div className="sm:col-span-2">
               <Field
                 label="Enclosure"
                 hint="Optional — you can attach or change this later from the detail page."
@@ -352,7 +357,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
                   className={INPUT_CLS}
                 />
               </Field>
-            </div>
+            </div>}
           </div>
         </section>
 
@@ -541,7 +546,7 @@ export default function EditAnimalClient({ animalId }: { animalId: string }) {
       {/* Danger Zone — separated from the form on purpose so it can't be */}
       {/* activated by an Enter keypress inside an input.                 */}
       {/* ------------------------------------------------------------- */}
-      <DangerZone animal={animal} />
+      {isOwner && <DangerZone animal={animal} />}
     </div>
   )
 }

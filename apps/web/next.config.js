@@ -58,6 +58,15 @@ const nextConfig = {
           { key: 'Cache-Control', value: 'no-store' },
         ],
       },
+      {
+        // Co-keeper invites carry a token in the fragment too (rung 3, T11).
+        source: '/invite',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
     ]
   },
   //

@@ -135,6 +135,9 @@ export type ColonyUpdate = Partial<Omit<ColonyCreate, 'taxon'>> & {
 
 export interface ColonyEvent {
   id: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   colony_id: string;
   user_id: string;
   event_type: ColonyEventType;
@@ -332,6 +335,9 @@ export interface ColonyPhoto {
 
 export interface ColonyFeedingLog {
   id: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   colony_id: string | null;
   fed_at: string;
   food_type: string | null;
@@ -361,6 +367,9 @@ export interface ColonyFeedingLog {
  */
 export interface ColonyMoltLog {
   id: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   colony_id: string | null;
   molted_at: string;
   notes: string | null;
@@ -399,6 +408,9 @@ export async function deleteColonyMolt(moltId: string): Promise<void> {
  */
 export interface ColonySubstrateChange {
   id: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   colony_id: string | null;
   changed_at: string;
   substrate_type: string | null;
@@ -455,6 +467,9 @@ export { CARE_LOG_LABELS, CARE_LOG_SHORT } from './inverts';
 
 export interface ColonyCareLog {
   id: string;
+  /** Set when a co-keeper logged it (null = the owner). */
+  logged_by_user_id?: string | null;
+  logged_by_name?: string | null;
   colony_id: string | null;
   log_type: import('./inverts').CareLogType;
   logged_at: string;

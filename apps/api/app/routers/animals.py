@@ -47,7 +47,7 @@ from app.schemas.feeding import (
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.services.snake_feeding_advisory import cgd_applies
 from app.utils.dependencies import get_current_user
-from app.utils.access import load_animal, policy, scope_collection
+from app.utils.access import load_animal, policy, require_own_enclosure, scope_collection, strip_owner_only
 from app.utils.feeding_pause import resume_if_accepted
 from app.schemas.death import MarkDiedRequest
 
@@ -262,8 +262,9 @@ async def create_animal(
     # In a shared collection the animal, its cap and its plan are the OWNER's.
     access = scope_collection(db, current_user, "herpetoverse", collection, need="keeper")
     enforce_animal_limit(db, access.owner)
+    require_own_enclosure(db, animal_data.enclosure_id, access.owner)
 
-    animal_dict = _coerce_enums(animal_data.model_dump())
+    animal_dict = _coerce_enums(strip_owner_only(access, animal_data.model_dump()))
 
     new_animal = Animal(user_id=access.owner.id, **animal_dict)
     db.add(new_animal)
@@ -489,9 +490,11 @@ async def update_animal(
 ):
     """Partial update. Only provided fields are written. `taxon` is
     immutable — it's not in the update schema."""
-    animal, _access = load_animal(db, current_user, animal_id, "keeper")
+    animal, access = load_animal(db, current_user, animal_id, "keeper")
 
-    update_data = _coerce_enums(animal_data.model_dump(exclude_unset=True))
+    update_data = _coerce_enums(strip_owner_only(access, animal_data.model_dump(exclude_unset=True)))
+    if "enclosure_id" in update_data:
+        require_own_enclosure(db, update_data["enclosure_id"], access.owner)
     for field, value in update_data.items():
         setattr(animal, field, value)
 

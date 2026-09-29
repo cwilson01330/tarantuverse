@@ -34,6 +34,7 @@ import InvertFeedingStatus, {
   type InvertFeedingStats,
 } from '@/components/InvertFeedingStatus'
 import QRModal from '@/components/QRModal'
+import { ROLE_LABEL, attribution, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -70,6 +71,7 @@ const TAXON_META: Record<TaxonKey, { glyph: string; label: string; prefix: strin
 
 interface Invert {
   id: string
+  user_id?: string
   taxon: TaxonKey
   name?: string | null
   common_name?: string | null
@@ -105,14 +107,15 @@ interface Invert {
   feeding_interval_days?: number | null
 }
 
-interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null; sitter_name?: string | null }
-interface MoltLog { id: string; molted_at: string; notes?: string | null }
-interface SubstrateChange { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
+interface Attributed { logged_by_user_id?: string | null; logged_by_name?: string | null; sitter_name?: string | null }
+interface FeedingLog extends Attributed { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
+interface MoltLog extends Attributed { id: string; molted_at: string; notes?: string | null }
+interface SubstrateChange extends Attributed { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
 /** Hydration events (car_20260909). Three types, because a top-up, a
  *  deliberate overflow to damp the substrate, and a misting are three
  *  different acts — see the care_log model docstring. */
 type CareLogType = 'water_dish' | 'overflow' | 'misted'
-interface CareLog { id: string; log_type: CareLogType; logged_at: string; notes?: string | null }
+interface CareLog extends Attributed { id: string; log_type: CareLogType; logged_at: string; notes?: string | null }
 const CARE_LOG_LABELS: Record<CareLogType, string> = {
   water_dish: 'Water dish refreshed',
   overflow: 'Dish overflowed',
@@ -127,6 +130,17 @@ export default function InvertDetailPage() {
   const { user, token, isAuthenticated, isLoading } = useAuth()
 
   const [invert, setInvert] = useState<Invert | null>(null)
+  // Co-keepers (PRD-shared-keeping rung 3): what can this viewer do here? Only
+  // hides controls — the API enforces every rule itself. Your own animal is
+  // known to be 'owner' immediately, so owners never see a flicker.
+  const shared = useCollectionRole(token, user?.id, invert?.user_id)
+  const isMine = !!invert?.user_id && !!user?.id && invert.user_id === user.id
+  const viewerRole: CollectionRole | null = isMine ? 'owner' : shared.role
+  const isOwner = viewerRole === 'owner'
+  const canKeep = can(viewerRole, 'keeper')
+  const canLog = can(viewerRole, 'logger')
+  // Loggers change only their own entries; keepers and the owner, any.
+  const canChange = (x: Attributed) => canKeep || (canLog && !!user?.id && x.logged_by_user_id === user.id)
   const [feedings, setFeedings] = useState<FeedingLog[]>([])
   const [molts, setMolts] = useState<MoltLog[]>([])
   const [substrate, setSubstrate] = useState<SubstrateChange[]>([])
@@ -455,9 +469,20 @@ export default function InvertDetailPage() {
       userAvatar={user?.image ?? undefined}
     >
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Link href="/dashboard/tarantulas" className="text-sm text-primary-600 hover:underline mb-4 inline-block">
-          ← Back to collection
-        </Link>
+        {invert && !isOwner && invert.user_id ? (
+          <Link href={`/dashboard/shared/${invert.user_id}`} className="text-sm text-primary-600 hover:underline mb-4 inline-block">
+            ← Back to {shared.ownerName ? `${shared.ownerName}'s collection` : 'shared collection'}
+          </Link>
+        ) : (
+          <Link href="/dashboard/tarantulas" className="text-sm text-primary-600 hover:underline mb-4 inline-block">
+            ← Back to collection
+          </Link>
+        )}
+        {invert && !isOwner && viewerRole && (
+          <p className="mb-4 px-3 py-2 rounded-xl bg-surface border border-theme text-sm text-theme-secondary">
+            {shared.ownerName ? `${shared.ownerName}'s animal` : 'Shared animal'} · you&apos;re a {ROLE_LABEL[viewerRole as 'viewer' | 'logger' | 'keeper']}
+          </p>
+        )}
 
         {loading && <p className="text-theme-secondary">Loading…</p>}
 
@@ -479,6 +504,7 @@ export default function InvertDetailPage() {
                 <span className="text-7xl">{meta.glyph}</span>
               )}
               <div className="absolute top-4 right-4 flex gap-2">
+                {canKeep && (<>
                 <button
                   onClick={() => router.push(`/dashboard/inverts/${id}/edit`)}
                   className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
@@ -513,6 +539,8 @@ export default function InvertDetailPage() {
                     ? `Every ${invert.feeding_interval_days}d`
                     : 'Feeding schedule'}
                 </button>
+                </>)}
+                {isOwner && (<>
                 {/* QR was tarantula-only on web until QRModal gained a
                     `resource` prop — mobile's QRSheet has had one for
                     months. */}
@@ -528,6 +556,7 @@ export default function InvertDetailPage() {
                 >
                   Delete
                 </button>
+                </>)}
               </div>
             </div>
 
@@ -537,7 +566,7 @@ export default function InvertDetailPage() {
             {taxonHasModule(invert.taxon, 'feedingStats') && (
               <InvertFeedingStatus
                 stats={feedingStats}
-                onSetCadence={() => setCadenceOpen(true)}
+                onSetCadence={canKeep ? () => setCadenceOpen(true) : undefined}
               />
             )}
 
@@ -592,8 +621,8 @@ export default function InvertDetailPage() {
             {/* Logs */}
             <LogSection
               title="Feedings"
-              cta="Log feeding"
-              onCta={() => router.push(`/dashboard/inverts/${id}/add-feeding`)}
+              cta={canLog ? 'Log feeding' : undefined}
+              onCta={canLog ? () => router.push(`/dashboard/inverts/${id}/add-feeding`) : undefined}
               empty="No feedings logged yet."
               state={logState.feedings}
               onRetry={fetchAll}
@@ -601,22 +630,22 @@ export default function InvertDetailPage() {
                 key: x.id,
                 left: `${x.food_type || 'Feeding'} · ${x.accepted ? 'Accepted' : 'Refused'}`,
                 right: formatLocalDate(x.fed_at),
-                sub: x.sitter_name ? `Logged by ${x.sitter_name} (sitter link)` : undefined,
-                onEdit: () => router.push(`/dashboard/inverts/${id}/add-feeding?${qp({ logId: x.id, fed_at: x.fed_at, food_type: x.food_type, accepted: x.accepted, notes: x.notes })}`),
-                onDelete: () => deleteLog(`feedings/${x.id}`, 'feeding'),
+                sub: attribution(x),
+                onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-feeding?${qp({ logId: x.id, fed_at: x.fed_at, food_type: x.food_type, accepted: x.accepted, notes: x.notes })}`) : undefined,
+                onDelete: canChange(x) ? () => deleteLog(`feedings/${x.id}`, 'feeding') : undefined,
               }))}
             />
             <LogSection
               title="Molts"
-              cta="Log molt"
-              onCta={() => router.push(`/dashboard/inverts/${id}/add-molt`)}
+              cta={canLog ? 'Log molt' : undefined}
+              onCta={canLog ? () => router.push(`/dashboard/inverts/${id}/add-molt`) : undefined}
               empty="No molts logged yet."
               state={logState.molts}
               onRetry={fetchAll}
               rows={molts.slice(0, 8).map((x) => ({
-                key: x.id, left: 'Molt', right: formatLocalDate(x.molted_at),
-                onEdit: () => router.push(`/dashboard/inverts/${id}/add-molt?${qp({ logId: x.id, molted_at: x.molted_at, notes: x.notes })}`),
-                onDelete: () => deleteLog(`molts/${x.id}`, 'molt'),
+                key: x.id, left: 'Molt', right: formatLocalDate(x.molted_at), sub: attribution(x),
+                onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-molt?${qp({ logId: x.id, molted_at: x.molted_at, notes: x.notes })}`) : undefined,
+                onDelete: canChange(x) ? () => deleteLog(`molts/${x.id}`, 'molt') : undefined,
               }))}
             />
 
@@ -645,7 +674,7 @@ export default function InvertDetailPage() {
             )}
 
             {/* Transfer / rehome (BRIEF §6) — owner action. Hidden once handed off. */}
-            {invert && !invert.transferred_out_at && (
+            {invert && isOwner && !invert.transferred_out_at && (
               <Section title="Transfer / rehome" action={{ label: 'Generate claim link', onClick: () => { setClaimUrl(null); setTransferOpen(true) } }}>
                 <p className="text-sm text-theme-tertiary">
                   Sold or rehoming this {meta?.label.toLowerCase()}? Generate a claim link the
@@ -694,7 +723,7 @@ export default function InvertDetailPage() {
             )}
 
             {/* Breeding module (registry-gated — ADR-021 Phase D) */}
-            {invert && taxonHasModule(invert.taxon, 'breeding') && (
+            {invert && isOwner && taxonHasModule(invert.taxon, 'breeding') && (
               <Section title="Breeding" action={{ label: '+ New pairing', onClick: () => setPairOpen(true) }}>
                 {pairings.length === 0 ? (
                   <p className="text-sm text-theme-tertiary">
@@ -727,8 +756,8 @@ export default function InvertDetailPage() {
                 derived deadline would be a fabricated number. */}
             <LogSection
               title="Water"
-              cta="Log water"
-              onCta={() => router.push(`/dashboard/inverts/${id}/add-care-log`)}
+              cta={canLog ? 'Log water' : undefined}
+              onCta={canLog ? () => router.push(`/dashboard/inverts/${id}/add-care-log`) : undefined}
               empty="No watering logged yet."
               state={logState.care}
               onRetry={fetchAll}
@@ -736,29 +765,30 @@ export default function InvertDetailPage() {
                 key: x.id,
                 left: CARE_LOG_LABELS[x.log_type] ?? 'Watered',
                 right: formatLocalDate(x.logged_at),
-                onEdit: () => router.push(`/dashboard/inverts/${id}/add-care-log?${qp({ logId: x.id, log_type: x.log_type, logged_at: x.logged_at, notes: x.notes })}`),
-                onDelete: () => deleteLog(`care-logs/${x.id}`, 'water log'),
+                sub: attribution(x),
+                onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-care-log?${qp({ logId: x.id, log_type: x.log_type, logged_at: x.logged_at, notes: x.notes })}`) : undefined,
+                onDelete: canChange(x) ? () => deleteLog(`care-logs/${x.id}`, 'water log') : undefined,
               }))}
             />
 
             <LogSection
               title="Substrate changes"
-              cta="Log substrate change"
-              onCta={() => router.push(`/dashboard/inverts/${id}/add-substrate-change`)}
+              cta={canLog ? 'Log substrate change' : undefined}
+              onCta={canLog ? () => router.push(`/dashboard/inverts/${id}/add-substrate-change`) : undefined}
               empty="No substrate changes logged yet."
               state={logState.substrate}
               onRetry={fetchAll}
               rows={substrate.slice(0, 8).map((x) => ({
-                key: x.id, left: x.substrate_type || 'Substrate change', right: formatLocalDate(x.changed_at),
-                onEdit: () => router.push(`/dashboard/inverts/${id}/add-substrate-change?${qp({ logId: x.id, changed_at: x.changed_at, substrate_type: x.substrate_type, substrate_depth: x.substrate_depth, reason: x.reason, notes: x.notes })}`),
-                onDelete: () => deleteLog(`substrate-changes/${x.id}`, 'substrate change'),
+                key: x.id, left: x.substrate_type || 'Substrate change', right: formatLocalDate(x.changed_at), sub: attribution(x),
+                onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-substrate-change?${qp({ logId: x.id, changed_at: x.changed_at, substrate_type: x.substrate_type, substrate_depth: x.substrate_depth, reason: x.reason, notes: x.notes })}`) : undefined,
+                onDelete: canChange(x) ? () => deleteLog(`substrate-changes/${x.id}`, 'substrate change') : undefined,
               }))}
             />
 
             {/* Photos */}
             <Section
               title="Photos"
-              action={{ label: 'Add photo', onClick: () => router.push(`/dashboard/inverts/${id}/add-photo`) }}
+              action={canLog ? { label: 'Add photo', onClick: () => router.push(`/dashboard/inverts/${id}/add-photo`) } : undefined}
             >
               {photos.length === 0 ? (
                 <p className="text-sm text-theme-tertiary italic">No photos yet.</p>
@@ -777,7 +807,7 @@ export default function InvertDetailPage() {
                         {isHero && (
                           <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/65 text-white text-[10px] font-semibold">★ Hero</span>
                         )}
-                        <div className="absolute inset-x-0 bottom-0 flex justify-center gap-2 bg-black/55 rounded-b-lg py-1 opacity-0 group-hover:opacity-100 transition">
+                        {canKeep && <div className="absolute inset-x-0 bottom-0 flex justify-center gap-2 bg-black/55 rounded-b-lg py-1 opacity-0 group-hover:opacity-100 transition">
                           {!isHero && (
                             <button onClick={() => setHeroPhoto(p.id)} className="text-[10px] font-semibold text-white hover:underline" aria-label="Set as hero photo">
                               Set hero
@@ -786,7 +816,7 @@ export default function InvertDetailPage() {
                           <button onClick={() => deletePhoto(p.id)} className="text-[10px] font-semibold text-red-300 hover:underline" aria-label="Delete photo">
                             Delete
                           </button>
-                        </div>
+                        </div>}
                       </div>
                     )
                   })}
@@ -1153,8 +1183,9 @@ function LogSection({
   onRetry,
 }: {
   title: string
-  cta: string
-  onCta: () => void
+  /** Omitted when the viewer can't log here (a co-keeper viewer). */
+  cta?: string
+  onCta?: () => void
   empty: string
   rows: { key: string; left: string; right: string; sub?: string; onEdit?: () => void; onDelete?: () => void }[]
   /** Loading ≠ zero ≠ error — see LoadState. */
@@ -1162,7 +1193,7 @@ function LogSection({
   onRetry?: () => void
 }) {
   return (
-    <Section title={title} action={{ label: cta, onClick: onCta }}>
+    <Section title={title} action={cta && onCta ? { label: cta, onClick: onCta } : undefined}>
       {state === 'loading' ? (
         // No text and no count. We don't know yet, so we say nothing.
         <div className="space-y-2" aria-busy="true">

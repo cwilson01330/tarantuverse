@@ -32,7 +32,7 @@ from app.services.inverts_dualwrite import (
     mirror_scorpion_delete,
     mirror_scorpion_update,
 )
-from app.utils.access import policy
+from app.utils.access import policy, require_own_enclosure
 
 router = APIRouter()
 
@@ -153,6 +153,7 @@ async def create_scorpion(
     enforce_collection_limit(db, current_user)
     _validate_species(db, scorpion_data.species_id)
     _validate_colony(db, current_user, scorpion_data.colony_id)
+    require_own_enclosure(db, scorpion_data.enclosure_id, current_user)
 
     payload = _coerce_enums(scorpion_data.model_dump())
 
@@ -225,6 +226,8 @@ async def update_scorpion(
         )
 
     update_data = scorpion_data.model_dump(exclude_unset=True)
+    if "enclosure_id" in update_data:
+        require_own_enclosure(db, update_data["enclosure_id"], current_user)
 
     if "species_id" in update_data:
         _validate_species(db, update_data["species_id"])

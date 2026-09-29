@@ -23,6 +23,7 @@ import { getExpoPushToken } from '../services/notifications';
 import { signInWithGoogle, signInWithApple } from '../services/google-signin';
 import { HV_WEB_ORIGIN } from '../lib/web-origin';
 import { getErrorMessage } from '../utils/errors';
+import { clearSharedCache } from '../lib/co-keepers';
 
 export interface AuthUser {
   id: string;
@@ -210,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    clearSharedCache();
     await AsyncStorage.removeItem(TOKEN_KEY);
     await AsyncStorage.removeItem(USER_KEY);
     setToken(null);

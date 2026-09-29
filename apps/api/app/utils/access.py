@@ -241,6 +241,46 @@ def invert_log_fields(db: Session, invert: Any) -> dict:
     return fields
 
 
+# Fields on an animal only the OWNER may set, even though keepers can edit the
+# rest of the record: who can see it (is_public / visibility), and the hero
+# image URL — a keeper could otherwise point it at an outside image that logs
+# the owner's IP every time it loads. Setting the hero from an uploaded photo
+# goes through /photos/{id}/set-main, which is unaffected. (Review 2026-09-29.)
+OWNER_ONLY_ANIMAL_FIELDS = ("is_public", "visibility", "photo_url")
+
+
+def strip_owner_only(access: "Access", data: dict) -> dict:
+    """Drop owner-only fields from a write made by a co-keeper.
+
+    Dropped rather than refused: edit forms send the whole record back, so a
+    keeper saving an unrelated change would otherwise be blocked by values
+    they never touched."""
+    if access.is_owner:
+        return data
+    return {k: v for k, v in data.items() if k not in OWNER_ONLY_ANIMAL_FIELDS}
+
+
+def require_own_enclosure(db: Session, enclosure_id, owner) -> None:
+    """404 unless `enclosure_id` is None or an enclosure belonging to `owner`
+    (the collection's owner — never the co-keeper acting on it).
+
+    Animals carry an `enclosure_id` FK, and the enclosure screens list every
+    row that points at them. Without this check any account could file its own
+    animal into someone else's enclosure by UUID, and a co-keeper could move
+    the owner's animal into the co-keeper's own enclosure. Same 404 for
+    missing and not-yours (T7)."""
+    if enclosure_id is None:
+        return
+    from app.models.enclosure import Enclosure  # local: avoid an import cycle
+    found = (
+        db.query(Enclosure.id)
+        .filter(Enclosure.id == enclosure_id, Enclosure.user_id == owner.id)
+        .first()
+    )
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enclosure not found")
+
+
 def access_helper(fn: Callable) -> Callable:
     """Mark a router-local helper that goes through this module (e.g. a
     by-id log loader that calls `require`). The structural test accepts a

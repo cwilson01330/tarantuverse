@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { ROLE_LABEL, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
 import DashboardLayout from '@/components/DashboardLayout'
 import ColonyPopulationChart from '@/components/ColonyPopulationChart'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
@@ -92,9 +93,18 @@ export default function ColonyDetailPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const colonyId = params?.id
-  const { token, isAuthenticated, isLoading } = useAuth()
+  const { token, user, isAuthenticated, isLoading } = useAuth()
 
   const [colony, setColony] = useState<ColonyResponse | null>(null)
+  // Co-keepers: hide what this viewer's role can't do. The API enforces it.
+  const shared = useCollectionRole(token, user?.id, colony?.user_id)
+  const isMine = !!colony?.user_id && !!user?.id && colony.user_id === user.id
+  const viewerRole: CollectionRole | null = isMine ? 'owner' : shared.role
+  const isOwner = viewerRole === 'owner'
+  const canKeep = can(viewerRole, 'keeper')
+  const canLog = can(viewerRole, 'logger')
+  const canChange = (x: { logged_by_user_id?: string | null }) =>
+    canKeep || (canLog && !!user?.id && x.logged_by_user_id === user.id)
   const [events, setEvents] = useState<ColonyEventResponse[]>([])
   const [history, setHistory] = useState<PopulationHistory | null>(null)
   const [feedings, setFeedings] = useState<ColonyFeedingLog[]>([])
@@ -480,11 +490,16 @@ export default function ColonyDetailPage() {
     <DashboardLayout>
       <div className="max-w-4xl mx-auto">
         <Link
-          href="/dashboard/tarantulas"
+          href={isOwner || !colony.user_id ? '/dashboard/tarantulas' : `/dashboard/shared/${colony.user_id}`}
           className="text-sm text-theme-secondary hover:text-theme-primary transition"
         >
-          ← Back to collection
+          ← Back to {isOwner ? 'collection' : shared.ownerName ? `${shared.ownerName}'s collection` : 'shared collection'}
         </Link>
+        {!isOwner && viewerRole && (
+          <p className="mt-2 px-3 py-2 rounded-xl bg-surface border border-theme text-sm text-theme-secondary">
+            {shared.ownerName ? `${shared.ownerName}'s colony` : 'Shared colony'} · you&apos;re a {ROLE_LABEL[viewerRole as 'viewer' | 'logger' | 'keeper']}
+          </p>
+        )}
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mt-2 mb-6">
@@ -529,18 +544,18 @@ export default function ColonyDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Link
+            {canKeep && <Link
               href={`/dashboard/colonies/${colony.id}/edit`}
               className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition"
             >
               Edit
-            </Link>
-            <button
+            </Link>}
+            {isOwner && <button
               onClick={() => setConfirmDelete(true)}
               className="px-4 py-2 rounded-xl border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900/40 transition"
             >
               Delete
-            </button>
+            </button>}
           </div>
         </div>
 
@@ -701,6 +716,7 @@ export default function ColonyDetailPage() {
             >
               Feeding
             </h2>
+            {canLog && (
             <button
               type="button"
               onClick={() => setFeedOpen((o) => !o)}
@@ -709,6 +725,7 @@ export default function ColonyDetailPage() {
             >
               {feedOpen ? 'Cancel' : '+ Log feeding'}
             </button>
+            )}
           </div>
 
           {feedOpen && (
@@ -887,6 +904,7 @@ export default function ColonyDetailPage() {
             >
               Water
             </h2>
+            {canLog && (
             <button
               type="button"
               onClick={() => setCareOpen((o) => !o)}
@@ -895,6 +913,7 @@ export default function ColonyDetailPage() {
             >
               {careOpen ? 'Cancel' : '+ Log water'}
             </button>
+            )}
           </div>
 
           {careError && (
@@ -984,6 +1003,7 @@ export default function ColonyDetailPage() {
                         .join(' · ')}
                     </p>
                   </div>
+                  {canChange(c) && (
                   <button
                     type="button"
                     onClick={() => removeCareLog(c.id)}
@@ -992,6 +1012,7 @@ export default function ColonyDetailPage() {
                   >
                     Delete
                   </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1009,6 +1030,7 @@ export default function ColonyDetailPage() {
             >
               Substrate
             </h2>
+            {canLog && (
             <button
               type="button"
               onClick={() => setSubOpen((o) => !o)}
@@ -1017,6 +1039,7 @@ export default function ColonyDetailPage() {
             >
               {subOpen ? 'Cancel' : '+ Log change'}
             </button>
+            )}
           </div>
 
           {subError && (
@@ -1125,6 +1148,7 @@ export default function ColonyDetailPage() {
                     >
                       {formatEventDate(c.changed_at)}
                     </time>
+                    {canChange(c) && (
                     <button
                       type="button"
                       onClick={() => removeSubstrate(c.id)}
@@ -1133,6 +1157,7 @@ export default function ColonyDetailPage() {
                     >
                       ×
                     </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -1152,6 +1177,7 @@ export default function ColonyDetailPage() {
             >
               Molts
             </h2>
+            {canLog && (
             <button
               type="button"
               onClick={() => setMoltOpen((o) => !o)}
@@ -1160,6 +1186,7 @@ export default function ColonyDetailPage() {
             >
               {moltOpen ? 'Cancel' : '+ Found a molt'}
             </button>
+            )}
           </div>
 
           {moltError && (
@@ -1232,6 +1259,7 @@ export default function ColonyDetailPage() {
                     >
                       {new Date(m.molted_at).toLocaleDateString()}
                     </time>
+                    {canChange(m) && (
                     <button
                       type="button"
                       onClick={() => removeMolt(m.id)}
@@ -1240,6 +1268,7 @@ export default function ColonyDetailPage() {
                     >
                       ×
                     </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -1247,8 +1276,8 @@ export default function ColonyDetailPage() {
           </div>
         </section>
 
-        {/* Add event */}
-        <section aria-labelledby="addevent-heading" className="mb-6">
+        {/* Add event — loggers and up */}
+        {canLog && <section aria-labelledby="addevent-heading" className="mb-6">
           <h2
             id="addevent-heading"
             className="text-sm font-semibold text-theme-tertiary uppercase tracking-wide mb-3"
@@ -1422,7 +1451,7 @@ export default function ColonyDetailPage() {
               </button>
             </div>
           </div>
-        </section>
+        </section>}
 
         {/* Timeline */}
         <section aria-labelledby="timeline-heading" className="mb-10">
@@ -1484,6 +1513,7 @@ export default function ColonyDetailPage() {
                         </p>
                       )}
                     </div>
+                    {canChange(ev) && (
                     <button
                       type="button"
                       onClick={() => removeEvent(ev.id)}
@@ -1492,6 +1522,7 @@ export default function ColonyDetailPage() {
                     >
                       ✕
                     </button>
+                    )}
                   </li>
                 )
               })}

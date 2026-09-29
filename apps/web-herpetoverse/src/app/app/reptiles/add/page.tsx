@@ -172,6 +172,8 @@ const SECTION_HDR_CLS =
 function AddReptileForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  // Set when a keeper adds to a collection shared with them (co-keepers).
+  const collection = searchParams.get('collection')
   // Seed from query params when the keeper arrives via "Add to collection"
   // on a species care sheet — they land with species + taxon pre-filled.
   // Lazy initializer so the params are read once; the keeper can still
@@ -259,11 +261,15 @@ function AddReptileForm() {
 
     setSubmitting(true)
     try {
-      const animal = await createAnimal(payload)
+      const animal = await createAnimal(payload, collection)
       // ADR-003: one taxon-agnostic detail route for every taxon.
       router.push(`/app/reptiles/${animal.id}`)
     } catch (err) {
-      if (err instanceof ApiError && err.status === 402) {
+      if (err instanceof ApiError && err.status === 402 && collection) {
+        // The cap is the OWNER's — an upgrade prompt aimed at the co-keeper
+        // would sell them something that doesn't help.
+        setError('This collection is at its free-plan limit. The owner can upgrade to add more.')
+      } else if (err instanceof ApiError && err.status === 402) {
         // Free-tier cap reached. The 402 body is
         // { detail: { message, current_count, limit, is_premium } }.
         // apiClient's extractMessage can't unwrap the object detail, so we
@@ -297,14 +303,15 @@ function AddReptileForm() {
     <div className="max-w-3xl mx-auto">
       <header className="mb-8">
         <p className="text-xs tracking-[0.2em] uppercase text-herp-lime mb-3 font-medium">
-          New reptile
+          {collection ? 'Shared collection' : 'New reptile'}
         </p>
         <h1 className="text-3xl sm:text-4xl font-bold tracking-wide text-white mb-2">
           Add a reptile
         </h1>
         <p className="text-neutral-400 text-sm">
-          The basics are enough to get started — you can always fill in more
-          from the detail page.
+          {collection
+            ? 'This animal goes into the collection shared with you, and counts toward the owner’s plan.'
+            : 'The basics are enough to get started — you can always fill in more from the detail page.'}
         </p>
       </header>
 
@@ -408,7 +415,8 @@ function AddReptileForm() {
               />
             </Field>
 
-            <div className="sm:col-span-2">
+            {/* Enclosures are the owner's to arrange — not offered in a shared collection. */}
+            {!collection && <div className="sm:col-span-2">
               <Field
                 label="Enclosure"
                 hint="Optional — you can attach this later from the detail page."
@@ -419,7 +427,7 @@ function AddReptileForm() {
                   className={INPUT_CLS}
                 />
               </Field>
-            </div>
+            </div>}
           </div>
         </section>
 

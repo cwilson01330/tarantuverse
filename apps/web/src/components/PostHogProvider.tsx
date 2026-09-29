@@ -45,7 +45,8 @@ const POSTHOG_UI_HOST =
 // ship the token to analytics. PostHog is therefore never started on /sit,
 // and no pageview is sent for it. (PRD-shared-keeping, T3.)
 function isSitterPage(path: string | null | undefined): boolean {
-  return !!path && (path === "/sit" || path.startsWith("/sit/"))
+  // /invite carries a co-keeper invite token in its fragment the same way.
+  return !!path && (path === "/sit" || path.startsWith("/sit/") || path === "/invite")
 }
 
 let initialized = false

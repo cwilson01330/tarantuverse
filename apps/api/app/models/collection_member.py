@@ -92,3 +92,25 @@ class CollectionMember(Base):
 
     def __repr__(self) -> str:
         return f"<CollectionMember {self.app} {self.role} {self.status}>"
+
+
+def end_memberships_of(db, user_id) -> None:
+    """Mark a departing user's active memberships as 'left' before their
+    account row is deleted.
+
+    `member_user_id` is ON DELETE SET NULL, but an active row must have a
+    member (collection_members_active_has_member) — Postgres re-checks that
+    when it applies the SET NULL, so deleting an active co-keeper's account
+    would fail outright. Ending the membership first keeps the row as history
+    and lets the delete go through. Collections they OWN go by CASCADE.
+    Call inside the same transaction as the delete; does not commit.
+    """
+    from datetime import datetime, timezone
+
+    db.query(CollectionMember).filter(
+        CollectionMember.member_user_id == user_id,
+        CollectionMember.status == "active",
+    ).update(
+        {CollectionMember.status: "left", CollectionMember.ended_at: datetime.now(timezone.utc)},
+        synchronize_session=False,
+    )

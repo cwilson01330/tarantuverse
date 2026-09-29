@@ -133,6 +133,9 @@ export interface ColonyCreate {
 export type ColonyUpdate = Partial<ColonyCreate>
 
 export interface ColonyEventResponse {
+  /** Set when a co-keeper logged it; absent/null means the owner. */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
   id: string
   colony_id: string
   user_id: string
@@ -318,6 +321,9 @@ export async function deleteColony(token: string, id: string): Promise<void> {
  * problem), not noise.
  */
 export interface ColonyFeedingLog {
+  /** Set when a co-keeper logged it; absent/null means the owner. */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
   id: string
   colony_id: string | null
   fed_at: string
@@ -389,6 +395,9 @@ export function colonyShowsPreySize(taxon: string | null | undefined): boolean {
  * vocabulary differs; see colonySubstrateReasons().
  */
 export interface ColonySubstrateChange {
+  /** Set when a co-keeper logged it; absent/null means the owner. */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
   id: string
   colony_id: string | null
   changed_at: string
@@ -455,6 +464,9 @@ export async function deleteColonySubstrateChange(
 export type CareLogType = 'water_dish' | 'overflow' | 'misted'
 
 export interface ColonyCareLog {
+  /** Set when a co-keeper logged it; absent/null means the owner. */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
   id: string
   colony_id: string | null
   log_type: CareLogType
@@ -530,6 +542,9 @@ export function colonySubstrateReasons(taxon: string | null | undefined): string
  * surfaces by itself, and it's how sexing happens: you sex the molt.
  */
 export interface ColonyMoltLog {
+  /** Set when a co-keeper logged it; absent/null means the owner. */
+  logged_by_user_id?: string | null
+  logged_by_name?: string | null
   id: string
   colony_id: string | null
   molted_at: string

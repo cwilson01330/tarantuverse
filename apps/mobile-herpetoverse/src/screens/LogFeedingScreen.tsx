@@ -64,6 +64,8 @@ import {
 import { apiClient } from '../services/api';
 import { scheduleFeedingReminder } from '../services/notifications';
 import { CGD_BRAND_OPTIONS } from '../lib/cgd';
+import { useAuth } from '../contexts/AuthContext';
+import { can, useCollectionRole } from '../lib/co-keepers';
 
 /** Subset of /notification-preferences/ the feeding flow needs. */
 interface NotificationPrefsSubset {
@@ -128,6 +130,11 @@ export function LogFeedingScreen() {
   const [animalName, setAnimalName] = useState<string | null>(null);
   const [feedsOnCgd, setFeedsOnCgd] = useState(false);
   const [pausedReason, setPausedReason] = useState<string | null>(null);
+  // Pausing changes the animal itself — keeper and up (co-keepers, rung 3).
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { role } = useCollectionRole(user?.id, ownerId);
+  const canPause = can(role, 'keeper');
   const [pausedUntil, setPausedUntil] = useState<string | null>(null);
   const [showPauseSheet, setShowPauseSheet] = useState(false);
   const [showPauseHelp, setShowPauseHelp] = useState(false);
@@ -148,6 +155,7 @@ export function LogFeedingScreen() {
       setFeedsOnCgd(Boolean(animal.feeds_on_cgd));
       setPausedReason(animal.feeding_paused_reason ?? null);
       setPausedUntil(animal.feeding_paused_until ?? null);
+      setOwnerId(animal.user_id);
     } catch {
       // Non-fatal — pause section just shows the default copy.
     }
@@ -501,7 +509,7 @@ export function LogFeedingScreen() {
                 in a hunger strike" is the moment most keepers reach
                 for a mute. Hidden in edit mode (correcting an old
                 log isn't the right time to manage pause state). */}
-            {!isEdit && id && (
+            {!isEdit && id && canPause && (
               <View style={styles.pauseSection}>
                 <View style={styles.pauseHeaderRow}>
                   <Text style={[styles.pauseLabel, { color: colors.textTertiary }]}>

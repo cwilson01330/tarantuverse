@@ -49,7 +49,9 @@ from app.services.growth_service import compute_growth_fields
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
 from app.utils.limits import active_inverts_query, enforce_collection_limit
-from app.utils.access import load_invert, policy, scope_collection
+from app.utils.access import (
+    OWNER_ONLY_ANIMAL_FIELDS, load_invert, policy, require_own_enclosure, scope_collection, strip_owner_only,
+)
 from app.services.retaxon_service import change_invert_taxon
 from app.schemas.death import MarkDiedRequest
 
@@ -208,6 +210,7 @@ def create_invert_row(
         enforce_collection_limit(db, user)
     _validate_species(db, payload.species_id, payload.taxon)
     _validate_colony(db, user, payload.colony_id)
+    require_own_enclosure(db, payload.enclosure_id, user)
 
     data = _coerce_enums(payload.model_dump())
 
@@ -259,6 +262,11 @@ async def create_invert(
     the owner's cap and plan (PRD-shared-keeping rung 3), never the keeper's.
     """
     access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
+    if not access.is_owner:
+        # Visibility and the hero URL are the owner's call (strip_owner_only).
+        payload = payload.model_copy(update={
+            f: type(payload).model_fields[f].get_default() for f in OWNER_ONLY_ANIMAL_FIELDS
+        })
     # Cross-taxon collection cap (counts inverts: tarantulas + scorpions + centipedes).
     return create_invert_row(db, access.owner, payload)
 
@@ -500,12 +508,14 @@ async def update_invert(
     taxa by echoing back an object it had merely fetched."""
     invert, access = load_invert(db, current_user, invert_id, "keeper", not_found="Invert not found")
 
-    data = payload.model_dump(exclude_unset=True)
+    data = strip_owner_only(access, payload.model_dump(exclude_unset=True))
 
     if "species_id" in data:
         _validate_species(db, data["species_id"], invert.taxon)
     if "colony_id" in data:
         _validate_colony(db, access.owner, data["colony_id"])
+    if "enclosure_id" in data:
+        require_own_enclosure(db, data["enclosure_id"], access.owner)
 
     data = _coerce_enums(data)
     for field, value in data.items():

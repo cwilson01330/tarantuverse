@@ -54,8 +54,10 @@ export function AnimalHero({
   photoCount: number;
   brumationActive?: boolean;
   onBack: () => void;
-  onShare: () => void;
-  onEdit: () => void;
+  /** Omitted for co-keepers — sharing and QR are the owner's (rung 3). */
+  onShare?: () => void;
+  /** Omitted when the viewer's role can't edit the animal. */
+  onEdit?: () => void;
   onOpenGallery: () => void;
 }) {
   const { colors } = useTheme();
@@ -108,8 +110,8 @@ export function AnimalHero({
       <View style={[styles.actions, { top: insets.top + 8 }]}>
         <CircleButton icon="arrow-left" label="Go back" onPress={onBack} />
         <View style={styles.actionsRight}>
-          <CircleButton icon="share-variant" label="Share public profile" onPress={onShare} />
-          <CircleButton icon="pencil-outline" label="Edit this animal" onPress={onEdit} />
+          {onShare && <CircleButton icon="share-variant" label="Share public profile" onPress={onShare} />}
+          {onEdit && <CircleButton icon="pencil-outline" label="Edit this animal" onPress={onEdit} />}
         </View>
       </View>
 

@@ -13,7 +13,7 @@ import { Analytics, type BeforeSendEvent } from '@vercel/analytics/react'
 function scrub(event: BeforeSendEvent): BeforeSendEvent | null {
   try {
     const u = new URL(event.url)
-    if (u.pathname === '/sit' || u.pathname.startsWith('/sit/')) return null
+    if (u.pathname === '/sit' || u.pathname.startsWith('/sit/') || u.pathname === '/invite') return null
     u.hash = ''
     return { ...event, url: u.toString() }
   } catch {

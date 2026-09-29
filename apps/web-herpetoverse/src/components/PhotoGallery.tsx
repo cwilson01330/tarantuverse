@@ -88,6 +88,8 @@ export default function PhotoGallery({
   taxon,
   mainPhotoUrl,
   onMainChanged,
+  canUpload = true,
+  canManage = true,
 }: {
   /** Animal id — used for the animal-scoped list/upload endpoints. */
   animalId: string
@@ -96,6 +98,10 @@ export default function PhotoGallery({
   /** Current denormalized main-photo URL on the parent record. */
   mainPhotoUrl: string | null
   onMainChanged?: () => void
+  /** Co-keepers: loggers and up may upload. UI hint only — the API decides. */
+  canUpload?: boolean
+  /** Keepers and up may pick the hero photo, delete and re-caption. */
+  canManage?: boolean
 }) {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [loading, setLoading] = useState(true)
@@ -443,10 +449,10 @@ export default function PhotoGallery({
             ? 'border-herp-teal/60 bg-herp-teal/5'
             : 'border-neutral-800 bg-neutral-900/40'
         }`}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
+        onDragEnter={canUpload ? handleDragEnter : undefined}
+        onDragLeave={canUpload ? handleDragLeave : undefined}
+        onDragOver={canUpload ? handleDragOver : undefined}
+        onDrop={canUpload ? handleDrop : undefined}
       >
         {mainPhoto ? (
           <button
@@ -474,7 +480,7 @@ export default function PhotoGallery({
         ) : (
           <EmptyState
             taxon={taxon}
-            onPick={() => fileInputRef.current?.click()}
+            onPick={canUpload ? () => fileInputRef.current?.click() : undefined}
           />
         )}
 
@@ -536,7 +542,7 @@ export default function PhotoGallery({
                   group-hover never fires, so we show the bar by default at
                   the smallest breakpoint and gate it behind hover/focus only
                   from `sm:` up, where hovering actually means something. */}
-              <div className="absolute inset-x-0 bottom-0 flex items-stretch bg-black/70 backdrop-blur-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+              {canManage && <div className="absolute inset-x-0 bottom-0 flex items-stretch bg-black/70 backdrop-blur-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
                 {!isMain && (
                   <button
                     type="button"
@@ -559,7 +565,7 @@ export default function PhotoGallery({
                 >
                   ✕
                 </button>
-              </div>
+              </div>}
             </div>
           )
         })}
@@ -575,7 +581,7 @@ export default function PhotoGallery({
         ))}
 
         {/* "+ Add" tile — always last, clickable and keyboard-focusable. */}
-        <button
+        {canUpload && <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           className="w-20 h-20 rounded-md border border-dashed border-neutral-700 hover:border-herp-teal/60 text-neutral-500 hover:text-herp-lime transition-colors flex flex-col items-center justify-center gap-1 focus:outline-none focus:ring-2 focus:ring-herp-teal/60"
@@ -587,11 +593,11 @@ export default function PhotoGallery({
           <span className="text-[10px] uppercase tracking-wider">
             {photos.length === 0 ? 'Upload' : 'Add'}
           </span>
-        </button>
+        </button>}
       </div>
 
       {/* Hint copy — only when there's no photos yet so we don't clutter. */}
-      {photos.length === 0 && queue.length === 0 && (
+      {canUpload && photos.length === 0 && queue.length === 0 && (
         <p className="text-xs text-neutral-500">
           Drag photos onto the tile above, or tap Upload. JPEG, PNG, GIF, or
           WebP up to 15 MB each.
@@ -615,7 +621,7 @@ export default function PhotoGallery({
               ? () => setLightboxIdx(lightboxIdx + 1)
               : undefined
           }
-          onSaveCaption={handleSaveCaption}
+          onSaveCaption={canManage ? handleSaveCaption : undefined}
         />
       )}
 
@@ -636,9 +642,18 @@ function EmptyState({
   onPick,
 }: {
   taxon: PhotoGalleryTaxon
-  onPick: () => void
+  /** Omitted when the viewer can't upload — renders a plain empty state. */
+  onPick?: () => void
 }) {
   const glyph = ANIMAL_TAXA[taxon]?.glyph ?? '🦕'
+  if (!onPick) {
+    return (
+      <div className="w-full aspect-[16/9] flex flex-col items-center justify-center gap-2 text-neutral-500">
+        <span className="text-4xl" aria-hidden="true">{glyph}</span>
+        <span className="text-sm font-medium text-neutral-300">No photos yet</span>
+      </div>
+    )
+  }
   return (
     <button
       type="button"
@@ -733,7 +748,7 @@ function Lightbox({
   onPrev?: () => void
   onNext?: () => void
   /** Throws on failure; caller already updates the photos list on success. */
-  onSaveCaption: (photoId: string, caption: string | null) => Promise<void>
+  onSaveCaption?: (photoId: string, caption: string | null) => Promise<void>
 }) {
   // Caption editor state. Keyed on photo.id so navigating between photos
   // resets the draft and cancels any in-flight editing.
@@ -762,6 +777,7 @@ function Lightbox({
     setSaving(true)
     setEditError(null)
     try {
+      if (!onSaveCaption) return
       await onSaveCaption(photo.id, nextCaption)
       setEditing(false)
     } catch (err) {
@@ -895,6 +911,10 @@ function Lightbox({
                 </div>
               </div>
             </div>
+          ) : !onSaveCaption ? (
+            photo.caption ? (
+              <p className="px-3 py-2 text-sm text-neutral-200 break-words">{photo.caption}</p>
+            ) : null
           ) : (
             <button
               type="button"

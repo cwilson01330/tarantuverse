@@ -6,11 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 import { warmupApi, useColdStartIndicator } from '@/lib/cold-start'
+import { safeRedirect } from '@/lib/safeRedirect'
 
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/dashboard'
+  const redirectTo = safeRedirect(searchParams.get('redirect'), '/dashboard')
   const [formData, setFormData] = useState({
     email: '',
     password: ''

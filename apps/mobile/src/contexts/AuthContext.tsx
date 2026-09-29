@@ -4,6 +4,7 @@ import { apiClient, authEvents, AUTH_EXPIRED_EVENT } from '../services/api';
 import { signInWithGoogle, signInWithApple, signOutFromGoogle, isGoogleSignInAvailable } from '../services/google-signin';
 import { getExpoPushToken } from '../services/notifications';
 import { getErrorMessage } from '../utils/errors';
+import { clearSharedCache } from '../lib/co-keepers';
 
 // Re-export for convenience so login screens can import from one place
 export { isGoogleSignInAvailable };
@@ -205,6 +206,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    clearSharedCache();
     // Sign out from Google if user was signed in with OAuth
     try {
       await signOutFromGoogle();

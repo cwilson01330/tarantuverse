@@ -51,6 +51,8 @@ import {
 } from '../../src/components/OverflowMenuSheet';
 import { COPY as LIFECYCLE_COPY, historicalRecordLine, pronounsFor, tenureLabel } from '../../src/lib/lifecycle-copy';
 import { parseLocalDate } from '../../src/utils/date';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { ROLE_HELP, ROLE_LABEL, attribution, can, canChangeEntry, useCollectionRole } from '../../src/lib/co-keepers';
 
 function InvertDetailScreen() {
   const router = useRouter();
@@ -92,6 +94,16 @@ function InvertDetailScreen() {
   // Fullscreen gallery. Tapping a thumbnail used to do nothing on this screen —
   // only long-press (set hero / delete) was wired.
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+
+  // Co-keepers (rung 3): what the viewer may do here. Hides controls that
+  // would fail — the API checks every request. Nothing write-shaped shows
+  // until the role resolves.
+  const { user } = useAuth();
+  const { role, ownerName } = useCollectionRole(user?.id, invert?.user_id);
+  const isOwner = role === 'owner';
+  const canLog = can(role, 'logger');
+  const canKeep = can(role, 'keeper');
+  const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
 
   const handleTransfer = useCallback(async () => {
     if (!id || transferring) return;
@@ -294,8 +306,9 @@ function InvertDetailScreen() {
   // record" — fourth in the list — did not exist on Android. A keeper who added
   // an animal by mistake had no way to remove it. iOS showed all five, which is
   // why it went unnoticed. See components/OverflowMenuSheet.
-  const overflowRows: OverflowMenuRow[] = [
+  const allOverflowRows: (OverflowMenuRow & { need: 'keeper' | 'owner' })[] = [
     {
+      need: 'keeper',
       key: 'edit',
       label: 'Edit',
       icon: 'pencil-outline',
@@ -303,6 +316,7 @@ function InvertDetailScreen() {
     },
     // QR was tarantula-only until the generic upload-session route landed.
     {
+      need: 'owner',
       key: 'qr',
       label: 'QR label & upload',
       icon: 'qrcode',
@@ -313,12 +327,14 @@ function InvertDetailScreen() {
     // records added by mistake, which is what it's actually for.
     invert.died_at
       ? {
+          need: 'keeper' as const,
           key: 'revive',
           label: 'Restore to collection',
           icon: 'backup-restore',
           onPress: handleRevive,
         }
       : {
+          need: 'keeper' as const,
           key: 'died',
           label: LIFECYCLE_COPY.menuItem,
           icon: 'weather-night',
@@ -329,6 +345,7 @@ function InvertDetailScreen() {
     // for answering this and should never be asked. Wording is an offer, not a
     // setting, because most keepers never need it.
     {
+      need: 'keeper',
       key: 'cadence',
       label: invert.feeding_interval_days
         ? `Feeding schedule — every ${invert.feeding_interval_days}d`
@@ -337,6 +354,7 @@ function InvertDetailScreen() {
       onPress: () => setCadenceOpen(true),
     },
     {
+      need: 'owner',
       key: 'delete',
       label: 'Delete record',
       icon: 'trash-can-outline',
@@ -344,6 +362,10 @@ function InvertDetailScreen() {
       onPress: handleDelete,
     },
   ];
+  // Deleting, transferring and QR sessions stay with the owner (rung 3).
+  const overflowRows: OverflowMenuRow[] = allOverflowRows
+    .filter((row) => (row.need === 'owner' ? isOwner : canKeep))
+    .map(({ need: _need, ...row }) => row);
 
   const openOverflow = () => setMenuOpen(true);
 
@@ -526,8 +548,9 @@ function InvertDetailScreen() {
       })(),
       trailing: f.accepted ? 'Accepted' : 'Refused',
       trailingTone: f.accepted ? 'good' : 'bad',
-      // Attribution only for sitter entries; the keeper's own need no label.
-      subtitle: f.sitter_name ? `Logged by ${f.sitter_name} (sitter link)` : undefined,
+      // Attribution only for sitters and co-keepers; the owner's own need no label.
+      subtitle: attribution(f),
+      canChange: mayChange(f),
       onEdit: () => editFeeding(f),
       onDelete: () => confirmDeleteLog('feeding', () => deleteInvertFeeding(f.id)),
     })),
@@ -536,6 +559,8 @@ function InvertDetailScreen() {
       kind: 'molt',
       at: m.molted_at,
       title: 'Molted',
+      subtitle: attribution(m),
+      canChange: mayChange(m),
       onEdit: () => editMolt(m),
       onDelete: () => confirmDeleteLog('molt', () => deleteInvertMolt(m.id)),
     })),
@@ -551,7 +576,8 @@ function InvertDetailScreen() {
       trailing: e.severity ? e.severity[0].toUpperCase() + e.severity.slice(1) : undefined,
       trailingTone: e.event_type === 'recovered' ? 'good'
         : e.severity === 'severe' ? 'bad' : 'muted',
-      subtitle: e.notes ?? undefined,
+      subtitle: joinLines(e.notes, attribution(e)),
+      canChange: mayChange(e),
       onEdit: () => router.push(`/invert/add-event?id=${id}&logId=${e.id}` as any),
       onDelete: () => confirmDeleteLog('event', () => deleteAnimalEvent(e.id)),
     })),
@@ -562,6 +588,8 @@ function InvertDetailScreen() {
       title: c.substrate_type ? `Substrate changed — ${c.substrate_type}` : 'Substrate changed',
       trailing: c.substrate_depth ?? undefined,
       trailingTone: 'muted',
+      subtitle: attribution(c),
+      canChange: mayChange(c),
       onEdit: () => editSubstrate(c),
       onDelete: () => confirmDeleteLog('substrate change', () => deleteInvertSubstrateChange(c.id)),
     })),
@@ -573,7 +601,8 @@ function InvertDetailScreen() {
       // No trailing badge. There's nothing to grade here — a watering isn't
       // accepted or refused, and it isn't early or late, because this feature
       // has no schedule to be late against.
-      subtitle: c.notes ?? undefined,
+      subtitle: joinLines(c.notes, attribution(c)),
+      canChange: mayChange(c),
       onEdit: () => editCareLog(c),
       onDelete: () => confirmDeleteLog('water log', () => deleteInvertCareLog(c.id)),
     })),
@@ -611,7 +640,7 @@ function InvertDetailScreen() {
             {invert.death_notes ? (
               <Text style={styles.diedNotes}>{invert.death_notes}</Text>
             ) : null}
-            <View style={styles.diedActions}>
+            {canKeep && <View style={styles.diedActions}>
               {/* Undo persists here rather than in a snackbar — /revive
                   deserves longer than four seconds. */}
               <TouchableOpacity onPress={handleRevive} disabled={reviving} accessibilityRole="button">
@@ -622,7 +651,7 @@ function InvertDetailScreen() {
               <TouchableOpacity onPress={() => setDiedOpen(true)} accessibilityRole="button">
                 <Text style={styles.diedAction}>{LIFECYCLE_COPY.editDetails}</Text>
               </TouchableOpacity>
-            </View>
+            </View>}
           </View>
         ) : null}
 
@@ -651,7 +680,7 @@ function InvertDetailScreen() {
             {heroButton('chevron-left', 'Back', () => router.back())}
             <View style={{ flex: 1 }} />
             {heroButton('share-variant', 'Share', handleShare)}
-            {heroButton('dots-horizontal', 'More actions', openOverflow)}
+            {overflowRows.length > 0 && heroButton('dots-horizontal', 'More actions', openOverflow)}
           </View>
 
           {/* Photo count → the gallery. The hero shows one photo and the rest
@@ -703,6 +732,12 @@ function InvertDetailScreen() {
           </View>
         </View>
 
+      {role && !isOwner && (
+        <Text style={[s.empty, { color: colors.textSecondary, marginHorizontal: SPACING.lg, marginTop: SPACING.sm, fontStyle: 'normal' }]}>
+          {ownerName ? `${ownerName}'s animal. ` : ''}You're a {ROLE_LABEL[role]} — {ROLE_HELP[role]}
+        </Text>
+      )}
+
       {/* Feeding card — the question the keeper opened the screen to answer,
           answered first. Registry-gated: a millipede has no feeding cadence,
           so it gets no card rather than a fabricated one. */}
@@ -735,7 +770,8 @@ function InvertDetailScreen() {
               Suppressed once they've set their own cadence: at that point the
               flag means they're genuinely past their own intention, which is
               the signal we want to keep sharp. */}
-          {feedingStats?.is_overdue
+          {canKeep
+            && feedingStats?.is_overdue
             && feedingStats.interval_source !== 'keeper'
             && !feedingStats.is_feeding_paused && (
             <TouchableOpacity
@@ -756,7 +792,7 @@ function InvertDetailScreen() {
             </TouchableOpacity>
           )}
 
-          {!feedingStats?.is_feeding_paused && (
+          {canLog && !feedingStats?.is_feeding_paused && (
             <View style={styles.feedActions}>
               <TouchableOpacity
                 style={[styles.feedPrimary, { backgroundColor: colors.primary }]}
@@ -779,19 +815,19 @@ function InvertDetailScreen() {
               >
                 <MaterialCommunityIcons name="tune-variant" size={18} color={colors.textSecondary} />
               </TouchableOpacity>
-              <TouchableOpacity
+              {canKeep && <TouchableOpacity
                 style={[styles.feedSecondary, { borderColor: colors.border }]}
                 onPress={() => setPauseOpen(true)}
                 accessibilityRole="button"
                 accessibilityLabel="Pause feeding reminders"
               >
                 <MaterialCommunityIcons name="pause" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </View>
           )}
 
           {/* Paused animals get the way back out in the same place. */}
-          {feedingStats?.is_feeding_paused && (
+          {canKeep && feedingStats?.is_feeding_paused && (
             <TouchableOpacity
               style={{ marginTop: SPACING.md }}
               onPress={() => setPauseOpen(true)}
@@ -868,7 +904,7 @@ function InvertDetailScreen() {
           A transferred-out animal stays expanded — that's a status, not
           reference material, and collapsing it would hide the fact that this
           record is historical. */}
-      {invert.transferred_out_at ? (
+      {!isOwner ? null : invert.transferred_out_at ? (
         <Section title="Transfer / rehome">
           <Text style={[s.empty, { color: colors.textTertiary }]}>
             ✓ Transferred {fmtDate(invert.transferred_out_at)}. This is a historical record.
@@ -926,7 +962,7 @@ function InvertDetailScreen() {
 
           Hidden once the animal is already dead — the status card above
           covers that state, and offering it again would be noise. */}
-      {!invert.died_at && (
+      {canKeep && !invert.died_at && (
         <CollapsibleRow
           icon="circle-slice-8"
           title="End of record"
@@ -960,6 +996,7 @@ function InvertDetailScreen() {
             reminders, and your plan&rsquo;s animal count.
           </Text>
 
+          {isOwner && <>
           <View
             style={[s.endOfRecordDivider, { borderTopColor: colors.border }]}
           />
@@ -978,6 +1015,7 @@ function InvertDetailScreen() {
               Delete record
             </Text>
           </Text>
+          </>}
         </CollapsibleRow>
       )}
 
@@ -990,8 +1028,8 @@ function InvertDetailScreen() {
           no entry point at all, and a log nobody can reach is not a log. */}
       <Section
         title="History"
-        actionLabel="Add event"
-        onAction={() => router.push(`/invert/add-event?id=${id}` as any)}
+        actionLabel={canLog ? 'Add event' : undefined}
+        onAction={canLog ? () => router.push(`/invert/add-event?id=${id}` as any) : undefined}
       >
         <View style={styles.timelineChips}>
           {(['all', 'feeding', 'molt', 'substrate', 'care', 'event'] as const).map((k) => {
@@ -1034,11 +1072,14 @@ function InvertDetailScreen() {
               // advertised. A keeper reading that as "logs can't be edited" is
               // the correct inference from the behaviour they saw.
               // Long-press stays wired for anyone who already learned it.
+              // Rows you can't change (a viewer, or a logger looking at someone
+              // else's entry) read as plain history — no menu that would 403.
+              disabled={!e.canChange}
               onPress={() => openTimelineActions(e)}
               onLongPress={() => openTimelineActions(e)}
-              accessibilityRole="button"
+              accessibilityRole={e.canChange ? 'button' : 'text'}
               accessibilityLabel={`${e.title}, ${fmtRelative(e.at)}${e.trailing ? `, ${e.trailing}` : ''}`}
-              accessibilityHint="Opens edit and delete options for this entry."
+              accessibilityHint={e.canChange ? 'Opens edit and delete options for this entry.' : undefined}
             >
               <View style={[styles.timelineIcon, { backgroundColor: colors.primary + '1F' }]}>
                 <MaterialCommunityIcons name={TIMELINE_META[e.kind].icon as any} size={16} color={colors.accent} />
@@ -1069,12 +1110,12 @@ function InvertDetailScreen() {
               {/* Makes the row read as interactive. Without it the entry looks
                   like a static list item, which is why nobody found the
                   edit menu. */}
-              <MaterialCommunityIcons
+              {e.canChange && <MaterialCommunityIcons
                 name="dots-horizontal"
                 size={18}
                 color={colors.textTertiary}
                 style={{ marginLeft: 6 }}
-              />
+              />}
             </TouchableOpacity>
           ))
         )}
@@ -1122,7 +1163,7 @@ function InvertDetailScreen() {
           mantis lays an ootheca of nymphs, a scorpion gives live birth to a
           brood and has no egg stage at all. Hard-coding "egg sac" here is what
           made the scorpion pilot feel bolted on. */}
-      {taxonHasModule(invert.taxon, 'breeding') && (
+      {isOwner && taxonHasModule(invert.taxon, 'breeding') && (
         <Section title="Breeding" actionLabel="New pairing" onAction={() => router.push(`/invert/add-pairing?id=${id}` as any)}>
           {pairings.length === 0 ? (
             <Text style={[s.empty, { color: colors.textTertiary }]}>
@@ -1155,7 +1196,7 @@ function InvertDetailScreen() {
       )}
 
       <View onLayout={(e) => { photosY.current = e.nativeEvent.layout.y; }}>
-      <Section title="Photos" actionLabel="Add photo" onAction={() => router.push(`/invert/add-photo?id=${id}` as any)}>
+      <Section title="Photos" actionLabel={canLog ? 'Add photo' : undefined} onAction={canLog ? () => router.push(`/invert/add-photo?id=${id}` as any) : undefined}>
         {photos.length === 0 ? (
           <Text style={[s.empty, { color: colors.textTertiary }]}>No photos yet.</Text>
         ) : (
@@ -1164,7 +1205,7 @@ function InvertDetailScreen() {
               renderItem={({ item, index }) => {
                 const isHero = invert.photo_url === item.url;
                 return (
-                  <TouchableOpacity activeOpacity={0.8} onPress={() => setViewerIndex(index)} onLongPress={() => handlePhotoLongPress(item)} accessibilityRole="imagebutton" accessibilityLabel={isHero ? 'Hero photo. Opens full screen.' : 'Photo. Opens full screen.'}>
+                  <TouchableOpacity activeOpacity={0.8} onPress={() => setViewerIndex(index)} onLongPress={canKeep ? () => handlePhotoLongPress(item) : undefined} accessibilityRole="imagebutton" accessibilityLabel={isHero ? 'Hero photo. Opens full screen.' : 'Photo. Opens full screen.'}>
                     <Image source={{ uri: getImageUrl(item.thumbnail_url ?? item.url) }} style={styles.photoThumb} />
                     {/* Visible manage control. Tap-to-view is the right default,
                         but "set as hero" and "delete" were reachable only by
@@ -1172,7 +1213,7 @@ function InvertDetailScreen() {
                         photo had no way to discover it. Nested Touchable — the
                         inner responder wins, so this doesn't also open the
                         viewer. */}
-                    <TouchableOpacity
+                    {canKeep && <TouchableOpacity
                       style={styles.photoManage}
                       onPress={() => handlePhotoLongPress(item)}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
@@ -1181,7 +1222,7 @@ function InvertDetailScreen() {
                       accessibilityHint="Set as hero photo or delete"
                     >
                       <MaterialCommunityIcons name="dots-horizontal" size={16} color="#fff" />
-                    </TouchableOpacity>
+                    </TouchableOpacity>}
                     {isHero && (
                       <View style={styles.heroTag}>
                         <MaterialCommunityIcons name="star" size={11} color="#fff" />
@@ -1191,7 +1232,7 @@ function InvertDetailScreen() {
                   </TouchableOpacity>
                 );
               }} />
-            <Text style={[s.empty, { color: colors.textTertiary, fontStyle: 'normal' }]}>Tap to view full screen. Long-press to set as hero or delete.</Text>
+            <Text style={[s.empty, { color: colors.textTertiary, fontStyle: 'normal' }]}>{canKeep ? 'Tap to view full screen. Long-press to set as hero or delete.' : 'Tap to view full screen.'}</Text>
           </>
         )}
       </Section>
@@ -1217,7 +1258,7 @@ function InvertDetailScreen() {
           screen has had this bar all along; the split is why it never crossed
           over. Labels stay identical across taxa so muscle memory transfers.
           Safe-area inset or it overhangs the Android nav bar. */}
-      <View
+      {canLog && <View
         style={[
           styles.actionBar,
           { paddingBottom: insets.bottom + SPACING.sm, borderTopColor: colors.border },
@@ -1245,7 +1286,7 @@ function InvertDetailScreen() {
             <Text style={styles.actionBarLabel} numberOfLines={1}>{a.label}</Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </View>}
 
       {/* `resource="inverts"` — PUT /inverts/{id} takes the same two pause
           fields and works for every taxon, so this no longer has to be the
@@ -1311,6 +1352,12 @@ function InvertDetailScreen() {
   );
 }
 
+/** Two optional lines as one subtitle — the keeper's note, then who logged it. */
+function joinLines(...parts: (string | null | undefined)[]): string | undefined {
+  const kept = parts.filter((p): p is string => !!p && !!p.trim());
+  return kept.length ? kept.join('\n') : undefined;
+}
+
 function fmtSex(sex: Invert['sex']): string { if (!sex || sex === 'unknown') return '—'; return sex.charAt(0).toUpperCase() + sex.slice(1); }
 // Routes through parseLocalDate. A bare "YYYY-MM-DD" from a DATE column is
 // parsed by `new Date()` as UTC midnight, and toLocaleDateString then rewinds
@@ -1368,6 +1415,8 @@ interface TimelineEntry {
    *  usually the most useful thing in the row. */
   subtitle?: string;
   trailingTone?: 'good' | 'bad' | 'muted';
+  /** Whether the viewer may edit/delete it (co-keepers: loggers only their own). */
+  canChange: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }

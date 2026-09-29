@@ -15,6 +15,7 @@
 const EXACT_MAP: Record<string, string> = {
   '/feeding-day': '/feeding-day',
   '/sitter': '/sitter',
+  '/shared': '/sharing', // co-keeper invites / membership changes
 };
 
 export function resolveDeeplink(deeplink: string | null | undefined): string | null {

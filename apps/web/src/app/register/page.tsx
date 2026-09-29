@@ -7,6 +7,7 @@ import { signIn } from 'next-auth/react'
 import OAuthButtons from '@/components/auth/OAuthButtons'
 import { warmupApi, useColdStartIndicator } from '@/lib/cold-start'
 import { readApiError } from '@/lib/api-error'
+import { safeRedirect } from '@/lib/safeRedirect'
 import {
   classifySignupFailure,
   trackSignupFailed,
@@ -24,7 +25,7 @@ interface ReferrerInfo {
 function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || ''
+  const redirectTo = safeRedirect(searchParams.get('redirect'), '')
   const [formData, setFormData] = useState({
     email: '',
     username: '',

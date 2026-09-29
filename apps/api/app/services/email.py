@@ -142,7 +142,15 @@ class EmailService:
             "logger": "see their collection and log feedings, molts, photos and care",
             "keeper": "see and log, and also add and edit animals",
         }.get(role, "see their collection")
-        subject = f"{inviter_name or 'A keeper'} invited you to their {brand.name} collection"
+        # Subject lines aren't HTML, so escaping doesn't apply — but a display
+        # name is user-chosen text arriving from our domain. Collapse control
+        # characters/whitespace, cap the length, and quote it so it reads as a
+        # person's name rather than as us ("Tarantuverse Security invited…").
+        import re as _re
+        raw_name = _re.sub(r"[\x00-\x1f\x7f]+", " ", inviter_name or "")
+        raw_name = " ".join(raw_name.split())[:40]
+        subject = (f'"{raw_name}" invited you to their {brand.name} collection' if raw_name
+                   else f"You've been invited to a {brand.name} collection")
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>You're invited to help keep a collection</h2>
