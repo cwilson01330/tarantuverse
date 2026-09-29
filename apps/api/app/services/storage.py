@@ -62,6 +62,9 @@ class StorageService:
     def _create_thumbnail(self, image_data: bytes, max_size: int = 300) -> bytes:
         """Create a thumbnail from image data (orientation applied, no EXIF)."""
         img = Image.open(BytesIO(image_data))
+        # JPEG: decode straight at a small scale — never the full image.
+        if img.format in ("JPEG", "MPO"):
+            img.draft("RGB", (max_size * 2, max_size * 2))
         img = ImageOps.exif_transpose(img) or img
 
         # JPEG can't hold alpha or palette modes.

@@ -424,7 +424,8 @@
 
 - **Photo Privacy & Storage (2026-09-29)**:
   - Every photo upload goes through `StorageService.upload_photo` → `utils/image_sanitize.py::sanitize_image`: EXIF orientation applied, then re-encoded with NO EXIF/GPS/XMP/comments (ICC kept only if colour mode unchanged). Stored type + extension follow the bytes, never the client. Dimension/frame limits are checked from the header before decoding (decompression bombs). MPO (multi-picture phone JPEGs) is treated as JPEG. Never store uploaded bytes directly.
-  - Backfill for pre-fix originals: `apps/api/strip_photo_exif.py` (Render shell, `--dry-run` first; purge the Cloudflare cache afterwards).
+  - **Memory (512 MB instance):** JPEGs are decoded with Pillow `draft` at 1/2–1/8 scale (long edge lands in 1920–2560) and shrunk BEFORE rotating, so no photo ever exists at full size in memory — a 12 MP photo costs ~35 MB, not ~95–145 MB. Full-size decodes killed the Render instance on 2026-09-29 (backfill OOM). Don't add a full-resolution decode anywhere in the API process.
+  - Backfill for pre-fix originals: `apps/api/strip_photo_exif.py` (Render shell, `--dry-run` first; `--offset/--limit` for batches; brings originals to the same 2560 px cap; purge the Cloudflare cache afterwards).
   - Deleting an animal, colony, photo or account removes its files after the commit via `utils/photo_cleanup.py`. Only exact generated keys (`photos/<uuid>.<ext>`, `thumbnails/thumb_<uuid>…`, `avatars/avatar_<uuid>…`) are ever deletable, and only when no row still references them — `avatar_url` is free text, so a loose check lets users delete others' files. `_delete_from_r2` only strips a LEADING base URL.
   - Free TV plan = 5 photos per animal, enforced by `utils/limits.py::enforce_photo_cap` on every TV upload route incl. `/inverts/{id}/photos` and QR (owner's plan decides). HV and colony photos are uncapped by design.
 

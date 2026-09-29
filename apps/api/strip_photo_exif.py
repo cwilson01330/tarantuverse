@@ -5,8 +5,12 @@ originals uploaded before that fix. Each object is overwritten IN PLACE (same
 key, so every stored URL — photos.url, inverts/animals.photo_url — keeps
 working), with its orientation applied.
 
-Quality: originals keep their full dimensions and are re-encoded at JPEG
-quality 95, so the one re-compression is as gentle as it can be. If the photo
+Size: originals are brought to the same 2560 px long edge as every new upload
+(re-encoded at JPEG quality 92). That is sharper than any phone screen shows,
+and it is what keeps this script inside the Render instance's 512 MB: the
+first run (2026-09-29) decoded 30 MP originals at full size, ~200 MB each on
+top of the running API, and the instance was killed for running out of
+memory. JPEGs are now decoded at reduced scale and never exist at full size. If the photo
 was stored sideways-with-a-rotation-tag, its thumbnail is regenerated too
 (thumbnails were always made from the un-rotated pixels, so those were
 sideways already).
@@ -30,8 +34,10 @@ Run on the Render shell (needs the R2_* env vars):
     python strip_photo_exif.py --dry-run      # count only, changes nothing
     python strip_photo_exif.py                # do it
     python strip_photo_exif.py --limit 20     # try a handful first
+    python strip_photo_exif.py --offset 200 --limit 200   # work in batches
 """
 import argparse
+import gc
 import sys
 from io import BytesIO
 
@@ -62,6 +68,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--offset", type=int, default=0)
     args = ap.parse_args()
 
     if not storage_service.use_r2:
@@ -81,6 +88,7 @@ def main() -> int:
     finally:
         db.close()
     urls = sorted(rows)
+    urls = urls[args.offset:]
     if args.limit:
         urls = urls[: args.limit]
     print(f"{len(urls)} photo objects to check{' (dry run)' if args.dry_run else ''}")
@@ -95,9 +103,10 @@ def main() -> int:
             if not needs_cleaning(data):
                 skipped += 1
                 continue
-            rotated = Image.open(BytesIO(data)).getexif().get(ORIENTATION, 1) not in (1, None)
-            clean, mime, _ext = sanitize_image(data, max_edge=None, jpeg_quality=95)
-            if not args.dry_run:
+            with Image.open(BytesIO(data)) as probe:  # header only — no decode
+                rotated = probe.getexif().get(ORIENTATION, 1) not in (1, None)
+            if not args.dry_run:  # a dry run never decodes a photo
+                clean, mime, _ext = sanitize_image(data, jpeg_quality=92)
                 s3.put_object(
                     Bucket=bucket, Key=key, Body=clean, ContentType=mime,
                     CacheControl="public, max-age=31536000",
@@ -113,6 +122,12 @@ def main() -> int:
         except Exception as e:  # keep going; report at the end
             failed += 1
             print(f"  ! {key}: {e}")
+        finally:
+            # One photo in memory at a time: drop this one's buffers before
+            # fetching the next.
+            data = obj = None
+            clean = None
+            gc.collect()
         if checked % 50 == 0:
             print(f"  …{checked} checked, {cleaned} {'would be ' if args.dry_run else ''}cleaned")
 
