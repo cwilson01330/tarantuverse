@@ -17,6 +17,7 @@ from app.schemas.pairing import (
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
 from app.services.breeding_service import attach_parents
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -132,6 +133,7 @@ def _set_parent(pairing: Pairing, slot: str, animal: Invert) -> None:
 
 
 @router.get("/pairings/", response_model=List[PairingResponse])
+@policy("owner_only")
 async def get_pairings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -147,6 +149,7 @@ async def get_pairings(
 
 
 @router.get("/pairings/{pairing_id}", response_model=PairingResponse)
+@policy("owner_only")
 async def get_pairing(
     pairing_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -165,6 +168,7 @@ async def get_pairing(
 
 
 @router.get("/inverts/{invert_id}/pairings", response_model=List[PairingResponse])
+@policy("owner_only")
 async def get_invert_pairings(
     invert_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -189,6 +193,7 @@ async def get_invert_pairings(
 
 
 @router.post("/inverts/pairings", response_model=PairingResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_invert_pairing(
     payload: PairingInvertCreate,
     db: Session = Depends(get_db),
@@ -263,6 +268,7 @@ async def create_invert_pairing(
 
 
 @router.post("/pairings/", response_model=PairingResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_pairing(
     pairing_data: PairingCreate,
     db: Session = Depends(get_db),
@@ -330,6 +336,7 @@ async def create_pairing(
 
 
 @router.put("/pairings/{pairing_id}", response_model=PairingResponse)
+@policy("owner_only")
 async def update_pairing(
     pairing_id: uuid.UUID,
     pairing_data: PairingUpdate,
@@ -434,6 +441,7 @@ async def update_pairing(
 
 
 @router.delete("/pairings/{pairing_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_pairing(
     pairing_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -456,6 +464,7 @@ async def delete_pairing(
 
 
 @router.get("/tarantulas/{tarantula_id}/pairings", response_model=List[PairingResponse])
+@policy("owner_only")
 async def get_tarantula_pairings(
     tarantula_id: uuid.UUID,
     db: Session = Depends(get_db),

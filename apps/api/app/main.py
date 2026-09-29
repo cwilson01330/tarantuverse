@@ -58,6 +58,7 @@ import app.routers.hv_feeder_species as hv_feeder_species
 import app.routers.hv_feeder_stocks as hv_feeder_stocks
 import app.routers.colonies as colonies  # ADR-010 pet colony mode
 import app.routers.sitter_passes as sitter_passes  # PRD-shared-keeping
+import app.routers.collection_members as collection_members  # PRD-shared-keeping rung 3
 import app.routers.animal_events as animal_events  # ADR-015 per-animal events
 import app.routers.species_shortlist as species_shortlist  # care-sheet bookmarks
 import app.routers.waitlist as waitlist
@@ -323,6 +324,7 @@ app.include_router(transfers.router, prefix="/api/v1", tags=["transfers", "prove
 # (user auth) and the sitter's (pass-session auth only, an allowlist).
 app.include_router(sitter_passes.keeper_router, prefix="/api/v1/sitter-passes", tags=["sitter-passes"])
 app.include_router(sitter_passes.sitter_router, prefix="/api/v1/sitter", tags=["sitter-passes"])
+app.include_router(collection_members.router, prefix="/api/v1/collection-members", tags=["co-keepers"])
 
 print("[STARTUP] Registering feeder routers...")
 app.include_router(feeder_species.router, prefix="/api/v1/feeder-species", tags=["feeders"])

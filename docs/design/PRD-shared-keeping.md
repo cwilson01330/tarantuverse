@@ -346,8 +346,9 @@ Phases 1 and 2 don't depend on 3a. Phase 3a can start any time and ship silently
 
 **Blocking before Phase 3b**
 
-6. **Role names and scope.** *(Cory/design)* Viewer / Logger / Keeper as above?
-7. **Member limit on premium.** *(Cory)* Recommendation: none in v1; revisit only if abuse appears.
+6. ~~**Role names and scope.**~~ **Decided 2026-09-29 (Cory):** Viewer / Logger / Keeper as specified above.
+7. ~~**Member limit on premium.**~~ **Decided 2026-09-29 (Cory):** up to **10** co-keepers per collection (per app). Easy to raise later.
+7b. **Invite scope — decided 2026-09-29 (Cory):** **per app.** An invite shares the owner's Tarantuverse *or* Herpetoverse collection, matching how sitter links and premium already work.
 8. **Privacy policy and terms.** *(Cory — legal)* Covers the sitter's name, rate-limit IP handling, and co-keepers seeing each other's names. Both sites' privacy pages need a paragraph before Phase 1 ships.
 
 **Non-blocking**

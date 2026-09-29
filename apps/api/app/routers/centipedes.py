@@ -37,6 +37,7 @@ from app.schemas.centipede import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_collection_limit
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -100,6 +101,7 @@ def _owned_centipede(
 
 
 @router.get("/", response_model=List[CentipedeResponse])
+@policy("owner_only")
 async def list_centipedes(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -120,6 +122,7 @@ async def list_centipedes(
     "/", response_model=CentipedeResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_centipede(
     payload: CentipedeCreate,
     db: Session = Depends(get_db),
@@ -163,6 +166,7 @@ async def create_centipede(
 @router.get(
     "/{centipede_id}", response_model=CentipedeResponse,
 )
+@policy("owner_only")
 async def get_centipede(
     centipede_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -175,6 +179,7 @@ async def get_centipede(
 @router.put(
     "/{centipede_id}", response_model=CentipedeResponse,
 )
+@policy("owner_only")
 async def update_centipede(
     centipede_id: UUID,
     payload: CentipedeUpdate,
@@ -202,6 +207,7 @@ async def update_centipede(
 @router.delete(
     "/{centipede_id}", status_code=status.HTTP_204_NO_CONTENT,
 )
+@policy("owner_only")
 async def delete_centipede(
     centipede_id: UUID,
     current_user: User = Depends(get_current_user),

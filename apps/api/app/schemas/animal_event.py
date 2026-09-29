@@ -76,5 +76,8 @@ class AnimalEventResponse(AnimalEventBase):
     occurred_at: date
     created_at: datetime
 
+    logged_by_user_id: Optional[uuid.UUID] = None
+    # Display name of the co-keeper who logged it; None means the owner.
+    logged_by_name: Optional[str] = None
     class Config:
         from_attributes = True

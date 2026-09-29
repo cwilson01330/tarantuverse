@@ -28,6 +28,7 @@ from app.schemas.animal_genotype import (
     AnimalGenotypeUpdate,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.access import policy
 
 
 router = APIRouter()
@@ -73,6 +74,7 @@ def _validate_poss_het_consistency(zygosity: str, poss_het_percentage):
     "/animals/{animal_id}/genotype",
     response_model=List[AnimalGenotypeResponse],
 )
+@policy("owner_only")
 async def list_genotype(
     animal_id: UUID,
     db: Session = Depends(get_db),
@@ -94,6 +96,7 @@ async def list_genotype(
     response_model=AnimalGenotypeResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def add_genotype(
     animal_id: UUID,
     payload: AnimalGenotypeCreate,
@@ -121,6 +124,7 @@ async def add_genotype(
     "/animals/{animal_id}/genotype/{genotype_id}",
     response_model=AnimalGenotypeResponse,
 )
+@policy("owner_only")
 async def update_genotype(
     animal_id: UUID,
     genotype_id: UUID,
@@ -166,6 +170,7 @@ async def update_genotype(
     "/animals/{animal_id}/genotype/{genotype_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
+@policy("owner_only")
 async def delete_genotype(
     animal_id: UUID,
     genotype_id: UUID,

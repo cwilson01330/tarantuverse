@@ -37,11 +37,13 @@ from app.services.inverts_dualwrite import (
     mirror_tarantula_delete,
     mirror_tarantula_update,
 )
+from app.utils.access import policy
 
 router = APIRouter()
 
 
 @router.get("/", response_model=List[TarantulaResponse])
+@policy("owner_only")
 async def get_tarantulas(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -78,6 +80,7 @@ async def get_tarantulas(
 
 
 @router.post("/", response_model=TarantulaResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_tarantula(
     tarantula_data: TarantulaCreate,
     db: Session = Depends(get_db),
@@ -162,6 +165,7 @@ async def create_tarantula(
 
 
 @router.get("/{tarantula_id}", response_model=TarantulaResponse)
+@policy("owner_only")
 async def get_tarantula(
     tarantula_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -187,6 +191,7 @@ async def get_tarantula(
 
 
 @router.put("/{tarantula_id}", response_model=TarantulaResponse)
+@policy("owner_only")
 async def update_tarantula(
     tarantula_id: UUID,
     tarantula_data: TarantulaUpdate,
@@ -233,6 +238,7 @@ async def update_tarantula(
 
 
 @router.delete("/{tarantula_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_tarantula(
     tarantula_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -278,6 +284,7 @@ async def delete_tarantula(
 
 
 @router.get("/{tarantula_id}/growth", response_model=GrowthAnalytics)
+@policy("owner_only")
 async def get_tarantula_growth(
     tarantula_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -436,6 +443,7 @@ def _calendar_day_diff(later: datetime, earlier: datetime, tz_offset_minutes: Op
 
 
 @router.get("/{tarantula_id}/feeding-stats", response_model=FeedingStats)
+@policy("owner_only")
 async def get_feeding_stats(
     tarantula_id: UUID,
     tz_offset_minutes: Optional[int] = Query(
@@ -684,6 +692,7 @@ async def get_feeding_stats(
 
 
 @router.get("/{tarantula_id}/public-link")
+@policy("owner_only")
 async def get_public_link(
     tarantula_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -727,6 +736,7 @@ async def get_public_link(
 
 
 @router.get("/public/{username}/{tarantula_slug}")
+@policy("public")
 async def get_public_tarantula(
     username: str,
     tarantula_slug: str,

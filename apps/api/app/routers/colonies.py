@@ -35,6 +35,7 @@ from app.schemas.colony import (
 from app.utils.dependencies import get_current_user
 from app.services.colony_history_service import colony_population_history
 from app.utils.limits import enforce_collection_limit
+from app.utils.access import access_helper, load_colony, policy, require_can_change, scope_collection
 
 router = APIRouter()
 
@@ -97,15 +98,18 @@ def _verify_species(db: Session, species_id: Optional[UUID]) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Species not found")
 
 
-def _get_owned(db: Session, colony_id: UUID, user: User) -> Colony:
-    colony = (
-        db.query(Colony)
-        .filter(Colony.id == colony_id, Colony.user_id == user.id)
-        .first()
-    )
-    if colony is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Colony not found")
-    return colony
+@access_helper
+def _event_for(db: Session, event_id: UUID, user: User, need: str):
+    """A colony event plus the caller's access through its colony (owner or
+    co-keeper). Resolved through the colony, not the event row's own user_id,
+    which is always the owner's. 404 for missing and for no access alike."""
+    log = db.query(ColonyEvent).filter(ColonyEvent.id == event_id).first()
+    if log is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    _colony, access = load_colony(db, user, log.colony_id, need, not_found="Event not found")
+    if need != "viewer":
+        require_can_change(access, log)
+    return log
 
 
 def _apply_delta(colony: Colony, stage: Optional[str], delta: Optional[int]) -> None:
@@ -122,13 +126,16 @@ def _apply_delta(colony: Colony, stage: Optional[str], delta: Optional[int]) -> 
 # ---------- colony CRUD ----------
 
 @router.get("/", response_model=List[ColonyListItem])
+@policy("viewer")
 async def list_colonies(
     include_inactive: bool = Query(False),
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a shared collection."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    access = scope_collection(db, current_user, "tarantuverse", collection)
     q = db.query(Colony).filter(
-        Colony.user_id == current_user.id,
+        Colony.user_id == access.owner.id,
         Colony.transferred_out_at.is_(None),
     )
     if not include_inactive:
@@ -173,17 +180,21 @@ async def list_colonies(
 
 
 @router.post("/", response_model=ColonyResponse, status_code=status.HTTP_201_CREATED)
+@policy("keeper")
 async def create_colony(
     payload: ColonyCreate,
+    collection: Optional[UUID] = Query(None, description="Owner's user id to add to a shared collection."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
+    owner = access.owner  # the colony, its cap and its enclosure are the OWNER's
     # A colony counts as 1 animal toward the free-tier cap.
-    enforce_collection_limit(db, current_user)
-    _verify_enclosure(db, payload.enclosure_id, current_user)
+    enforce_collection_limit(db, owner)
+    _verify_enclosure(db, payload.enclosure_id, owner)
     _verify_species(db, payload.species_id)
 
-    colony = Colony(user_id=current_user.id, **payload.model_dump())
+    colony = Colony(user_id=owner.id, **payload.model_dump())
     db.add(colony)
 
     # Bump the species "times_kept" counter (parity with invert create).
@@ -198,27 +209,29 @@ async def create_colony(
 
 
 @router.get("/{colony_id}", response_model=ColonyResponse)
+@policy("viewer")
 async def get_colony(
     colony_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    colony = _get_owned(db, colony_id, current_user)
+    colony, _access = load_colony(db, current_user, colony_id, "viewer")
     return ColonyResponse(**_build_response(colony, db))
 
 
 @router.put("/{colony_id}", response_model=ColonyResponse)
+@policy("keeper")
 async def update_colony(
     colony_id: UUID,
     payload: ColonyUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    colony = _get_owned(db, colony_id, current_user)
+    colony, access = load_colony(db, current_user, colony_id, "keeper")
     data = payload.model_dump(exclude_unset=True)
 
     if "enclosure_id" in data:
-        _verify_enclosure(db, data["enclosure_id"], current_user)
+        _verify_enclosure(db, data["enclosure_id"], access.owner)
     if data.get("species_id"):
         _verify_species(db, data["species_id"])
 
@@ -231,18 +244,27 @@ async def update_colony(
 
 
 @router.delete("/{colony_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_colony(
     colony_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    colony = _get_owned(db, colony_id, current_user)
+    # Owner-only (PRD T8): deliberately the inline owner filter, not the resolver.
+    colony = (
+        db.query(Colony)
+        .filter(Colony.id == colony_id, Colony.user_id == current_user.id)
+        .first()
+    )
+    if colony is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Colony not found")
     db.delete(colony)
     db.commit()
     return None
 
 
 @router.get("/{colony_id}/population-history")
+@policy("viewer")
 async def population_history(
     colony_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -253,13 +275,14 @@ async def population_history(
     Observed history only — no projection. See colony_history_service for why
     a breeding forecast would be dishonest here rather than merely hard.
     """
-    colony = _get_owned(db, colony_id, current_user)
+    colony, _access = load_colony(db, current_user, colony_id, "viewer")
     return colony_population_history(db, colony)
 
 
 # ---------- events ----------
 
 @router.get("/{colony_id}/events", response_model=List[ColonyEventResponse])
+@policy("viewer")
 async def list_events(
     colony_id: UUID,
     limit: int = Query(100, ge=1, le=500),
@@ -267,7 +290,7 @@ async def list_events(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    _get_owned(db, colony_id, current_user)  # ownership check
+    load_colony(db, current_user, colony_id, "viewer")
     return (
         db.query(ColonyEvent)
         .filter(ColonyEvent.colony_id == colony_id)
@@ -283,17 +306,19 @@ async def list_events(
     response_model=ColonyEventResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_event(
     colony_id: UUID,
     payload: ColonyEventCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    colony = _get_owned(db, colony_id, current_user)
+    colony, access = load_colony(db, current_user, colony_id, "logger")
 
     log = ColonyEvent(
         colony_id=colony.id,
-        user_id=current_user.id,
+        user_id=access.owner.id,  # the collection's owner, whoever logged it
+        logged_by_user_id=access.logged_by_user_id,
         **payload.model_dump(exclude_unset=True),
     )
     db.add(log)
@@ -307,19 +332,14 @@ async def create_event(
 
 
 @router.put("/events/{event_id}", response_model=ColonyEventResponse)
+@policy("logger")
 async def update_event(
     event_id: UUID,
     payload: ColonyEventUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    log = (
-        db.query(ColonyEvent)
-        .filter(ColonyEvent.id == event_id, ColonyEvent.user_id == current_user.id)
-        .first()
-    )
-    if log is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    log = _event_for(db, event_id, current_user, "logger")
 
     data = payload.model_dump(exclude_unset=True)
     for k, v in data.items():
@@ -331,18 +351,13 @@ async def update_event(
 
 
 @router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("logger")
 async def delete_event(
     event_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    log = (
-        db.query(ColonyEvent)
-        .filter(ColonyEvent.id == event_id, ColonyEvent.user_id == current_user.id)
-        .first()
-    )
-    if log is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    log = _event_for(db, event_id, current_user, "logger")
 
     db.delete(log)
     db.commit()

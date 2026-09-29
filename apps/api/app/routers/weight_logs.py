@@ -54,45 +54,26 @@ from app.services.snake_feeding_advisory import (
     suggest_prey_range,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.access import access_helper, load_animal, load_log_parent, policy, require_can_change
 
 router = APIRouter()
 
 
 # ── Ownership helpers ─────────────────────────────────────────────────
 
-def _get_owned_animal(db: Session, animal_id: uuid.UUID, user: User) -> Animal:
-    animal = (
-        db.query(Animal)
-        .filter(Animal.id == animal_id, Animal.user_id == user.id)
-        .first()
-    )
-    if not animal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Animal not found"
-        )
-    return animal
+@access_helper
+def _weight_log_for(db: Session, weight_log_id: uuid.UUID, user: User, need: str) -> WeightLog:
+    """The row plus an access check through its animal (owner or co-keeper).
 
-
-def _get_owned_weight_log(
-    db: Session, weight_log_id: uuid.UUID, user: User
-) -> WeightLog:
-    """Fetch a weight log and verify the owning animal belongs to the
-    caller. Raises 404 for missing log, 403 for not-yours."""
-    log = db.query(WeightLog).filter(WeightLog.id == weight_log_id).first()
-    if not log:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Weight log not found"
-        )
-    owner = (
-        db.query(Animal)
-        .filter(Animal.id == log.animal_id, Animal.user_id == user.id)
-        .first()
-    )
-    if not owner:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
-        )
-    return log
+    404 for missing and for no access alike — the old helper answered 403 for
+    someone else's row, confirming it existed. Writes also apply the logger
+    rule: a logger may change only entries they logged themselves.
+    """
+    row = db.query(WeightLog).filter(WeightLog.id == weight_log_id).first()
+    _parent, access = load_log_parent(db, user, row, need, not_found="Weight log not found")
+    if need != "viewer":
+        require_can_change(access, row)
+    return row
 
 
 def _species_for_animal(db: Session, animal: Animal) -> ReptileSpecies | None:
@@ -177,13 +158,14 @@ def _resolve_interval_window(
     "/animals/{animal_id}/weight-logs",
     response_model=List[WeightLogResponse],
 )
+@policy("viewer")
 async def list_weight_logs(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List weigh-ins for an animal, most recent first."""
-    _get_owned_animal(db, animal_id, current_user)
+    load_animal(db, current_user, animal_id, "viewer")
     return (
         db.query(WeightLog)
         .filter(WeightLog.animal_id == animal_id)
@@ -196,13 +178,14 @@ async def list_weight_logs(
     "/animals/{animal_id}/weight-logs/latest",
     response_model=WeightLogResponse | None,
 )
+@policy("viewer")
 async def latest_weight_log(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Return the most recent weigh-in, or null if the animal has none."""
-    _get_owned_animal(db, animal_id, current_user)
+    load_animal(db, current_user, animal_id, "viewer")
     return (
         db.query(WeightLog)
         .filter(WeightLog.animal_id == animal_id)
@@ -215,6 +198,7 @@ async def latest_weight_log(
     "/animals/{animal_id}/weight-logs/trend",
     response_model=WeightTrendResponse,
 )
+@policy("viewer")
 async def weight_trend(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -226,7 +210,7 @@ async def weight_trend(
     aestivating — same flag for frogs), don't flag weight loss; it's
     expected behavior.
     """
-    animal = _get_owned_animal(db, animal_id, current_user)
+    animal, access = load_animal(db, current_user, animal_id, "viewer")
     species = _species_for_animal(db, animal)
 
     logs = (
@@ -269,6 +253,7 @@ async def weight_trend(
     response_model=WeightLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_weight_log(
     animal_id: uuid.UUID,
     payload: WeightLogCreate,
@@ -278,9 +263,9 @@ async def create_weight_log(
     """Log a weigh-in. Denormalizes `animals.current_weight_g` when the
     new entry is the most recent one — backfilling older weights leaves
     the current-weight hint untouched."""
-    animal = _get_owned_animal(db, animal_id, current_user)
+    animal, access = load_animal(db, current_user, animal_id, "logger")
 
-    new_log = WeightLog(animal_id=animal_id, **payload.model_dump())
+    new_log = WeightLog(animal_id=animal_id, logged_by_user_id=access.logged_by_user_id, **payload.model_dump())
     db.add(new_log)
     db.flush()  # so new_log.weighed_at is populated before comparison
 
@@ -304,6 +289,7 @@ async def create_weight_log(
     "/weight-logs/{weight_log_id}",
     response_model=WeightLogResponse,
 )
+@policy("viewer")
 async def get_weight_log(
     weight_log_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -311,13 +297,14 @@ async def get_weight_log(
 ):
     """Fetch a single weight log by id — used by the edit forms to
     pre-fill fields."""
-    return _get_owned_weight_log(db, weight_log_id, current_user)
+    return _weight_log_for(db, weight_log_id, current_user, "viewer")
 
 
 @router.put(
     "/weight-logs/{weight_log_id}",
     response_model=WeightLogResponse,
 )
+@policy("logger")
 async def update_weight_log(
     weight_log_id: uuid.UUID,
     payload: WeightLogUpdate,
@@ -327,7 +314,7 @@ async def update_weight_log(
     """Partial update. Does NOT recompute `animals.current_weight_g` —
     editing a historical weight is rare and the denormalized hint
     resyncs on the next POST."""
-    log = _get_owned_weight_log(db, weight_log_id, current_user)
+    log = _weight_log_for(db, weight_log_id, current_user, "logger")
 
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -342,6 +329,7 @@ async def update_weight_log(
     "/weight-logs/{weight_log_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
+@policy("logger")
 async def delete_weight_log(
     weight_log_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -349,7 +337,7 @@ async def delete_weight_log(
 ):
     """Delete a weigh-in. Does NOT recompute current_weight_g — same
     rationale as update. The next POST resyncs."""
-    log = _get_owned_weight_log(db, weight_log_id, current_user)
+    log = _weight_log_for(db, weight_log_id, current_user, "logger")
     db.delete(log)
     db.commit()
     return None
@@ -361,6 +349,7 @@ async def delete_weight_log(
     "/animals/{animal_id}/prey-suggestion",
     response_model=PreySuggestion,
 )
+@policy("viewer")
 async def prey_suggestion(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -373,7 +362,7 @@ async def prey_suggestion(
     species has no life_stage_feeding data, returns
     `is_data_available=false` and the UI shows an explanation.
     """
-    animal = _get_owned_animal(db, animal_id, current_user)
+    animal, access = load_animal(db, current_user, animal_id, "viewer")
     species = _species_for_animal(db, animal)
 
     latest_log = (
@@ -584,6 +573,7 @@ def _compute_feeding_status(
     "/animals/{animal_id}/feeding-status",
     response_model=FeedingStatus,
 )
+@policy("viewer")
 async def animal_feeding_status(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -595,7 +585,7 @@ async def animal_feeding_status(
     feeding. Brumating/aestivating animals get status='paused' so the
     dashboard doesn't nag.
     """
-    animal = _get_owned_animal(db, animal_id, current_user)
+    animal, access = load_animal(db, current_user, animal_id, "viewer")
     species = _species_for_animal(db, animal)
 
     latest_log = (

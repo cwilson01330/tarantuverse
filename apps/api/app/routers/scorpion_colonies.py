@@ -29,6 +29,7 @@ from app.schemas.scorpion_colony import (
     ScorpionColonyUpdate,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -47,6 +48,7 @@ def _attach_member_count(db: Session, colony: ScorpionColony) -> ScorpionColony:
 
 
 @router.get("/", response_model=List[ScorpionColonyResponse])
+@policy("owner_only")
 async def list_colonies(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -79,6 +81,7 @@ async def list_colonies(
     "/", response_model=ScorpionColonyResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_colony(
     payload: ScorpionColonyCreate,
     current_user: User = Depends(get_current_user),
@@ -100,6 +103,7 @@ async def create_colony(
 @router.get(
     "/{colony_id}", response_model=ScorpionColonyDetailResponse,
 )
+@policy("owner_only")
 async def get_colony(
     colony_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -125,6 +129,7 @@ async def get_colony(
 
 
 @router.put("/{colony_id}", response_model=ScorpionColonyResponse)
+@policy("owner_only")
 async def update_colony(
     colony_id: UUID,
     payload: ScorpionColonyUpdate,
@@ -154,6 +159,7 @@ async def update_colony(
 @router.delete(
     "/{colony_id}", status_code=status.HTTP_204_NO_CONTENT,
 )
+@policy("owner_only")
 async def delete_colony(
     colony_id: UUID,
     current_user: User = Depends(get_current_user),

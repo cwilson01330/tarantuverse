@@ -30,6 +30,7 @@ from app.schemas.whip_spider import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_collection_limit
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -89,6 +90,7 @@ def _owned_whip_spider(db: Session, whip_spider_id: UUID, user: User) -> Invert:
 
 
 @router.get("/", response_model=List[WhipSpiderResponse])
+@policy("owner_only")
 async def list_whip_spiders(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -109,6 +111,7 @@ async def list_whip_spiders(
     "/", response_model=WhipSpiderResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_whip_spider(
     payload: WhipSpiderCreate,
     db: Session = Depends(get_db),
@@ -150,6 +153,7 @@ async def create_whip_spider(
 
 
 @router.get("/{whip_spider_id}", response_model=WhipSpiderResponse)
+@policy("owner_only")
 async def get_whip_spider(
     whip_spider_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -160,6 +164,7 @@ async def get_whip_spider(
 
 
 @router.put("/{whip_spider_id}", response_model=WhipSpiderResponse)
+@policy("owner_only")
 async def update_whip_spider(
     whip_spider_id: UUID,
     payload: WhipSpiderUpdate,
@@ -185,6 +190,7 @@ async def update_whip_spider(
 
 
 @router.delete("/{whip_spider_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_whip_spider(
     whip_spider_id: UUID,
     current_user: User = Depends(get_current_user),

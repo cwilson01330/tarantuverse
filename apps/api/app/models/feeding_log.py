@@ -91,6 +91,18 @@ class FeedingLog(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+    logged_by = relationship("User", foreign_keys=[logged_by_user_id], lazy="select")
+
+    @property
+    def logged_by_name(self):
+        """Display name of the co-keeper who logged this, else None (the owner).
+        Checks the id first so owner rows never trigger a lookup."""
+        if self.logged_by_user_id is None:
+            return None
+        u = self.logged_by
+        if u is None:
+            return None
+        return (getattr(u, "display_name", None) or "").strip() or getattr(u, "username", None)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

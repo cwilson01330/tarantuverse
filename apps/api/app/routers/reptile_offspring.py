@@ -31,6 +31,7 @@ from app.schemas.reptile_breeding import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_hv_premium
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -89,6 +90,7 @@ def _resolve_link(
     "/clutches/{clutch_id}/offspring",
     response_model=List[ReptileOffspringResponse],
 )
+@policy("owner_only")
 async def list_offspring_for_clutch(
     clutch_id: UUID,
     db: Session = Depends(get_db),
@@ -109,6 +111,7 @@ async def list_offspring_for_clutch(
     response_model=ReptileOffspringResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_offspring(
     payload: ReptileOffspringCreate,
     db: Session = Depends(get_db),
@@ -145,6 +148,7 @@ async def create_offspring(
     "/reptile-offspring/{offspring_id}",
     response_model=ReptileOffspringResponse,
 )
+@policy("owner_only")
 async def get_offspring(
     offspring_id: UUID,
     db: Session = Depends(get_db),
@@ -157,6 +161,7 @@ async def get_offspring(
     "/reptile-offspring/{offspring_id}",
     response_model=ReptileOffspringResponse,
 )
+@policy("owner_only")
 async def update_offspring(
     offspring_id: UUID,
     payload: ReptileOffspringUpdate,
@@ -186,6 +191,7 @@ async def update_offspring(
     "/reptile-offspring/{offspring_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
+@policy("owner_only")
 async def delete_offspring(
     offspring_id: UUID,
     db: Session = Depends(get_db),

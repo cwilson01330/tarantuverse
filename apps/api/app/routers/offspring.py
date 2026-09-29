@@ -18,6 +18,7 @@ from app.schemas.offspring import (
 )
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -90,6 +91,7 @@ def _resolve_kept_link(
 
 
 @router.get("/offspring/", response_model=List[OffspringResponse])
+@policy("owner_only")
 async def get_offspring(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -103,6 +105,7 @@ async def get_offspring(
 
 
 @router.get("/offspring/{offspring_id}", response_model=OffspringResponse)
+@policy("owner_only")
 async def get_offspring_record(
     offspring_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -121,6 +124,7 @@ async def get_offspring_record(
 
 
 @router.post("/offspring/", response_model=OffspringResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_offspring_record(
     offspring_data: OffspringCreate,
     db: Session = Depends(get_db),
@@ -190,6 +194,7 @@ async def create_offspring_record(
 
 
 @router.put("/offspring/{offspring_id}", response_model=OffspringResponse)
+@policy("owner_only")
 async def update_offspring_record(
     offspring_id: uuid.UUID,
     offspring_data: OffspringUpdate,
@@ -239,6 +244,7 @@ async def update_offspring_record(
 
 
 @router.delete("/offspring/{offspring_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_offspring_record(
     offspring_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -261,6 +267,7 @@ async def delete_offspring_record(
 
 
 @router.post("/offspring/bulk", response_model=OffspringBulkResult, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def bulk_create_offspring(
     payload: OffspringBulkCreate,
     db: Session = Depends(get_db),
@@ -305,6 +312,7 @@ async def bulk_create_offspring(
 
 
 @router.post("/offspring/bulk-update", response_model=OffspringBulkResult)
+@policy("owner_only")
 async def bulk_update_offspring(
     payload: OffspringBulkUpdate,
     db: Session = Depends(get_db),
@@ -334,6 +342,7 @@ async def bulk_update_offspring(
 
 
 @router.get("/egg-sacs/{egg_sac_id}/offspring", response_model=List[OffspringResponse])
+@policy("owner_only")
 async def get_egg_sac_offspring(
     egg_sac_id: uuid.UUID,
     db: Session = Depends(get_db),

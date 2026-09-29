@@ -13,11 +13,13 @@ from app.models.egg_sac import EggSac
 from app.schemas.egg_sac import EggSacCreate, EggSacUpdate, EggSacResponse
 from app.utils.dependencies import get_current_user
 from app.services.activity_service import create_activity
+from app.utils.access import policy
 
 router = APIRouter()
 
 
 @router.get("/egg-sacs/", response_model=List[EggSacResponse])
+@policy("owner_only")
 async def get_egg_sacs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -31,6 +33,7 @@ async def get_egg_sacs(
 
 
 @router.get("/egg-sacs/{egg_sac_id}", response_model=EggSacResponse)
+@policy("owner_only")
 async def get_egg_sac(
     egg_sac_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -49,6 +52,7 @@ async def get_egg_sac(
 
 
 @router.post("/egg-sacs/", response_model=EggSacResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_egg_sac(
     egg_sac_data: EggSacCreate,
     db: Session = Depends(get_db),
@@ -114,6 +118,7 @@ async def create_egg_sac(
 
 
 @router.put("/egg-sacs/{egg_sac_id}", response_model=EggSacResponse)
+@policy("owner_only")
 async def update_egg_sac(
     egg_sac_id: uuid.UUID,
     egg_sac_data: EggSacUpdate,
@@ -151,6 +156,7 @@ async def update_egg_sac(
 
 
 @router.delete("/egg-sacs/{egg_sac_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_egg_sac(
     egg_sac_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -173,6 +179,7 @@ async def delete_egg_sac(
 
 
 @router.get("/pairings/{pairing_id}/egg-sacs", response_model=List[EggSacResponse])
+@policy("owner_only")
 async def get_pairing_egg_sacs(
     pairing_id: uuid.UUID,
     db: Session = Depends(get_db),

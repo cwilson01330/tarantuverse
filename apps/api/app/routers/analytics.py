@@ -24,11 +24,13 @@ from app.schemas.analytics import (
     SpeciesDistEntry,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.access import policy
 
 router = APIRouter()
 
 
 @router.get("/breeding")
+@policy("owner_only")
 async def breeding_analytics(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -147,6 +149,7 @@ async def breeding_analytics(
 
 
 @router.get("/collection", response_model=CollectionAnalytics)
+@policy("owner_only")
 async def get_collection_analytics(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -393,6 +396,7 @@ async def get_collection_analytics(
 
 
 @router.get("/advanced/", response_model=AdvancedAnalyticsResponse)
+@policy("owner_only")
 async def get_advanced_analytics(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

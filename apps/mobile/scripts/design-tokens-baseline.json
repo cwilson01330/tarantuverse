@@ -1,30 +1,13 @@
 {
-  "app/(tabs)/_layout.tsx": {
-    "hex": 1,
-    "fontSize": 1,
-    "borderRadius": 1
-  },
   "app/(tabs)/collection.tsx": {
-    "hex": 4,
-    "fontSize": 34,
-    "borderRadius": 22
-  },
-  "app/colony/add.tsx": {
-    "fontSize": 11,
-    "borderRadius": 7
-  },
-  "app/colony/[id].tsx": {
-    "fontSize": 32,
-    "borderRadius": 5
-  },
-  "app/colony/[id]/edit.tsx": {
-    "fontSize": 11,
-    "borderRadius": 5
+    "hex": 1,
+    "fontSize": 30,
+    "borderRadius": 21
   },
   "app/(tabs)/community.tsx": {
-    "hex": 11,
-    "fontSize": 26,
-    "borderRadius": 9
+    "hex": 3,
+    "fontSize": 31,
+    "borderRadius": 13
   },
   "app/(tabs)/enclosures.tsx": {
     "fontSize": 8,
@@ -36,30 +19,24 @@
   },
   "app/(tabs)/index.tsx": {
     "hex": 10,
-    "fontSize": 30,
-    "borderRadius": 18
-  },
-  "src/components/NotificationBell.tsx": {
-    "hex": 1,
-    "fontSize": 1,
-    "borderRadius": 1
-  },
-  "app/(tabs)/profile.tsx": {
-    "hex": 6,
-    "fontSize": 10,
-    "borderRadius": 6
+    "fontSize": 29,
+    "borderRadius": 20
   },
   "app/(tabs)/species.tsx": {
-    "hex": 10,
-    "fontSize": 15,
-    "borderRadius": 8
+    "hex": 6,
+    "fontSize": 18,
+    "borderRadius": 9
   },
   "app/achievements.tsx": {
     "fontSize": 12,
     "borderRadius": 5
   },
+  "app/add.tsx": {
+    "fontSize": 22,
+    "borderRadius": 12
+  },
   "app/admin/index.tsx": {
-    "hex": 7,
+    "hex": 8,
     "fontSize": 8,
     "borderRadius": 6
   },
@@ -67,6 +44,10 @@
     "hex": 13,
     "fontSize": 10,
     "borderRadius": 5
+  },
+  "app/admin/species-images.tsx": {
+    "fontSize": 7,
+    "borderRadius": 6
   },
   "app/admin/species.tsx": {
     "hex": 16,
@@ -100,8 +81,8 @@
   },
   "app/breeding/index.tsx": {
     "hex": 7,
-    "fontSize": 14,
-    "borderRadius": 3
+    "fontSize": 18,
+    "borderRadius": 4
   },
   "app/breeding/offspring/[id].tsx": {
     "hex": 21,
@@ -115,46 +96,37 @@
   },
   "app/breeding/pairings/[id].tsx": {
     "hex": 9,
-    "fontSize": 14
+    "fontSize": 15
   },
   "app/breeding/pairings/new.tsx": {
     "hex": 1,
-    "fontSize": 15,
-    "borderRadius": 3
-  },
-  "app/centipede/[id].tsx": {
-    "hex": 1,
-    "fontSize": 10,
+    "fontSize": 17,
     "borderRadius": 4
-  },
-  "app/centipede/add-feeding.tsx": {
-    "fontSize": 4,
-    "borderRadius": 4
-  },
-  "app/centipede/add-molt.tsx": {
-    "fontSize": 3,
-    "borderRadius": 2
-  },
-  "app/centipede/add-photo.tsx": {
-    "fontSize": 5,
-    "borderRadius": 5
-  },
-  "app/centipede/add-substrate-change.tsx": {
-    "fontSize": 4,
-    "borderRadius": 3
-  },
-  "app/centipede/add.tsx": {
-    "fontSize": 4,
-    "borderRadius": 3
-  },
-  "app/centipede/edit.tsx": {
-    "fontSize": 6,
-    "borderRadius": 3
   },
   "app/centipede-species/[id].tsx": {
     "hex": 4,
     "fontSize": 8,
     "borderRadius": 4
+  },
+  "app/colony/[id]/edit.tsx": {
+    "fontSize": 13,
+    "borderRadius": 7
+  },
+  "app/colony/[id].tsx": {
+    "fontSize": 36,
+    "borderRadius": 8
+  },
+  "app/colony/add-feeding.tsx": {
+    "fontSize": 6,
+    "borderRadius": 5
+  },
+  "app/colony/add-photo.tsx": {
+    "fontSize": 5,
+    "borderRadius": 5
+  },
+  "app/colony/add.tsx": {
+    "fontSize": 12,
+    "borderRadius": 8
   },
   "app/community/[username].tsx": {
     "hex": 34,
@@ -221,25 +193,10 @@
     "fontSize": 18,
     "borderRadius": 4
   },
-  "app/linked-accounts.tsx": {
-    "hex": 5,
-    "fontSize": 7,
-    "borderRadius": 1
-  },
   "app/feeding-day.tsx": {
-    "hex": 6,
+    "hex": 9,
     "fontSize": 18,
     "borderRadius": 5
-  },
-  "app/import.tsx": {
-    "hex": 14,
-    "fontSize": 31,
-    "borderRadius": 3
-  },
-  "app/notification-center.tsx": {
-    "hex": 3,
-    "fontSize": 8,
-    "borderRadius": 1
   },
   "app/forgot-password.tsx": {
     "fontSize": 5,
@@ -258,23 +215,38 @@
     "fontSize": 24,
     "borderRadius": 17
   },
+  "app/import.tsx": {
+    "hex": 14,
+    "fontSize": 32,
+    "borderRadius": 3
+  },
   "app/index.tsx": {
     "fontSize": 2
   },
   "app/invert/[id].tsx": {
-    "fontSize": 1,
+    "hex": 1,
+    "fontSize": 7,
+    "borderRadius": 16
+  },
+  "app/invert/add-care-log.tsx": {
+    "fontSize": 5,
+    "borderRadius": 3
+  },
+  "app/invert/add-event.tsx": {
+    "fontSize": 6,
     "borderRadius": 3
   },
   "app/invert/add-feeding.tsx": {
-    "fontSize": 4,
-    "borderRadius": 4
+    "fontSize": 5,
+    "borderRadius": 5
   },
   "app/invert/add-molt.tsx": {
-    "fontSize": 3,
-    "borderRadius": 2
+    "hex": 4,
+    "fontSize": 9,
+    "borderRadius": 4
   },
   "app/invert/add-pairing.tsx": {
-    "fontSize": 6,
+    "fontSize": 8,
     "borderRadius": 4
   },
   "app/invert/add-photo.tsx": {
@@ -286,17 +258,22 @@
     "borderRadius": 3
   },
   "app/invert/add.tsx": {
-    "fontSize": 5,
-    "borderRadius": 3
-  },
-  "app/invert/edit.tsx": {
-    "fontSize": 6,
-    "borderRadius": 3
-  },
-  "app/invert-species/[id].tsx": {
-    "hex": 16,
     "fontSize": 8,
     "borderRadius": 4
+  },
+  "app/invert/edit.tsx": {
+    "fontSize": 10,
+    "borderRadius": 6
+  },
+  "app/invert-species/[id].tsx": {
+    "hex": 10,
+    "fontSize": 2,
+    "borderRadius": 2
+  },
+  "app/linked-accounts.tsx": {
+    "hex": 5,
+    "fontSize": 7,
+    "borderRadius": 1
   },
   "app/login.tsx": {
     "fontSize": 10,
@@ -311,6 +288,11 @@
     "hex": 2,
     "fontSize": 16,
     "borderRadius": 7
+  },
+  "app/notification-center.tsx": {
+    "hex": 3,
+    "fontSize": 8,
+    "borderRadius": 1
   },
   "app/onboarding.tsx": {
     "fontSize": 6,
@@ -330,35 +312,6 @@
     "hex": 5,
     "fontSize": 14,
     "borderRadius": 7
-  },
-  "app/scorpion/[id].tsx": {
-    "hex": 1,
-    "fontSize": 10,
-    "borderRadius": 4
-  },
-  "app/scorpion/add-feeding.tsx": {
-    "fontSize": 4,
-    "borderRadius": 4
-  },
-  "app/scorpion/add-molt.tsx": {
-    "fontSize": 3,
-    "borderRadius": 2
-  },
-  "app/scorpion/add-photo.tsx": {
-    "fontSize": 5,
-    "borderRadius": 5
-  },
-  "app/scorpion/add-substrate-change.tsx": {
-    "fontSize": 4,
-    "borderRadius": 3
-  },
-  "app/scorpion/add.tsx": {
-    "fontSize": 4,
-    "borderRadius": 3
-  },
-  "app/scorpion/edit.tsx": {
-    "fontSize": 6,
-    "borderRadius": 3
   },
   "app/scorpion-species/[id].tsx": {
     "hex": 4,
@@ -392,33 +345,34 @@
     "fontSize": 15,
     "borderRadius": 9
   },
+  "app/shortlist.tsx": {
+    "hex": 2,
+    "fontSize": 7,
+    "borderRadius": 5
+  },
   "app/species/[id].tsx": {
-    "hex": 14,
-    "fontSize": 22,
-    "borderRadius": 8
+    "hex": 6,
+    "fontSize": 9,
+    "borderRadius": 3
   },
   "app/subscription.tsx": {
     "hex": 3,
-    "fontSize": 25,
-    "borderRadius": 9
+    "fontSize": 27,
+    "borderRadius": 10
   },
   "app/support.tsx": {
     "hex": 2,
     "fontSize": 11,
     "borderRadius": 6
   },
-  "app/tarantula/[id].tsx": {
-    "hex": 3,
-    "fontSize": 25,
-    "borderRadius": 8
-  },
   "app/tarantula/add-feeding.tsx": {
     "fontSize": 11,
     "borderRadius": 7
   },
   "app/tarantula/add-molt.tsx": {
-    "fontSize": 9,
-    "borderRadius": 4
+    "hex": 4,
+    "fontSize": 12,
+    "borderRadius": 5
   },
   "app/tarantula/add-photo.tsx": {
     "fontSize": 9,
@@ -433,8 +387,8 @@
     "borderRadius": 7
   },
   "app/tarantula/edit.tsx": {
-    "fontSize": 11,
-    "borderRadius": 3
+    "fontSize": 14,
+    "borderRadius": 5
   },
   "app/tarantula/public/[username]/[name].tsx": {
     "hex": 3,
@@ -449,35 +403,6 @@
     "fontSize": 5,
     "borderRadius": 2
   },
-  "app/whip-spider/[id].tsx": {
-    "hex": 1,
-    "fontSize": 10,
-    "borderRadius": 4
-  },
-  "app/whip-spider/add-feeding.tsx": {
-    "fontSize": 4,
-    "borderRadius": 4
-  },
-  "app/whip-spider/add-molt.tsx": {
-    "fontSize": 3,
-    "borderRadius": 2
-  },
-  "app/whip-spider/add-photo.tsx": {
-    "fontSize": 5,
-    "borderRadius": 5
-  },
-  "app/whip-spider/add-substrate-change.tsx": {
-    "fontSize": 4,
-    "borderRadius": 3
-  },
-  "app/whip-spider/add.tsx": {
-    "fontSize": 4,
-    "borderRadius": 3
-  },
-  "app/whip-spider/edit.tsx": {
-    "fontSize": 6,
-    "borderRadius": 3
-  },
   "app/whip-spider-species/[id].tsx": {
     "hex": 10,
     "fontSize": 8,
@@ -489,13 +414,18 @@
     "borderRadius": 2
   },
   "src/components/ActivityFeedItem.tsx": {
-    "hex": 8,
-    "fontSize": 7,
+    "hex": 12,
+    "fontSize": 6,
     "borderRadius": 4
   },
   "src/components/AddPickerSheet.tsx": {
     "fontSize": 5,
     "borderRadius": 3
+  },
+  "src/components/AnimalCard.tsx": {
+    "hex": 2,
+    "fontSize": 7,
+    "borderRadius": 7
   },
   "src/components/AnnouncementBanner.tsx": {
     "hex": 5,
@@ -505,9 +435,27 @@
   "src/components/AppHeader.tsx": {
     "fontSize": 2
   },
+  "src/components/BulkOffspringSheets.tsx": {
+    "hex": 4,
+    "fontSize": 10,
+    "borderRadius": 3
+  },
   "src/components/CentipedeSpeciesPicker.tsx": {
     "fontSize": 5,
     "borderRadius": 3
+  },
+  "src/components/ChangePairingAnimalsSheet.tsx": {
+    "hex": 1,
+    "fontSize": 11,
+    "borderRadius": 2
+  },
+  "src/components/ChangeTaxonSheet.tsx": {
+    "fontSize": 10,
+    "borderRadius": 4
+  },
+  "src/components/ColonyPopulationChart.tsx": {
+    "fontSize": 8,
+    "borderRadius": 1
   },
   "src/components/CommunitySkeletons.tsx": {
     "borderRadius": 2
@@ -520,6 +468,10 @@
     "hex": 9,
     "fontSize": 5,
     "borderRadius": 3
+  },
+  "src/components/FeedingCadenceSheet.tsx": {
+    "fontSize": 10,
+    "borderRadius": 5
   },
   "src/components/FeedingStatsCard.tsx": {
     "hex": 24,
@@ -536,6 +488,22 @@
   "src/components/InvertSpeciesPicker.tsx": {
     "hex": 8,
     "fontSize": 5,
+    "borderRadius": 3
+  },
+  "src/components/KeeperSignalsBlock.tsx": {
+    "fontSize": 4
+  },
+  "src/components/MarkDiedSheet.tsx": {
+    "fontSize": 10,
+    "borderRadius": 4
+  },
+  "src/components/NotificationBell.tsx": {
+    "hex": 1,
+    "fontSize": 1,
+    "borderRadius": 1
+  },
+  "src/components/OverflowMenuSheet.tsx": {
+    "fontSize": 3,
     "borderRadius": 3
   },
   "src/components/PauseFeedingSheet.tsx": {
@@ -603,6 +571,11 @@
     "hex": 8,
     "fontSize": 5,
     "borderRadius": 3
+  },
+  "src/components/caresheet.tsx": {
+    "hex": 6,
+    "fontSize": 12,
+    "borderRadius": 6
   },
   "src/components/ui/index.tsx": {
     "fontSize": 2

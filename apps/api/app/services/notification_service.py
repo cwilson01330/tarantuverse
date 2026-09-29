@@ -51,6 +51,7 @@ DEEPLINK_PATTERNS = (
     r"^/feeding-day$",                 # bulk feeding screen
     r"^/transfers$",                   # transfers index (Herpetoverse web only)
     r"^/sitter$",                      # sitter links (activity, lockouts)
+    r"^/shared$",                      # co-keepers: shared with me / members
 )
 
 _COMPILED_DEEPLINK_PATTERNS = tuple(re.compile(p) for p in DEEPLINK_PATTERNS)

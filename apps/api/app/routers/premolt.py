@@ -1,7 +1,9 @@
 """
 Premolt prediction API routes for tarantulas
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -9,6 +11,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.tarantula import Tarantula
 from app.utils.dependencies import get_current_user
+from app.utils.access import load_invert, policy, scope_collection
 from app.schemas.premolt import PremoltPrediction, PremoltSummary
 from app.services.premolt_service import predict_premolt, predict_premolt_batch
 
@@ -21,6 +24,7 @@ router = APIRouter()
     summary="Get premolt prediction for a single tarantula",
     description="Returns comprehensive premolt prediction including refusal streak, molt interval progress, and confidence level"
 )
+@policy("viewer")
 async def get_premolt_prediction(
     tarantula_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -42,17 +46,9 @@ async def get_premolt_prediction(
     - estimated_molt_window_days: Estimated days until next molt
     - data_quality: 'good', 'fair', or 'insufficient'
     """
-    # Verify tarantula exists and belongs to current user
-    tarantula = db.query(Tarantula).filter(
-        Tarantula.id == tarantula_id,
-        Tarantula.user_id == current_user.id
-    ).first()
-
-    if not tarantula:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tarantula not found"
-        )
+    # The tarantula's invert row shares its id (ADR-005), so access resolves
+    # through the unified surface: the owner, or a co-keeper viewer and up.
+    load_invert(db, current_user, tarantula_id, "viewer", not_found="Tarantula not found")
 
     # Get prediction
     prediction = predict_premolt(db, tarantula_id)
@@ -73,7 +69,9 @@ async def get_premolt_prediction(
     summary="Get premolt predictions for user's collection",
     description="Returns premolt predictions for all tarantulas in the user's collection, sorted by likelihood and confidence"
 )
+@policy("viewer")
 async def get_collection_premolt_predictions(
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a shared collection."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -92,6 +90,7 @@ async def get_collection_premolt_predictions(
     2. Premolt possible (medium/low confidence)
     3. Unlikely (not premolt)
     """
-    summary = predict_premolt_batch(db, current_user.id)
+    access = scope_collection(db, current_user, "tarantuverse", collection)
+    summary = predict_premolt_batch(db, access.owner.id)
 
     return PremoltSummary(**summary)

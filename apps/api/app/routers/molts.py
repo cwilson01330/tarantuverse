@@ -14,54 +14,23 @@ from app.models.invert import Invert
 from app.models.molt_log import MoltLog
 from app.schemas.molt import MoltLogCreate, MoltLogUpdate, MoltLogResponse
 from app.utils.dependencies import get_current_user
+from app.utils.access import (
+    invert_log_fields,
+    load_animal,
+    load_colony,
+    load_invert,
+    load_log_parent,
+    policy,
+    require_can_change,
+)
 from app.services.activity_service import create_activity
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 
 router = APIRouter()
 
 
-def _molt_owner_parent(molt: MoltLog, db: Session, user: User):
-    """Return the owned parent row for a molt log (tarantula or scorpion),
-    or None if the user isn't the owner.
-
-    Centralized polymorphism check — molt_logs are at-least-one-of
-    (tarantula_id, enclosure_id, scorpion_id) per the CHECK from
-    scp_20260522. Enclosure-parented molts aren't reachable here yet
-    (no /enclosures/{id}/molts route), so we only branch the two
-    per-animal parents.
-    """
-    if molt.tarantula_id:
-        return db.query(Tarantula).filter(
-            Tarantula.id == molt.tarantula_id,
-            Tarantula.user_id == user.id,
-        ).first()
-    if molt.scorpion_id:
-        return db.query(Scorpion).filter(
-            Scorpion.id == molt.scorpion_id,
-            Scorpion.user_id == user.id,
-        ).first()
-    # Centipede molts live solely on `invert_id` — no per-taxon FK.
-    # ADR-005 C2; CHECK widened in cip_20260527.
-    if molt.invert_id:
-        return db.query(Invert).filter(
-            Invert.id == molt.invert_id,
-            Invert.user_id == user.id,
-        ).first()
-    # Colony-parented molts (cml_20260730). A communal's molts belong to the
-    # group — edit and delete resolve ownership through the colony exactly as
-    # they do through an animal, so the generic /molts/{id} routes need no
-    # colony-specific handling.
-    if molt.colony_id:
-        from app.models.colony import Colony
-
-        return db.query(Colony).filter(
-            Colony.id == molt.colony_id,
-            Colony.user_id == user.id,
-        ).first()
-    return None
-
-
 @router.get("/tarantulas/{tarantula_id}/molts", response_model=List[MoltLogResponse])
+@policy("owner_only")
 async def get_molt_logs(
     tarantula_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -85,6 +54,7 @@ async def get_molt_logs(
 
 
 @router.post("/tarantulas/{tarantula_id}/molts", response_model=MoltLogResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_molt_log(
     tarantula_id: uuid.UUID,
     molt_data: MoltLogCreate,
@@ -132,6 +102,7 @@ async def create_molt_log(
 
 
 @router.get("/scorpions/{scorpion_id}/molts", response_model=List[MoltLogResponse])
+@policy("owner_only")
 async def get_scorpion_molt_logs(
     scorpion_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -163,6 +134,7 @@ async def get_scorpion_molt_logs(
     response_model=MoltLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_scorpion_molt_log(
     scorpion_id: uuid.UUID,
     molt_data: MoltLogCreate,
@@ -189,6 +161,7 @@ async def create_scorpion_molt_log(
 
 
 @router.get("/centipedes/{centipede_id}/molts", response_model=List[MoltLogResponse])
+@policy("owner_only")
 async def get_centipede_molt_logs(
     centipede_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -223,6 +196,7 @@ async def get_centipede_molt_logs(
     response_model=MoltLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_centipede_molt_log(
     centipede_id: uuid.UUID,
     molt_data: MoltLogCreate,
@@ -249,6 +223,7 @@ async def create_centipede_molt_log(
 
 
 @router.get("/whip-spiders/{whip_spider_id}/molts", response_model=List[MoltLogResponse])
+@policy("owner_only")
 async def get_whip_spider_molt_logs(
     whip_spider_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -278,6 +253,7 @@ async def get_whip_spider_molt_logs(
     response_model=MoltLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_whip_spider_molt_log(
     whip_spider_id: uuid.UUID,
     molt_data: MoltLogCreate,
@@ -308,18 +284,14 @@ async def create_whip_spider_molt_log(
 # ---------------------------------------------------------------------------
 
 @router.get("/inverts/{invert_id}/molts", response_model=List[MoltLogResponse])
+@policy("viewer")
 async def get_invert_molt_logs(
     invert_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List molt logs for any invert the caller owns."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    invert, access = load_invert(db, current_user, invert_id, "viewer", not_found="Animal not found")
     return (
         db.query(MoltLog)
         .filter(MoltLog.invert_id == invert_id)
@@ -333,6 +305,7 @@ async def get_invert_molt_logs(
     response_model=MoltLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_invert_molt_log(
     invert_id: uuid.UUID,
     molt_data: MoltLogCreate,
@@ -340,13 +313,8 @@ async def create_invert_molt_log(
     current_user: User = Depends(get_current_user),
 ):
     """Log a molt for any invert the caller owns. Sets only invert_id."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
-    new_molt = MoltLog(invert_id=invert_id, **molt_data.model_dump())
+    invert, access = load_invert(db, current_user, invert_id, "logger", not_found="Animal not found")
+    new_molt = MoltLog(**invert_log_fields(db, invert), logged_by_user_id=access.logged_by_user_id, **molt_data.model_dump())
     db.add(new_molt)
     db.commit()
     db.refresh(new_molt)
@@ -354,6 +322,7 @@ async def create_invert_molt_log(
 
 
 @router.get("/molts/{molt_id}", response_model=MoltLogResponse)
+@policy("viewer")
 async def get_molt_log(
     molt_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -364,14 +333,12 @@ async def get_molt_log(
     Powers edit forms — without it the edit screen would have to scan
     the parent's whole molt history to find the row by id."""
     molt = db.query(MoltLog).filter(MoltLog.id == molt_id).first()
-    if not molt:
-        raise HTTPException(status_code=404, detail="Molt log not found")
-    if _molt_owner_parent(molt, db, current_user) is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    _parent, access = load_log_parent(db, current_user, molt, "viewer", not_found="Molt log not found")
     return molt
 
 
 @router.put("/molts/{molt_id}", response_model=MoltLogResponse)
+@policy("logger")
 async def update_molt_log(
     molt_id: uuid.UUID,
     molt_data: MoltLogUpdate,
@@ -380,10 +347,8 @@ async def update_molt_log(
 ):
     """Update a molt log (polymorphic — tarantula or scorpion parent)."""
     molt = db.query(MoltLog).filter(MoltLog.id == molt_id).first()
-    if not molt:
-        raise HTTPException(status_code=404, detail="Molt log not found")
-    if _molt_owner_parent(molt, db, current_user) is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    _parent, access = load_log_parent(db, current_user, molt, "logger", not_found="Molt log not found")
+    require_can_change(access, molt)
 
     update_data = molt_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -395,6 +360,7 @@ async def update_molt_log(
 
 
 @router.delete("/molts/{molt_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("logger")
 async def delete_molt_log(
     molt_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -402,10 +368,8 @@ async def delete_molt_log(
 ):
     """Delete a molt log (polymorphic — tarantula or scorpion parent)."""
     molt = db.query(MoltLog).filter(MoltLog.id == molt_id).first()
-    if not molt:
-        raise HTTPException(status_code=404, detail="Molt log not found")
-    if _molt_owner_parent(molt, db, current_user) is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    _parent, access = load_log_parent(db, current_user, molt, "logger", not_found="Molt log not found")
+    require_can_change(access, molt)
 
     db.delete(molt)
     db.commit()
@@ -425,20 +389,14 @@ async def delete_molt_log(
 
 
 @router.get("/colonies/{colony_id}/molts", response_model=List[MoltLogResponse])
+@policy("viewer")
 async def get_colony_molt_logs(
     colony_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List molts found in a colony the caller owns, newest first."""
-    from app.models.colony import Colony
-
-    colony = db.query(Colony).filter(
-        Colony.id == colony_id,
-        Colony.user_id == current_user.id,
-    ).first()
-    if not colony:
-        raise HTTPException(status_code=404, detail="Colony not found")
+    colony, access = load_colony(db, current_user, colony_id, "viewer", not_found="Colony not found")
 
     return (
         db.query(MoltLog)
@@ -453,6 +411,7 @@ async def get_colony_molt_logs(
     response_model=MoltLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_colony_molt_log(
     colony_id: uuid.UUID,
     molt_data: MoltLogCreate,
@@ -466,18 +425,11 @@ async def create_colony_molt_log(
     it, which the enclosure makes impossible — and that claim would then flow
     into any later analysis as though it were observed.
     """
-    from app.models.colony import Colony
-
-    colony = db.query(Colony).filter(
-        Colony.id == colony_id,
-        Colony.user_id == current_user.id,
-    ).first()
-    if not colony:
-        raise HTTPException(status_code=404, detail="Colony not found")
+    colony, access = load_colony(db, current_user, colony_id, "logger", not_found="Colony not found")
 
     payload = molt_data.model_dump()
     payload["is_unidentified"] = True
-    new_molt = MoltLog(colony_id=colony_id, **payload)
+    new_molt = MoltLog(colony_id=colony_id, logged_by_user_id=access.logged_by_user_id, **payload)
     db.add(new_molt)
     db.commit()
     db.refresh(new_molt)

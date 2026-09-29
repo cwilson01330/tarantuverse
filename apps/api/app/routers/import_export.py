@@ -28,6 +28,7 @@ from app.models.animal import Animal
 from app.models.tarantula import Sex, Source
 from app.schemas.animal import AnimalCreate
 from app.utils.limits import active_inverts_query, enforce_animal_limit
+from app.utils.access import policy
 
 router = APIRouter(
     tags=["import-export"]
@@ -84,6 +85,7 @@ async def _read_source(
 
 
 @router.post("/import/analyze", status_code=status.HTTP_200_OK)
+@policy("owner_only")
 async def import_analyze(
     file: UploadFile = File(None),
     sheet_url: str = Form(None),
@@ -234,6 +236,7 @@ async def _import_commit_animals(
 
 
 @router.post("/import/commit", status_code=status.HTTP_200_OK)
+@policy("owner_only")
 async def import_commit(
     file: UploadFile = File(None),
     sheet_url: str = Form(None),
@@ -354,6 +357,7 @@ async def import_commit(
 
 @router.get("/export/json")
 @limiter.limit("10/hour")
+@policy("owner_only")
 async def export_json(
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -378,6 +382,7 @@ async def export_json(
 
 @router.get("/export/csv")
 @limiter.limit("10/hour")
+@policy("owner_only")
 async def export_csv(
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -401,6 +406,7 @@ async def export_csv(
 
 @router.get("/export/full")
 @limiter.limit("3/hour")
+@policy("owner_only")
 async def export_full(
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -424,6 +430,7 @@ async def export_full(
 
 
 @router.get("/export/preview")
+@policy("owner_only")
 async def export_preview(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

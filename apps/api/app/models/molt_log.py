@@ -26,6 +26,22 @@ class MoltLog(Base):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Who logged it when that wasn't the owner — a co-keeper (PRD-shared-
+    # keeping rung 3). NULL means the owner, which is what every earlier row
+    # means. SET NULL on account deletion: the entry stays, the name goes.
+    logged_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    logged_by = relationship("User", foreign_keys=[logged_by_user_id], lazy="select")
+
+    @property
+    def logged_by_name(self):
+        """Display name of the co-keeper who logged this, else None (the owner).
+        Checks the id first so owner rows never trigger a lookup."""
+        if self.logged_by_user_id is None:
+            return None
+        u = self.logged_by
+        if u is None:
+            return None
+        return (getattr(u, "display_name", None) or "").strip() or getattr(u, "username", None)
     tarantula_id = Column(UUID(as_uuid=True), ForeignKey("tarantulas.id", ondelete="CASCADE"), nullable=True)
     enclosure_id = Column(UUID(as_uuid=True), ForeignKey("enclosures.id", ondelete="CASCADE"), nullable=True)
     scorpion_id = Column(

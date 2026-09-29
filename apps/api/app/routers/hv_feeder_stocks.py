@@ -26,6 +26,7 @@ from app.schemas.hv_feeder import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_hv_premium
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -87,6 +88,7 @@ def _validate_species(db: Session, species_id: Optional[UUID]) -> None:
 # ── stock CRUD ──────────────────────────────────────────────────────────────────
 
 @router.get("/", response_model=List[HvFeederStockListItem])
+@policy("owner_only")
 async def list_stocks(
     include_inactive: bool = Query(False),
     current_user: User = Depends(get_current_user),
@@ -100,6 +102,7 @@ async def list_stocks(
 
 
 @router.post("/", response_model=HvFeederStockResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_stock(
     payload: HvFeederStockCreate,
     current_user: User = Depends(get_current_user),
@@ -117,6 +120,7 @@ async def create_stock(
 
 
 @router.get("/{stock_id}", response_model=HvFeederStockResponse)
+@policy("owner_only")
 async def get_stock(
     stock_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -127,6 +131,7 @@ async def get_stock(
 
 
 @router.put("/{stock_id}", response_model=HvFeederStockResponse)
+@policy("owner_only")
 async def update_stock(
     stock_id: UUID,
     payload: HvFeederStockUpdate,
@@ -145,6 +150,7 @@ async def update_stock(
 
 
 @router.delete("/{stock_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_stock(
     stock_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -159,6 +165,7 @@ async def delete_stock(
 # ── logs (used / restock / cleaned / …) with inventory adjustment ───────────────
 
 @router.get("/{stock_id}/logs", response_model=List[HvFeederLogResponse])
+@policy("owner_only")
 async def list_logs(
     stock_id: UUID,
     limit: int = Query(100, ge=1, le=500),
@@ -176,6 +183,7 @@ async def list_logs(
 
 
 @router.post("/{stock_id}/logs", response_model=HvFeederLogResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_log(
     stock_id: UUID,
     payload: HvFeederLogCreate,
@@ -218,6 +226,7 @@ async def create_log(
 
 
 @router.delete("/logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_log(
     log_id: UUID,
     current_user: User = Depends(get_current_user),

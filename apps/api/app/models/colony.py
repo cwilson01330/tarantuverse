@@ -153,6 +153,21 @@ class ColonyEvent(Base):
     __tablename__ = "colony_events"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Who logged it when that wasn't the owner — a co-keeper (PRD-shared-
+    # keeping rung 3). NULL means the owner.
+    logged_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    logged_by = relationship("User", foreign_keys=[logged_by_user_id], lazy="select")
+
+    @property
+    def logged_by_name(self):
+        """Display name of the co-keeper who logged this, else None (the owner).
+        Checks the id first so owner rows never trigger a lookup."""
+        if self.logged_by_user_id is None:
+            return None
+        u = self.logged_by
+        if u is None:
+            return None
+        return (getattr(u, "display_name", None) or "").strip() or getattr(u, "username", None)
     colony_id = Column(
         UUID(as_uuid=True),
         ForeignKey("colonies.id", ondelete="CASCADE"),
@@ -193,7 +208,7 @@ class ColonyEvent(Base):
 
     # Relationships
     colony = relationship("Colony", back_populates="events")
-    user = relationship("User")
+    user = relationship("User", foreign_keys=[user_id])
 
     def __repr__(self):
         return f"<ColonyEvent {self.event_type} @ {self.occurred_at}>"

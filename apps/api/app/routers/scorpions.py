@@ -32,6 +32,7 @@ from app.services.inverts_dualwrite import (
     mirror_scorpion_delete,
     mirror_scorpion_update,
 )
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -89,6 +90,7 @@ def _validate_species(
 
 
 @router.get("/", response_model=List[ScorpionResponse])
+@policy("owner_only")
 async def list_scorpions(
     colony_id: Optional[UUID] = Query(
         None, description="Filter to members of one colony.",
@@ -140,6 +142,7 @@ async def list_scorpions(
 @router.post(
     "/", response_model=ScorpionResponse, status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_scorpion(
     scorpion_data: ScorpionCreate,
     db: Session = Depends(get_db),
@@ -183,6 +186,7 @@ async def create_scorpion(
 
 
 @router.get("/{scorpion_id}", response_model=ScorpionResponse)
+@policy("owner_only")
 async def get_scorpion(
     scorpion_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -202,6 +206,7 @@ async def get_scorpion(
 
 
 @router.put("/{scorpion_id}", response_model=ScorpionResponse)
+@policy("owner_only")
 async def update_scorpion(
     scorpion_id: UUID,
     scorpion_data: ScorpionUpdate,
@@ -240,6 +245,7 @@ async def update_scorpion(
 @router.delete(
     "/{scorpion_id}", status_code=status.HTTP_204_NO_CONTENT,
 )
+@policy("owner_only")
 async def delete_scorpion(
     scorpion_id: UUID,
     current_user: User = Depends(get_current_user),

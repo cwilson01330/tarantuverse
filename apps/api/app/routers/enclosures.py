@@ -26,6 +26,7 @@ from app.schemas.feeding import FeedingLogCreate, FeedingLogResponse
 from app.schemas.molt import MoltLogCreate, MoltLogResponse
 from app.schemas.substrate_change import SubstrateChangeCreate, SubstrateChangeResponse
 from app.utils.dependencies import get_current_user
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -92,6 +93,7 @@ def get_enclosure_with_computed_fields(
 # ============== ENCLOSURE CRUD ==============
 
 @router.get("/", response_model=List[EnclosureListResponse])
+@policy("owner_only")
 async def get_enclosures(
     purpose: Optional[str] = Query(
         None,
@@ -138,6 +140,7 @@ async def get_enclosures(
 
 
 @router.post("/", response_model=EnclosureResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_enclosure(
     enclosure_data: EnclosureCreate,
     db: Session = Depends(get_db),
@@ -157,6 +160,7 @@ async def create_enclosure(
 
 
 @router.get("/{enclosure_id}", response_model=EnclosureResponse)
+@policy("owner_only")
 async def get_enclosure(
     enclosure_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -178,6 +182,7 @@ async def get_enclosure(
 
 
 @router.put("/{enclosure_id}", response_model=EnclosureResponse)
+@policy("owner_only")
 async def update_enclosure(
     enclosure_id: UUID,
     enclosure_data: EnclosureUpdate,
@@ -207,6 +212,7 @@ async def update_enclosure(
 
 
 @router.delete("/{enclosure_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_enclosure(
     enclosure_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -237,6 +243,7 @@ async def delete_enclosure(
 # ============== INHABITANTS ==============
 
 @router.get("/{enclosure_id}/inhabitants", response_model=List[InhabitantInfo])
+@policy("owner_only")
 async def get_inhabitants(
     enclosure_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -268,6 +275,7 @@ async def get_inhabitants(
 
 
 @router.post("/{enclosure_id}/inhabitants/{tarantula_id}", status_code=status.HTTP_200_OK)
+@policy("owner_only")
 async def add_inhabitant(
     enclosure_id: UUID,
     tarantula_id: UUID,
@@ -311,6 +319,7 @@ async def add_inhabitant(
 
 
 @router.delete("/{enclosure_id}/inhabitants/{tarantula_id}", status_code=status.HTTP_200_OK)
+@policy("owner_only")
 async def remove_inhabitant(
     enclosure_id: UUID,
     tarantula_id: UUID,
@@ -356,6 +365,7 @@ async def remove_inhabitant(
 # ============== FEEDING LOGS ==============
 
 @router.get("/{enclosure_id}/feedings", response_model=List[FeedingLogResponse])
+@policy("owner_only")
 async def get_enclosure_feedings(
     enclosure_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -381,6 +391,7 @@ async def get_enclosure_feedings(
 
 
 @router.post("/{enclosure_id}/feedings", response_model=FeedingLogResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_enclosure_feeding(
     enclosure_id: UUID,
     feeding_data: FeedingLogCreate,
@@ -414,6 +425,7 @@ async def create_enclosure_feeding(
 # ============== MOLT LOGS ==============
 
 @router.get("/{enclosure_id}/molts", response_model=List[MoltLogResponse])
+@policy("owner_only")
 async def get_enclosure_molts(
     enclosure_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -439,6 +451,7 @@ async def get_enclosure_molts(
 
 
 @router.post("/{enclosure_id}/molts", response_model=MoltLogResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_enclosure_molt(
     enclosure_id: UUID,
     molt_data: MoltLogCreate,
@@ -472,6 +485,7 @@ async def create_enclosure_molt(
 # ============== SUBSTRATE CHANGES ==============
 
 @router.get("/{enclosure_id}/substrate-changes", response_model=List[SubstrateChangeResponse])
+@policy("owner_only")
 async def get_enclosure_substrate_changes(
     enclosure_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -497,6 +511,7 @@ async def get_enclosure_substrate_changes(
 
 
 @router.post("/{enclosure_id}/substrate-changes", response_model=SubstrateChangeResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_enclosure_substrate_change(
     enclosure_id: UUID,
     change_data: SubstrateChangeCreate,
@@ -573,6 +588,7 @@ class IncidentResponse(BaseModel):
 
 
 @router.get("/{enclosure_id}/incidents", response_model=List[IncidentResponse])
+@policy("owner_only")
 async def get_incidents(
     enclosure_id: UUID,
     db: Session = Depends(get_db),
@@ -611,6 +627,7 @@ async def get_incidents(
 
 
 @router.post("/{enclosure_id}/incidents", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_incident(
     enclosure_id: UUID,
     data: IncidentCreate,
@@ -648,6 +665,7 @@ async def create_incident(
 
 
 @router.delete("/{enclosure_id}/incidents/{incident_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_incident(
     enclosure_id: UUID,
     incident_id: UUID,

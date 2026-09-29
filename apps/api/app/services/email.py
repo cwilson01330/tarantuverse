@@ -116,3 +116,46 @@ class EmailService:
         </div>
         """
         await EmailService.send_email(to_email, subject, html_content)
+
+    @staticmethod
+    async def send_collection_invite_email(
+        to_email: str,
+        inviter_name: str,
+        role: str,
+        accept_link: str,
+        valid_days: int,
+        brand: "Brand | None" = None,
+    ):
+        """Co-keeper invite (PRD-shared-keeping rung 3).
+
+        `inviter_name` is user-controlled (a display name), so it is HTML-
+        escaped: an email body is HTML, and a display name like
+        `<a href=...>` must render as text, not become a link in someone
+        else's inbox. The accept link carries the token in its fragment.
+        """
+        import html
+
+        brand = brand or TARANTUVERSE
+        who = html.escape(inviter_name or "A keeper")
+        can = {
+            "viewer": "see their collection",
+            "logger": "see their collection and log feedings, molts, photos and care",
+            "keeper": "see and log, and also add and edit animals",
+        }.get(role, "see their collection")
+        subject = f"{inviter_name or 'A keeper'} invited you to their {brand.name} collection"
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>You're invited to help keep a collection</h2>
+            <p>{who} has invited you to be a co-keeper on {brand.name}. You'll be able to {can}.</p>
+            <p>You'll use your own account — sign in (or create a free one) with <strong>this email address</strong>, then accept.</p>
+            <p style="margin: 20px 0;">
+                <a href="{accept_link}" style="background-color: {brand.button_hex}; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Accept invite
+                </a>
+            </p>
+            <p>This invite works for {valid_days} days. If you weren't expecting it, you can ignore this email — nothing is shared until you accept.</p>
+            <hr style="margin-top: 20px; border: 0; border-top: 1px solid #eee;" />
+            <p style="color: #666; font-size: 12px;">{brand.name} Team</p>
+        </div>
+        """
+        await EmailService.send_email(to_email, subject, html_content)

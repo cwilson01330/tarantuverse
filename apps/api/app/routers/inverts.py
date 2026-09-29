@@ -6,7 +6,8 @@
   PUT    /api/v1/inverts/{invert_id}     partial update
   DELETE /api/v1/inverts/{invert_id}     delete (cascades to logs, photos)
 
-Ownership: every query filters by Invert.user_id == current_user.id.
+Access: every route goes through utils/access (owner, or a co-keeper with the
+route's role) — see the @policy tag on each handler.
 Anonymous / public reads will land on a future /i/{id} public-profile
 route, mirroring the existing /t/{id} surface — not in this bundle.
 
@@ -48,6 +49,7 @@ from app.services.growth_service import compute_growth_fields
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
 from app.utils.limits import active_inverts_query, enforce_collection_limit
+from app.utils.access import load_invert, policy, scope_collection
 from app.services.retaxon_service import change_invert_taxon
 from app.schemas.death import MarkDiedRequest
 
@@ -121,6 +123,7 @@ def _validate_colony(db: Session, user: User, colony_id: Optional[UUID]) -> None
 
 
 @router.get("/", response_model=List[InvertResponse])
+@policy("viewer")
 async def list_inverts(
     taxon: Optional[str] = Query(
         None, pattern="^(tarantula|scorpion|centipede|whip_spider|vinegaroon|true_spider|millipede|mantis|roach|isopod|other)$",
@@ -143,6 +146,9 @@ async def list_inverts(
     # break the moment this deploys; remove once those have rolled over.
     transferred: bool = Query(False, deprecated=True, description="Use status=transferred."),
     deceased: bool = Query(False, deprecated=True, description="Use status=deceased."),
+    collection: Optional[UUID] = Query(
+        None, description="Owner's user id to list a collection shared with you. Omit for your own."
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -153,7 +159,8 @@ async def list_inverts(
     (BRIEF §4b, ADR-015). Pass `status=transferred` or `status=deceased` for
     the history views — those records are retained in full, every log intact.
     """
-    query = db.query(Invert).filter(Invert.user_id == current_user.id)
+    access = scope_collection(db, current_user, "tarantuverse", collection)
+    query = db.query(Invert).filter(Invert.user_id == access.owner.id)
     # Three terminal states: active, transferred out, died (ADR-015). Resolve
     # the legacy booleans into the same vocabulary so there's exactly one
     # branch to read, rather than a precedence rule between two flags.
@@ -237,14 +244,23 @@ def create_invert_row(
 @router.post(
     "/", response_model=InvertResponse, status_code=status.HTTP_201_CREATED,
 )
+@policy("keeper")
 async def create_invert(
     payload: InvertCreate,
+    collection: Optional[UUID] = Query(
+        None, description="Owner's user id to add to a collection shared with you (keeper role)."
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new invert. `taxon` is required and immutable."""
+    """Create a new invert. `taxon` is required and immutable.
+
+    In a shared collection the animal belongs to the OWNER and counts against
+    the owner's cap and plan (PRD-shared-keeping rung 3), never the keeper's.
+    """
+    access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
     # Cross-taxon collection cap (counts inverts: tarantulas + scorpions + centipedes).
-    return create_invert_row(db, current_user, payload)
+    return create_invert_row(db, access.owner, payload)
 
 
 # Fallback feeding intervals (days) when species/stage data is missing.
@@ -354,8 +370,10 @@ def _recommended_feeding_interval(
 
 
 @router.get("/feeding-status", response_model=List[InvertFeedingStatusItem])
+@policy("viewer")
 async def list_feeding_status(
     tz_offset_minutes: Optional[int] = Query(None),
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a shared collection."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -376,7 +394,8 @@ async def list_feeding_status(
     # a live bug, not just a gap ahead of ADR-015. Routing through
     # active_inverts_query fixes that and excludes deceased animals in the same
     # move, so nobody is ever asked to feed an animal that died.
-    inverts = active_inverts_query(db, current_user.id).all()
+    access = scope_collection(db, current_user, "tarantuverse", collection)
+    inverts = active_inverts_query(db, access.owner.id).all()
     if not inverts:
         return []
 
@@ -453,25 +472,19 @@ async def list_feeding_status(
 
 
 @router.get("/{invert_id}", response_model=InvertResponse)
+@policy("viewer")
 async def get_invert(
     invert_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Fetch a single invert the current user owns."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invert not found",
-        )
+    invert, access = load_invert(db, current_user, invert_id, "viewer", not_found="Invert not found")
     return invert
 
 
 @router.put("/{invert_id}", response_model=InvertResponse)
+@policy("keeper")
 async def update_invert(
     invert_id: UUID,
     payload: InvertUpdate,
@@ -485,22 +498,14 @@ async def update_invert(
     the change deletes a legacy mirror row and rewrites foreign keys across
     every log table. Allowing it here would let a client move an animal between
     taxa by echoing back an object it had merely fetched."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invert not found",
-        )
+    invert, access = load_invert(db, current_user, invert_id, "keeper", not_found="Invert not found")
 
     data = payload.model_dump(exclude_unset=True)
 
     if "species_id" in data:
         _validate_species(db, data["species_id"], invert.taxon)
     if "colony_id" in data:
-        _validate_colony(db, current_user, data["colony_id"])
+        _validate_colony(db, access.owner, data["colony_id"])
 
     data = _coerce_enums(data)
     for field, value in data.items():
@@ -546,8 +551,10 @@ class BulkCadenceResponse(BaseModel):
 
 
 @router.post("/bulk-feeding-cadence", response_model=BulkCadenceResponse)
+@policy("keeper")
 async def bulk_set_feeding_cadence(
     payload: BulkCadenceRequest,
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a shared collection."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -567,7 +574,8 @@ async def bulk_set_feeding_cadence(
             detail="Choose which animals to apply this to.",
         )
 
-    query = active_inverts_query(db, current_user.id)
+    access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
+    query = active_inverts_query(db, access.owner.id)
     if not payload.apply_to_all:
         query = query.filter(Invert.id.in_(payload.invert_ids or []))
 
@@ -582,6 +590,7 @@ async def bulk_set_feeding_cadence(
 
 
 @router.delete("/{invert_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_invert(
     invert_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -618,6 +627,7 @@ async def delete_invert(
 
 
 @router.get("/{invert_id}/growth", response_model=InvertGrowthAnalytics)
+@policy("viewer")
 async def get_invert_growth(
     invert_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -631,15 +641,7 @@ async def get_invert_growth(
     whatever the keeper recorded (leg span vs body length — the client
     labels it via the taxon registry).
     """
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invert not found",
-        )
+    invert, access = load_invert(db, current_user, invert_id, "viewer", not_found="Invert not found")
 
     molt_logs = (
         db.query(MoltLog)
@@ -655,6 +657,7 @@ async def get_invert_growth(
 
 
 @router.get("/{invert_id}/feeding-stats", response_model=InvertFeedingStats)
+@policy("viewer")
 async def get_invert_feeding_stats(
     invert_id: UUID,
     tz_offset_minutes: Optional[int] = Query(
@@ -676,15 +679,7 @@ async def get_invert_feeding_stats(
     feeding-stats endpoint). Feeding logs are matched on invert_id, which
     dual-write/backfill keep populated for every taxon.
     """
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invert not found",
-        )
+    invert, access = load_invert(db, current_user, invert_id, "viewer", not_found="Invert not found")
 
     # Pause state — a paused animal (premolt / recovering / etc.) shouldn't
     # trigger overdue treatment. Trumps the days-since badge on the client.
@@ -770,6 +765,7 @@ async def get_invert_feeding_stats(
 
 
 @router.post("/{invert_id}/died", response_model=InvertResponse)
+@policy("keeper")
 async def mark_invert_died(
     invert_id: UUID,
     payload: MarkDiedRequest,
@@ -782,12 +778,7 @@ async def mark_invert_died(
     status, Feeding Day, overdue counts and the daily digest — but nothing is
     deleted, and it remains readable under the deceased view.
     """
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    invert, access = load_invert(db, current_user, invert_id, "keeper", not_found="Animal not found")
 
     invert.died_at = payload.died_at or date.today()
     invert.death_cause = payload.death_cause
@@ -810,6 +801,7 @@ async def mark_invert_died(
 
 
 @router.post("/{invert_id}/change-taxon", response_model=InvertResponse)
+@policy("keeper")
 async def change_taxon(
     invert_id: UUID,
     payload: ChangeTaxonRequest,
@@ -832,12 +824,7 @@ async def change_taxon(
 
     See retaxon_service for why the order of operations is not negotiable.
     """
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    invert, access = load_invert(db, current_user, invert_id, "keeper", not_found="Animal not found")
 
     change_invert_taxon(
         db, invert, payload.taxon, species_id=payload.species_id
@@ -846,6 +833,7 @@ async def change_taxon(
 
 
 @router.post("/{invert_id}/revive", response_model=InvertResponse)
+@policy("keeper")
 async def revive_invert(
     invert_id: UUID,
     db: Session = Depends(get_db),
@@ -861,12 +849,7 @@ async def revive_invert(
     starts counting again. We allow it rather than block: refusing to correct a
     mistake because of a billing limit would be indefensible.
     """
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    invert, access = load_invert(db, current_user, invert_id, "keeper", not_found="Animal not found")
 
     from app.services.inverts_dualwrite import mirror_invert_update_to_legacy
 

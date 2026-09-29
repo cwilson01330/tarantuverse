@@ -34,6 +34,7 @@ from app.schemas.reptile_breeding import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_hv_premium
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -109,6 +110,7 @@ def _own_clutch_or_404(
     "/reptile-pairings/{pairing_id}/clutches",
     response_model=List[ClutchResponse],
 )
+@policy("owner_only")
 async def list_clutches_for_pairing(
     pairing_id: UUID,
     db: Session = Depends(get_db),
@@ -129,6 +131,7 @@ async def list_clutches_for_pairing(
     response_model=ClutchResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_clutch(
     payload: ClutchCreate,
     db: Session = Depends(get_db),
@@ -158,6 +161,7 @@ async def create_clutch(
 
 
 @router.get("/clutches/{clutch_id}", response_model=ClutchResponse)
+@policy("owner_only")
 async def get_clutch(
     clutch_id: UUID,
     db: Session = Depends(get_db),
@@ -168,6 +172,7 @@ async def get_clutch(
 
 
 @router.put("/clutches/{clutch_id}", response_model=ClutchResponse)
+@policy("owner_only")
 async def update_clutch(
     clutch_id: UUID,
     payload: ClutchUpdate,
@@ -192,6 +197,7 @@ async def update_clutch(
     "/clutches/{clutch_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
+@policy("owner_only")
 async def delete_clutch(
     clutch_id: UUID,
     db: Session = Depends(get_db),
@@ -209,6 +215,7 @@ async def delete_clutch(
     "/clutches/{clutch_id}/parent-genotypes",
     response_model=ClutchParentGenotypesResponse,
 )
+@policy("owner_only")
 async def get_clutch_parent_genotypes(
     clutch_id: UUID,
     db: Session = Depends(get_db),

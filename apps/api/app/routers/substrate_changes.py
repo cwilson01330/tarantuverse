@@ -14,48 +14,22 @@ from app.models.invert import Invert
 from app.models.substrate_change import SubstrateChange
 from app.schemas.substrate_change import SubstrateChangeCreate, SubstrateChangeUpdate, SubstrateChangeResponse
 from app.utils.dependencies import get_current_user
+from app.utils.access import (
+    invert_log_fields,
+    load_animal,
+    load_colony,
+    load_invert,
+    load_log_parent,
+    policy,
+    require_can_change,
+)
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 
 router = APIRouter()
 
 
-def _substrate_owner_parent(change: SubstrateChange, db: Session, user: User):
-    """Return the owned parent for a substrate change (tarantula or
-    scorpion), or None if the user doesn't own it.
-
-    Polymorphism mirrors molt_logs — at-least-one of
-    (tarantula_id, enclosure_id, scorpion_id) per scp_20260522. No
-    enclosure-parented substrate-change route exists yet."""
-    if change.tarantula_id:
-        return db.query(Tarantula).filter(
-            Tarantula.id == change.tarantula_id,
-            Tarantula.user_id == user.id,
-        ).first()
-    if change.scorpion_id:
-        return db.query(Scorpion).filter(
-            Scorpion.id == change.scorpion_id,
-            Scorpion.user_id == user.id,
-        ).first()
-    # Centipede substrate changes — invert-only parent (ADR-005 C2).
-    if change.invert_id:
-        return db.query(Invert).filter(
-            Invert.id == change.invert_id,
-            Invert.user_id == user.id,
-        ).first()
-    # Colony-parented (csc_20260731). Edit/delete resolve ownership through the
-    # colony exactly as they do through an animal, so the generic routes need
-    # no colony-specific handling.
-    if change.colony_id:
-        from app.models.colony import Colony
-
-        return db.query(Colony).filter(
-            Colony.id == change.colony_id,
-            Colony.user_id == user.id,
-        ).first()
-    return None
-
-
 @router.get("/tarantulas/{tarantula_id}/substrate-changes", response_model=List[SubstrateChangeResponse])
+@policy("owner_only")
 async def get_substrate_changes(
     tarantula_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -79,6 +53,7 @@ async def get_substrate_changes(
 
 
 @router.post("/tarantulas/{tarantula_id}/substrate-changes", response_model=SubstrateChangeResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_substrate_change(
     tarantula_id: uuid.UUID,
     change_data: SubstrateChangeCreate,
@@ -120,6 +95,7 @@ async def create_substrate_change(
     "/scorpions/{scorpion_id}/substrate-changes",
     response_model=List[SubstrateChangeResponse],
 )
+@policy("owner_only")
 async def get_scorpion_substrate_changes(
     scorpion_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -146,6 +122,7 @@ async def get_scorpion_substrate_changes(
     response_model=SubstrateChangeResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_scorpion_substrate_change(
     scorpion_id: uuid.UUID,
     change_data: SubstrateChangeCreate,
@@ -191,6 +168,7 @@ async def create_scorpion_substrate_change(
     "/centipedes/{centipede_id}/substrate-changes",
     response_model=List[SubstrateChangeResponse],
 )
+@policy("owner_only")
 async def get_centipede_substrate_changes(
     centipede_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -222,6 +200,7 @@ async def get_centipede_substrate_changes(
     response_model=SubstrateChangeResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_centipede_substrate_change(
     centipede_id: uuid.UUID,
     change_data: SubstrateChangeCreate,
@@ -265,6 +244,7 @@ async def create_centipede_substrate_change(
     "/whip-spiders/{whip_spider_id}/substrate-changes",
     response_model=List[SubstrateChangeResponse],
 )
+@policy("owner_only")
 async def get_whip_spider_substrate_changes(
     whip_spider_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -292,6 +272,7 @@ async def get_whip_spider_substrate_changes(
     response_model=SubstrateChangeResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_whip_spider_substrate_change(
     whip_spider_id: uuid.UUID,
     change_data: SubstrateChangeCreate,
@@ -337,18 +318,14 @@ async def create_whip_spider_substrate_change(
     "/inverts/{invert_id}/substrate-changes",
     response_model=List[SubstrateChangeResponse],
 )
+@policy("viewer")
 async def get_invert_substrate_changes(
     invert_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List substrate-change logs for any invert the caller owns."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    invert, access = load_invert(db, current_user, invert_id, "viewer", not_found="Animal not found")
     return (
         db.query(SubstrateChange)
         .filter(SubstrateChange.invert_id == invert_id)
@@ -362,6 +339,7 @@ async def get_invert_substrate_changes(
     response_model=SubstrateChangeResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_invert_substrate_change(
     invert_id: uuid.UUID,
     change_data: SubstrateChangeCreate,
@@ -370,14 +348,9 @@ async def create_invert_substrate_change(
 ):
     """Log a substrate change for any invert the caller owns. Forward-only
     denorm of date + type + depth onto the parent Invert."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    invert, access = load_invert(db, current_user, invert_id, "logger", not_found="Animal not found")
 
-    new_change = SubstrateChange(invert_id=invert_id, **change_data.model_dump())
+    new_change = SubstrateChange(**invert_log_fields(db, invert), logged_by_user_id=access.logged_by_user_id, **change_data.model_dump())
     db.add(new_change)
 
     if (
@@ -396,6 +369,7 @@ async def create_invert_substrate_change(
 
 
 @router.put("/substrate-changes/{change_id}", response_model=SubstrateChangeResponse)
+@policy("logger")
 async def update_substrate_change(
     change_id: uuid.UUID,
     change_data: SubstrateChangeUpdate,
@@ -404,10 +378,8 @@ async def update_substrate_change(
 ):
     """Update a substrate change (polymorphic — tarantula or scorpion parent)."""
     change = db.query(SubstrateChange).filter(SubstrateChange.id == change_id).first()
-    if not change:
-        raise HTTPException(status_code=404, detail="Substrate change not found")
-    if _substrate_owner_parent(change, db, current_user) is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    _parent, access = load_log_parent(db, current_user, change, "logger", not_found="Substrate change not found")
+    require_can_change(access, change)
 
     update_data = change_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -419,6 +391,7 @@ async def update_substrate_change(
 
 
 @router.delete("/substrate-changes/{change_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("logger")
 async def delete_substrate_change(
     change_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -426,10 +399,8 @@ async def delete_substrate_change(
 ):
     """Delete a substrate change (polymorphic — tarantula or scorpion parent)."""
     change = db.query(SubstrateChange).filter(SubstrateChange.id == change_id).first()
-    if not change:
-        raise HTTPException(status_code=404, detail="Substrate change not found")
-    if _substrate_owner_parent(change, db, current_user) is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    _parent, access = load_log_parent(db, current_user, change, "logger", not_found="Substrate change not found")
+    require_can_change(access, change)
 
     db.delete(change)
     db.commit()
@@ -448,20 +419,14 @@ async def delete_substrate_change(
     "/colonies/{colony_id}/substrate-changes",
     response_model=List[SubstrateChangeResponse],
 )
+@policy("viewer")
 async def get_colony_substrate_changes(
     colony_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List substrate changes for a colony the caller owns, newest first."""
-    from app.models.colony import Colony
-
-    colony = db.query(Colony).filter(
-        Colony.id == colony_id,
-        Colony.user_id == current_user.id,
-    ).first()
-    if not colony:
-        raise HTTPException(status_code=404, detail="Colony not found")
+    colony, access = load_colony(db, current_user, colony_id, "viewer", not_found="Colony not found")
 
     return (
         db.query(SubstrateChange)
@@ -476,6 +441,7 @@ async def get_colony_substrate_changes(
     response_model=SubstrateChangeResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_colony_substrate_change(
     colony_id: uuid.UUID,
     change_data: SubstrateChangeCreate,
@@ -488,16 +454,9 @@ async def create_colony_substrate_change(
     current substrate fields are updated to match so the detail screen doesn't
     disagree with its own timeline.
     """
-    from app.models.colony import Colony
+    colony, access = load_colony(db, current_user, colony_id, "logger", not_found="Colony not found")
 
-    colony = db.query(Colony).filter(
-        Colony.id == colony_id,
-        Colony.user_id == current_user.id,
-    ).first()
-    if not colony:
-        raise HTTPException(status_code=404, detail="Colony not found")
-
-    new_change = SubstrateChange(colony_id=colony_id, **change_data.model_dump())
+    new_change = SubstrateChange(colony_id=colony_id, logged_by_user_id=access.logged_by_user_id, **change_data.model_dump())
     db.add(new_change)
 
     # Forward-only: backfilling an older change must not rewrite current state

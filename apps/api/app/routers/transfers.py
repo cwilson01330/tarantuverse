@@ -36,6 +36,7 @@ from app.schemas.transfer import (
     TransferCreate, TransferCreateResponse, TransferPreview, TransferListItem,
 )
 from app.config import settings
+from app.utils.access import policy
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +182,7 @@ def _herp_web_base() -> str:
 # ─── endpoints ──────────────────────────────────────────────────────────────
 
 @router.post("/inverts/{invert_id}/transfer", response_model=TransferCreateResponse)
+@policy("owner_only")
 async def create_transfer(
     invert_id: str,
     body: TransferCreate,
@@ -230,6 +232,7 @@ async def create_transfer(
 
 
 @router.post("/animals/{animal_id}/transfer", response_model=TransferCreateResponse)
+@policy("owner_only")
 async def create_animal_transfer(
     animal_id: str,
     body: TransferCreate,
@@ -280,6 +283,7 @@ async def create_animal_transfer(
 
 
 @router.get("/transfers/{token}", response_model=TransferPreview)
+@policy("public")
 async def preview_transfer(
     token: str,
     db: Session = Depends(get_db),
@@ -472,6 +476,7 @@ async def _claim_animal_transfer(
 
 
 @router.post("/transfers/{token}/claim")
+@policy("owner_only")
 async def claim_transfer(
     token: str,
     body: Optional[ClaimBody] = None,
@@ -661,6 +666,7 @@ async def claim_transfer(
 
 
 @router.post("/transfers/{token}/cancel")
+@policy("owner_only")
 async def cancel_transfer(
     token: str,
     db: Session = Depends(get_db),
@@ -681,6 +687,7 @@ async def cancel_transfer(
 
 
 @router.get("/transfers/", response_model=list[TransferListItem])
+@policy("owner_only")
 async def list_transfers(
     role: str = "sent",
     db: Session = Depends(get_db),

@@ -13,6 +13,15 @@ from app.models.animal import Animal
 from app.models.scorpion import Scorpion
 from app.models.invert import Invert
 from app.routers.auth import get_current_user
+from app.utils.access import (
+    invert_log_fields,
+    load_animal,
+    load_colony,
+    load_invert,
+    load_log_parent,
+    policy,
+    require_can_change,
+)
 from app.models.user import User
 from app.services.storage import storage_service
 from app.config import settings
@@ -38,6 +47,7 @@ router = APIRouter(tags=["photos"])
 
 
 @router.get("/storage-info")
+@policy("owner_only")
 async def get_storage_info():
     """Debug endpoint to check storage configuration."""
     return {
@@ -53,6 +63,7 @@ async def get_storage_info():
 
 
 @router.post("/tarantulas/{tarantula_id}/photos")
+@policy("owner_only")
 async def upload_photo(
     tarantula_id: str,
     file: UploadFile = File(...),
@@ -150,6 +161,7 @@ async def upload_photo(
 
 
 @router.get("/tarantulas/{tarantula_id}/photos")
+@policy("owner_only")
 async def get_photos(
     tarantula_id: str,
     db: Session = Depends(get_db),
@@ -182,49 +194,8 @@ async def get_photos(
     ]
 
 
-def _photo_owner_parent(photo: Photo, db: Session, user: User):
-    """Return the owned parent row for a photo, or None if user isn't owner.
-
-    Polymorphic between a TV tarantula, an HV animal (ADR-003), and a
-    TV scorpion (scp_20260522) — exactly one of (tarantula_id,
-    animal_id, scorpion_id) is set. Centralizing this ownership check
-    keeps DELETE / set-main / caption-edit free of taxon branching.
-    """
-    if photo.tarantula_id:
-        return db.query(Tarantula).filter(
-            Tarantula.id == photo.tarantula_id,
-            Tarantula.user_id == user.id,
-        ).first()
-    if photo.animal_id:
-        return db.query(Animal).filter(
-            Animal.id == photo.animal_id,
-            Animal.user_id == user.id,
-        ).first()
-    if photo.scorpion_id:
-        return db.query(Scorpion).filter(
-            Scorpion.id == photo.scorpion_id,
-            Scorpion.user_id == user.id,
-        ).first()
-    # Centipede photos — invert-only parent (ADR-005 C2). The widened
-    # CHECK in cip_20260527 allows this shape.
-    if photo.invert_id:
-        return db.query(Invert).filter(
-            Invert.id == photo.invert_id,
-            Invert.user_id == user.id,
-        ).first()
-    # Colony photos (cph_20260729_colony_logs). Adding the branch here is what
-    # makes DELETE, caption-edit and set-main work for colonies without any
-    # taxon branching in those handlers.
-    if photo.colony_id:
-        from app.models.colony import Colony
-        return db.query(Colony).filter(
-            Colony.id == photo.colony_id,
-            Colony.user_id == user.id,
-        ).first()
-    return None
-
-
 @router.post("/animals/{animal_id}/photos")
+@policy("logger")
 async def upload_animal_photo(
     animal_id: str,
     file: UploadFile = File(...),
@@ -238,13 +209,7 @@ async def upload_animal_photo(
     subscription limits extend to animals (v1.x), mirror the tarantula
     gate here keyed off `Photo.animal_id == animal_id`.
     """
-    animal = db.query(Animal).filter(
-        Animal.id == animal_id,
-        Animal.user_id == current_user.id,
-    ).first()
-
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    animal, access = load_animal(db, current_user, animal_id, "logger", not_found="Animal not found")
 
     try:
         file_data = await file.read()
@@ -267,6 +232,7 @@ async def upload_animal_photo(
         photo = Photo(
             id=str(uuid.uuid4()),
             animal_id=animal_id,
+            logged_by_user_id=access.logged_by_user_id,
             url=photo_url,
             thumbnail_url=thumbnail_url,
             caption=caption,
@@ -301,19 +267,14 @@ async def upload_animal_photo(
 
 
 @router.get("/animals/{animal_id}/photos")
+@policy("viewer")
 async def get_animal_photos(
     animal_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List photos for an HV animal, most recent first."""
-    animal = db.query(Animal).filter(
-        Animal.id == animal_id,
-        Animal.user_id == current_user.id,
-    ).first()
-
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    animal, access = load_animal(db, current_user, animal_id, "viewer", not_found="Animal not found")
 
     photos = (
         db.query(Photo)
@@ -336,6 +297,7 @@ async def get_animal_photos(
 
 
 @router.post("/scorpions/{scorpion_id}/photos")
+@policy("owner_only")
 async def upload_scorpion_photo(
     scorpion_id: str,
     file: UploadFile = File(...),
@@ -418,6 +380,7 @@ async def upload_scorpion_photo(
 
 
 @router.get("/scorpions/{scorpion_id}/photos")
+@policy("owner_only")
 async def get_scorpion_photos(
     scorpion_id: str,
     db: Session = Depends(get_db),
@@ -453,6 +416,7 @@ async def get_scorpion_photos(
 
 
 @router.post("/centipedes/{centipede_id}/photos")
+@policy("owner_only")
 async def upload_centipede_photo(
     centipede_id: str,
     file: UploadFile = File(...),
@@ -528,6 +492,7 @@ async def upload_centipede_photo(
 
 
 @router.get("/centipedes/{centipede_id}/photos")
+@policy("owner_only")
 async def get_centipede_photos(
     centipede_id: str,
     db: Session = Depends(get_db),
@@ -563,6 +528,7 @@ async def get_centipede_photos(
 
 
 @router.post("/whip-spiders/{whip_spider_id}/photos")
+@policy("owner_only")
 async def upload_whip_spider_photo(
     whip_spider_id: str,
     file: UploadFile = File(...),
@@ -634,6 +600,7 @@ async def upload_whip_spider_photo(
 
 
 @router.get("/whip-spiders/{whip_spider_id}/photos")
+@policy("owner_only")
 async def get_whip_spider_photos(
     whip_spider_id: str,
     db: Session = Depends(get_db),
@@ -673,6 +640,7 @@ async def get_whip_spider_photos(
 # ---------------------------------------------------------------------------
 
 @router.post("/inverts/{invert_id}/photos")
+@policy("logger")
 async def upload_invert_photo(
     invert_id: str,
     file: UploadFile = File(...),
@@ -681,12 +649,7 @@ async def upload_invert_photo(
     current_user: User = Depends(get_current_user),
 ):
     """Upload a photo for any invert the caller owns. Sets only invert_id."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    invert, access = load_invert(db, current_user, invert_id, "logger", not_found="Animal not found")
 
     try:
         file_data = await file.read()
@@ -705,7 +668,8 @@ async def upload_invert_photo(
         )
         photo = Photo(
             id=str(uuid.uuid4()),
-            invert_id=invert_id,
+            **invert_log_fields(db, invert),
+            logged_by_user_id=access.logged_by_user_id,
             url=photo_url,
             thumbnail_url=thumbnail_url,
             caption=caption,
@@ -737,6 +701,7 @@ async def upload_invert_photo(
 
 
 @router.post("/colonies/{colony_id}/photos")
+@policy("logger")
 async def upload_colony_photo(
     colony_id: str,
     file: UploadFile = File(...),
@@ -752,14 +717,7 @@ async def upload_colony_photo(
     existed on the model but could never be filled and the collection card
     showed a generic glyph forever.
     """
-    from app.models.colony import Colony
-
-    colony = db.query(Colony).filter(
-        Colony.id == colony_id,
-        Colony.user_id == current_user.id,
-    ).first()
-    if not colony:
-        raise HTTPException(status_code=404, detail="Colony not found")
+    colony, access = load_colony(db, current_user, colony_id, "logger", not_found="Colony not found")
 
     try:
         file_data = await file.read()
@@ -779,6 +737,7 @@ async def upload_colony_photo(
         photo = Photo(
             id=str(uuid.uuid4()),
             colony_id=colony_id,
+            logged_by_user_id=access.logged_by_user_id,
             url=photo_url,
             thumbnail_url=thumbnail_url,
             caption=caption,
@@ -808,20 +767,14 @@ async def upload_colony_photo(
 
 
 @router.get("/colonies/{colony_id}/photos")
+@policy("viewer")
 async def get_colony_photos(
     colony_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List photos for a colony the caller owns."""
-    from app.models.colony import Colony
-
-    colony = db.query(Colony).filter(
-        Colony.id == colony_id,
-        Colony.user_id == current_user.id,
-    ).first()
-    if not colony:
-        raise HTTPException(status_code=404, detail="Colony not found")
+    colony, access = load_colony(db, current_user, colony_id, "viewer", not_found="Colony not found")
     photos = (
         db.query(Photo)
         .filter(Photo.colony_id == colony_id)
@@ -842,18 +795,14 @@ async def get_colony_photos(
 
 
 @router.get("/inverts/{invert_id}/photos")
+@policy("viewer")
 async def get_invert_photos(
     invert_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List photos for any invert the caller owns."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    invert, access = load_invert(db, current_user, invert_id, "viewer", not_found="Animal not found")
     photos = (
         db.query(Photo)
         .filter(Photo.invert_id == invert_id)
@@ -874,6 +823,7 @@ async def get_invert_photos(
 
 
 @router.delete("/photos/{photo_id}")
+@policy("logger")
 async def delete_photo(
     photo_id: str,
     db: Session = Depends(get_db),
@@ -881,13 +831,9 @@ async def delete_photo(
 ):
     """Delete a photo (polymorphic — tarantula or animal parent)."""
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
-
-    if not photo:
-        raise HTTPException(status_code=404, detail="Photo not found")
-
-    parent = _photo_owner_parent(photo, db, current_user)
-    if parent is None:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this photo")
+    # 404 for missing AND for someone else's (the old 403 confirmed it existed).
+    parent, access = load_log_parent(db, current_user, photo, "logger", not_found="Photo not found")
+    require_can_change(access, photo)
 
     try:
         # If we're deleting the current hero, promote the next most-recent
@@ -939,6 +885,7 @@ async def delete_photo(
 
 
 @router.patch("/photos/{photo_id}")
+@policy("logger")
 async def update_photo(
     photo_id: str,
     data: PhotoUpdate,
@@ -947,17 +894,12 @@ async def update_photo(
 ):
     """Update a photo's editable metadata (currently: caption only).
 
-    Polymorphic — same endpoint handles tarantula and animal photos.
-    Ownership is resolved through the parent via `_photo_owner_parent`.
+    Polymorphic — same endpoint handles every parent type. Access goes
+    through utils/access (owner, keeper, or the logger who uploaded it).
     """
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
-
-    if not photo:
-        raise HTTPException(status_code=404, detail="Photo not found")
-
-    parent = _photo_owner_parent(photo, db, current_user)
-    if parent is None:
-        raise HTTPException(status_code=403, detail="Not authorized to modify this photo")
+    _parent, access = load_log_parent(db, current_user, photo, "logger", not_found="Photo not found")
+    require_can_change(access, photo)
 
     # Only apply fields the client explicitly sent — preserves existing values
     # for anything omitted. exclude_unset distinguishes "not sent" from
@@ -994,6 +936,7 @@ async def update_photo(
 
 
 @router.patch("/photos/{photo_id}/set-main")
+@policy("keeper")
 async def set_main_photo(
     photo_id: str,
     db: Session = Depends(get_db),
@@ -1001,13 +944,8 @@ async def set_main_photo(
 ):
     """Set a photo as the main photo for its owning parent (tarantula or animal)."""
     photo = db.query(Photo).filter(Photo.id == photo_id).first()
-
-    if not photo:
-        raise HTTPException(status_code=404, detail="Photo not found")
-
-    parent = _photo_owner_parent(photo, db, current_user)
-    if parent is None:
-        raise HTTPException(status_code=403, detail="Not authorized to modify this photo")
+    # Choosing the hero changes the ANIMAL, so it's a keeper action.
+    parent, _access = load_log_parent(db, current_user, photo, "keeper", not_found="Photo not found")
 
     try:
         # Writes BOTH rows of the dual-write pair. This used to mirror only

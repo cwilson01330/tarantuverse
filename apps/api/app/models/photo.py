@@ -37,6 +37,10 @@ class Photo(Base):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Who logged it when that wasn't the owner — a co-keeper (PRD-shared-
+    # keeping rung 3). NULL means the owner, which is what every earlier row
+    # means. SET NULL on account deletion: the entry stays, the name goes.
+    logged_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     tarantula_id = Column(
         UUID(as_uuid=True),
         ForeignKey("tarantulas.id", ondelete="CASCADE"),

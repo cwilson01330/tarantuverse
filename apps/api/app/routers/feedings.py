@@ -1,9 +1,9 @@
 """
 Feeding log routes
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import uuid
 
 from datetime import datetime, timezone
@@ -25,6 +25,17 @@ from app.schemas.feeding import (
 )
 from app.schemas.feeding_reminder import FeedingReminderSummary
 from app.utils.dependencies import get_current_user
+from app.utils.access import (
+    access_helper,
+    invert_log_fields,
+    load_animal,
+    load_colony,
+    load_invert,
+    load_log_parent,
+    policy,
+    require_can_change,
+    scope_collection,
+)
 from app.utils.feeding_pause import resume_if_accepted
 from app.services.activity_service import create_activity
 from app.services.feeding_reminder_service import get_user_feeding_reminders
@@ -34,48 +45,8 @@ from app.services.inverts_dualwrite import invert_id_if_exists
 router = APIRouter()
 
 
-def _feeding_owner_taxon(feeding: FeedingLog, db: Session, user: User):
-    """Return (parent_model, parent_row) if the user owns the parent of
-    this feeding log. Returns (None, None) if not authorized.
-
-    Polymorphic parent lookup — ADR-003 collapsed snake/lizard/frog into
-    a single animal_id, and scp_20260522 added scorpion_id. Feeding logs
-    are now parented by tarantula, animal, scorpion, or enclosure.
-    Centralized so update/delete don't duplicate the branching logic.
-    """
-    if feeding.tarantula_id:
-        row = db.query(Tarantula).filter(
-            Tarantula.id == feeding.tarantula_id,
-            Tarantula.user_id == user.id,
-        ).first()
-        return (Tarantula, row) if row else (None, None)
-    if feeding.animal_id:
-        row = db.query(Animal).filter(
-            Animal.id == feeding.animal_id,
-            Animal.user_id == user.id,
-        ).first()
-        return (Animal, row) if row else (None, None)
-    if feeding.scorpion_id:
-        row = db.query(Scorpion).filter(
-            Scorpion.id == feeding.scorpion_id,
-            Scorpion.user_id == user.id,
-        ).first()
-        return (Scorpion, row) if row else (None, None)
-    # Centipedes (and any taxon that launches on the consolidated
-    # surface) have NO per-taxon FK column — only invert_id is set on
-    # the log row. ADR-005 C2.
-    if feeding.invert_id:
-        row = db.query(Invert).filter(
-            Invert.id == feeding.invert_id,
-            Invert.user_id == user.id,
-        ).first()
-        return (Invert, row) if row else (None, None)
-    # enclosure-parented feedings aren't ownership-checked here (feeders);
-    # they're handled by their own router.
-    return (None, None)
-
-
 @router.get("/tarantulas/{tarantula_id}/feedings", response_model=List[FeedingLogResponse])
+@policy("owner_only")
 async def get_feeding_logs(
     tarantula_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -100,6 +71,7 @@ async def get_feeding_logs(
 
 
 @router.post("/tarantulas/{tarantula_id}/feedings", response_model=FeedingLogResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_feeding_log(
     tarantula_id: uuid.UUID,
     feeding_data: FeedingLogCreate,
@@ -156,6 +128,7 @@ async def create_feeding_log(
 
 
 @router.get("/animals/{animal_id}/feedings", response_model=List[FeedingLogResponse])
+@policy("viewer")
 async def get_animal_feeding_logs(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -164,15 +137,9 @@ async def get_animal_feeding_logs(
     """List feeding logs for an HV animal (any taxon), most recent first.
 
     ADR-003 collapsed the per-taxon snake/lizard feeding routes into this
-    single taxon-agnostic endpoint.
+    single taxon-agnostic endpoint. Co-keepers: viewer and up.
     """
-    animal = db.query(Animal).filter(
-        Animal.id == animal_id,
-        Animal.user_id == current_user.id,
-    ).first()
-
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    load_animal(db, current_user, animal_id, "viewer")
 
     return (
         db.query(FeedingLog)
@@ -187,6 +154,7 @@ async def get_animal_feeding_logs(
     response_model=FeedingLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_animal_feeding_log(
     animal_id: uuid.UUID,
     feeding_data: FeedingLogCreate,
@@ -207,15 +175,13 @@ async def create_animal_feeding_log(
     Activity feed emission for HV taxa is deferred until the feed has
     herp icons — tarantula feedings still emit via create_activity.
     """
-    animal = db.query(Animal).filter(
-        Animal.id == animal_id,
-        Animal.user_id == current_user.id,
-    ).first()
+    animal, access = load_animal(db, current_user, animal_id, "logger")
 
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
-
-    new_feeding = FeedingLog(animal_id=animal_id, **feeding_data.model_dump())
+    new_feeding = FeedingLog(
+        animal_id=animal_id,
+        logged_by_user_id=access.logged_by_user_id,
+        **feeding_data.model_dump(),
+    )
     # Taking food ends a pause; a refusal confirms it. See utils/feeding_pause.
     resume_if_accepted(animal, feeding_data.accepted)
     db.add(new_feeding)
@@ -235,6 +201,7 @@ async def create_animal_feeding_log(
     response_model=FeedingLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def quick_feed_animal(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -245,12 +212,7 @@ async def quick_feed_animal(
     low-friction path for frequent feeders (e.g. an insectivorous beardie fed
     daily); precise details can still be edited on the log afterward.
     """
-    animal = db.query(Animal).filter(
-        Animal.id == animal_id,
-        Animal.user_id == current_user.id,
-    ).first()
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    animal, access = load_animal(db, current_user, animal_id, "logger")
 
     # Remember the last meal (most recent feeding of any outcome).
     last = (
@@ -267,6 +229,7 @@ async def quick_feed_animal(
         accepted=True,
         food_type=last.food_type if last else None,
         food_size=last.food_size if last else None,
+        logged_by_user_id=access.logged_by_user_id,
     )
     # Quick-feed is accepted by definition, so it always ends a pause.
     resume_if_accepted(animal, True)
@@ -286,6 +249,7 @@ async def quick_feed_animal(
 
 
 @router.get("/scorpions/{scorpion_id}/feedings", response_model=List[FeedingLogResponse])
+@policy("owner_only")
 async def get_scorpion_feeding_logs(
     scorpion_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -313,6 +277,7 @@ async def get_scorpion_feeding_logs(
     response_model=FeedingLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_scorpion_feeding_log(
     scorpion_id: uuid.UUID,
     feeding_data: FeedingLogCreate,
@@ -353,6 +318,7 @@ async def create_scorpion_feeding_log(
 
 
 @router.get("/centipedes/{centipede_id}/feedings", response_model=List[FeedingLogResponse])
+@policy("owner_only")
 async def get_centipede_feeding_logs(
     centipede_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -385,6 +351,7 @@ async def get_centipede_feeding_logs(
     response_model=FeedingLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_centipede_feeding_log(
     centipede_id: uuid.UUID,
     feeding_data: FeedingLogCreate,
@@ -417,6 +384,7 @@ async def create_centipede_feeding_log(
 
 
 @router.get("/whip-spiders/{whip_spider_id}/feedings", response_model=List[FeedingLogResponse])
+@policy("owner_only")
 async def get_whip_spider_feeding_logs(
     whip_spider_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -448,6 +416,7 @@ async def get_whip_spider_feeding_logs(
     response_model=FeedingLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_whip_spider_feeding_log(
     whip_spider_id: uuid.UUID,
     feeding_data: FeedingLogCreate,
@@ -480,18 +449,14 @@ async def create_whip_spider_feeding_log(
 # ---------------------------------------------------------------------------
 
 @router.get("/inverts/{invert_id}/feedings", response_model=List[FeedingLogResponse])
+@policy("viewer")
 async def get_invert_feeding_logs(
     invert_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List feeding logs for any invert the caller owns."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    """List feeding logs for an invert the caller can see (owner or co-keeper)."""
+    load_invert(db, current_user, invert_id, "viewer")
     return (
         db.query(FeedingLog)
         .filter(FeedingLog.invert_id == invert_id)
@@ -505,20 +470,24 @@ async def get_invert_feeding_logs(
     response_model=FeedingLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_invert_feeding_log(
     invert_id: uuid.UUID,
     feeding_data: FeedingLogCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Log a feeding for any invert the caller owns. Sets only invert_id."""
-    invert = db.query(Invert).filter(
-        Invert.id == invert_id,
-        Invert.user_id == current_user.id,
-    ).first()
-    if not invert:
-        raise HTTPException(status_code=404, detail="Animal not found")
-    new_feeding = FeedingLog(invert_id=invert_id, **feeding_data.model_dump())
+    """Log a feeding for an invert (owner, or a co-keeper logger and up).
+
+    Also sets the tarantula twin FK when there is one, so the entry shows on
+    the legacy tarantula screens (utils/access.invert_log_fields).
+    """
+    invert, access = load_invert(db, current_user, invert_id, "logger")
+    new_feeding = FeedingLog(
+        **invert_log_fields(db, invert),
+        logged_by_user_id=access.logged_by_user_id,
+        **feeding_data.model_dump(),
+    )
     # Taking food ends a pause; a refusal confirms it. Applied on the single-
     # feeding path too, not just Feeding Day — otherwise which screen you
     # happened to use would decide whether the pause survived.
@@ -530,20 +499,14 @@ async def create_invert_feeding_log(
 
 
 @router.get("/colonies/{colony_id}/feedings", response_model=List[FeedingLogResponse])
+@policy("viewer")
 async def get_colony_feeding_logs(
     colony_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List feedings for a colony the caller owns, newest first."""
-    from app.models.colony import Colony
-
-    colony = db.query(Colony).filter(
-        Colony.id == colony_id,
-        Colony.user_id == current_user.id,
-    ).first()
-    if not colony:
-        raise HTTPException(status_code=404, detail="Colony not found")
+    """List feedings for a colony the caller can see, newest first."""
+    load_colony(db, current_user, colony_id, "viewer")
     return (
         db.query(FeedingLog)
         .filter(FeedingLog.colony_id == colony_id)
@@ -557,6 +520,7 @@ async def get_colony_feeding_logs(
     response_model=FeedingLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_colony_feeding_log(
     colony_id: uuid.UUID,
     feeding_data: FeedingLogCreate,
@@ -576,15 +540,12 @@ async def create_colony_feeding_log(
     (often pre-molt or a husbandry problem), which is why the field is kept
     rather than dropped.
     """
-    from app.models.colony import Colony
-
-    colony = db.query(Colony).filter(
-        Colony.id == colony_id,
-        Colony.user_id == current_user.id,
-    ).first()
-    if not colony:
-        raise HTTPException(status_code=404, detail="Colony not found")
-    new_feeding = FeedingLog(colony_id=colony_id, **feeding_data.model_dump())
+    colony, access = load_colony(db, current_user, colony_id, "logger")
+    new_feeding = FeedingLog(
+        colony_id=colony_id,
+        logged_by_user_id=access.logged_by_user_id,
+        **feeding_data.model_dump(),
+    )
     db.add(new_feeding)
     db.commit()
     db.refresh(new_feeding)
@@ -596,8 +557,10 @@ async def create_colony_feeding_log(
     response_model=BulkFeedingResult,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def bulk_create_invert_feedings(
     payload: BulkFeedingRequest,
+    collection: Optional[uuid.UUID] = Query(None, description="Owner's user id when logging in a shared collection"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -616,9 +579,10 @@ async def bulk_create_invert_feedings(
     requested = list(dict.fromkeys(payload.invert_ids))
     # Load the rows, not just the ids — an accepted feeding resumes a paused
     # animal, and that needs the ORM objects.
+    access = scope_collection(db, current_user, "tarantuverse", collection, need="logger")
     owned = (
         db.query(Invert)
-        .filter(Invert.id.in_(requested), Invert.user_id == current_user.id)
+        .filter(Invert.id.in_(requested), Invert.user_id == access.owner.id)
         .all()
     )
     owned_by_id = {inv.id: inv for inv in owned}
@@ -634,7 +598,8 @@ async def bulk_create_invert_feedings(
             continue
         db.add(
             FeedingLog(
-                invert_id=iid,
+                **invert_log_fields(db, owned_by_id[iid]),
+                logged_by_user_id=access.logged_by_user_id,
                 fed_at=fed_at,
                 food_type=payload.food_type,
                 food_size=payload.food_size,
@@ -657,7 +622,20 @@ async def bulk_create_invert_feedings(
     )
 
 
+@access_helper
+def _feeding_for(db: Session, user: User, feeding_id: uuid.UUID, need: str):
+    """The feeding row plus the caller's access to its parent, or 404.
+
+    Replaces _feeding_owner_taxon for the by-id routes: 404 (not 403) for
+    someone else's entry, and colony feedings now resolve too.
+    """
+    feeding = db.query(FeedingLog).filter(FeedingLog.id == feeding_id).first()
+    _parent, access = load_log_parent(db, user, feeding, need, not_found="Feeding log not found")
+    return feeding, access
+
+
 @router.get("/feedings/{feeding_id}", response_model=FeedingLogResponse)
+@policy("viewer")
 async def get_feeding_log(
     feeding_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -667,19 +645,15 @@ async def get_feeding_log(
 
     Powers edit forms on web + mobile so the form can pre-fill from a
     deep link without first fetching the parent's whole history list.
-    Ownership is checked through `_feeding_owner_taxon` — same gate as
-    update + delete.
+    Access goes through utils/access (owner, or a co-keeper viewer and up),
+    the same gate as update + delete.
     """
-    feeding = db.query(FeedingLog).filter(FeedingLog.id == feeding_id).first()
-    if not feeding:
-        raise HTTPException(status_code=404, detail="Feeding log not found")
-    _parent_model, parent_row = _feeding_owner_taxon(feeding, db, current_user)
-    if parent_row is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    feeding, _access = _feeding_for(db, current_user, feeding_id, "viewer")
     return feeding
 
 
 @router.put("/feedings/{feeding_id}", response_model=FeedingLogResponse)
+@policy("logger")
 async def update_feeding_log(
     feeding_id: uuid.UUID,
     feeding_data: FeedingLogUpdate,
@@ -687,14 +661,8 @@ async def update_feeding_log(
     current_user: User = Depends(get_current_user)
 ):
     """Update a feeding log (polymorphic — tarantula, snake, or lizard parent)."""
-    feeding = db.query(FeedingLog).filter(FeedingLog.id == feeding_id).first()
-
-    if not feeding:
-        raise HTTPException(status_code=404, detail="Feeding log not found")
-
-    _parent_model, parent_row = _feeding_owner_taxon(feeding, db, current_user)
-    if parent_row is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    feeding, access = _feeding_for(db, current_user, feeding_id, "logger")
+    require_can_change(access, feeding)
 
     update_data = feeding_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -707,6 +675,7 @@ async def update_feeding_log(
 
 
 @router.delete("/feedings/{feeding_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("logger")
 async def delete_feeding_log(
     feeding_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -718,14 +687,8 @@ async def delete_feeding_log(
     the `sheds.py` pattern: the denorm column is a dashboard hint, not
     authoritative. A full recompute would need a history scan.
     """
-    feeding = db.query(FeedingLog).filter(FeedingLog.id == feeding_id).first()
-
-    if not feeding:
-        raise HTTPException(status_code=404, detail="Feeding log not found")
-
-    _parent_model, parent_row = _feeding_owner_taxon(feeding, db, current_user)
-    if parent_row is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    feeding, access = _feeding_for(db, current_user, feeding_id, "logger")
+    require_can_change(access, feeding)
 
     db.delete(feeding)
     db.commit()
@@ -734,7 +697,9 @@ async def delete_feeding_log(
 
 
 @router.get("/feeding-reminders/", response_model=FeedingReminderSummary)
+@policy("viewer")
 async def get_feeding_reminders(
+    collection: Optional[uuid.UUID] = Query(None, description="Owner's user id to read a shared collection"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -744,4 +709,5 @@ async def get_feeding_reminders(
     Calculates recommended feeding intervals based on species data and life stage,
     returns status for each tarantula (overdue, due today, due soon, on track, never fed).
     """
-    return get_user_feeding_reminders(current_user.id, db)
+    access = scope_collection(db, current_user, "tarantuverse", collection)
+    return get_user_feeding_reminders(access.owner.id, db)

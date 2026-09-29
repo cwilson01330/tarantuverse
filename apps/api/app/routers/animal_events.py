@@ -28,40 +28,19 @@ from app.schemas.animal_event import (
     AnimalEventUpdate,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.access import access_helper, load_animal, load_invert, load_log_parent, policy, require_can_change
 
 router = APIRouter()
 
 
-def _owned_invert(db: Session, invert_id: uuid.UUID, user: User) -> Invert:
-    row = db.query(Invert).filter(
-        Invert.id == invert_id, Invert.user_id == user.id
-    ).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Animal not found")
-    return row
-
-
-def _owned_animal(db: Session, animal_id: uuid.UUID, user: User) -> Animal:
-    row = db.query(Animal).filter(
-        Animal.id == animal_id, Animal.user_id == user.id
-    ).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Animal not found")
-    return row
-
-
-def _event_owner(event: AnimalEvent, db: Session, user: User):
-    """Resolve the owned parent, or None. Centralised so edit/delete don't each
-    reimplement the polymorphism."""
-    if event.invert_id:
-        return db.query(Invert).filter(
-            Invert.id == event.invert_id, Invert.user_id == user.id
-        ).first()
-    if event.animal_id:
-        return db.query(Animal).filter(
-            Animal.id == event.animal_id, Animal.user_id == user.id
-        ).first()
-    return None
+@access_helper
+def _event_for(event_id: uuid.UUID, db: Session, user: User, need: str):
+    """An event plus the caller's access to its parent animal (owner or
+    co-keeper). 404 for missing and for no access alike — the old helper
+    answered 403 for someone else's event, confirming it existed."""
+    event = db.query(AnimalEvent).filter(AnimalEvent.id == event_id).first()
+    _parent, access = load_log_parent(db, user, event, need, not_found="Event not found")
+    return event, access
 
 
 def _ordered(query):
@@ -77,12 +56,13 @@ def _ordered(query):
 
 
 @router.get("/inverts/{invert_id}/events", response_model=List[AnimalEventResponse])
+@policy("viewer")
 async def list_invert_events(
     invert_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _owned_invert(db, invert_id, current_user)
+    load_invert(db, current_user, invert_id, "viewer")
     return _ordered(
         db.query(AnimalEvent).filter(AnimalEvent.invert_id == invert_id)
     ).all()
@@ -93,6 +73,7 @@ async def list_invert_events(
     response_model=AnimalEventResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_invert_event(
     invert_id: uuid.UUID,
     payload: AnimalEventCreate,
@@ -107,10 +88,11 @@ async def create_invert_event(
     Inferring it from a log would mean a single edited row could bring a dead
     animal back into the collection.
     """
-    _owned_invert(db, invert_id, current_user)
+    _invert, access = load_invert(db, current_user, invert_id, "logger")
     event = AnimalEvent(
         invert_id=invert_id,
-        user_id=current_user.id,
+        user_id=access.owner.id,  # the collection's owner, whoever logged it
+        logged_by_user_id=access.logged_by_user_id,
         occurred_at=payload.occurred_at or date.today(),
         event_type=payload.event_type,
         severity=payload.severity,
@@ -126,12 +108,13 @@ async def create_invert_event(
 
 
 @router.get("/animals/{animal_id}/events", response_model=List[AnimalEventResponse])
+@policy("viewer")
 async def list_animal_events(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    _owned_animal(db, animal_id, current_user)
+    load_animal(db, current_user, animal_id, "viewer")
     return _ordered(
         db.query(AnimalEvent).filter(AnimalEvent.animal_id == animal_id)
     ).all()
@@ -142,6 +125,7 @@ async def list_animal_events(
     response_model=AnimalEventResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_animal_event(
     animal_id: uuid.UUID,
     payload: AnimalEventCreate,
@@ -150,10 +134,11 @@ async def create_animal_event(
 ):
     """Record something that happened to this animal. See the TV twin for why
     a `death` event doesn't touch the animal's lifecycle."""
-    _owned_animal(db, animal_id, current_user)
+    _animal, access = load_animal(db, current_user, animal_id, "logger")
     event = AnimalEvent(
         animal_id=animal_id,
-        user_id=current_user.id,
+        user_id=access.owner.id,
+        logged_by_user_id=access.logged_by_user_id,
         occurred_at=payload.occurred_at or date.today(),
         event_type=payload.event_type,
         severity=payload.severity,
@@ -169,6 +154,7 @@ async def create_animal_event(
 
 
 @router.put("/animal-events/{event_id}", response_model=AnimalEventResponse)
+@policy("logger")
 async def update_animal_event(
     event_id: uuid.UUID,
     payload: AnimalEventUpdate,
@@ -182,11 +168,8 @@ async def update_animal_event(
     read-only would push keepers into deleting and re-adding, which loses the
     original date.
     """
-    event = db.query(AnimalEvent).filter(AnimalEvent.id == event_id).first()
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-    if _event_owner(event, db, current_user) is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    event, access = _event_for(event_id, db, current_user, "logger")
+    require_can_change(access, event)
 
     # exclude_unset so a PATCH-style body can't null fields it never mentioned.
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -198,16 +181,14 @@ async def update_animal_event(
 
 
 @router.delete("/animal-events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("logger")
 async def delete_animal_event(
     event_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    event = db.query(AnimalEvent).filter(AnimalEvent.id == event_id).first()
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-    if _event_owner(event, db, current_user) is None:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    event, access = _event_for(event_id, db, current_user, "logger")
+    require_can_change(access, event)
 
     db.delete(event)
     db.commit()

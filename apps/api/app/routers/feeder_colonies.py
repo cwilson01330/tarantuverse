@@ -30,6 +30,7 @@ from app.schemas.feeder_care_log import (
     FeederCareLogResponse,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -114,6 +115,7 @@ def _get_colony_owned(db: Session, colony_id: UUID, current_user: User) -> Feede
 # ---------- colony CRUD ----------
 
 @router.get("/", response_model=List[FeederColonyListItem])
+@policy("owner_only")
 async def list_colonies(
     include_inactive: bool = Query(False),
     current_user: User = Depends(get_current_user),
@@ -132,6 +134,7 @@ async def list_colonies(
 
 
 @router.post("/", response_model=FeederColonyResponse, status_code=status.HTTP_201_CREATED)
+@policy("owner_only")
 async def create_colony(
     payload: FeederColonyCreate,
     current_user: User = Depends(get_current_user),
@@ -159,6 +162,7 @@ async def create_colony(
 
 
 @router.get("/{colony_id}", response_model=FeederColonyResponse)
+@policy("owner_only")
 async def get_colony(
     colony_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -169,6 +173,7 @@ async def get_colony(
 
 
 @router.put("/{colony_id}", response_model=FeederColonyResponse)
+@policy("owner_only")
 async def update_colony(
     colony_id: UUID,
     payload: FeederColonyUpdate,
@@ -209,6 +214,7 @@ async def update_colony(
 
 
 @router.delete("/{colony_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_colony(
     colony_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -223,6 +229,7 @@ async def delete_colony(
 # ---------- care logs ----------
 
 @router.get("/{colony_id}/care-logs", response_model=List[FeederCareLogResponse])
+@policy("owner_only")
 async def list_care_logs(
     colony_id: UUID,
     limit: int = Query(100, ge=1, le=500),
@@ -246,6 +253,7 @@ async def list_care_logs(
     response_model=FeederCareLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_care_log(
     colony_id: UUID,
     payload: FeederCareLogCreate,
@@ -286,6 +294,7 @@ async def create_care_log(
 
 
 @router.put("/care-logs/{log_id}", response_model=FeederCareLogResponse)
+@policy("owner_only")
 async def update_care_log(
     log_id: UUID,
     payload: FeederCareLogUpdate,
@@ -310,6 +319,7 @@ async def update_care_log(
 
 
 @router.delete("/care-logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_care_log(
     log_id: UUID,
     current_user: User = Depends(get_current_user),

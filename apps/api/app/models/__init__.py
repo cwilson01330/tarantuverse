@@ -77,6 +77,7 @@ from app.models.animal_transfer import AnimalTransfer
 from app.models.colony import Colony, ColonyEvent
 # Sitter passes reference inverts, colonies and animals — imported after all three.
 from app.models.sitter_pass import KeeperPass, KeeperPassAnimal, SitterGuide
+from app.models.collection_member import CollectionMember
 
 # Species shortlist (shl_20260727) — species a keeper is considering.
 # Server-side rather than device-local so it survives a reinstall and is the
@@ -152,6 +153,7 @@ __all__ = [
     "ColonyEvent",
     "KeeperPass",
     "KeeperPassAnimal",
+    "CollectionMember",
     "SitterGuide",
     "SpeciesShortlist",
 ]

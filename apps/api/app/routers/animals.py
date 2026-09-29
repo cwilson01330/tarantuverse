@@ -47,6 +47,7 @@ from app.schemas.feeding import (
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.services.snake_feeding_advisory import cgd_applies
 from app.utils.dependencies import get_current_user
+from app.utils.access import load_animal, policy, scope_collection
 from app.utils.feeding_pause import resume_if_accepted
 from app.schemas.death import MarkDiedRequest
 
@@ -208,11 +209,13 @@ def _coerce_enums(data: dict) -> dict:
 
 
 @router.get("/", response_model=List[AnimalResponse])
+@policy("viewer")
 async def get_animals(
     taxon: Optional[str] = Query(
         None, pattern="^(snake|lizard|turtle|tortoise|frog|salamander|other)$",
         description="Filter to a single taxon. Omit for the whole collection.",
     ),
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -224,11 +227,12 @@ async def get_animals(
     # Eager-load herp_species so the AnimalResponse.feeds_on_cgd
     # resolution (override ?? species default) doesn't fire one extra
     # SELECT per row in this list.
+    access = scope_collection(db, current_user, "herpetoverse", collection)
     query = (
         db.query(Animal)
         .options(selectinload(Animal.herp_species))
         .filter(
-            Animal.user_id == current_user.id,
+            Animal.user_id == access.owner.id,
             # Handed-off animals (transferred to another keeper) drop out of
             # the active collection — see htr_20260707.
             Animal.transferred_out_at.is_(None),
@@ -243,8 +247,10 @@ async def get_animals(
 
 
 @router.post("/", response_model=AnimalResponse, status_code=status.HTTP_201_CREATED)
+@policy("keeper")
 async def create_animal(
     animal_data: AnimalCreate,
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -253,11 +259,13 @@ async def create_animal(
     # Free-tier cap (HV_FREE_TIER_MAX_ANIMALS). Raises 402 with an
     # upgrade-prompt payload when the free keeper is at the limit; premium
     # (any active subscription) is uncapped.
-    enforce_animal_limit(db, current_user)
+    # In a shared collection the animal, its cap and its plan are the OWNER's.
+    access = scope_collection(db, current_user, "herpetoverse", collection, need="keeper")
+    enforce_animal_limit(db, access.owner)
 
     animal_dict = _coerce_enums(animal_data.model_dump())
 
-    new_animal = Animal(user_id=current_user.id, **animal_dict)
+    new_animal = Animal(user_id=access.owner.id, **animal_dict)
     db.add(new_animal)
     db.commit()
     db.refresh(new_animal)
@@ -273,15 +281,18 @@ async def create_animal(
 # parsing.
 
 @router.get("/limits")
+@policy("viewer")
 async def get_animal_limits(
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Free-tier animal cap status for the caller — powers the "X / N" counter
     and proactive upgrade prompt. `limit` is -1 when premium (unlimited).
     Premium is APP-SCOPED — only an HV (or 'both') subscription counts here."""
-    is_premium = current_user.is_premium_for_app("herpetoverse")
-    current_count = active_animals_query(db, current_user.id).count()
+    access = scope_collection(db, current_user, "herpetoverse", collection)
+    is_premium = access.owner.is_premium_for_app("herpetoverse")
+    current_count = active_animals_query(db, access.owner.id).count()
     limit = -1 if is_premium else HV_FREE_TIER_MAX_ANIMALS
     return {
         "limit": limit,
@@ -293,8 +304,10 @@ async def get_animal_limits(
 
 
 @router.get("/feeding-status", response_model=List[AnimalFeedingStatusItem])
+@policy("viewer")
 async def list_feeding_status(
     tz_offset_minutes: Optional[int] = Query(None),
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -305,11 +318,12 @@ async def list_feeding_status(
     species/schedule-aware and NEVER fires for paused animals or animals whose
     cadence can't be determined.
     """
+    access = scope_collection(db, current_user, "herpetoverse", collection)
     animals = (
         db.query(Animal)
         .options(selectinload(Animal.herp_species))
         .filter(
-            Animal.user_id == current_user.id,
+            Animal.user_id == access.owner.id,
             Animal.transferred_out_at.is_(None),
         )
         .all()
@@ -390,8 +404,10 @@ async def list_feeding_status(
     response_model=AnimalBulkFeedingResult,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def bulk_create_animal_feedings(
     payload: AnimalBulkFeedingRequest,
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -403,9 +419,10 @@ async def bulk_create_animal_feedings(
     """
     requested = list(dict.fromkeys(payload.animal_ids))
     # Full rows, not just ids — an accepted feeding resumes a paused animal.
+    access = scope_collection(db, current_user, "herpetoverse", collection, need="logger")
     owned = (
         db.query(Animal)
-        .filter(Animal.id.in_(requested), Animal.user_id == current_user.id)
+        .filter(Animal.id.in_(requested), Animal.user_id == access.owner.id)
         .all()
     )
     owned_by_id = {a.id: a for a in owned}
@@ -422,6 +439,7 @@ async def bulk_create_animal_feedings(
         db.add(
             FeedingLog(
                 animal_id=aid,
+                logged_by_user_id=access.logged_by_user_id,
                 fed_at=fed_at,
                 food_type=payload.food_type,
                 food_size=payload.food_size,
@@ -450,26 +468,19 @@ async def bulk_create_animal_feedings(
 
 
 @router.get("/{animal_id}", response_model=AnimalResponse)
+@policy("viewer")
 async def get_animal(
     animal_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Fetch one animal by id. Owner-only."""
-    animal = (
-        db.query(Animal)
-        .options(selectinload(Animal.herp_species))
-        .filter(Animal.id == animal_id, Animal.user_id == current_user.id)
-        .first()
-    )
-    if not animal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Animal not found"
-        )
+    """Fetch one animal by id (owner, or a co-keeper viewer and up)."""
+    animal, _access = load_animal(db, current_user, animal_id, "viewer")
     return animal
 
 
 @router.put("/{animal_id}", response_model=AnimalResponse)
+@policy("keeper")
 async def update_animal(
     animal_id: UUID,
     animal_data: AnimalUpdate,
@@ -478,16 +489,7 @@ async def update_animal(
 ):
     """Partial update. Only provided fields are written. `taxon` is
     immutable — it's not in the update schema."""
-    animal = (
-        db.query(Animal)
-        .options(selectinload(Animal.herp_species))
-        .filter(Animal.id == animal_id, Animal.user_id == current_user.id)
-        .first()
-    )
-    if not animal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Animal not found"
-        )
+    animal, _access = load_animal(db, current_user, animal_id, "keeper")
 
     update_data = _coerce_enums(animal_data.model_dump(exclude_unset=True))
     for field, value in update_data.items():
@@ -517,8 +519,10 @@ class BulkCadenceResponse(BaseModel):
 
 
 @router.post("/bulk-feeding-cadence", response_model=BulkCadenceResponse)
+@policy("keeper")
 async def bulk_set_feeding_cadence(
     payload: BulkCadenceRequest,
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a collection shared with you."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -534,7 +538,8 @@ async def bulk_set_feeding_cadence(
             detail="Choose which animals to apply this to.",
         )
 
-    query = active_animals_query(db, current_user.id)
+    access = scope_collection(db, current_user, "herpetoverse", collection, need="keeper")
+    query = active_animals_query(db, access.owner.id)
     if not payload.apply_to_all:
         query = query.filter(Animal.id.in_(payload.animal_ids or []))
 
@@ -547,6 +552,7 @@ async def bulk_set_feeding_cadence(
 
 
 @router.delete("/{animal_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("owner_only")
 async def delete_animal(
     animal_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -589,6 +595,7 @@ async def delete_animal(
 
 
 @router.post("/{animal_id}/died", response_model=AnimalResponse)
+@policy("keeper")
 async def mark_animal_died(
     animal_id: UUID,
     payload: MarkDiedRequest,
@@ -600,12 +607,7 @@ async def mark_animal_died(
     Drops out of the collection list, the free-tier count, feeding status,
     Feeding Day and the daily digest — nothing is deleted.
     """
-    animal = db.query(Animal).filter(
-        Animal.id == animal_id,
-        Animal.user_id == current_user.id,
-    ).first()
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    animal, _access = load_animal(db, current_user, animal_id, "keeper")
 
     animal.died_at = payload.died_at or date.today()
     animal.death_cause = payload.death_cause
@@ -622,6 +624,7 @@ async def mark_animal_died(
 
 
 @router.post("/{animal_id}/revive", response_model=AnimalResponse)
+@policy("keeper")
 async def revive_animal(
     animal_id: UUID,
     db: Session = Depends(get_db),
@@ -633,12 +636,7 @@ async def revive_animal(
     the cap: refusing to let someone correct a mistake because of a billing
     limit would be indefensible.
     """
-    animal = db.query(Animal).filter(
-        Animal.id == animal_id,
-        Animal.user_id == current_user.id,
-    ).first()
-    if not animal:
-        raise HTTPException(status_code=404, detail="Animal not found")
+    animal, _access = load_animal(db, current_user, animal_id, "keeper")
 
     animal.died_at = None
     animal.death_cause = None

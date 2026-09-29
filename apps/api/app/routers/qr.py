@@ -48,6 +48,7 @@ from app.utils.hero_photo import sync_hero_photo
 from app.services.storage import storage_service
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.config import settings
+from app.utils.access import policy
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +187,7 @@ def _optional_user(
 # ─── Upload Session endpoints ──────────────────────────────────────────────────
 
 @router.post("/tarantulas/{tarantula_id}/upload-session")
+@policy("owner_only")
 async def create_upload_session(
     tarantula_id: str,
     db: Session = Depends(get_db),
@@ -236,6 +238,7 @@ async def create_upload_session(
 
 
 @router.post("/animals/{animal_id}/upload-session")
+@policy("owner_only")
 async def create_animal_upload_session(
     animal_id: str,
     db: Session = Depends(get_db),
@@ -288,6 +291,7 @@ async def create_animal_upload_session(
 
 
 @router.post("/inverts/{invert_id}/upload-session")
+@policy("owner_only")
 async def create_invert_upload_session(
     invert_id: str,
     db: Session = Depends(get_db),
@@ -348,6 +352,7 @@ async def create_invert_upload_session(
 
 
 @router.post("/scorpions/{scorpion_id}/upload-session")
+@policy("owner_only")
 async def create_scorpion_upload_session(
     scorpion_id: str,
     db: Session = Depends(get_db),
@@ -400,6 +405,7 @@ async def create_scorpion_upload_session(
 
 
 @router.post("/centipedes/{centipede_id}/upload-session")
+@policy("owner_only")
 async def create_centipede_upload_session(
     centipede_id: str,
     db: Session = Depends(get_db),
@@ -457,6 +463,7 @@ async def create_centipede_upload_session(
 
 
 @router.get("/upload-sessions/{token}")
+@policy("public")
 async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
     """
     Public endpoint — the phone browser calls this on load to get the
@@ -508,6 +515,7 @@ async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/upload-sessions/{token}/photo")
+@policy("public")
 async def upload_photo_via_token(
     token: str,
     file: UploadFile = File(...),
@@ -648,6 +656,7 @@ async def upload_photo_via_token(
 # ─── Public Tarantula Profile (/t/{id}) ───────────────────────────────────────
 
 @router.get("/t/{tarantula_id}")
+@policy("public")
 async def get_public_tarantula_profile(
     tarantula_id: str,
     db: Session = Depends(get_db),
@@ -798,6 +807,7 @@ async def get_public_tarantula_profile(
 # ─── Public Invert Profile (/i/{id}) ─────────────────────────────────────────
 
 @router.get("/i/{invert_id}")
+@policy("public")
 async def get_public_invert_profile(
     invert_id: str,
     db: Session = Depends(get_db),
@@ -952,6 +962,7 @@ async def get_public_invert_profile(
 # ─── Public Animal Profile (/a/{id}) ──────────────────────────────────────────
 
 @router.get("/a/{animal_id}")
+@policy("public")
 async def get_public_animal_profile(
     animal_id: str,
     db: Session = Depends(get_db),

@@ -29,52 +29,35 @@ from app.models.animal import Animal
 from app.models.shed_log import ShedLog
 from app.schemas.shed_log import ShedLogCreate, ShedLogUpdate, ShedLogResponse
 from app.utils.dependencies import get_current_user
+from app.utils.access import access_helper, load_animal, load_log_parent, policy, require_can_change
 
 router = APIRouter()
 
 
-def _get_owned_animal(db: Session, animal_id: uuid.UUID, user: User) -> Animal:
-    animal = (
-        db.query(Animal)
-        .filter(Animal.id == animal_id, Animal.user_id == user.id)
-        .first()
-    )
-    if not animal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Animal not found"
-        )
-    return animal
+@access_helper
+def _shed_for(db: Session, shed_id: uuid.UUID, user: User, need: str) -> ShedLog:
+    """The row plus an access check through its animal (owner or co-keeper).
 
-
-def _get_owned_shed(db: Session, shed_id: uuid.UUID, user: User) -> ShedLog:
-    """Fetch a shed log and verify the owning animal belongs to the
-    caller. Raises 404 for missing shed, 403 for not-your-shed."""
-    shed = db.query(ShedLog).filter(ShedLog.id == shed_id).first()
-    if not shed:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Shed log not found"
-        )
-
-    owner = (
-        db.query(Animal)
-        .filter(Animal.id == shed.animal_id, Animal.user_id == user.id)
-        .first()
-    )
-    if not owner:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
-        )
-    return shed
+    404 for missing and for no access alike — the old helper answered 403 for
+    someone else's row, confirming it existed. Writes also apply the logger
+    rule: a logger may change only entries they logged themselves.
+    """
+    row = db.query(ShedLog).filter(ShedLog.id == shed_id).first()
+    _parent, access = load_log_parent(db, user, row, need, not_found="Shed log not found")
+    if need != "viewer":
+        require_can_change(access, row)
+    return row
 
 
 @router.get("/animals/{animal_id}/sheds", response_model=List[ShedLogResponse])
+@policy("viewer")
 async def list_sheds(
     animal_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """List shed logs for an animal, most recent first."""
-    _get_owned_animal(db, animal_id, current_user)
+    load_animal(db, current_user, animal_id, "viewer")
     return (
         db.query(ShedLog)
         .filter(ShedLog.animal_id == animal_id)
@@ -88,6 +71,7 @@ async def list_sheds(
     response_model=ShedLogResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("logger")
 async def create_shed(
     animal_id: uuid.UUID,
     shed_data: ShedLogCreate,
@@ -96,9 +80,9 @@ async def create_shed(
 ):
     """Log a shed. Denormalizes `animals.last_shed_at` so the dashboard
     "X days since shed" badge doesn't re-scan the shed history."""
-    animal = _get_owned_animal(db, animal_id, current_user)
+    animal, access = load_animal(db, current_user, animal_id, "logger")
 
-    new_shed = ShedLog(animal_id=animal_id, **shed_data.model_dump())
+    new_shed = ShedLog(animal_id=animal_id, logged_by_user_id=access.logged_by_user_id, **shed_data.model_dump())
     db.add(new_shed)
 
     # Denormalize last_shed_at — only move it forward, never backward
@@ -115,6 +99,7 @@ async def create_shed(
 
 
 @router.get("/sheds/{shed_id}", response_model=ShedLogResponse)
+@policy("viewer")
 async def get_shed(
     shed_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -122,10 +107,11 @@ async def get_shed(
 ):
     """Fetch a single shed log by id — used by the edit forms to
     pre-fill fields."""
-    return _get_owned_shed(db, shed_id, current_user)
+    return _shed_for(db, shed_id, current_user, "viewer")
 
 
 @router.put("/sheds/{shed_id}", response_model=ShedLogResponse)
+@policy("logger")
 async def update_shed(
     shed_id: uuid.UUID,
     shed_data: ShedLogUpdate,
@@ -133,7 +119,7 @@ async def update_shed(
     current_user: User = Depends(get_current_user),
 ):
     """Partial update of a shed log."""
-    shed = _get_owned_shed(db, shed_id, current_user)
+    shed = _shed_for(db, shed_id, current_user, "logger")
 
     update_data = shed_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -145,6 +131,7 @@ async def update_shed(
 
 
 @router.delete("/sheds/{shed_id}", status_code=status.HTTP_204_NO_CONTENT)
+@policy("logger")
 async def delete_shed(
     shed_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -153,7 +140,7 @@ async def delete_shed(
     """Delete a shed log. Does NOT recompute last_shed_at — that would
     need a full history scan; acceptable since last_shed_at is a hint,
     not authoritative."""
-    shed = _get_owned_shed(db, shed_id, current_user)
+    shed = _shed_for(db, shed_id, current_user, "logger")
     db.delete(shed)
     db.commit()
     return None

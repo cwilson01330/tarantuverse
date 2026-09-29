@@ -36,6 +36,7 @@ from app.schemas.reptile_breeding import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_hv_premium
+from app.utils.access import policy
 
 router = APIRouter()
 
@@ -137,6 +138,7 @@ def _resolve_parents(
 
 
 @router.get("/", response_model=List[ReptilePairingResponse])
+@policy("owner_only")
 async def list_pairings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -156,6 +158,7 @@ async def list_pairings(
     response_model=ReptilePairingResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@policy("owner_only")
 async def create_pairing(
     payload: ReptilePairingCreate,
     db: Session = Depends(get_db),
@@ -192,6 +195,7 @@ async def create_pairing(
 
 
 @router.get("/{pairing_id}", response_model=ReptilePairingResponse)
+@policy("owner_only")
 async def get_pairing(
     pairing_id: UUID,
     db: Session = Depends(get_db),
@@ -221,6 +225,7 @@ async def get_pairing(
 
 
 @router.put("/{pairing_id}", response_model=ReptilePairingResponse)
+@policy("owner_only")
 async def update_pairing(
     pairing_id: UUID,
     payload: ReptilePairingUpdate,
@@ -256,6 +261,7 @@ async def update_pairing(
     "/{pairing_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
+@policy("owner_only")
 async def delete_pairing(
     pairing_id: UUID,
     db: Session = Depends(get_db),
