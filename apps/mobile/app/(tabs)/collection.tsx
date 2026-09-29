@@ -56,13 +56,13 @@ import {
 import { AppHeader } from '../../src/components/AppHeader';
 import {
   listColonies,
-  formatColonyCount,
   type ColonyListItem,
 } from '../../src/lib/colonies';
 // One card for every taxon — replaced five near-identical renderers that had
 // already drifted apart (see AnimalCard's header comment).
 import AnimalCard from '../../src/components/AnimalCard';
-import { colonyKindLabel } from '../../src/lib/colony-buckets';
+import ColonyRow from '../../src/components/ColonyRow';
+import { TYPE } from '../../src/theme/tokens';
 
 // Taxa that have no per-taxon list lib — fetched generically via /inverts/.
 // (scorpion/centipede/whip_spider keep their existing per-taxon fetches.)
@@ -758,21 +758,6 @@ function CollectionScreen() {
   const handleQuickRefuse = (id: string, taxon: string, displayName: string) =>
     logQuickFeeding(id, taxon, displayName, false);
 
-  /** Group feeding from the collection card opens the form instead of writing.
-   *
-   *  The one-tap Fed button is right for an individual: one animal, one prey
-   *  item, nothing left to specify. It's wrong for a group — it would write a
-   *  log that reads "fed" with no count, when the number of prey offered is
-   *  the whole point of a communal feeding record. So the colony card's Fed
-   *  button navigates to the form rather than posting silently.
-   *
-   *  Kept as a separate handler from handleQuickFeed because a colony isn't an
-   *  invert: different endpoint, different semantics (ONE log per feeding
-   *  event, not one per animal). */
-  const handleQuickFeedColony = (id: string, taxon: string | null | undefined) => {
-    router.push({ pathname: '/colony/add-feeding', params: { id, taxon: taxon ?? '' } });
-  };
-
   const handleLogMolt = () => {
     if (!actionTarget) return;
     const tarantulaId = actionTarget.id;
@@ -893,47 +878,6 @@ function CollectionScreen() {
   const renderWhipSpider = ({ item }: { item: WhipSpider }) => renderInvertCard(item, 'whip_spider');
   const renderInvert = ({ item }: { item: GenericInvert }) => renderInvertCard(item, item.taxon);
 
-
-  // Colony card (ADR-010). Same card frame, but tagged as a "Colony" with the
-  // population count (≈N when estimated) instead of a sex badge. Taxon glyph in
-  // the bottom-left, same as the other invert cards. Routes to /colony/[id].
-  /** Colony card. Uses AnimalCard like every other entry — a tarantula
-   *  communal is a first-class member of the collection and shouldn't render
-   *  in a different visual language from the animals beside it.
-   *
-   *  This was a bespoke renderer built on the pre-AnimalCard styles (fixed-
-   *  height image, different overlay positions), which is exactly the drift
-   *  AnimalCard exists to prevent — it just predated the consolidation.
-   *  The sex chip becomes a "Colony" label and the population takes the
-   *  opposite corner, since headcount is the at-a-glance number for a group
-   *  the way days-since-fed is for an individual. */
-  const renderColony = ({ item }: { item: ColonyListItem }) => {
-    const meta = INVERT_TAXA[item.taxon];
-    const countLabel = formatColonyCount(item.total_count, item.count_is_estimated);
-    const speciesLabel = item.species_missing
-      ? 'Species removed'
-      : item.species_display_name || item.species_scientific_name || `${meta?.label ?? 'Colony'} colony`;
-    return (
-      <AnimalCard
-        key={item.id}
-        displayName={item.name}
-        scientificName={speciesLabel}
-        photoUrl={item.photo_url}
-        taxon={item.taxon}
-        kindLabel={colonyKindLabel(item.taxon)}
-        countLabel={countLabel}
-        // Colonies get the same feeding treatment as animals now that they can
-        // actually be fed (cph_20260729_colony_logs). Days-since only — no
-        // isOverdue, because a colony has no life stage to resolve a cadence
-        // from and the card must not imply one exists.
-        feeding={{ daysSince: item.days_since_last_feeding }}
-        onPress={() => router.push(`/colony/${item.id}` as any)}
-        // Opens the form rather than logging in place — see the handler.
-        onQuickFeed={showFedButton ? () => handleQuickFeedColony(item.id, item.taxon) : undefined}
-        colors={colors}
-      />
-    );
-  };
 
   const renderListItem = ({ item }: { item: Tarantula }) => {
     const feedingStatus = feedingStatuses.get(item.id);
@@ -1171,55 +1115,6 @@ function CollectionScreen() {
     );
   };
 
-  // Colony list row (ADR-010). Mirrors renderInvertListItem chrome but shows
-  // the population count pill + a "Colony" tag instead of a sex chip.
-  const renderColonyListItem = (item: ColonyListItem) => {
-    const meta = INVERT_TAXA[item.taxon];
-    const glyph = meta?.glyph ?? '🐜';
-    const countLabel = formatColonyCount(item.total_count, item.count_is_estimated);
-    const speciesLabel = item.species_missing
-      ? 'Species removed'
-      : item.species_display_name || item.species_scientific_name || `${meta?.label ?? 'Colony'} colony`;
-    return (
-      <TouchableOpacity
-        style={styles.listItem}
-        onPress={() => router.push(`/colony/${item.id}` as any)}
-        accessibilityRole="button"
-        accessibilityLabel={`${item.name}, colony, ${countLabel} animals, ${speciesLabel}`}
-        accessibilityHint="Opens this colony's detail page."
-      >
-        <View style={styles.listImageContainer}>
-          {item.photo_url ? (
-            <Image source={{ uri: getImageUrl(item.photo_url) }} style={styles.listImage} accessibilityLabel={`Photo of ${item.name}`} />
-          ) : (
-            <View style={styles.listPlaceholder} accessibilityElementsHidden importantForAccessibility="no">
-              <Text style={{ fontSize: 22 }}>{glyph}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.listContent}>
-          <Text style={styles.listName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.listScientificName} numberOfLines={1}>{speciesLabel}</Text>
-        </View>
-        <View style={styles.listBadges}>
-          <View style={[styles.colonyListTag, { backgroundColor: colors.primary + '20' }]} accessibilityLabel="Colony">
-            <Text style={[styles.colonyListTagText, { color: colors.primary }]}>Colony</Text>
-          </View>
-          <View style={[styles.listBadge, { backgroundColor: colors.primary }]} accessibilityLabel={`${countLabel} animals`}>
-            <Text style={styles.listBadgeText}>{countLabel}</Text>
-          </View>
-        </View>
-        <MaterialCommunityIcons
-          name="chevron-right"
-          size={24}
-          color={colors.textTertiary}
-          accessibilityElementsHidden
-          importantForAccessibility="no"
-        />
-      </TouchableOpacity>
-    );
-  };
-
   // The old inline `ViewToggle` and `SortChips` components are gone — the view
   // toggle is a header icon now and sort lives in the ⚙ sheet. (Historical
   // note worth keeping: a `SearchBar` component defined inside this screen
@@ -1354,18 +1249,6 @@ function CollectionScreen() {
       backgroundColor: 'rgba(0,0,0,0.45)',
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    colonyListTag: {
-      height: 22,
-      paddingHorizontal: 8,
-      borderRadius: 11,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    colonyListTagText: {
-      fontSize: 10,
-      fontWeight: '700',
-      letterSpacing: 0.3,
     },
     feedingBadge: {
       position: 'absolute',
@@ -1718,6 +1601,9 @@ function CollectionScreen() {
     },
 
     // --- Empty result state (filter/search matched nothing) ---
+    colonySection: { gap: 10, marginBottom: 12 },
+    colonySectionLabel: { ...TYPE.caption, letterSpacing: 1.1 },
+    animalsLabel: { marginTop: 6 },
     filteredEmpty: {
       alignItems: 'center',
       gap: 10,
@@ -1848,11 +1734,9 @@ function CollectionScreen() {
             statusFor(item.data.id, item.data.taxon),
           );
     }
-    if (item.kind === 'colony') {
-      return viewMode === 'card'
-        ? renderColony({ item: item.data })
-        : renderColonyListItem(item.data);
-    }
+    // Colonies never reach here — they render as full-width ColonyRows above
+    // the grid (see ListHeaderComponent).
+    if (item.kind === 'colony') return null;
     return viewMode === 'card'
       ? renderTarantula({ item: item.data })
       : renderListItem({ item: item.data });
@@ -1978,6 +1862,8 @@ function CollectionScreen() {
   ];
   // Colonies count as ONE entry each toward the collection Total (ADR-010:
   // 1 toward the cap regardless of headcount).
+  const filteredRows = getFilteredRows();
+  const colonyRowsShown = filteredRows.flatMap((row) => (row.kind === 'colony' ? [row.data] : []));
   const totalAnimals = allCollectionAnimals.length + colonies.length;
   const uniqueSpeciesCount = new Set(
     [
@@ -2127,7 +2013,9 @@ function CollectionScreen() {
         <>
           <FlatList
             key={viewMode} // Force re-render when viewMode changes (needed for numColumns)
-            data={getFilteredRows()}
+            // Colonies render above the grid as full-width rows (design
+            // handoff, screen 8) — a population isn't an animal card.
+            data={filteredRows.filter((row) => row.kind !== 'colony')}
             renderItem={renderRow}
             keyExtractor={(item) => `${item.kind}-${item.data.id}`}
             numColumns={viewMode === 'card' ? 2 : 1}
@@ -2147,9 +2035,24 @@ function CollectionScreen() {
                     header, sort into the ⚙ sheet, layout into the header
                     toggle, and the stats card was a duplicate of Home's. */}
                 <TaxonFilterChips />
+                {colonyRowsShown.length > 0 && (
+                  <View style={styles.colonySection}>
+                    <Text style={[styles.colonySectionLabel, { color: colors.textSecondary }]}>
+                      COLONIES
+                    </Text>
+                    {colonyRowsShown.map((c) => (
+                      <ColonyRow key={c.id} item={c} onPress={() => router.push(`/colony/${c.id}` as any)} />
+                    ))}
+                    {filteredRows.some((row) => row.kind !== 'colony') && (
+                      <Text style={[styles.colonySectionLabel, styles.animalsLabel, { color: colors.textSecondary }]}>
+                        ANIMALS
+                      </Text>
+                    )}
+                  </View>
+                )}
               </>
             }
-            ListEmptyComponent={
+            ListEmptyComponent={colonyRowsShown.length > 0 ? null : 
               // A filter that matches nothing used to leave a blank screen
               // with the chips still lit — indistinguishable from a failed
               // load.

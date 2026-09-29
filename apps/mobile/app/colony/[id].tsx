@@ -10,7 +10,7 @@
  * Mirrors feeders/[id].tsx (quick-log panel + history + delete modals) and
  * app/invert/[id].tsx (species care-sheet link, shared InfoGrid).
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -33,7 +33,12 @@ import { PrimaryButton } from '../../src/components/PrimaryButton';
 import DateInput from '../../src/components/DateInput';
 import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { useTheme } from '../../src/contexts/ThemeContext';
-import { ColonyPopulationChart } from '../../src/components/ColonyPopulationChart';
+import ColonyPopulationCard from '../../src/components/colony/ColonyPopulationCard';
+import ColonyQuickLogSheet, { type QuickKind } from '../../src/components/colony/ColonyQuickLogSheet';
+import ColonyActivity from '../../src/components/colony/ColonyActivity';
+import { taxonMdiIcon } from '../../src/lib/inverts';
+import { TYPE } from '../../src/theme/tokens';
+import { COLONY_EVENT_MDI } from '../../src/lib/colony-events';
 import { getImageUrl } from '../../src/utils/image-url';
 import { getErrorMessage } from '../../src/utils/errors';
 import { parseLocalDate, toISODateLocal, formatLocalDate } from '../../src/utils/date';
@@ -67,10 +72,8 @@ import {
   createColonyEvent,
   deleteColonyEvent,
   deleteColony,
-  formatColonyCount,
   eventHasSeverity,
   COLONY_EVENT_LABELS,
-  COLONY_EVENT_ICONS,
   type Colony,
   type ColonyEvent,
   type ColonyEventType,
@@ -168,6 +171,8 @@ export default function ColonyDetailScreen() {
   const canKeep = can(role, 'keeper');
   const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
   const [deleting, setDeleting] = useState(false);
+  const [quick, setQuick] = useState<QuickKind | null>(null);
+  const [husbandryOpen, setHusbandryOpen] = useState(false);
   /** Slices that failed to load on the last fetch (empty = all good). */
   const [partialFailure, setPartialFailure] = useState<string[]>([]);
 
@@ -224,9 +229,9 @@ export default function ColonyDetailScreen() {
     fetchColony();
   };
 
-  const openForm = () => {
+  const openForm = (preset: ColonyEventType = 'observation') => {
     setFormOpen(true);
-    setEventType('observation');
+    setEventType(preset);
     setEventStage('');
     setEventDelta('');
     setEventDate(toISODateLocal(new Date()));
@@ -316,11 +321,6 @@ export default function ColonyDetailScreen() {
     }
   };
 
-  const totalLabel = useMemo(() => {
-    if (!colony) return '—';
-    return formatColonyCount(colony.total_count, colony.count_is_estimated);
-  }, [colony]);
-
   const backAction = (
     <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" style={{ paddingRight: 4 }}>
       <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
@@ -389,7 +389,6 @@ export default function ColonyDetailScreen() {
     ? 'Species removed'
     : colony.species_display_name || colony.species_scientific_name || 'No species set';
 
-  const stageEntries = Object.entries(colony.stage_counts ?? {});
 
 
   /** Group feeding goes through a form, not a one-tap write.
@@ -614,6 +613,14 @@ export default function ColonyDetailScreen() {
   husbandryItems.push({ icon: 'cup-water', label: 'Water dish', value: colony.water_dish ? 'Yes' : 'No' });
   if (colony.last_substrate_change)
     husbandryItems.push({ icon: 'calendar-refresh', label: 'Substrate changed', value: formatLocalDate(colony.last_substrate_change, { month: 'short', day: 'numeric', year: 'numeric' }) });
+  // One-line preview for the collapsed Husbandry row: "85–95°F · egg flats".
+  const husbandryPreview = [
+    colony.target_temp_min || colony.target_temp_max
+      ? `${colony.target_temp_min ?? '—'}–${colony.target_temp_max ?? '—'}°F`
+      : null,
+    colony.substrate_type,
+    colony.enclosure_size,
+  ].filter(Boolean).join(' · ');
 
   return (
     <View style={styles.container}>
@@ -649,76 +656,222 @@ export default function ColonyDetailScreen() {
           contentContainerStyle={styles.contentInner}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         >
-          {/* Hero */}
-          <View style={styles.hero}>
+          {/* Identity — design handoff screen 8: nobody opens a colony to look
+              at it, so the 200px hero became a thumbnail beside the species. */}
+          <View style={[styles.identity, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
             {colony.photo_url ? (
-              <Image source={{ uri: getImageUrl(colony.photo_url) }} style={styles.heroImage} accessibilityLabel={`Photo of ${colony.name}`} />
+              <Image source={{ uri: getImageUrl(colony.photo_url) }} style={[styles.identityThumb, { borderRadius: layout.radius.sm }]} accessibilityLabel={`Photo of ${colony.name}`} />
             ) : (
-              <View style={styles.heroPlaceholder}>
-                <Text style={styles.heroEmoji}>{meta?.glyph ?? '🐾'}</Text>
+              <View style={[styles.identityThumb, styles.identityTile, { backgroundColor: colors.primary + '1F', borderRadius: layout.radius.sm }]}>
+                <MaterialCommunityIcons name={taxonMdiIcon(colony.taxon) as any} size={24} color={colors.accent} />
               </View>
             )}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                style={[TYPE.bodyStrong, { color: colony.species_missing ? colors.textSecondary : colors.textPrimary }, colony.species_missing && { fontStyle: 'italic' }]}
+                numberOfLines={2}
+              >
+                {speciesLabel}
+              </Text>
+              {colony.species_id && !colony.species_missing ? (
+                <TouchableOpacity
+                  onPress={() => router.push(`/invert-species/${colony.species_id}` as any)}
+                  accessibilityRole="link"
+                  style={styles.identityLink}
+                >
+                  <Text style={[TYPE.label, { color: colors.accent }]}>Care sheet →</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             {!colony.is_active && (
-              <View style={[styles.archivedPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[styles.archivedPill, styles.archivedInline, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Text style={styles.archivedText}>Archived</Text>
               </View>
             )}
           </View>
 
-          {/* Species / care-sheet link */}
-          {colony.species_id && !colony.species_missing ? (
-            <TouchableOpacity
-              onPress={() => router.push(`/invert-species/${colony.species_id}` as any)}
-              activeOpacity={0.7}
-              accessibilityLabel="View care sheet for this species"
-              style={[styles.careCard, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}
-            >
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.sectionHeading}>SPECIES</Text>
-                <Text style={styles.careSummary} numberOfLines={2}>{speciesLabel}</Text>
-                <Text style={[styles.careLink, { color: colors.primary }]}>View full care sheet →</Text>
-              </View>
-              <MaterialCommunityIcons name="book-open-variant" size={26} color={colors.primary} />
-            </TouchableOpacity>
-          ) : (
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
-              <Text style={styles.sectionHeading}>SPECIES</Text>
-              <Text style={[styles.speciesPlain, colony.species_missing && { fontStyle: 'italic', color: colors.textTertiary }]}>
-                {speciesLabel}
-              </Text>
+          {/* Population card — count, 30-day trend, weekly bars, stage split. */}
+          <ColonyPopulationCard
+            stageCounts={colony.stage_counts}
+            estimated={colony.count_is_estimated}
+            history={history}
+            taxon={colony.taxon}
+          />
+
+          {/* Quick log — the four things keepers log day to day. Each asks
+              only stage + count; everything else is behind "More options". */}
+          {canLog && (
+            <View style={styles.quickRow}>
+              {([
+                { kind: 'birth', label: 'Births', icon: 'egg-outline', color: colors.success },
+                { kind: 'death', label: 'Deaths', icon: 'minus-circle-outline', color: colors.error },
+                { kind: 'removed', label: 'Removed', icon: 'export', color: colors.warning },
+                { kind: 'recount', label: 'Recount', icon: 'counter', color: colors.accent },
+              ] as const).map((b) => (
+                <TouchableOpacity
+                  key={b.kind}
+                  onPress={() => setQuick(b.kind)}
+                  style={[styles.quickTile, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={b.kind === 'recount' ? 'Recount a stage' : `Log ${b.label.toLowerCase()}`}
+                >
+                  <MaterialCommunityIcons name={b.icon} size={22} color={b.color} />
+                  <Text style={[TYPE.label, { color: colors.textPrimary }]}>{b.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
 
-          {/* Population card */}
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
-            <Text style={styles.sectionHeading}>POPULATION</Text>
-            <View style={styles.totalRow}>
-              <Text style={styles.total}>{totalLabel}</Text>
-              <Text style={styles.totalLabel}>{colony.count_is_estimated ? 'estimated total' : 'total'}</Text>
-            </View>
-            {stageEntries.length > 0 && (
-              <View style={styles.stageGrid}>
-                {stageEntries.map(([stage, n]) => (
-                  <View key={stage} style={[styles.stageBucket, { backgroundColor: colors.background, borderColor: colors.border, borderRadius: layout.radius.sm }]}>
-                    <Text style={styles.stageLabel}>{stage}</Text>
-                    <Text style={styles.stageValue}>{n.toLocaleString()}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-            {/* The estimate note lives inside the chart now — it belongs next
-                to the trend it qualifies, not floating above it. */}
-            <View style={[styles.historyBlock, { borderTopColor: colors.border }]}>
-              <Text style={[styles.sectionHeading, { marginBottom: 8 }]}>OVER TIME</Text>
-              <ColonyPopulationChart history={history} taxon={colony.taxon} />
-            </View>
+          {/* Recent activity (moved up — design handoff screen 8) */}
+          <View style={styles.eventsHeaderRow}>
+            <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>RECENT ACTIVITY</Text>
+            {canLog && <TouchableOpacity onPress={formOpen ? closeForm : () => openForm()} accessibilityRole="button" accessibilityLabel={formOpen ? 'Cancel adding an event' : 'Log another kind of event'}>
+              <Text style={[styles.addEventLink, { color: colors.primary }]}>{formOpen ? 'Cancel' : '+ Other event'}</Text>
+            </TouchableOpacity>}
           </View>
+
+          {formOpen && (
+            <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
+              {eventError !== '' && (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>{eventError}</Text>
+                </View>
+              )}
+
+              <Text style={styles.fieldLabel}>Event type</Text>
+              <View style={styles.chipWrap}>
+                {EVENT_TYPES.map((t) => {
+                  const selected = t === eventType;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => setEventType(t)}
+                      style={[styles.eventChip, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.background }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                    >
+                      <MaterialCommunityIcons name={COLONY_EVENT_MDI[t] as any} size={14} color={selected ? '#fff' : colors.textSecondary} />
+                      <Text style={{ color: selected ? '#fff' : colors.textPrimary, fontSize: 12, fontWeight: '600' }}>{COLONY_EVENT_LABELS[t]}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {eventNeedsDelta(eventType) && (
+                <>
+                  <Text style={[styles.fieldLabel, { marginTop: 12 }]}>
+                    {eventType === 'count_correction' ? 'Adjustment (use − to remove)' : 'How many'}
+                  </Text>
+                  <TextInput
+                    value={eventDelta}
+                    onChangeText={(v) => {
+                      const pat = eventType === 'count_correction' ? /^-?\d*$/ : /^\d*$/;
+                      if (v === '' || pat.test(v)) setEventDelta(v);
+                    }}
+                    keyboardType={eventType === 'count_correction' ? 'numbers-and-punctuation' : 'number-pad'}
+                    placeholder={eventType === 'count_correction' ? 'e.g. -5' : 'e.g. 20'}
+                    placeholderTextColor={colors.textTertiary}
+                    style={[styles.input, { borderRadius: layout.radius.sm }]}
+                  />
+                </>
+              )}
+
+              <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Stage (optional)</Text>
+              <TextInput
+                value={eventStage}
+                onChangeText={setEventStage}
+                placeholder="e.g. nymphs (blank = mixed)"
+                placeholderTextColor={colors.textTertiary}
+                autoCapitalize="none"
+                style={[styles.input, { borderRadius: layout.radius.sm }]}
+              />
+
+              <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Date</Text>
+              <DateInput
+                value={parseLocalDate(eventDate) ?? new Date()}
+                onChange={(d) => setEventDate(toISODateLocal(d))}
+                maximumDate={new Date()}
+                label="Event date"
+              />
+
+              {eventHasSeverity(eventType) && (
+                <>
+                  <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Severity</Text>
+                  <View style={styles.chipWrap}>
+                    {SEVERITY_OPTIONS.map((opt) => {
+                      const selected = opt.value === eventSeverity;
+                      return (
+                        <TouchableOpacity
+                          key={opt.value}
+                          onPress={() => setEventSeverity(selected ? '' : opt.value)}
+                          style={[styles.eventChip, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.background }]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                        >
+                          <Text style={{ color: selected ? '#fff' : colors.textPrimary, fontSize: 12, fontWeight: '600' }}>{opt.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              <Text style={[styles.fieldLabel, { marginTop: 12 }]}>
+                Notes {eventType === 'observation' && <Text style={{ color: colors.error }}>*</Text>}
+              </Text>
+              <TextInput
+                value={eventNotes}
+                onChangeText={setEventNotes}
+                multiline
+                numberOfLines={3}
+                maxLength={2000}
+                placeholder="What happened?"
+                placeholderTextColor={colors.textTertiary}
+                style={[styles.input, styles.textarea, { borderRadius: layout.radius.sm }]}
+              />
+
+              <View style={styles.panelActions}>
+                <TouchableOpacity onPress={closeForm} style={[styles.ghostBtn, { borderRadius: layout.radius.sm }]}>
+                  <Text style={styles.ghostBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <PrimaryButton
+                  onPress={submitEvent}
+                  disabled={eventSubmitting}
+                  style={[styles.saveBtn, { borderRadius: layout.radius.sm }]}
+                  outerStyle={{ borderRadius: layout.radius.sm }}
+                >
+                  <Text style={styles.onPrimaryText}>{eventSubmitting ? 'Saving…' : 'Log it'}</Text>
+                </PrimaryButton>
+              </View>
+            </View>
+          )}
+
+          <ColonyActivity
+            events={events}
+            canChange={mayChange}
+            onDelete={(ev) => setConfirmDeleteEventId(ev.id)}
+          />
+
 
           {/* Husbandry */}
           {husbandryItems.length > 0 && (
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
-              <Text style={[styles.sectionHeading, { marginBottom: 12 }]}>HUSBANDRY</Text>
-              <InfoGrid items={husbandryItems} />
+              <TouchableOpacity
+                onPress={() => setHusbandryOpen((o) => !o)}
+                style={styles.collapseHead}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: husbandryOpen }}
+              >
+                <MaterialCommunityIcons name="home-thermometer-outline" size={18} color={colors.accent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>Husbandry</Text>
+                  {!husbandryOpen && husbandryPreview ? (
+                    <Text style={[TYPE.caption, { color: colors.textSecondary }]} numberOfLines={1}>{husbandryPreview}</Text>
+                  ) : null}
+                </View>
+                <MaterialCommunityIcons name={husbandryOpen ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+              {husbandryOpen ? <View style={{ marginTop: 12 }}><InfoGrid items={husbandryItems} /></View> : null}
             </View>
           )}
 
@@ -1129,172 +1282,6 @@ export default function ColonyDetailScreen() {
             </View>
           ) : null}
 
-          {/* Events */}
-          <View style={styles.eventsHeaderRow}>
-            <Text style={[styles.sectionHeading, { marginBottom: 0 }]}>EVENTS</Text>
-            {canLog && <TouchableOpacity onPress={formOpen ? closeForm : openForm} accessibilityRole="button" accessibilityLabel={formOpen ? 'Cancel add event' : 'Add event'}>
-              <Text style={[styles.addEventLink, { color: colors.primary }]}>{formOpen ? 'Cancel' : '+ Add event'}</Text>
-            </TouchableOpacity>}
-          </View>
-
-          {formOpen && (
-            <View style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
-              {eventError !== '' && (
-                <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>{eventError}</Text>
-                </View>
-              )}
-
-              <Text style={styles.fieldLabel}>Event type</Text>
-              <View style={styles.chipWrap}>
-                {EVENT_TYPES.map((t) => {
-                  const selected = t === eventType;
-                  return (
-                    <TouchableOpacity
-                      key={t}
-                      onPress={() => setEventType(t)}
-                      style={[styles.eventChip, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.background }]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                    >
-                      <Text style={{ fontSize: 13 }}>{COLONY_EVENT_ICONS[t]}</Text>
-                      <Text style={{ color: selected ? '#fff' : colors.textPrimary, fontSize: 12, fontWeight: '600' }}>{COLONY_EVENT_LABELS[t]}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {eventNeedsDelta(eventType) && (
-                <>
-                  <Text style={[styles.fieldLabel, { marginTop: 12 }]}>
-                    {eventType === 'count_correction' ? 'Adjustment (use − to remove)' : 'How many'}
-                  </Text>
-                  <TextInput
-                    value={eventDelta}
-                    onChangeText={(v) => {
-                      const pat = eventType === 'count_correction' ? /^-?\d*$/ : /^\d*$/;
-                      if (v === '' || pat.test(v)) setEventDelta(v);
-                    }}
-                    keyboardType={eventType === 'count_correction' ? 'numbers-and-punctuation' : 'number-pad'}
-                    placeholder={eventType === 'count_correction' ? 'e.g. -5' : 'e.g. 20'}
-                    placeholderTextColor={colors.textTertiary}
-                    style={[styles.input, { borderRadius: layout.radius.sm }]}
-                  />
-                </>
-              )}
-
-              <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Stage (optional)</Text>
-              <TextInput
-                value={eventStage}
-                onChangeText={setEventStage}
-                placeholder="e.g. nymphs (blank = mixed)"
-                placeholderTextColor={colors.textTertiary}
-                autoCapitalize="none"
-                style={[styles.input, { borderRadius: layout.radius.sm }]}
-              />
-
-              <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Date</Text>
-              <DateInput
-                value={parseLocalDate(eventDate) ?? new Date()}
-                onChange={(d) => setEventDate(toISODateLocal(d))}
-                maximumDate={new Date()}
-                label="Event date"
-              />
-
-              {eventHasSeverity(eventType) && (
-                <>
-                  <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Severity</Text>
-                  <View style={styles.chipWrap}>
-                    {SEVERITY_OPTIONS.map((opt) => {
-                      const selected = opt.value === eventSeverity;
-                      return (
-                        <TouchableOpacity
-                          key={opt.value}
-                          onPress={() => setEventSeverity(selected ? '' : opt.value)}
-                          style={[styles.eventChip, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.background }]}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                        >
-                          <Text style={{ color: selected ? '#fff' : colors.textPrimary, fontSize: 12, fontWeight: '600' }}>{opt.label}</Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </>
-              )}
-
-              <Text style={[styles.fieldLabel, { marginTop: 12 }]}>
-                Notes {eventType === 'observation' && <Text style={{ color: colors.error }}>*</Text>}
-              </Text>
-              <TextInput
-                value={eventNotes}
-                onChangeText={setEventNotes}
-                multiline
-                numberOfLines={3}
-                maxLength={2000}
-                placeholder="What happened?"
-                placeholderTextColor={colors.textTertiary}
-                style={[styles.input, styles.textarea, { borderRadius: layout.radius.sm }]}
-              />
-
-              <View style={styles.panelActions}>
-                <TouchableOpacity onPress={closeForm} style={[styles.ghostBtn, { borderRadius: layout.radius.sm }]}>
-                  <Text style={styles.ghostBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <PrimaryButton
-                  onPress={submitEvent}
-                  disabled={eventSubmitting}
-                  style={[styles.saveBtn, { borderRadius: layout.radius.sm }]}
-                  outerStyle={{ borderRadius: layout.radius.sm }}
-                >
-                  <Text style={styles.onPrimaryText}>{eventSubmitting ? 'Saving…' : 'Log it'}</Text>
-                </PrimaryButton>
-              </View>
-            </View>
-          )}
-
-          {/* Timeline */}
-          {events.length === 0 ? (
-            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md, alignItems: 'center' }]}>
-              <Text style={styles.emptyHistory}>No events yet. Log births, deaths, restocks, and observations to track the colony over time.</Text>
-            </View>
-          ) : (
-            <View style={[styles.historyWrap, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.md }]}>
-              {events.map((ev, idx) => (
-                <View
-                  key={ev.id}
-                  style={[styles.logRow, { borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
-                >
-                  <Text style={styles.logIcon}>{COLONY_EVENT_ICONS[ev.event_type]}</Text>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <View style={styles.logTopRow}>
-                      <Text style={styles.logTitle}>
-                        {COLONY_EVENT_LABELS[ev.event_type]}
-                        {ev.stage ? <Text style={styles.logStage}>{`  ${ev.stage}`}</Text> : null}
-                        {ev.count_delta != null && ev.count_delta !== 0 && (
-                          <Text style={{ color: ev.count_delta > 0 ? colors.success : colors.error, fontWeight: '700' }}>
-                            {`  ${ev.count_delta > 0 ? '+' : ''}${ev.count_delta.toLocaleString()}`}
-                          </Text>
-                        )}
-                      </Text>
-                      <Text style={styles.logDate}>{formatLocalDate(ev.occurred_at, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-                    </View>
-                    {ev.severity ? <Text style={styles.logSeverity}>{`Severity: ${ev.severity}`}</Text> : null}
-                    {ev.notes ? <Text style={styles.logNotes} numberOfLines={6}>{ev.notes}</Text> : null}
-                    {attribution(ev) ? <Text style={styles.logSeverity}>{attribution(ev)}</Text> : null}
-                  </View>
-                  {mayChange(ev) && <TouchableOpacity
-                    onPress={() => setConfirmDeleteEventId(ev.id)}
-                    accessibilityLabel={`Delete ${COLONY_EVENT_LABELS[ev.event_type]} event`}
-                    style={{ padding: 6 }}
-                  >
-                    <MaterialCommunityIcons name="close" size={18} color={colors.textTertiary} />
-                  </TouchableOpacity>}
-                </View>
-              ))}
-            </View>
-          )}
-
           {/* Delete colony */}
           {isOwner && <TouchableOpacity
             onPress={() => setConfirmDelete(true)}
@@ -1306,6 +1293,16 @@ export default function ColonyDetailScreen() {
           <View style={{ height: 32 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ColonyQuickLogSheet
+        kind={quick}
+        colonyId={colony.id}
+        taxon={colony.taxon}
+        stageCounts={colony.stage_counts}
+        onClose={() => setQuick(null)}
+        onSaved={fetchColony}
+        onMore={(type) => openForm(type)}
+      />
 
       {/* Delete colony modal */}
       <Modal visible={confirmDelete} transparent animationType="fade" onRequestClose={() => !deleting && setConfirmDelete(false)}>
@@ -1351,6 +1348,14 @@ export default function ColonyDetailScreen() {
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
+    identity: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, padding: 12, marginBottom: 12 },
+    identityThumb: { width: 52, height: 52 },
+    identityTile: { alignItems: 'center', justifyContent: 'center' },
+    identityLink: { minHeight: 32, justifyContent: 'center', alignSelf: 'flex-start' },
+    archivedInline: { position: 'relative', top: 0, right: 0 },
+    quickRow: { flexDirection: 'row', gap: 8, marginTop: 12, marginBottom: 16 },
+    quickTile: { flex: 1, alignItems: 'center', gap: 4, borderWidth: 1, paddingVertical: 11, minHeight: 64, justifyContent: 'center' },
+    collapseHead: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
     content: { flex: 1 },
     partialFail: { marginHorizontal: 16, marginTop: 12, padding: 12, borderWidth: 1, gap: 4 },
     partialFailRetry: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' },

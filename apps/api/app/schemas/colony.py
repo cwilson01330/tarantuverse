@@ -199,16 +199,19 @@ class ColonyListItem(BaseModel):
     species_scientific_name: Optional[str] = None
     species_missing: bool = False
 
-    model_config = ConfigDict(from_attributes=True)
-
-
-# ---------- ColonyEvent ----------
     # Last ACCEPTED feeding, so the collection card can say "Fed 4d ago" like
     # every other card. No overdue flag: a colony has no life_stage to resolve
     # a cadence from, and guessing one would be fabrication.
     last_feeding_date: Optional[datetime] = None
     days_since_last_feeding: Optional[int] = None
+    # Net of logged count changes over the last 30 days; None when nothing
+    # moved the count in that window.
+    change_30d: Optional[int] = None
 
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------- ColonyEvent ----------
 
 class ColonyEventCreate(BaseModel):
     event_type: str

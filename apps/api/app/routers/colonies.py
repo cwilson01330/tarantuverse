@@ -11,7 +11,7 @@ place) so SQLAlchemy flushes the change.
 """
 from typing import List, Optional
 from uuid import UUID
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
@@ -112,6 +112,9 @@ def _event_for(db: Session, event_id: UUID, user: User, need: str):
     return log
 
 
+CHANGE_WINDOW_DAYS = 30
+
+
 def _apply_delta(colony: Colony, stage: Optional[str], delta: Optional[int]) -> None:
     """Adjust a bucket by delta (clamped at 0). Reassigns the JSONB dict so
     SQLAlchemy detects the change. Missing stage defaults to 'mixed'."""
@@ -162,12 +165,33 @@ async def list_colonies(
         )
         last_fed = {r[0]: r[1] for r in rows}
 
+    # Net headcount change over the last 30 days, also ONE grouped query.
+    # A plain sum of logged deltas: it's what the keeper recorded, not a
+    # model. None (not 0) when nothing moved the count in the window, so the
+    # card can stay quiet instead of claiming "±0" for a colony nobody counted.
+    change_30d: dict = {}
+    if colonies:
+        since = date.today() - timedelta(days=CHANGE_WINDOW_DAYS)
+        rows = (
+            db.query(ColonyEvent.colony_id, func.sum(ColonyEvent.count_delta))
+            .filter(
+                ColonyEvent.colony_id.in_([c.id for c in colonies]),
+                ColonyEvent.count_delta.isnot(None),
+                ColonyEvent.count_delta != 0,
+                ColonyEvent.occurred_at >= since,
+            )
+            .group_by(ColonyEvent.colony_id)
+            .all()
+        )
+        change_30d = {r[0]: int(r[1]) for r in rows if r[1] is not None}
+
     now = datetime.now(timezone.utc)
     items = []
     for c in colonies:
         data = _build_response(c, db)
         fed_at = last_fed.get(c.id)
         data["last_feeding_date"] = fed_at
+        data["change_30d"] = change_30d.get(c.id)
         # Days since only — deliberately NOT an overdue flag. Overdue needs a
         # cadence, and a colony has no life_stage to resolve one from; the
         # stage buckets are a census, not a maturity. Inventing a cadence here

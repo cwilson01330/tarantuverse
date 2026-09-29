@@ -53,6 +53,9 @@ export interface ColonyListItem {
    *  every other card. */
   last_feeding_date?: string | null;
   days_since_last_feeding?: number | null;
+  /** Net of logged count changes over the last 30 days. Absent/null when
+   *  nothing moved the count in that window — show nothing, not "±0". */
+  change_30d?: number | null;
 }
 
 export interface Colony {
@@ -296,20 +299,8 @@ export const COLONY_EVENT_LABELS: Record<ColonyEventType, string> = {
   count_correction: 'Count correction',
 };
 
-/** Emoji glyph for an event type — used in the timeline. */
-export const COLONY_EVENT_ICONS: Record<ColonyEventType, string> = {
-  birth: '🐣',
-  death: '💀',
-  added: '➕',
-  removed: '➖',
-  cannibalism: '🩸',
-  aggression: '⚔️',
-  molt_found: '🐚',
-  split: '🔀',
-  merge: '🔗',
-  observation: '📝',
-  count_correction: '✏️',
-};
+// Event icons, colours and sentences live in ./colony-events (MDI icons —
+// the emoji map that used to be here, 💀 included, is retired).
 
 /** Event types that carry a severity rating (aggression/cannibalism). */
 export function eventHasSeverity(t: ColonyEventType): boolean {

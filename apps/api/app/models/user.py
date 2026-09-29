@@ -113,8 +113,18 @@ class User(Base):
     feeder_colonies = relationship("FeederColony", back_populates="user", lazy="select", passive_deletes=True)
 
     # Referral relationships
-    referred_by = relationship("User", remote_side=[id], foreign_keys=[referred_by_user_id], lazy="select")
-    referrals = relationship("User", foreign_keys="User.referred_by_user_id", lazy="select")
+    # One self-referential pair: `referred_by` is the many-to-one side,
+    # `referrals` the one-to-many. Declared as two independent relationships
+    # they both wrote users.referred_by_user_id, which SQLAlchemy warned about
+    # on every mapper configure (and in the Render logs).
+    referred_by = relationship(
+        "User", remote_side=[id], foreign_keys=[referred_by_user_id],
+        back_populates="referrals", lazy="select",
+    )
+    referrals = relationship(
+        "User", foreign_keys="User.referred_by_user_id",
+        back_populates="referred_by", lazy="select",
+    )
     referral_rewards = relationship("ReferralReward", back_populates="referrer", lazy="select", passive_deletes=True)
 
     # Linked OAuth accounts (allows multiple providers per user)

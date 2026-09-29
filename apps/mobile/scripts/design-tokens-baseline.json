@@ -1,8 +1,8 @@
 {
   "app/(tabs)/collection.tsx": {
     "hex": 1,
-    "fontSize": 30,
-    "borderRadius": 21
+    "fontSize": 28,
+    "borderRadius": 20
   },
   "app/(tabs)/community.tsx": {
     "hex": 3,
@@ -113,7 +113,7 @@
     "borderRadius": 7
   },
   "app/colony/[id].tsx": {
-    "fontSize": 36,
+    "fontSize": 35,
     "borderRadius": 8
   },
   "app/colony/add-feeding.tsx": {
