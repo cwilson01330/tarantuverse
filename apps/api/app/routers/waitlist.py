@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models.waitlist import WaitlistSignup
 from app.schemas.waitlist import WaitlistCreate, WaitlistResponse
 from app.utils.rate_limit import limiter
+from app.utils.rate_limit import client_ip as _client_ip
 
 router = APIRouter()
 
@@ -32,7 +33,8 @@ async def add_to_waitlist(
     payload: WaitlistCreate,
     db: Session = Depends(get_db),
 ):
-    client_ip = request.client.host if request.client else ""
+    # Same spoof-resistant address the rate limiter uses (utils/rate_limit.py).
+    client_ip = _client_ip(request)
     user_agent = (request.headers.get("user-agent") or "")[:512]
     email_clean = payload.email.lower().strip()
 
