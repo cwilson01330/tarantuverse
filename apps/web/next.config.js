@@ -14,7 +14,16 @@ const nextConfig = {
   },
   // Ship the share-card fonts with the serverless functions (read via readFile).
   outputFileTracingIncludes: {
-    '/api/**': ['./src/lib/share-card/fonts/**'],
+    '/api/card/*': ['./src/lib/share-card/fonts/*.ttf'],
+    '/api/card-link/*': ['./src/lib/share-card/fonts/*.ttf'],
+    '/api/og/**': ['./src/lib/share-card/fonts/*.ttf'],
+  },
+  // Backstop: never let the card routes trace in source, build caches or the
+  // mobile apps (a runtime-built path once pulled in 430 MB).
+  outputFileTracingExcludes: {
+    '/api/card/*': ['./src/app/**', './.next/cache/**', '../mobile/**', '../mobile-herpetoverse/**', '../api/**'],
+    '/api/card-link/*': ['./src/app/**', './.next/cache/**', '../mobile/**', '../mobile-herpetoverse/**', '../api/**'],
+    '/api/og/**': ['./src/app/**', './.next/cache/**', '../mobile/**', '../mobile-herpetoverse/**', '../api/**'],
   },
   typescript: {
     ignoreBuildErrors: false,

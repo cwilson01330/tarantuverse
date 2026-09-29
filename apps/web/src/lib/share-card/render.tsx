@@ -8,24 +8,19 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000
 type Font = { name: string; data: Buffer; style: 'normal' | 'italic' }
 let fonts: Promise<Font[]> | null = null
 
-async function readFont(file: string): Promise<Buffer> {
-  const rel = ['src/lib/share-card/fonts', 'apps/web/src/lib/share-card/fonts']
-  let err: unknown
-  for (const dir of rel) {
-    try {
-      return await readFile(path.join(process.cwd(), dir, file))
-    } catch (e) {
-      err = e
-    }
-  }
-  throw err
+// Literal paths only. A path built at runtime (a loop over directories, a
+// variable file name) makes Vercel's file tracer give up and bundle the whole
+// project into the function — that pushed /api/card past the 250 MB limit.
+const FONT_FILES = {
+  regular: path.join(process.cwd(), 'src/lib/share-card/fonts/LibreCaslonText-Regular.ttf'),
+  italic: path.join(process.cwd(), 'src/lib/share-card/fonts/LibreCaslonText-Italic.ttf'),
 }
 
 function loadFonts(): Promise<Font[]> {
   if (!fonts) {
     fonts = Promise.all([
-      readFont('LibreCaslonText-Regular.ttf').then((data) => ({ name: 'Caslon', data, style: 'normal' as const })),
-      readFont('LibreCaslonText-Italic.ttf').then((data) => ({ name: 'Caslon', data, style: 'italic' as const })),
+      readFile(FONT_FILES.regular).then((data) => ({ name: 'Caslon', data, style: 'normal' as const })),
+      readFile(FONT_FILES.italic).then((data) => ({ name: 'Caslon', data, style: 'italic' as const })),
     ]).catch((e) => {
       fonts = null // don't poison a warm instance with one transient failure
       throw e
