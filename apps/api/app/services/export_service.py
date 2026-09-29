@@ -97,6 +97,10 @@ FEEDING_FIELDS = [
     "id", "tarantula_id", "invert_id", "colony_id", "animal_id", "enclosure_id",
     "fed_at", "food_type", "food_size", "quantity", "accepted", "notes",
     "created_at",
+    # Who logged it, when it wasn't the keeper (PRD-shared-keeping). Blank for
+    # the keeper's own entries. `sitter_name` is the pass label, so the export
+    # says "Sam" rather than an id the keeper can't look up.
+    "logged_via_pass_id", "logged_by_user_id", "sitter_name",
 ]
 
 MOLT_FIELDS = [

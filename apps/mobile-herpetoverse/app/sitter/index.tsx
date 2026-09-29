@@ -90,8 +90,15 @@ function SitterListScreen() {
     ]);
   };
 
-  const open = (passes ?? []).filter((p) => p.status === 'active' || p.status === 'scheduled');
-  const past = (passes ?? []).filter((p) => !(p.status === 'active' || p.status === 'scheduled'));
+  // Locked links stay under "Open": a lockout needs the keeper to act (unlock
+  // or end), so it mustn't sink into history.
+  const isOpen = (p: PassSummary) => p.status === 'active' || p.status === 'scheduled' || p.status === 'locked';
+  const open = (passes ?? []).filter(isOpen);
+  const past = (passes ?? []).filter((p) => !isOpen(p));
+  const loggingLabel = (p: PassSummary) =>
+    p.status === 'locked'
+      ? 'Locked — review'
+      : `Logging: ${p.can_log ? 'on' : 'off'}${p.log_count > 0 ? ` · ${p.log_count} logged` : ''}`;
   const card = [styles.card, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.lg }];
 
   return (
@@ -127,6 +134,14 @@ function SitterListScreen() {
             <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
               {p.open_count > 0 && p.last_used_at ? `Opened ${p.open_count}× · last ${fmtDay(p.last_used_at)}` : 'Not opened yet'}
             </Text>
+            {p.status === 'locked' && (
+              <Text style={[TYPE.bodyStrong, { color: colors.danger }]} accessibilityRole="alert">
+                Logging paused after 5 wrong PINs. The list still works.
+              </Text>
+            )}
+            <SitterButton label={loggingLabel(p)} variant={p.status === 'locked' ? 'danger' : 'secondary'} disabled={!!busy}
+              onPress={() => router.push({ pathname: '/sitter/logging', params: { id: p.id } } as never)}
+              accessibilityHint="Turn sitter logging on or off, change the PIN, and see what was logged" />
             <View style={styles.row}>
               <View style={styles.flexBtn}>
                 <SitterButton label="Preview" variant="secondary" busy={busy === p.id}
@@ -151,10 +166,14 @@ function SitterListScreen() {
           <>
             <Text style={[TYPE.heading, styles.h, { color: colors.textPrimary }]}>Past links</Text>
             {past.slice(0, 10).map((p) => (
-              <View key={p.id} style={[styles.pastRow, { borderColor: colors.border }]}>
+              <TouchableOpacity key={p.id} style={[styles.pastRow, { borderColor: colors.border }]}
+                disabled={p.log_count === 0} accessibilityRole={p.log_count > 0 ? 'button' : undefined}
+                onPress={() => router.push({ pathname: '/sitter/logging', params: { id: p.id } } as never)}>
                 <Text style={[TYPE.body, { color: colors.textPrimary }]}>{p.label || `Link …${p.token_prefix}`}</Text>
-                <Text style={[TYPE.caption, { color: colors.textTertiary }]}>{STATUS_LABEL[p.status]} · {fmtDay(p.expires_at)}</Text>
-              </View>
+                <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
+                  {STATUS_LABEL[p.status]} · {fmtDay(p.expires_at)}{p.log_count > 0 ? ` · ${p.log_count} logged` : ''}
+                </Text>
+              </TouchableOpacity>
             ))}
           </>
         )}

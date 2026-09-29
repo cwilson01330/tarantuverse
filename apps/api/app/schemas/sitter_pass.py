@@ -27,12 +27,26 @@ class PassCreate(BaseModel):
     starts_at: Optional[datetime] = None
     expires_at: datetime
     label: Optional[str] = Field(None, max_length=80)
+    # Rung 2 (premium). Logging always needs a PIN — the DB enforces it too.
+    can_log: bool = False
+    pin: Optional[str] = Field(None, max_length=12)
 
 
 class PassUpdate(BaseModel):
     label: Optional[str] = Field(None, max_length=80)
     expires_at: Optional[datetime] = None
     animals: Optional[List[PassAnimalRef]] = Field(None, min_length=1, max_length=MAX_ANIMALS_PER_PASS)
+    # Turning logging ON needs premium and a PIN (new, or the one already
+    # set). Turning it OFF clears the PIN. Changing just the PIN is always
+    # allowed — it's security hygiene, never a paywalled action.
+    can_log: Optional[bool] = None
+    pin: Optional[str] = Field(None, max_length=12)
+
+
+class PassUnlock(BaseModel):
+    """Keeper clears a PIN lockout. A new PIN is optional but recommended
+    when the keeper didn't cause the lockout themselves."""
+    pin: Optional[str] = Field(None, max_length=12)
 
 
 class PassSummary(BaseModel):
@@ -48,6 +62,10 @@ class PassSummary(BaseModel):
     open_count: int
     last_used_at: Optional[datetime]
     created_at: Optional[datetime]
+    can_log: bool = False
+    log_count: int = 0
+    # Never the PIN or its hash — only whether one is set.
+    has_pin: bool = False
 
 
 class PassCreated(PassSummary):
@@ -60,6 +78,30 @@ class PassCreated(PassSummary):
 
 class ExchangeRequest(BaseModel):
     token: str = Field(..., min_length=20, max_length=128)
+
+
+class PinUnlockRequest(BaseModel):
+    pin: str = Field(..., min_length=1, max_length=12)
+
+
+class SitterFeedingCreate(BaseModel):
+    """What a sitter can log. Deliberately narrow (PRD decision 5): a feeding
+    or a refusal, for one individual animal on their pass. No molts, no health
+    events, no dates in the past — fed_at is the server's clock."""
+    # Colonies are fed as a unit on the keeper's own schedule and their cards
+    # say "graze"; sitters don't log them in v1.
+    kind: Literal["invert", "animal"]
+    id: UUID
+    accepted: bool
+    food_type: Optional[str] = Field(None, max_length=100)
+    food_size: Optional[str] = Field(None, max_length=50)
+    quantity: Optional[int] = Field(None, ge=1, le=50)
+    notes: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("food_type", "food_size", "notes")
+    @classmethod
+    def _strip(cls, v: Optional[str]) -> Optional[str]:
+        return (v or "").strip() or None
 
 
 class SitterNoteUpdate(BaseModel):

@@ -44,6 +44,7 @@ interface PrefsResponse {
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
+  sitter_activity_enabled?: boolean;
 }
 
 const HOUR_OPTIONS: ChipOption<string>[] = [
@@ -70,6 +71,7 @@ function NotificationPreferencesScreen() {
   const [quietEnabled, setQuietEnabled] = useState(false);
   const [quietStart, setQuietStart] = useState('22:00');
   const [quietEnd, setQuietEnd] = useState('08:00');
+  const [sitterEnabled, setSitterEnabled] = useState(true);
 
   useEffect(() => {
     load();
@@ -92,6 +94,7 @@ function NotificationPreferencesScreen() {
       setQuietEnabled(data.quiet_hours_enabled);
       setQuietStart(data.quiet_hours_start || '22:00');
       setQuietEnd(data.quiet_hours_end || '08:00');
+      setSitterEnabled(data.sitter_activity_enabled ?? true);
     } catch {
       setLoadError(true);
     } finally {
@@ -136,6 +139,7 @@ function NotificationPreferencesScreen() {
         quiet_hours_enabled: quietEnabled,
         quiet_hours_start: quietStart,
         quiet_hours_end: quietEnd,
+        sitter_activity_enabled: sitterEnabled,
       });
       setSaved(true);
     } catch (err) {
@@ -177,6 +181,43 @@ function NotificationPreferencesScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
+          {/* ------------------- Sitter links ------------------- */}
+          <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>
+            SITTER LINKS
+          </Text>
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                borderRadius: layout.radius.lg,
+              },
+            ]}
+          >
+            <View style={styles.row}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                  Sitter activity
+                </Text>
+                <Text style={[styles.rowHint, { color: colors.textSecondary }]}>
+                  When a sitter starts logging feedings on one of your links
+                  (once per round). Lockouts always notify you.
+                </Text>
+              </View>
+              <Switch
+                value={sitterEnabled}
+                onValueChange={(v) => { markDirty(); setSitterEnabled(v); }}
+                trackColor={{
+                  false: colors.surfaceRaised,
+                  true: colors.primary,
+                }}
+                thumbColor="#0B0B0B"
+                accessibilityLabel="Sitter activity notifications"
+              />
+            </View>
+          </View>
+
           {/* ------------------- Feeding reminders ------------------- */}
           <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>
             FEEDING REMINDERS

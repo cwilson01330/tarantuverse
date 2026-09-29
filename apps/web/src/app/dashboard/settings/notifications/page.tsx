@@ -18,6 +18,7 @@ interface NotificationPreferences {
   forum_replies_enabled: boolean;
   new_followers_enabled: boolean;
   community_activity_enabled: boolean;
+  sitter_activity_enabled: boolean;
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
@@ -43,6 +44,7 @@ export default function NotificationSettingsPage() {
     forum_replies_enabled: true,
     new_followers_enabled: true,
     community_activity_enabled: false,
+    sitter_activity_enabled: true,
     quiet_hours_enabled: false,
     quiet_hours_start: '22:00',
     quiet_hours_end: '08:00',
@@ -106,6 +108,7 @@ export default function NotificationSettingsPage() {
         forum_replies_enabled: preferences.forum_replies_enabled,
         new_followers_enabled: preferences.new_followers_enabled,
         community_activity_enabled: preferences.community_activity_enabled,
+        sitter_activity_enabled: preferences.sitter_activity_enabled ?? true,
         quiet_hours_enabled: preferences.quiet_hours_enabled,
         quiet_hours_start: preferences.quiet_hours_start,
         quiet_hours_end: preferences.quiet_hours_end,
@@ -352,6 +355,31 @@ export default function NotificationSettingsPage() {
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                     preferences.new_followers_enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Sitter activity */}
+            <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Sitter activity</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  When a sitter starts logging feedings on one of your links (once per round). Lockouts always notify you.
+                </p>
+              </div>
+              <button
+                onClick={() => togglePreference('sitter_activity_enabled')}
+                role="switch"
+                aria-checked={preferences.sitter_activity_enabled ?? true}
+                aria-label="Sitter activity notifications"
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ml-4 ${
+                  (preferences.sitter_activity_enabled ?? true) ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    (preferences.sitter_activity_enabled ?? true) ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>

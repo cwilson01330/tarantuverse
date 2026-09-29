@@ -19,8 +19,10 @@ import {
   PASS_MAX_DAYS,
   PassApiError,
   STATUS_LABEL,
+  pinProblem,
   shareUrl,
   sitterApi,
+  type ActivityEntry,
   type Candidate,
   type PassCreated,
   type PassSummary,
@@ -32,6 +34,7 @@ type Mode =
   | { kind: 'new' }
   | { kind: 'link'; created: PassCreated }
   | { kind: 'preview'; pass: PassSummary; data: Payload }
+  | { kind: 'activity'; pass: PassSummary; entries: ActivityEntry[] }
 
 const BTN = 'px-4 py-2 rounded-xl font-medium transition disabled:opacity-50'
 const BTN_PRIMARY = `${BTN} herp-gradient-bg text-herp-dark hover:opacity-90`
@@ -57,6 +60,7 @@ export default function SitterPage() {
   const [passes, setPasses] = useState<PassSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [upgrade, setUpgrade] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!token) return
@@ -82,16 +86,21 @@ export default function SitterPage() {
     try {
       await fn()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.')
+      if (e instanceof PassApiError && e.status === 402) setUpgrade(e.message)
+      else setError(e instanceof Error ? e.message : 'Something went wrong.')
     } finally {
       setBusy(null)
     }
   }
 
-  const open = (passes ?? []).filter((p) => p.status === 'active' || p.status === 'scheduled')
-  const past = (passes ?? []).filter((p) => !(p.status === 'active' || p.status === 'scheduled'))
+  // Locked links stay in "open": a lockout is something the keeper has to act
+  // on (unlock or end), not history.
+  const isOpen = (p: PassSummary) => p.status === 'active' || p.status === 'scheduled' || p.status === 'locked'
+  const open = (passes ?? []).filter(isOpen)
+  const past = (passes ?? []).filter((p) => !isOpen(p))
 
   return (
+    <>
       <div className="max-w-3xl mx-auto space-y-6">
         <header>
           <h1 className="text-2xl font-bold text-neutral-100">Sitter &amp; sharing</h1>
@@ -131,6 +140,9 @@ export default function SitterPage() {
                     void act('revoke', async () => { await sitterApi.revoke(token!, p.id); await refresh() })
                   }}
                   onExtend={(iso) => act('extend', async () => { await sitterApi.update(token!, p.id, { expires_at: iso }); await refresh() })}
+                  onLogging={(body) => act('logging', async () => { await sitterApi.update(token!, p.id, body); await refresh() })}
+                  onUnlock={(pin) => act('unlock', async () => { await sitterApi.unlock(token!, p.id, pin); await refresh() })}
+                  onActivity={() => act('activity', async () => setMode({ kind: 'activity', pass: p, entries: await sitterApi.activity(token!, p.id) }))}
                 />
               ))}
             </section>
@@ -139,9 +151,17 @@ export default function SitterPage() {
               <section className="space-y-2">
                 <h2 className="text-lg font-semibold text-neutral-100">Past links</h2>
                 {past.slice(0, 10).map((p) => (
-                  <div key={p.id} className="flex justify-between text-sm p-3 rounded-xl bg-neutral-900 border border-neutral-800">
+                  <div key={p.id} className="flex justify-between items-center gap-3 text-sm p-3 rounded-xl bg-neutral-900 border border-neutral-800">
                     <span className="text-neutral-100">{p.label || `Link …${p.token_prefix}`}</span>
-                    <span className="text-neutral-500">{STATUS_LABEL[p.status]} · {fmt(p.expires_at)}</span>
+                    <span className="flex items-center gap-3 text-neutral-500">
+                      {STATUS_LABEL[p.status]} · {fmt(p.expires_at)}
+                      {p.log_count > 0 && (
+                        <button className="underline text-neutral-400" disabled={!!busy}
+                          onClick={() => act('activity', async () => setMode({ kind: 'activity', pass: p, entries: await sitterApi.activity(token!, p.id) }))}>
+                          {p.log_count} logged
+                        </button>
+                      )}
+                    </span>
                   </div>
                 ))}
               </section>
@@ -161,6 +181,10 @@ export default function SitterPage() {
           <LinkReveal created={mode.created} onDone={() => { setMode({ kind: 'list' }); void refresh() }} />
         )}
 
+        {mode.kind === 'activity' && (
+          <ActivityView pass={mode.pass} entries={mode.entries} onBack={() => setMode({ kind: 'list' })} />
+        )}
+
         {mode.kind === 'preview' && (
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -175,16 +199,22 @@ export default function SitterPage() {
           </section>
         )}
       </div>
+      <UpgradeModal isOpen={upgrade !== null} onClose={() => setUpgrade(null)} source="shared_keeping"
+        message={upgrade} />
+    </>
   )
 }
 
-function PassRow({ pass, busy, onPreview, onRotate, onRevoke, onExtend }: {
+function PassRow({ pass, busy, onPreview, onRotate, onRevoke, onExtend, onLogging, onUnlock, onActivity }: {
   pass: PassSummary
   busy: string | null
   onPreview: () => void
   onRotate: () => void
   onRevoke: () => void
   onExtend: (iso: string) => void
+  onLogging: (body: { can_log?: boolean; pin?: string }) => void
+  onUnlock: (pin?: string) => void
+  onActivity: () => void
 }) {
   const maxEnd = new Date(new Date(pass.starts_at).getTime() + PASS_MAX_DAYS * 86400000 - 60000)
   const [extendTo, setExtendTo] = useState(dateInput(new Date(pass.expires_at)))
@@ -198,6 +228,11 @@ function PassRow({ pass, busy, onPreview, onRotate, onRevoke, onExtend }: {
           </p>
           <p className="text-xs text-neutral-500">
             {pass.open_count > 0 ? `Opened ${pass.open_count}× · last ${fmt(pass.last_used_at!)}` : 'Not opened yet'}
+            {pass.log_count > 0 && (
+              <> · <button className="underline text-neutral-400" onClick={onActivity} disabled={!!busy}>
+                {pass.log_count} {pass.log_count === 1 ? 'feeding' : 'feedings'} logged
+              </button></>
+            )}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-start">
@@ -207,6 +242,8 @@ function PassRow({ pass, busy, onPreview, onRotate, onRevoke, onExtend }: {
             disabled={!!busy} onClick={onRevoke}>End now</button>
         </div>
       </div>
+      {pass.status === 'locked' && <LockedBanner busy={busy} onUnlock={onUnlock} onRevoke={onRevoke} />}
+      <LoggingControls pass={pass} busy={busy} onChange={onLogging} />
       <div className="flex items-end gap-2 flex-wrap">
         <label className="text-sm text-neutral-400">
           Ends on
@@ -241,6 +278,8 @@ function NewPass({ token, onCancel, onCreated }: {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [upgrade, setUpgrade] = useState<string | null>(null)
+  const [canLog, setCanLog] = useState(false)
+  const [pin, setPin] = useState('')
 
   useEffect(() => {
     sitterApi.candidates(token).then((c) => {
@@ -283,6 +322,13 @@ function NewPass({ token, onCancel, onCreated }: {
       setError('Pick at least one animal.')
       return
     }
+    if (canLog) {
+      const problem = pinProblem(pin)
+      if (problem) {
+        setError(`PIN: ${problem}`)
+        return
+      }
+    }
     setSaving(true)
     try {
       onCreated(await sitterApi.create(token, {
@@ -290,6 +336,7 @@ function NewPass({ token, onCancel, onCreated }: {
         label: label.trim() || undefined,
         starts_at: startDate.getTime() > Date.now() ? startsAt.toISOString() : undefined,
         expires_at: endAt.toISOString(),
+        ...(canLog ? { can_log: true, pin } : {}),
       }))
     } catch (e) {
       if (e instanceof PassApiError && e.status === 402) setUpgrade(e.message)
@@ -372,6 +419,22 @@ function NewPass({ token, onCancel, onCreated }: {
         </p>
       </div>
 
+      <fieldset className="space-y-2 p-4 rounded-xl border border-neutral-800">
+        <legend className="px-1 font-semibold text-neutral-100">Logging back <span className="text-xs font-normal text-neutral-500">Premium</span></legend>
+        <label className="flex items-start gap-2 text-neutral-100">
+          <input type="checkbox" className="mt-1" checked={canLog} onChange={(e) => setCanLog(e.target.checked)} />
+          <span>
+            Let {label.trim() || 'your sitter'} mark animals as fed or refused
+            <span className="block text-sm text-neutral-400">
+              Their entries land in your records, labelled with their name, so nothing goes missing while you&apos;re away.
+            </span>
+          </span>
+        </label>
+        {canLog && (
+          <PinField value={pin} onChange={setPin} />
+        )}
+      </fieldset>
+
       <div className="flex gap-3">
         <button className={BTN_PRIMARY} disabled={saving} onClick={submit}>{saving ? 'Making link…' : 'Make link'}</button>
         <button className={BTN_SECONDARY} onClick={onCancel}>Cancel</button>
@@ -411,6 +474,12 @@ function LinkReveal({ created, onDone }: { created: PassCreated; onDone: () => v
           <p className="text-xs text-neutral-500">
             Anyone with this link can see the feeding list until it ends. You can end it early at any time.
           </p>
+          {created.can_log && (
+            <p className="text-sm p-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200">
+              <strong>Tell them the PIN separately</strong> — say it, or send it in a different message.
+              The link alone can only read; the PIN is what lets someone log.
+            </p>
+          )}
         </div>
       </div>
       <button className={BTN_SECONDARY} onClick={onDone}>Done</button>
@@ -495,6 +564,135 @@ function GuideEditor({ token }: { token: string }) {
         <button className={BTN_PRIMARY} onClick={save}>Save routine</button>
         {status && <span role="status" className="text-sm text-neutral-400">{status}</span>}
       </div>
+    </section>
+  )
+}
+
+function PinField({ value, onChange, label = 'PIN for logging' }: {
+  value: string
+  onChange: (v: string) => void
+  label?: string
+}) {
+  const problem = value.length >= 4 ? pinProblem(value) : null
+  return (
+    <label className="block text-sm text-neutral-400 max-w-xs">
+      {label}
+      <input className={`${INPUT} mt-1 tracking-widest`} inputMode="numeric" autoComplete="off" maxLength={6}
+        value={value} placeholder="4–6 digits" onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+        aria-invalid={!!problem} />
+      <span className={`block mt-1 text-xs ${problem ? 'text-red-300' : 'text-neutral-500'}`}>
+        {problem ?? 'Tell your sitter this separately from the link. 5 wrong tries pause the link and tell you.'}
+      </span>
+    </label>
+  )
+}
+
+function LoggingControls({ pass, busy, onChange }: {
+  pass: PassSummary
+  busy: string | null
+  onChange: (body: { can_log?: boolean; pin?: string }) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [pin, setPin] = useState('')
+  const ok = pinProblem(pin) === null
+  const save = (body: { can_log?: boolean; pin?: string }) => {
+    onChange(body)
+    setEditing(false)
+    setPin('')
+  }
+  return (
+    <div className="p-3 rounded-xl bg-neutral-800 space-y-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-neutral-100">
+          <span className="font-medium">Logging back:</span>{' '}
+          {pass.can_log ? 'On — your sitter can mark feedings with the PIN.' : 'Off — the link is read-only.'}
+        </p>
+        {!editing && (
+          <div className="flex gap-2">
+            {pass.can_log ? (
+              <>
+                <button className="text-sm underline text-neutral-400" disabled={!!busy} onClick={() => setEditing(true)}>Change PIN</button>
+                <button className="text-sm underline text-neutral-400" disabled={!!busy}
+                  onClick={() => { if (confirm('Turn off logging? Your sitter can still see the list, but can no longer mark feedings.')) save({ can_log: false }) }}>
+                  Turn off
+                </button>
+              </>
+            ) : (
+              <button className="text-sm underline text-neutral-400" disabled={!!busy} onClick={() => setEditing(true)}>Turn on</button>
+            )}
+          </div>
+        )}
+      </div>
+      {editing && (
+        <div className="flex items-end gap-2 flex-wrap">
+          <PinField value={pin} onChange={setPin} label={pass.can_log ? 'New PIN' : 'PIN for logging'} />
+          <button className={BTN_PRIMARY} disabled={!!busy || !ok}
+            onClick={() => save(pass.can_log ? { pin } : { can_log: true, pin })}>
+            {pass.can_log ? 'Save PIN' : 'Turn on logging'}
+          </button>
+          <button className={BTN_SECONDARY} onClick={() => { setEditing(false); setPin('') }}>Cancel</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LockedBanner({ busy, onUnlock, onRevoke }: {
+  busy: string | null
+  onUnlock: (pin?: string) => void
+  onRevoke: () => void
+}) {
+  const [pin, setPin] = useState('')
+  const pinOk = pin === '' || pinProblem(pin) === null
+  return (
+    <div role="alert" className="p-3 rounded-xl border border-red-500/40 bg-red-500/10 space-y-2">
+      <p className="text-sm text-red-200">
+        <strong>Logging on this link is paused.</strong> Someone entered the wrong PIN 5 times. Your sitter can
+        still see the feeding list. If it was them, unlock logging — a new PIN is safest. If you&apos;re not sure who
+        it was, end the link and send a new one.
+      </p>
+      <div className="flex items-end gap-2 flex-wrap">
+        <PinField value={pin} onChange={setPin} label="New PIN (optional)" />
+        <button className={BTN_PRIMARY} disabled={!!busy || !pinOk} onClick={() => onUnlock(pin || undefined)}>Unlock</button>
+        <button className={`${BTN} border border-red-500/40 text-red-300`} disabled={!!busy} onClick={onRevoke}>End it</button>
+      </div>
+    </div>
+  )
+}
+
+function ActivityView({ pass, entries, onBack }: { pass: PassSummary; entries: ActivityEntry[]; onBack: () => void }) {
+  const who = pass.label || 'Your sitter'
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold text-neutral-100">What {who} logged</h2>
+          <p className="text-sm text-neutral-400">
+            These are in your feeding records too, marked &ldquo;Fed by {who} (sitter link)&rdquo;. Edit or delete them there.
+          </p>
+        </div>
+        <button className={BTN_SECONDARY} onClick={onBack}>Back</button>
+      </div>
+      {entries.length === 0 && <p className="text-neutral-400">Nothing logged yet.</p>}
+      <ul className="space-y-2">
+        {entries.map((e) => (
+          <li key={e.id} className="p-3 rounded-xl bg-neutral-900 border border-neutral-800">
+            <div className="flex justify-between gap-3 flex-wrap">
+              <span className="font-medium text-neutral-100">
+                <span aria-hidden>{e.accepted ? '✓ ' : '✗ '}</span>
+                {e.animal_name} — {e.accepted ? 'fed' : 'refused'}
+                {(e.food_type || e.food_size) && (
+                  <span className="font-normal text-neutral-400"> · {[e.quantity && e.quantity > 1 ? `${e.quantity}×` : null, e.food_size, e.food_type].filter(Boolean).join(' ')}</span>
+                )}
+              </span>
+              <span className="text-sm text-neutral-500">
+                {e.fed_at ? new Date(e.fed_at).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''}
+              </span>
+            </div>
+            {e.notes && <p className="mt-1 text-sm text-neutral-400 italic">&ldquo;{e.notes}&rdquo;</p>}
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

@@ -129,6 +129,13 @@ class FeedingLogResponse(FeedingLogBase):
     # one without inferring it from which id is missing.
     colony_id: Optional[uuid.UUID] = None
     created_at: datetime
+    # Authorship (PRD-shared-keeping). Both null = the owner logged it.
+    # `sitter_name` is set only for pass-logged rows: the pass label, or
+    # "Your sitter" when the keeper didn't name them. Clients render
+    # "Fed by {sitter_name} (sitter link)".
+    logged_via_pass_id: Optional[uuid.UUID] = None
+    logged_by_user_id: Optional[uuid.UUID] = None
+    sitter_name: Optional[str] = None
 
     class Config:
         from_attributes = True

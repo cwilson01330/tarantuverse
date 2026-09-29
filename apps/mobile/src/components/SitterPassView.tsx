@@ -46,6 +46,11 @@ export default function SitterPassView({ data }: { data: Payload }) {
       {data.label ? <Text style={[TYPE.body, { color: colors.textSecondary }]}>Hi {data.label},</Text> : null}
       <Text style={[TYPE.title, { color: colors.textPrimary }]}>{data.keeper_name}&apos;s feeding list</Text>
       <Text style={[TYPE.caption, { color: colors.textSecondary }]}>Open until {fmtDay(data.expires_at)}</Text>
+      {data.can_log && (
+        <Text style={[TYPE.caption, { color: colors.textSecondary }]}>
+          Logging is on: your sitter sees a PIN box here, then Fed / Refused buttons on each animal.
+        </Text>
+      )}
 
       <View style={styles.chips}>
         <Chip color={stateColor.feed} label={`Feed today: ${s.feed_today}`} radius={layout.radius.full} />

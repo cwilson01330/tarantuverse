@@ -78,6 +78,8 @@ interface FeedingLog {
   accepted: boolean
   notes?: string
   created_at: string
+  /** Set only when a sitter logged it through a sitter link. */
+  sitter_name?: string | null
 }
 
 interface MoltLog {
@@ -1893,6 +1895,11 @@ export default function TarantulaDetailPage() {
                           <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${feeding.accepted ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'}`}>
                             {feeding.accepted ? '✓ Accepted' : '✗ Refused'}
                           </span>
+                          {feeding.sitter_name && (
+                            <span className="ml-2 inline-block px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                              Logged by {feeding.sitter_name} (sitter link)
+                            </span>
+                          )}
                           {feeding.notes && (
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 pl-11">{feeding.notes}</p>
                           )}

@@ -105,7 +105,7 @@ interface Invert {
   feeding_interval_days?: number | null
 }
 
-interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
+interface FeedingLog { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null; sitter_name?: string | null }
 interface MoltLog { id: string; molted_at: string; notes?: string | null }
 interface SubstrateChange { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
 /** Hydration events (car_20260909). Three types, because a top-up, a
@@ -601,6 +601,7 @@ export default function InvertDetailPage() {
                 key: x.id,
                 left: `${x.food_type || 'Feeding'} · ${x.accepted ? 'Accepted' : 'Refused'}`,
                 right: formatLocalDate(x.fed_at),
+                sub: x.sitter_name ? `Logged by ${x.sitter_name} (sitter link)` : undefined,
                 onEdit: () => router.push(`/dashboard/inverts/${id}/add-feeding?${qp({ logId: x.id, fed_at: x.fed_at, food_type: x.food_type, accepted: x.accepted, notes: x.notes })}`),
                 onDelete: () => deleteLog(`feedings/${x.id}`, 'feeding'),
               }))}
@@ -1155,7 +1156,7 @@ function LogSection({
   cta: string
   onCta: () => void
   empty: string
-  rows: { key: string; left: string; right: string; onEdit?: () => void; onDelete?: () => void }[]
+  rows: { key: string; left: string; right: string; sub?: string; onEdit?: () => void; onDelete?: () => void }[]
   /** Loading ≠ zero ≠ error — see LoadState. */
   state?: LoadState
   onRetry?: () => void
@@ -1191,7 +1192,10 @@ function LogSection({
       ) : (
         rows.map((r) => (
           <div key={r.key} className="group flex items-center gap-3 py-1.5 border-b border-theme last:border-0">
-            <span className="flex-1 text-sm text-theme-primary">{r.left}</span>
+            <span className="flex-1 text-sm text-theme-primary">
+              {r.left}
+              {r.sub && <span className="block text-xs text-theme-tertiary">{r.sub}</span>}
+            </span>
             <span className="text-sm text-theme-tertiary">{r.right}</span>
             {r.onEdit && (
               <button

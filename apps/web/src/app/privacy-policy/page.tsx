@@ -142,6 +142,9 @@ export default function PrivacyPolicyPage() {
             <p className="text-gray-700 dark:text-gray-300 mb-4">
               The sitter does not need an account, and we do not ask for their name, email address or phone number. If you type a name for the sitter, it is stored with the link and shown to them. When a link is opened we record how many times it has been opened and when it was last used, so you can see that in the app; we do not record who opened it. As with any request to our servers, opening a link passes through our standard security measures, which use IP addresses briefly for rate limiting and abuse prevention. The link&rsquo;s access code is never stored in readable form &mdash; we keep only a one-way fingerprint of it &mdash; and our analytics tools are switched off on sitter pages.
             </p>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              If you turn on logging for a link (a premium feature), the person using it can mark the animals on that link as fed or refused, after entering a PIN that you set and share with them separately. Those entries become part of your feeding records, labelled with the sitter name you typed for the link, and count toward your feeding history and statistics like entries you make yourself. The sitter can add a short note and can undo their own entry within an hour; they cannot see or change anything else in your account. The PIN is stored only as a one-way fingerprint, and after five wrong PINs, logging on that link pauses (the feeding list stays available) and we notify you.
+            </p>
           </section>
 
           <section className="mb-8">
@@ -184,7 +187,7 @@ export default function PrivacyPolicyPage() {
               Aggregated or de-identified information that can no longer reasonably be linked to you may be retained and used indefinitely. Log data and backups are rotated on normal operational schedules.
             </p>
             <p className="text-gray-700 dark:text-gray-300 mt-4">
-              Sitter links you create, and their open counts, are kept with your account so you can see past links, and are deleted along with your account.
+              Sitter links you create, and their open counts, are kept with your account so you can see past links, and are deleted along with your account. Feedings a sitter logs are kept as part of your records, like any other feeding log.
             </p>
           </section>
 

@@ -3,10 +3,20 @@
 /**
  * The sitter's view of a pass — shared by /sit (the sitter) and the keeper's
  * "preview as sitter" screen, so the preview is the page, not an imitation of it.
- * Renders only what /sitter/pass returns; it never fetches or writes anything.
+ * Renders only what /sitter/pass returns. It never fetches or writes anything
+ * itself: logging (rung 2) goes through the `logging` handlers, which only
+ * /sit supplies — so the keeper's preview is read-only by construction.
  */
 
 import Link from 'next/link'
+import {
+  EntryList,
+  LogPanel,
+  PreviewLoggingNote,
+  UnlockPanel,
+  type SitterEntry,
+  type SitterLoggingHandlers,
+} from '@/components/SitterLogging'
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export type Source = 'safety' | 'keeper' | 'record' | 'species' | 'default'
@@ -29,12 +39,19 @@ export interface Card {
     next_due_on: string | null
   } | null
   sections: Section[]
+  // Rung 2 (sitter logging)
+  loggable?: boolean
+  prefill?: { food_type: string | null; food_size: string | null } | null
+  sitter_logs?: SitterEntry[]
 }
 export interface Payload {
   keeper_name: string
   label: string | null
   starts_at: string
   expires_at: string
+  can_log?: boolean
+  logging_unlocked?: boolean
+  logging_locked?: boolean
   routine: {
     summary: { feed_today: number; dont_feed: number; not_due: number; check: number; total: number }
     steps: Line[]
@@ -76,7 +93,7 @@ export function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
-export default function SitterPassView({ data }: { data: Payload }) {
+export default function SitterPassView({ data, logging }: { data: Payload; logging?: SitterLoggingHandlers }) {
   const { routine } = data
   const s = routine.summary
   return (
@@ -97,6 +114,13 @@ export default function SitterPassView({ data }: { data: Payload }) {
           className="inline-block mt-4 text-sm font-medium text-red-700 dark:text-red-300 underline">
           If something goes wrong →
         </a>
+        {data.can_log && (
+          <div className="mt-4">
+            {logging
+              ? <UnlockPanel handlers={logging} keeperName={data.keeper_name} paused={!!data.logging_locked} />
+              : <PreviewLoggingNote />}
+          </div>
+        )}
       </header>
 
       {routine.steps.length > 0 && (
@@ -117,7 +141,7 @@ export default function SitterPassView({ data }: { data: Payload }) {
               {g.title} <span className="text-gray-500 dark:text-gray-400 font-normal">({cards.length})</span>
             </h2>
             <div className="space-y-4">
-              {cards.map((c) => <AnimalCard key={`${c.kind}-${c.id}`} card={c} />)}
+              {cards.map((c) => <AnimalCard key={`${c.kind}-${c.id}`} card={c} logging={logging} />)}
             </div>
           </section>
         )
@@ -150,7 +174,7 @@ function Chip({ className, children }: { className: string; children: React.Reac
   return <span className={`px-3 py-1 rounded-full font-medium ${className}`}>{children}</span>
 }
 
-function AnimalCard({ card }: { card: Card }) {
+function AnimalCard({ card, logging }: { card: Card; logging?: SitterLoggingHandlers }) {
   const img = imageUrl(card.photo_url)
   const title = card.name || card.common_name || card.scientific_name || 'Unnamed'
   const subtitle = [card.name ? card.common_name : null, card.scientific_name].filter(Boolean).join(' · ')
@@ -178,6 +202,11 @@ function AnimalCard({ card }: { card: Card }) {
         {card.sections.filter((sec) => sec.key !== 'today').map((sec) => (
           <CardSection key={sec.key} section={sec} />
         ))}
+        {card.loggable && logging?.unlocked && (
+          <LogPanel kind={card.kind} id={card.id} name={title} prefill={card.prefill ?? null}
+            paused={card.feeding?.state === 'dont_feed'} handlers={logging} />
+        )}
+        <EntryList entries={card.sitter_logs ?? []} handlers={logging} />
       </div>
     </article>
   )

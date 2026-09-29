@@ -78,6 +78,20 @@ class FeedingLog(Base):
 
     notes = Column(Text)
 
+    # Authorship (slg_20260928_sitter_logging). Both NULL = the owner logged
+    # it, which is what every row before sitter logging means. SET NULL on
+    # delete: removing a pass or an account strips attribution, never history.
+    logged_via_pass_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("keeper_passes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    logged_by_user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -90,6 +104,20 @@ class FeedingLog(Base):
     animal = relationship("Animal", backref=backref("feeding_logs", passive_deletes=True))
     scorpion = relationship("Scorpion", backref=backref("feeding_logs", passive_deletes=True))
     invert = relationship("Invert", backref=backref("feeding_logs", passive_deletes=True))
+    logged_via_pass = relationship("KeeperPass", lazy="select")
+
+    @property
+    def sitter_name(self):
+        """Who logged this, when it came through a sitter pass; else None.
+
+        Reads the pass's label (the sitter's name as the keeper typed it).
+        Checks the id first so owner-logged rows never trigger a lazy load.
+        """
+        if self.logged_via_pass_id is None:
+            return None
+        p = self.logged_via_pass
+        label = (getattr(p, "label", None) or "").strip() if p is not None else ""
+        return label or "Your sitter"
 
     def __repr__(self):
         parent = (

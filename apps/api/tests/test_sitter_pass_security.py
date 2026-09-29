@@ -45,7 +45,7 @@ class FakeQuery:
     def filter(self, *a, **k):
         return self
 
-    options = order_by = limit = with_for_update = filter
+    options = order_by = limit = with_for_update = populate_existing = filter
 
     def first(self):
         return self.result
@@ -138,10 +138,9 @@ class TestSessionRechecks:
 
     @pytest.mark.parametrize("change", [
         {"revoked_at": NOW},
-        {"locked_at": NOW},
         {"expires_at": NOW - timedelta(seconds=1)},
         {"starts_at": NOW + timedelta(days=1)},
-    ], ids=["revoked", "locked", "expired", "not-started"])
+    ], ids=["revoked", "expired", "not-started"])
     def test_existing_session_dies_with_the_pass(self, change):
         _, p = make_pass()
         token = auth.create_pass_session(p)[0]
@@ -150,6 +149,14 @@ class TestSessionRechecks:
         with pytest.raises(HTTPException) as e:
             self.check(p, token)
         assert e.value.status_code == 401 and e.value.detail == auth.UNAVAILABLE
+
+    def test_a_pin_lockout_does_not_end_reading(self):
+        """Review M1: whoever tripped the lockout already has the list, so
+        blocking reads only strands the real sitter. Logging pauses instead."""
+        _, p = make_pass()
+        token = auth.create_pass_session(p)[0]
+        p.locked_at = NOW
+        assert self.check(p, token) is p
 
     def test_rotation_kills_sessions_from_the_old_link(self):
         _, p = make_pass()
@@ -185,13 +192,11 @@ class TestExchange:
         fn = inspect.unwrap(sp.exchange)
         return asyncio.run(fn(request=None, body=sp.ExchangeRequest(token=token), db=db))
 
-    @pytest.mark.parametrize("state", ["missing", "revoked", "locked", "expired"])
+    @pytest.mark.parametrize("state", ["missing", "revoked", "expired"])
     def test_every_dead_link_looks_the_same(self, state):
         raw, p = make_pass()
         if state == "revoked":
             p.revoked_at = NOW
-        elif state == "locked":
-            p.locked_at = NOW
         elif state == "expired":
             p.expires_at = NOW - timedelta(minutes=1)
         with pytest.raises(HTTPException) as e:
@@ -204,6 +209,11 @@ class TestExchange:
             self.call(FakeDB(p), raw)
         assert e.value.status_code == 409
         assert set(e.value.detail) == {"status", "starts_at"}
+
+    def test_a_pin_locked_link_still_opens(self):
+        raw, p = make_pass(locked_at=NOW)
+        out = self.call(FakeDB(p), raw)
+        assert auth.decode_pass_session(out["session"]) == p.id
 
     def test_live_pass_returns_a_session_and_counts_the_open(self):
         raw, p = make_pass()
@@ -227,9 +237,17 @@ def _deps(dependant):
 
 
 class TestAllowlist:
-    def test_sitter_router_has_exactly_two_routes(self):
+    def test_sitter_router_is_exactly_the_allowlist(self):
+        # Adding a route here is a security decision: the PRD's T6 control is
+        # that a pass can do only what this set allows, nothing else.
         routes = {(tuple(sorted(r.methods)), r.path) for r in sp.sitter_router.routes}
-        assert routes == {(("POST",), "/exchange"), (("GET",), "/pass")}
+        assert routes == {
+            (("POST",), "/exchange"),
+            (("GET",), "/pass"),
+            (("POST",), "/unlock"),
+            (("POST",), "/feedings"),
+            (("DELETE",), "/feedings/{feeding_id}"),
+        }
 
     def test_no_sitter_route_accepts_a_user_login(self):
         from app.utils.dependencies import get_current_user, get_current_user_optional
@@ -237,9 +255,17 @@ class TestAllowlist:
             calls = set(_deps(r.dependant))
             assert get_current_user not in calls and get_current_user_optional not in calls
 
-    def test_the_read_route_requires_a_pass(self):
-        r = next(r for r in sp.sitter_router.routes if r.path == "/pass")
-        assert auth.get_current_pass in set(_deps(r.dependant))
+    def test_every_route_but_exchange_requires_a_pass(self):
+        for r in sp.sitter_router.routes:
+            if r.path == "/exchange":
+                continue
+            calls = set(_deps(r.dependant))
+            assert calls & {auth.get_current_pass, auth.get_current_pass_with_claims}, r.path
+
+    def test_every_write_requires_an_unlocked_session(self):
+        for r in sp.sitter_router.routes:
+            if r.path.startswith("/feedings"):
+                assert auth.get_logging_pass in set(_deps(r.dependant)), r.path
 
     def test_every_keeper_route_requires_a_user(self):
         from app.utils.dependencies import get_current_user
@@ -320,7 +346,8 @@ def test_payload_top_level_keys():
     tree = ast.parse(inspect.getsource(sp.build_pass_payload))
     ret = [n for n in ast.walk(tree) if isinstance(n, ast.Return)][-1]
     keys = {k.value for k in ret.value.keys}
-    assert keys == {"app", "keeper_name", "label", "starts_at", "expires_at", "can_log", "routine", "cards"}
+    assert keys == {"app", "keeper_name", "label", "starts_at", "expires_at", "can_log",
+                    "logging_unlocked", "logging_locked", "routine", "cards"}
 
 
 # ── fixes from the independent security review (2026-09-28) ─────────────────

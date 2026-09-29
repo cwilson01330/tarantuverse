@@ -1,5 +1,7 @@
 """
-Sitter passes — PRD-shared-keeping, Phase 1 (rung 1: read-only link + care cards).
+Sitter passes — PRD-shared-keeping.
+  Phase 1 (rung 1): read-only link + care cards (free).
+  Phase 2 (rung 2): the same link can log feedings back, behind a PIN (premium).
 
 Two routers, deliberately separate:
 
@@ -7,10 +9,17 @@ Two routers, deliberately separate:
   sitter_router  /api/v1/sitter/*          — the sitter, authenticated ONLY by a
                                              pass session (never a user token)
 
-The sitter router is an allowlist. In Phase 1 it can do exactly two things:
-trade a link for a read session, and read the feeding list. There is no
-endpoint through which a pass can write, so a leaked link can at worst show
-someone a feeding list for at most 30 days (T1, T6).
+The sitter router is an allowlist, and this is the whole of it:
+  POST   /exchange            link → read session
+  GET    /pass                the feeding list
+  POST   /unlock              PIN → write session (only if the keeper turned logging on)
+  POST   /feedings            log a feeding or refusal (write session)
+  DELETE /feedings/{id}       undo the sitter's OWN entry, within 60 minutes
+
+A leaked link alone can still only read (T1): every write needs a session
+unlocked with the PIN, which the keeper shares separately, and 5 wrong PINs
+lock the pass and tell the keeper (T4). Sitters only ADD; they can't edit or
+delete anything they didn't create, and not even that after an hour (T8).
 """
 # NOTE: no `from __future__ import annotations` here. slowapi's @limiter.limit
 # wraps the endpoint, and FastAPI then can't resolve string annotations
@@ -19,8 +28,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import or_
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.concurrency import run_in_threadpool
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
@@ -29,6 +41,7 @@ from app.models.colony import Colony
 from app.models.feeding_log import FeedingLog
 from app.models.invert import Invert
 from app.models.invert_species import InvertSpecies
+from app.models.notification import Notification
 from app.models.sitter_pass import PASS_MAX_DAYS, KeeperPass, KeeperPassAnimal, SitterGuide
 from app.models.user import User
 from app.schemas.sitter_pass import (
@@ -36,23 +49,38 @@ from app.schemas.sitter_pass import (
     PassCreate,
     PassCreated,
     PassSummary,
+    PassUnlock,
     PassUpdate,
+    PinUnlockRequest,
+    SitterFeedingCreate,
     SitterGuideBody,
     SitterNoteUpdate,
 )
 from app.services import sitter_card as sc
 from app.utils.dependencies import get_current_user
+from app.utils.feeding_pause import is_feeding_paused
 from app.utils.limits import active_animals_query, active_colonies_query, active_inverts_query
 from app.utils.rate_limit import limiter
 from app.utils.sitter_pass import (
+    LOGGING_PAUSED,
+    MAX_PIN_FAILURES,
+    PIN_NEEDED,
     UNAVAILABLE,
+    WeakPinError,
     create_pass_session,
     get_current_pass,
+    get_current_pass_with_claims,
+    get_logging_pass,
     hash_pass_token,
+    hash_pin,
     new_pass_token,
     owner_is_active,
     pass_is_live,
+    session_can_log,
+    verify_pin,
 )
+
+logger = logging.getLogger(__name__)
 
 keeper_router = APIRouter()
 sitter_router = APIRouter()
@@ -61,6 +89,13 @@ FREE_ACTIVE_PASS_LIMIT = 2          # decided 2026-09-28
 MAX_START_AHEAD = timedelta(days=90)
 FEEDING_LOOKBACK = timedelta(days=365)
 KINDS_BY_APP = {"tarantuverse": {"invert", "colony"}, "herpetoverse": {"animal"}}
+
+# Rung 2 limits (PRD-shared-keeping).
+UNDO_WINDOW = timedelta(minutes=60)
+PASS_WRITES_PER_HOUR = 60            # well above any real feeding round
+DOUBLE_TAP_WINDOW = timedelta(seconds=60)
+SITTER_LOG_LOOKBACK = timedelta(days=2)   # what the sitter sees of their own entries
+NOTIFY_COALESCE = timedelta(hours=2)      # at most one "sitter is logging" push per round
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -76,22 +111,65 @@ def _aware(dt: datetime) -> datetime:
 def _status(p: KeeperPass, now: datetime) -> str:
     if p.revoked_at is not None:
         return "revoked"
-    if p.locked_at is not None:
-        return "locked"
     if now >= p.expires_at:
         return "expired"
+    if p.locked_at is not None:
+        return "locked"
     if now < p.starts_at:
         return "scheduled"
     return "active"
 
 
-def _summary(p: KeeperPass, now: Optional[datetime] = None) -> PassSummary:
+def _summary(p: KeeperPass, now: Optional[datetime] = None, log_count: int = 0) -> PassSummary:
     now = now or _now()
     return PassSummary(
         id=p.id, app=p.app, label=p.label, token_prefix=p.token_prefix,
         status=_status(p, now), starts_at=p.starts_at, expires_at=p.expires_at,
         revoked_at=p.revoked_at, animal_count=len(p.animals), open_count=p.open_count or 0,
         last_used_at=p.last_used_at, created_at=p.created_at,
+        can_log=bool(p.can_log), has_pin=bool(p.pin_hash), log_count=log_count,
+    )
+
+
+def _log_counts(db: Session, pass_ids: List[UUID]) -> Dict[UUID, int]:
+    if not pass_ids:
+        return {}
+    rows = (
+        db.query(FeedingLog.logged_via_pass_id, func.count(FeedingLog.id))
+        .filter(FeedingLog.logged_via_pass_id.in_(pass_ids))
+        .group_by(FeedingLog.logged_via_pass_id)
+        .all()
+    )
+    return {pid: n for pid, n in rows}
+
+
+async def _pin_hash_or_422(pin: Optional[str]) -> str:
+    # bcrypt is ~250 ms of CPU on purpose. Run it off the event loop so one
+    # keeper saving a PIN doesn't stall every other request on the worker.
+    try:
+        return await run_in_threadpool(hash_pin, pin or "")
+    except WeakPinError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+def _require_logging_premium(user: User, app: str) -> None:
+    """Turning logging ON is the premium action (`can_use_sitter_logging`).
+
+    Checked when logging is ENABLED, never when a sitter writes: the welfare
+    rule (T12) says a pass set up under premium keeps logging until it
+    expires, even if the subscription lapses mid-trip. A lapse must never
+    strand a sitter halfway through someone's feeding round.
+    """
+    if user.is_premium_for_app(app):
+        return
+    raise HTTPException(
+        status.HTTP_402_PAYMENT_REQUIRED,
+        detail={
+            "message": "Letting a sitter log feedings back is a premium feature. "
+                       "The feeding list itself stays free.",
+            "is_premium": False,
+            "source": "shared_keeping",
+        },
     )
 
 
@@ -244,7 +322,65 @@ def _premolt_likely(db: Session, inv: Invert) -> bool:
         return False
 
 
-def build_pass_payload(db: Session, p: KeeperPass, tz_offset_minutes: Optional[int]) -> dict:
+def _prefill(feedings: list) -> Optional[dict]:
+    """The animal's usual meal, from its last ACCEPTED feeding, so the sitter
+    taps "Fed" rather than typing prey names they may not know."""
+    for f in feedings:  # newest-first
+        if f.accepted and (f.food_type or f.food_size):
+            return {"food_type": f.food_type, "food_size": f.food_size}
+    return None
+
+
+def _sitter_entry(f: FeedingLog, now: datetime) -> dict:
+    created = _aware(f.created_at) if f.created_at else None
+    undo_until = created + UNDO_WINDOW if created else None
+    return {
+        "id": str(f.id),
+        "accepted": bool(f.accepted),
+        "food_type": f.food_type,
+        "food_size": f.food_size,
+        "quantity": f.quantity,
+        # Keyed "comment", not "notes": it's the sitter's own words on their
+        # own entry, and the privacy snapshot tests forbid any `notes` key in
+        # a pass payload so the animal's private notes can never slip in.
+        "comment": f.notes,
+        "fed_at": _aware(f.fed_at).isoformat() if f.fed_at else None,
+        "can_undo": bool(undo_until and now < undo_until),
+        "undo_until": undo_until.isoformat() if undo_until else None,
+    }
+
+
+def _logging_fields(p: KeeperPass, card: dict, feedings: list, now: datetime) -> dict:
+    """Per-card rung-2 fields. Only THIS pass's own entries are listed, so a
+    sitter never sees who else (the keeper, another sitter) logged what."""
+    loggable = bool(p.can_log) and card.get("kind") in ("invert", "animal")
+    mine = [
+        f for f in feedings
+        if f.logged_via_pass_id == p.id and f.fed_at and _aware(f.fed_at) >= now - SITTER_LOG_LOOKBACK
+    ]
+    return {
+        "loggable": loggable,
+        "prefill": _prefill(feedings) if loggable else None,
+        "sitter_logs": [_sitter_entry(f, now) for f in mine],
+    }
+
+
+def _logging_state(p: KeeperPass, logging_unlocked: bool) -> dict:
+    """What the sitter page needs to decide between PIN box, buttons, or
+    "logging paused". A lockout pauses logging; it never hides the list."""
+    return {
+        "can_log": bool(p.can_log),
+        "logging_unlocked": bool(logging_unlocked and p.can_log and p.locked_at is None),
+        "logging_locked": bool(p.can_log and p.locked_at is not None),
+    }
+
+
+def build_pass_payload(
+    db: Session,
+    p: KeeperPass,
+    tz_offset_minutes: Optional[int],
+    logging_unlocked: bool = False,
+) -> dict:
     from app.routers.animals import _animal_feeding_interval
     from app.routers.inverts import (
         INTERVAL_SOURCE_KEEPER,
@@ -303,15 +439,19 @@ def build_pass_payload(db: Session, p: KeeperPass, tz_offset_minutes: Optional[i
                 interval_days=interval,
                 interval_source=src,
             )
-            cards.append(sc.compose_invert_card(
+            card = sc.compose_invert_card(
                 inv, sp, facts=facts, premolt_likely=_premolt_likely(db, inv),
                 keeper_name=keeper, now=now, tz_offset_minutes=tz_offset_minutes,
-            ))
+            )
+            card.update(_logging_fields(p, card, feeds, now))
+            cards.append(card)
         elif r.colony_id and r.colony_id in colonies:
             col = colonies[r.colony_id]
-            cards.append(sc.compose_colony_card(
+            card = sc.compose_colony_card(
                 col, species.get(col.species_id) if col.species_id else None, keeper_name=keeper,
-            ))
+            )
+            card.update(_logging_fields(p, card, [], now))
+            cards.append(card)
         elif r.animal_id and r.animal_id in animals:
             a = animals[r.animal_id]
             feeds = ani_feedings.get(a.id, [])
@@ -325,23 +465,32 @@ def build_pass_payload(db: Session, p: KeeperPass, tz_offset_minutes: Optional[i
                 interval_source=sc.KEEPER if a.feeding_interval_days else sc.SPECIES,
                 schedule_text=(a.feeding_schedule or "").strip() or None,
             )
-            cards.append(sc.compose_animal_card(
+            card = sc.compose_animal_card(
                 a, sp, facts=facts, enclosure=a.enclosure, feeds_on_cgd=feeds_cgd,
                 keeper_name=keeper, now=now, tz_offset_minutes=tz_offset_minutes,
-            ))
+            )
+            card.update(_logging_fields(p, card, feeds, now))
+            cards.append(card)
 
     guide = (
         db.query(SitterGuide)
         .filter(SitterGuide.owner_user_id == p.owner_user_id, SitterGuide.app == p.app)
         .first()
     )
+    state = _logging_state(p, logging_unlocked)
     return {
         "app": p.app,
         "keeper_name": keeper,
         "label": p.label,
         "starts_at": p.starts_at.isoformat(),
         "expires_at": p.expires_at.isoformat(),
-        "can_log": False,  # Phase 2
+        "can_log": state["can_log"],
+        # Whether THIS session was unlocked with the current PIN. The page
+        # uses it to show Fed/Refused buttons vs. the PIN prompt.
+        "logging_unlocked": state["logging_unlocked"],
+        # 5 wrong PINs: logging is paused until the keeper unlocks it. The
+        # list itself keeps working (see utils/sitter_pass.pass_is_live).
+        "logging_locked": state["logging_locked"],
         "routine": sc.compose_routine(guide, cards),
         "cards": cards,
     }
@@ -451,7 +600,9 @@ async def list_passes(
         .limit(20)
         .all()
     )
-    return [_summary(p, now) for p in open_passes + past]
+    passes = open_passes + past
+    counts = _log_counts(db, [p.id for p in passes])
+    return [_summary(p, now, counts.get(p.id, 0)) for p in passes]
 
 
 @keeper_router.post("/", response_model=PassCreated, status_code=status.HTTP_201_CREATED)
@@ -466,6 +617,10 @@ async def create_pass(
     starts_at = max(_aware(body.starts_at), now) if body.starts_at else now
     expires_at = _aware(body.expires_at)
     _validate_window(starts_at, expires_at, now)
+    pin_hash = None
+    if body.can_log:
+        _require_logging_premium(current_user, body.app)
+        pin_hash = await _pin_hash_or_422(body.pin)
     premium = _enforce_free_limit(db, current_user, body.app, now)
     rows = _resolve_animals(db, current_user, body.app, body.animals)
 
@@ -473,7 +628,7 @@ async def create_pass(
     p = KeeperPass(
         owner_user_id=current_user.id, app=body.app, token_hash=token_hash, token_prefix=prefix,
         label=(body.label or "").strip() or None, starts_at=starts_at, expires_at=expires_at,
-        created_under_premium=premium,
+        created_under_premium=premium, can_log=bool(body.can_log), pin_hash=pin_hash,
     )
     p.animals = rows
     db.add(p)
@@ -520,9 +675,33 @@ async def update_pass(
         p.animals = []
         db.flush()
         p.animals = new_rows
+
+    # ── rung 2: logging + PIN ──
+    # Order matters: work out the final (can_log, pin_hash) pair, THEN assign,
+    # so the DB CHECK "logging requires a PIN" can never see a half-state.
+    can_log, pin_hash = bool(p.can_log), p.pin_hash
+    if body.pin is not None and body.pin.strip():
+        pin_hash = await _pin_hash_or_422(body.pin)  # changing the PIN: always allowed
+    if body.can_log is True and not p.can_log:
+        _require_logging_premium(current_user, p.app)
+        if not pin_hash:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                "Set a PIN to let the sitter log feedings.")
+        can_log = True
+    elif body.can_log is False:
+        # Off means off: drop the PIN too, which also ends every unlocked
+        # session (their binding no longer matches anything).
+        can_log, pin_hash = False, None
+    if not can_log and body.can_log is not False and body.pin:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "Turn on logging to set a PIN.")
+    p.can_log, p.pin_hash = can_log, pin_hash
+    if body.pin or body.can_log is not None:
+        p.pin_failures = 0
+
     db.commit()
     db.refresh(p)
-    return _summary(p, now)
+    return _summary(p, now, _log_counts(db, [p.id]).get(p.id, 0))
 
 
 @keeper_router.post("/{pass_id}/rotate", response_model=PassCreated)
@@ -557,7 +736,80 @@ async def revoke_pass(
         p.revoked_at = _now()
         db.commit()
         db.refresh(p)
-    return _summary(p)
+    return _summary(p, log_count=_log_counts(db, [p.id]).get(p.id, 0))
+
+
+@keeper_router.post("/{pass_id}/unlock", response_model=PassSummary)
+async def unlock_pass(
+    pass_id: UUID,
+    body: Optional[PassUnlock] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Clear a PIN lockout. Optionally set a new PIN at the same time.
+
+    The keeper decides whether the lockout was their sitter fumbling the PIN
+    (unlock) or someone who shouldn't have the link (revoke, or rotate for a
+    new link). The UI puts both side by side; this endpoint only unlocks.
+    """
+    p = _owned_pass(db, pass_id, current_user)
+    if p.revoked_at is not None or _now() >= p.expires_at:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This pass has ended. Make a new one instead.")
+    if body is not None and body.pin:
+        if not p.can_log:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Turn on logging to set a PIN.")
+        p.pin_hash = await _pin_hash_or_422(body.pin)
+    p.locked_at = None
+    p.pin_failures = 0
+    db.commit()
+    db.refresh(p)
+    return _summary(p, log_count=_log_counts(db, [p.id]).get(p.id, 0))
+
+
+@keeper_router.get("/{pass_id}/activity")
+async def pass_activity(
+    pass_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Everything logged through this pass, newest first (T10)."""
+    p = _owned_pass(db, pass_id, current_user)
+    logs = (
+        db.query(FeedingLog)
+        .filter(FeedingLog.logged_via_pass_id == p.id)
+        .order_by(FeedingLog.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    inv_ids = {f.invert_id for f in logs if f.invert_id}
+    ani_ids = {f.animal_id for f in logs if f.animal_id}
+    # Scoped to the keeper's own rows: names come only from animals they own.
+    names: Dict[UUID, str] = {}
+    if inv_ids:
+        for i in db.query(Invert).filter(Invert.id.in_(inv_ids), Invert.user_id == current_user.id):
+            names[i.id] = i.name or i.common_name or i.scientific_name or "Unnamed"
+    if ani_ids:
+        for a in db.query(Animal).filter(Animal.id.in_(ani_ids), Animal.user_id == current_user.id):
+            names[a.id] = a.name or a.common_name or a.scientific_name or "Unnamed"
+    who = (p.label or "").strip() or "Your sitter"
+    out = []
+    for f in logs:
+        aid = f.invert_id or f.animal_id
+        out.append({
+            "id": str(f.id),
+            "kind": "invert" if f.invert_id else "animal",
+            "animal_id": str(aid) if aid else None,
+            "animal_name": names.get(aid, "An animal no longer in your collection"),
+            "accepted": bool(f.accepted),
+            "food_type": f.food_type,
+            "food_size": f.food_size,
+            "quantity": f.quantity,
+            "notes": f.notes,
+            "fed_at": f.fed_at.isoformat() if f.fed_at else None,
+            "created_at": f.created_at.isoformat() if f.created_at else None,
+            "sitter_name": who,
+        })
+    return out
 
 
 # ── sitter endpoints ──────────────────────────────────────────────────────────
@@ -572,7 +824,6 @@ async def exchange(request: Request, body: ExchangeRequest, db: Session = Depend
     if (
         p is None
         or p.revoked_at is not None
-        or p.locked_at is not None
         or now >= p.expires_at
         or not owner_is_active(p)
     ):
@@ -595,8 +846,330 @@ async def exchange(request: Request, body: ExchangeRequest, db: Session = Depend
 async def read_pass(
     request: Request,
     tz_offset_minutes: Optional[int] = Query(None, ge=-900, le=900),
+    pc: tuple = Depends(get_current_pass_with_claims),
+    db: Session = Depends(get_db),
+):
+    p, claims = pc
+    unlocked = session_can_log(p, claims)
+    p = db.query(KeeperPass).options(selectinload(KeeperPass.animals)).filter(KeeperPass.id == p.id).one()
+    return build_pass_payload(db, p, tz_offset_minutes, logging_unlocked=unlocked)
+
+
+# ── sitter writes (rung 2) ────────────────────────────────────────────────────
+
+@sitter_router.post("/unlock")
+@limiter.limit("10/minute")
+async def unlock_logging(
+    request: Request,
+    body: PinUnlockRequest,
     p: KeeperPass = Depends(get_current_pass),
     db: Session = Depends(get_db),
 ):
-    p = db.query(KeeperPass).options(selectinload(KeeperPass.animals)).filter(KeeperPass.id == p.id).one()
-    return build_pass_payload(db, p, tz_offset_minutes)
+    """Trade the PIN for a write-capable session.
+
+    RACE SAFETY (security review 2026-09-28, H1). The dependency above has
+    already loaded this pass into the session, and a plain re-query would hand
+    back that same in-memory object — with the failure count read BEFORE the
+    lock. N parallel wrong guesses would then all read k and all write k+1.
+    `populate_existing()` forces the locked SELECT's values onto the object, so
+    each guess sees the previous one's increment and the 5th really locks.
+
+    Failures are NOT reset by a correct PIN (review L1): otherwise someone
+    holding a leaked link gets 4 fresh guesses every time the real sitter
+    unlocks in a new tab. Only the keeper resets the count — by unlocking,
+    changing the PIN, or toggling logging.
+    """
+    if not p.can_log:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This feeding list is read-only.")
+    locked = (
+        db.query(KeeperPass)
+        .populate_existing()
+        .filter(KeeperPass.id == p.id)
+        .with_for_update()
+        .one()
+    )
+    if not pass_is_live(locked):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=UNAVAILABLE)
+    if not locked.can_log or not locked.pin_hash:
+        raise HTTPException(status.HTTP_409_CONFLICT, "This feeding list is read-only.")
+    if locked.locked_at is not None:
+        # Checked BEFORE verifying: once paused, even the right PIN can't mint
+        # a write session (the pass stays paused until the keeper says so).
+        raise HTTPException(status.HTTP_423_LOCKED, detail=LOGGING_PAUSED)
+
+    ok = await run_in_threadpool(verify_pin, body.pin, locked.pin_hash)
+    if ok:
+        session, exp = create_pass_session(locked, logging=True)
+        db.commit()  # releases the row lock
+        return {"session": session, "session_expires_at": exp.isoformat()}
+
+    locked.pin_failures = (locked.pin_failures or 0) + 1
+    if locked.pin_failures >= MAX_PIN_FAILURES:
+        locked.locked_at = _now()
+        db.commit()
+        _notify_locked(db, locked)
+        raise HTTPException(status.HTTP_423_LOCKED, detail=LOGGING_PAUSED)
+    db.commit()
+    left = MAX_PIN_FAILURES - locked.pin_failures
+    raise HTTPException(
+        status.HTTP_403_FORBIDDEN,
+        detail={"message": "That PIN didn't match.", "attempts_left": left},
+    )
+
+
+def _on_pass(db: Session, p: KeeperPass, kind: str, animal_id: UUID):
+    """The animal must be on THIS pass and still the owner's active animal.
+    Same 404 for every miss — never confirm another keeper's ids exist."""
+    col = KeeperPassAnimal.invert_id if kind == "invert" else KeeperPassAnimal.animal_id
+    on_pass = (
+        db.query(KeeperPassAnimal)
+        .filter(KeeperPassAnimal.pass_id == p.id, col == animal_id)
+        .first()
+    )
+    if on_pass is None:
+        return None
+    if kind == "invert":
+        return active_inverts_query(db, p.owner_user_id).filter(Invert.id == animal_id).first()
+    return active_animals_query(db, p.owner_user_id).filter(Animal.id == animal_id).first()
+
+
+def _entry_response(f: FeedingLog, kind: str, animal_id: UUID) -> dict:
+    return {**_sitter_entry(f, _now()), "kind": kind, "animal_id": str(animal_id)}
+
+
+@sitter_router.post("/feedings", status_code=status.HTTP_201_CREATED)
+@limiter.limit("60/minute")
+async def sitter_log_feeding(
+    request: Request,
+    body: SitterFeedingCreate,
+    p: KeeperPass = Depends(get_logging_pass),
+    db: Session = Depends(get_db),
+):
+    """Log a feeding or a refusal. Counts toward cadence, stats and premolt
+    exactly like the keeper's own entry, and is attributed to the pass.
+
+    One thing it deliberately does NOT do that the keeper's own entry does:
+    end a feeding pause. A pause is the keeper's judgment (premolt, post-
+    rehouse…), the card tells the sitter not to feed, and a sitter's tap can be
+    a mis-tap that "undo" couldn't cleanly reverse. If a paused animal is
+    logged as fed, the keeper is told instead (security review 2026-09-28, M2).
+    """
+    now = _now()
+    # Serialise writes per pass so the hourly cap and double-tap guard can't
+    # be raced past by parallel requests — and re-read the pass under that
+    # lock (populate_existing: the dependency's copy may be stale), so a
+    # revoke, lockout or "logging off" that lands mid-request still wins.
+    fresh = (
+        db.query(KeeperPass)
+        .populate_existing()
+        .filter(KeeperPass.id == p.id)
+        .with_for_update()
+        .one()
+    )
+    if not pass_is_live(fresh):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=UNAVAILABLE)
+    if fresh.locked_at is not None:
+        raise HTTPException(status.HTTP_423_LOCKED, detail=LOGGING_PAUSED)
+    if not fresh.can_log or not fresh.pin_hash:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail=PIN_NEEDED)
+
+    recent = (
+        db.query(FeedingLog)
+        .filter(FeedingLog.logged_via_pass_id == p.id, FeedingLog.created_at >= now - timedelta(hours=1))
+        .count()
+    )
+    if recent >= PASS_WRITES_PER_HOUR:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS,
+                            "That's a lot of entries in an hour. Try again a bit later.")
+
+    target = _on_pass(db, p, body.kind, body.id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That animal isn't on this feeding list.")
+
+    parent_col = FeedingLog.invert_id if body.kind == "invert" else FeedingLog.animal_id
+    dup = (
+        db.query(FeedingLog)
+        .filter(
+            FeedingLog.logged_via_pass_id == p.id,
+            parent_col == body.id,
+            FeedingLog.accepted == body.accepted,
+            FeedingLog.created_at >= now - DOUBLE_TAP_WINDOW,
+        )
+        .first()
+    )
+    if dup is not None:
+        # A double tap, or a retry after a flaky connection: hand back the
+        # entry that already exists instead of logging the meal twice.
+        return _entry_response(dup, body.kind, body.id)
+
+    fields = dict(
+        fed_at=now,
+        accepted=body.accepted,
+        food_type=body.food_type,
+        food_size=body.food_size,
+        quantity=body.quantity or 1,
+        notes=body.notes,
+        logged_via_pass_id=p.id,
+    )
+    if body.kind == "invert":
+        log = FeedingLog(invert_id=target.id, **fields)
+        # A tarantula still has its legacy twin row, and its detail screens
+        # read feedings by tarantula_id (ADR-005, read cutover pending). Set
+        # both, exactly as the keeper's own tarantula path does, or a sitter's
+        # entry would be invisible on the tarantula's own page.
+        if target.taxon == "tarantula":
+            from app.models.tarantula import Tarantula
+
+            twin = db.query(Tarantula).filter(
+                Tarantula.id == target.id, Tarantula.user_id == p.owner_user_id
+            ).first()
+            if twin is not None:
+                log.tarantula_id = twin.id
+    else:
+        log = FeedingLog(animal_id=target.id, **fields)
+        if body.accepted and (target.last_fed_at is None or _aware(target.last_fed_at) < now):
+            target.last_fed_at = now
+
+    paused = is_feeding_paused(
+        getattr(target, "feeding_paused_reason", None),
+        getattr(target, "feeding_paused_until", None),
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    if body.accepted and paused:
+        _notify_fed_while_paused(db, p, target)
+    else:
+        _notify_sitter_log(db, p, target, body.accepted)
+    return _entry_response(log, body.kind, target.id)
+
+
+@sitter_router.delete("/feedings/{feeding_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
+async def sitter_undo_feeding(
+    request: Request,
+    feeding_id: UUID,
+    p: KeeperPass = Depends(get_logging_pass),
+    db: Session = Depends(get_db),
+):
+    """Undo the sitter's OWN entry, within an hour. Anything else — the
+    keeper's entries, another pass's, or an older one — isn't theirs to touch."""
+    f = (
+        db.query(FeedingLog)
+        .filter(FeedingLog.id == feeding_id, FeedingLog.logged_via_pass_id == p.id)
+        .first()
+    )
+    if f is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entry not found.")
+    created = _aware(f.created_at) if f.created_at else None
+    if created is None or _now() >= created + UNDO_WINDOW:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "It's been over an hour, so only the keeper can change this entry now.",
+        )
+    animal_id, removed_at = f.animal_id, f.fed_at
+    db.delete(f)
+    db.flush()
+    if animal_id is not None:
+        # HV keeps a denormalised last_fed_at, and the sitter's entry moved it
+        # forward. Put it back to the newest remaining feeding so "days since
+        # fed" doesn't keep claiming a meal that was undone.
+        a = db.query(Animal).filter(Animal.id == animal_id).first()
+        if a is not None and a.last_fed_at is not None and removed_at is not None \
+                and _aware(a.last_fed_at) <= _aware(removed_at):
+            latest = (
+                db.query(func.max(FeedingLog.fed_at))
+                .filter(FeedingLog.animal_id == animal_id, FeedingLog.accepted.is_(True))
+                .scalar()
+            )
+            a.last_fed_at = latest
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── keeper notifications ──────────────────────────────────────────────────────
+
+def _notify_sitter_log(db: Session, p: KeeperPass, target, accepted: bool) -> None:
+    """One heads-up per feeding round, not one per animal: a 20-animal round
+    would otherwise be 20 pushes. The activity list has every entry."""
+    try:
+        from app.services.notification_service import create_notification
+
+        since = _now() - NOTIFY_COALESCE
+        already = (
+            db.query(Notification.id)
+            .filter(
+                Notification.user_id == p.owner_user_id,
+                Notification.type == "sitter_log",
+                Notification.created_at >= since,
+                Notification.data["pass_id"].astext == str(p.id),
+            )
+            .first()
+        )
+        if already is not None:
+            return
+        who = (p.label or "").strip() or "Your sitter"
+        name = getattr(target, "name", None) or "an animal"
+        outcome = "fed" if accepted else "refused food"
+        create_notification(
+            db,
+            user_id=p.owner_user_id,
+            type="sitter_log",
+            title=f"{who} is logging feedings",
+            body=f"{name} {outcome}. The whole round is in Sitter links.",
+            deeplink="/sitter",
+            data={"pass_id": str(p.id)},
+            push_category="sitter_activity_enabled",
+        )
+    except Exception:  # a notification must never fail the sitter's write
+        logger.exception("sitter_log notification failed")
+        db.rollback()
+
+
+def _notify_fed_while_paused(db: Session, p: KeeperPass, target) -> None:
+    """A paused animal was logged as fed. Always sent (not coalesced, not
+    gated by the sitter-activity preference): it's a welfare signal — maybe a
+    mis-tap, maybe live prey in with a molting spider."""
+    try:
+        from app.services.notification_service import create_notification
+
+        who = (p.label or "").strip() or "Your sitter"
+        name = getattr(target, "name", None) or "an animal"
+        reason = (getattr(target, "feeding_paused_reason", None) or "").strip()
+        create_notification(
+            db,
+            user_id=p.owner_user_id,
+            type="sitter_log",
+            title=f"{who} logged {name} as fed while paused",
+            body=(f"{name} is paused{f' ({reason})' if reason else ''} and the pause is still on. "
+                  "Check on them when you can — if it was premolt, any live prey should come out."),
+            deeplink="/sitter",
+            data={"pass_id": str(p.id), "paused_feed": True},
+        )
+    except Exception:
+        logger.exception("sitter fed-while-paused notification failed")
+        db.rollback()
+
+
+def _notify_locked(db: Session, p: KeeperPass) -> None:
+    """Always sent, regardless of the sitter-activity preference: a lockout
+    can mean the link is in the wrong hands, and the keeper must know."""
+    try:
+        from app.services.notification_service import create_notification
+
+        label = (p.label or "").strip()
+        which = f"the link for {label}" if label else "one of your sitter links"
+        create_notification(
+            db,
+            user_id=p.owner_user_id,
+            type="sitter_pass_locked",
+            title="Logging paused on a sitter link",
+            body=(f"Someone entered the wrong PIN {MAX_PIN_FAILURES} times on {which}, so logging is paused "
+                  "(the feeding list still works). Unlock it, or end the link and send a new one "
+                  "if you're not sure who it was."),
+            deeplink="/sitter",
+            data={"pass_id": str(p.id)},
+        )
+    except Exception:
+        logger.exception("sitter_pass_locked notification failed")
+        db.rollback()

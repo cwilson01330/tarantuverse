@@ -1819,6 +1819,11 @@ function FeedingList({
               {f.food_type && (
                 <span className="text-neutral-200 text-xs">{f.food_type}</span>
               )}
+              {f.sitter_name && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0 bg-herp-teal/15 text-herp-teal">
+                  Logged by {f.sitter_name} (sitter link)
+                </span>
+              )}
               {preyG != null && (
                 <span className="text-neutral-400 text-xs">
                   {fmtDecimal(preyG, 1)} g

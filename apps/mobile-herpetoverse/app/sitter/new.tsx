@@ -35,6 +35,7 @@ import {
   PASS_MAX_DAYS,
   fmtDay,
   passErrorMessage,
+  pinProblem,
   shareUrl,
   sitterApi,
   takeReveal,
@@ -73,6 +74,8 @@ function NewSitterLinkScreen() {
   const [noteDraft, setNoteDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const [upgrade, setUpgrade] = useState<string | null>(null);
+  const [canLog, setCanLog] = useState(false);
+  const [pin, setPin] = useState('');
 
   useEffect(() => {
     if (created) return;
@@ -119,6 +122,10 @@ function NewSitterLinkScreen() {
       Alert.alert('Pick at least one animal');
       return;
     }
+    if (canLog && pinProblem(pin)) {
+      Alert.alert('Check the PIN', pinProblem(pin) ?? undefined);
+      return;
+    }
     const now = Date.now();
     const start = startIn === 0 ? new Date(now) : startOfDay(startIn);
     // End of the last day, clamped to the 30-day ceiling the server enforces.
@@ -133,6 +140,7 @@ function NewSitterLinkScreen() {
           label: label.trim() || undefined,
           starts_at: startIn === 0 ? undefined : start.toISOString(),
           expires_at: end.toISOString(),
+          ...(canLog ? { can_log: true, pin } : {}),
         }),
       );
     } catch (e: any) {
@@ -186,6 +194,14 @@ function NewSitterLinkScreen() {
           <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
             Anyone with this link can see the feeding list until it ends. You can end it early from Sitter &amp; sharing.
           </Text>
+          {created.can_log && (
+            <View style={[styles.card, { borderColor: colors.warning, borderRadius: layout.radius.lg, backgroundColor: colors.surface }]}>
+              <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>Tell them the PIN separately</Text>
+              <Text style={[TYPE.body, { color: colors.textSecondary }]}>
+                Say it, or send it in a different message. The link alone can only read; the PIN is what lets someone log.
+              </Text>
+            </View>
+          )}
           <SitterButton label="Done" variant="secondary" onPress={() => router.replace('/sitter' as never)} />
         </ScrollView>
       </View>
@@ -263,6 +279,29 @@ function NewSitterLinkScreen() {
           </Text>
         </View>
 
+        <View style={card}>
+          <View style={styles.between}>
+            <View style={styles.flex}>
+              <Text style={[TYPE.subheading, { color: colors.textPrimary }]}>Logging back · Premium</Text>
+              <Text style={[TYPE.caption, { color: colors.textSecondary }]}>
+                Let {label.trim() || 'your sitter'} mark animals as fed or refused. Entries land in your records with their name on them.
+              </Text>
+            </View>
+            <Switch value={canLog} onValueChange={setCanLog} accessibilityLabel="Let the sitter log feedings" />
+          </View>
+          {canLog && (
+            <>
+              <Text style={[TYPE.label, styles.gap, { color: colors.textSecondary }]}>PIN for logging</Text>
+              <TextInput style={[...input, styles.pin]} value={pin} onChangeText={(t) => setPin(t.replace(/\D/g, ''))}
+                keyboardType="number-pad" maxLength={6} placeholder="4–6 digits" placeholderTextColor={colors.textTertiary}
+                accessibilityLabel="PIN for logging" />
+              <Text style={[TYPE.caption, { color: pin.length >= 4 && pinProblem(pin) ? colors.danger : colors.textTertiary }]}>
+                {(pin.length >= 4 && pinProblem(pin)) || 'Tell your sitter this separately from the link. 5 wrong tries pause the link and tell you.'}
+              </Text>
+            </>
+          )}
+        </View>
+
         <SitterButton label="Make link" busy={saving} onPress={submit} />
       </ScrollView>
 
@@ -270,7 +309,7 @@ function NewSitterLinkScreen() {
         visible={upgrade !== null}
         onClose={() => setUpgrade(null)}
         source="shared_keeping"
-        title="More sitter links"
+        title={canLog ? 'Sitter logging' : 'More sitter links'}
         message={upgrade ?? ''}
       />
     </View>
@@ -319,6 +358,7 @@ const styles = StyleSheet.create({
   between: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   animal: { borderTopWidth: 1, paddingTop: 10, gap: 6 },
   qr: { backgroundColor: '#fff', padding: 16, alignSelf: 'center' },
+  pin: { letterSpacing: 4, maxWidth: 200 },
 });
 
 export default withErrorBoundary(NewSitterLinkScreen, 'sitter-new');

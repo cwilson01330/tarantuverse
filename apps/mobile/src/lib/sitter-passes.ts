@@ -33,6 +33,25 @@ export interface PassSummary {
   open_count: number;
   last_used_at: string | null;
   created_at: string | null;
+  // Rung 2 — sitter logging. The PIN itself is never sent back; only whether one is set.
+  can_log: boolean;
+  has_pin: boolean;
+  log_count: number;
+}
+
+export interface ActivityEntry {
+  id: string;
+  kind: 'invert' | 'animal';
+  animal_id: string | null;
+  animal_name: string;
+  accepted: boolean;
+  food_type: string | null;
+  food_size: string | null;
+  quantity: number | null;
+  notes: string | null;
+  fed_at: string | null;
+  created_at: string | null;
+  sitter_name: string;
 }
 
 export interface PassCreated extends PassSummary {
@@ -71,12 +90,15 @@ export interface Card {
   photo_url: string | null;
   feeding: { state: FeedState; headline: string; last_fed_on: string | null; next_due_on: string | null } | null;
   sections: CardSection[];
+  loggable?: boolean;
+  sitter_logs?: { id: string; accepted: boolean; food_type: string | null; food_size: string | null; fed_at: string | null }[];
 }
 export interface Payload {
   keeper_name: string;
   label: string | null;
   starts_at: string;
   expires_at: string;
+  can_log?: boolean;
   routine: {
     summary: { feed_today: number; dont_feed: number; not_due: number; check: number; total: number };
     steps: CardLine[];
@@ -98,9 +120,15 @@ export const sitterApi = {
     expires_at: string;
     starts_at?: string;
     label?: string;
+    can_log?: boolean;
+    pin?: string;
   }) => (await apiClient.post<PassCreated>(`${BASE}/`, { app: PASS_APP, ...body })).data,
-  update: async (id: string, body: { label?: string; expires_at?: string }) =>
+  update: async (id: string, body: { label?: string; expires_at?: string; can_log?: boolean; pin?: string }) =>
     (await apiClient.patch<PassSummary>(`${BASE}/${id}`, body)).data,
+  /** Clear a PIN lockout, optionally with a new PIN. */
+  unlock: async (id: string, pin?: string) =>
+    (await apiClient.post<PassSummary>(`${BASE}/${id}/unlock`, pin ? { pin } : {})).data,
+  activity: async (id: string) => (await apiClient.get<ActivityEntry[]>(`${BASE}/${id}/activity`)).data,
   rotate: async (id: string) => (await apiClient.post<PassCreated>(`${BASE}/${id}/rotate`)).data,
   revoke: async (id: string) => (await apiClient.post<PassSummary>(`${BASE}/${id}/revoke`)).data,
   preview: async (id: string) =>
@@ -129,6 +157,16 @@ export function takeReveal(): PassCreated | null {
 
 export function shareUrl(created: PassCreated): string {
   return `${WEB_ORIGIN}${created.share_path}`;
+}
+
+/** Mirrors utils/sitter_pass.validate_pin so the keeper hears about a weak PIN before saving. */
+export function pinProblem(pin: string): string | null {
+  if (!/^\d{4,6}$/.test(pin)) return 'Use 4 to 6 digits.';
+  const digits = pin.split('');
+  if (new Set(digits).size === 1) return "Pick a PIN that isn't the same digit repeated.";
+  const steps = new Set(digits.slice(1).map((c, i) => Number(c) - Number(digits[i])));
+  if (steps.size === 1 && (steps.has(1) || steps.has(-1))) return "Pick a PIN that isn't a straight run like 1234.";
+  return null;
 }
 
 export const STATUS_LABEL: Record<PassStatus, string> = {

@@ -21,6 +21,7 @@ interface NotificationPreferences {
   forum_replies_enabled: boolean;
   new_followers_enabled: boolean;
   community_activity_enabled: boolean;
+  sitter_activity_enabled?: boolean;
   quiet_hours_enabled: boolean;
   quiet_hours_start: string;
   quiet_hours_end: string;
@@ -53,6 +54,7 @@ export default function NotificationSettingsScreen() {
     forum_replies_enabled: true,
     new_followers_enabled: true,
     community_activity_enabled: false,
+    sitter_activity_enabled: true,
     quiet_hours_enabled: false,
     quiet_hours_start: '22:00',
     quiet_hours_end: '08:00',
@@ -384,6 +386,21 @@ export default function NotificationSettingsScreen() {
               value={preferences.new_followers_enabled}
               onValueChange={(value) => setPreferences({ ...preferences, new_followers_enabled: value })}
               trackColor={{ false: colors.border, true: colors.primary }}
+            />
+          </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Sitter activity</Text>
+              <Text style={styles.settingDescription}>
+                When a sitter starts logging feedings on one of your links (once per round). Lockouts always notify you.
+              </Text>
+            </View>
+            <Switch
+              value={preferences.sitter_activity_enabled ?? true}
+              onValueChange={(value) => setPreferences({ ...preferences, sitter_activity_enabled: value })}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              accessibilityLabel="Sitter activity notifications"
             />
           </View>
 

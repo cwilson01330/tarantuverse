@@ -37,6 +37,9 @@ class NotificationPreferences(Base):
     forum_replies_enabled = Column(Boolean, default=True)
     new_followers_enabled = Column(Boolean, default=True)
     community_activity_enabled = Column(Boolean, default=False)
+    # A sitter logged feedings on one of your passes (coalesced: at most one
+    # push per pass per round). Lockouts ignore this — they're security.
+    sitter_activity_enabled = Column(Boolean, default=True, nullable=False, server_default="true")
 
     # Quiet hours
     quiet_hours_enabled = Column(Boolean, default=False)

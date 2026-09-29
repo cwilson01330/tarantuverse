@@ -526,6 +526,8 @@ function InvertDetailScreen() {
       })(),
       trailing: f.accepted ? 'Accepted' : 'Refused',
       trailingTone: f.accepted ? 'good' : 'bad',
+      // Attribution only for sitter entries; the keeper's own need no label.
+      subtitle: f.sitter_name ? `Logged by ${f.sitter_name} (sitter link)` : undefined,
       onEdit: () => editFeeding(f),
       onDelete: () => confirmDeleteLog('feeding', () => deleteInvertFeeding(f.id)),
     })),

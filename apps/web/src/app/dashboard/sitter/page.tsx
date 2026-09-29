@@ -20,8 +20,10 @@ import {
   PASS_MAX_DAYS,
   PassApiError,
   STATUS_LABEL,
+  pinProblem,
   shareUrl,
   sitterApi,
+  type ActivityEntry,
   type Candidate,
   type PassCreated,
   type PassSummary,
@@ -33,6 +35,7 @@ type Mode =
   | { kind: 'new' }
   | { kind: 'link'; created: PassCreated }
   | { kind: 'preview'; pass: PassSummary; data: Payload }
+  | { kind: 'activity'; pass: PassSummary; entries: ActivityEntry[] }
 
 const BTN = 'px-4 py-2 rounded-xl font-medium transition disabled:opacity-50'
 const BTN_PRIMARY = `${BTN} bg-gradient-brand text-white shadow-gradient-brand hover:opacity-90`
@@ -55,6 +58,7 @@ export default function SitterPage() {
   const [passes, setPasses] = useState<PassSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [upgrade, setUpgrade] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!token) return
@@ -80,14 +84,18 @@ export default function SitterPage() {
     try {
       await fn()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong.')
+      if (e instanceof PassApiError && e.status === 402) setUpgrade(e.message)
+      else setError(e instanceof Error ? e.message : 'Something went wrong.')
     } finally {
       setBusy(null)
     }
   }
 
-  const open = (passes ?? []).filter((p) => p.status === 'active' || p.status === 'scheduled')
-  const past = (passes ?? []).filter((p) => !(p.status === 'active' || p.status === 'scheduled'))
+  // Locked links stay in "open": a lockout is something the keeper has to act
+  // on (unlock or end), not history.
+  const isOpen = (p: PassSummary) => p.status === 'active' || p.status === 'scheduled' || p.status === 'locked'
+  const open = (passes ?? []).filter(isOpen)
+  const past = (passes ?? []).filter((p) => !isOpen(p))
 
   return (
     <DashboardLayout>
@@ -130,6 +138,9 @@ export default function SitterPage() {
                     void act('revoke', async () => { await sitterApi.revoke(token!, p.id); await refresh() })
                   }}
                   onExtend={(iso) => act('extend', async () => { await sitterApi.update(token!, p.id, { expires_at: iso }); await refresh() })}
+                  onLogging={(body) => act('logging', async () => { await sitterApi.update(token!, p.id, body); await refresh() })}
+                  onUnlock={(pin) => act('unlock', async () => { await sitterApi.unlock(token!, p.id, pin); await refresh() })}
+                  onActivity={() => act('activity', async () => setMode({ kind: 'activity', pass: p, entries: await sitterApi.activity(token!, p.id) }))}
                 />
               ))}
             </section>
@@ -138,9 +149,17 @@ export default function SitterPage() {
               <section className="space-y-2">
                 <h2 className="text-lg font-semibold text-theme-primary">Past links</h2>
                 {past.slice(0, 10).map((p) => (
-                  <div key={p.id} className="flex justify-between text-sm p-3 rounded-xl bg-surface border border-theme">
+                  <div key={p.id} className="flex justify-between items-center gap-3 text-sm p-3 rounded-xl bg-surface border border-theme">
                     <span className="text-theme-primary">{p.label || `Link …${p.token_prefix}`}</span>
-                    <span className="text-theme-tertiary">{STATUS_LABEL[p.status]} · {fmt(p.expires_at)}</span>
+                    <span className="flex items-center gap-3 text-theme-tertiary">
+                      {STATUS_LABEL[p.status]} · {fmt(p.expires_at)}
+                      {p.log_count > 0 && (
+                        <button className="underline text-theme-secondary" disabled={!!busy}
+                          onClick={() => act('activity', async () => setMode({ kind: 'activity', pass: p, entries: await sitterApi.activity(token!, p.id) }))}>
+                          {p.log_count} logged
+                        </button>
+                      )}
+                    </span>
                   </div>
                 ))}
               </section>
@@ -160,6 +179,10 @@ export default function SitterPage() {
           <LinkReveal created={mode.created} onDone={() => { setMode({ kind: 'list' }); void refresh() }} />
         )}
 
+        {mode.kind === 'activity' && (
+          <ActivityView pass={mode.pass} entries={mode.entries} onBack={() => setMode({ kind: 'list' })} />
+        )}
+
         {mode.kind === 'preview' && (
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -174,17 +197,22 @@ export default function SitterPage() {
           </section>
         )}
       </div>
+      <UpgradeModal isOpen={upgrade !== null} onClose={() => setUpgrade(null)} source="shared_keeping"
+        feature="Sitter logging" description={upgrade ?? ''} />
     </DashboardLayout>
   )
 }
 
-function PassRow({ pass, busy, onPreview, onRotate, onRevoke, onExtend }: {
+function PassRow({ pass, busy, onPreview, onRotate, onRevoke, onExtend, onLogging, onUnlock, onActivity }: {
   pass: PassSummary
   busy: string | null
   onPreview: () => void
   onRotate: () => void
   onRevoke: () => void
   onExtend: (iso: string) => void
+  onLogging: (body: { can_log?: boolean; pin?: string }) => void
+  onUnlock: (pin?: string) => void
+  onActivity: () => void
 }) {
   const maxEnd = new Date(new Date(pass.starts_at).getTime() + PASS_MAX_DAYS * 86400000 - 60000)
   const [extendTo, setExtendTo] = useState(dateInput(new Date(pass.expires_at)))
@@ -198,6 +226,11 @@ function PassRow({ pass, busy, onPreview, onRotate, onRevoke, onExtend }: {
           </p>
           <p className="text-xs text-theme-tertiary">
             {pass.open_count > 0 ? `Opened ${pass.open_count}× · last ${fmt(pass.last_used_at!)}` : 'Not opened yet'}
+            {pass.log_count > 0 && (
+              <> · <button className="underline text-theme-secondary" onClick={onActivity} disabled={!!busy}>
+                {pass.log_count} {pass.log_count === 1 ? 'feeding' : 'feedings'} logged
+              </button></>
+            )}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-start">
@@ -207,6 +240,8 @@ function PassRow({ pass, busy, onPreview, onRotate, onRevoke, onExtend }: {
             disabled={!!busy} onClick={onRevoke}>End now</button>
         </div>
       </div>
+      {pass.status === 'locked' && <LockedBanner busy={busy} onUnlock={onUnlock} onRevoke={onRevoke} />}
+      <LoggingControls pass={pass} busy={busy} onChange={onLogging} />
       <div className="flex items-end gap-2 flex-wrap">
         <label className="text-sm text-theme-secondary">
           Ends on
@@ -241,6 +276,8 @@ function NewPass({ token, onCancel, onCreated }: {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [upgrade, setUpgrade] = useState<string | null>(null)
+  const [canLog, setCanLog] = useState(false)
+  const [pin, setPin] = useState('')
 
   useEffect(() => {
     sitterApi.candidates(token).then((c) => {
@@ -283,6 +320,13 @@ function NewPass({ token, onCancel, onCreated }: {
       setError('Pick at least one animal.')
       return
     }
+    if (canLog) {
+      const problem = pinProblem(pin)
+      if (problem) {
+        setError(`PIN: ${problem}`)
+        return
+      }
+    }
     setSaving(true)
     try {
       onCreated(await sitterApi.create(token, {
@@ -290,6 +334,7 @@ function NewPass({ token, onCancel, onCreated }: {
         label: label.trim() || undefined,
         starts_at: startDate.getTime() > Date.now() ? startsAt.toISOString() : undefined,
         expires_at: endAt.toISOString(),
+        ...(canLog ? { can_log: true, pin } : {}),
       }))
     } catch (e) {
       if (e instanceof PassApiError && e.status === 402) setUpgrade(e.message)
@@ -372,13 +417,29 @@ function NewPass({ token, onCancel, onCreated }: {
         </p>
       </div>
 
+      <fieldset className="space-y-2 p-4 rounded-xl border border-theme">
+        <legend className="px-1 font-semibold text-theme-primary">Logging back <span className="text-xs font-normal text-theme-tertiary">Premium</span></legend>
+        <label className="flex items-start gap-2 text-theme-primary">
+          <input type="checkbox" className="mt-1" checked={canLog} onChange={(e) => setCanLog(e.target.checked)} />
+          <span>
+            Let {label.trim() || 'your sitter'} mark animals as fed or refused
+            <span className="block text-sm text-theme-secondary">
+              Their entries land in your records, labelled with their name, so nothing goes missing while you&apos;re away.
+            </span>
+          </span>
+        </label>
+        {canLog && (
+          <PinField value={pin} onChange={setPin} />
+        )}
+      </fieldset>
+
       <div className="flex gap-3">
         <button className={BTN_PRIMARY} disabled={saving} onClick={submit}>{saving ? 'Making link…' : 'Make link'}</button>
         <button className={BTN_SECONDARY} onClick={onCancel}>Cancel</button>
       </div>
 
       <UpgradeModal isOpen={upgrade !== null} onClose={() => setUpgrade(null)} source="shared_keeping"
-        feature="More sitter links" description={upgrade ?? ''} />
+        feature={canLog ? 'Sitter logging' : 'More sitter links'} description={upgrade ?? ''} />
     </section>
   )
 }
@@ -411,6 +472,12 @@ function LinkReveal({ created, onDone }: { created: PassCreated; onDone: () => v
           <p className="text-xs text-theme-tertiary">
             Anyone with this link can see the feeding list until it ends. You can end it early at any time.
           </p>
+          {created.can_log && (
+            <p className="text-sm p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30 text-amber-900 dark:text-amber-200">
+              <strong>Tell them the PIN separately</strong> — say it, or send it in a different message.
+              The link alone can only read; the PIN is what lets someone log.
+            </p>
+          )}
         </div>
       </div>
       <button className={BTN_SECONDARY} onClick={onDone}>Done</button>
@@ -495,6 +562,135 @@ function GuideEditor({ token }: { token: string }) {
         <button className={BTN_PRIMARY} onClick={save}>Save routine</button>
         {status && <span role="status" className="text-sm text-theme-secondary">{status}</span>}
       </div>
+    </section>
+  )
+}
+
+function PinField({ value, onChange, label = 'PIN for logging' }: {
+  value: string
+  onChange: (v: string) => void
+  label?: string
+}) {
+  const problem = value.length >= 4 ? pinProblem(value) : null
+  return (
+    <label className="block text-sm text-theme-secondary max-w-xs">
+      {label}
+      <input className={`${INPUT} mt-1 tracking-widest`} inputMode="numeric" autoComplete="off" maxLength={6}
+        value={value} placeholder="4–6 digits" onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
+        aria-invalid={!!problem} />
+      <span className={`block mt-1 text-xs ${problem ? 'text-red-700 dark:text-red-300' : 'text-theme-tertiary'}`}>
+        {problem ?? 'Tell your sitter this separately from the link. 5 wrong tries pause the link and tell you.'}
+      </span>
+    </label>
+  )
+}
+
+function LoggingControls({ pass, busy, onChange }: {
+  pass: PassSummary
+  busy: string | null
+  onChange: (body: { can_log?: boolean; pin?: string }) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [pin, setPin] = useState('')
+  const ok = pinProblem(pin) === null
+  const save = (body: { can_log?: boolean; pin?: string }) => {
+    onChange(body)
+    setEditing(false)
+    setPin('')
+  }
+  return (
+    <div className="p-3 rounded-xl bg-surface-elevated space-y-2">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-theme-primary">
+          <span className="font-medium">Logging back:</span>{' '}
+          {pass.can_log ? 'On — your sitter can mark feedings with the PIN.' : 'Off — the link is read-only.'}
+        </p>
+        {!editing && (
+          <div className="flex gap-2">
+            {pass.can_log ? (
+              <>
+                <button className="text-sm underline text-theme-secondary" disabled={!!busy} onClick={() => setEditing(true)}>Change PIN</button>
+                <button className="text-sm underline text-theme-secondary" disabled={!!busy}
+                  onClick={() => { if (confirm('Turn off logging? Your sitter can still see the list, but can no longer mark feedings.')) save({ can_log: false }) }}>
+                  Turn off
+                </button>
+              </>
+            ) : (
+              <button className="text-sm underline text-theme-secondary" disabled={!!busy} onClick={() => setEditing(true)}>Turn on</button>
+            )}
+          </div>
+        )}
+      </div>
+      {editing && (
+        <div className="flex items-end gap-2 flex-wrap">
+          <PinField value={pin} onChange={setPin} label={pass.can_log ? 'New PIN' : 'PIN for logging'} />
+          <button className={BTN_PRIMARY} disabled={!!busy || !ok}
+            onClick={() => save(pass.can_log ? { pin } : { can_log: true, pin })}>
+            {pass.can_log ? 'Save PIN' : 'Turn on logging'}
+          </button>
+          <button className={BTN_SECONDARY} onClick={() => { setEditing(false); setPin('') }}>Cancel</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LockedBanner({ busy, onUnlock, onRevoke }: {
+  busy: string | null
+  onUnlock: (pin?: string) => void
+  onRevoke: () => void
+}) {
+  const [pin, setPin] = useState('')
+  const pinOk = pin === '' || pinProblem(pin) === null
+  return (
+    <div role="alert" className="p-3 rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/30 space-y-2">
+      <p className="text-sm text-red-800 dark:text-red-200">
+        <strong>Logging on this link is paused.</strong> Someone entered the wrong PIN 5 times. Your sitter can
+        still see the feeding list. If it was them, unlock logging — a new PIN is safest. If you&apos;re not sure who
+        it was, end the link and send a new one.
+      </p>
+      <div className="flex items-end gap-2 flex-wrap">
+        <PinField value={pin} onChange={setPin} label="New PIN (optional)" />
+        <button className={BTN_PRIMARY} disabled={!!busy || !pinOk} onClick={() => onUnlock(pin || undefined)}>Unlock</button>
+        <button className={`${BTN} border border-red-300 dark:border-red-800 text-red-700 dark:text-red-300`} disabled={!!busy} onClick={onRevoke}>End it</button>
+      </div>
+    </div>
+  )
+}
+
+function ActivityView({ pass, entries, onBack }: { pass: PassSummary; entries: ActivityEntry[]; onBack: () => void }) {
+  const who = pass.label || 'Your sitter'
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-lg font-semibold text-theme-primary">What {who} logged</h2>
+          <p className="text-sm text-theme-secondary">
+            These are in your feeding records too, marked &ldquo;Fed by {who} (sitter link)&rdquo;. Edit or delete them there.
+          </p>
+        </div>
+        <button className={BTN_SECONDARY} onClick={onBack}>Back</button>
+      </div>
+      {entries.length === 0 && <p className="text-theme-secondary">Nothing logged yet.</p>}
+      <ul className="space-y-2">
+        {entries.map((e) => (
+          <li key={e.id} className="p-3 rounded-xl bg-surface border border-theme">
+            <div className="flex justify-between gap-3 flex-wrap">
+              <span className="font-medium text-theme-primary">
+                <span aria-hidden>{e.accepted ? '✓ ' : '✗ '}</span>
+                {e.animal_name} — {e.accepted ? 'fed' : 'refused'}
+                {(e.food_type || e.food_size) && (
+                  <span className="font-normal text-theme-secondary"> · {[e.quantity && e.quantity > 1 ? `${e.quantity}×` : null, e.food_size, e.food_type].filter(Boolean).join(' ')}</span>
+                )}
+              </span>
+              <span className="text-sm text-theme-tertiary">
+                {e.fed_at ? new Date(e.fed_at).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''}
+              </span>
+            </div>
+            {e.notes && <p className="mt-1 text-sm text-theme-secondary italic">&ldquo;{e.notes}&rdquo;</p>}
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

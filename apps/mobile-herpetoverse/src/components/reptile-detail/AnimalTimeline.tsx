@@ -51,6 +51,8 @@ interface TimelineEntry {
   /** False when `at` carried no time component — see the tiebreak note. */
   hasTime: boolean;
   title: string;
+  /** Who logged it, when it wasn't the keeper (sitter links). */
+  attribution?: string;
   /** Right-aligned outcome or delta. */
   trailing?: string;
   /** Colour for `trailing`; falls back to textTertiary. */
@@ -154,6 +156,7 @@ export function AnimalTimeline({
         day: localDay(f.fed_at),
         hasTime: hasTimeComponent(f.fed_at),
         title: feedingTitle(f),
+        attribution: f.sitter_name ? `Logged by ${f.sitter_name} (sitter link)` : undefined,
         trailing: f.accepted ? undefined : 'Refused',
         trailingTone: f.accepted ? undefined : 'danger',
       });
@@ -308,6 +311,7 @@ export function AnimalTimeline({
                 {relativeDay(e.at)}
                 {/* Never fabricate a 00:00 for a date-only entry. */}
                 {!e.hasTime ? ' · No time recorded' : ''}
+                {e.attribution ? ` · ${e.attribution}` : ''}
               </Text>
             </View>
 

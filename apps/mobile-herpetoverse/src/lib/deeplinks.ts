@@ -14,6 +14,7 @@
 
 const EXACT_MAP: Record<string, string> = {
   '/feeding-day': '/feeding-day',
+  '/sitter': '/sitter',
 };
 
 export function resolveDeeplink(deeplink: string | null | undefined): string | null {

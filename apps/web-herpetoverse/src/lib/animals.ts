@@ -227,6 +227,8 @@ export interface FeedingLog {
   prey_weight_g: string | null
   notes: string | null
   created_at: string
+  /** Set only when a sitter logged it via a sitter link. */
+  sitter_name?: string | null
 }
 
 export interface ShedLog {

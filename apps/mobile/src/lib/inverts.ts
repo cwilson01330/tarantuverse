@@ -364,7 +364,7 @@ export interface InvertSpecies {
   times_kept: number;
 }
 
-export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; food_size: string | null; accepted: boolean; notes: string | null; }
+export interface InvertFeedingLog { id: string; invert_id: string | null; fed_at: string; food_type: string | null; food_size: string | null; accepted: boolean; notes: string | null; /** Set only when a sitter logged it via a sitter link. */ sitter_name?: string | null; }
 /** successful | stuck | lost_limb | fatal — the backend vocabulary.
  *  Deliberately small: finer gradations would be guesses about a process the
  *  keeper mostly didn't watch. `fatal` records a death IN the molt and does

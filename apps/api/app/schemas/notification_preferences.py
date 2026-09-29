@@ -29,6 +29,7 @@ class NotificationPreferencesBase(BaseModel):
     forum_replies_enabled: bool = True
     new_followers_enabled: bool = True
     community_activity_enabled: bool = False
+    sitter_activity_enabled: bool = True
 
     # Quiet hours
     quiet_hours_enabled: bool = False
@@ -56,6 +57,7 @@ class NotificationPreferencesUpdate(BaseModel):
     forum_replies_enabled: Optional[bool] = None
     new_followers_enabled: Optional[bool] = None
     community_activity_enabled: Optional[bool] = None
+    sitter_activity_enabled: Optional[bool] = None
 
     quiet_hours_enabled: Optional[bool] = None
     quiet_hours_start: Optional[str] = Field(None, pattern=r"^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$")

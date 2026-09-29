@@ -25,7 +25,7 @@ const PASSTHROUGH_PREFIXES = [
   '/forums/thread/',
 ];
 
-const PASSTHROUGH_EXACT = ['/feeding-day'];
+const PASSTHROUGH_EXACT = ['/feeding-day', '/sitter'];
 
 export function resolveDeeplink(deeplink: string | null | undefined): string | null {
   if (!deeplink) return null;

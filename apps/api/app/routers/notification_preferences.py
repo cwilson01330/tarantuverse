@@ -43,6 +43,7 @@ async def get_notification_preferences(
             forum_replies_enabled=True,
             new_followers_enabled=True,
             community_activity_enabled=False,
+            sitter_activity_enabled=True,
             quiet_hours_enabled=False,
             quiet_hours_start="22:00",
             quiet_hours_end="08:00"

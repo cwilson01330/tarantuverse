@@ -26,6 +26,25 @@ export interface PassSummary {
   open_count: number
   last_used_at: string | null
   created_at: string | null
+  // Rung 2 — sitter logging. The PIN itself is never sent back; only whether one is set.
+  can_log: boolean
+  has_pin: boolean
+  log_count: number
+}
+
+export interface ActivityEntry {
+  id: string
+  kind: 'invert' | 'animal'
+  animal_id: string | null
+  animal_name: string
+  accepted: boolean
+  food_type: string | null
+  food_size: string | null
+  quantity: number | null
+  notes: string | null
+  fed_at: string | null
+  created_at: string | null
+  sitter_name: string
 }
 
 export interface PassCreated extends PassSummary {
@@ -82,9 +101,15 @@ export const sitterApi = {
   candidates: (t: string) => call<Candidate[]>(t, `/candidates?app=${PASS_APP}`),
   create: (t: string, body: {
     animals: { kind: string; id: string }[]; expires_at: string; starts_at?: string; label?: string
+    can_log?: boolean; pin?: string
   }) => call<PassCreated>(t, '/', { method: 'POST', body: JSON.stringify({ app: PASS_APP, ...body }) }),
-  update: (t: string, id: string, body: { label?: string; expires_at?: string }) =>
-    call<PassSummary>(t, `/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  update: (t: string, id: string, body: {
+    label?: string; expires_at?: string; can_log?: boolean; pin?: string
+  }) => call<PassSummary>(t, `/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  /** Clear a PIN lockout, optionally with a new PIN. */
+  unlock: (t: string, id: string, pin?: string) =>
+    call<PassSummary>(t, `/${id}/unlock`, { method: 'POST', body: JSON.stringify(pin ? { pin } : {}) }),
+  activity: (t: string, id: string) => call<ActivityEntry[]>(t, `/${id}/activity`),
   rotate: (t: string, id: string) => call<PassCreated>(t, `/${id}/rotate`, { method: 'POST' }),
   revoke: (t: string, id: string) => call<PassSummary>(t, `/${id}/revoke`, { method: 'POST' }),
   preview: (t: string, id: string) =>
@@ -99,6 +124,16 @@ export const sitterApi = {
 /** The full link. The token lives in the fragment, which browsers never send to a server. */
 export function shareUrl(created: PassCreated): string {
   return `${window.location.origin}${created.share_path}`
+}
+
+/** Mirrors utils/sitter_pass.validate_pin so the keeper hears about a weak PIN before saving. */
+export function pinProblem(pin: string): string | null {
+  if (!/^\d{4,6}$/.test(pin)) return 'Use 4 to 6 digits.'
+  const digits = pin.split('')
+  if (new Set(digits).size === 1) return "Pick a PIN that isn't the same digit repeated."
+  const steps = new Set(digits.slice(1).map((c, i) => Number(c) - Number(digits[i])))
+  if (steps.size === 1 && (steps.has(1) || steps.has(-1))) return "Pick a PIN that isn't a straight run like 1234."
+  return null
 }
 
 export const STATUS_LABEL: Record<PassStatus, string> = {

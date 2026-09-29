@@ -176,7 +176,10 @@ def test_every_export_field_exists_on_its_model():
     ]
     for model, fields, name in pairs:
         columns = {c.name for c in model.__table__.columns}
-        missing = [f for f in fields if f not in columns]
+        # A read-only @property on the model is fine too (e.g. FeedingLog.
+        # sitter_name) — it's a real attribute, not a typo.
+        props = {f for f in fields if isinstance(getattr(model, f, None), property)}
+        missing = [f for f in fields if f not in columns and f not in props]
         assert not missing, f"{name} names columns absent from {model.__name__}: {missing}"
 
 

@@ -107,6 +107,39 @@ function ProfileScreen() {
           />
         </TouchableOpacity>
 
+        {/* One tap from the tab, like TV's "You" menu. It used to live only
+            inside Settings (Profile → Settings → Sitter links). */}
+        <TouchableOpacity
+          onPress={() => router.push('/sitter' as never)}
+          style={[
+            styles.toolButton,
+            {
+              borderColor: colors.border,
+              borderRadius: layout.radius.md,
+              backgroundColor: colors.surface,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Open sitter links"
+        >
+          <MaterialCommunityIcons name="link" size={20} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.toolButtonTitle, { color: colors.textPrimary }]}>
+              Sitter links
+            </Text>
+            <Text
+              style={[styles.toolButtonSubtitle, { color: colors.textSecondary }]}
+            >
+              Going away? Share a feeding list with whoever's covering.
+            </Text>
+          </View>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={20}
+            color={colors.textTertiary}
+          />
+        </TouchableOpacity>
+
         <TouchableOpacity
           onPress={() => router.push('/settings' as never)}
           style={[

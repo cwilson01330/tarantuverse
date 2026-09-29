@@ -1,6 +1,6 @@
 # PRD — Shared keeping: sitter pass & co-keepers
 
-**Status:** Phase 1 decisions made; ready to build (privacy-policy copy due before ship) · **Date:** 2026-09-28 · **Apps:** Tarantuverse + Herpetoverse (app + web)
+**Status:** Phases 1–2 built (rungs 1–2); rung 3 (co-keepers) not started · **Date:** 2026-09-28 · **Apps:** Tarantuverse + Herpetoverse (app + web)
 **Related:** Premium Scope feature 08 (`design_handoff_keeper_apps_redesign/Premium Scope (standalone).html`), QR upload sessions (`routers/qr.py`), Feeding Day (`/inverts/feeding-status`), upgrade tracking (`shared_keeping` source key)
 
 ---
@@ -341,8 +341,8 @@ Phases 1 and 2 don't depend on 3a. Phase 3a can start any time and ship silently
 
 **Blocking before Phase 2**
 
-4. **PIN required for write passes?** *(Cory)* Recommendation: **yes**. It's the control that turns a forwarded link from "stranger can falsify records" into "stranger sees a feeding list".
-5. **What else sitters can log.** *(Cory)* Recommendation: feedings and refusals in v1, water/misting in P1, observations as notifications in P1, **never** molts or health events directly.
+4. ~~**PIN required for write passes?**~~ **Built as recommended 2026-09-28:** yes — required, enforced in the DB (`keeper_passes_logging_requires_pin`) as well as the API.
+5. ~~**What else sitters can log.**~~ **Built as recommended 2026-09-28:** feedings and refusals only. Water/misting and "report something" stay P1; molts and health events are never sitter-writable.
 
 **Blocking before Phase 3b**
 
@@ -368,6 +368,37 @@ Phases 1 and 2 don't depend on 3a. Phase 3a can start any time and ship silently
 **Open:**
 - ~~**Rate-limit keying behind Render.**~~ **Checked 2026-09-28, not an issue.** Render's API logs show uvicorn receiving varied real client IPs (only the internal health check is 127.0.0.1), so SlowAPI's per-IP buckets are per visitor, for sitter links and login alike. No `FORWARDED_ALLOW_IPS` change needed.
 - Per-pass payload cost scales with animals (a premolt prediction per tarantula). Consider a ~60s payload cache if large passes become common.
+
+## Phase 2 build notes (2026-09-28)
+
+**Shipped:** migration `slg_20260928_sitter_logging` (`feeding_logs.logged_via_pass_id` + `logged_by_user_id`, both SET NULL, partial indexes; `notification_preferences.sitter_activity_enabled`). Sitter router grows to exactly five routes — `/exchange`, `/pass`, `/unlock`, `POST /feedings`, `DELETE /feedings/{id}` — pinned by an allowlist test. Keeper router adds `/{id}/unlock` and `/{id}/activity`; create/PATCH take `can_log` + `pin`. `FeedingLogResponse` carries `sitter_name`; every feeding history (TV web tarantula + invert, TV mobile invert/tarantula, HV web + mobile) shows "Logged by {name} (sitter link)". Export includes the attribution columns. Tests: `test_sitter_logging.py` (68), 35 mutations all caught.
+
+**How the PIN works:**
+- 4–6 digits; all-same and straight runs (1234, 4321) rejected; bcrypt-hashed.
+- `/sitter/unlock` checks it under a row lock (parallel guesses count one at a time) and mints a *write* session whose `pb` claim is bound to the current PIN hash. Changing the PIN or turning logging off ends every write session on its next request; the read session carries no `pb` and gets 403 "Enter the PIN" on writes.
+- 5 wrong PINs → `locked_at` set → **logging pauses; the feeding list stays readable** (see review M1 below) and the keeper gets a `sitter_pass_locked` notification regardless of preferences. The keeper unlocks (optionally with a new PIN) or ends the link.
+- A correct PIN does **not** reset the failure count; only the keeper does (unlock, new PIN, or toggling logging).
+
+**Decisions made while building:**
+- **Premium is checked when logging is turned ON, never on a sitter write** (T12 welfare rule, tested). Changing the PIN or turning logging off is never paywalled.
+- **Server time only.** Sitters can't backdate; `fed_at` isn't in the request schema.
+- **Double-tap guard:** the same animal + outcome from the same pass within 60 s returns the existing entry.
+- **Per-pass cap:** 60 writes/hour, counted from the DB under the pass row lock (not per-IP).
+- **Tarantulas write both `invert_id` and `tarantula_id`** (when the legacy twin exists), exactly as the keeper's own tarantula path does, so the entry shows on every tarantula screen until ADR-005 C1.
+- **A sitter entry never ends a feeding pause** (unlike the keeper's own). If a paused animal is logged as fed, the keeper gets an always-on "logged as fed while paused" notification instead. Undo on an HV animal restores `last_fed_at` to the newest remaining accepted feeding.
+- **Colonies aren't sitter-loggable** (their cards say "graze"; group feedings stay the keeper's call).
+- **Notifications are coalesced:** one `sitter_log` notification per pass per 2 hours ("Sam is logging feedings"), gated by `sitter_activity_enabled`. The activity list has every entry.
+- **The sitter only ever sees their own entries** (`sitter_logs` on each card) — never the keeper's or another pass's. Keyed `comment`, not `notes`, so the privacy snapshot rule (no `notes` key in a pass payload) still holds.
+
+**Independent security review (2026-09-28):** no Critical. Fixed:
+- **H1 (High):** the unlock endpoint's `with_for_update()` re-query returned the dependency's already-loaded object (SQLAlchemy identity map), so parallel wrong PINs all read the same failure count and the lockout could be outrun. Now `populate_existing()` under the row lock, lock state checked before verifying, and a behavioural test simulates the stale object.
+- **M1:** a lockout used to kill reading too, letting anyone with a leaked link strand the real sitter. Now it pauses logging only.
+- **M2:** sitter entries used to clear pauses, and undo couldn't restore them. Now they don't clear pauses (see above).
+- **L1** (no failure reset on success), **L3** (writes re-check the pass under the lock), **L5** (bcrypt off the event loop), sitter PIN field `autoComplete="one-time-code"`.
+
+Accepted as Low: undo lets a sitter churn under the 60/hour cap; notification coalescing can double-fire on simultaneous writes; a keeper's later note on a sitter entry is visible to that sitter for 2 days; the weak-PIN filter doesn't catch patterns like 1212 (the lockout is the real control). `sitter_activity_enabled` gates the push only — the in-app notification row is always written, as for every category.
+
+**Deferred:** in-app sitter screen + iOS AASA `/sit` (unchanged from Phase 1); P1 water/misting and "report something"; a Postgres-backed concurrency test (the suite has no database).
 
 ## Adjacent hardening found while scoping
 

@@ -50,6 +50,7 @@ DEEPLINK_PATTERNS = (
     r"^/forums/thread/[0-9a-fA-F-]+$",  # forum thread by id
     r"^/feeding-day$",                 # bulk feeding screen
     r"^/transfers$",                   # transfers index (Herpetoverse web only)
+    r"^/sitter$",                      # sitter links (activity, lockouts)
 )
 
 _COMPILED_DEEPLINK_PATTERNS = tuple(re.compile(p) for p in DEEPLINK_PATTERNS)
