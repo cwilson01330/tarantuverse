@@ -1,0 +1,133 @@
+"""Card text is composed server-side, from only the fields the keeper chose.
+
+These pin the privacy promise (a field that wasn't chosen, or isn't on the
+allow-list, never appears) and the "no empty rows" rule from the spec.
+"""
+from datetime import date
+
+import pytest
+
+from app.services.share_card import (
+    DEFAULT_FIELDS, FIELD_ALLOW, CardSubject, MoltFacts,
+    clean_fields, compose_card, in_care_label,
+)
+
+TODAY = date(2026, 9, 30)
+
+
+def rosie(**kw):
+    base = dict(
+        app="tarantuverse", taxon="tarantula", name="Rosie",
+        scientific_name="Brachypelma hamorii", common_name="Mexican redknee",
+        sex="female", date_acquired=date(2025, 8, 14),
+        photo_url="https://pub.example.r2.dev/photos/0b1c.jpg",
+        molt_count=9, latest_size="4.1 in",
+    )
+    base.update(kw)
+    return CardSubject(**base)
+
+
+def test_unknown_and_disallowed_fields_are_dropped():
+    assert clean_fields("tarantuverse", "profile", ["name", "price_paid", "notes", "email", "sex"]) == ["name", "sex"]
+
+
+def test_none_means_defaults():
+    assert clean_fields("tarantuverse", "molt", None) == list(DEFAULT_FIELDS[("tarantuverse", "molt")])
+
+
+def test_herpetoverse_has_no_molt_card():
+    with pytest.raises(ValueError):
+        clean_fields("herpetoverse", "molt", None)
+
+
+def test_profile_card_full():
+    card = compose_card("profile", rosie(), list(FIELD_ALLOW[("tarantuverse", "profile")]), today=TODAY)
+    assert card["header"] == "Specimen · female"
+    assert card["name"] == "Rosie"
+    assert card["scientific_name"] == "Brachypelma hamorii"
+    assert card["common_name"] == "Mexican redknee"
+    assert card["photo_url"].endswith("0b1c.jpg")
+    assert card["facts"] == [
+        {"label": "In care", "value": "1 yr, 1 mo"},
+        {"label": "Molts", "value": "9"},
+        {"label": "Leg span", "value": "4.1 in"},
+    ]
+
+
+def test_unchosen_fields_are_absent_not_blank():
+    card = compose_card("profile", rosie(), ["species"], today=TODAY)
+    assert card["name"] is None and card["photo_url"] is None
+    assert card["header"] == "Specimen"  # sex not chosen
+    assert card["facts"] == []
+
+
+def test_missing_values_remove_rows():
+    card = compose_card(
+        "profile", rosie(date_acquired=None, molt_count=0, latest_size=None, sex="unknown"),
+        list(FIELD_ALLOW[("tarantuverse", "profile")]), today=TODAY,
+    )
+    assert card["header"] == "Specimen"
+    assert card["facts"] == []
+
+
+def test_molt_card_with_measurements():
+    molt = MoltFacts(number=9, molted_on=date(2026, 9, 29), span_before=3.2, span_after=4.1)
+    card = compose_card("molt", rosie(), ["name", "species", "size_change", "days_in_care"], molt=molt, today=TODAY)
+    assert card["header"] == "Specimen · molt no. 9"
+    assert card["facts"] == [
+        {"label": "Leg span", "value": "3.2 → 4.1 in"},
+        {"label": "In care", "value": "day 411"},
+    ]
+
+
+def test_molt_card_without_measurements_is_still_complete():
+    """385 of 438 production molts have no measurements (2026-09-29)."""
+    molt = MoltFacts(number=3, molted_on=date(2026, 9, 29), span_before=None, span_after=None)
+    card = compose_card("molt", rosie(), ["name", "species", "size_change"], molt=molt, today=TODAY)
+    assert card["header"] == "Specimen · molt no. 3"
+    assert card["facts"] == []
+
+
+def test_molt_card_after_only():
+    molt = MoltFacts(number=4, molted_on=TODAY, span_before=None, span_after=2.0)
+    card = compose_card("molt", rosie(), ["size_change"], molt=molt, today=TODAY)
+    assert card["facts"] == [{"label": "Leg span", "value": "2 in"}]
+
+
+def test_non_spider_size_label():
+    s = rosie(taxon="scorpion", latest_size="62 mm")
+    card = compose_card("profile", s, ["size"], today=TODAY)
+    assert card["facts"] == [{"label": "Body length", "value": "62 mm"}]
+
+
+def test_herpetoverse_profile():
+    s = CardSubject(
+        app="herpetoverse", taxon="snake", name="Juniper", scientific_name="Python regius",
+        common_name="Ball python", sex="male", date_acquired=date(2023, 5, 2), photo_url=None,
+        weight_g=1412.0, length_in=38.5, shed_count=14,
+    )
+    card = compose_card("profile", s, list(FIELD_ALLOW[("herpetoverse", "profile")]), today=TODAY)
+    assert card["header"] == "Specimen · male"
+    assert card["facts"] == [
+        {"label": "In care", "value": "3 yr, 4 mo"},
+        {"label": "Weight", "value": "1.41 kg"},
+        {"label": "Length", "value": "38.5 in"},
+        {"label": "Sheds", "value": "14"},
+    ]
+
+
+@pytest.mark.parametrize("start,end,label", [
+    (date(2026, 9, 1), date(2026, 9, 30), "less than a month"),
+    (date(2026, 8, 30), date(2026, 9, 30), "1 mo"),
+    (date(2025, 9, 30), date(2026, 9, 30), "1 yr"),
+    (date(2026, 10, 1), date(2026, 9, 30), None),  # future acquisition: say nothing
+])
+def test_in_care_label(start, end, label):
+    assert in_care_label(start, end) == label
+
+
+@pytest.fixture(autouse=True)
+def _r2_base(monkeypatch):
+    from app.services.storage import storage_service
+    monkeypatch.setattr(storage_service, "use_r2", True, raising=False)
+    monkeypatch.setattr(storage_service, "public_url_base", "https://pub.example.r2.dev", raising=False)

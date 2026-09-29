@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     
     # Frontend URL for emails
     FRONTEND_URL: str = "http://localhost:3000"
+    # Where share-card PNGs are rendered (the Tarantuverse web app hosts the
+    # one renderer for both products). Override per environment.
+    CARD_RENDERER_ORIGIN: str = "https://www.tarantuverse.com"
 
     # Auth email flow
     EMAIL_VERIFICATION_REQUIRED: bool = False

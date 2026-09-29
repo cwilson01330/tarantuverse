@@ -25,9 +25,13 @@ species images, avatars, or the shop's files in the shared bucket.
 Idempotent: an object with no metadata worth removing is skipped, so re-running
 never re-compresses a clean JPEG.
 
-AFTER RUNNING: purge the Cloudflare cache for the photos domain (dashboard →
-Caching → Purge Everything, or purge by URL). Objects are served with a
-one-year cache, so edge copies of the old bytes can linger until purged.
+Run history: 2026-09-29 — all 823 photo objects cleaned (798 + a 25-photo
+test batch), 0 failures. A re-run with --dry-run should report cleaned=0.
+
+Caching: photos are served from the bucket's r2.dev address, not a custom
+domain, so there is no zone cache in the Cloudflare dashboard to purge.
+Browsers that already viewed a photo may hold their own copy (1-year
+Cache-Control) until it's evicted from that device.
 
 Run on the Render shell (needs the R2_* env vars):
 

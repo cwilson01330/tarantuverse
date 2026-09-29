@@ -392,12 +392,8 @@ function InvertDetailScreen() {
 
   const openOverflow = () => setMenuOpen(true);
 
-  const handleShare = async () => {
-    try {
-      await Share.share({ message: `Check out ${headerTitle} on Tarantuverse!` });
-    } catch {
-      // User dismissed the share sheet — not an error worth surfacing.
-    }
+  const handleShare = () => {
+    router.push(`/share/${id}?kind=profile` as any);
   };
 
   const sexGlyph =
@@ -702,7 +698,7 @@ function InvertDetailScreen() {
           <View style={[styles.heroActions, { top: insets.top + 8 }]}>
             {heroButton('chevron-left', 'Back', () => router.back())}
             <View style={{ flex: 1 }} />
-            {heroButton('share-variant', 'Share', handleShare)}
+            {canKeep && heroButton('share-variant', 'Share', handleShare)}
             {overflowRows.length > 0 && heroButton('dots-horizontal', 'More actions', openOverflow)}
           </View>
 

@@ -59,6 +59,7 @@ import app.routers.hv_feeder_stocks as hv_feeder_stocks
 import app.routers.colonies as colonies  # ADR-010 pet colony mode
 import app.routers.sitter_passes as sitter_passes  # PRD-shared-keeping
 import app.routers.collection_members as collection_members  # PRD-shared-keeping rung 3
+import app.routers.share_cards as share_cards  # share cards (spec 2026-09-29)
 import app.routers.animal_events as animal_events  # ADR-015 per-animal events
 import app.routers.species_shortlist as species_shortlist  # care-sheet bookmarks
 import app.routers.waitlist as waitlist
@@ -336,6 +337,7 @@ app.include_router(colonies.router, prefix="/api/v1/colonies", tags=["colonies"]
 # resource prefixes — one router serves both /inverts/{id}/events and
 # /animals/{id}/events, since the concept is identical across the two products.
 app.include_router(animal_events.router, prefix="/api/v1", tags=["events"])
+app.include_router(share_cards.router, prefix="/api/v1", tags=["share-cards"])
 app.include_router(species_shortlist.router, prefix="/api/v1/species-shortlist", tags=["species"])
 
 print("[STARTUP] Registering waitlist router...")

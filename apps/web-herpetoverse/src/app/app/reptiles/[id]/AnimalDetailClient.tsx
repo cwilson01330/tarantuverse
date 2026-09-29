@@ -42,6 +42,7 @@ import PhotoGallery from '@/components/PhotoGallery'
 import { PauseFeedingDialog } from '@/components/PauseFeedingDialog'
 import { FeedingCadenceDialog } from '@/components/FeedingCadenceDialog'
 import ReptileQRModal from '@/components/ReptileQRModal'
+import ShareCardModal from '@/components/ShareCardModal'
 import {
   type Animal,
   type CreateFeedingPayload,
@@ -165,6 +166,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
 
   // QR upload-session modal
   const [qrOpen, setQrOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
 
   const refetchAll = useCallback(async () => {
     const [animalR, weightsR, trendR, preyR, feedingsR, shedsR] =
@@ -316,6 +318,14 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           <h2 className="text-sm uppercase tracking-[0.2em] text-herp-lime font-medium">
             Photos
           </h2>
+          <div className="flex items-center gap-2">
+          {access.canKeep && <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-neutral-800 text-xs font-medium text-neutral-300 hover:text-herp-lime hover:border-herp-teal/40 transition-colors"
+          >
+            Share card
+          </button>}
           {access.isOwner && <button
             type="button"
             onClick={() => setQrOpen(true)}
@@ -325,6 +335,7 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
             <span aria-hidden="true">📱</span>
             QR upload
           </button>}
+          </div>
         </div>
         <PhotoGallery
           animalId={animal.id}
@@ -335,6 +346,10 @@ export default function AnimalDetailClient({ animalId }: { animalId: string }) {
           canManage={access.canKeep}
         />
       </section>
+
+      {token && access.canKeep && (
+        <ShareCardModal open={shareOpen} onClose={() => setShareOpen(false)} app="herpetoverse" animalId={animal.id} kind="profile" token={token} />
+      )}
 
       {qrOpen && (
         <ReptileQRModal

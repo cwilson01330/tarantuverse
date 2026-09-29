@@ -110,7 +110,7 @@ export function AnimalHero({
       <View style={[styles.actions, { top: insets.top + 8 }]}>
         <CircleButton icon="arrow-left" label="Go back" onPress={onBack} />
         <View style={styles.actionsRight}>
-          {onShare && <CircleButton icon="share-variant" label="Share public profile" onPress={onShare} />}
+          {onShare && <CircleButton icon="share-variant" label="Share card" onPress={onShare} />}
           {onEdit && <CircleButton icon="pencil-outline" label="Edit this animal" onPress={onEdit} />}
         </View>
       </View>

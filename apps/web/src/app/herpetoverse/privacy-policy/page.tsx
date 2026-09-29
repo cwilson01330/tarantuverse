@@ -157,6 +157,10 @@ export default function HerpetoversePrivacyPolicyPage() {
             <p className="text-gray-700 dark:text-gray-300 mb-4">
               You and your co-keepers see each other&rsquo;s names (display name or username). Entries a co-keeper makes become part of your records, labelled with their name. You can change a role or remove someone at any time, and a co-keeper can leave at any time; either way their access ends straight away. If your premium plan lapses, co-keepers can still view but not change anything.
             </p>
+            <h3 className="text-xl font-semibold mb-3 text-gray-900 dark:text-white">5.6 Share cards</h3>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              When you make a share card, we generate the image from the details you choose for that card. Making a card never changes who can see your animals. If you choose &ldquo;Make a link to this card&rdquo;, we store a copy of that card so the link can show it; the link shows only that card, isn&rsquo;t listed or indexed, and you can turn it off at any time in the app under Sharing &rarr; Shared cards. Deleting the animal or your account turns its card links off. Photos on cards come from photos you already uploaded, which have their location and camera details removed when they are uploaded.
+            </p>
           </section>
 
           <section className="mb-8">

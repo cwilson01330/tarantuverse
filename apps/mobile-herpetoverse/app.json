@@ -68,6 +68,15 @@
       "expo-apple-authentication",
       "expo-iap",
       [
+        "expo-media-library",
+        {
+          "photosPermission": "Herpetoverse needs access to your photo library so you can attach photos to your reptile profiles — sheds, feedings, and growth over time.",
+          "savePhotosPermission": "Save share cards you make to your photo library.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": []
+        }
+      ],
+      [
         "@react-native-google-signin/google-signin",
         {
           "iosUrlScheme": "com.googleusercontent.apps.793166570390-l672evlsoecq3qklhor3puuqrc28vj5m"
@@ -82,7 +91,7 @@
         "projectId": "8f745ac0-847d-4a69-93b3-a3a31970d616"
       }
     },
-    "runtimeVersion": "1.1.0",
+    "runtimeVersion": "1.2.0",
     "owner": "gwizard202",
     "updates": {
       "url": "https://u.expo.dev/8f745ac0-847d-4a69-93b3-a3a31970d616"

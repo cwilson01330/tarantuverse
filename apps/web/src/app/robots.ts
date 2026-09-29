@@ -14,7 +14,9 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
-      allow: '/',
+      // Link-preview images must be fetchable: X/Twitter's card crawler
+      // honours robots.txt, and a disallowed og:image renders as nothing.
+      allow: ['/', '/api/og/', '/api/card-link/', '/c/'],
       disallow: ['/dashboard', '/messages', '/api/'],
     },
     sitemap: `${base}/sitemap.xml`,

@@ -86,6 +86,7 @@ from app.models.species_shortlist import SpeciesShortlist
 
 # Per-animal event log (ADR-015). Depends on Invert + Animal above (FK targets).
 from app.models.animal_event import AnimalEvent
+from app.models.card_link import CardLink
 
 __all__ = [
     "User",
@@ -156,4 +157,5 @@ __all__ = [
     "CollectionMember",
     "SitterGuide",
     "SpeciesShortlist",
+    "CardLink",
 ]

@@ -122,6 +122,15 @@ function SharingScreen() {
           Keep a collection together. Everyone uses their own account, and you choose what each person can do.
         </Text>
 
+        <TouchableOpacity onPress={() => router.push('/share/cards' as never)} accessibilityRole="button" accessibilityLabel="Shared cards"
+          style={[...card, styles.linkRow]}>
+          <View style={styles.flexBtn}>
+            <Text style={[TYPE.subheading, { color: colors.textPrimary }]}>Shared cards</Text>
+            <Text style={[TYPE.caption, { color: colors.textSecondary }]}>Links you made to share a card. Turn any off.</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         {/* ── Shared with me ── */}
         <Text style={[TYPE.heading, styles.h, { color: colors.textPrimary }]}>Shared with me</Text>
         {shared === null && members === null && <ActivityIndicator color={colors.primary} />}
@@ -293,6 +302,7 @@ const styles = StyleSheet.create({
   h: { marginTop: 12 },
   card: { borderWidth: 1, padding: 14, gap: 8 },
   row: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   flexBtn: { flex: 1 },
   input: { borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10 },
   chips: { flexDirection: 'row', gap: 8 },

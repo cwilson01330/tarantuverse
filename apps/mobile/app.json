@@ -72,6 +72,15 @@
         }
       ],
       "expo-iap",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Tarantuverse needs access to your photo library to let you add photos to your tarantula profiles. For example, when your tarantula molts, you can select a photo from your library to document its new size and coloration. You can also add photos of enclosure setups, feeding responses, or other care-related images to track your collection over time.",
+          "savePhotosPermission": "Save share cards you make to your photo library.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": []
+        }
+      ],
       "expo-quick-actions"
     ],
     "extra": {
@@ -82,7 +91,7 @@
         "projectId": "1d412361-4866-482a-a0a6-5d525508d8b8"
       }
     },
-    "runtimeVersion": "1.0.1",
+    "runtimeVersion": "1.1.0",
     "updates": {
       "url": "https://u.expo.dev/1d412361-4866-482a-a0a6-5d525508d8b8"
     }

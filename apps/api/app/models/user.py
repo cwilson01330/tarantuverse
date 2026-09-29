@@ -61,6 +61,9 @@ class User(Base):
     profile_specialties = Column(ARRAY(String))  # e.g., ['arboreal', 'old_world', 'breeding']
     social_links = Column(JSONB)  # {instagram: '', youtube: '', website: ''}
     collection_visibility = Column(String(20), default='private')  # private, public
+    # Share cards: the fields a keeper last chose, per "app:kind", used as the
+    # composer's defaults next time (spec §4.1). Never read by anything else.
+    share_defaults = Column(JSONB, nullable=True)
 
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)

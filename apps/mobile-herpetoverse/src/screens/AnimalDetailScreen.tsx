@@ -243,7 +243,7 @@ export function AnimalDetailScreen() {
           photoCount={photos?.length ?? 0}
           brumationActive={animal.brumation_active}
           onBack={() => router.back()}
-          onShare={isOwner && !dead ? () => setShareOpen(true) : undefined}
+          onShare={isOwner || canKeep ? () => router.push(`/share/${animal.id}` as never) : undefined}
           onEdit={canKeep && !dead ? () => router.push(`/reptile/edit/${animal.id}` as never) : undefined}
           onOpenGallery={() =>
             router.push(`/reptile/photos/${animal.id}` as never)
@@ -251,6 +251,17 @@ export function AnimalDetailScreen() {
         />
 
         <View style={styles.belowHero}>
+
+        {isOwner && !dead && (
+          <TouchableOpacity
+            onPress={() => setShareOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Share profile link"
+            style={styles.linkRow}
+          >
+            <Text style={[TYPE.bodyStrong, { color: colors.accent }]}>Share profile link</Text>
+          </TouchableOpacity>
+        )}
 
         {role && !isOwner && (
           <Text style={[TYPE.body, { color: colors.textSecondary }]}>
@@ -555,6 +566,7 @@ const styles = StyleSheet.create({
   diedButton: { borderWidth: 1, borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   /** Everything after the hero gets the normal 16pt gutter. */
   belowHero: { paddingHorizontal: 16, gap: 16 },
+  linkRow: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
 
   // Pinned log bar
   logBar: {

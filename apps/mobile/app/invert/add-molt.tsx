@@ -121,10 +121,11 @@ export default function AddInvertMoltScreen() {
         complication_notes: complication.trim() || null,
         is_ultimate: isUltimate,
       };
+      let created: { id: string } | null = null;
       if (isEdit && logId) {
         await updateInvertMolt(logId, payload);
       } else {
-        await createInvertMolt(taxon, id, payload);
+        created = await createInvertMolt(taxon, id, payload);
       }
       // Handoff §14.9: offer the path AFTER the molt saves — never before,
       // never automatically. A fatal outcome still doesn't set died_at
@@ -151,6 +152,19 @@ export default function AddInvertMoltScreen() {
           ],
           { cancelable: true, onDismiss: () => router.back() },
         );
+        return;
+      }
+      // Offer a share card after a NEW, non-fatal molt (never forced). The
+      // fatal branch above stays first so a death never offers a card.
+      if (!isEdit && created && outcome !== 'fatal' && can(role, 'keeper')) {
+        const molt = created;
+        // Same post-save navigation as the fatal offer: back to the detail
+        // screen we came from, else open it in this screen's place.
+        const leave = () => { if (from === 'detail') router.back(); else router.replace(`/invert/${id}` as any); };
+        Alert.alert('Molt saved', 'Make a card of it?', [
+          { text: 'Not now', style: 'cancel', onPress: leave },
+          { text: 'Make a card', onPress: () => router.replace(`/share/${id}?kind=molt&moltId=${molt.id}` as any) },
+        ], { cancelable: true, onDismiss: leave });
         return;
       }
       router.back();

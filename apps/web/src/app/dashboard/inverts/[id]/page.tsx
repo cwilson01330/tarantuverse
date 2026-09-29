@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
 import GrowthChart from '@/components/GrowthChart'
+import ShareCardModal from '@/components/ShareCardModal'
 import UpgradeModal from '@/components/UpgradeModal'
 import {
   DEATH_CAUSE_LABELS,
@@ -152,6 +153,8 @@ export default function InvertDetailPage() {
   const [growth, setGrowth] = useState<any | null>(null)
   const [feedingStats, setFeedingStats] = useState<InvertFeedingStats | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareMolt, setShareMolt] = useState<string | null>(null)
   // Breeding module (registry-gated, ADR-021 Phase D)
   const [pairings, setPairings] = useState<any[]>([])
   const [mates, setMates] = useState<Invert[]>([])
@@ -506,6 +509,12 @@ export default function InvertDetailPage() {
               <div className="absolute top-4 right-4 flex gap-2">
                 {canKeep && (<>
                 <button
+                  onClick={() => setShareOpen(true)}
+                  className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
+                >
+                  Share card
+                </button>
+                <button
                   onClick={() => router.push(`/dashboard/inverts/${id}/edit`)}
                   className="px-4 py-2 rounded-lg bg-black/50 text-white text-sm font-semibold backdrop-blur-sm hover:bg-black/70"
                 >
@@ -646,6 +655,7 @@ export default function InvertDetailPage() {
                 key: x.id, left: 'Molt', right: formatLocalDate(x.molted_at), sub: attribution(x),
                 onEdit: canChange(x) ? () => router.push(`/dashboard/inverts/${id}/add-molt?${qp({ logId: x.id, molted_at: x.molted_at, notes: x.notes })}`) : undefined,
                 onDelete: canChange(x) ? () => deleteLog(`molts/${x.id}`, 'molt') : undefined,
+                onShare: canKeep ? () => setShareMolt(x.id) : undefined,
               }))}
             />
 
@@ -832,6 +842,13 @@ export default function InvertDetailPage() {
           </>
         )}
       </div>
+
+      {token && invert && canKeep ? (
+        <>
+          <ShareCardModal open={shareOpen} onClose={() => setShareOpen(false)} app="tarantuverse" animalId={invert.id} kind="profile" token={token} />
+          <ShareCardModal open={!!shareMolt} onClose={() => setShareMolt(null)} app="tarantuverse" animalId={invert.id} kind="molt" moltId={shareMolt ?? undefined} token={token} />
+        </>
+      ) : null}
 
       {/* Keeper feeding cadence — ADR-017. Same dialog as the legacy tarantula
           page; it always addresses /inverts/{id}, which is this page's own
@@ -1187,7 +1204,7 @@ function LogSection({
   cta?: string
   onCta?: () => void
   empty: string
-  rows: { key: string; left: string; right: string; sub?: string; onEdit?: () => void; onDelete?: () => void }[]
+  rows: { key: string; left: string; right: string; sub?: string; onEdit?: () => void; onDelete?: () => void; onShare?: () => void }[]
   /** Loading ≠ zero ≠ error — see LoadState. */
   state?: LoadState
   onRetry?: () => void
@@ -1228,6 +1245,15 @@ function LogSection({
               {r.sub && <span className="block text-xs text-theme-tertiary">{r.sub}</span>}
             </span>
             <span className="text-sm text-theme-tertiary">{r.right}</span>
+            {r.onShare && (
+              <button
+                onClick={r.onShare}
+                className="text-xs font-semibold text-primary-600 hover:underline opacity-60 group-hover:opacity-100 transition"
+                aria-label="Share molt card"
+              >
+                Share
+              </button>
+            )}
             {r.onEdit && (
               <button
                 onClick={r.onEdit}

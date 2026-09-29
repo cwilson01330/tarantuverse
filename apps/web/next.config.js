@@ -12,6 +12,10 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
+  // Ship the share-card fonts with the serverless functions (read via readFile).
+  outputFileTracingIncludes: {
+    '/api/**': ['./src/lib/share-card/fonts/**'],
+  },
   typescript: {
     ignoreBuildErrors: false,
   },
