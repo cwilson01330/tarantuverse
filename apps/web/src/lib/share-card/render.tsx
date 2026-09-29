@@ -140,6 +140,15 @@ export function sanitizePayload(raw: unknown, shapeOverride?: Shape): CardPayloa
   }
 }
 
+// Always send a finished PNG with an explicit Content-Length. Without it the
+// response goes out chunked, and Facebook's image processor rejects that as a
+// "corrupted image" even though the bytes are a valid PNG.
+function pngResponse(buf: ArrayBuffer, headers: Record<string, string>): Response {
+  return new Response(new Uint8Array(buf), {
+    headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(buf.byteLength) },
+  })
+}
+
 export async function renderCard(raw: unknown, policy: CachePolicy, shape?: Shape): Promise<Response> {
   const p = sanitizePayload(raw)
   const useShape = shape ?? p.shape
@@ -148,11 +157,11 @@ export async function renderCard(raw: unknown, policy: CachePolicy, shape?: Shap
   const photo = await loadPhoto(p.photo_url)
   try {
     const buf = await new ImageResponse(<SpecimenCard p={{ ...p, photo_url: photo }} shape={useShape} />, opts).arrayBuffer()
-    return new Response(buf, { headers })
+    return pngResponse(buf, headers)
   } catch {
     // Any render failure (bad image, satori quirk): retry once with the glyph block.
     const buf = await new ImageResponse(<SpecimenCard p={{ ...p, photo_url: null }} shape={useShape} />, opts).arrayBuffer()
-    return new Response(buf, { headers })
+    return pngResponse(buf, headers)
   }
 }
 
@@ -166,7 +175,7 @@ export async function renderNoLongerShared(shape: Shape) {
     ),
     { width, height, fonts: await loadFonts() },
   ).arrayBuffer()
-  return new Response(buf, { headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=60', 'X-Robots-Tag': 'noindex' } })
+  return pngResponse(buf, { 'Cache-Control': 'public, max-age=60', 'X-Robots-Tag': 'noindex' })
 }
 
 export function asShape(v: string | null): Shape {
