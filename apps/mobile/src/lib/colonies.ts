@@ -49,6 +49,8 @@ export interface ColonyListItem {
   species_display_name: string | null;
   species_scientific_name: string | null;
   species_missing: boolean;
+  /** Room / rack / shelf (see lib/locations). */
+  location?: string | null;
   /** Last ACCEPTED feeding. Lets the collection card read "Fed 4d ago" like
    *  every other card. */
   last_feeding_date?: string | null;
@@ -90,6 +92,7 @@ export interface Colony {
   target_humidity_min: number | null;
   target_humidity_max: number | null;
   water_dish: boolean;
+  location: string | null;
   notes: string | null;
   photo_url: string | null;
   visibility: Visibility | null;
@@ -125,6 +128,7 @@ export interface ColonyCreate {
   target_humidity_min?: number | string | null;
   target_humidity_max?: number | string | null;
   water_dish?: boolean;
+  location?: string | null;
   notes?: string | null;
   photo_url?: string | null;
   visibility?: Visibility | null;

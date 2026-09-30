@@ -60,6 +60,7 @@ import { INVERT_TAXA } from '../src/lib/inverts';
 import { careLevelMeta } from '../src/components/caresheet';
 import { useAuth } from '../src/contexts/AuthContext';
 import { SPACING, TYPE } from '../src/theme/tokens';
+import { LocationPicker } from '../src/components/LocationPicker';
 import { MEMBER_APP, loadSharedWithMe } from '../src/lib/co-keepers';
 import {
   loadSpeciesCatalog,
@@ -173,6 +174,9 @@ function AddScreen() {
   const [pricePaid, setPricePaid] = useState('');
   const [lastFed, setLastFed] = useState('');
   const [notes, setNotes] = useState('');
+  // Room / rack / shelf. Kept across "add another" — a shipment of slings
+  // usually all go on the same rack.
+  const [location, setLocation] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -308,6 +312,7 @@ function AddScreen() {
           stage_counts: { mixed: 0 },
           count_is_estimated: true,
           notes: notes || null,
+          location,
           ...husbandry,
         });
       } else if (taxon === 'tarantula' && !collection && !enclosureId) {
@@ -322,6 +327,7 @@ function AddScreen() {
           source: source || undefined,
           price_paid: pricePaid ? Number(pricePaid) : undefined,
           notes: notes || undefined,
+          location: location ?? undefined,
           ...husbandry,
         });
         await seedFirstFeeding(`/tarantulas/${created.data?.id}/feedings`);
@@ -343,6 +349,7 @@ function AddScreen() {
           source: source || null,
           price_paid: pricePaid ? Number(pricePaid) : null,
           notes: notes || null,
+          location,
           ...husbandry,
         });
         await seedFirstFeeding(`/inverts/${created.data?.id}/feedings`);
@@ -747,13 +754,16 @@ function AddScreen() {
           <Collapsed
             title="Enclosure & environment"
             icon="home-outline"
-            preview={prefill && prefillSummary.length ? 'Prefilled' : 'Not set'}
-            previewAccent={prefill && prefillSummary.length > 0}
+            preview={location ? location : prefill && prefillSummary.length ? 'Prefilled' : 'Not set'}
+            previewAccent={!!location || (prefill && prefillSummary.length > 0)}
             open={openSection === 'env'}
             onToggle={() => setOpenSection(openSection === 'env' ? null : 'env')}
             colors={colors}
             styles={styles}
           >
+            <Field label="Location" colors={colors} styles={styles}>
+              <LocationPicker value={location} onChange={setLocation} />
+            </Field>
             <Text style={styles.hintLine}>
               {prefill && prefillSummary.length
                 ? `Using the care sheet's values: ${prefillSummary.join(' · ')}. Turn the prefill off above to leave these blank, then edit the animal to set your own.`

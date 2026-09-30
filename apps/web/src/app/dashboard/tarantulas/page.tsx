@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useSubscription } from '@/hooks/useSubscription'
 import ActivityFeed from '@/components/ActivityFeed'
 import { SkeletonCard } from '@/components/ui/skeleton'
 import DashboardLayout from '@/components/DashboardLayout'
+import { LocationRenameDialog } from '@/components/LocationPicker'
+import { groupByLocation, listLocations, locationKey, renameLocation, UNASSIGNED_KEY, type LocationItem } from '@/lib/locations'
 import UpgradeModal from '@/components/UpgradeModal'
 import CollectionCapNotice from '@/components/CollectionCapNotice'
 import { formatLocalDate } from '@/lib/date'
@@ -20,6 +22,7 @@ interface Tarantula {
   sex?: string
   date_acquired?: string
   photo_url?: string
+  location?: string | null
 }
 
 interface FeedingStatus {
@@ -63,6 +66,8 @@ interface Animal {
   sex?: string
   date_acquired?: string
   photo_url?: string
+  /** Room / rack / shelf (see lib/locations). */
+  location?: string | null
 }
 
 const TAXA: {
@@ -114,6 +119,48 @@ export default function TarantulasPage() {
   const [showWarning, setShowWarning] = useState(true)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card')
+  // Group by keeper-defined location (room / rack / shelf). The toggle only
+  // renders once a location exists somewhere, so a keeper who never set one
+  // sees exactly the page they had before. Per-animal location comes from
+  // /inverts/feeding-status — one call, every taxon, no facade drift.
+  const [groupByLoc, setGroupByLoc] = useState(false)
+  const [locationById, setLocationById] = useState<Map<string, string | null>>(new Map())
+  const [keeperLocations, setKeeperLocations] = useState<LocationItem[]>([])
+  const [renameTarget, setRenameTarget] = useState<string | null>(null)
+  useEffect(() => {
+    try {
+      setGroupByLoc(window.localStorage.getItem('collection_group_by_location') === '1')
+    } catch {
+      // storage unavailable — default off
+    }
+  }, [])
+  const toggleGroupByLoc = () => {
+    const next = !groupByLoc
+    setGroupByLoc(next)
+    try {
+      window.localStorage.setItem('collection_group_by_location', next ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+  const loadLocations = useCallback(async (tok: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/v1/inverts/feeding-status`, { headers: { Authorization: `Bearer ${tok}` } })
+      if (res.ok) {
+        const rows = await res.json()
+        const next = new Map<string, string | null>()
+        for (const r of Array.isArray(rows) ? rows : []) next.set(r.id, r.location ?? null)
+        setLocationById(next)
+      }
+    } catch {
+      // non-fatal — cards fall back to the location on their own row
+    }
+    try {
+      setKeeperLocations(await listLocations(tok))
+    } catch {
+      setKeeperLocations([])
+    }
+  }, [])
 
   // Load view preference from localStorage
   useEffect(() => {
@@ -198,6 +245,7 @@ export default function TarantulasPage() {
               sex: r.sex,
               date_acquired: r.date_acquired,
               photo_url: r.photo_url,
+              location: r.location ?? null,
             })) as Animal[]
           } catch {
             return [] as Animal[]
@@ -205,6 +253,7 @@ export default function TarantulasPage() {
         }),
       )
       setOtherAnimals(otherResults.flat())
+      loadLocations(token)
 
       // Fetch colonies (non-fatal — a lagging endpoint just hides colonies).
       try {
@@ -385,6 +434,7 @@ export default function TarantulasPage() {
       sex: t.sex,
       date_acquired: t.date_acquired,
       photo_url: t.photo_url,
+      location: t.location ?? null,
     })),
     ...otherAnimals,
   ]
@@ -417,6 +467,57 @@ export default function TarantulasPage() {
     return true
   })
 
+  const animalLocation = (a: Animal): string | null =>
+    locationById.get(a.id) ?? a.location ?? null
+  const hasAnyLocation =
+    keeperLocations.length > 0
+    || allAnimals.some((a) => !!animalLocation(a))
+    || colonies.some((c) => !!c.location)
+  const grouped = groupByLoc && hasAnyLocation
+  type GroupRow = { kind: 'animal'; data: Animal } | { kind: 'colony'; data: ColonyListItem }
+  const locationGroups = grouped
+    ? groupByLocation<GroupRow>(
+        [
+          ...filteredAnimals.map((a) => ({ kind: 'animal' as const, data: a })),
+          ...filteredColonies.map((c) => ({ kind: 'colony' as const, data: c })),
+        ],
+        (r) => (r.kind === 'animal' ? animalLocation(r.data) : r.data.location ?? null),
+      )
+    : []
+
+  /** Rename (or merge) a location from its group header. Merging is
+   *  confirmed with the count — it's the one action here that can't be undone
+   *  with a single click. */
+  const submitRename = async (oldName: string, newName: string) => {
+    if (!token) return
+    const targetKey = locationKey(newName)
+    if (!targetKey || targetKey === locationKey(oldName)) {
+      setRenameTarget(null)
+      return
+    }
+    const existing = keeperLocations.find((l) => locationKey(l.name) === targetKey)
+    if (existing) {
+      const moving = keeperLocations.find((l) => locationKey(l.name) === locationKey(oldName))?.count ?? 0
+      if (!window.confirm(`Merge into ${existing.name}? ${moving} ${moving === 1 ? 'entry' : 'entries'} from “${oldName}” will move to “${existing.name}”.`)) {
+        return
+      }
+    }
+    try {
+      await renameLocation(token, oldName, newName)
+      setRenameTarget(null)
+      await loadLocations(token)
+      // Colony rows carry their own location; patch them locally so the
+      // headers agree with the server without a full reload.
+      setColonies((prev) =>
+        prev.map((c) =>
+          locationKey(c.location) === locationKey(oldName) ? { ...c, location: existing?.name ?? newName.replace(/\s+/g, ' ').trim() } : c,
+        ),
+      )
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Could not rename location')
+    }
+  }
+
   // Cross-taxon total (animals + colonies) — the cap counts colonies as 1 each.
   const totalCollectionCount = allAnimals.length + colonies.length
 
@@ -433,6 +534,269 @@ export default function TarantulasPage() {
       router.push(TAXON_CONFIG[taxon].addPath)
     }
   }
+
+  const renderAnimalsView = (items: Animal[]) =>
+    viewMode === 'list' ? (
+                      /* List View */
+                      <div className="bg-surface rounded-2xl shadow-lg border border-theme overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 dark:bg-gray-800/50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Photo</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Name</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden sm:table-cell">Species</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden md:table-cell">Sex</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Last Fed</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden lg:table-cell">Premolt</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                            {items.map((animal) => {
+                              const isT = animal.taxon === 'tarantula'
+                              const feedingStatus = isT ? feedingStatuses.get(animal.id) : undefined
+                              const premoltPrediction = isT ? premoltPredictions.get(animal.id) : undefined
+                              const cfg = TAXON_CONFIG[animal.taxon]
+                              return (
+                                <tr
+                                  key={animal.id}
+                                  onClick={() => router.push(cfg.detailPath(animal.id))}
+                                  className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+                                >
+                                  <td className="px-4 py-3">
+                                    <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30 flex-shrink-0">
+                                      {animal.photo_url ? (
+                                        <img
+                                          src={getImageUrl(animal.photo_url)}
+                                          alt={animal.common_name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-2xl">{cfg.glyph}</div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="font-semibold text-theme-primary">
+                                      {!isT && <span className="mr-1">{cfg.glyph}</span>}
+                                      {animal.common_name || animal.scientific_name}
+                                    </div>
+                                    <div className="text-sm text-theme-secondary italic sm:hidden">{animal.scientific_name}</div>
+                                  </td>
+                                  <td className="px-4 py-3 hidden sm:table-cell">
+                                    <span className="text-sm italic text-theme-secondary">{animal.scientific_name}</span>
+                                  </td>
+                                  <td className="px-4 py-3 hidden md:table-cell align-middle">
+                                    {animal.sex ? (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
+                                        {animal.sex === 'male' ? '♂️' : animal.sex === 'female' ? '♀️' : '?'} {animal.sex}
+                                      </span>
+                                    ) : (
+                                      <span className="text-theme-tertiary text-sm">—</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 align-middle">
+                                    {!isT ? (
+                                      <span className="text-theme-tertiary text-sm">—</span>
+                                    ) : feedingStatus?.is_feeding_paused ? (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
+                                        ⏸ Paused
+                                      </span>
+                                    ) : feedingStatus?.days_since_last_feeding != null ? (
+                                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                                        feedingStatus.days_since_last_feeding >= 21 ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
+                                        feedingStatus.days_since_last_feeding >= 14 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
+                                        feedingStatus.days_since_last_feeding >= 7 ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' :
+                                        'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300'
+                                      }`}>
+                                        {feedingStatus.days_since_last_feeding}d ago
+                                      </span>
+                                    ) : (
+                                      <span className="text-theme-tertiary text-sm">Not fed yet</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 hidden lg:table-cell align-middle">
+                                    {isT
+                                      && premoltPrediction
+                                      && premoltPrediction.is_premolt_likely
+                                      && premoltPrediction.data_quality !== 'insufficient' ? (
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300">
+                                        🦋 Premolt
+                                      </span>
+                                    ) : (
+                                      <span className="text-theme-tertiary text-sm">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      /* Card View */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {items.map((animal) => (
+                          <div
+                            key={animal.id}
+                            onClick={() => router.push(TAXON_CONFIG[animal.taxon].detailPath(animal.id))}
+                            className="group relative overflow-hidden rounded-2xl bg-surface shadow-lg hover:shadow-lg transition-all duration-300 cursor-pointer border border-theme hover:border-electric-blue-500/40"
+                          >
+                            {/* Image with gradient overlay */}
+                            <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
+                              {animal.photo_url ? (
+                                <>
+                                  <img
+                                    src={getImageUrl(animal.photo_url)}
+                                    alt={animal.common_name}
+                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                </>
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
+                                  {TAXON_CONFIG[animal.taxon].glyph}
+                                </div>
+                              )}
+
+                              {/* Status badges */}
+                              <div className="absolute top-3 left-3 right-3 flex flex-col gap-2">
+                                <div className="flex justify-between items-start">
+                                  {/* Premolt badge (left) — tarantula only */}
+                                  <div>
+                                    {animal.taxon === 'tarantula' ? getPremoltBadge(animal.id) : null}
+                                  </div>
+
+                                  {/* Right badge: feeding status for tarantulas,
+                                      taxon label for the other taxa. */}
+                                  <div>
+                                    {animal.taxon === 'tarantula' ? (
+                                      getFeedingStatusBadge(animal.id) || (
+                                        <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
+                                          No data
+                                        </span>
+                                      )
+                                    ) : (
+                                      <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
+                                        {TAXON_CONFIG[animal.taxon].glyph} {TAXON_CONFIG[animal.taxon].label.replace(/s$/, '')}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-5">
+                              <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
+                                {animal.common_name || animal.scientific_name}
+                              </h3>
+                              <p className="text-sm italic text-theme-secondary mb-3 line-clamp-1">
+                                {animal.scientific_name}
+                              </p>
+
+                              {/* Quick stats */}
+                              <div className="flex flex-wrap gap-2">
+                                {animal.sex && (
+                                  <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
+                                    {animal.sex === 'male' ? '♂️' : animal.sex === 'female' ? '♀️' : '?'} {animal.sex}
+                                  </span>
+                                )}
+                                {animal.date_acquired && (
+                                  <span className="px-3 py-1 rounded-lg bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-xs font-semibold border border-pink-200 dark:border-pink-500/30">
+                                    📅 {formatLocalDate(animal.date_acquired, { year: 'numeric', month: 'short' })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Hover overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-electric-blue-600/0 to-neon-pink-600/0 group-hover:from-electric-blue-600/10 group-hover:to-neon-pink-600/5 transition-all duration-300 pointer-events-none" />
+                          </div>
+                        ))}
+                      </div>
+                    )
+
+  const renderColonyGrid = (items: ColonyListItem[]) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {items.map((c) => {
+        const speciesLabel = c.species_missing
+          ? 'Species removed'
+          : c.species_display_name ||
+            c.species_scientific_name ||
+            'No species set'
+        const totalLabel =
+          c.total_count == null
+            ? '—'
+            : `${c.count_is_estimated ? '≈' : ''}${c.total_count.toLocaleString()}`
+        return (
+          <div
+            key={c.id}
+            onClick={() => router.push(`/dashboard/colonies/${c.id}`)}
+            className="group relative overflow-hidden rounded-2xl bg-surface shadow-lg hover:shadow-lg transition-all duration-300 cursor-pointer border border-theme hover:border-electric-blue-500/40"
+          >
+            <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
+              {c.photo_url ? (
+                <>
+                  <img
+                    src={getImageUrl(c.photo_url)}
+                    alt={c.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
+                  {colonyGlyph(c.taxon)}
+                </div>
+              )}
+              <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
+                <span className="px-3 py-1 rounded-full bg-purple-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
+                  👥 Colony
+                </span>
+                <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-primary text-xs font-bold shadow-lg border border-theme">
+                  {totalLabel}
+                </span>
+              </div>
+            </div>
+            <div className="p-5">
+              <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
+                {colonyGlyph(c.taxon)} {c.name}
+              </h3>
+              <p
+                className={`text-sm mb-3 line-clamp-1 ${
+                  c.species_missing
+                    ? 'italic text-theme-tertiary'
+                    : 'italic text-theme-secondary'
+                }`}
+              >
+                {speciesLabel}
+              </p>
+              {c.stage_counts &&
+                Object.keys(c.stage_counts).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(c.stage_counts)
+                      .slice(0, 3)
+                      .map(([stage, n]) => (
+                        <span
+                          key={stage}
+                          className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30"
+                        >
+                          <span className="capitalize">{stage}</span> {n}
+                        </span>
+                      ))}
+                    {Object.keys(c.stage_counts).length > 3 && (
+                      <span className="px-2 py-0.5 text-xs text-theme-tertiary">
+                        +{Object.keys(c.stage_counts).length - 3} more
+                      </span>
+                    )}
+                  </div>
+                )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 
   return (
     <DashboardLayout
@@ -583,6 +947,22 @@ export default function TarantulasPage() {
                         </svg>
                       </button>
                     </div>
+                    {hasAnyLocation && (
+                      <button
+                        type="button"
+                        onClick={toggleGroupByLoc}
+                        role="switch"
+                        aria-checked={groupByLoc}
+                        title="Group by location"
+                        className={`px-4 py-3 rounded-xl border font-semibold transition-all duration-200 ${
+                          groupByLoc
+                            ? 'bg-gradient-brand text-white border-transparent shadow-lg shadow-gradient-brand'
+                            : 'bg-surface border-theme text-theme-primary hover:bg-surface-elevated'
+                        }`}
+                      >
+                        📍 By location
+                      </button>
+                    )}
                     <button
                       onClick={() => setShowAddMenu(true)}
                       className="px-6 py-3 bg-gradient-brand text-white rounded-xl hover:brightness-90 transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl"
@@ -603,189 +983,43 @@ export default function TarantulasPage() {
                     <div className="text-4xl mb-3">🔍</div>
                     <p className="text-theme-secondary">Nothing matches your filters.</p>
                   </div>
-                ) : filteredAnimals.length === 0 ? null : viewMode === 'list' ? (
-                  /* List View */
-                  <div className="bg-surface rounded-2xl shadow-lg border border-theme overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 dark:bg-gray-800/50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Photo</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Name</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden sm:table-cell">Species</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden md:table-cell">Sex</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider">Last Fed</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-theme-secondary uppercase tracking-wider hidden lg:table-cell">Premolt</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {filteredAnimals.map((animal) => {
-                          const isT = animal.taxon === 'tarantula'
-                          const feedingStatus = isT ? feedingStatuses.get(animal.id) : undefined
-                          const premoltPrediction = isT ? premoltPredictions.get(animal.id) : undefined
-                          const cfg = TAXON_CONFIG[animal.taxon]
-                          return (
-                            <tr
-                              key={animal.id}
-                              onClick={() => router.push(cfg.detailPath(animal.id))}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
-                            >
-                              <td className="px-4 py-3">
-                                <div className="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30 flex-shrink-0">
-                                  {animal.photo_url ? (
-                                    <img
-                                      src={getImageUrl(animal.photo_url)}
-                                      alt={animal.common_name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-2xl">{cfg.glyph}</div>
-                                  )}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="font-semibold text-theme-primary">
-                                  {!isT && <span className="mr-1">{cfg.glyph}</span>}
-                                  {animal.common_name || animal.scientific_name}
-                                </div>
-                                <div className="text-sm text-theme-secondary italic sm:hidden">{animal.scientific_name}</div>
-                              </td>
-                              <td className="px-4 py-3 hidden sm:table-cell">
-                                <span className="text-sm italic text-theme-secondary">{animal.scientific_name}</span>
-                              </td>
-                              <td className="px-4 py-3 hidden md:table-cell align-middle">
-                                {animal.sex ? (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold whitespace-nowrap">
-                                    {animal.sex === 'male' ? '♂️' : animal.sex === 'female' ? '♀️' : '?'} {animal.sex}
-                                  </span>
-                                ) : (
-                                  <span className="text-theme-tertiary text-sm">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 align-middle">
-                                {!isT ? (
-                                  <span className="text-theme-tertiary text-sm">—</span>
-                                ) : feedingStatus?.is_feeding_paused ? (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300">
-                                    ⏸ Paused
-                                  </span>
-                                ) : feedingStatus?.days_since_last_feeding != null ? (
-                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                                    feedingStatus.days_since_last_feeding >= 21 ? 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300' :
-                                    feedingStatus.days_since_last_feeding >= 14 ? 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300' :
-                                    feedingStatus.days_since_last_feeding >= 7 ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300' :
-                                    'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-300'
-                                  }`}>
-                                    {feedingStatus.days_since_last_feeding}d ago
-                                  </span>
-                                ) : (
-                                  <span className="text-theme-tertiary text-sm">Not fed yet</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 hidden lg:table-cell align-middle">
-                                {isT
-                                  && premoltPrediction
-                                  && premoltPrediction.is_premolt_likely
-                                  && premoltPrediction.data_quality !== 'insufficient' ? (
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-300">
-                                    🦋 Premolt
-                                  </span>
-                                ) : (
-                                  <span className="text-theme-tertiary text-sm">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  /* Card View */
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredAnimals.map((animal) => (
-                      <div
-                        key={animal.id}
-                        onClick={() => router.push(TAXON_CONFIG[animal.taxon].detailPath(animal.id))}
-                        className="group relative overflow-hidden rounded-2xl bg-surface shadow-lg hover:shadow-lg transition-all duration-300 cursor-pointer border border-theme hover:border-electric-blue-500/40"
-                      >
-                        {/* Image with gradient overlay */}
-                        <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
-                          {animal.photo_url ? (
-                            <>
-                              <img
-                                src={getImageUrl(animal.photo_url)}
-                                alt={animal.common_name}
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                            </>
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
-                              {TAXON_CONFIG[animal.taxon].glyph}
-                            </div>
+                ) : filteredAnimals.length === 0 && !grouped ? null : grouped ? (
+                  <div className="space-y-8">
+                    {locationGroups.map((g) => {
+                      const groupAnimals = g.rows.flatMap((r) => (r.kind === 'animal' ? [r.data] : []))
+                      const groupColonies = g.rows.flatMap((r) => (r.kind === 'colony' ? [r.data] : []))
+                      return (
+                        <section key={g.key} aria-label={g.label}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <span aria-hidden>{g.key === UNASSIGNED_KEY ? '∅' : '📍'}</span>
+                            <h3 className="text-lg font-bold text-theme-primary truncate">{g.label}</h3>
+                            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-surface-elevated text-theme-secondary tabular-nums">
+                              {g.rows.length}
+                            </span>
+                            {g.key !== UNASSIGNED_KEY && (
+                              <button
+                                type="button"
+                                onClick={() => setRenameTarget(g.label)}
+                                className="text-xs text-theme-tertiary hover:text-theme-primary underline"
+                                aria-label={`Rename ${g.label}`}
+                              >
+                                Rename
+                              </button>
+                            )}
+                          </div>
+                          {groupAnimals.length > 0 && renderAnimalsView(groupAnimals)}
+                          {groupColonies.length > 0 && (
+                            <div className={groupAnimals.length > 0 ? 'mt-4' : ''}>{renderColonyGrid(groupColonies)}</div>
                           )}
-
-                          {/* Status badges */}
-                          <div className="absolute top-3 left-3 right-3 flex flex-col gap-2">
-                            <div className="flex justify-between items-start">
-                              {/* Premolt badge (left) — tarantula only */}
-                              <div>
-                                {animal.taxon === 'tarantula' ? getPremoltBadge(animal.id) : null}
-                              </div>
-
-                              {/* Right badge: feeding status for tarantulas,
-                                  taxon label for the other taxa. */}
-                              <div>
-                                {animal.taxon === 'tarantula' ? (
-                                  getFeedingStatusBadge(animal.id) || (
-                                    <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
-                                      No data
-                                    </span>
-                                  )
-                                ) : (
-                                  <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-secondary text-xs font-semibold shadow-lg border border-theme">
-                                    {TAXON_CONFIG[animal.taxon].glyph} {TAXON_CONFIG[animal.taxon].label.replace(/s$/, '')}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-5">
-                          <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
-                            {animal.common_name || animal.scientific_name}
-                          </h3>
-                          <p className="text-sm italic text-theme-secondary mb-3 line-clamp-1">
-                            {animal.scientific_name}
-                          </p>
-
-                          {/* Quick stats */}
-                          <div className="flex flex-wrap gap-2">
-                            {animal.sex && (
-                              <span className="px-3 py-1 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30">
-                                {animal.sex === 'male' ? '♂️' : animal.sex === 'female' ? '♀️' : '?'} {animal.sex}
-                              </span>
-                            )}
-                            {animal.date_acquired && (
-                              <span className="px-3 py-1 rounded-lg bg-pink-100 dark:bg-pink-500/20 text-pink-700 dark:text-pink-300 text-xs font-semibold border border-pink-200 dark:border-pink-500/30">
-                                📅 {formatLocalDate(animal.date_acquired, { year: 'numeric', month: 'short' })}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Hover overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-electric-blue-600/0 to-neon-pink-600/0 group-hover:from-electric-blue-600/10 group-hover:to-neon-pink-600/5 transition-all duration-300 pointer-events-none" />
-                      </div>
-                    ))}
+                        </section>
+                      )
+                    })}
                   </div>
-                )}
+                ) : renderAnimalsView(filteredAnimals)}
 
                 {/* Colonies (ADR-010) — population entries, always rendered as
                     cards regardless of view mode; distinguished by a badge. */}
-                {filteredColonies.length > 0 && (
+                {!grouped && filteredColonies.length > 0 && (
                   <div className="mt-8">
                     <div className="flex items-center gap-2 mb-4">
                       <h3 className="text-xl font-bold text-theme-primary">Colonies</h3>
@@ -793,85 +1027,7 @@ export default function TarantulasPage() {
                         {filteredColonies.length}
                       </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                      {filteredColonies.map((c) => {
-                        const speciesLabel = c.species_missing
-                          ? 'Species removed'
-                          : c.species_display_name ||
-                            c.species_scientific_name ||
-                            'No species set'
-                        const totalLabel =
-                          c.total_count == null
-                            ? '—'
-                            : `${c.count_is_estimated ? '≈' : ''}${c.total_count.toLocaleString()}`
-                        return (
-                          <div
-                            key={c.id}
-                            onClick={() => router.push(`/dashboard/colonies/${c.id}`)}
-                            className="group relative overflow-hidden rounded-2xl bg-surface shadow-lg hover:shadow-lg transition-all duration-300 cursor-pointer border border-theme hover:border-electric-blue-500/40"
-                          >
-                            <div className="relative h-48 overflow-hidden bg-gradient-to-br from-electric-blue-900/30 to-neon-pink-900/30">
-                              {c.photo_url ? (
-                                <>
-                                  <img
-                                    src={getImageUrl(c.photo_url)}
-                                    alt={c.name}
-                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                                </>
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center text-7xl bg-gradient-to-br from-electric-blue-900/50 to-neon-pink-900/50">
-                                  {colonyGlyph(c.taxon)}
-                                </div>
-                              )}
-                              <div className="absolute top-3 left-3 right-3 flex justify-between items-start">
-                                <span className="px-3 py-1 rounded-full bg-purple-500/90 backdrop-blur-sm text-white text-xs font-semibold shadow-lg">
-                                  👥 Colony
-                                </span>
-                                <span className="px-3 py-1 rounded-full bg-surface-elevated backdrop-blur-sm text-theme-primary text-xs font-bold shadow-lg border border-theme">
-                                  {totalLabel}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="p-5">
-                              <h3 className="font-bold text-lg text-theme-primary mb-1 line-clamp-1">
-                                {colonyGlyph(c.taxon)} {c.name}
-                              </h3>
-                              <p
-                                className={`text-sm mb-3 line-clamp-1 ${
-                                  c.species_missing
-                                    ? 'italic text-theme-tertiary'
-                                    : 'italic text-theme-secondary'
-                                }`}
-                              >
-                                {speciesLabel}
-                              </p>
-                              {c.stage_counts &&
-                                Object.keys(c.stage_counts).length > 0 && (
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {Object.entries(c.stage_counts)
-                                      .slice(0, 3)
-                                      .map(([stage, n]) => (
-                                        <span
-                                          key={stage}
-                                          className="px-2 py-0.5 rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-semibold border border-blue-200 dark:border-blue-500/30"
-                                        >
-                                          <span className="capitalize">{stage}</span> {n}
-                                        </span>
-                                      ))}
-                                    {Object.keys(c.stage_counts).length > 3 && (
-                                      <span className="px-2 py-0.5 text-xs text-theme-tertiary">
-                                        +{Object.keys(c.stage_counts).length - 3} more
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                    {renderColonyGrid(filteredColonies)}
                   </div>
                 )}
               </div>
@@ -961,6 +1117,12 @@ export default function TarantulasPage() {
         onClose={() => setShowUpgradeModal(false)}
         feature="Unlimited Animals"
         description="You've reached the free tier limit of 15 animals. Upgrade to Premium for unlimited tracking!"
+      />
+      <LocationRenameDialog
+        open={renameTarget !== null}
+        current={renameTarget ?? ''}
+        onClose={() => setRenameTarget(null)}
+        onSubmit={(next) => submitRename(renameTarget ?? '', next)}
       />
     </DashboardLayout>
   )

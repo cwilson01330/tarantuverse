@@ -216,6 +216,9 @@ export interface Invert {
   misting_schedule: string | null;
   last_enclosure_cleaning: string | null;
   enclosure_notes: string | null;
+  /** Room / rack / shelf. Canonicalised per keeper server-side — send whatever
+   *  they typed, read back the spelling the server settled on. */
+  location?: string | null;
   feeding_paused_reason: string | null;
   feeding_paused_until: string | null;
   /** ADR-017 — the keeper's own cadence in days. null means the app derives it

@@ -13,6 +13,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
 import { INVERT_TAXA, isInvertTaxon, type InvertTaxon } from '@/lib/inverts'
@@ -50,6 +51,7 @@ function AddInvertForm() {
   const [pricePaid, setPricePaid] = useState('')
   const [enclosureType, setEnclosureType] = useState<'terrestrial' | 'arboreal' | 'fossorial'>('terrestrial')
   const [enclosureSize, setEnclosureSize] = useState('')
+  const [location, setLocation] = useState<string | null>(null)
   const [substrateType, setSubstrateType] = useState('')
   const [substrateDepth, setSubstrateDepth] = useState('')
   const [tempMin, setTempMin] = useState('')
@@ -128,6 +130,7 @@ function AddInvertForm() {
           price_paid: pricePaid.trim() || null,
           enclosure_type: enclosureType,
           enclosure_size: enclosureSize.trim() || null,
+          location,
           substrate_type: substrateType.trim() || null,
           substrate_depth: substrateDepth.trim() || null,
           target_temp_min: tempMin.trim() || null,
@@ -248,6 +251,7 @@ function AddInvertForm() {
             </div>
           </Field>
           <Field label="Enclosure size"><input value={enclosureSize} onChange={(e) => setEnclosureSize(e.target.value)} placeholder='e.g. 6x6x6"' className={inputCls} /></Field>
+          <Field label="Location"><LocationField token={token} value={location} onChange={setLocation} /></Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Substrate type"><input value={substrateType} onChange={(e) => setSubstrateType(e.target.value)} placeholder="e.g. coco fiber" className={inputCls} /></Field>
             <Field label="Substrate depth"><input value={substrateDepth} onChange={(e) => setSubstrateDepth(e.target.value)} placeholder='e.g. 3"' className={inputCls} /></Field>

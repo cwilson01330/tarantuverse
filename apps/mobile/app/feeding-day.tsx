@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   View,
@@ -15,12 +15,17 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppHeader } from '../src/components/AppHeader';
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
+import { TYPE } from '../src/theme/tokens';
+import { LocationSheet } from '../src/components/LocationPicker';
+import PremiumIntroCard, { shouldShowPremiumIntro } from '../src/components/PremiumIntroCard';
+import { bulkSetLocation, groupByLocation, listLocations, type LocationItem } from '../src/lib/locations';
 
 interface FeedingStatus {
   id: string;
@@ -30,6 +35,8 @@ interface FeedingStatus {
   taxon: string;
   photo_url: string | null;
   life_stage: string | null;
+  /** Room / rack / shelf, when the keeper set one. */
+  location?: string | null;
   last_feeding_date: string | null;
   days_since_last_feeding: number | null;
   is_feeding_paused: boolean;
@@ -84,6 +91,28 @@ export default function FeedingDayScreen() {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  // Group the list by location so the screen matches walking the shelves.
+  // Device-local like the collection view mode — it's a display preference.
+  // Only offered once at least one animal HAS a location; a keeper who never
+  // set one sees exactly the screen they had before.
+  const [groupByLoc, setGroupByLoc] = useState(false);
+  const [locations, setLocations] = useState<LocationItem[]>([]);
+  const [locSheetOpen, setLocSheetOpen] = useState(false);
+  const [locBusy, setLocBusy] = useState(false);
+  // The one-time "here's what you get" card — server decides, see the component.
+  const [introOpen, setIntroOpen] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem('feeding_day_group_by_location')
+      .then((v) => setGroupByLoc(v === '1'))
+      .catch(() => {});
+  }, []);
+  const toggleGroupByLoc = () => {
+    const next = !groupByLoc;
+    setGroupByLoc(next);
+    AsyncStorage.setItem('feeding_day_group_by_location', next ? '1' : '0').catch(() => {});
+  };
+  const hasLocations = useMemo(() => items.some((i) => !!i.location), [items]);
+
   // Batch sheet
   const [sheetOpen, setSheetOpen] = useState(false);
   const [outcome, setOutcome] = useState<'fed' | 'refused'>('fed');
@@ -99,6 +128,8 @@ export default function FeedingDayScreen() {
       );
       setItems(res.data ?? []);
       setLoadError('');
+      // Best effort — the picker just starts empty if this fails.
+      listLocations().then(setLocations).catch(() => {});
     } catch (e: any) {
       if (e?.response?.status === 401) return;
       setLoadError(e?.response?.data?.detail || e?.message || 'Failed to load animals');
@@ -194,6 +225,32 @@ export default function FeedingDayScreen() {
     );
   };
 
+  /** Tag every selected animal with one location (or clear it). This is the
+   *  path that makes locations usable on a big collection: one pass with
+   *  multi-select instead of sixty edit forms. */
+  const applyLocation = async (location: string | null) => {
+    if (selected.size === 0) return;
+    setLocBusy(true);
+    try {
+      const res = await bulkSetLocation(location, { invert_ids: Array.from(selected) });
+      setSelected(new Set());
+      setResumedNote(
+        res.location
+          ? `${res.updated} moved to ${res.location}.`
+          : `Location cleared on ${res.updated}.`,
+      );
+      if (res.location && !groupByLoc) {
+        // First location ever set — turn grouping on so the tag is visible.
+        if (!hasLocations) toggleGroupByLoc();
+      }
+      await fetchStatus();
+    } catch (e: any) {
+      setLoadError(e?.response?.data?.detail || e?.message || 'Could not set location');
+    } finally {
+      setLocBusy(false);
+    }
+  };
+
   const submit = async () => {
     if (selected.size === 0) return;
     setSubmitting(true);
@@ -227,7 +284,10 @@ export default function FeedingDayScreen() {
           ? `${resumed} paused ${resumed === 1 ? 'animal' : 'animals'} resumed — they ate.`
           : '',
       );
-      void n;
+      // After a keeper's FIRST completed batch, and only then, show what
+      // stays free and what premium adds. The server says whether this is
+      // that moment; a failed check means no card.
+      if (n > 0 && (await shouldShowPremiumIntro())) setIntroOpen(true);
     } catch (e: any) {
       setLoadError(e?.response?.data?.detail || e?.message || 'Failed to log feeding');
     } finally {
@@ -235,128 +295,7 @@ export default function FeedingDayScreen() {
     }
   };
 
-  const backAction = (
-    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" style={{ paddingRight: 4 }}>
-      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
-    </TouchableOpacity>
-  );
-
-  const statusPill = (a: FeedingStatus) => {
-    if (a.is_feeding_paused) return { label: 'Paused', color: STATUS.paused };
-    if (a.days_since_last_feeding === null) return { label: 'Never fed', color: STATUS.overdue };
-    if (a.is_overdue) return { label: `${a.days_since_last_feeding}d ago`, color: STATUS.overdue };
-    return { label: `${a.days_since_last_feeding}d ago`, color: colors.textTertiary };
-  };
-
-  const FILTERS: { key: FilterKey; label: string }[] = [
-    { key: 'all', label: `All (${counts.all})` },
-    { key: 'overdue', label: `Overdue (${counts.overdue})` },
-    { key: 'never', label: `Never fed (${counts.never})` },
-  ];
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader title="Feeding Day" subtitle="Log feeding for many at once" leftAction={backAction} />
-
-      {/* Filter chips */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipsRow}
-        contentContainerStyle={styles.chipsInner}
-      >
-        {FILTERS.map((f) => {
-          const active = filter === f.key;
-          return (
-            <TouchableOpacity
-              key={f.key}
-              onPress={() => setFilter(f.key)}
-              accessibilityState={{ selected: active }}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: active ? colors.primary : colors.surface,
-                  borderColor: active ? colors.primary : colors.border,
-                  borderRadius: layout.radius.lg,
-                },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: active ? '#fff' : colors.textSecondary }]}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Select all shown */}
-      {!loading && shown.length > 0 && (
-        <TouchableOpacity onPress={toggleAllShown} style={styles.selectAllRow} accessibilityRole="button">
-          <MaterialCommunityIcons
-            name={allShownSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-            size={22}
-            color={allShownSelected ? colors.primary : colors.textTertiary}
-          />
-          <Text style={[styles.selectAllText, { color: colors.textSecondary }]}>
-            {allShownSelected ? 'Deselect all' : 'Select all shown'}
-            {selected.size > 0 ? `  ·  ${selected.size} selected` : ''}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentInner}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchStatus(); }} tintColor={colors.primary} />
-        }
-      >
-        {loading && (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={colors.primary} />
-          </View>
-        )}
-
-        {loadError !== '' && !loading && (
-          <View style={[styles.errorCard, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: colors.error ?? '#ef4444' }]}>
-            <Text style={[styles.errorText, { color: colors.error ?? '#b91c1c' }]}>{loadError}</Text>
-            <TouchableOpacity onPress={() => { setLoading(true); setLoadError(''); fetchStatus(); }}>
-              <Text style={[styles.retryText, { color: colors.error ?? '#b91c1c' }]}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* An accepted feeding resumes a paused animal server-side. Announce it
-            rather than letting the Paused pill quietly vanish — the keeper set
-            that pause on purpose and deserves to know it's been lifted. */}
-        {resumedNote !== '' && (
-          <View
-            style={[
-              styles.errorCard,
-              { backgroundColor: 'rgba(34, 197, 94, 0.12)', borderColor: colors.success ?? '#22c55e' },
-            ]}
-            accessibilityLiveRegion="polite"
-          >
-            <Text style={[styles.errorText, { color: colors.success ?? '#15803d' }]}>
-              {resumedNote}
-            </Text>
-            <TouchableOpacity onPress={() => setResumedNote('')} accessibilityLabel="Dismiss">
-              <Text style={[styles.retryText, { color: colors.success ?? '#15803d' }]}>Got it</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {!loading && !loadError && shown.length === 0 && (
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyEmoji}>🍽️</Text>
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Nothing here</Text>
-            <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
-              {filter === 'all' ? 'Add animals to your collection to feed them here.' : 'No animals match this filter.'}
-            </Text>
-          </View>
-        )}
-
-        {!loading && shown.map((a) => {
+  const renderAnimal = (a: FeedingStatus) => {
           const isSel = selected.has(a.id);
           const pill = statusPill(a);
           return (
@@ -443,7 +382,171 @@ export default function FeedingDayScreen() {
               )}
             </TouchableOpacity>
           );
+  };
+
+  const backAction = (
+    <TouchableOpacity onPress={() => router.back()} accessibilityLabel="Back" style={{ paddingRight: 4 }}>
+      <MaterialCommunityIcons name="arrow-left" size={26} color={iconColor} />
+    </TouchableOpacity>
+  );
+
+  const statusPill = (a: FeedingStatus) => {
+    if (a.is_feeding_paused) return { label: 'Paused', color: STATUS.paused };
+    if (a.days_since_last_feeding === null) return { label: 'Never fed', color: STATUS.overdue };
+    if (a.is_overdue) return { label: `${a.days_since_last_feeding}d ago`, color: STATUS.overdue };
+    return { label: `${a.days_since_last_feeding}d ago`, color: colors.textTertiary };
+  };
+
+  const FILTERS: { key: FilterKey; label: string }[] = [
+    { key: 'all', label: `All (${counts.all})` },
+    { key: 'overdue', label: `Overdue (${counts.overdue})` },
+    { key: 'never', label: `Never fed (${counts.never})` },
+  ];
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="Feeding Day" subtitle="Log feeding for many at once" leftAction={backAction} />
+
+      {/* Filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipsRow}
+        contentContainerStyle={styles.chipsInner}
+      >
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          return (
+            <TouchableOpacity
+              key={f.key}
+              onPress={() => setFilter(f.key)}
+              accessibilityState={{ selected: active }}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: active ? colors.primary : colors.surface,
+                  borderColor: active ? colors.primary : colors.border,
+                  borderRadius: layout.radius.lg,
+                },
+              ]}
+            >
+              <Text style={[styles.chipText, { color: active ? '#fff' : colors.textSecondary }]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          );
         })}
+        {hasLocations && (
+          <TouchableOpacity
+            onPress={toggleGroupByLoc}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: groupByLoc }}
+            accessibilityLabel="Group by location"
+            style={[
+              styles.chip,
+              styles.chipIcon,
+              {
+                backgroundColor: groupByLoc ? colors.primary : colors.surface,
+                borderColor: groupByLoc ? colors.primary : colors.border,
+                borderRadius: layout.radius.lg,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="map-marker-outline"
+              size={15}
+              color={groupByLoc ? '#fff' : colors.textSecondary}
+            />
+            <Text style={[styles.chipText, { color: groupByLoc ? '#fff' : colors.textSecondary }]}>
+              By location
+            </Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+
+      {/* Select all shown */}
+      {!loading && shown.length > 0 && (
+        <TouchableOpacity onPress={toggleAllShown} style={styles.selectAllRow} accessibilityRole="button">
+          <MaterialCommunityIcons
+            name={allShownSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
+            size={22}
+            color={allShownSelected ? colors.primary : colors.textTertiary}
+          />
+          <Text style={[styles.selectAllText, { color: colors.textSecondary }]}>
+            {allShownSelected ? 'Deselect all' : 'Select all shown'}
+            {selected.size > 0 ? `  ·  ${selected.size} selected` : ''}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentInner}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchStatus(); }} tintColor={colors.primary} />
+        }
+      >
+        {loading && (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        )}
+
+        {loadError !== '' && !loading && (
+          <View style={[styles.errorCard, { backgroundColor: 'rgba(239, 68, 68, 0.12)', borderColor: colors.error ?? '#ef4444' }]}>
+            <Text style={[styles.errorText, { color: colors.error ?? '#b91c1c' }]}>{loadError}</Text>
+            <TouchableOpacity onPress={() => { setLoading(true); setLoadError(''); fetchStatus(); }}>
+              <Text style={[styles.retryText, { color: colors.error ?? '#b91c1c' }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* An accepted feeding resumes a paused animal server-side. Announce it
+            rather than letting the Paused pill quietly vanish — the keeper set
+            that pause on purpose and deserves to know it's been lifted. */}
+        {resumedNote !== '' && (
+          <View
+            style={[
+              styles.errorCard,
+              { backgroundColor: 'rgba(34, 197, 94, 0.12)', borderColor: colors.success ?? '#22c55e' },
+            ]}
+            accessibilityLiveRegion="polite"
+          >
+            <Text style={[styles.errorText, { color: colors.success ?? '#15803d' }]}>
+              {resumedNote}
+            </Text>
+            <TouchableOpacity onPress={() => setResumedNote('')} accessibilityLabel="Dismiss">
+              <Text style={[styles.retryText, { color: colors.success ?? '#15803d' }]}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && !loadError && shown.length === 0 && (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyEmoji}>🍽️</Text>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Nothing here</Text>
+            <Text style={[styles.emptySub, { color: colors.textSecondary }]}>
+              {filter === 'all' ? 'Add animals to your collection to feed them here.' : 'No animals match this filter.'}
+            </Text>
+          </View>
+        )}
+
+        {!loading && !groupByLoc && shown.map(renderAnimal)}
+
+        {!loading && groupByLoc && groupByLocation<FeedingStatus>(shown, (a) => a.location).map((g) => (
+          <View key={g.key}>
+            <View style={styles.groupHeader}>
+              <MaterialCommunityIcons
+                name={g.key === '__unassigned__' ? 'map-marker-off-outline' : 'map-marker-outline'}
+                size={16}
+                color={colors.textTertiary}
+              />
+              <Text style={[styles.groupTitle, { color: colors.textSecondary }]}>{g.label}</Text>
+              <Text style={[styles.groupCount, { color: colors.textTertiary }]}>{g.rows.length}</Text>
+            </View>
+            {g.rows.map(renderAnimal)}
+          </View>
+        ))}
 
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -451,6 +554,18 @@ export default function FeedingDayScreen() {
       {/* Action bar */}
       {selected.size > 0 && (
         <View style={[styles.actionBar, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity
+            onPress={() => setLocSheetOpen(true)}
+            disabled={locBusy}
+            accessibilityRole="button"
+            accessibilityLabel={`Set location for ${selected.size} selected`}
+            style={[
+              styles.locBtn,
+              { borderColor: colors.border, backgroundColor: colors.background, borderRadius: layout.radius.lg },
+            ]}
+          >
+            <MaterialCommunityIcons name="map-marker-plus-outline" size={22} color={locBusy ? colors.textTertiary : colors.textPrimary} />
+          </TouchableOpacity>
           <PrimaryButton
             onPress={() => setSheetOpen(true)}
             style={styles.actionBtn}
@@ -460,6 +575,17 @@ export default function FeedingDayScreen() {
           </PrimaryButton>
         </View>
       )}
+
+      <PremiumIntroCard visible={introOpen} onClose={() => setIntroOpen(false)} />
+
+      <LocationSheet
+        visible={locSheetOpen}
+        title={`Set location for ${selected.size}`}
+        locations={locations}
+        confirmLabel="Apply"
+        onClose={() => setLocSheetOpen(false)}
+        onPick={applyLocation}
+      />
 
       {/* Batch sheet */}
       <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={() => !submitting && setSheetOpen(false)}>
@@ -584,6 +710,11 @@ const styles = StyleSheet.create({
   pill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   pillText: { fontSize: 11, fontWeight: '700' },
   actionBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', padding: 16, borderTopWidth: 1 },
+  locBtn: { width: 52, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginRight: 10 },
+  chipIcon: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4, paddingTop: 10, paddingBottom: 6 },
+  groupTitle: { flex: 1, ...TYPE.label, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  groupCount: { ...TYPE.label, fontVariant: ['tabular-nums'] },
   actionBtn: { paddingVertical: 14 },
   actionBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center' },
   modalWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },

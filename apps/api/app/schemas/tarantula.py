@@ -1,7 +1,7 @@
 """
 Tarantula schemas
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import date, datetime
 from decimal import Decimal
@@ -61,6 +61,15 @@ class TarantulaBase(BaseModel):
     # the profile's stance unless the client explicitly overrides.
     visibility: Optional[str] = Field(None, pattern="^(public|private)$")
     notes: Optional[str] = None
+    # Room / rack / shelf. NOT a `tarantulas` column — the router writes it
+    # onto the mirrored `inverts` row (ADR-005) and reads it back from there.
+    location: Optional[str] = Field(None, max_length=120)
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _normalise_location(cls, v):
+        from app.utils.locations import normalize_location
+        return normalize_location(v) if isinstance(v, str) else v
 
 
 class TarantulaCreate(TarantulaBase):

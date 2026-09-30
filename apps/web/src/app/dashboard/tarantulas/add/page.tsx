@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { LocationField } from '@/components/LocationPicker'
 import SpeciesAutocomplete from '@/components/SpeciesAutocomplete'
 import DashboardLayout from '@/components/DashboardLayout'
 import DateInput from '@/components/DateInput'
@@ -36,6 +37,7 @@ function AddTarantulaContent() {
     // Husbandry fields
     enclosure_type: '',
     enclosure_size: '',
+    location: null as string | null,
     substrate_type: '',
     substrate_depth: '',
     last_substrate_change: '',
@@ -127,6 +129,7 @@ function AddTarantulaContent() {
         // Husbandry fields
         enclosure_type: formData.enclosure_type || null,
         enclosure_size: formData.enclosure_size || null,
+        location: formData.location,
         substrate_type: formData.substrate_type || null,
         substrate_depth: formData.substrate_depth || null,
         last_substrate_change: formData.last_substrate_change || null,
@@ -363,6 +366,15 @@ function AddTarantulaContent() {
                     placeholder="e.g., 10x10x10 inches"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Location</label>
+                <LocationField
+                  token={token}
+                  value={formData.location}
+                  onChange={(v) => setFormData({ ...formData, location: v })}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

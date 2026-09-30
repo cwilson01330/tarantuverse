@@ -35,6 +35,7 @@ from app.schemas.colony import (
 from app.utils.dependencies import get_current_user
 from app.services.colony_history_service import colony_population_history
 from app.utils.limits import enforce_collection_limit
+from app.utils.locations import canonical_location
 from app.utils.access import access_helper, load_colony, policy, require_can_change, scope_collection
 from app.utils.photo_cleanup import collect_for_colony, delete_files
 
@@ -219,7 +220,10 @@ async def create_colony(
     _verify_enclosure(db, payload.enclosure_id, owner)
     _verify_species(db, payload.species_id)
 
-    colony = Colony(user_id=owner.id, **payload.model_dump())
+    colony_data = payload.model_dump()
+    # One spelling per place per keeper — see utils/locations.
+    colony_data["location"] = canonical_location(db, owner.id, colony_data.get("location"))
+    colony = Colony(user_id=owner.id, **colony_data)
     db.add(colony)
 
     # Bump the species "times_kept" counter (parity with invert create).
@@ -259,6 +263,8 @@ async def update_colony(
         _verify_enclosure(db, data["enclosure_id"], access.owner)
     if data.get("species_id"):
         _verify_species(db, data["species_id"])
+    if "location" in data:
+        data["location"] = canonical_location(db, access.owner.id, data["location"])
 
     for k, v in data.items():
         setattr(colony, k, v)

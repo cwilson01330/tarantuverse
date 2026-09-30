@@ -49,6 +49,7 @@ from app.services.growth_service import compute_growth_fields
 from app.services.feeding_reminder_service import parse_frequency_string
 from app.utils.dependencies import get_current_user
 from app.utils.limits import active_inverts_query, enforce_collection_limit
+from app.utils.locations import canonical_location, list_locations, rename_location
 from app.utils.access import (
     OWNER_ONLY_ANIMAL_FIELDS, load_invert, policy, require_own_enclosure, scope_collection, strip_owner_only,
 )
@@ -214,6 +215,8 @@ def create_invert_row(
     require_own_enclosure(db, payload.enclosure_id, user)
 
     data = _coerce_enums(payload.model_dump())
+    # One spelling per place per keeper — see utils/locations.
+    data["location"] = canonical_location(db, user.id, data.get("location"))
 
     if not data.get("visibility"):
         data["visibility"] = (
@@ -464,6 +467,7 @@ async def list_feeding_status(
                 taxon=inv.taxon,
                 photo_url=inv.photo_url,
                 life_stage=inv.life_stage,
+                location=inv.location,
                 last_feeding_date=last,
                 days_since_last_feeding=days,
                 is_feeding_paused=paused,
@@ -478,6 +482,112 @@ async def list_feeding_status(
         key=lambda x: (0 if x.days_since_last_feeding is None else 1, -(x.days_since_last_feeding or 0))
     )
     return items
+
+
+# ── Locations (room / rack / shelf) ─────────────────────────────────────────
+#
+# Static routes: these MUST stay declared before `/{invert_id}` or the dynamic
+# route swallows "locations" and 422s on UUID parsing (same rule as
+# feeding-status above).
+
+class LocationItem(BaseModel):
+    name: str
+    count: int
+
+
+class RenameLocationRequest(BaseModel):
+    old: str = Field(..., min_length=1, max_length=120)
+    new: str = Field(..., min_length=1, max_length=120)
+
+
+class RenameLocationResponse(BaseModel):
+    moved: int
+    # The spelling everything now sits under — the target's EXISTING spelling
+    # when the rename merged into a place already on file.
+    name: Optional[str] = None
+
+
+class BulkLocationRequest(BaseModel):
+    """Set (or clear, with null) one location across many animals and/or
+    colonies. Feeding Day's multi-select drives this so tagging a whole rack
+    is one action, not sixty edit forms."""
+    location: Optional[str] = Field(None, max_length=120)
+    invert_ids: List[UUID] = Field(default_factory=list)
+    colony_ids: List[UUID] = Field(default_factory=list)
+
+
+class BulkLocationResponse(BaseModel):
+    updated: int
+    # The canonical spelling that was stored (None when clearing).
+    location: Optional[str] = None
+
+
+@router.get("/locations", response_model=List[LocationItem])
+@policy("viewer")
+async def get_locations(
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a shared collection."),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Every location this keeper has on file, with how many animals and
+    colonies sit there. Empty for a keeper who has never set one — and the
+    clients hide the whole feature on an empty list, so nothing changes for
+    anyone who doesn't use it."""
+    access = scope_collection(db, current_user, "tarantuverse", collection)
+    return [LocationItem(**e) for e in list_locations(db, access.owner.id)]
+
+
+@router.post("/locations/rename", response_model=RenameLocationResponse)
+@policy("keeper")
+async def rename_location_endpoint(
+    payload: RenameLocationRequest,
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a shared collection."),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Rename one location everywhere it's used. Renaming onto a name that
+    already exists MERGES the two groups under the existing spelling — the
+    escape hatch when a keeper ends up with "Rack 1" and "Rack #1"."""
+    access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
+    target = canonical_location(db, access.owner.id, payload.new)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Give the location a name.")
+    moved = rename_location(db, access.owner.id, payload.old, payload.new)
+    db.commit()
+    return RenameLocationResponse(moved=moved, name=target)
+
+
+@router.post("/bulk-location", response_model=BulkLocationResponse)
+@policy("keeper")
+async def bulk_set_location(
+    payload: BulkLocationRequest,
+    collection: Optional[UUID] = Query(None, description="Owner's user id for a shared collection."),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Apply one location to many animals / colonies at once. Scoped to the
+    caller's own living, untransferred animals; deceased and transferred
+    records keep whatever they had, since they no longer live anywhere."""
+    if not payload.invert_ids and not payload.colony_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose which animals to apply this to.")
+
+    access = scope_collection(db, current_user, "tarantuverse", collection, need="keeper")
+    target = canonical_location(db, access.owner.id, payload.location)
+
+    updated = 0
+    if payload.invert_ids:
+        for inv in active_inverts_query(db, access.owner.id).filter(Invert.id.in_(payload.invert_ids)).all():
+            inv.location = target
+            updated += 1
+    if payload.colony_ids:
+        from app.models.colony import Colony
+        for col in db.query(Colony).filter(Colony.user_id == access.owner.id, Colony.id.in_(payload.colony_ids)).all():
+            col.location = target
+            updated += 1
+
+    # No legacy mirror: `location` lives on `inverts` / `colonies` only.
+    db.commit()
+    return BulkLocationResponse(updated=updated, location=target)
 
 
 @router.get("/{invert_id}", response_model=InvertResponse)
@@ -519,6 +629,8 @@ async def update_invert(
         require_own_enclosure(db, data["enclosure_id"], access.owner)
 
     data = _coerce_enums(data)
+    if "location" in data:
+        data["location"] = canonical_location(db, access.owner.id, data["location"])
     for field, value in data.items():
         setattr(invert, field, value)
 

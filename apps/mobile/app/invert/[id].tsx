@@ -420,6 +420,7 @@ function InvertDetailScreen() {
 
   // Husbandry as a rich icon grid (shared InfoGrid) — the convergence look.
   const husbandryItems: InfoGridItem[] = [];
+  if (invert.location) husbandryItems.push({ icon: 'map-marker-outline', label: 'Location', value: invert.location });
   if (invert.enclosure_type) husbandryItems.push({ icon: 'shape-outline', label: 'Type', value: invert.enclosure_type });
   if (invert.enclosure_size) husbandryItems.push({ icon: 'cube-outline', label: 'Enclosure', value: invert.enclosure_size });
   if (invert.substrate_type) husbandryItems.push({ icon: 'layers', label: 'Substrate', value: invert.substrate_depth ? `${invert.substrate_type} (${invert.substrate_depth})` : invert.substrate_type });

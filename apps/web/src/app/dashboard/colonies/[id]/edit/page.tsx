@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
@@ -76,6 +77,7 @@ export default function EditColonyPage() {
   const [source, setSource] = useState<ColonySource | ''>('')
   const [enclosureType, setEnclosureType] = useState('')
   const [enclosureSize, setEnclosureSize] = useState('')
+  const [location, setLocation] = useState<string | null>(null)
   const [substrateType, setSubstrateType] = useState('')
   const [substrateDepth, setSubstrateDepth] = useState('')
   const [tempMin, setTempMin] = useState('')
@@ -106,6 +108,7 @@ export default function EditColonyPage() {
       setSource((c.source as ColonySource) ?? '')
       setEnclosureType(c.enclosure_type ?? '')
       setEnclosureSize(c.enclosure_size ?? '')
+      setLocation(c.location ?? null)
       setSubstrateType(c.substrate_type ?? '')
       setSubstrateDepth(c.substrate_depth ?? '')
       setTempMin(numToStr(c.target_temp_min))
@@ -207,6 +210,7 @@ export default function EditColonyPage() {
         source: source || null,
         enclosure_type: enclosureType || null,
         enclosure_size: enclosureSize.trim() || null,
+        location,
         substrate_type: substrateType.trim() || null,
         substrate_depth: substrateDepth.trim() || null,
         target_temp_min: numOrNull(tempMin),
@@ -435,6 +439,9 @@ export default function EditColonyPage() {
                 placeholder={enclosureSizePlaceholder(colony.taxon)}
                 className={inputCls}
               />
+            </Field>
+            <Field label="Location">
+              <LocationField token={token} value={location} onChange={setLocation} />
             </Field>
             <Field label="Substrate type">
               <input

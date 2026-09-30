@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Optional
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import field_validator, BaseModel, ConfigDict, Field
 
 
 # Full ADR-006 taxon set — kept in sync with the inverts_taxon_check
@@ -57,6 +57,15 @@ class InvertBase(BaseModel):
     misting_schedule: Optional[str] = Field(None, max_length=100)
     last_enclosure_cleaning: Optional[date] = None
     enclosure_notes: Optional[str] = None
+    # Room / rack / shelf. Trimmed and whitespace-collapsed here; the router
+    # then snaps it to the keeper's existing spelling (utils/locations).
+    location: Optional[str] = Field(None, max_length=120)
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _normalise_location(cls, v):
+        from app.utils.locations import normalize_location
+        return normalize_location(v) if isinstance(v, str) else v
 
     # Feeding pause
     feeding_paused_reason: Optional[str] = Field(None, max_length=40)
@@ -198,6 +207,7 @@ class InvertFeedingStatusItem(BaseModel):
     taxon: str
     photo_url: Optional[str] = None
     life_stage: Optional[str] = None
+    location: Optional[str] = None
     last_feeding_date: Optional[datetime] = None
     days_since_last_feeding: Optional[int] = None
     is_feeding_paused: bool = False

@@ -57,6 +57,7 @@ IMPORT_FIELDS: List[Dict[str, str]] = [
     {"field": "target_temp_max", "label": "Temp max (°F)", "type": "decimal"},
     {"field": "target_humidity_min", "label": "Humidity min (%)", "type": "decimal"},
     {"field": "target_humidity_max", "label": "Humidity max (%)", "type": "decimal"},
+    {"field": "location", "label": "Location (room / rack / shelf)", "type": "str"},
     {"field": "notes", "label": "Notes", "type": "str"},
 ]
 FIELD_TYPE = {f["field"]: f["type"] for f in IMPORT_FIELDS}
@@ -84,6 +85,8 @@ HEADER_SYNONYMS: Dict[str, str] = {
     "humidity min": "target_humidity_min", "min humidity": "target_humidity_min",
     "humidity max": "target_humidity_max", "max humidity": "target_humidity_max",
     "notes": "notes", "comments": "notes", "remarks": "notes", "description": "notes",
+    "location": "location", "room": "location", "rack": "location", "shelf": "location",
+    "where": "location", "area": "location", "spot": "location",
 }
 
 _SEX_VALUES = {"m", "f", "male", "female", "unknown", "unsexed", "?", "female?", "male?"}

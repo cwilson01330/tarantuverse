@@ -65,6 +65,8 @@ export interface ColonyListItem {
   species_display_name: string | null
   species_scientific_name: string | null
   species_missing: boolean
+  /** Room / rack / shelf (see lib/locations). */
+  location?: string | null
 }
 
 export interface ColonyResponse {
@@ -92,6 +94,7 @@ export interface ColonyResponse {
   target_humidity_min: number | null
   target_humidity_max: number | null
   water_dish: boolean | null
+  location: string | null
   notes: string | null
   photo_url: string | null
   visibility: ColonyVisibility | null
@@ -124,6 +127,7 @@ export interface ColonyCreate {
   target_humidity_min?: number | null
   target_humidity_max?: number | null
   water_dish?: boolean | null
+  location?: string | null
   notes?: string | null
   photo_url?: string | null
   visibility?: ColonyVisibility | null

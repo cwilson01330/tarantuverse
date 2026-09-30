@@ -57,10 +57,17 @@ class ColonyBase(BaseModel):
     target_humidity_min: Optional[float] = None
     target_humidity_max: Optional[float] = None
     water_dish: Optional[bool] = None
+    location: Optional[str] = Field(None, max_length=120)
 
     notes: Optional[str] = None
     photo_url: Optional[str] = Field(None, max_length=500)
     visibility: str = "private"
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _normalise_location(cls, v):
+        from app.utils.locations import normalize_location
+        return normalize_location(v) if isinstance(v, str) else v
 
     @field_validator("taxon")
     @classmethod
@@ -117,10 +124,17 @@ class ColonyUpdate(BaseModel):
     target_humidity_min: Optional[float] = None
     target_humidity_max: Optional[float] = None
     water_dish: Optional[bool] = None
+    location: Optional[str] = Field(None, max_length=120)
     notes: Optional[str] = None
     photo_url: Optional[str] = Field(None, max_length=500)
     visibility: Optional[str] = None
     is_active: Optional[bool] = None
+
+    @field_validator("location", mode="before")
+    @classmethod
+    def _normalise_location(cls, v):
+        from app.utils.locations import normalize_location
+        return normalize_location(v) if isinstance(v, str) else v
 
     @field_validator("source")
     @classmethod
@@ -167,6 +181,7 @@ class ColonyResponse(BaseModel):
     target_humidity_min: Optional[float] = None
     target_humidity_max: Optional[float] = None
     water_dish: Optional[bool] = None
+    location: Optional[str] = None
 
     notes: Optional[str] = None
     photo_url: Optional[str] = None
@@ -195,6 +210,7 @@ class ColonyListItem(BaseModel):
     count_is_estimated: bool = False
     stage_counts: Optional[Dict[str, int]] = None
     is_active: bool
+    location: Optional[str] = None
     species_display_name: Optional[str] = None
     species_scientific_name: Optional[str] = None
     species_missing: bool = False

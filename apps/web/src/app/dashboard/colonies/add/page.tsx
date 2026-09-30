@@ -13,6 +13,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
 import { INVERT_TAXA, isInvertTaxon, PICKER_TAXA } from '@/lib/inverts'
@@ -96,6 +97,7 @@ function AddColonyForm() {
 
   const [enclosureType, setEnclosureType] = useState('')
   const [enclosureSize, setEnclosureSize] = useState('')
+  const [location, setLocation] = useState<string | null>(null)
   const [substrateType, setSubstrateType] = useState('')
   const [substrateDepth, setSubstrateDepth] = useState('')
   const [tempMin, setTempMin] = useState('')
@@ -212,6 +214,7 @@ function AddColonyForm() {
         count_is_estimated: countEstimated,
         enclosure_type: enclosureType || null,
         enclosure_size: enclosureSize.trim() || null,
+        location,
         substrate_type: substrateType.trim() || null,
         substrate_depth: substrateDepth.trim() || null,
         target_temp_min: numOrNull(tempMin),
@@ -486,6 +489,9 @@ function AddColonyForm() {
                 placeholder={enclosureSizePlaceholder(taxon)}
                 className={inputCls}
               />
+            </Field>
+            <Field label="Location">
+              <LocationField token={token} value={location} onChange={setLocation} />
             </Field>
             <Field label="Substrate type">
               <input

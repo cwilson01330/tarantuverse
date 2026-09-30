@@ -60,6 +60,8 @@ import {
   listColonies,
   type ColonyListItem,
 } from '../../src/lib/colonies';
+import { groupByLocation, renameLocation, useLocations, locationKey } from '../../src/lib/locations';
+import { LocationRenameSheet } from '../../src/components/LocationPicker';
 // One card for every taxon — replaced five near-identical renderers that had
 // already drifted apart (see AnimalCard's header comment).
 import AnimalCard from '../../src/components/AnimalCard';
@@ -81,6 +83,9 @@ interface Tarantula {
 
 interface FeedingStatus {
   tarantula_id: string;
+  /** Room / rack / shelf — carried on feeding-status so every taxon gets it
+   *  from the one call the grid already makes. */
+  location?: string | null;
   days_since_last_feeding?: number;
   acceptance_rate?: number;
   // Pause flag — see migration pst_20260502. When true, the
@@ -194,7 +199,12 @@ function CollectionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'lastFed' | 'acquired'>('name');
+  const [sortBy, setSortBy] = useState<'name' | 'lastFed' | 'acquired' | 'location'>('name');
+  // Keeper-defined locations (room / rack / shelf). The 'location' sort only
+  // appears in the sheet once at least one exists, so a keeper who never set
+  // one sees the exact same sheet as before.
+  const { locations: keeperLocations, refresh: refreshLocations } = useLocations();
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
   // Taxon filter — sits above search/sort. When 'tarantulas' or
   // 'scorpions', the other taxon is filtered out entirely.
   const [taxonFilter, setTaxonFilter] = useState<TaxonFilter>('all');
@@ -307,6 +317,7 @@ function CollectionScreen() {
           days_since_last_feeding: row.days_since_last_feeding ?? undefined,
           is_feeding_paused: row.is_feeding_paused ?? false,
           is_overdue: row.is_overdue ?? false,
+          location: row.location ?? null,
         });
       }
       setFeedingStatuses(next);
@@ -508,6 +519,19 @@ function CollectionScreen() {
     return centipedeDisplayName(row.data);
   };
 
+  /** Where a row lives. Animals come from feeding-status (one call, every
+   *  taxon); colonies carry it on their own list item. */
+  const rowLocation = (row: Row): string | null => {
+    if (row.kind === 'colony') return row.data.location ?? null;
+    return feedingStatuses.get(row.data.id)?.location ?? (row.data as any).location ?? null;
+  };
+  const hasAnyLocation =
+    keeperLocations.length > 0
+    || colonies.some((c) => !!c.location)
+    || Array.from(feedingStatuses.values()).some((s: FeedingStatus) => !!s.location);
+  // If the last location gets cleared while grouped, fall back quietly.
+  const effectiveSort = sortBy === 'location' && !hasAnyLocation ? 'name' : sortBy;
+
   // Filter and sort rows, gated by taxonFilter. Selecting one taxon collapses
   // the others out entirely so the keeper can focus. 'due' cuts across taxa.
   const getFilteredRows = (): Row[] => {
@@ -585,7 +609,22 @@ function CollectionScreen() {
       });
     }
 
-    switch (sortBy) {
+    switch (effectiveSort) {
+      case 'location': {
+        // Grouped rendering happens below; here we just order by location
+        // (unassigned last) then name so the groups come out contiguous.
+        rows.sort((a, b) => {
+          const la = locationKey(rowLocation(a));
+          const lb = locationKey(rowLocation(b));
+          if (la !== lb) {
+            if (la === null) return 1;
+            if (lb === null) return -1;
+            return la.localeCompare(lb);
+          }
+          return getRowName(a).localeCompare(getRowName(b));
+        });
+        break;
+      }
       case 'lastFed': {
         // Now cross-taxon: one feeding-status call covers every animal, so a
         // hungry scorpion sorts alongside a hungry tarantula instead of being
@@ -621,6 +660,7 @@ function CollectionScreen() {
       fetchColonies(),
       fetchDeceased(),
       loadFeedingStatuses(),
+      refreshLocations(),
     ]);
     setRefreshing(false);
   }, []);
@@ -1173,6 +1213,16 @@ function CollectionScreen() {
       padding: 8,
       paddingBottom: 88, // FAB height (56) + 16pt clearance + 16pt base
     },
+    groupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingTop: 14,
+      paddingBottom: 4,
+    },
+    groupTitle: { flex: 1, ...TYPE.label, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+    groupCount: { ...TYPE.label, fontVariant: ['tabular-nums'], marginRight: 6 },
     statsCard: {
       margin: 8,
       marginBottom: 16,
@@ -1743,6 +1793,60 @@ function CollectionScreen() {
 
   // Renders the cross-taxon row using the discriminated union — the
   // FlatList itself stays homogeneous; renderItem dispatches.
+  /** One location group: header, its colonies (full width), then its
+   *  animals in the same card grid / list the flat view uses. Two-up in card
+   *  mode is done by hand here because the FlatList's numColumns can't wrap
+   *  headers. */
+  const renderGroup = ({ item: g }: { item: { key: string; label: string; rows: Row[] } }) => {
+    const groupColonies = g.rows.flatMap((r) => (r.kind === 'colony' ? [r.data] : []));
+    const animals = g.rows.filter((r) => r.kind !== 'colony');
+    const isUnassigned = g.key === '__unassigned__';
+    const pairs: Row[][] = [];
+    if (viewMode === 'card') {
+      for (let i = 0; i < animals.length; i += 2) pairs.push(animals.slice(i, i + 2));
+    }
+    return (
+      <View>
+        <View style={styles.groupHeader}>
+          <MaterialCommunityIcons
+            name={isUnassigned ? 'map-marker-off-outline' : 'map-marker-outline'}
+            size={16}
+            color={colors.textTertiary}
+          />
+          <Text style={[styles.groupTitle, { color: colors.textSecondary }]} numberOfLines={1}>
+            {g.label}
+          </Text>
+          <Text style={[styles.groupCount, { color: colors.textTertiary }]}>{g.rows.length}</Text>
+          {!isUnassigned && (
+            <TouchableOpacity
+              onPress={() => setRenameTarget(g.label)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Rename ${g.label}`}
+            >
+              <MaterialCommunityIcons name="pencil-outline" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {groupColonies.map((c) => (
+          <ColonyRow key={c.id} item={c} onPress={() => router.push(`/colony/${c.id}` as any)} />
+        ))}
+        {viewMode === 'card'
+          ? pairs.map((pair, i) => (
+              <View key={i} style={{ flexDirection: 'row' }}>
+                {pair.map((r) => (
+                  <React.Fragment key={`${r.kind}-${r.data.id}`}>{renderRow({ item: r })}</React.Fragment>
+                ))}
+                {pair.length === 1 && <View style={{ flex: 1, margin: 8 }} />}
+              </View>
+            ))
+          : animals.map((r) => (
+              <React.Fragment key={`${r.kind}-${r.data.id}`}>{renderRow({ item: r })}</React.Fragment>
+            ))}
+      </View>
+    );
+  };
+
   const renderRow = ({ item }: { item: Row }) => {
     if (item.kind === 'scorpion') {
       return viewMode === 'card'
@@ -1904,7 +2008,45 @@ function CollectionScreen() {
   // Colonies count as ONE entry each toward the collection Total (ADR-010:
   // 1 toward the cap regardless of headcount).
   const filteredRows = getFilteredRows();
-  const colonyRowsShown = filteredRows.flatMap((row) => (row.kind === 'colony' ? [row.data] : []));
+  const grouped = effectiveSort === 'location';
+  const colonyRowsShown = grouped
+    ? []
+    : filteredRows.flatMap((row) => (row.kind === 'colony' ? [row.data] : []));
+  const locationGroups = grouped ? groupByLocation<Row>(filteredRows, rowLocation) : [];
+
+  /** Rename (or merge) a location from its group header. Merging is
+   *  confirmed with the count, because it's the one action here that can't
+   *  be undone with a single tap. */
+  const submitRename = async (oldName: string, newName: string) => {
+    const targetKey = locationKey(newName);
+    if (!targetKey || targetKey === locationKey(oldName)) {
+      setRenameTarget(null);
+      return;
+    }
+    const existing = keeperLocations.find((l) => locationKey(l.name) === targetKey);
+    const run = async () => {
+      try {
+        await renameLocation(oldName, newName);
+        setRenameTarget(null);
+        await Promise.all([loadFeedingStatuses(), fetchColonies(), refreshLocations()]);
+      } catch (e: any) {
+        Alert.alert('Could not rename', e?.response?.data?.detail || e?.message || 'Something went wrong.');
+      }
+    };
+    if (existing) {
+      const moving = keeperLocations.find((l) => locationKey(l.name) === locationKey(oldName))?.count ?? 0;
+      Alert.alert(
+        `Merge into ${existing.name}?`,
+        `${moving} ${moving === 1 ? 'entry' : 'entries'} from “${oldName}” will move to “${existing.name}”.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Merge', onPress: run },
+        ],
+      );
+      return;
+    }
+    await run();
+  };
   const totalAnimals = allCollectionAnimals.length + colonies.length;
   const uniqueSpeciesCount = new Set(
     [
@@ -2076,13 +2218,13 @@ function CollectionScreen() {
       ) : (
         <>
           <FlatList
-            key={viewMode} // Force re-render when viewMode changes (needed for numColumns)
+            key={`${viewMode}-${grouped ? 'grouped' : 'flat'}`} // numColumns can't change on a mounted list
             // Colonies render above the grid as full-width rows (design
             // handoff, screen 8) — a population isn't an animal card.
-            data={filteredRows.filter((row) => row.kind !== 'colony')}
-            renderItem={renderRow}
-            keyExtractor={(item) => `${item.kind}-${item.data.id}`}
-            numColumns={viewMode === 'card' ? 2 : 1}
+            data={(grouped ? locationGroups : filteredRows.filter((row) => row.kind !== 'colony')) as any[]}
+            renderItem={(grouped ? renderGroup : renderRow) as any}
+            keyExtractor={(item: any) => (grouped ? `group-${item.key}` : `${item.kind}-${item.data.id}`)}
+            numColumns={viewMode === 'card' && !grouped ? 2 : 1}
             contentContainerStyle={styles.list}
             ListHeaderComponent={
               <>
@@ -2148,6 +2290,12 @@ function CollectionScreen() {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
             }
           />
+          <LocationRenameSheet
+            visible={renameTarget !== null}
+            current={renameTarget ?? ''}
+            onClose={() => setRenameTarget(null)}
+            onSubmit={(next) => submitRename(renameTarget ?? '', next)}
+          />
           <PrimaryButton
             fab
             size={56}
@@ -2211,6 +2359,10 @@ function CollectionScreen() {
                 { value: 'name' as const, label: 'Name', icon: 'sort-alphabetical-ascending' },
                 { value: 'lastFed' as const, label: 'Longest since fed', icon: 'silverware-fork-knife' },
                 { value: 'acquired' as const, label: 'Date acquired', icon: 'calendar-blank-outline' },
+                // Only once a location exists — otherwise the sheet is unchanged.
+                ...(hasAnyLocation
+                  ? [{ value: 'location' as const, label: 'By location', icon: 'map-marker-outline' }]
+                  : []),
               ]
             ).map((opt) => {
               const active = sortBy === opt.value;

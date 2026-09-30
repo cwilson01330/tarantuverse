@@ -29,6 +29,7 @@ from app.schemas.tarantula import (
 )
 from app.utils.dependencies import get_current_user
 from app.utils.limits import enforce_collection_limit
+from app.utils.locations import canonical_location
 from app.services.activity_service import create_activity
 # ADR-005 Phase A2 — mirror writes to the unified `inverts` table.
 # Same SQLAlchemy session = atomic commit with the legacy write.
@@ -41,6 +42,36 @@ from app.utils.access import policy
 from app.utils.photo_cleanup import collect_for_animal, delete_files
 
 router = APIRouter()
+
+
+def _attach_locations(db: Session, tarantulas) -> None:
+    """`location` is not a `tarantulas` column — it lives on the mirrored
+    `inverts` row (same PK). Read it back in one batched query and hang it on
+    the ORM instances so TarantulaResponse can serialise it."""
+    from app.models.invert import Invert
+
+    rows = list(tarantulas)
+    if not rows:
+        return
+    by_id = dict(
+        db.query(Invert.id, Invert.location)
+        .filter(Invert.id.in_([t.id for t in rows]))
+        .all()
+    )
+    for t in rows:
+        t.location = by_id.get(t.id)
+
+
+def _write_location_to_mirror(db: Session, tarantula: Tarantula, raw) -> None:
+    """Store the keeper's location on the unified row (canonicalised) and
+    mirror it back onto the instance being returned."""
+    from app.models.invert import Invert
+
+    invert = db.query(Invert).filter(Invert.id == tarantula.id).first()
+    value = canonical_location(db, tarantula.user_id, raw)
+    if invert is not None:
+        invert.location = value
+    tarantula.location = value
 
 
 @router.get("/", response_model=List[TarantulaResponse])
@@ -77,6 +108,7 @@ async def get_tarantulas(
         Tarantula.id.notin_(archived_ids),
     ).order_by(Tarantula.created_at.desc()).all()
 
+    _attach_locations(db, tarantulas)
     return tarantulas
 
 
@@ -103,6 +135,8 @@ async def create_tarantula(
     enforce_collection_limit(db, current_user)
 
     tarantula_dict = tarantula_data.model_dump()
+    # Not a legacy column — written onto the mirrored `inverts` row below.
+    location_raw = tarantula_dict.pop('location', None)
     # sex/source DB enums were created with uppercase names (MALE, FEMALE, BRED, etc.)
     # so we must pass the Python enum member so SQLAlchemy stores the name, not the value string.
     if tarantula_dict.get('sex'):
@@ -137,6 +171,8 @@ async def create_tarantula(
     # mirrored Invert row — both inserts then commit atomically.
     db.flush()
     mirror_tarantula_create(db, new_tarantula)
+    db.flush()
+    _write_location_to_mirror(db, new_tarantula, location_raw)
     db.commit()
     db.refresh(new_tarantula)
 
@@ -162,6 +198,7 @@ async def create_tarantula(
         }
     )
 
+    _attach_locations(db, [new_tarantula])
     return new_tarantula
 
 
@@ -188,6 +225,7 @@ async def get_tarantula(
             detail="Tarantula not found"
         )
 
+    _attach_locations(db, [tarantula])
     return tarantula
 
 
@@ -217,6 +255,8 @@ async def update_tarantula(
 
     # Update only provided fields
     update_data = tarantula_data.model_dump(exclude_unset=True)
+    location_set = 'location' in update_data
+    location_raw = update_data.pop('location', None)
     if update_data.get('sex'):
         try:
             update_data['sex'] = Sex(update_data['sex'])
@@ -232,9 +272,13 @@ async def update_tarantula(
 
     # Mirror the same edit to the unified `inverts` row (ADR-005 A2).
     mirror_tarantula_update(db, tarantula)
+    if location_set:
+        db.flush()
+        _write_location_to_mirror(db, tarantula, location_raw)
     db.commit()
     db.refresh(tarantula)
 
+    _attach_locations(db, [tarantula])
     return tarantula
 
 

@@ -14,6 +14,7 @@ import { AppHeader } from '../../src/components/AppHeader';
 import { ChangeTaxonSheet } from '../../src/components/ChangeTaxonSheet';
 import DateInput from '../../src/components/DateInput';
 import { InvertSpeciesPicker } from '../../src/components/InvertSpeciesPicker';
+import { LocationPicker } from '../../src/components/LocationPicker';
 import {
   INVERT_TAXA, changeInvertTaxon, describeTaxonChangeError, getInvert, updateInvert,
   type Invert, type InvertTaxon, type Sex, type Source,
@@ -100,6 +101,7 @@ export default function EditInvertScreen() {
         target_temp_min: form.target_temp_min, target_temp_max: form.target_temp_max, target_humidity_min: form.target_humidity_min, target_humidity_max: form.target_humidity_max,
         water_dish: form.water_dish, misting_schedule: form.misting_schedule, last_enclosure_cleaning: form.last_enclosure_cleaning,
         last_substrate_change: form.last_substrate_change, enclosure_notes: form.enclosure_notes, notes: form.notes,
+        location: form.location ?? null,
       });
       router.back();
     } catch (err) {
@@ -180,6 +182,7 @@ export default function EditInvertScreen() {
           <SectionHeader title="Enclosure" colors={colors} />
           <Field label="Type"><ChipGroup options={ENCLOSURE_OPTIONS.map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))} value={(form.enclosure_type as any) ?? meta?.defaultEnclosureType ?? 'terrestrial'} onChange={(v) => update('enclosure_type', v)} colors={colors} /></Field>
           <Field label="Size"><TextInput style={styles.input} value={form.enclosure_size ?? ''} onChangeText={(t) => update('enclosure_size', t)} placeholderTextColor={colors.textTertiary} /></Field>
+          <Field label="Location"><LocationPicker value={form.location} onChange={(v) => update('location', v)} /></Field>
           <Field label="Substrate type"><TextInput style={styles.input} value={form.substrate_type ?? ''} onChangeText={(t) => update('substrate_type', t)} placeholderTextColor={colors.textTertiary} /></Field>
           <Field label="Substrate depth"><TextInput style={styles.input} value={form.substrate_depth ?? ''} onChangeText={(t) => update('substrate_depth', t)} placeholderTextColor={colors.textTertiary} /></Field>
           <View style={styles.row}>

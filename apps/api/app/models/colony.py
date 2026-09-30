@@ -111,6 +111,8 @@ class Colony(Base):
     target_humidity_min = Column(Numeric(5, 2), nullable=True)  # Percentage
     target_humidity_max = Column(Numeric(5, 2), nullable=True)
     water_dish = Column(Boolean, nullable=True)
+    # Room / rack / shelf, canonicalised per keeper (utils/locations).
+    location = Column(String(40), nullable=True)
 
     notes = Column(Text, nullable=True)
     # Written FOR a sitter; `notes` stays private (PRD-shared-keeping).

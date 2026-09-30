@@ -39,6 +39,7 @@ import {
   type StageCounts,
 } from '../../../src/lib/colonies';
 import { getErrorMessage } from '../../../src/utils/errors';
+import { LocationPicker } from '../../../src/components/LocationPicker';
 import { parseLocalDate, toISODateLocal } from '../../../src/utils/date';
 
 const SOURCE_OPTIONS: { value: Source; label: string }[] = [
@@ -105,6 +106,7 @@ export default function EditColonyScreen() {
   const [humidityMin, setHumidityMin] = useState('');
   const [humidityMax, setHumidityMax] = useState('');
   const [waterDish, setWaterDish] = useState(false);
+  const [location, setLocation] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [isActive, setIsActive] = useState(true);
 
@@ -141,6 +143,7 @@ export default function EditColonyScreen() {
       setHumidityMin(toStr(c.target_humidity_min));
       setHumidityMax(toStr(c.target_humidity_max));
       setWaterDish(c.water_dish);
+      setLocation(c.location ?? null);
       setNotes(c.notes ?? '');
       setIsActive(c.is_active);
       setLoadError('');
@@ -252,6 +255,7 @@ export default function EditColonyScreen() {
         target_humidity_min: numOrNull(humidityMin),
         target_humidity_max: numOrNull(humidityMax),
         water_dish: waterDish,
+        location,
         notes: toStr(notes).trim() || null,
         is_active: isActive,
       };
@@ -484,6 +488,10 @@ export default function EditColonyScreen() {
             </View>
             <Switch value={waterDish} onValueChange={setWaterDish} trackColor={{ false: colors.border, true: colors.primary }} thumbColor="#fff" accessibilityLabel="Toggle water dish" />
           </View>
+
+          <Field label="Location">
+            <LocationPicker value={location} onChange={setLocation} />
+          </Field>
 
           <Field label="Notes">
             <TextInput style={[styles.input, styles.textArea]} placeholder="Anything worth remembering about this colony" placeholderTextColor={colors.textTertiary} value={notes} onChangeText={setNotes} multiline />

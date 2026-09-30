@@ -37,6 +37,7 @@ import {
   type Source,
 } from '../../src/lib/inverts';
 import { createColony, type StageCounts } from '../../src/lib/colonies';
+import { LocationPicker } from '../../src/components/LocationPicker';
 import { getErrorMessage, isPaymentRequired } from '../../src/utils/errors';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
@@ -97,6 +98,7 @@ export default function AddColonyScreen() {
   const [humidityMin, setHumidityMin] = useState('');
   const [humidityMax, setHumidityMax] = useState('');
   const [waterDish, setWaterDish] = useState(false);
+  const [location, setLocation] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
   const [saving, setSaving] = useState(false);
@@ -156,6 +158,7 @@ export default function AddColonyScreen() {
         target_humidity_min: humidityMin.trim() || null,
         target_humidity_max: humidityMax.trim() || null,
         water_dish: waterDish,
+        location,
         notes: notes.trim() || null,
       });
       router.replace(`/colony/${created.id}` as any);
@@ -428,6 +431,10 @@ export default function AddColonyScreen() {
               accessibilityLabel="Toggle water dish"
             />
           </View>
+
+          <Field label="Location">
+            <LocationPicker value={location} onChange={setLocation} />
+          </Field>
 
           <Field label="Notes">
             <TextInput style={[styles.input, styles.textArea]} placeholder="Anything worth remembering about this colony" placeholderTextColor={colors.textTertiary} value={notes} onChangeText={setNotes} multiline />

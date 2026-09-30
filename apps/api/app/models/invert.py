@@ -120,6 +120,11 @@ class Invert(Base):
     misting_schedule = Column(String(100))
     last_enclosure_cleaning = Column(Date)
     enclosure_notes = Column(Text)
+    # Where the animal physically lives (room / rack / shelf). Free text,
+    # canonicalised per keeper by utils/locations so one place can't split
+    # into "Spider room" and "spider room". Lives on inverts only — the
+    # legacy tarantula/scorpion routers write it straight onto this row.
+    location = Column(String(40), nullable=True)
 
     # Feeding pause (mirrors tarantula + scorpion behavior)
     feeding_paused_reason = Column(String(40))

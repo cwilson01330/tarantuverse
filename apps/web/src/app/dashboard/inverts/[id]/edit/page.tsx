@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import ChangeTaxonDialog, { describeTaxonChangeFailure } from '@/components/ChangeTaxonDialog'
 import { INVERT_TAXA, isInvertTaxon, type InvertTaxon } from '@/lib/inverts'
@@ -107,6 +108,7 @@ export default function EditInvertPage() {
           price_paid: form.price_paid || null,
           enclosure_type: form.enclosure_type,
           enclosure_size: form.enclosure_size,
+          location: form.location ?? null,
           substrate_type: form.substrate_type,
           substrate_depth: form.substrate_depth,
           target_temp_min: form.target_temp_min,
@@ -209,6 +211,7 @@ export default function EditInvertPage() {
                 </div>
               </Field>
               <Field label="Size"><input value={form.enclosure_size ?? ''} onChange={(e) => set('enclosure_size', e.target.value)} placeholder='e.g. 12x12x18"' className={inputCls} /></Field>
+              <Field label="Location"><LocationField token={token} value={form.location} onChange={(v) => set('location', v)} /></Field>
               <Field label="Substrate type"><input value={form.substrate_type ?? ''} onChange={(e) => set('substrate_type', e.target.value)} className={inputCls} /></Field>
               <Field label="Substrate depth"><input value={form.substrate_depth ?? ''} onChange={(e) => set('substrate_depth', e.target.value)} className={inputCls} /></Field>
               <div className="grid grid-cols-2 gap-4">

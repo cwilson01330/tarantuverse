@@ -610,6 +610,7 @@ export default function ColonyDetailScreen() {
       label: 'Humidity',
       value: `${colony.target_humidity_min ?? '—'}–${colony.target_humidity_max ?? '—'}%`,
     });
+  if (colony.location) husbandryItems.push({ icon: 'map-marker-outline', label: 'Location', value: colony.location });
   husbandryItems.push({ icon: 'cup-water', label: 'Water dish', value: colony.water_dish ? 'Yes' : 'No' });
   if (colony.last_substrate_change)
     husbandryItems.push({ icon: 'calendar-refresh', label: 'Substrate changed', value: formatLocalDate(colony.last_substrate_change, { month: 'short', day: 'numeric', year: 'numeric' }) });
