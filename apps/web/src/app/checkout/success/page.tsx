@@ -74,8 +74,9 @@ function CheckoutSuccessContent() {
           </h1>
 
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Thank you for your purchase. Your premium subscription is now active
-            and you have access to all features.
+            {searchParams.get('price_type') === 'lifetime'
+              ? 'Thank you. That was a one-time payment — Premium is yours for good, and you will never be billed again.'
+              : 'Thank you for your purchase. Your premium subscription is now active and you have access to all features.'}
           </p>
 
           <div className="space-y-4">

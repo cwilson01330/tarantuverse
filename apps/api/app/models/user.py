@@ -91,6 +91,11 @@ class User(Base):
     # Username change tracking (30-day cooldown)
     last_username_change = Column(DateTime(timezone=True), nullable=True)
 
+    # The one-time "here's what you get" card (free vs premium, plainly),
+    # shown after the first completed Feeding Day batch. NULL = never shown.
+    # On the user, not the device, so it can't reappear on a second phone.
+    premium_intro_seen_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

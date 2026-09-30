@@ -4,6 +4,13 @@ import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { trackUpgrade, UPGRADE_EVENTS, type UpgradeSource } from '@/lib/upgrade-tracking'
 
+// Keep in step with /pricing and the mobile UpgradeModal.
+const PLANS: { key: 'monthly' | 'yearly' | 'lifetime'; name: string; price: string; period: string; highlight?: boolean }[] = [
+  { key: 'monthly', name: 'Monthly', price: '$4.99', period: 'per month' },
+  { key: 'yearly', name: 'Yearly', price: '$44.99', period: 'per year', highlight: true },
+  { key: 'lifetime', name: 'Lifetime', price: '$149.99', period: 'one-time, forever' },
+]
+
 interface UpgradeModalProps {
   isOpen: boolean
   onClose: () => void
@@ -27,6 +34,16 @@ export default function UpgradeModal({ isOpen, onClose, source, feature, descrip
   }, [isOpen, source])
 
   if (!isOpen) return null
+
+  const goToPricing = (priceType?: 'monthly' | 'yearly' | 'lifetime') => {
+    acted.current = true
+    trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'pricing', price_type: priceType ?? null })
+    onClose()
+    // The source rides along so /pricing can attribute the checkout.
+    const qs = new URLSearchParams({ source })
+    if (priceType) qs.set('plan', priceType)
+    router.push(`/pricing?${qs.toString()}`)
+  }
 
   const dismiss = () => {
     if (!acted.current) trackUpgrade(UPGRADE_EVENTS.dismissed, source)
@@ -83,16 +100,32 @@ export default function UpgradeModal({ isOpen, onClose, source, feature, descrip
           </ul>
         </div>
 
+        {/* Plans — lifetime included. The prompt used to lead with
+            subscriptions only; the one-time option exists on both stores and
+            on Stripe, and the buyers who want it should see it here. */}
+        <div className="grid grid-cols-3 gap-2 mb-6 text-center">
+          {PLANS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => goToPricing(p.key)}
+              className={`rounded-xl border px-2 py-3 transition hover:bg-purple-50 dark:hover:bg-purple-900/20 ${
+                p.highlight
+                  ? 'border-purple-500 dark:border-purple-400'
+                  : 'border-gray-200 dark:border-gray-700'
+              }`}
+            >
+              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400">{p.name}</div>
+              <div className="text-lg font-bold text-gray-900 dark:text-white">{p.price}</div>
+              <div className="text-[11px] text-gray-500 dark:text-gray-400">{p.period}</div>
+            </button>
+          ))}
+        </div>
+
         {/* Action buttons */}
         <div className="flex flex-col gap-3">
           <button
-            onClick={() => {
-              acted.current = true
-              trackUpgrade(UPGRADE_EVENTS.clicked, source, { action: 'pricing' })
-              onClose()
-              // The source rides along so /pricing can attribute the checkout.
-              router.push(`/pricing?source=${encodeURIComponent(source)}`)
-            }}
+            onClick={() => goToPricing()}
             className="w-full px-6 py-3 bg-gradient-brand text-white rounded-xl hover:shadow-lg hover:brightness-90 transition font-semibold"
           >
             View Premium Plans

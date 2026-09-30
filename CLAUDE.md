@@ -556,6 +556,17 @@
 - **Legacy migration**: `migrate_communal_enclosures_to_colonies.py` (one-shot, idempotent, `--dry-run`) converts surviving `enclosures.is_communal`/`population_count` rows into colonies; leaves the enclosure dormant.
 - **Deferred (Phase 3)**: Feeding Day / daily-digest inclusion (would need `colony_id` added to the polymorphic feeding/substrate CHECK) — intentionally skipped since colony taxa are mostly detritivore/casual-feed and don't fit a per-animal feeding cadence.
 
+#### Keeper Locations 📍 (✅ COMPLETE — 2026-09-30)
+**Room / rack / shelf on animals and colonies, so Collection and Feeding Day can be walked in the order a keeper walks their house.**
+
+- `inverts.location` + `colonies.location` (VARCHAR(40), migration `loc_20260930_animal_location`). NOT on the legacy `tarantulas`/`scorpions` tables — `/tarantulas/` accepts `location` and writes it onto the mirrored `inverts` row (`_write_location_to_mirror`), and reads it back with one batched query (`_attach_locations`). The dual-write kwargs builders don't mention it, so the forward mirror can't clobber it.
+- **One spelling per place per keeper, enforced on write** (`utils/locations.py`): trim, collapse whitespace, strip trailing punctuation, blank→NULL, cap 40, then snap to the keeper's EXISTING spelling case-insensitively. Every write path goes through `canonical_location` (invert create/update, colony create/update, bulk, legacy tarantula, importer). Grouping compares `lower(location)`. Tests: `tests/test_locations.py`.
+- API: `GET /inverts/locations` (name + count), `POST /inverts/locations/rename` (rename; onto an existing name = MERGE), `POST /inverts/bulk-location` (Feeding Day multi-select). `location` rides on `/inverts/feeding-status`, which is how the collection grids get it for every taxon without facade drift.
+- Clients: pick-first picker (`LocationPicker` web + mobile) on add/edit forms; "By location" grouping on Collection + Feeding Day with rename from the group header; "Set location" bulk action in the Feeding Day action bar. **A keeper with no locations sees nothing new** — the sort option / toggle only renders once one exists. Importer maps `location/room/rack/shelf` columns.
+
+#### Premium Intro Card 💎 (✅ COMPLETE — 2026-09-30)
+One-time "here's what you get" card after a keeper's FIRST completed Feeding Day batch (not signup, not a wall). `users.premium_intro_seen_at` (migration `pin_20260930_premium_intro`); `GET /auth/me/premium-intro` decides, `POST /auth/me/premium-intro/seen` on any dismissal. Copy lists what stays free and what premium adds, all three plans incl. lifetime; "Not now" is primary. Source `feeding_day_intro` in all four upgrade-tracking vocabularies. Web `UpgradeModal` now shows monthly/yearly/lifetime and `/pricing?plan=lifetime` scrolls to the lifetime card; checkout-success says "one-time payment" for lifetime.
+
 #### Smart Feeding Reminders 🍽️ (✅ COMPLETE)
 **Per-species automatic feeding interval calculation**
 

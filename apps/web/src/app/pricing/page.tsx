@@ -25,6 +25,15 @@ export default function PricingPage() {
     const s = sourceFromParam(new URLSearchParams(window.location.search).get('source'))
     setSource(s)
     trackUpgrade(UPGRADE_EVENTS.pricingViewed, s)
+    // An upgrade prompt that was opened on a specific plan lands on that plan
+    // — the lifetime card sits below the fold, so without this a keeper who
+    // chose "Lifetime" on the prompt arrives at the top and hunts for it.
+    const plan = new URLSearchParams(window.location.search).get('plan')
+    if (plan === 'lifetime') {
+      window.setTimeout(() => {
+        document.getElementById('lifetime-plan')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 150)
+    }
   }, [])
 
   const handleCheckout = async (priceType: 'monthly' | 'yearly' | 'lifetime') => {
@@ -313,7 +322,7 @@ export default function PricingPage() {
         </div>
 
         {/* Lifetime Plan - Standalone */}
-        <div className="max-w-3xl mx-auto mt-12">
+        <div id="lifetime-plan" className="max-w-3xl mx-auto mt-12 scroll-mt-24">
           <div className="bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-600 text-white rounded-3xl p-8 shadow-2xl relative">
             <div className="absolute -top-4 left-1/2 -translate-x-1/2">
               <span className="inline-block px-4 py-1 bg-gradient-brand text-white rounded-full text-sm font-bold shadow-lg">

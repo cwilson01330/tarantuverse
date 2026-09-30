@@ -24,6 +24,8 @@ export const UPGRADE_SOURCES = [
   'advanced_analytics',
   'feeders',
   'settings',
+  // The one-time "here's what you get" card after the first Feeding Day batch
+  'feeding_day_intro',
   // Premium Scope features, reserved so their previews slot straight in
   'forecast',
   'benchmark',

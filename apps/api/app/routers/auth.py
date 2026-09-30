@@ -4,6 +4,7 @@ Authentication routes
 from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Optional, List
+from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 import logging
 import uuid
@@ -265,6 +266,38 @@ async def logout(
 async def get_me(current_user: User = Depends(get_current_user)):
     """Get current authenticated user profile"""
     return UserResponse.from_orm(current_user)
+
+
+class PremiumIntroStatus(BaseModel):
+    """Whether to show the one-time premium intro card right now."""
+    show: bool
+    is_premium: bool
+
+
+@router.get("/me/premium-intro", response_model=PremiumIntroStatus)
+async def premium_intro_status(current_user: User = Depends(get_current_user)):
+    """Clients ask this once, right after a keeper's first successful batch
+    feeding. `show` is true only for a non-premium keeper who has never been
+    shown the card; the card is informational (what stays free, what premium
+    adds) and never gates anything."""
+    is_premium = bool(current_user.is_premium)
+    return PremiumIntroStatus(
+        show=(not is_premium) and current_user.premium_intro_seen_at is None,
+        is_premium=is_premium,
+    )
+
+
+@router.post("/me/premium-intro/seen", response_model=PremiumIntroStatus)
+async def premium_intro_seen(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mark the card as seen. Idempotent; called on ANY dismissal (Not now,
+    close, or tapping through to plans), so it is shown once, ever."""
+    if current_user.premium_intro_seen_at is None:
+        current_user.premium_intro_seen_at = datetime.now(timezone.utc)
+        db.commit()
+    return PremiumIntroStatus(show=False, is_premium=bool(current_user.is_premium))
 
 
 @router.put("/me/profile", response_model=UserResponse)

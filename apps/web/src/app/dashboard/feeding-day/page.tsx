@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
+import { LocationDialog } from '@/components/LocationPicker'
+import PremiumIntroCard, { shouldShowPremiumIntro } from '@/components/PremiumIntroCard'
+import { bulkSetLocation, groupByLocation, listLocations, UNASSIGNED_KEY, type LocationItem } from '@/lib/locations'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -21,6 +24,8 @@ interface FeedingStatus {
   is_feeding_paused: boolean
   is_overdue: boolean
   life_stage: string | null
+  /** Room / rack / shelf, when the keeper set one. */
+  location?: string | null
   interval_days: number | null
   /** 'species' = from the care sheet; 'stage_default' / 'generic_default' = a
    *  guess. Never render a default as a species schedule. */
@@ -121,6 +126,33 @@ export default function FeedingDayPage() {
   const [actionError, setActionError] = useState('')
   const [resultMessage, setResultMessage] = useState('')
 
+  // Group the list by location so the page matches walking the shelves.
+  // Only offered once at least one animal HAS a location; a keeper who never
+  // set one sees exactly the page they had before. Remembered per browser.
+  const [groupByLoc, setGroupByLoc] = useState(false)
+  const [locations, setLocations] = useState<LocationItem[]>([])
+  const [locDialogOpen, setLocDialogOpen] = useState(false)
+  const [locBusy, setLocBusy] = useState(false)
+  // The one-time "here's what you get" card — the server decides, see the component.
+  const [introOpen, setIntroOpen] = useState(false)
+  useEffect(() => {
+    try {
+      setGroupByLoc(window.localStorage.getItem('feeding_day_group_by_location') === '1')
+    } catch {
+      // storage unavailable — default off
+    }
+  }, [])
+  const toggleGroupByLoc = () => {
+    const next = !groupByLoc
+    setGroupByLoc(next)
+    try {
+      window.localStorage.setItem('feeding_day_group_by_location', next ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+  const hasLocations = useMemo(() => animals.some((a) => !!a.location), [animals])
+
   const fetchStatus = useCallback(async () => {
     if (!token) return
     setLoadError('')
@@ -135,6 +167,8 @@ export default function FeedingDayPage() {
       }
       const data = (await res.json()) as FeedingStatus[]
       setAnimals(Array.isArray(data) ? data : [])
+      // Best effort — the picker just starts empty if this fails.
+      listLocations(token).then(setLocations).catch(() => {})
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
@@ -296,11 +330,97 @@ export default function FeedingDayPage() {
       setFoodType('')
       setNotes('')
       await fetchStatus()
+      // After a keeper's FIRST completed batch, and only then, show what
+      // stays free and what premium adds. The server says whether this is
+      // that moment; a failed check means no card.
+      if (result.created_count > 0 && token && (await shouldShowPremiumIntro(token))) setIntroOpen(true)
     } catch (e) {
       setActionError(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  /** Tag every selected animal with one location (or clear it). One pass
+   *  with multi-select instead of sixty edit forms. */
+  const applyLocation = async (location: string | null) => {
+    if (!token || selectedCount === 0) return
+    setLocBusy(true)
+    setActionError('')
+    try {
+      const res = await bulkSetLocation(token, location, { invert_ids: Array.from(selectedIds) })
+      clearSelection()
+      setResultMessage(
+        res.location ? `${res.updated} moved to ${res.location}.` : `Location cleared on ${res.updated}.`,
+      )
+      // First location ever set — turn grouping on so the tag is visible.
+      if (res.location && !hasLocations && !groupByLoc) toggleGroupByLoc()
+      await fetchStatus()
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Could not set location')
+    } finally {
+      setLocBusy(false)
+    }
+  }
+
+  const renderAnimal = (a: FeedingStatus) => {
+    const selected = selectedIds.has(a.id)
+    return (
+      <li key={a.id}>
+        <label
+          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
+            selected
+              ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
+              : 'border-theme bg-surface hover:bg-surface-elevated'
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => toggleOne(a.id)}
+            className="w-4 h-4 rounded border-theme accent-purple-600 flex-shrink-0"
+            aria-label={`Select ${displayName(a)}`}
+          />
+          {/* Thumbnail or emoji */}
+          <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface-elevated flex items-center justify-center flex-shrink-0">
+            {a.photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={getImageUrl(a.photo_url)}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-lg" aria-hidden="true">
+                {taxonEmoji(a.taxon)}
+              </span>
+            )}
+          </div>
+          {/* Name + scientific */}
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-theme-primary truncate">
+              {displayName(a)}
+            </p>
+            {a.scientific_name && (
+              <p className="text-sm text-theme-tertiary italic truncate">
+                {a.scientific_name}
+              </p>
+            )}
+            {lifeStageMeta(a) && (
+              <p className="text-xs text-theme-tertiary truncate">
+                {lifeStageMeta(a)}
+              </p>
+            )}
+          </div>
+          {/* Status pill */}
+          <StatusPill
+            animal={a}
+            onResume={handleResume}
+            resuming={resumingId === a.id}
+          />
+        </label>
+      </li>
+    )
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -443,6 +563,21 @@ export default function FeedingDayPage() {
               </button>
             )
           })}
+          {hasLocations && (
+            <button
+              type="button"
+              onClick={toggleGroupByLoc}
+              role="switch"
+              aria-checked={groupByLoc}
+              className={`px-4 py-2 rounded-full text-sm font-medium border transition ${
+                groupByLoc
+                  ? 'bg-gradient-brand text-white border-transparent shadow-gradient-brand'
+                  : 'bg-surface text-theme-primary border-theme hover:bg-surface-elevated'
+              }`}
+            >
+              📍 By location
+            </button>
+          )}
         </div>
 
         {/* Select-all + selected count */}
@@ -480,65 +615,18 @@ export default function FeedingDayPage() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {shownAnimals.map((a) => {
-              const selected = selectedIds.has(a.id)
-              return (
-                <li key={a.id}>
-                  <label
-                    className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${
-                      selected
-                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                        : 'border-theme bg-surface hover:bg-surface-elevated'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => toggleOne(a.id)}
-                      className="w-4 h-4 rounded border-theme accent-purple-600 flex-shrink-0"
-                      aria-label={`Select ${displayName(a)}`}
-                    />
-                    {/* Thumbnail or emoji */}
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface-elevated flex items-center justify-center flex-shrink-0">
-                      {a.photo_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={getImageUrl(a.photo_url)}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-lg" aria-hidden="true">
-                          {taxonEmoji(a.taxon)}
-                        </span>
-                      )}
-                    </div>
-                    {/* Name + scientific */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-theme-primary truncate">
-                        {displayName(a)}
-                      </p>
-                      {a.scientific_name && (
-                        <p className="text-sm text-theme-tertiary italic truncate">
-                          {a.scientific_name}
-                        </p>
-                      )}
-                      {lifeStageMeta(a) && (
-                        <p className="text-xs text-theme-tertiary truncate">
-                          {lifeStageMeta(a)}
-                        </p>
-                      )}
-                    </div>
-                    {/* Status pill */}
-                    <StatusPill
-                      animal={a}
-                      onResume={handleResume}
-                      resuming={resumingId === a.id}
-                    />
-                  </label>
+            {!groupByLoc && shownAnimals.map(renderAnimal)}
+            {groupByLoc &&
+              groupByLocation<FeedingStatus>(shownAnimals, (a) => a.location).map((g) => (
+                <li key={g.key}>
+                  <h2 className="flex items-center gap-2 px-1 pt-4 pb-2 text-xs font-bold uppercase tracking-wide text-theme-secondary">
+                    <span aria-hidden>{g.key === UNASSIGNED_KEY ? '∅' : '📍'}</span>
+                    <span className="flex-1 truncate">{g.label}</span>
+                    <span className="tabular-nums text-theme-tertiary">{g.rows.length}</span>
+                  </h2>
+                  <ul className="space-y-2">{g.rows.map(renderAnimal)}</ul>
                 </li>
-              )
-            })}
+              ))}
           </ul>
         )}
       </div>
@@ -624,6 +712,18 @@ export default function FeedingDayPage() {
                 </div>
               </div>
 
+              {/* Set location for the selection — the bulk path that makes
+                  locations usable on a big collection. */}
+              <button
+                type="button"
+                onClick={() => setLocDialogOpen(true)}
+                disabled={locBusy || submitting}
+                title="Set location for the selected animals"
+                className="px-4 py-3 rounded-xl border border-theme bg-surface text-theme-primary font-medium hover:bg-surface-elevated transition disabled:opacity-50 flex-shrink-0"
+              >
+                📍 Set location
+              </button>
+
               {/* Submit */}
               <button
                 type="button"
@@ -662,6 +762,18 @@ export default function FeedingDayPage() {
           </div>
         </div>
       )}
+
+      <PremiumIntroCard open={introOpen} token={token} onClose={() => setIntroOpen(false)} />
+
+      <LocationDialog
+        open={locDialogOpen}
+        token={token}
+        title={`Set location for ${selectedCount} animal${selectedCount === 1 ? '' : 's'}`}
+        locations={locations}
+        confirmLabel="Apply"
+        onClose={() => setLocDialogOpen(false)}
+        onPick={applyLocation}
+      />
     </DashboardLayout>
   )
 }
