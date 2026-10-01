@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct
 from app.database import get_db
 from app.models.user import User
+from app.utils.test_accounts import real_user_clause, test_user_clause, is_test_account
 from app.models.species import Species
 from app.models.invert_species import InvertSpecies
 from app.models.invert import Invert
@@ -35,7 +36,10 @@ async def get_admin_stats(
     Get platform statistics for admin dashboard
     """
     # Total users
-    total_users = db.query(func.count(User.id)).scalar() or 0
+    # Real keepers only: Google Play's pre-launch robots are counted separately
+    # (utils/test_accounts.py) so signups aren't inflated by every Android upload.
+    total_users = db.query(func.count(User.id)).filter(real_user_clause()).scalar() or 0
+    test_accounts = db.query(func.count(User.id)).filter(test_user_clause()).scalar() or 0
 
     # Total species across ALL taxa — count the unified `invert_species` catalog,
     # not the legacy tarantula-only `species` table (which omits scorpions,
@@ -100,6 +104,7 @@ async def get_admin_stats(
 
     return {
         "total_users": total_users,
+        "test_accounts": test_accounts,
         "total_species": total_species,
         "species_by_taxon": species_by_taxon,
         "premium_users": premium_users,
@@ -275,6 +280,7 @@ async def list_users(
         user_dict['colony_count'] = colony_n
         # The "is this account actually empty?" number.
         user_dict['collection_count'] = invert_n + animal_n + colony_n
+        user_dict['is_test_account'] = is_test_account(user.email)
         result.append(user_dict)
 
     return result

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from app.database import get_db
 from app.models.user import User
+from app.utils.test_accounts import real_user_clause
 from app.models.tarantula import Tarantula
 from app.models.species import Species
 from app.models.forum import ForumThread, ForumCategory, ForumPost
@@ -163,7 +164,7 @@ async def get_discover_feed(db: Session = Depends(get_db)):
     # ============================================================
     # 5. PLATFORM STATS
     # ============================================================
-    total_keepers = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
+    total_keepers = db.query(func.count(User.id)).filter(User.is_active == True, real_user_clause()).scalar() or 0
     total_tarantulas = db.query(func.count(Tarantula.id)).scalar() or 0
     total_species = db.query(func.count(Species.id)).filter(Species.is_verified == True).scalar() or 0
     total_forum_threads = db.query(func.count(ForumThread.id)).scalar() or 0

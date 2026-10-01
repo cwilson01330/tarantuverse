@@ -8,6 +8,7 @@ from sqlalchemy import or_
 from typing import Optional
 from app.database import get_db
 from app.models.user import User
+from app.utils.test_accounts import real_user_clause
 from app.models.tarantula import Tarantula
 from app.models.species import Species
 from app.models.forum import ForumThread
@@ -104,6 +105,7 @@ async def global_search(
     if not type or type == "keepers":
         keepers = db.query(User).filter(
             User.is_active == True,
+            real_user_clause(),
             or_(
                 User.username.ilike(search_term),
                 User.display_name.ilike(search_term),

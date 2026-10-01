@@ -16,6 +16,7 @@ from typing import Literal
 
 from app.database import get_db
 from app.models.user import User
+from app.utils.test_accounts import real_user_clause
 from app.models.tarantula import Tarantula
 from app.models.invert import Invert
 from app.models.animal import Animal
@@ -96,7 +97,7 @@ async def get_analytics_overview(
     thirty_days_ago = now - timedelta(days=30)
 
     # User counts
-    total_users = db.query(func.count(User.id)).scalar() or 0
+    total_users = db.query(func.count(User.id)).filter(real_user_clause()).scalar() or 0
 
     # Active users (users with activity feed entries)
     active_users_today = db.query(func.count(distinct(ActivityFeed.user_id))).filter(
@@ -113,20 +114,24 @@ async def get_analytics_overview(
 
     # New users
     new_users_today = db.query(func.count(User.id)).filter(
+        real_user_clause(),
         User.created_at >= today_start
     ).scalar() or 0
 
     new_users_7d = db.query(func.count(User.id)).filter(
+        real_user_clause(),
         User.created_at >= seven_days_ago
     ).scalar() or 0
 
     new_users_30d = db.query(func.count(User.id)).filter(
+        real_user_clause(),
         User.created_at >= thirty_days_ago
     ).scalar() or 0
 
     # Previous 30 days for growth rate
     sixty_days_ago = now - timedelta(days=60)
     new_users_prev_30d = db.query(func.count(User.id)).filter(
+        real_user_clause(),
         and_(
             User.created_at >= sixty_days_ago,
             User.created_at < thirty_days_ago
@@ -347,6 +352,7 @@ async def get_user_analytics(
         func.date_trunc('day', User.created_at).label('date'),
         func.count(User.id).label('count')
     ).filter(
+        real_user_clause(),
         User.created_at >= start_date,
         User.created_at < end_date
     ).group_by(
@@ -356,6 +362,7 @@ async def get_user_analytics(
     # Build time series with cumulative count
     time_series = []
     base_count = db.query(func.count(User.id)).filter(
+        real_user_clause(),
         User.created_at < start_date
     ).scalar() or 0
     cumulative = base_count
@@ -385,6 +392,8 @@ async def get_user_analytics(
     oauth_counts = db.query(
         func.coalesce(User.oauth_provider, 'email').label('provider'),
         func.count(User.id).label('count')
+    ).filter(
+        real_user_clause()
     ).group_by(
         func.coalesce(User.oauth_provider, 'email')
     ).all()
@@ -406,6 +415,7 @@ async def get_user_analytics(
         cohort_end = (cohort_start + timedelta(days=32)).replace(day=1)
 
         cohort_users = db.query(User.id).filter(
+            real_user_clause(),
             User.created_at >= cohort_start,
             User.created_at < cohort_end
         ).all()
@@ -445,11 +455,13 @@ async def get_user_analytics(
 
     # Summary stats
     total_new_users = db.query(func.count(User.id)).filter(
+        real_user_clause(),
         User.created_at >= start_date,
         User.created_at < end_date
     ).scalar() or 0
 
     prev_new_users = db.query(func.count(User.id)).filter(
+        real_user_clause(),
         User.created_at >= prev_start,
         User.created_at < prev_end
     ).scalar() or 0
@@ -579,7 +591,7 @@ async def get_revenue_analytics(
         churn_rate = (total_cancellations / total_active) * 100
 
     # Conversion rate
-    total_users = db.query(func.count(User.id)).scalar() or 0
+    total_users = db.query(func.count(User.id)).filter(real_user_clause()).scalar() or 0
     conversion_rate = 0.0
     if total_users > 0:
         conversion_rate = (total_active / total_users) * 100
@@ -694,7 +706,7 @@ async def get_activity_analytics(
         MoltLog.molted_at < end_date
     ).scalar() or 0
 
-    user_count = db.query(func.count(User.id)).scalar() or 1
+    user_count = db.query(func.count(User.id)).filter(real_user_clause()).scalar() or 1
     average_collection_size = total_tarantulas / user_count
 
     return ActivityAnalyticsResponse(

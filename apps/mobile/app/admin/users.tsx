@@ -25,6 +25,7 @@ interface AdminUser {
   is_superuser: boolean;
   is_verified: boolean;
   is_premium: boolean;
+  is_test_account?: boolean;  // Google Play pre-launch robot; not counted
   created_at: string;
 }
 
@@ -262,6 +263,13 @@ export default function AdminUsersScreen() {
                 <View style={[styles.badge, { backgroundColor: '#fef3c7' }]}>
                   <MaterialCommunityIcons name="crown" size={12} color="#b45309" />
                   <Text style={[styles.badgeText, { color: '#b45309' }]}>Premium</Text>
+                </View>
+              )}
+
+              {user.is_test_account && (
+                <View style={[styles.badge, { backgroundColor: colors.border }]}>
+                  <MaterialCommunityIcons name="robot-outline" size={12} color={colors.textSecondary} />
+                  <Text style={[styles.badgeText, { color: colors.textSecondary }]}>Test account</Text>
                 </View>
               )}
 

@@ -17,6 +17,8 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 
 interface AdminStats {
   total_users: number;
+  // Google Play pre-launch robots, excluded from total_users.
+  test_accounts?: number;
   total_species: number;
   species_by_taxon?: Record<string, number>;
   premium_users: number;
@@ -51,7 +53,7 @@ export default function AdminIndexScreen() {
   };
 
   const statCards = stats ? [
-    { label: 'Total Users', value: stats.total_users, icon: 'account-group', color: '#6366f1' },
+    { label: 'Keepers', value: stats.total_users, icon: 'account-group', color: '#6366f1' },
     { label: 'Total Species', value: stats.total_species, icon: 'spider', color: '#8b5cf6' },
     { label: 'Premium Users', value: stats.premium_users, icon: 'crown', color: '#f59e0b' },
     { label: 'Pending Reports', value: stats.pending_reports, icon: 'flag', color: '#ef4444' },
@@ -120,6 +122,11 @@ export default function AdminIndexScreen() {
               </View>
               <Text style={[styles.statValue, { color: colors.textPrimary }]}>{card.value.toLocaleString()}</Text>
               <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{card.label}</Text>
+              {card.label === 'Keepers' && (stats?.test_accounts ?? 0) > 0 && (
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>
+                  {stats?.test_accounts} test accounts not counted
+                </Text>
+              )}
             </View>
           ))}
         </View>

@@ -10,6 +10,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface AdminStats {
   total_users: number;
+  // Google Play pre-launch robots, excluded from total_users.
+  test_accounts?: number;
   total_species: number;
   species_by_taxon?: Record<string, number>;
   premium_users: number;
@@ -292,8 +294,13 @@ export default function AdminDashboard() {
                 </div>
               )}
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Total Users
+                Keepers
               </div>
+              {(stats?.test_accounts ?? 0) > 0 && (
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {stats?.test_accounts} test accounts not counted
+                </div>
+              )}
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               {statsLoading ? (

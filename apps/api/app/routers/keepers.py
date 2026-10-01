@@ -7,6 +7,7 @@ from sqlalchemy import or_, and_
 from typing import List, Optional
 from app.database import get_db
 from app.models.user import User
+from app.utils.test_accounts import real_user_clause
 from app.models.tarantula import Tarantula
 from app.schemas.user import UserResponse
 from app.schemas.tarantula import TarantulaResponse
@@ -34,7 +35,7 @@ async def list_public_keepers(
     - **offset**: For pagination
     """
     # Base query - only public keepers
-    query = db.query(User).filter(User.collection_visibility == 'public')
+    query = db.query(User).filter(User.collection_visibility == 'public', real_user_clause())
     
     # Apply filters
     if experience_level:

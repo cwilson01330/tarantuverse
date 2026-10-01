@@ -437,6 +437,8 @@
   - `robots.ts` must keep `/api/og/`, `/api/card-link/` and `/c/` allowed or previews go blank. `/c/` is excluded from PostHog and Vercel Analytics (the code is the access).
   - Mobile: TV `app/share/*` + HV `app/share/*` use expo-sharing / expo-media-library (native — shipped in runtimeVersion TV 1.1.0 / HV 1.2.0; OTA can't reach older binaries).
 
+- **Test accounts (2026-09-30)**: every Android upload makes Google Play's pre-launch report sign in with robot accounts on `@cloudtestlabaccounts.com`. `utils/test_accounts.py::real_user_clause()` excludes them from every admin user count (admin stats, admin analytics incl. growth/cohorts/OAuth split) and from public keeper listings (directory, search, discover totals). The admin user list still shows them, tagged `is_test_account`; admin stats return `test_accounts`. Never block the domain at signup — the pre-launch report needs to sign in. New counting/listing queries must use the clause (`tests/test_test_accounts.py` checks the routers).
+
 - **Password & Secret Management**:
   - Password complexity validator (uppercase, lowercase, digit, special char)
   - Dev secret detection — refuses to start in production with default key

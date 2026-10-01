@@ -38,6 +38,7 @@ interface User {
     animal_count?: number;      // Herpetoverse
     colony_count?: number;      // population-tracked colonies
     collection_count?: number;  // inverts + animals + colonies
+    is_test_account?: boolean;  // Google Play pre-launch robot; not counted anywhere
     created_at: string;
 }
 
@@ -731,6 +732,14 @@ export default function ManageUsersPage() {
                                                     <>Free</>
                                                 )}
                                             </span>
+                                            {user.is_test_account && (
+                                                <span
+                                                    className="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded-full leading-none bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                                    title="Google Play pre-launch test account. Not counted in signups."
+                                                >
+                                                    Test account
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 text-sm font-medium tabular-nums">
                                             {/* Total across ALL surfaces — an HV-only or colony-only
