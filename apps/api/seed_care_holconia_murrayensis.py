@@ -49,10 +49,7 @@ SPECIES = dict(
     common_names=["Murray's Banded Huntsman", "Murray Banded Huntsman"],
     genus="Holconia", family="Sparassidae", order_name="Araneae",
     care_level="intermediate",
-    temperament=(
-        "calmer and more deliberate than most hobby huntsmen, but still very fast "
-        "when startled; bite mechanically painful, not medically significant"
-    ),
+    temperament="calmer than most huntsmen but very fast when startled; painful, harmless bite",
     native_region="semi-arid south-eastern Australia (South Australia, Victoria, New South Wales)",
     adult_size="up to ~6.7 in (170 mm) leg span",
     type="arboreal (huntsman)",
@@ -62,10 +59,7 @@ SPECIES = dict(
     # humidity_min / humidity_max deliberately NULL — see module docstring.
     enclosure_size_sling="ventilated vial about 4-5 in tall and 2 in wide",
     enclosure_size_juvenile="ventilated container taller than wide, cork bark to grip and hide behind",
-    enclosure_size_adult=(
-        "tall, well-ventilated enclosure (taller than wide) with cork bark slabs; "
-        "enough height to hang and molt"
-    ),
+    enclosure_size_adult="tall, well-ventilated enclosure with cork bark slabs and room to molt",
     substrate_depth="thin layer (no deep substrate needed)",
     substrate_type="dry coco fiber or soil; vertical cork bark; strong ventilation",
     prey_size="no larger than about 1/3 of the spider — crickets, roaches, moths, flies",
@@ -92,7 +86,17 @@ SPECIES = dict(
 )
 
 
+def _check_lengths():
+    """Fail before touching the database if any text is longer than its column."""
+    cols = InvertSpecies.__table__.columns
+    for key, value in SPECIES.items():
+        limit = getattr(cols[key].type, "length", None) if key in cols else None
+        if limit and isinstance(value, str) and len(value) > limit:
+            raise SystemExit(f"{key} is {len(value)} characters; the column allows {limit}")
+
+
 def seed():
+    _check_lengths()
     db = SessionLocal()
     try:
         name = SPECIES["scientific_name"]
