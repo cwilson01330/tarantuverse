@@ -4,6 +4,8 @@ Last store releases: Tarantuverse 1.7 (2026-07-13), Herpetoverse 1.0 (2026-08-09
 Notes cover everything since then. App Store "What's New" allows 4,000 characters;
 Google Play release notes allow **500 per language**, so Play gets the short versions.
 
+> **App Store copy must never mention Android, Google Play or any other platform** (Guideline 2.3.10). TV 1.8.0 was rejected on 2026-10-01 for "delete on Android" in What's New. Keep platform-specific wording in the Play notes only.
+
 ---
 
 ## Tarantuverse 1.8.0
@@ -37,7 +39,7 @@ Photos
 Location and camera details are now removed from every photo you upload. The free plan includes up to 5 photos per animal; Premium is unlimited.
 
 Fixes
-Dates showing a day early, delete on Android, unreadable registration errors, and many smaller fixes.
+Dates showing a day early, delete not responding on some devices, unreadable registration errors, and many smaller fixes.
 ```
 
 ### Google Play — Release notes (≤500 characters)
