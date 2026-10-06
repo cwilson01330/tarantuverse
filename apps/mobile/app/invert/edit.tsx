@@ -141,7 +141,8 @@ export default function EditInvertScreen() {
           {!meta?.freeform && (
             <Field label="Species">
               <InvertSpeciesPicker taxon={form.taxon} valueId={form.species_id} valueScientific={form.scientific_name ?? ''}
-                onChange={(picked) => { update('species_id', picked?.id ?? null); if (picked) { update('scientific_name', picked.scientific_name); if (!form.common_name && picked.common_names?.[0]) update('common_name', picked.common_names[0]); } }} />
+                onChange={(picked) => { update('species_id', picked?.id ?? null); if (picked) { update('scientific_name', picked.scientific_name); if (!form.common_name && picked.common_names?.[0]) update('common_name', picked.common_names[0]); } }}
+                onTextChange={(text) => update('scientific_name', text)} />
             </Field>
           )}
           <Field label="Nickname"><TextInput style={styles.input} value={form.name ?? ''} onChangeText={(t) => update('name', t)} autoCapitalize="words" /></Field>

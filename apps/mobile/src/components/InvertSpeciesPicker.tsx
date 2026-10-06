@@ -4,7 +4,11 @@
  * Taxon-aware debounced autocomplete used by the generic add/edit forms.
  * Scopes the search to the taxon's catalog via searchInvertSpecies(taxon, q).
  * Shows a care-level pill (honest across all taxa, including harmless ones).
- * Free-typing still works — onChange(null) keeps the typed scientific_name.
+ * Free-typing works: every keystroke is reported through `onTextChange`, so a
+ * species that isn't in the catalog yet can still be saved as typed. (Before
+ * 2026-10-05 the typed text never left this component, so a non-catalog name
+ * silently kept the OLD species on save.) Picking a row reports it through
+ * `onChange`; typing over a picked row reports `onChange(null)` first.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -30,6 +34,8 @@ interface Props {
   valueId: string | null;
   valueScientific: string;
   onChange: (picked: InvertSpecies | null) => void;
+  /** Every keystroke — the caller stores it as the scientific name. */
+  onTextChange?: (text: string) => void;
   placeholder?: string;
 }
 
@@ -50,12 +56,14 @@ function careColor(level: CareLevel | null | undefined) {
   }
 }
 
-export function InvertSpeciesPicker({ taxon, valueId, valueScientific, onChange, placeholder = 'Search species…' }: Props) {
+export function InvertSpeciesPicker({ taxon, valueId, valueScientific, onChange, onTextChange, placeholder = 'Search species…' }: Props) {
   const { colors } = useTheme();
   const [query, setQuery] = useState(valueScientific);
   const [results, setResults] = useState<InvertSpecies[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  // The last search came back empty for this text — say it'll be saved as typed.
+  const [noMatch, setNoMatch] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -65,7 +73,9 @@ export function InvertSpeciesPicker({ taxon, valueId, valueScientific, onChange,
   const handleChangeText = (text: string) => {
     setQuery(text);
     setOpen(true);
+    setNoMatch(false);
     if (valueId) onChange(null);
+    onTextChange?.(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (text.trim().length === 0) {
       setResults([]);
@@ -77,6 +87,7 @@ export function InvertSpeciesPicker({ taxon, valueId, valueScientific, onChange,
       try {
         const rows = await searchInvertSpecies(taxon, text.trim(), 8);
         setResults(rows);
+        setNoMatch(rows.length === 0);
       } catch {
         setResults([]);
       } finally {
@@ -90,6 +101,7 @@ export function InvertSpeciesPicker({ taxon, valueId, valueScientific, onChange,
     setQuery(row.scientific_name);
     setOpen(false);
     setResults([]);
+    setNoMatch(false);
   };
 
   const styles = makeStyles(colors);
@@ -138,6 +150,11 @@ export function InvertSpeciesPicker({ taxon, valueId, valueScientific, onChange,
           )}
         </View>
       )}
+      {noMatch && !valueId && query.trim().length > 0 && (
+        <Text style={[styles.resultCommon, styles.hint]} accessibilityLiveRegion="polite">
+          Not in our species list yet. It will be saved as you typed it.
+        </Text>
+      )}
     </View>
   );
 }
@@ -153,4 +170,5 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     resultCommon: { fontSize: 12, color: colors.textSecondary },
     pill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
     pillText: { fontSize: 11, fontWeight: '600' },
+    hint: { marginTop: 6 },
   });

@@ -244,9 +244,12 @@ export default function AddColonyScreen() {
                 taxon={taxon}
                 valueId={speciesId}
                 valueScientific={scientificName}
+                onTextChange={setScientificName}
                 onChange={(picked) => {
                   setSpeciesId(picked?.id ?? null);
-                  setScientificName(picked ? picked.scientific_name : '');
+                  // Typing over a picked species reports null — keep the typed
+                  // text (onTextChange already stored it) rather than blanking it.
+                  if (picked) setScientificName(picked.scientific_name);
                 }}
               />
               <Text style={styles.hint}>Optional — links to the care sheet.</Text>
