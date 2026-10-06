@@ -117,14 +117,27 @@ function Label({ p, scale, width }: { p: CardPayload; scale: number; width: numb
   )
 }
 
+const sidePad = (shape: Shape) => (shape === 'wide' ? 36 : 48)
+const TALL_PAD = 56
+
+/** The photo's drawn size. Exported so the renderer can crop to it exactly. */
+export function specimenPhotoSize(shape: Shape): { w: number; h: number } {
+  const { width, height } = SHAPE_SIZE[shape]
+  if (shape === 'wide' || shape === 'square') {
+    const pad = sidePad(shape)
+    return { w: Math.round(width * (shape === 'wide' ? 0.46 : 0.5)) - pad, h: height - pad * 2 }
+  }
+  return { w: width - TALL_PAD * 2, h: Math.round(height * (shape === 'story' ? 0.56 : 0.5)) }
+}
+
 export function SpecimenCard({ p, shape }: { p: CardPayload; shape: Shape }) {
   const { width, height } = SHAPE_SIZE[shape]
   const wordmark = (
     <div style={{ fontSize: shape === 'wide' ? 22 : 28, color: INK_SOFT }}>{p.app}</div>
   )
   if (shape === 'wide' || shape === 'square') {
-    const pad = shape === 'wide' ? 36 : 48
-    const photoW = Math.round(width * (shape === 'wide' ? 0.46 : 0.5)) - pad
+    const pad = sidePad(shape)
+    const photoW = specimenPhotoSize(shape).w
     const labelW = width - photoW - pad * 3
     return (
       <div style={{ width, height, background: PAPER, display: 'flex', padding: pad, fontFamily: 'Caslon' }}>
@@ -136,8 +149,8 @@ export function SpecimenCard({ p, shape }: { p: CardPayload; shape: Shape }) {
       </div>
     )
   }
-  const pad = 56
-  const photoH = Math.round(height * (shape === 'story' ? 0.56 : 0.5))
+  const pad = TALL_PAD
+  const photoH = specimenPhotoSize(shape).h
   return (
     <div style={{ width, height, background: PAPER, display: 'flex', flexDirection: 'column', padding: pad, fontFamily: 'Caslon' }}>
       <Photo url={p.photo_url} taxon={p.taxon} w={width - pad * 2} h={photoH} />

@@ -18,7 +18,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.card_link import CardLink
 from app.models.user import User
-from app.schemas.share_card import CardLinkItem, ShareCardCreate, ShareCardCreated
+from app.schemas.share_card import CardLinkItem, ShareCardCreate, ShareCardCreated, SharePhotoItem
 from app.services.share_card import (
     CardSubject,
     MoltFacts,
@@ -124,6 +124,36 @@ def _load_molt(db: Session, animal_id: UUID, molt_id: UUID) -> MoltFacts:
     )
 
 
+def _photo_parent_column(app: str):
+    from app.models.photo import Photo
+    return Photo.invert_id if app == "tarantuverse" else Photo.animal_id
+
+
+def _load_photo_url(db: Session, app: str, animal_id, photo_id) -> Optional[str]:
+    """The URL of one of THIS animal's photos, or None. A photo id that
+    belongs to another animal is treated exactly like one that doesn't exist."""
+    from app.models.photo import Photo
+
+    row = (
+        db.query(Photo.url)
+        .filter(Photo.id == photo_id, _photo_parent_column(app) == animal_id)
+        .first()
+    )
+    return row[0] if row else None
+
+
+def _list_photos(db: Session, app: str, animal_id) -> list:
+    from app.models.photo import Photo
+
+    return (
+        db.query(Photo)
+        .filter(_photo_parent_column(app) == animal_id)
+        .order_by(Photo.created_at.desc())
+        .limit(60)
+        .all()
+    )
+
+
 def _animal_exists(db: Session, app: str, animal_id) -> bool:
     if app == "tarantuverse":
         from app.models.invert import Invert
@@ -154,11 +184,17 @@ async def create_share_card(
     # Keeper role or owner (spec §4.1). 404 for anyone else.
     _animal, owner, subject = _load_subject(db, current_user, body.app, body.animal_id, "keeper")
     molt = _load_molt(db, body.animal_id, body.molt_id) if body.kind == "molt" else None
+    if body.photo_id is not None:
+        chosen = _load_photo_url(db, body.app, body.animal_id, body.photo_id)
+        if chosen is None:
+            raise HTTPException(status_code=404, detail="Photo not found")
+        subject.photo_url = chosen
 
     token = sign_render_token({
         "app": body.app, "kind": body.kind, "animal_id": str(body.animal_id),
         "molt_id": str(body.molt_id) if body.molt_id else None,
         "fields": fields, "shape": body.shape, "frame": body.frame,
+        "photo_id": str(body.photo_id) if body.photo_id else None,
     })
     image_url = f"{settings.CARD_RENDERER_ORIGIN.rstrip('/')}/api/card/{token}"
 
@@ -195,6 +231,22 @@ async def get_share_defaults(
         raise HTTPException(status_code=422, detail=str(e))
 
 
+@router.get("/share-cards/photos", response_model=List[SharePhotoItem])
+async def list_share_photos(
+    app: str = Query(..., pattern="^(tarantuverse|herpetoverse)$"),
+    animal_id: UUID = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """The animal's photos for the composer's photo picker. Same role rule as
+    sharing itself (keeper or owner; 404 for anyone else)."""
+    _animal, _owner, subject = _load_subject(db, current_user, app, animal_id, "keeper")
+    return [
+        SharePhotoItem(id=p.id, url=p.url, thumbnail_url=p.thumbnail_url, is_main=p.url == subject.photo_url)
+        for p in _list_photos(db, app, animal_id)
+    ]
+
+
 @router.get("/share-cards/{token}/data")
 async def share_card_data(token: str, response: Response, db: Session = Depends(get_db)):
     """Called by the renderer. The token is the only credential.
@@ -206,6 +258,11 @@ async def share_card_data(token: str, response: Response, db: Session = Depends(
     # No login here: the token proved the sharer's right when it was issued.
     app, animal_id = claims["app"], UUID(claims["animal_id"])
     _animal, _owner, subject = _load_subject_unchecked(db, app, animal_id)
+    if claims.get("photo_id"):
+        # Deleted since the token was minted: fall back to the main photo.
+        chosen = _load_photo_url(db, app, animal_id, UUID(claims["photo_id"]))
+        if chosen:
+            subject.photo_url = chosen
     molt = _load_molt(db, animal_id, UUID(claims["molt_id"])) if claims.get("molt_id") else None
     card = compose_card(claims["kind"], subject, claims["fields"], molt=molt)
     card["shape"] = claims["shape"]

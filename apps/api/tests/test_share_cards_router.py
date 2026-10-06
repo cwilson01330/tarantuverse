@@ -423,3 +423,101 @@ def test_old_card_links_render_as_specimen():
     out = create(OWNER, db, link=True, fields=["name"])
     db.links[out.code].payload.pop("frame")
     assert run(sc.get_card_link(out.code, response=Response(), db=db))["frame"] == "specimen"
+
+
+# ── Photo picker ─────────────────────────────────────────────────────────────
+
+OTHER_PHOTO = "https://pub.example.r2.dev/photos/older-molt.jpg"
+
+
+@pytest.fixture
+def photos(monkeypatch):
+    """One extra photo that belongs to ANIMAL_ID; any other id is foreign."""
+    mine = uuid.uuid4()
+    store = {"deleted": False}
+
+    def load_photo_url(db, app, animal_id, photo_id):
+        if store["deleted"] or animal_id != ANIMAL_ID or photo_id != mine:
+            return None
+        return OTHER_PHOTO
+
+    monkeypatch.setattr(sc, "_load_photo_url", load_photo_url)
+    return NS(mine=mine, store=store)
+
+
+def _data(out, db):
+    return run(sc.share_card_data(out.image_url.rsplit("/", 1)[1], response=Response(), db=db))
+
+
+def test_chosen_photo_is_used_on_the_card(photos):
+    db = FakeDB()
+    out = create(OWNER, db, fields=["photo", "name"], photo_id=photos.mine)
+    assert _data(out, db)["photo_url"] == OTHER_PHOTO
+
+
+def test_no_photo_id_means_the_main_photo(photos):
+    db = FakeDB()
+    out = create(OWNER, db, fields=["photo", "name"])
+    assert _data(out, db)["photo_url"] == "https://pub.example.r2.dev/photos/x.jpg"
+
+
+def test_someone_elses_photo_is_404(photos):
+    with pytest.raises(HTTPException) as e:
+        create(OWNER, FakeDB(), fields=["photo"], photo_id=uuid.uuid4())
+    assert e.value.status_code == 404
+
+
+def test_deleted_photo_falls_back_to_main(photos):
+    db = FakeDB()
+    out = create(OWNER, db, fields=["photo"], photo_id=photos.mine)
+    photos.store["deleted"] = True
+    assert _data(out, db)["photo_url"] == "https://pub.example.r2.dev/photos/x.jpg"
+
+
+def test_chosen_photo_is_frozen_into_card_links(photos):
+    db = FakeDB()
+    out = create(OWNER, db, link=True, fields=["photo", "name"], photo_id=photos.mine)
+    photos.store["deleted"] = True
+    assert run(sc.get_card_link(out.code, response=Response(), db=db))["photo_url"] == OTHER_PHOTO
+
+
+def test_photo_left_off_ignores_the_choice(photos):
+    db = FakeDB()
+    out = create(OWNER, db, fields=["name"], photo_id=photos.mine)
+    assert _data(out, db)["photo_url"] is None
+
+
+def test_list_photos_flags_the_main_one(monkeypatch):
+    rows = [NS(id=uuid.uuid4(), url=OTHER_PHOTO, thumbnail_url=None),
+            NS(id=uuid.uuid4(), url="https://pub.example.r2.dev/photos/x.jpg", thumbnail_url="t")]
+    monkeypatch.setattr(sc, "_list_photos", lambda db, app, animal_id: rows)
+    out = run(sc.list_share_photos(app="tarantuverse", animal_id=ANIMAL_ID, db=FakeDB(), current_user=OWNER))
+    assert [p.is_main for p in out] == [False, True]
+
+
+def test_list_photos_needs_keeper_access():
+    with pytest.raises(HTTPException) as e:
+        run(sc.list_share_photos(app="tarantuverse", animal_id=ANIMAL_ID, db=FakeDB(), current_user=NS(id=uuid.uuid4())))
+    assert e.value.status_code == 404
+
+
+def test_photo_lookup_is_scoped_to_the_animal():
+    """The real query filters on BOTH the photo id and this animal's column."""
+    from sqlalchemy.dialects import postgresql
+
+    class Rec:
+        def __init__(self):
+            self.sql = []
+        def query(self, *a):
+            return self
+        def filter(self, *clauses):
+            self.sql += [str(c.compile(dialect=postgresql.dialect())) for c in clauses]
+            return self
+        def first(self):
+            return None
+
+    for app, col in (("tarantuverse", "photos.invert_id"), ("herpetoverse", "photos.animal_id")):
+        db = Rec()
+        assert sc._load_photo_url(db, app, ANIMAL_ID, uuid.uuid4()) is None
+        joined = " ".join(db.sql)
+        assert "photos.id" in joined and col in joined

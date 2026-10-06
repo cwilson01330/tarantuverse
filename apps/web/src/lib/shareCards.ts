@@ -24,6 +24,16 @@ export const FIELDS: Record<string, string[]> = {
   'herpetoverse:profile': ['photo', 'name', 'species', 'sex', 'in_care', 'weight', 'length', 'sheds'],
 }
 
+/** One of the animal's photos, for the composer's photo picker. */
+export interface SharePhoto { id: string; url: string; thumbnail_url: string | null; is_main: boolean }
+
+// The renderer returns a full-size PNG by default (older app builds rely on
+// that). The composer asks for a half-size JPEG preview (~50 KB instead of
+// ~3 MB) and a full-size JPEG to share.
+const withParams = (u: string, q: string) => `${u}${u.includes('?') ? '&' : '?'}${q}`
+export const previewImageUrl = (u: string) => withParams(u, 'size=preview&fmt=jpg')
+export const shareImageUrl = (u: string) => withParams(u, 'fmt=jpg')
+
 async function call<T>(token: string, path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${API_URL}/api/v1${path}`, {
     ...init,
@@ -43,9 +53,13 @@ export function getShareDefaults(token: string, app: CardApp, kind: CardKind) {
 }
 
 export function createShareCard(token: string, body: {
-  app: CardApp; animal_id: string; kind: CardKind; molt_id?: string; fields: string[]; shape: CardShape; frame: CardFrame; link: boolean; preview?: boolean
+  app: CardApp; animal_id: string; kind: CardKind; molt_id?: string; fields: string[]; shape: CardShape; frame: CardFrame; photo_id?: string | null; link: boolean; preview?: boolean
 }) {
   return call<{ image_url: string; card_link: string | null; code: string | null; fields: string[] }>(
     token, '/share-cards/', { method: 'POST', body: JSON.stringify(body) },
   )
+}
+
+export function listSharePhotos(token: string, app: CardApp, animalId: string) {
+  return call<SharePhoto[]>(token, `/share-cards/photos?app=${app}&animal_id=${encodeURIComponent(animalId)}`)
 }

@@ -86,21 +86,48 @@ function Rules({ width, height }: { width: number; height: number }) {
   )
 }
 
+// Blurred box-shadows cost ~600ms each in the renderer, so shadows here are
+// a few offset, faintly tinted layers instead. Visually near-identical at
+// card size; effectively free to draw.
 function Tape({ left, top, w, h }: { left: number; top: number; w: number; h: number }) {
+  const tape: CSSProperties = { position: 'absolute', left, top, width: w, height: h, display: 'flex', transform: 'rotate(-38deg)', transformOrigin: 'center' }
   return (
-    <div
-      style={{
-        position: 'absolute', left, top, width: w, height: h, background: TAPE, display: 'flex',
-        transform: 'rotate(-38deg)', transformOrigin: 'center', boxShadow: '0 3px 6px rgba(0,0,0,.12)',
-      }}
-    />
+    <>
+      <div style={{ ...tape, top: top + 3, background: 'rgba(0,0,0,.07)' }} />
+      <div style={{ ...tape, background: TAPE }} />
+    </>
+  )
+}
+
+/** Soft drop shadow under the mounted photo: stacked translucent layers,
+ *  each a little lower and wider, approximating a 27px blur. */
+function PhotoShadow({ box }: { box: Box }) {
+  const layers = [
+    { dy: 4, grow: 0, a: 0.06 },
+    { dy: 9, grow: 4, a: 0.05 },
+    { dy: 14, grow: 10, a: 0.035 },
+    { dy: 20, grow: 18, a: 0.025 },
+  ]
+  return (
+    <>
+      {layers.map((l, i) => (
+        <div
+          key={i}
+          style={{
+            position: 'absolute', display: 'flex', left: box.left - l.grow, top: box.top + l.dy - l.grow,
+            width: box.width + l.grow * 2, height: box.height + l.grow * 2, background: `rgba(40,30,10,${l.a})`,
+            borderRadius: l.grow, transform: 'rotate(-1.2deg)', transformOrigin: 'center',
+          }}
+        />
+      ))}
+    </>
   )
 }
 
 function MountedPhoto({ url, taxon, box }: { url: string | null; taxon: string; box: Box }) {
   const frame: CSSProperties = {
     position: 'absolute', left: box.left, top: box.top, width: box.width, height: box.height, display: 'flex',
-    transform: 'rotate(-1.2deg)', transformOrigin: 'center', boxShadow: '0 9px 27px rgba(40,30,10,.22)',
+    transform: 'rotate(-1.2deg)', transformOrigin: 'center',
   }
   if (url) {
     return (
@@ -129,23 +156,36 @@ function estimateBoxHeight(p: CardPayload, t: Layout['type'], nameSize: number, 
   return Math.ceil(h)
 }
 
+function nameSizeFor(p: CardPayload, L: Layout): number {
+  // Long names step down a size.
+  return p.name && p.name.length > 16 ? Math.round(L.type.name * (L.stacked ? 0.66 : 0.78)) : L.type.name
+}
+
+/** Where the mounted photo sits. Exported so the renderer can crop the photo
+ *  to exactly this size before drawing (much cheaper than letting the
+ *  renderer scale a full-size photo). */
+export function herbariumPhotoBox(p: CardPayload, shape: Shape): Box {
+  const { width, height } = SHAPE_SIZE[shape]
+  const L = LAYOUT[shape]
+  // Story/post: the box sits under the photo. The spec photo height is the
+  // most it gets; when the box runs taller (common name, a two-line name) the
+  // photo gives up the difference so the two never overlap.
+  let photoH = p.facts.length === 0 && L.photoNoFacts ? L.photoNoFacts : L.photo.height
+  if (!L.stacked) {
+    const boxH = estimateBoxHeight(p, L.type, nameSizeFor(p, L), width - L.box.left - L.box.right)
+    const room = height - L.box.bottom - boxH - 48 - L.photo.top
+    photoH = Math.max(360, Math.min(photoH, room))
+  }
+  return { ...L.photo, height: photoH }
+}
+
 export function HerbariumCard({ p, shape }: { p: CardPayload; shape: Shape }) {
   const { width, height } = SHAPE_SIZE[shape]
   const L = LAYOUT[shape]
   const t = L.type
   const hasFacts = p.facts.length > 0
-  // Long names step down a size.
-  const nameSize = p.name && p.name.length > 16 ? Math.round(t.name * (L.stacked ? 0.66 : 0.78)) : t.name
-  // Story/post: the box sits under the photo. The spec photo height is the
-  // most it gets; when the box runs taller (common name, a two-line name) the
-  // photo gives up the difference so the two never overlap.
-  let photoH = !hasFacts && L.photoNoFacts ? L.photoNoFacts : L.photo.height
-  if (!L.stacked) {
-    const boxH = estimateBoxHeight(p, t, nameSize, width - L.box.left - L.box.right)
-    const room = height - L.box.bottom - boxH - 48 - L.photo.top
-    photoH = Math.max(360, Math.min(photoH, room))
-  }
-  const photo = { ...L.photo, height: photoH }
+  const nameSize = nameSizeFor(p, L)
+  const photo = herbariumPhotoBox(p, shape)
   const boxStyle: CSSProperties = {
     position: 'absolute', left: L.box.left, right: L.box.right, bottom: L.box.bottom,
     ...(L.box.top !== undefined ? { top: L.box.top } : {}),
@@ -158,6 +198,7 @@ export function HerbariumCard({ p, shape }: { p: CardPayload; shape: Shape }) {
   return (
     <div style={{ width, height, background: GROUND, display: 'flex', position: 'relative', fontFamily: 'Caslon' }}>
       <Rules width={width} height={height} />
+      <PhotoShadow box={photo} />
       <MountedPhoto url={p.photo_url} taxon={p.taxon} box={photo} />
       <Tape left={photo.left + L.tape.a[0]} top={photo.top + L.tape.a[1]} w={L.tape.w} h={L.tape.h} />
       <Tape left={photo.left + photo.width + L.tape.b[0]} top={photo.top + photo.height + L.tape.b[1]} w={L.tape.w} h={L.tape.h} />

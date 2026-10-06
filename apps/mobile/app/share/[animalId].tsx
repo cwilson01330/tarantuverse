@@ -14,12 +14,20 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { TYPE } from '../../src/theme/tokens';
 import { FrameRow } from '../../src/components/share/FrameRow';
+import { PhotoStrip } from '../../src/components/share/PhotoStrip';
 import { AppHeader } from '../../src/components/AppHeader';
-import { CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, createShareCard, getShareDefaults } from '../../src/lib/share-cards';
+import {
+  CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, SharePhoto,
+  createShareCard, getShareDefaults, listSharePhotos, previewImageUrl, shareImageUrl,
+} from '../../src/lib/share-cards';
 
 const ASPECT: Record<CardShape, number> = { story: 1080 / 1920, post: 1080 / 1350, square: 1 };
 
-/** A card link made in this screen session, reusable while frame+fields+shape are unchanged. */
+// Preview tokens last 15 minutes; reuse a cached preview for a bit less.
+const PREVIEW_TTL_MS = 12 * 60 * 1000;
+const previewKey = (f: string[], s: CardShape, fr: CardFrame, ph: string | null) => `${[...f].sort().join(',')}|${s}|${fr}|${ph ?? 'main'}`;
+
+/** A card link made in this screen session, reusable while frame+fields+shape+photo are unchanged. */
 interface MadeLink { key: string; cardLink: string }
 
 export default function ShareCardScreen() {
@@ -35,6 +43,14 @@ export default function ShareCardScreen() {
   const [link, setLink] = useState(false);
   // The preview remembers its shape so a new shape never shows a stretched old image.
   const [preview, setPreview] = useState<{ uri: string; shape: CardShape } | null>(null);
+  const [photos, setPhotos] = useState<SharePhoto[]>([]);
+  // null = the animal's main photo.
+  const [photoId, setPhotoId] = useState<string | null>(null);
+  // Previews already drawn this session, so going back to a frame/shape/photo is instant.
+  const cache = useRef(new Map<string, { uri: string; at: number }>());
+  const prefetched = useRef<string | null>(null);
+  // The image actually on screen; re-selecting it fires no new load event.
+  const loadedUri = useRef<string | null>(null);
   // True from a change until the new image has actually loaded (the server takes a few seconds to draw it).
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<'save' | 'share' | null>(null);
@@ -55,29 +71,70 @@ export default function ShareCardScreen() {
   }, [kind]);
 
   useEffect(() => {
+    if (!animalId) return;
+    listSharePhotos(animalId).then(setPhotos).catch(() => setPhotos([]));
+  }, [animalId]);
+
+  const cached = (k: string) => {
+    const hit = cache.current.get(k);
+    return hit && Date.now() - hit.at < PREVIEW_TTL_MS ? hit.uri : null;
+  };
+  const requestPreview = async (f: string[], s: CardShape, fr: CardFrame, ph: string | null) => {
+    const r = await createShareCard({ animal_id: animalId, kind, molt_id: moltId, fields: f, shape: s, frame: fr, photo_id: ph, link: false, preview: true });
+    return previewImageUrl(r.image_url);
+  };
+
+  useEffect(() => {
     if (!fields || !animalId) return;
     if (timer.current) clearTimeout(timer.current);
     // Any change invalidates responses still in flight.
     const mine = ++reqId.current;
-    // Keep the old image on screen (dimmed) while the new one draws.
-    setLoading(true);
     if (fields.length === 0) {
       setPreview(null);
       setLoading(false);
       setError(null);
       return;
     }
+    const k = previewKey(fields, shape, frame, photoId);
+    const hit = cached(k);
+    setError(null);
+    // Keep the old image on screen (dimmed) while the new one draws.
+    setLoading(true);
+    if (hit) {
+      setPreview({ uri: hit, shape });
+      if (hit === loadedUri.current) setLoading(false);
+      return;
+    }
     timer.current = setTimeout(async () => {
       try {
-        setError(null);
-        const r = await createShareCard({ animal_id: animalId, kind, molt_id: moltId, fields, shape, frame, link: false, preview: true });
-        if (mine === reqId.current) setPreview({ uri: r.image_url, shape });
+        const uri = await requestPreview(fields, shape, frame, photoId);
+        cache.current.set(k, { uri, at: Date.now() });
+        if (mine === reqId.current) setPreview({ uri, shape });
       } catch {
         if (mine === reqId.current) { setPreview(null); setLoading(false); setError("Couldn't make the card. Try again."); }
       }
     }, 350);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [fields, shape, frame, animalId, kind, moltId]);
+  }, [fields, shape, frame, photoId, animalId, kind, moltId]);
+
+  /** Once the current preview is on screen, quietly draw the other two frames
+   *  so switching frame is instant. Runs once per fields/shape/photo combination. */
+  const prefetchOtherFrames = () => {
+    if (!fields || fields.length === 0) return;
+    const combo = previewKey(fields, shape, 'specimen', photoId);
+    if (prefetched.current === combo) return;
+    prefetched.current = combo;
+    const f = fields, s = shape, ph = photoId;
+    FRAMES.filter((x) => x.key !== frame).forEach(async ({ key: fr }) => {
+      const k = previewKey(f, s, fr, ph);
+      if (cached(k)) return;
+      try {
+        const uri = await requestPreview(f, s, fr, ph);
+        cache.current.set(k, { uri, at: Date.now() });
+        await Image.prefetch(uri);
+      } catch { /* best effort */ }
+    });
+  };
 
   useEffect(() => () => {
     reqId.current += 1;
@@ -92,7 +149,7 @@ export default function ShareCardScreen() {
     copyTimer.current = setTimeout(() => setCopied(false), 2000);
   };
 
-  const linkKey = (f: string[], s: CardShape, fr: CardFrame) => `${[...f].sort().join(',')}|${s}|${fr}`;
+  const linkKey = previewKey;
 
   const toggle = (f: string) => {
     madeLink.current = null;
@@ -101,15 +158,17 @@ export default function ShareCardScreen() {
   };
   const pickShape = (s: CardShape) => { madeLink.current = null; setShownLink(null); setShape(s); };
   const pickFrame = (f: CardFrame) => { madeLink.current = null; setShownLink(null); setFrame(f); };
+  const pickPhoto = (id: string | null) => { madeLink.current = null; setShownLink(null); setPhotoId(id); };
   const onLinkChange = (v: boolean) => { if (!v) { madeLink.current = null; setShownLink(null); } setLink(v); };
 
   const produce = async (): Promise<{ file: string; cardLink: string | null }> => {
-    const key = linkKey(fields!, shape, frame);
+    const key = linkKey(fields!, shape, frame, photoId);
     const reuse = link && madeLink.current?.key === key ? madeLink.current : null;
-    const r = await createShareCard({ animal_id: animalId!, kind, molt_id: moltId, fields: fields!, shape, frame, link: link && !reuse });
+    const r = await createShareCard({ animal_id: animalId!, kind, molt_id: moltId, fields: fields!, shape, frame, photo_id: photoId, link: link && !reuse });
     if (link && r.card_link) madeLink.current = { key, cardLink: r.card_link };
-    const file = `${FileSystem.cacheDirectory}share-card-${Date.now()}.png`;
-    const dl = await FileSystem.downloadAsync(r.image_url, file);
+    // Full-size JPEG: ~10x smaller than the PNG, indistinguishable on a feed.
+    const file = `${FileSystem.cacheDirectory}share-card-${Date.now()}.jpg`;
+    const dl = await FileSystem.downloadAsync(shareImageUrl(r.image_url), file);
     const ctype = Object.entries(dl.headers ?? {}).find(([k]) => k.toLowerCase() === 'content-type')?.[1];
     // Reject a non-image body (an error page); a missing header is allowed.
     if (dl.status !== 200 || (ctype != null && !String(ctype).toLowerCase().startsWith('image/'))) throw new Error('download');
@@ -122,7 +181,7 @@ export default function ShareCardScreen() {
     setBusy('share');
     try {
       const { file } = await produce();
-      await Sharing.shareAsync(file, { mimeType: 'image/png', dialogTitle: 'Share card', UTI: 'public.png' });
+      await Sharing.shareAsync(file, { mimeType: 'image/jpeg', dialogTitle: 'Share card', UTI: 'public.jpeg' });
     } catch {
       setError("Couldn't make the card. Try again.");
     } finally { setBusy(null); }
@@ -156,7 +215,7 @@ export default function ShareCardScreen() {
               <Image
                 source={{ uri: preview.uri }}
                 style={{ width: '100%', aspectRatio: ASPECT[preview.shape], borderRadius: layout.radius.sm, opacity: loading ? 0.45 : 1 }}
-                onLoadEnd={() => setLoading(false)}
+                onLoadEnd={() => { loadedUri.current = preview.uri; setLoading(false); prefetchOtherFrames(); }}
                 accessibilityLabel={loading ? 'Updating card preview' : 'Card preview'}
               />
               {loading ? <View style={styles.previewSpinner} pointerEvents="none"><ActivityIndicator color={colors.primary} size="large" /></View> : null}
@@ -169,6 +228,7 @@ export default function ShareCardScreen() {
           )}
         </View>
         <FrameRow value={frame} onChange={pickFrame} />
+        {photos.length > 1 && fields?.includes('photo') ? <PhotoStrip photos={photos} value={photoId} onChange={pickPhoto} /> : null}
         <View style={styles.chips} accessibilityRole="radiogroup">
           {(['story', 'post', 'square'] as CardShape[]).map((s) => {
             const on = s === shape;

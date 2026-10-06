@@ -104,30 +104,38 @@ function estimateTextHeight(p: CardPayload, shape: Shape, textW: number): number
   return Math.ceil(h)
 }
 
-export function FieldNotesCard({ p, shape }: { p: CardPayload; shape: Shape }) {
+/** The photo's drawn size. Exported so the renderer can crop to it exactly. */
+export function fieldNotesPhotoSize(p: CardPayload, shape: Shape): { w: number; h: number } {
   const { width, height } = SHAPE_SIZE[shape]
   if (shape === 'wide' || shape === 'square') {
     // Square departs from the handoff (600 wide): that left a 330px text
     // column and long names were clipped.
-    const photoW = shape === 'wide' ? 546 : 480
+    return { w: shape === 'wide' ? 546 : 480, h: height - PAD * 2 }
+  }
+  // No facts line: the photo takes the freed height. A long headline or
+  // facts line takes height back, so the text never runs into the wordmark.
+  const freed = p.notes.facts.length > 0 ? 0 : Math.round(TYPE[shape].facts * 1.15) + 12
+  const room = height - PAD * 2 - 42 - estimateTextHeight(p, shape, width - PAD * 2)
+  return { w: width - PAD * 2, h: Math.max(480, Math.min(PHOTO_H[shape] + freed, room)) }
+}
+
+export function FieldNotesCard({ p, shape }: { p: CardPayload; shape: Shape }) {
+  const { width, height } = SHAPE_SIZE[shape]
+  const ph = fieldNotesPhotoSize(p, shape)
+  if (shape === 'wide' || shape === 'square') {
+    const photoW = ph.w
     return (
       <div style={{ width, height, background: GROUND, display: 'flex', padding: PAD, fontFamily: 'Caslon' }}>
-        <Photo url={p.photo_url} taxon={p.taxon} w={photoW} h={height - PAD * 2} />
+        <Photo url={p.photo_url} taxon={p.taxon} w={photoW} h={ph.h} />
         <div style={{ display: 'flex', marginLeft: 42, width: width - PAD * 2 - photoW - 42 }}>
           <Text p={p} shape={shape} />
         </div>
       </div>
     )
   }
-  // No facts line: the photo takes the freed height. A long headline or
-  // facts line takes height back, so the text never runs into the wordmark.
-  const freed = p.notes.facts.length > 0 ? 0 : Math.round(TYPE[shape].facts * 1.15) + 12
-  const textW = width - PAD * 2
-  const room = height - PAD * 2 - 42 - estimateTextHeight(p, shape, textW)
-  const photoH = Math.max(480, Math.min(PHOTO_H[shape] + freed, room))
   return (
     <div style={{ width, height, background: GROUND, display: 'flex', flexDirection: 'column', padding: PAD, fontFamily: 'Caslon' }}>
-      <Photo url={p.photo_url} taxon={p.taxon} w={width - PAD * 2} h={photoH} />
+      <Photo url={p.photo_url} taxon={p.taxon} w={ph.w} h={ph.h} />
       <div style={{ display: 'flex', flexGrow: 1, marginTop: 42 }}>
         <Text p={p} shape={shape} />
       </div>

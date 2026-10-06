@@ -1,9 +1,10 @@
 import { ImageResponse } from 'next/og'
+import sharp from 'sharp'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { FieldNotesCard } from './FieldNotesCard'
-import { HerbariumCard } from './HerbariumCard'
-import { CardPayload, Frame, SHAPE_SIZE, Shape, SpecimenCard } from './SpecimenCard'
+import { FieldNotesCard, fieldNotesPhotoSize } from './FieldNotesCard'
+import { HerbariumCard, herbariumPhotoBox } from './HerbariumCard'
+import { CardPayload, Frame, SHAPE_SIZE, Shape, SpecimenCard, specimenPhotoSize } from './SpecimenCard'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -102,17 +103,51 @@ function sniffMime(b: Uint8Array): string | null {
 }
 
 /** One GET of our own; satori only ever sees a verified data URL. Anything
- *  unexpected returns null and the card falls back to the glyph block. */
-export async function loadPhoto(url: string | null): Promise<string | null> {
+ *  unexpected returns null and the card falls back to the glyph block.
+ *
+ *  With `fit`, the photo is cropped to exactly the pixels it will occupy on
+ *  the card before satori sees it. Letting the renderer decode and scale a
+ *  full-size phone photo was the slowest step of every card (~180ms+). */
+// A warm instance keeps the last few photos it fetched: a keeper flicking
+// between frames and fields re-renders the same photo many times, and the
+// download from storage was a quarter-second of every preview. Bounded by
+// entry count (photos are capped at MAX_PHOTO_BYTES).
+const PHOTO_CACHE = new Map<string, Uint8Array>()
+const PHOTO_CACHE_MAX = 6
+
+async function fetchPhotoBytes(url: string): Promise<Uint8Array | null> {
+  const hit = PHOTO_CACHE.get(url)
+  if (hit) {
+    PHOTO_CACHE.delete(url) // refresh recency
+    PHOTO_CACHE.set(url, hit)
+    return hit
+  }
+  const r = await fetch(url, { signal: AbortSignal.timeout(3000), redirect: 'error' })
+  if (!r.ok) return null
+  if (Number(r.headers.get('content-length') || 0) > MAX_PHOTO_BYTES) return null
+  const buf = new Uint8Array(await r.arrayBuffer())
+  if (buf.byteLength > MAX_PHOTO_BYTES) return null
+  PHOTO_CACHE.set(url, buf)
+  while (PHOTO_CACHE.size > PHOTO_CACHE_MAX) PHOTO_CACHE.delete(PHOTO_CACHE.keys().next().value as string)
+  return buf
+}
+
+export async function loadPhoto(url: string | null, fit?: { w: number; h: number }): Promise<string | null> {
   if (!url || !allowedPhotoUrl(url)) return null
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(3000), redirect: 'error' })
-    if (!r.ok) return null
-    if (Number(r.headers.get('content-length') || 0) > MAX_PHOTO_BYTES) return null
-    const buf = new Uint8Array(await r.arrayBuffer())
-    if (buf.byteLength > MAX_PHOTO_BYTES) return null
+    const buf = await fetchPhotoBytes(url)
+    if (!buf) return null
     const mime = sniffMime(buf)
-    return mime ? `data:${mime};base64,${Buffer.from(buf).toString('base64')}` : null
+    if (!mime) return null
+    if (fit) {
+      const out = await sharp(buf, { limitInputPixels: 50_000_000 })
+        .rotate()
+        .resize(Math.max(1, Math.round(fit.w)), Math.max(1, Math.round(fit.h)), { fit: 'cover', position: 'attention' })
+        .jpeg({ quality: 88 })
+        .toBuffer()
+      return `data:image/jpeg;base64,${out.toString('base64')}`
+    }
+    return `data:${mime};base64,${Buffer.from(buf).toString('base64')}`
   } catch {
     return null
   }
@@ -164,6 +199,16 @@ export function asFrame(v: unknown, hasNotes: boolean): Frame {
   return 'specimen'
 }
 
+/** The size the photo is drawn at for this frame and shape. */
+export function photoSizeFor(p: CardPayload, shape: Shape): { w: number; h: number } {
+  if (p.frame === 'herbarium') {
+    const b = herbariumPhotoBox(p, shape)
+    return { w: b.width, h: b.height }
+  }
+  if (p.frame === 'notes') return fieldNotesPhotoSize(p, shape)
+  return specimenPhotoSize(shape)
+}
+
 function CardFor({ p, shape }: { p: CardPayload; shape: Shape }) {
   if (p.frame === 'herbarium') return <HerbariumCard p={p} shape={shape} />
   if (p.frame === 'notes') return <FieldNotesCard p={p} shape={shape} />
@@ -173,26 +218,44 @@ function CardFor({ p, shape }: { p: CardPayload; shape: Shape }) {
 // Always send a finished PNG with an explicit Content-Length. Without it the
 // response goes out chunked, and Facebook's image processor rejects that as a
 // "corrupted image" even though the bytes are a valid PNG.
+function imageResponse(body: Uint8Array<ArrayBuffer>, type: string, headers: Record<string, string>): Response {
+  return new Response(body, { headers: { ...headers, 'Content-Type': type, 'Content-Length': String(body.byteLength) } })
+}
 function pngResponse(buf: ArrayBuffer, headers: Record<string, string>): Response {
-  return new Response(new Uint8Array(buf), {
-    headers: { ...headers, 'Content-Type': 'image/png', 'Content-Length': String(buf.byteLength) },
-  })
+  return imageResponse(new Uint8Array(buf), 'image/png', headers)
 }
 
-export async function renderCard(raw: unknown, policy: CachePolicy, shape?: Shape): Promise<Response> {
+export type RenderOptions = {
+  /** < 1 returns a smaller image (live previews). The card is drawn at full
+   *  size and shrunk afterwards: scaling inside the renderer was 4-6x slower
+   *  for frames with rotations or rounded photos. */
+  scale?: number
+  /** JPEG is ~10x smaller than PNG for a photo card. Opt-in, so older app builds keep PNG. */
+  format?: 'png' | 'jpeg'
+}
+
+export async function renderCard(raw: unknown, policy: CachePolicy, shape?: Shape, o: RenderOptions = {}): Promise<Response> {
   const p = sanitizePayload(raw)
   const useShape = shape ?? p.shape
+  const scale = o.scale && o.scale > 0 && o.scale < 1 ? o.scale : 1
   const opts = { ...SHAPE_SIZE[useShape], fonts: await loadFonts() }
-  const headers = { 'Content-Type': 'image/png', ...IMAGE_CACHE[policy] }
-  const photo = await loadPhoto(p.photo_url)
+  const box = photoSizeFor(p, useShape)
+  const photo = await loadPhoto(p.photo_url, { w: box.w, h: box.h }).catch(() => null)
+  let buf: ArrayBuffer
   try {
-    const buf = await new ImageResponse(<CardFor p={{ ...p, photo_url: photo }} shape={useShape} />, opts).arrayBuffer()
-    return pngResponse(buf, headers)
+    buf = await new ImageResponse(<CardFor p={{ ...p, photo_url: photo }} shape={useShape} />, opts).arrayBuffer()
   } catch {
     // Any render failure (bad image, satori quirk): retry once with the glyph block.
-    const buf = await new ImageResponse(<CardFor p={{ ...p, photo_url: null }} shape={useShape} />, opts).arrayBuffer()
-    return pngResponse(buf, headers)
+    buf = await new ImageResponse(<CardFor p={{ ...p, photo_url: null }} shape={useShape} />, opts).arrayBuffer()
   }
+  if (scale === 1 && o.format !== 'jpeg') return imageResponse(new Uint8Array(buf), 'image/png', IMAGE_CACHE[policy])
+  let img = sharp(Buffer.from(buf))
+  if (scale < 1) img = img.resize(Math.round(opts.width * scale))
+  const out = o.format === 'jpeg'
+    // Previews can be lighter; a shared card keeps full colour detail (4:4:4) so small type stays crisp.
+    ? await img.jpeg(scale < 1 ? { quality: 80 } : { quality: 90, chromaSubsampling: '4:4:4' }).toBuffer()
+    : await img.png().toBuffer()
+  return imageResponse(new Uint8Array(out), o.format === 'jpeg' ? 'image/jpeg' : 'image/png', IMAGE_CACHE[policy])
 }
 
 export async function renderNoLongerShared(shape: Shape) {

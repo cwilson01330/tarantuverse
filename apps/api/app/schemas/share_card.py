@@ -13,6 +13,8 @@ class ShareCardCreate(BaseModel):
     fields: Optional[List[str]] = Field(None, max_length=20)
     shape: str = Field("story", pattern="^(story|post|square|wide)$")
     frame: str = Field("specimen", pattern="^(specimen|notes|herbarium)$")
+    # Which of the animal's photos to use. None = its main photo.
+    photo_id: Optional[UUID] = None
     link: bool = False
     # Live-preview render: mints a token only. Never saves defaults or a link.
     preview: bool = False
@@ -24,6 +26,13 @@ class ShareCardCreated(BaseModel):
     code: Optional[str] = None
     fields: List[str]
     frame: str = "specimen"
+
+
+class SharePhotoItem(BaseModel):
+    id: UUID
+    url: str
+    thumbnail_url: Optional[str]
+    is_main: bool
 
 
 class CardLinkItem(BaseModel):

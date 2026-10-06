@@ -9,6 +9,15 @@ export const FRAMES: { key: CardFrame; label: string }[] = [
   { key: 'notes', label: 'Field notes' },
   { key: 'specimen', label: 'Specimen' },
 ];
+/** One of the animal's photos, for the composer's photo picker. */
+export interface SharePhoto { id: string; url: string; thumbnail_url: string | null; is_main: boolean }
+
+// The renderer returns a full-size PNG by default (older app builds rely on
+// that). The composer asks for a half-size JPEG preview (~50 KB instead of
+// ~3 MB) and a full-size JPEG to share.
+const withParams = (u: string, q: string) => `${u}${u.includes('?') ? '&' : '?'}${q}`;
+export const previewImageUrl = (u: string) => withParams(u, 'size=preview&fmt=jpg');
+export const shareImageUrl = (u: string) => withParams(u, 'fmt=jpg');
 export interface ShareDefaults { fields: string[]; frame: CardFrame }
 
 export const FIELD_LABELS: Record<string, string> = {
@@ -25,7 +34,7 @@ export async function getShareDefaults(): Promise<ShareDefaults> {
   const { data } = await apiClient.get<{ fields: string[]; frame?: CardFrame }>(`/share-cards/defaults`, { params: { app: 'herpetoverse', kind: 'profile' } });
   return { fields: data.fields, frame: data.frame ?? 'specimen' };
 }
-export async function createShareCard(body: { animal_id: string; fields: string[]; shape: CardShape; frame: CardFrame; link: boolean; preview?: boolean }): Promise<ShareCardCreated> {
+export async function createShareCard(body: { animal_id: string; fields: string[]; shape: CardShape; frame: CardFrame; photo_id?: string | null; link: boolean; preview?: boolean }): Promise<ShareCardCreated> {
   const { data } = await apiClient.post<ShareCardCreated>(`/share-cards/`, { app: 'herpetoverse', kind: 'profile', ...body });
   return data;
 }
@@ -35,4 +44,8 @@ export async function listCardLinks(): Promise<CardLinkItem[]> {
 }
 export async function revokeCardLink(code: string): Promise<void> {
   await apiClient.delete(`/card-links/${encodeURIComponent(code)}`);
+}
+export async function listSharePhotos(animalId: string): Promise<SharePhoto[]> {
+  const { data } = await apiClient.get<SharePhoto[]>(`/share-cards/photos`, { params: { app: 'herpetoverse', animal_id: animalId } });
+  return data;
 }
