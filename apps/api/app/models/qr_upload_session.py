@@ -1,6 +1,6 @@
 """
 QR upload session model — short-lived token that allows a phone browser
-to upload a photo to a specific tarantula, snake, or lizard without being
+to upload a photo to a specific tarantula, snake, lizard or colony without being
 logged in.
 
 Polymorphic parent: exactly one of `tarantula_id` / `snake_id` / `lizard_id`
@@ -22,8 +22,13 @@ class QRUploadSession(Base):
         # Polymorphic across TV tarantulas, HV animals, and TV
         # scorpions — exactly one parent set. scorpion_id added in
         # scp_20260522.
+        # Widened for invert-only rows (cip_20260527) and colonies
+        # (cqr_20261006) — same shape as photos_must_have_exactly_one_parent.
         CheckConstraint(
-            'num_nonnulls(tarantula_id, animal_id, scorpion_id) = 1',
+            '(num_nonnulls(tarantula_id, animal_id, scorpion_id) = 1 '
+            'AND colony_id IS NULL) '
+            'OR (num_nonnulls(tarantula_id, animal_id, scorpion_id) = 0 '
+            'AND num_nonnulls(invert_id, colony_id) = 1)',
             name='qr_upload_sessions_must_have_exactly_one_parent',
         ),
     )
@@ -55,6 +60,13 @@ class QRUploadSession(Base):
         nullable=True,
         index=True,
     )
+    # Population colonies (ADR-010) — cqr_20261006.
+    colony_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("colonies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     # Allow multiple uploads per session (e.g. a whole photo shoot)
@@ -69,8 +81,9 @@ class QRUploadSession(Base):
     animal = relationship("Animal")
     scorpion = relationship("Scorpion")
     invert = relationship("Invert")
+    colony = relationship("Colony")
     user = relationship("User")
 
     def __repr__(self):
-        parent = self.tarantula_id or self.animal_id or self.scorpion_id
+        parent = self.tarantula_id or self.animal_id or self.scorpion_id or self.invert_id or self.colony_id
         return f"<QRUploadSession {self.token[:8]}... parent={parent}>"

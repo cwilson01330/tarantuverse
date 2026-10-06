@@ -34,6 +34,7 @@ from app.models.tarantula import Tarantula
 from app.models.animal import Animal
 from app.models.scorpion import Scorpion
 from app.models.invert import Invert
+from app.models.colony import Colony
 from app.models.invert_species import InvertSpecies
 from app.models.photo import Photo
 from app.models.user import User
@@ -111,7 +112,7 @@ def _invert_display_name(i: Invert) -> str:
 def _session_parent(session: QRUploadSession) -> tuple[str, object | None]:
     """Return (kind, parent_row) for a session.
 
-    `kind` is 'tarantula', 'animal', 'scorpion', or 'invert'. `row`
+    `kind` is 'tarantula', 'animal', 'scorpion', 'invert', or 'colony'. `row`
     may be None only if the parent was hard-deleted after session
     creation (shouldn't happen — FKs are CASCADE — but defensive).
 
@@ -128,6 +129,8 @@ def _session_parent(session: QRUploadSession) -> tuple[str, object | None]:
         # Centipede sessions land here. Other taxa that launch on the
         # consolidated surface in the future will share this branch.
         return ("invert", session.invert)
+    if session.colony_id:
+        return ("colony", session.colony)
     return ("unknown", None)
 
 
@@ -144,7 +147,7 @@ def _session_taxon_str(kind: str, parent) -> str:
         return "scorpion"
     if kind == "animal" and parent is not None:
         return parent.taxon.value if hasattr(parent.taxon, "value") else str(parent.taxon)
-    if kind == "invert" and parent is not None:
+    if kind in ("invert", "colony") and parent is not None:
         return parent.taxon if isinstance(parent.taxon, str) else str(parent.taxon)
     return "unknown"
 
@@ -162,6 +165,8 @@ def _display_name_for(kind: str, parent) -> str:
         return _animal_display_name(parent)
     if kind == "invert":
         return _invert_display_name(parent)
+    if kind == "colony":
+        return parent.name or "Unknown"
     return "Unknown"
 
 
@@ -351,6 +356,60 @@ async def create_invert_upload_session(
     }
 
 
+@router.post("/colonies/{colony_id}/upload-session")
+@policy("owner_only")
+async def create_colony_upload_session(
+    colony_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a short-lived QR upload session for a population colony.
+
+    Same access rule as `/inverts/{id}/upload-session`: the owner only. A
+    co-keeper or a stranger gets the same 404 an unknown id does. Photos that
+    arrive through the token are never capped (colony photos are uncapped by
+    design).
+    """
+    colony = db.query(Colony).filter(
+        Colony.id == colony_id,
+        Colony.user_id == current_user.id,
+    ).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+
+    # A newly-generated QR supersedes the old one, same as every sibling route.
+    db.query(QRUploadSession).filter(
+        QRUploadSession.colony_id == colony_id,
+        QRUploadSession.user_id == current_user.id,
+        QRUploadSession.is_active == True,
+    ).update({"is_active": False})
+
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=SESSION_TTL_MINUTES)
+
+    session = QRUploadSession(
+        token=token,
+        colony_id=colony_id,
+        user_id=current_user.id,
+        expires_at=expires_at,
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    web_base = getattr(settings, "FRONTEND_URL", "https://tarantuverse.com")
+
+    return {
+        "token": token,
+        "upload_url": f"{web_base}/upload/{token}",
+        "expires_at": expires_at.isoformat(),
+        "expires_in_minutes": SESSION_TTL_MINUTES,
+        "taxon": colony.taxon,
+        "kind": "colony",
+        "animal_name": colony.name,
+    }
+
+
 @router.post("/scorpions/{scorpion_id}/upload-session")
 @policy("owner_only")
 async def create_scorpion_upload_session(
@@ -490,12 +549,21 @@ async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
 
     display_name = _display_name_for(kind, parent)
 
+    if kind == "colony":
+        # A colony has no name columns of its own; the species carries them.
+        sp = parent.species
+        common_name = sp.common_names[0] if sp is not None and sp.common_names else None
+        scientific_name = sp.scientific_name if sp is not None else None
+    else:
+        common_name = parent.common_name
+        scientific_name = parent.scientific_name
+
     payload = {
         "valid": True,
         "taxon": _session_taxon_str(kind, parent),
         "display_name": display_name,
-        "common_name": parent.common_name,
-        "scientific_name": parent.scientific_name,
+        "common_name": common_name,
+        "scientific_name": scientific_name,
         "photo_url": parent.photo_url,
         "expires_at": session.expires_at.isoformat(),
         "uploads_so_far": session.used_count,
@@ -511,6 +579,8 @@ async def get_upload_session_info(token: str, db: Session = Depends(get_db)):
         # additional taxa launched on the consolidated surface).
         taxon_key = parent.taxon if isinstance(parent.taxon, str) else str(parent.taxon)
         payload[f"{taxon_key}_name"] = display_name
+    elif kind == "colony":
+        payload["kind"] = "colony"
     return payload
 
 
@@ -554,7 +624,8 @@ async def upload_photo_via_token(
         raise HTTPException(status_code=400, detail="File must be an image")
 
     # Free-plan photo limit for Tarantuverse animals. A QR upload used to be a
-    # way round it. Herpetoverse animals ('animal' sessions) aren't capped.
+    # way round it. Herpetoverse animals ('animal' sessions) and colonies
+    # aren't capped (by design) — they fall outside the tuple below.
     qr_kind, _ = _session_parent(session)
     if qr_kind in ("tarantula", "scorpion", "invert") and session.user is not None:
         from app.utils.limits import enforce_photo_cap
@@ -614,6 +685,9 @@ async def upload_photo_via_token(
             photo_kwargs["invert_id"] = invert_id_if_exists(db, session.scorpion_id)
         elif kind == "invert":
             photo_kwargs["invert_id"] = str(session.invert_id)
+        elif kind == "colony":
+            # Colony photos carry colony_id only (photos_must_have_exactly_one_parent).
+            photo_kwargs["colony_id"] = str(session.colony_id)
         else:
             photo_kwargs["animal_id"] = str(session.animal_id)
 
@@ -655,6 +729,8 @@ async def upload_photo_via_token(
         elif kind == "invert" and parent is not None:
             taxon_key = parent.taxon if isinstance(parent.taxon, str) else str(parent.taxon)
             resp[f"{taxon_key}_name"] = display_name
+        elif kind == "colony":
+            resp["kind"] = "colony"
         return resp
 
     except HTTPException:
@@ -970,6 +1046,151 @@ async def get_public_invert_profile(
         base["date_acquired"] = invert.date_acquired.isoformat() if invert.date_acquired else None
         base["source"] = invert.source.value if invert.source else None
         base["notes"] = invert.notes
+
+    return base
+
+
+# ─── Public Colony Profile (/col/{id}) ───────────────────────────────────────
+
+@router.get("/col/{colony_id}")
+@policy("public")
+async def get_public_colony_profile(
+    colony_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(_optional_user),
+):
+    """Permanent public profile for a population colony — its QR destination.
+
+    The visibility rule is `/i/{id}`'s, line for line: the owner sees the
+    husbandry block and notes; everyone else gets the public card, and only
+    when the owner's collection is public (403 otherwise). Nothing `/i` keeps
+    private is added here. The colony-only fields are the population (total
+    and per-stage headcounts, which are what a colony IS the way an animal has
+    a sex and a last-fed date).
+
+    Deliberately NOT exposed: location, sitter_note, price, enclosure link and
+    event history; source, acquisition date, husbandry and notes are
+    owner-only exactly as on `/i`.
+
+    Two deliberate tightenings over `/i`: the colony's own `visibility` must be
+    'public' too (the keeper chose it per colony), and a colony that has been
+    transferred out is a 404 to everyone but its owner, matching the link-preview rule
+    (`/public-card`) that a handed-off animal stops being public.
+    """
+    from app.routers.colonies import _total_count
+
+    try:
+        c_uuid = uuid.UUID(colony_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid colony ID")
+
+    colony = db.query(Colony).filter(Colony.id == c_uuid).first()
+    if not colony:
+        raise HTTPException(status_code=404, detail="Colony not found")
+
+    is_owner = current_user and str(current_user.id) == str(colony.user_id)
+
+    owner = db.query(User).filter(User.id == colony.user_id).first()
+    collection_public = owner and owner.collection_visibility == "public"
+    if not is_owner and not collection_public:
+        raise HTTPException(status_code=403, detail="This collection is private")
+    # Colonies carry their OWN private/public choice (the add-colony form asks
+    # for it, default private). Unlike an invert's, it is a promise the keeper
+    # made explicitly, so a public collection does not override it.
+    if not is_owner and colony.visibility != "public":
+        raise HTTPException(status_code=403, detail="This colony is private")
+    if not is_owner and colony.transferred_out_at is not None:
+        raise HTTPException(status_code=404, detail="Colony not found")
+
+    species_data = None
+    common_name = None
+    scientific_name = None
+    if colony.species_id:
+        sp = db.query(InvertSpecies).filter(
+            InvertSpecies.id == colony.species_id
+        ).first()
+        if sp:
+            common_name = sp.common_names[0] if sp.common_names else None
+            scientific_name = sp.scientific_name
+            species_data = {
+                "id": str(sp.id),
+                "taxon": sp.taxon,
+                "scientific_name": sp.scientific_name,
+                "common_names": sp.common_names or [],
+                "care_level": sp.care_level,
+                "temperament": sp.temperament,
+                "type": sp.type,
+                "temperature_min": float(sp.temperature_min) if sp.temperature_min else None,
+                "temperature_max": float(sp.temperature_max) if sp.temperature_max else None,
+                "humidity_min": float(sp.humidity_min) if sp.humidity_min else None,
+                "humidity_max": float(sp.humidity_max) if sp.humidity_max else None,
+                "venom_severity": sp.venom_severity,
+                "defensive_secretion": sp.defensive_secretion,
+                "can_fly": sp.can_fly,
+                "can_climb_smooth": sp.can_climb_smooth,
+                "image_url": sp.image_url,
+            }
+
+    photos = db.query(Photo).filter(
+        Photo.colony_id == c_uuid
+    ).order_by(Photo.created_at.desc()).limit(10).all()
+
+    stage_counts = {
+        k: v for k, v in (colony.stage_counts or {}).items()
+        if isinstance(v, int) and not isinstance(v, bool)
+    }
+
+    base = {
+        "id": str(colony.id),
+        "kind": "colony",
+        "taxon": colony.taxon,
+        "name": colony.name,
+        "common_name": common_name,
+        "scientific_name": scientific_name,
+        "display_name": colony.name,
+        "photo_url": colony.photo_url,
+        "is_owner": bool(is_owner),
+        "owner_username": owner.username if owner else None,
+        "is_following": (
+            db.query(Follow).filter(
+                Follow.follower_id == current_user.id,
+                Follow.followed_id == owner.id,
+            ).first() is not None
+        ) if (current_user and owner and not is_owner) else False,
+        "species": species_data,
+        "population": {
+            "total": _total_count(colony),
+            "stage_counts": stage_counts,
+            "is_estimated": bool(colony.count_is_estimated),
+        },
+        "photos": [
+            {
+                "id": str(p.id),
+                "url": p.url,
+                "thumbnail_url": p.thumbnail_url,
+                "caption": p.caption,
+                "taken_at": p.taken_at.isoformat() if p.taken_at else None,
+            }
+            for p in photos
+        ],
+    }
+
+    if is_owner:
+        base["husbandry"] = {
+            "enclosure_type": colony.enclosure_type,
+            "enclosure_size": colony.enclosure_size,
+            "substrate_type": colony.substrate_type,
+            "substrate_depth": colony.substrate_depth,
+            "last_substrate_change": colony.last_substrate_change.isoformat() if colony.last_substrate_change else None,
+            "target_temp_min": float(colony.target_temp_min) if colony.target_temp_min else None,
+            "target_temp_max": float(colony.target_temp_max) if colony.target_temp_max else None,
+            "target_humidity_min": float(colony.target_humidity_min) if colony.target_humidity_min else None,
+            "target_humidity_max": float(colony.target_humidity_max) if colony.target_humidity_max else None,
+            "water_dish": colony.water_dish,
+        }
+        base["date_acquired"] = colony.date_acquired.isoformat() if colony.date_acquired else None
+        base["source"] = colony.source
+        base["notes"] = colony.notes
 
     return base
 

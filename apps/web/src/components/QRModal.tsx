@@ -57,9 +57,17 @@ interface QRModalProps {
    * Which API surface owns this animal. Defaults to the legacy tarantula
    * routes so existing call sites keep working unchanged; pass 'inverts' for
    * anything else, which is the only path that resolves for a mantis or
-   * jumper. Mirrors QRSheet's prop of the same name on mobile.
+   * jumper; 'colonies' for a population colony (public page `/col/{id}`).
+   * Mirrors QRSheet's prop of the same name on mobile.
    */
-  resource?: 'tarantulas' | 'inverts'
+  resource?: 'tarantulas' | 'inverts' | 'colonies'
+  /**
+   * Headcount for a colony label. Colonies have no sex or molts, so this is
+   * their equivalent optional line ("Population: ~30"). Ignored elsewhere.
+   */
+  population?: number | null
+  /** True when the colony's count is an estimate — printed as "~30". */
+  populationIsEstimated?: boolean
   onClose: () => void
   onPhotoAdded?: () => void
 }
@@ -170,6 +178,10 @@ interface RenderLabelOptions {
   showSciName: boolean
   showMolts: boolean
   showDomain: boolean
+  /** Colony labels only — printed when `showPopulation` and a count exist. */
+  showPopulation?: boolean
+  population?: number | null
+  populationIsEstimated?: boolean
   profileUrl: string
   /** Pre-rendered inline QR SVG markup (from qrcode.react) */
   qrSvgMarkup: string
@@ -189,8 +201,13 @@ export function renderLabelHTML(opts: RenderLabelOptions): string {
     tarantulaName, scientificName, sex, molts,
     size, font, theme,
     showSex, showSciName, showMolts, showDomain,
+    showPopulation = false, population = null, populationIsEstimated = false,
     qrSvgMarkup, highContrast = false,
   } = opts
+  const populationText =
+    showPopulation && population != null
+      ? `Population: ${populationIsEstimated ? '~' : ''}${population}`
+      : ''
 
   // Thermal-safe palette: everything solid black, no opacity. On a normal
   // print we keep the themed grays/accents for a softer look.
@@ -247,6 +264,11 @@ export function renderLabelHTML(opts: RenderLabelOptions): string {
             ${escapeHtml(scientificName)}
           </div>
         ` : ''}
+        ${populationText ? `
+          <div style="font-size: ${size.fontSize.sci}px; color: ${accentColor}; font-weight: 600; line-height: 1.3;">
+            ${escapeHtml(populationText)}
+          </div>
+        ` : ''}
         ${showMolts && recentMolts.length > 0 ? `
           <div style="font-size: ${size.fontSize.molt}px; color: ${moltColor}; font-weight: ${faintWeight}; margin-top: 2px; line-height: 1.3; border-top: 0.5px solid ${moltBorder}; padding-top: 2px;">
             <span style="font-weight: 700; color: ${accentColor};">Molts: </span>${moltsHtml}
@@ -274,6 +296,7 @@ interface StoredPrefs {
   showSciName?: boolean
   showMolts?: boolean
   showDomain?: boolean
+  showPopulation?: boolean
 }
 
 function loadPrefs(): StoredPrefs {
@@ -299,12 +322,18 @@ export default function QRModal({
   tarantulaId,
   tarantulaName,
   scientificName,
-  sex,
-  molts = [],
+  sex: sexProp,
+  molts: moltsProp = [],
   resource = 'tarantulas',
+  population = null,
+  populationIsEstimated = false,
   onClose,
   onPhotoAdded,
 }: QRModalProps) {
+  // Sex and molts don't apply to a population: never print them on a colony
+  // label even if a caller passes them.
+  const sex = resource === 'colonies' ? null : sexProp
+  const molts = resource === 'colonies' ? [] : moltsProp
   const [tab, setTab] = useState<Tab>('upload')
   const [uploadState, setUploadState] = useState<UploadState>('idle')
   const [uploadToken, setUploadToken] = useState<string | null>(null)
@@ -320,6 +349,7 @@ export default function QRModal({
   const [showSex, setShowSex] = useState(true)
   const [showSciName, setShowSciName] = useState(true)
   const [showDomain, setShowDomain] = useState(true)
+  const [showPopulation, setShowPopulation] = useState(true)
   const [prefsLoaded, setPrefsLoaded] = useState(false)
   const previewRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -327,7 +357,9 @@ export default function QRModal({
   // A printed label outlives the app, so the URL has to be right the first
   // time: `/t/` reads the legacy tarantula table and errors for every other
   // taxon. `/i/` resolves any of them.
-  const profilePath = resource === 'inverts' ? 'i' : 't'
+  // Colonies live in their own table, so `/i/` would 404 for them too: `/col/`.
+  const profilePath = resource === 'colonies' ? 'col' : resource === 'inverts' ? 'i' : 't'
+  const isColony = resource === 'colonies'
   const profileUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://tarantuverse.com'}/${profilePath}/${tarantulaId}`
 
   // Restore saved label preferences on mount
@@ -349,6 +381,7 @@ export default function QRModal({
     if (typeof prefs.showSciName === 'boolean') setShowSciName(prefs.showSciName)
     if (typeof prefs.showMolts === 'boolean') setShowMolts(prefs.showMolts)
     if (typeof prefs.showDomain === 'boolean') setShowDomain(prefs.showDomain)
+    if (typeof prefs.showPopulation === 'boolean') setShowPopulation(prefs.showPopulation)
     setPrefsLoaded(true)
   }, [])
 
@@ -363,8 +396,9 @@ export default function QRModal({
       showSciName,
       showMolts,
       showDomain,
+      showPopulation,
     })
-  }, [prefsLoaded, labelSize, labelFont, labelTheme, showSex, showSciName, showMolts, showDomain])
+  }, [prefsLoaded, labelSize, labelFont, labelTheme, showSex, showSciName, showMolts, showDomain, showPopulation])
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
@@ -478,6 +512,9 @@ export default function QRModal({
         showSciName,
         showMolts,
         showDomain,
+        showPopulation: isColony && showPopulation,
+        population,
+        populationIsEstimated,
         profileUrl,
         // Embed the baked QR as an <img> — survives foreignObject rasterization.
         qrSvgMarkup:
@@ -590,6 +627,9 @@ export default function QRModal({
       showSciName,
       showMolts,
       showDomain,
+      showPopulation: isColony && showPopulation,
+      population,
+      populationIsEstimated,
       profileUrl,
       qrSvgMarkup: qrSvg,
     })
@@ -837,6 +877,7 @@ export default function QRModal({
                   { label: 'Sex',             checked: showSex,     set: setShowSex,     show: !!sex },
                   { label: 'Scientific name', checked: showSciName, set: setShowSciName, show: !!scientificName },
                   { label: `Molts (last ${Math.min(recentMolts.length, 3)})`, checked: showMolts, set: setShowMolts, show: molts.length > 0 },
+                  { label: 'Population',      checked: showPopulation, set: setShowPopulation, show: isColony && population != null },
                   { label: 'Domain',          checked: showDomain,  set: setShowDomain,  show: true },
                 ].filter(f => f.show).map((f) => (
                   <label key={f.label} className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -884,6 +925,18 @@ export default function QRModal({
                       </div>
                     )}
 
+                    {/* Colony headcount */}
+                    {isColony && showPopulation && population != null && (
+                      <div style={{
+                        fontSize: labelSize.fontSize.sci,
+                        color: labelTheme.accent,
+                        fontWeight: 600,
+                        lineHeight: 1.3,
+                      }}>
+                        Population: {populationIsEstimated ? '~' : ''}{population}
+                      </div>
+                    )}
+
                     {/* Molt history */}
                     {showMolts && recentMolts.length > 0 && (
                       <div style={{
@@ -917,7 +970,7 @@ export default function QRModal({
             </div>
 
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              QR links permanently to this spider&apos;s profile.
+              QR links permanently to this {isColony ? 'colony' : 'spider'}&apos;s profile.
             </p>
 
             <div className="flex gap-2">

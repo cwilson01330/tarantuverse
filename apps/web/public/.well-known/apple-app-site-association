@@ -4,7 +4,7 @@
     "details": [
       {
         "appID": "G872A6667J.com.tarantuverse.app",
-        "paths": ["/t/*"]
+        "paths": ["/t/*", "/i/*", "/col/*"]
       }
     ]
   }

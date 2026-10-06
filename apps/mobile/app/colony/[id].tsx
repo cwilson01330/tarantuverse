@@ -33,6 +33,7 @@ import { PrimaryButton } from '../../src/components/PrimaryButton';
 import DateInput from '../../src/components/DateInput';
 import { InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { useTheme } from '../../src/contexts/ThemeContext';
+import QRSheet from '../../src/components/QRSheet';
 import ColonyPopulationCard from '../../src/components/colony/ColonyPopulationCard';
 import ColonyQuickLogSheet, { type QuickKind } from '../../src/components/colony/ColonyQuickLogSheet';
 import ColonyActivity from '../../src/components/colony/ColonyActivity';
@@ -166,6 +167,7 @@ export default function ColonyDetailScreen() {
 
   // Delete state
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [confirmDeleteEventId, setConfirmDeleteEventId] = useState<string | null>(null);
 
   // Co-keepers (rung 3): what the viewer may do here. Hides controls that
@@ -349,7 +351,18 @@ export default function ColonyDetailScreen() {
     </TouchableOpacity>
   );
 
-  const editAction = colony && canKeep ? (
+  // QR sits beside Edit. Owner only, like the upload-session route behind it.
+  const qrAction = colony && isOwner ? (
+    <TouchableOpacity
+      onPress={() => setQrOpen(true)}
+      accessibilityLabel="QR label and photo upload"
+      style={{ paddingHorizontal: 4 }}
+    >
+      <MaterialCommunityIcons name="qrcode" size={24} color={iconColor} />
+    </TouchableOpacity>
+  ) : null;
+
+  const editButton = colony && canKeep ? (
     <TouchableOpacity
       onPress={() => router.push(`/colony/${colony.id}/edit` as any)}
       accessibilityLabel="Edit colony"
@@ -357,6 +370,13 @@ export default function ColonyDetailScreen() {
     >
       <MaterialCommunityIcons name="pencil-outline" size={24} color={iconColor} />
     </TouchableOpacity>
+  ) : null;
+
+  const editAction = qrAction || editButton ? (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {qrAction}
+      {editButton}
+    </View>
   ) : null;
 
   const styles = makeStyles(colors);
@@ -1682,6 +1702,18 @@ export default function ColonyDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Enclosure label + phone photo upload. resource="colonies" points the
+          label at /col/{id} and the upload session at the colony route. */}
+      <QRSheet
+        visible={qrOpen}
+        onClose={() => setQrOpen(false)}
+        tarantulaId={colony.id}
+        resource="colonies"
+        tarantulaName={colony.name}
+        scientificName={colony.species_scientific_name}
+        onPhotoAdded={fetchColony}
+      />
     </View>
   );
 }

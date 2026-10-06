@@ -38,7 +38,11 @@
           "autoVerify": true,
           "data": [
             { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/t" },
-            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/t" }
+            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/t" },
+            { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/i" },
+            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/i" },
+            { "scheme": "https", "host": "tarantuverse.com", "pathPrefix": "/col" },
+            { "scheme": "https", "host": "www.tarantuverse.com", "pathPrefix": "/col" }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
         }

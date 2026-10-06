@@ -108,6 +108,9 @@ export default function EditColonyScreen() {
   const [waterDish, setWaterDish] = useState(false);
   const [location, setLocation] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  // Per-colony public/private (default private). Public also needs a public
+  // collection; it's what lets someone scanning the colony's QR label see it.
+  const [isPublic, setIsPublic] = useState(false);
   const [isActive, setIsActive] = useState(true);
 
   const loadColony = useCallback(async () => {
@@ -145,6 +148,7 @@ export default function EditColonyScreen() {
       setWaterDish(c.water_dish);
       setLocation(c.location ?? null);
       setNotes(c.notes ?? '');
+      setIsPublic(c.visibility === 'public');
       setIsActive(c.is_active);
       setLoadError('');
     } catch (e: any) {
@@ -257,6 +261,7 @@ export default function EditColonyScreen() {
         water_dish: waterDish,
         location,
         notes: toStr(notes).trim() || null,
+        visibility: isPublic ? 'public' : 'private',
         is_active: isActive,
       };
 
@@ -499,6 +504,14 @@ export default function EditColonyScreen() {
           <Field label="Notes">
             <TextInput style={[styles.input, styles.textArea]} placeholder="Anything worth remembering about this colony" placeholderTextColor={colors.textTertiary} value={notes} onChangeText={setNotes} multiline />
           </Field>
+
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.switchLabel}>Public</Text>
+              <Text style={styles.hint}>Lets anyone who scans this colony's label see it, if your collection is public too.</Text>
+            </View>
+            <Switch value={isPublic} onValueChange={setIsPublic} trackColor={{ false: colors.border, true: colors.primary }} thumbColor="#fff" accessibilityLabel="Make this colony public" />
+          </View>
 
           {/* Active toggle */}
           <View style={styles.switchRow}>

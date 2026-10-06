@@ -10,10 +10,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/hooks/useAuth'
 import { ROLE_LABEL, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
 import DashboardLayout from '@/components/DashboardLayout'
 import ColonyPopulationChart from '@/components/ColonyPopulationChart'
+const QRModal = dynamic(() => import('@/components/QRModal'), { ssr: false })
 import EditPanel, { type EditField, type EditValues } from './EditPanel'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
@@ -189,6 +191,7 @@ export default function ColonyDetailPage() {
 
   // Delete colony
   const [deleting, setDeleting] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   const fetchAll = useCallback(async () => {
@@ -813,6 +816,12 @@ export default function ColonyDetailPage() {
             >
               Edit
             </Link>}
+            {isOwner && <button
+              onClick={() => setQrOpen(true)}
+              className="px-4 py-2 rounded-xl border border-theme bg-surface text-theme-primary hover:bg-surface-elevated transition"
+            >
+              QR
+            </button>}
             {isOwner && <button
               onClick={() => setConfirmDelete(true)}
               className="px-4 py-2 rounded-xl border border-red-300 dark:border-red-600/60 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900/40 transition"
@@ -1910,6 +1919,22 @@ export default function ColonyDetailPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Enclosure label + phone photo upload. `resource="colonies"` points the
+            label at /col/{id} and the upload session at the colony route. */}
+        {qrOpen && colony && (
+          <QRModal
+            tarantulaId={colony.id}
+            tarantulaName={colony.name}
+            scientificName={colony.species_scientific_name ?? null}
+            sex={null}
+            resource="colonies"
+            population={colony.total_count}
+            populationIsEstimated={colony.count_is_estimated}
+            onClose={() => setQrOpen(false)}
+            onPhotoAdded={fetchAll}
+          />
         )}
       </div>
     </DashboardLayout>

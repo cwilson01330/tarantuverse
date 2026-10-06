@@ -29,10 +29,10 @@ interface QRSheetProps {
   /**
    * Collection surface. 'inverts' hits the taxon-agnostic upload-session +
    * photos routes and works for every taxon; 'tarantulas' is the legacy path
-   * kept for the old tarantula screen. Defaulted so existing callers are
-   * unaffected.
+   * kept for the old tarantula screen; 'colonies' is a population colony
+   * (public page `/col/{id}`). Defaulted so existing callers are unaffected.
    */
-  resource?: 'tarantulas' | 'inverts'
+  resource?: 'tarantulas' | 'inverts' | 'colonies'
   tarantulaName: string
   scientificName?: string | null
   onPhotoAdded?: () => void
@@ -64,7 +64,8 @@ export default function QRSheet({
   // This sheet has been handing out `/t/` links for inverts since it gained
   // the `resource` prop — meaning a keeper could print a mantis label, scan
   // it, and get an error on the one page that exists to identify the animal.
-  const profileUrl = `${WEB_BASE}/${resource === 'inverts' ? 'i' : 't'}/${tarantulaId}`
+  const profilePath = resource === 'colonies' ? 'col' : resource === 'inverts' ? 'i' : 't'
+  const profileUrl = `${WEB_BASE}/${profilePath}/${tarantulaId}`
 
   const stopPolling = () => {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }

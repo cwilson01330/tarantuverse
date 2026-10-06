@@ -22,7 +22,9 @@
  *   /keeper/<username>              → /community/<username>
  *   /community/forums/thread/<id>   → /forums/thread/<id>
  *   /species/<id>                   → unchanged ✓
- *   /t/<id>                         → unchanged ✓
+ *   /t/<id>                         → unchanged ✓ (app/t/[id].tsx)
+ *   /i/<id>                         → unchanged ✓ (app/i/[id].tsx → /invert/<id>)
+ *   /col/<id>                       → unchanged ✓ (app/col/[id].tsx → /colony/<id>)
  *
  * When you find another mismatch, add a regex here rather than duplicating
  * a string-replace at the call site — keeps the fixes centralised and
