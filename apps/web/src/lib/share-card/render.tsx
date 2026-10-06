@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { FieldNotesCard, fieldNotesPhotoSize } from './FieldNotesCard'
 import { HerbariumCard, herbariumPhotoBox } from './HerbariumCard'
-import { CardPayload, Frame, SHAPE_SIZE, Shape, SpecimenCard, specimenPhotoSize } from './SpecimenCard'
+import { CardPayload, Frame, PhotoFocus, SHAPE_SIZE, Shape, SpecimenCard, specimenPhotoSize } from './SpecimenCard'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -132,7 +132,21 @@ async function fetchPhotoBytes(url: string): Promise<Uint8Array | null> {
   return buf
 }
 
-export async function loadPhoto(url: string | null, fit?: { w: number; h: number }): Promise<string | null> {
+/** The part of a W×H photo to show in a w×h window, centred on the keeper's
+ *  focus point at their zoom, clamped so it never runs off the photo. Same
+ *  maths as the composers' "Adjust photo" editor. */
+export function focusCrop(W: number, H: number, w: number, h: number, f: PhotoFocus) {
+  const zoom = Math.min(4, Math.max(1, f.zoom))
+  const cover = Math.max(w / W, h / H)
+  const cw = Math.min(W, w / (cover * zoom))
+  const ch = Math.min(H, h / (cover * zoom))
+  const left = Math.min(W - cw, Math.max(0, f.x * W - cw / 2))
+  const top = Math.min(H - ch, Math.max(0, f.y * H - ch / 2))
+  const r = (n: number) => Math.max(0, Math.round(n))
+  return { left: r(left), top: r(top), width: Math.max(1, Math.min(W - r(left), Math.round(cw))), height: Math.max(1, Math.min(H - r(top), Math.round(ch))) }
+}
+
+export async function loadPhoto(url: string | null, fit?: { w: number; h: number }, focus?: PhotoFocus | null): Promise<string | null> {
   if (!url || !allowedPhotoUrl(url)) return null
   try {
     const buf = await fetchPhotoBytes(url)
@@ -140,11 +154,23 @@ export async function loadPhoto(url: string | null, fit?: { w: number; h: number
     const mime = sniffMime(buf)
     if (!mime) return null
     if (fit) {
-      const out = await sharp(buf, { limitInputPixels: 50_000_000 })
-        .rotate()
-        .resize(Math.max(1, Math.round(fit.w)), Math.max(1, Math.round(fit.h)), { fit: 'cover', position: 'attention' })
-        .jpeg({ quality: 88 })
-        .toBuffer()
+      const w = Math.max(1, Math.round(fit.w))
+      const h = Math.max(1, Math.round(fit.h))
+      let img = sharp(buf, { limitInputPixels: 50_000_000 })
+      const meta = await img.metadata()
+      if (meta.orientation && meta.orientation > 1) {
+        // Uploads are stored upright already; bake in any stray orientation
+        // first so the crop maths sees the photo the way people do.
+        img = sharp(await img.rotate().toBuffer())
+      }
+      if (focus) {
+        const { width: W = 0, height: H = 0 } = await img.metadata()
+        if (W > 0 && H > 0) img = img.extract(focusCrop(W, H, w, h, focus))
+        img = img.resize(w, h, { fit: 'cover' })
+      } else {
+        img = img.resize(w, h, { fit: 'cover', position: 'attention' })
+      }
+      const out = await img.jpeg({ quality: 88 }).toBuffer()
       return `data:image/jpeg;base64,${out.toString('base64')}`
     }
     return `data:${mime};base64,${Buffer.from(buf).toString('base64')}`
@@ -184,11 +210,19 @@ export function sanitizePayload(raw: unknown, shapeOverride?: Shape): CardPayloa
     scientific_name: clamp(o.scientific_name, 200),
     common_name: clamp(o.common_name, 200),
     photo_url: typeof o.photo_url === 'string' ? o.photo_url.slice(0, 500) : null,
+    photo_focus: asFocus(o.photo_focus),
     facts,
     notes,
     shape: shapeOverride ?? asShape(typeof o.shape === 'string' ? o.shape : null),
     frame: asFrame(o.frame, notes.headline !== null || notes.facts.length > 0),
   }
+}
+
+function asFocus(v: unknown): PhotoFocus | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const n = (x: unknown, lo: number, hi: number, d: number) => (typeof x === 'number' && Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : d)
+  return { x: n(o.x, 0, 1, 0.5), y: n(o.y, 0, 1, 0.5), zoom: n(o.zoom, 1, 4, 1) }
 }
 
 /** Unknown frames render as the specimen card. Field notes needs the server's
@@ -206,7 +240,7 @@ export function photoSizeFor(p: CardPayload, shape: Shape): { w: number; h: numb
     return { w: b.width, h: b.height }
   }
   if (p.frame === 'notes') return fieldNotesPhotoSize(p, shape)
-  return specimenPhotoSize(shape)
+  return specimenPhotoSize(shape, p)
 }
 
 function CardFor({ p, shape }: { p: CardPayload; shape: Shape }) {
@@ -240,7 +274,7 @@ export async function renderCard(raw: unknown, policy: CachePolicy, shape?: Shap
   const scale = o.scale && o.scale > 0 && o.scale < 1 ? o.scale : 1
   const opts = { ...SHAPE_SIZE[useShape], fonts: await loadFonts() }
   const box = photoSizeFor(p, useShape)
-  const photo = await loadPhoto(p.photo_url, { w: box.w, h: box.h }).catch(() => null)
+  const photo = await loadPhoto(p.photo_url, { w: box.w, h: box.h }, p.photo_focus).catch(() => null)
   let buf: ArrayBuffer
   try {
     buf = await new ImageResponse(<CardFor p={{ ...p, photo_url: photo }} shape={useShape} />, opts).arrayBuffer()

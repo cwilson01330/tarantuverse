@@ -99,7 +99,7 @@ def test_token_data_contains_only_chosen_fields():
     # `notes` is the Field-notes text block — never the animal's own notes.
     assert data["notes"] == {"headline": "Brachypelma hamorii", "species_line": "Mexican redknee", "facts": []}
     assert set(data) == {"app", "kind", "taxon", "header", "name", "scientific_name", "common_name",
-                         "photo_url", "facts", "notes", "shape", "frame"}
+                         "photo_url", "facts", "notes", "shape", "frame", "photo_focus"}
     assert data["shape"] == "story"
 
 
@@ -521,3 +521,37 @@ def test_photo_lookup_is_scoped_to_the_animal():
         assert sc._load_photo_url(db, app, ANIMAL_ID, uuid.uuid4()) is None
         joined = " ".join(db.sql)
         assert "photos.id" in joined and col in joined
+
+
+# ── Photo focus / zoom ───────────────────────────────────────────────────────
+
+def test_focus_rides_the_token():
+    db = FakeDB()
+    out = create(OWNER, db, fields=["photo"], focus={"x": 0.7, "y": 0.3123456, "zoom": 2})
+    assert _data(out, db)["photo_focus"] == {"x": 0.7, "y": 0.3123, "zoom": 2.0}
+
+
+def test_no_focus_means_automatic():
+    db = FakeDB()
+    out = create(OWNER, db, fields=["photo"])
+    assert _data(out, db)["photo_focus"] is None
+
+
+@pytest.mark.parametrize("bad", [{"x": 1.5}, {"y": -0.1}, {"zoom": 0.5}, {"zoom": 9}])
+def test_out_of_range_focus_is_rejected(bad):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        create(OWNER, FakeDB(), fields=["photo"], focus=bad)
+
+
+def test_focus_is_frozen_into_card_links():
+    db = FakeDB()
+    out = create(OWNER, db, link=True, fields=["photo", "name"], focus={"x": 0.2, "y": 0.8, "zoom": 1.5})
+    assert run(sc.get_card_link(out.code, response=Response(), db=db))["photo_focus"] == {"x": 0.2, "y": 0.8, "zoom": 1.5}
+
+
+def test_tampered_focus_claims_are_dropped():
+    assert sc._clean_focus({"x": 3, "y": 0.5, "zoom": 1}) is None
+    assert sc._clean_focus("nope") is None
+    assert sc._clean_focus(None) is None
+    assert sc._clean_focus({"x": 0.5, "y": 0.5, "zoom": 2}) == {"x": 0.5, "y": 0.5, "zoom": 2.0}

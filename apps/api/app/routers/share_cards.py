@@ -124,6 +124,26 @@ def _load_molt(db: Session, animal_id: UUID, molt_id: UUID) -> MoltFacts:
     )
 
 
+def _focus_claim(focus) -> Optional[dict]:
+    """Rounded so equivalent framings share a cache key and tokens stay short."""
+    if focus is None:
+        return None
+    return {"x": round(focus.x, 4), "y": round(focus.y, 4), "zoom": round(focus.zoom, 3)}
+
+
+def _clean_focus(raw) -> Optional[dict]:
+    """A focus read back from a token or snapshot, re-validated."""
+    from pydantic import ValidationError
+    from app.schemas.share_card import PhotoFocus
+
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return _focus_claim(PhotoFocus(**raw))
+    except (ValidationError, TypeError):
+        return None
+
+
 def _photo_parent_column(app: str):
     from app.models.photo import Photo
     return Photo.invert_id if app == "tarantuverse" else Photo.animal_id
@@ -195,6 +215,7 @@ async def create_share_card(
         "molt_id": str(body.molt_id) if body.molt_id else None,
         "fields": fields, "shape": body.shape, "frame": body.frame,
         "photo_id": str(body.photo_id) if body.photo_id else None,
+        "focus": _focus_claim(body.focus),
     })
     image_url = f"{settings.CARD_RENDERER_ORIGIN.rstrip('/')}/api/card/{token}"
 
@@ -203,7 +224,8 @@ async def create_share_card(
         code = secrets.token_urlsafe(16)
         # The frame is frozen with the text: a shared link always shows the
         # card as it looked when it was shared.
-        payload = dict(compose_card(body.kind, subject, fields, molt=molt), frame=body.frame)
+        payload = dict(compose_card(body.kind, subject, fields, molt=molt), frame=body.frame,
+                       photo_focus=_focus_claim(body.focus))
         db.add(CardLink(
             id=uuid.uuid4(), code=code, app=body.app, animal_id=body.animal_id, kind=body.kind,
             payload=payload, created_by=current_user.id, owner_id=owner.id,
@@ -268,6 +290,7 @@ async def share_card_data(token: str, response: Response, db: Session = Depends(
     card["shape"] = claims["shape"]
     # Tokens minted before frames existed have no frame claim.
     card["frame"] = clean_frame(claims.get("frame"))
+    card["photo_focus"] = _clean_focus(claims.get("focus"))
     return card
 
 

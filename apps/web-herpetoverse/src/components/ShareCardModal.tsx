@@ -6,9 +6,10 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import {
-  CardApp, CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, SharePhoto,
+  CardApp, CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, PHOTO_ASPECT, PhotoFocus, SharePhoto, focusKey,
   createShareCard, getShareDefaults, listSharePhotos, previewImageUrl, shareImageUrl,
 } from '@/lib/shareCards'
+import PhotoAdjustPanel from '@/components/PhotoAdjustPanel'
 
 const GENERIC_ERROR = "Couldn't make the card. Try again."
 // Preview tokens last 15 minutes; reuse a cached preview for a bit less.
@@ -60,6 +61,9 @@ export default function ShareCardModal({
   const [photos, setPhotos] = useState<SharePhoto[]>([])
   // null = the animal's main photo.
   const [photoId, setPhotoId] = useState<string | null>(null)
+  // The keeper's framing for that photo; null = automatic.
+  const [focus, setFocus] = useState<PhotoFocus | null>(null)
+  const [adjusting, setAdjusting] = useState(false)
   // Previews already drawn while the modal is open: going back is instant.
   const cache = useRef(new Map<string, { url: string; at: number }>())
   const prefetched = useRef<string | null>(null)
@@ -75,14 +79,18 @@ export default function ShareCardModal({
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
-  const keyFor = (f: string[], s: CardShape, fr: CardFrame, ph: string | null) => `${fr}|${s}|${[...f].sort().join(',')}|${ph ?? 'main'}`
-  const key = fields ? keyFor(fields, shape, frame, photoId) : ''
+  const keyFor = (f: string[], s: CardShape, fr: CardFrame, ph: string | null, fo: PhotoFocus | null) =>
+    `${fr}|${s}|${[...f].sort().join(',')}|${ph ?? 'main'}|${focusKey(fo)}`
+  const key = fields ? keyFor(fields, shape, frame, photoId, focus) : ''
+  const currentPhoto = photos.find((ph) => (photoId ? ph.id === photoId : ph.is_main)) ?? null
 
   // Reset per open / per molt so nothing stale from a previous card shows.
   useEffect(() => {
     if (!open) return
     setPreview(null)
     setPhotoId(null)
+    setFocus(null)
+    setAdjusting(false)
     cache.current.clear()
     prefetched.current = null
     setCardLink(null)
@@ -116,8 +124,8 @@ export default function ShareCardModal({
     const hit = cache.current.get(k)
     return hit && Date.now() - hit.at < PREVIEW_TTL_MS ? hit.url : null
   }
-  const requestPreview = async (f: string[], s: CardShape, fr: CardFrame, ph: string | null) => {
-    const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields: f, shape: s, frame: fr, photo_id: ph, link: false, preview: true })
+  const requestPreview = async (f: string[], s: CardShape, fr: CardFrame, ph: string | null, fo: PhotoFocus | null) => {
+    const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields: f, shape: s, frame: fr, photo_id: ph, focus: fo, link: false, preview: true })
     return previewImageUrl(r.image_url)
   }
 
@@ -133,7 +141,7 @@ export default function ShareCardModal({
       setError(null)
       return
     }
-    const k = keyFor(fields, shape, frame, photoId)
+    const k = keyFor(fields, shape, frame, photoId, focus)
     const hit = cachedUrl(k)
     setError(null)
     setLoading(true)
@@ -146,7 +154,7 @@ export default function ShareCardModal({
     timer.current = setTimeout(async () => {
       const id = ++reqId.current
       try {
-        const url = await requestPreview(fields, shape, frame, photoId)
+        const url = await requestPreview(fields, shape, frame, photoId, focus)
         cache.current.set(k, { url, at: Date.now() })
         if (id !== reqId.current) return
         setPreview(url)
@@ -158,21 +166,21 @@ export default function ShareCardModal({
     }, 350)
     return () => { if (timer.current) clearTimeout(timer.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, fields, shape, frame, photoId, token, app, animalId, kind, moltId])
+  }, [open, fields, shape, frame, photoId, focus, token, app, animalId, kind, moltId])
 
   /** Once the current preview shows, quietly draw the other two frames so
    *  switching frame is instant. Once per fields/shape/photo combination. */
   const prefetchOtherFrames = () => {
     if (!fields || fields.length === 0) return
-    const combo = keyFor(fields, shape, 'specimen', photoId)
+    const combo = keyFor(fields, shape, 'specimen', photoId, focus)
     if (prefetched.current === combo) return
     prefetched.current = combo
-    const f = fields, s = shape, ph = photoId
+    const f = fields, s = shape, ph = photoId, fo = focus
     FRAMES.filter((x) => x.key !== frame).forEach(async ({ key: fr }) => {
-      const k = keyFor(f, s, fr, ph)
+      const k = keyFor(f, s, fr, ph, fo)
       if (cachedUrl(k)) return
       try {
-        const url = await requestPreview(f, s, fr, ph)
+        const url = await requestPreview(f, s, fr, ph, fo)
         cache.current.set(k, { url, at: Date.now() })
         const img = new window.Image()
         img.src = url
@@ -233,7 +241,7 @@ export default function ShareCardModal({
     setError(null)
     try {
       const reuse = link && !!shownLink
-      const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields, shape, frame, photo_id: photoId, link: reuse ? false : link })
+      const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields, shape, frame, photo_id: photoId, focus, link: reuse ? false : link })
       const url = reuse ? shownLink : r.card_link
       if (!reuse && r.card_link) setCardLink({ url: r.card_link, key })
       // Full-size JPEG: ~10x smaller than the PNG, indistinguishable on a feed.
@@ -271,7 +279,13 @@ export default function ShareCardModal({
         className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-950 shadow-2xl p-6 grid md:grid-cols-2 gap-6 outline-none"
       >
         <div className="flex items-center justify-center bg-neutral-900 rounded-lg min-h-[320px]">
-          {noFields
+          {adjusting && currentPhoto ? (
+            <PhotoAdjustPanel
+              url={currentPhoto.url} aspect={PHOTO_ASPECT[frame][shape as 'story' | 'post' | 'square']} value={focus}
+              onCancel={() => setAdjusting(false)}
+              onDone={(fo) => { setFocus(fo); setAdjusting(false) }}
+            />
+          ) : noFields
             ? <span className="text-neutral-500 text-sm px-4 text-center">Pick at least one thing to show.</span>
             : preview
               ? (
@@ -327,7 +341,7 @@ export default function ShareCardModal({
                   const on = ph.id === (photoId ?? photos.find((x) => x.is_main)?.id)
                   return (
                     <button
-                      key={ph.id} onClick={() => setPhotoId(ph.is_main ? null : ph.id)} aria-pressed={on}
+                      key={ph.id} onClick={() => { setPhotoId(ph.is_main ? null : ph.id); setFocus(null); setAdjusting(false) }} aria-pressed={on}
                       aria-label={ph.is_main ? 'Main photo' : `Photo ${i + 1}`}
                       className={`shrink-0 w-14 h-14 rounded-md overflow-hidden ${on ? 'border-2 border-emerald-500' : 'border border-neutral-700'}`}
                     >
@@ -338,6 +352,11 @@ export default function ShareCardModal({
                 })}
               </div>
             </div>
+          ) : null}
+          {currentPhoto && fields?.includes('photo') && !adjusting ? (
+            <button onClick={() => setAdjusting(true)} className="self-start px-3 py-1.5 rounded-lg text-sm border border-neutral-700 text-neutral-200">
+              {focus ? 'Adjust photo (custom)' : 'Adjust photo'}
+            </button>
           ) : null}
           <fieldset className="border border-neutral-800 rounded-lg divide-y divide-neutral-800">
             <legend className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider px-1">On this card</legend>

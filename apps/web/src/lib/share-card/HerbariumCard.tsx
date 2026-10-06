@@ -53,14 +53,16 @@ const LAYOUT: Record<Shape, Layout> = {
     stacked: false,
     type: { header: 24, name: 84, sci: 36, common: 28, label: 22, value: 31, row: 28 },
   },
-  // Square departs from the handoff (photo 510 wide, box from 636): at that
-  // width the header and species wrapped. A narrower photo buys the box room.
+  // Square departs from the handoff, which put a 510x900 photo beside a
+  // narrow box: a 1:2 sliver that cut most phone photos badly, and the box
+  // wrapped. It now stacks like post; the photo gives up height to the box.
   square: {
-    photo: { left: 66, top: 78, width: 470, height: 924 },
-    box: { left: 590, right: 60, bottom: 78, top: 78 },
+    photo: { left: 78, top: 72, width: 924, height: 600 },
+    photoNoFacts: 680,
+    box: { left: 78, right: 78, bottom: 60 },
     tape: SMALL_TAPE,
-    stacked: true,
-    type: { header: 18, name: 66, sci: 28, common: 24, label: 26, value: 26, row: 26 },
+    stacked: false,
+    type: { header: 20, name: 64, sci: 30, common: 24, label: 18, value: 26, row: 26 },
   },
   wide: {
     photo: { left: 54, top: 48, width: 504, height: 534 },
@@ -190,7 +192,7 @@ export function HerbariumCard({ p, shape }: { p: CardPayload; shape: Shape }) {
     position: 'absolute', left: L.box.left, right: L.box.right, bottom: L.box.bottom,
     ...(L.box.top !== undefined ? { top: L.box.top } : {}),
     border: `4.5px solid ${BORDER}`, background: 'rgba(237,231,214,.6)',
-    padding: L.stacked ? '30px 32px 24px' : '42px 48px 36px',
+    padding: L.stacked ? '30px 32px 24px' : shape === 'square' ? '30px 36px 26px' : '42px 48px 36px',
     display: 'flex', flexDirection: 'column', color: INK,
   }
   const headerStyle: CSSProperties = { display: 'flex', fontSize: t.header, letterSpacing: L.stacked ? 4 : 6.6, color: INK_SOFT }

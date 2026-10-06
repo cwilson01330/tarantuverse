@@ -5,6 +5,15 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class PhotoFocus(BaseModel):
+    """Where the keeper wants the photo framed: the point of the photo (0-1
+    across, 0-1 down) to centre in the card's photo window, and how far to
+    zoom in. Works for every frame and shape, since each crops around it."""
+    x: float = Field(0.5, ge=0, le=1)
+    y: float = Field(0.5, ge=0, le=1)
+    zoom: float = Field(1, ge=1, le=4)
+
+
 class ShareCardCreate(BaseModel):
     app: str = Field(..., pattern="^(tarantuverse|herpetoverse)$")
     animal_id: UUID
@@ -15,6 +24,8 @@ class ShareCardCreate(BaseModel):
     frame: str = Field("specimen", pattern="^(specimen|notes|herbarium)$")
     # Which of the animal's photos to use. None = its main photo.
     photo_id: Optional[UUID] = None
+    # How to frame that photo. None = automatic.
+    focus: Optional[PhotoFocus] = None
     link: bool = False
     # Live-preview render: mints a token only. Never saves defaults or a link.
     preview: bool = False

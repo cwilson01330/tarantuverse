@@ -10,6 +10,20 @@ export const FRAMES: { key: CardFrame; label: string }[] = [
   { key: 'notes', label: 'Field notes' },
   { key: 'specimen', label: 'Specimen' },
 ];
+/** The keeper's framing for the photo: point to centre (0-1) and zoom (1-4). */
+export interface PhotoFocus { x: number; y: number; zoom: number }
+
+/** Width/height of the photo window per frame and shape, so "Adjust photo"
+ *  shows roughly what the card will. Mirrors the renderer in
+ *  apps/web/src/lib/share-card (story/post/square photo slots). The renderer
+ *  crops around the same centre point, so small differences don't matter. */
+export const PHOTO_ASPECT: Record<CardFrame, Record<CardShape, number>> = {
+  specimen: { story: 968 / 1075, post: 968 / 675, square: 984 / 540 },
+  notes: { story: 972 / 1254, post: 972 / 786, square: 972 / 580 },
+  herbarium: { story: 900 / 1140, post: 900 / 708, square: 924 / 570 },
+};
+export const focusKey = (f: PhotoFocus | null) => (f ? `${f.x.toFixed(3)},${f.y.toFixed(3)},${f.zoom.toFixed(2)}` : 'auto');
+
 /** One of the animal's photos, for the composer's photo picker. */
 export interface SharePhoto { id: string; url: string; thumbnail_url: string | null; is_main: boolean }
 
@@ -38,7 +52,7 @@ export async function getShareDefaults(kind: CardKind): Promise<ShareDefaults> {
   const { data } = await apiClient.get<{ fields: string[]; frame?: CardFrame }>(`/share-cards/defaults`, { params: { app: 'tarantuverse', kind } });
   return { fields: data.fields, frame: data.frame ?? 'specimen' };
 }
-export async function createShareCard(body: { animal_id: string; kind: CardKind; molt_id?: string; fields: string[]; shape: CardShape; frame: CardFrame; photo_id?: string | null; link: boolean; preview?: boolean }): Promise<ShareCardCreated> {
+export async function createShareCard(body: { animal_id: string; kind: CardKind; molt_id?: string; fields: string[]; shape: CardShape; frame: CardFrame; photo_id?: string | null; focus?: PhotoFocus | null; link: boolean; preview?: boolean }): Promise<ShareCardCreated> {
   const { data } = await apiClient.post<ShareCardCreated>(`/share-cards/`, { app: 'tarantuverse', ...body });
   return data;
 }

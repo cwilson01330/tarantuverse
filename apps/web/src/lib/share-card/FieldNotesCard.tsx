@@ -24,7 +24,9 @@ const TYPE: Record<Shape, { headline: number; facts: number }> = {
   square: { headline: 92, facts: 56 },
   wide: { headline: 90, facts: 57 },
 }
-const PHOTO_H: Record<'story' | 'post', number> = { story: 1254, post: 786 }
+// Square used to put the photo in a 480px-wide side column (a 1:2 sliver);
+// it now stacks like post.
+const PHOTO_H: Record<'story' | 'post' | 'square', number> = { story: 1254, post: 786, square: 600 }
 
 const upper = (s: string) => s.toUpperCase()
 
@@ -68,7 +70,7 @@ function FactsLine({ facts, size, stacked }: { facts: string[]; size: number; st
 
 function Text({ p, shape }: { p: CardPayload; shape: Shape }) {
   const t = TYPE[shape]
-  const side = shape === 'wide' || shape === 'square'
+  const side = shape === 'wide'
   const facts = p.notes.facts
   // At the side-column shapes two facts read best one per line, like a note;
   // longer lists stay on one wrapping line so they still fit the column.
@@ -107,22 +109,20 @@ function estimateTextHeight(p: CardPayload, shape: Shape, textW: number): number
 /** The photo's drawn size. Exported so the renderer can crop to it exactly. */
 export function fieldNotesPhotoSize(p: CardPayload, shape: Shape): { w: number; h: number } {
   const { width, height } = SHAPE_SIZE[shape]
-  if (shape === 'wide' || shape === 'square') {
-    // Square departs from the handoff (600 wide): that left a 330px text
-    // column and long names were clipped.
-    return { w: shape === 'wide' ? 546 : 480, h: height - PAD * 2 }
+  if (shape === 'wide') {
+    return { w: 546, h: height - PAD * 2 }
   }
   // No facts line: the photo takes the freed height. A long headline or
   // facts line takes height back, so the text never runs into the wordmark.
   const freed = p.notes.facts.length > 0 ? 0 : Math.round(TYPE[shape].facts * 1.15) + 12
   const room = height - PAD * 2 - 42 - estimateTextHeight(p, shape, width - PAD * 2)
-  return { w: width - PAD * 2, h: Math.max(480, Math.min(PHOTO_H[shape] + freed, room)) }
+  return { w: width - PAD * 2, h: Math.max(shape === 'square' ? 380 : 480, Math.min(PHOTO_H[shape] + freed, room)) }
 }
 
 export function FieldNotesCard({ p, shape }: { p: CardPayload; shape: Shape }) {
   const { width, height } = SHAPE_SIZE[shape]
   const ph = fieldNotesPhotoSize(p, shape)
-  if (shape === 'wide' || shape === 'square') {
+  if (shape === 'wide') {
     const photoW = ph.w
     return (
       <div style={{ width, height, background: GROUND, display: 'flex', padding: PAD, fontFamily: 'Caslon' }}>

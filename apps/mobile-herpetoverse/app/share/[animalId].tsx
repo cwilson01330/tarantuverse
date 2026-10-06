@@ -15,9 +15,10 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { TYPE } from '../../src/theme/type';
 import { FrameRow } from '../../src/components/share/FrameRow';
 import { PhotoStrip } from '../../src/components/share/PhotoStrip';
+import { PhotoAdjuster } from '../../src/components/share/PhotoAdjuster';
 import { AppHeader } from '../../src/components/AppHeader';
 import {
-  CardFrame, CardShape, FIELDS, FIELD_LABELS, FRAMES, SharePhoto,
+  CardFrame, CardShape, FIELDS, FIELD_LABELS, FRAMES, PHOTO_ASPECT, PhotoFocus, SharePhoto, focusKey,
   createShareCard, getShareDefaults, listSharePhotos, previewImageUrl, shareImageUrl,
 } from '../../src/lib/share-cards';
 
@@ -25,7 +26,8 @@ const ASPECT: Record<CardShape, number> = { story: 1080 / 1920, post: 1080 / 135
 
 // Preview tokens last 15 minutes; reuse a cached preview for a bit less.
 const PREVIEW_TTL_MS = 12 * 60 * 1000;
-const previewKey = (f: string[], s: CardShape, fr: CardFrame, ph: string | null) => `${[...f].sort().join(',')}|${s}|${fr}|${ph ?? 'main'}`;
+const previewKey = (f: string[], s: CardShape, fr: CardFrame, ph: string | null, fo: PhotoFocus | null) =>
+  `${[...f].sort().join(',')}|${s}|${fr}|${ph ?? 'main'}|${focusKey(fo)}`;
 
 /** A card link made in this screen session, reusable while frame+fields+shape+photo are unchanged. */
 interface MadeLink { key: string; cardLink: string }
@@ -45,6 +47,9 @@ export default function ShareCardScreen() {
   const [photos, setPhotos] = useState<SharePhoto[]>([]);
   // null = the animal's main photo.
   const [photoId, setPhotoId] = useState<string | null>(null);
+  // The keeper's framing for that photo; null = automatic.
+  const [focus, setFocus] = useState<PhotoFocus | null>(null);
+  const [adjusting, setAdjusting] = useState(false);
   // Previews already drawn this session, so going back to a frame/shape/photo is instant.
   const cache = useRef(new Map<string, { uri: string; at: number }>());
   const prefetched = useRef<string | null>(null);
@@ -78,8 +83,8 @@ export default function ShareCardScreen() {
     const hit = cache.current.get(k);
     return hit && Date.now() - hit.at < PREVIEW_TTL_MS ? hit.uri : null;
   };
-  const requestPreview = async (f: string[], s: CardShape, fr: CardFrame, ph: string | null) => {
-    const r = await createShareCard({ animal_id: animalId, fields: f, shape: s, frame: fr, photo_id: ph, link: false, preview: true });
+  const requestPreview = async (f: string[], s: CardShape, fr: CardFrame, ph: string | null, fo: PhotoFocus | null) => {
+    const r = await createShareCard({ animal_id: animalId, fields: f, shape: s, frame: fr, photo_id: ph, focus: fo, link: false, preview: true });
     return previewImageUrl(r.image_url);
   };
 
@@ -94,7 +99,7 @@ export default function ShareCardScreen() {
       setError(null);
       return;
     }
-    const k = previewKey(fields, shape, frame, photoId);
+    const k = previewKey(fields, shape, frame, photoId, focus);
     const hit = cached(k);
     setError(null);
     // Keep the old image on screen (dimmed) while the new one draws.
@@ -106,7 +111,7 @@ export default function ShareCardScreen() {
     }
     timer.current = setTimeout(async () => {
       try {
-        const uri = await requestPreview(fields, shape, frame, photoId);
+        const uri = await requestPreview(fields, shape, frame, photoId, focus);
         cache.current.set(k, { uri, at: Date.now() });
         if (mine === reqId.current) setPreview({ uri, shape });
       } catch {
@@ -114,21 +119,21 @@ export default function ShareCardScreen() {
       }
     }, 350);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [fields, shape, frame, photoId, animalId]);
+  }, [fields, shape, frame, photoId, focus, animalId]);
 
   /** Once the current preview is on screen, quietly draw the other two frames
    *  so switching frame is instant. Runs once per fields/shape/photo combination. */
   const prefetchOtherFrames = () => {
     if (!fields || fields.length === 0) return;
-    const combo = previewKey(fields, shape, 'specimen', photoId);
+    const combo = previewKey(fields, shape, 'specimen', photoId, focus);
     if (prefetched.current === combo) return;
     prefetched.current = combo;
-    const f = fields, s = shape, ph = photoId;
+    const f = fields, s = shape, ph = photoId, fo = focus;
     FRAMES.filter((x) => x.key !== frame).forEach(async ({ key: fr }) => {
-      const k = previewKey(f, s, fr, ph);
+      const k = previewKey(f, s, fr, ph, fo);
       if (cached(k)) return;
       try {
-        const uri = await requestPreview(f, s, fr, ph);
+        const uri = await requestPreview(f, s, fr, ph, fo);
         cache.current.set(k, { uri, at: Date.now() });
         await Image.prefetch(uri);
       } catch { /* best effort */ }
@@ -157,13 +162,16 @@ export default function ShareCardScreen() {
   };
   const pickShape = (s: CardShape) => { madeLink.current = null; setShownLink(null); setShape(s); };
   const pickFrame = (f: CardFrame) => { madeLink.current = null; setShownLink(null); setFrame(f); };
-  const pickPhoto = (id: string | null) => { madeLink.current = null; setShownLink(null); setPhotoId(id); };
+  // A new photo starts from automatic framing: the old focus point belonged to the old photo.
+  const pickPhoto = (id: string | null) => { madeLink.current = null; setShownLink(null); setPhotoId(id); setFocus(null); };
+  const applyFocus = (fo: PhotoFocus | null) => { madeLink.current = null; setShownLink(null); setFocus(fo); setAdjusting(false); };
+  const currentPhoto = photos.find((ph) => (photoId ? ph.id === photoId : ph.is_main)) ?? null;
   const onLinkChange = (v: boolean) => { if (!v) { madeLink.current = null; setShownLink(null); } setLink(v); };
 
   const produce = async (): Promise<{ file: string; cardLink: string | null }> => {
-    const key = linkKey(fields!, shape, frame, photoId);
+    const key = linkKey(fields!, shape, frame, photoId, focus);
     const reuse = link && madeLink.current?.key === key ? madeLink.current : null;
-    const r = await createShareCard({ animal_id: animalId!, fields: fields!, shape, frame, photo_id: photoId, link: link && !reuse });
+    const r = await createShareCard({ animal_id: animalId!, fields: fields!, shape, frame, photo_id: photoId, focus, link: link && !reuse });
     if (link && r.card_link) madeLink.current = { key, cardLink: r.card_link };
     // Full-size JPEG: ~10x smaller than the PNG, indistinguishable on a feed.
     const file = `${FileSystem.cacheDirectory}share-card-${Date.now()}.jpg`;
@@ -228,6 +236,20 @@ export default function ShareCardScreen() {
         </View>
         <FrameRow value={frame} onChange={pickFrame} />
         {photos.length > 1 && fields?.includes('photo') ? <PhotoStrip photos={photos} value={photoId} onChange={pickPhoto} /> : null}
+        {currentPhoto && fields?.includes('photo') ? (
+          <TouchableOpacity onPress={() => setAdjusting(true)} accessibilityRole="button" style={[styles.adjustBtn, { borderRadius: layout.radius.md }]}>
+            <MaterialCommunityIcons name="crop" size={18} color={colors.textPrimary} />
+            <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>{focus ? 'Adjust photo (custom)' : 'Adjust photo'}</Text>
+          </TouchableOpacity>
+        ) : null}
+        <PhotoAdjuster
+          visible={adjusting}
+          uri={currentPhoto?.url ?? null}
+          aspect={PHOTO_ASPECT[frame][shape]}
+          value={focus}
+          onCancel={() => setAdjusting(false)}
+          onDone={applyFocus}
+        />
         <View style={styles.chips} accessibilityRole="radiogroup">
           {(['story', 'post', 'square'] as CardShape[]).map((s) => {
             const on = s === shape;
@@ -283,6 +305,7 @@ export default function ShareCardScreen() {
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16, gap: 12, paddingBottom: 48 },
+  adjustBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 44, borderWidth: 1, borderColor: colors.border, alignSelf: 'center', paddingHorizontal: 16 },
   previewFrame: { width: '70%', alignItems: 'center', justifyContent: 'center' },
   previewSpinner: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
   previewEmpty: { alignItems: 'center', gap: 8 },

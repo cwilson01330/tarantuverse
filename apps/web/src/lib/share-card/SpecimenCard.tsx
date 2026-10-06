@@ -6,6 +6,7 @@
  */
 export type Shape = 'story' | 'post' | 'square' | 'wide'
 export type Frame = 'specimen' | 'notes' | 'herbarium'
+export type PhotoFocus = { x: number; y: number; zoom: number }
 
 /** The Field notes frame's handwritten copy, composed on the server. */
 export type CardNotes = { headline: string | null; species_line: string | null; facts: string[] }
@@ -19,6 +20,8 @@ export type CardPayload = {
   scientific_name: string | null
   common_name: string | null
   photo_url: string | null
+  /** Keeper's framing: point to centre (0-1) and zoom (1-4). null = automatic. */
+  photo_focus: PhotoFocus | null
   facts: { label: string; value: string }[]
   notes: CardNotes
   shape: Shape
@@ -120,12 +123,34 @@ function Label({ p, scale, width }: { p: CardPayload; scale: number; width: numb
 const sidePad = (shape: Shape) => (shape === 'wide' ? 36 : 48)
 const TALL_PAD = 56
 
-/** The photo's drawn size. Exported so the renderer can crop to it exactly. */
-export function specimenPhotoSize(shape: Shape): { w: number; h: number } {
+const SQUARE_PAD = 48
+const SQUARE_LABEL_SCALE = 0.72
+
+/** Rough height of the label at a scale, for sizing the square photo. Errs high. */
+function estimateLabelHeight(p: CardPayload, scale: number): number {
+  let h = 26 * 1.3
+  if (p.name) h += 6 + 64 * 1.15
+  if (p.scientific_name) h += 4 + 34 * 1.3
+  if (p.common_name) h += 2 + 26 * 1.3
+  if (p.facts.length > 0) h += 32 + p.facts.length * 45
+  h += 32 // ruler
+  return Math.ceil(h * scale)
+}
+
+/** The photo's drawn size. Exported so the renderer can crop to it exactly.
+ *  Square used to put a half-width photo beside the label (a 1:2 sliver that
+ *  cut most phone photos badly); it now stacks like post, and the photo takes
+ *  whatever height the label leaves. */
+export function specimenPhotoSize(shape: Shape, p?: CardPayload): { w: number; h: number } {
   const { width, height } = SHAPE_SIZE[shape]
-  if (shape === 'wide' || shape === 'square') {
+  if (shape === 'wide') {
     const pad = sidePad(shape)
-    return { w: Math.round(width * (shape === 'wide' ? 0.46 : 0.5)) - pad, h: height - pad * 2 }
+    return { w: Math.round(width * 0.46) - pad, h: height - pad * 2 }
+  }
+  if (shape === 'square') {
+    const label = p ? estimateLabelHeight(p, SQUARE_LABEL_SCALE) : 300
+    const h = height - SQUARE_PAD * 2 - 28 - label - 30
+    return { w: width - SQUARE_PAD * 2, h: Math.max(420, Math.min(600, h)) }
   }
   return { w: width - TALL_PAD * 2, h: Math.round(height * (shape === 'story' ? 0.56 : 0.5)) }
 }
@@ -135,7 +160,7 @@ export function SpecimenCard({ p, shape }: { p: CardPayload; shape: Shape }) {
   const wordmark = (
     <div style={{ fontSize: shape === 'wide' ? 22 : 28, color: INK_SOFT }}>{p.app}</div>
   )
-  if (shape === 'wide' || shape === 'square') {
+  if (shape === 'wide') {
     const pad = sidePad(shape)
     const photoW = specimenPhotoSize(shape).w
     const labelW = width - photoW - pad * 3
@@ -143,19 +168,20 @@ export function SpecimenCard({ p, shape }: { p: CardPayload; shape: Shape }) {
       <div style={{ width, height, background: PAPER, display: 'flex', padding: pad, fontFamily: 'Caslon' }}>
         <Photo url={p.photo_url} taxon={p.taxon} w={photoW} h={height - pad * 2} />
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', marginLeft: pad, width: labelW }}>
-          <Label p={p} scale={shape === 'wide' ? 0.62 : 0.8} width={labelW} />
+          <Label p={p} scale={0.62} width={labelW} />
           {wordmark}
         </div>
       </div>
     )
   }
-  const pad = TALL_PAD
-  const photoH = specimenPhotoSize(shape).h
+  const square = shape === 'square'
+  const pad = square ? SQUARE_PAD : TALL_PAD
+  const photo = specimenPhotoSize(shape, p)
   return (
     <div style={{ width, height, background: PAPER, display: 'flex', flexDirection: 'column', padding: pad, fontFamily: 'Caslon' }}>
-      <Photo url={p.photo_url} taxon={p.taxon} w={width - pad * 2} h={photoH} />
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flexGrow: 1, marginTop: 40 }}>
-        <Label p={p} scale={1} width={width - pad * 2} />
+      <Photo url={p.photo_url} taxon={p.taxon} w={photo.w} h={photo.h} />
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flexGrow: 1, marginTop: square ? 30 : 40 }}>
+        <Label p={p} scale={square ? SQUARE_LABEL_SCALE : 1} width={width - pad * 2} />
         {wordmark}
       </div>
     </div>
