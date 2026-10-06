@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 import PublicCareShell from '@/components/PublicCareShell'
 import ShortlistButton from '@/components/ShortlistButton'
+import { growthLengthLabel } from '@/lib/inverts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -125,6 +126,10 @@ const HARMLESS_COPY: Record<string, { title: string; body: string }> = {
   roach: {
     title: 'No venom, no sting',
     body: 'Pet and feeder roaches are harmless to humans — no venom, no sting, and no meaningful bite. Wash your hands after handling.',
+  },
+  isopod: {
+    title: 'Harmless to people',
+    body: 'Isopods are harmless to humans — no venom, no sting, and no bite that breaks skin. They are detritivores, so wash your hands after handling the substrate.',
   },
   true_spider: {
     title: 'Not medically significant',
@@ -387,7 +392,7 @@ export default function InvertCareSheetClient({
               <Fact label="Adult size" value={species.adult_size} />
               {(species.adult_length_min_mm || species.adult_length_max_mm) && (
                 <Fact
-                  label={species.taxon === 'whip_spider' ? 'Leg span' : 'Length'}
+                  label={growthLengthLabel(species.taxon)}
                   value={`${species.adult_length_min_mm ?? '?'}–${species.adult_length_max_mm ?? '?'} mm`}
                 />
               )}

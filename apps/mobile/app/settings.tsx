@@ -562,7 +562,7 @@ export default function SettingsScreen() {
             style={[styles.input, styles.textArea]}
             value={formData.profile_bio}
             onChangeText={(text) => setFormData({ ...formData, profile_bio: text })}
-            placeholder="Tell us about yourself and your tarantula keeping journey..."
+            placeholder="Tell us about yourself and your keeping journey..."
             placeholderTextColor={colors.textTertiary}
             multiline
             numberOfLines={4}

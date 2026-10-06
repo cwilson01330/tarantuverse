@@ -642,7 +642,7 @@ export default function KeeperProfilePage() {
             ) : (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">📦</div>
-                <p className="text-gray-600 dark:text-gray-400">No public tarantulas in this collection</p>
+                <p className="text-gray-600 dark:text-gray-400">No public animals in this collection</p>
               </div>
             )
           ) : (

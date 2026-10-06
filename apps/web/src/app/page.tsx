@@ -319,7 +319,7 @@ export default function Home() {
         </div>
 
         <p className="text-center text-sm text-gray-400 mt-8 max-w-2xl mx-auto">
-          Plus whip spiders, vinegaroons, true spiders, millipedes, mantises, and roaches —
+          Plus whip spiders, vinegaroons, true spiders, millipedes, mantises, roaches, and isopods —
           each with their own care sheets and the same tracking tools.
         </p>
       </section>
@@ -497,7 +497,7 @@ export default function Home() {
               <ul className="space-y-3 text-gray-300">
                 <li className="flex items-start gap-3">
                   <span className="text-neon-pink-400 font-bold mt-0.5">→</span>
-                  <span>Generate unique QR codes for each tarantula from the web app</span>
+                  <span>Generate unique QR codes for each animal from the web app</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-neon-pink-400 font-bold mt-0.5">→</span>
@@ -968,7 +968,7 @@ export default function Home() {
             <div className="bg-dark-50 border border-electric-blue-500/20 rounded-2xl p-8 pt-12 h-full">
               <div className="text-4xl mb-4">➕</div>
               <h3 className="text-xl font-bold mb-3 text-gray-100">Add Your Collection</h3>
-              <p className="text-gray-300 text-sm leading-relaxed">Create a profile for each tarantula. Search our species database to auto-fill care requirements. Add a photo from your camera roll.</p>
+              <p className="text-gray-300 text-sm leading-relaxed">Create a profile for each animal. Search our species database to auto-fill care requirements. Add a photo from your camera roll.</p>
             </div>
           </div>
           <div className="relative">

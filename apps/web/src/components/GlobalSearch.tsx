@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
+import { INVERT_TAXA, type InvertTaxon } from '@/lib/inverts'
 
 interface SearchResult {
   id: string
@@ -25,6 +26,24 @@ interface SearchResponse {
 interface GlobalSearchProps {
   isOpen: boolean
   onClose: () => void
+}
+
+// Animal results carry their taxon as the type; everything else is fixed.
+function resultIcon(type: string): string {
+  // Animal results carry their taxon as the type ('mantis', 'scorpion', …).
+  if (type in INVERT_TAXA) return INVERT_TAXA[type as InvertTaxon].glyph
+  switch (type) {
+    case 'colony':
+      return '🪲'
+    case 'species':
+      return '📚'
+    case 'keeper':
+      return '👥'
+    case 'forum':
+      return '💬'
+    default:
+      return '🔍'
+  }
 }
 
 export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
@@ -155,20 +174,7 @@ export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
     setQuery('')
   }
 
-  const getIcon = (type: string) => {
-    switch (type) {
-      case 'tarantula':
-        return '🕷️'
-      case 'species':
-        return '📚'
-      case 'keeper':
-        return '👥'
-      case 'forum':
-        return '💬'
-      default:
-        return '🔍'
-    }
-  }
+
 
   if (!isOpen) return null
 
@@ -190,7 +196,7 @@ export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Search tarantulas, species, keepers, forums..."
+                placeholder="Search animals, species, keepers, forums..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="flex-1 bg-transparent text-lg outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
@@ -233,7 +239,7 @@ export default function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
                 {/* Tarantulas Section */}
                 {results?.tarantulas && results.tarantulas.length > 0 && (
                   <div className="p-4">
-                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-3">🕷️ Tarantulas</p>
+                    <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-3">🐾 Animals</p>
                     {results.tarantulas.map((result) => (
                       <ResultItem
                         key={result.id}
@@ -330,10 +336,7 @@ function ResultItem({ result, isSelected, onSelect }: ResultItemProps) {
         />
       ) : (
         <span className="text-lg flex-shrink-0">
-          {result.type === 'tarantula' && '🕷️'}
-          {result.type === 'species' && '📚'}
-          {result.type === 'keeper' && '👥'}
-          {result.type === 'forum' && '💬'}
+          {resultIcon(result.type)}
         </span>
       )}
 

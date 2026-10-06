@@ -654,7 +654,7 @@ export default function KeeperProfilePage() {
             {tarantulas.length === 0 ? (
               <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                 <div className="text-5xl mb-3">🕷️</div>
-                <p>No public tarantulas yet</p>
+                <p>No public animals yet</p>
               </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -112,7 +112,7 @@ export default function CommunityPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">🌐 Keeper Community</h1>
-              <p className="text-gray-600 dark:text-gray-400 text-lg">Discover fellow tarantula enthusiasts</p>
+              <p className="text-gray-600 dark:text-gray-400 text-lg">Discover fellow keepers</p>
             </div>
             <button
               onClick={() => router.push('/community/forums')}

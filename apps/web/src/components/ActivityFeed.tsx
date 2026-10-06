@@ -202,8 +202,8 @@ export default function ActivityFeed({
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
             {feedType === "personalized"
-              ? "Your feed is personalized — follow other keepers to see their feedings, molts, and new tarantulas show up here."
-              : "Log feedings, molts, or add tarantulas to start seeing community activity."}
+              ? "Your feed is personalized — follow other keepers to see their feedings, molts, and new animals show up here."
+              : "Log feedings, molts, or add animals to start seeing community activity."}
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
             {/* next/link for internal routes — Vercel's no-html-link-for-pages

@@ -49,10 +49,10 @@ newer one while the older one kept serving tarantulas:
 | # | Finding | Who | Size |
 | --- | --- | --- | --- |
 | A1 | **[FIXED 2026-10-05: everything says inches; 4 proven-cm rows converted]** **Molt measurements are stored in two units in the same column.** The web tarantula molt form says inches; the generic invert molt forms (web + mobile, which mobile tarantulas now use too) say cm; growth charts label cm; the share card prints " in". A keeper's growth chart can mix the two. Needs a decision on one unit, then a data look at existing rows before any conversion. | everyone who logs molt sizes | M |
-| A2 | **Global search only searches the legacy tarantula table** (`routers/search.py`). A mantis, isopod or scorpion can't be found. | all non-tarantula | M |
+| A2 | **[FIXED 2026-10-06]** **Global search only searches the legacy tarantula table** (`routers/search.py`). A mantis, isopod or scorpion can't be found. | all non-tarantula | M |
 | A3 | **Full ZIP export only bundles tarantulas** (`export_service.py`); other taxa get no folder and no photos. The mobile export screen shows only a "Tarantulas" count. JSON/CSV are fine. | all non-tarantula | M |
 | A4 | **Premium advanced analytics read only tarantulas** (`routers/analytics.py`). A premium mantis keeper gets an empty page. | premium non-tarantula | M |
-| A5 | Colony event edit/delete doesn't reverse its population change, so counts drift. | colony keepers | S |
+| A5 | **[FIXED 2026-10-06]** Colony event edit/delete doesn't reverse its population change, so counts drift. | colony keepers | S |
 
 ### B. Missing capability for a group
 
@@ -61,12 +61,12 @@ newer one while the older one kept serving tarantulas:
 | B1 | **Colonies: no QR label, no QR photo upload, no public page** (the reported bug). Needs `colony_id` on upload sessions, a colony upload-session route, a public colony page, and colony support in `QRModal` / `QRSheet`. | M |
 | B2 | **Scanning any non-tarantula label opens the browser, not the app.** Universal/App Links only cover `/t/*`. Adding `/i/*` (and the colony path) needs a native build. | S + build |
 | B3 | Colonies on web: no photo gallery/upload, no archive toggle. | S–M |
-| B4 | Colonies: feeding rows can't be edited or deleted; event edit not wired; molt/water/substrate entries can't be edited. API already supports all of it. | S |
+| B4 | **[FIXED 2026-10-06]** Colonies: feeding rows can't be edited or deleted; event edit not wired; molt/water/substrate entries can't be edited. API already supports all of it. | S |
 | B5 | Web invert page lacks pause feeding and the public/private toggle that the tarantula page has. | M |
 | B6 | Colonies: no share card, no mark-died, no transfer, no import. | M–L |
 | B7 | HV: no rack/room locations; breeding limited to snake/lizard/frog; no mark-died on HV web; no shed/weight share card; no growth chart on HV mobile. | M each |
 
-### C. Copy and small drift (cheap, removes most of the "this screen is from another app" feel)
+### C. Copy and small drift — **[DONE 2026-10-06]** (consistency pass; see git log) (cheap, removes most of the "this screen is from another app" feel)
 
 - Isopod missing from the web change-taxon dialog, species SEO labels, claim/feeding-day emoji maps, care-sheet "harmless" copy and import aliases (`pillbug`, `woodlouse`, `isopods`).
 - Tarantula-only wording: notification settings ("Tarantula Care Reminders"), search placeholder, Discover/community strings, web dashboard "Add Tarantula" quick action, landing meta description, "QR codes for each tarantula".

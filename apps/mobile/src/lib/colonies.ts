@@ -554,3 +554,62 @@ export async function uploadColonyPhoto(id: string, form: FormData): Promise<Col
   });
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Edit / delete log rows (audit B4)
+//
+// The by-id routes are shared with every other parent type and resolve access
+// through whichever parent the row carries, colonies included.
+// ---------------------------------------------------------------------------
+
+export async function updateColonyFeeding(
+  feedingId: string,
+  payload: {
+    fed_at?: string;
+    food_type?: string | null;
+    food_size?: string | null;
+    quantity?: number | null;
+    accepted?: boolean;
+    notes?: string | null;
+  },
+): Promise<ColonyFeedingLog> {
+  const { data } = await apiClient.put<ColonyFeedingLog>(`/feedings/${feedingId}`, payload);
+  return data;
+}
+
+export async function deleteColonyFeeding(feedingId: string): Promise<void> {
+  await apiClient.delete(`/feedings/${feedingId}`);
+}
+
+export async function updateColonyMolt(
+  moltId: string,
+  payload: { molted_at?: string; notes?: string | null },
+): Promise<ColonyMoltLog> {
+  const { data } = await apiClient.put<ColonyMoltLog>(`/molts/${moltId}`, payload);
+  return data;
+}
+
+export async function updateColonySubstrateChange(
+  changeId: string,
+  payload: {
+    changed_at?: string;
+    substrate_type?: string | null;
+    reason?: string | null;
+    notes?: string | null;
+  },
+): Promise<ColonySubstrateChange> {
+  const { data } = await apiClient.put<ColonySubstrateChange>(`/substrate-changes/${changeId}`, payload);
+  return data;
+}
+
+export async function updateColonyCareLog(
+  logId: string,
+  payload: {
+    log_type?: import('./inverts').CareLogType;
+    logged_at?: string;
+    notes?: string | null;
+  },
+): Promise<ColonyCareLog> {
+  const { data } = await apiClient.put<ColonyCareLog>(`/care-logs/${logId}`, payload);
+  return data;
+}

@@ -471,7 +471,7 @@ export default function SettingsPage() {
 
             <div className="space-y-3 text-sm text-theme-secondary pt-2">
               <p>Tarantuverse v1.0.0</p>
-              <p>A comprehensive tarantula husbandry tracking platform</p>
+              <p>A comprehensive tarantula and invertebrate husbandry tracking platform</p>
               <p className="text-xs text-theme-tertiary">© 2025 Tarantuverse. All rights reserved.</p>
             </div>
           </div>

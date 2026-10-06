@@ -1139,7 +1139,7 @@ export default function KeeperProfileScreen() {
                         <Image source={{ uri: tarantula.photo_url }} style={styles.tarantulaImage} />
                       ) : (
                         <View style={styles.tarantulaPlaceholder}>
-                          <Text style={styles.tarantulaEmoji}>🕷️</Text>
+                          <Text style={styles.tarantulaEmoji}>🐾</Text>
                         </View>
                       )}
                       {/* Sex badge overlaid on the image corner — frees up
@@ -1209,7 +1209,7 @@ export default function KeeperProfileScreen() {
             ) : (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyEmoji}>📦</Text>
-                <Text style={styles.emptyText}>No public tarantulas</Text>
+                <Text style={styles.emptyText}>No public animals</Text>
               </View>
             )
           ) : (

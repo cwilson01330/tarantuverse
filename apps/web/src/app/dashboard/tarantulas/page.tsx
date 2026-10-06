@@ -111,6 +111,10 @@ export default function TarantulasPage() {
   const [colonies, setColonies] = useState<ColonyListItem[]>([])
   const [taxonFilter, setTaxonFilter] = useState<'all' | TaxonKey | 'colony'>('all')
   const [showAddMenu, setShowAddMenu] = useState(false)
+  // The dashboard's Add Animal action lands here with ?add=1 to open the picker.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('add') === '1') setShowAddMenu(true)
+  }, [])
   const [feedingStatuses, setFeedingStatuses] = useState<Map<string, FeedingStatus>>(new Map())
   const [premoltPredictions, setPremoltPredictions] = useState<Map<string, PremoltPrediction>>(new Map())
   const [searchQuery, setSearchQuery] = useState('')

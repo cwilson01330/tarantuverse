@@ -503,7 +503,7 @@ export default function ProfileSettingsPage() {
                   onChange={(e) => setFormData({ ...formData, profile_bio: e.target.value })}
                   rows={4}
                   className="w-full px-3 py-2 border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600 text-theme-primary bg-surface-elevated"
-                  placeholder="Tell us about yourself and your tarantula keeping journey..."
+                  placeholder="Tell us about yourself and your keeping journey..."
                 />
               </div>
 
@@ -719,7 +719,7 @@ export default function ProfileSettingsPage() {
 
             <div className="bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mb-4">
               <p className="text-sm text-blue-900 dark:text-blue-200">
-                <strong>Collection Visibility:</strong> When your collection is public, other keepers can view your profile and your tarantulas.
+                <strong>Collection Visibility:</strong> When your collection is public, other keepers can view your profile and your animals.
                 Your email, prices paid, and private notes will never be shared.
               </p>
             </div>

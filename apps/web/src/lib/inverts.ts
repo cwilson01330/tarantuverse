@@ -85,9 +85,16 @@ export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding'
 export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   tarantula: ['premolt', 'feedingStats', 'growth', 'breeding'],
   scorpion: ['feedingStats', 'growth', 'breeding'], // breeding pilot — ADR-021 Phase D
-  centipede: ['feedingStats', 'growth'],
-  whip_spider: ['feedingStats'],
-  vinegaroon: ['feedingStats'],
+  // Centipede breeding enabled 2026-10-06 (consistency audit C): the female
+  // broods a clutch of eggs (no egg sac) — see 'Clutch' / 'plings' in
+  // BREEDING_VOCABULARY below. 'plings' still wants a keeper's second opinion.
+  centipede: ['feedingStats', 'growth', 'breeding'],
+  // Growth enabled 2026-10-06 (consistency audit C): both molt through visible
+  // instars and keepers measure them; /inverts/{id}/growth is taxon-agnostic
+  // and growthLengthLabel() labels whip spiders 'Leg span', vinegaroons
+  // 'Body length'. Breeding left off: no keeper demand on record.
+  whip_spider: ['feedingStats', 'growth'],
+  vinegaroon: ['feedingStats', 'growth'],
   // Jumping spiders lay an egg sac like a tarantula, so the pairing → sac →
   // offspring chain is the same shape. Enabled 2026-09-20 on real demand.
   true_spider: ['feedingStats', 'breeding'],

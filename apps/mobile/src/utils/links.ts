@@ -16,6 +16,9 @@
  *
  * Known mappings (web-canonical → mobile equivalent):
  *   /dashboard/tarantulas/<id>      → /tarantula/<id>
+ *   /dashboard/inverts/<id>         → /invert/<id>
+ *   /dashboard/colonies/<id>        → /colony/<id>
+ *   /species/inverts/<id>           → /invert-species/<id>
  *   /keeper/<username>              → /community/<username>
  *   /community/forums/thread/<id>   → /forums/thread/<id>
  *   /species/<id>                   → unchanged ✓
@@ -32,6 +35,18 @@ export function toMobilePath(url: string): string {
   // /dashboard/tarantulas/<id>  →  /tarantula/<id>
   const tarantulaMatch = url.match(/^\/dashboard\/tarantulas\/([^/?#]+)/);
   if (tarantulaMatch) return `/tarantula/${tarantulaMatch[1]}`;
+
+  // /dashboard/inverts/<id>  →  /invert/<id>   (every non-tarantula animal)
+  const invertMatch = url.match(/^\/dashboard\/inverts\/([^/?#]+)/);
+  if (invertMatch) return `/invert/${invertMatch[1]}`;
+
+  // /dashboard/colonies/<id>  →  /colony/<id>
+  const colonyMatch = url.match(/^\/dashboard\/colonies\/([^/?#]+)/);
+  if (colonyMatch) return `/colony/${colonyMatch[1]}`;
+
+  // /species/inverts/<id>  →  /invert-species/<id>
+  const invertSpeciesMatch = url.match(/^\/species\/inverts\/([^/?#]+)/);
+  if (invertSpeciesMatch) return `/invert-species/${invertSpeciesMatch[1]}`;
 
   // /keeper/<u>  →  /community/<u>
   const keeperMatch = url.match(/^\/keeper\/([^/?#]+)/);

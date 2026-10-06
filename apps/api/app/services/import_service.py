@@ -249,6 +249,8 @@ def _normalize_taxon(v: Any) -> Optional[str]:
         "whip spider": "whip_spider", "amblypygid": "whip_spider", "tailless whip scorpion": "whip_spider",
         "vinegaroon": "vinegaroon", "uropygid": "vinegaroon", "whip scorpion": "vinegaroon",
         "hisser": "roach", "roaches": "roach", "cockroach": "roach",
+        "isopods": "isopod", "pillbug": "isopod", "pill bug": "isopod", "pillbugs": "isopod",
+        "woodlouse": "isopod", "woodlice": "isopod", "roly poly": "isopod", "rolypoly": "isopod",
         "t": "tarantula", "tarantulas": "tarantula",
         "scorpions": "scorpion", "centipedes": "centipede", "millipedes": "millipede",
         "mantid": "mantis", "praying mantis": "mantis",

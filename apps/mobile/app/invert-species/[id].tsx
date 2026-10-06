@@ -44,6 +44,7 @@ const HARMLESS_COPY: Record<string, { title: string; body: string }> = {
   mantis: { title: 'No venom, no sting', body: 'Mantises are harmless to humans. They have no venom or sting — the worst they can do is grip with their spined forelegs or deliver a startling but harmless nip.' },
   millipede: { title: 'No venom, no sting', body: "Millipedes don't bite or sting and have no venom. Many do secrete defensive chemicals when stressed, so wash your hands after handling and keep them away from your eyes and mouth." },
   roach: { title: 'No venom, no sting', body: 'Pet and feeder roaches are harmless to humans — no venom, no sting, and no meaningful bite. Wash your hands after handling.' },
+  isopod: { title: 'Harmless to people', body: 'Isopods are harmless to humans — no venom, no sting, and no bite that breaks skin. They are detritivores, so wash your hands after handling the substrate.' },
   true_spider: { title: 'Not medically significant', body: 'Like all spiders, this species has venom, but it is not considered medically significant to humans. Bites are uncommon and, at worst, comparable to a bee sting for most people. Handle minimally.' },
 };
 const DEFAULT_HARMLESS = { title: 'No medically significant venom', body: 'This species is not considered dangerous to humans. Always research individual care before keeping.' };

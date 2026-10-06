@@ -416,7 +416,7 @@ function CollectionScreen() {
       setTarantulas(response.data);
       await fetchAllPremoltPredictions(response.data);
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to load tarantulas');
+      Alert.alert('Error', 'Failed to load your collection');
     } finally {
       setLoading(false);
     }
@@ -968,7 +968,7 @@ function CollectionScreen() {
         onLongPress={() => setActionTarget(item)}
         accessibilityRole="button"
         accessibilityLabel={`${displayName}, ${item.scientific_name}, ${sexLabel}`}
-        accessibilityHint="Opens this tarantula's detail page. Long press for quick actions."
+        accessibilityHint="Opens this animal's detail page. Long press for quick actions."
       >
         <View style={styles.listImageContainer}>
           {item.photo_url ? (

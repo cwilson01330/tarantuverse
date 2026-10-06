@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { ROLE_LABEL, can, useCollectionRole, type CollectionRole } from '@/lib/coKeepers'
 import DashboardLayout from '@/components/DashboardLayout'
 import ColonyPopulationChart from '@/components/ColonyPopulationChart'
+import EditPanel, { type EditField, type EditValues } from './EditPanel'
 import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import {
   COLONY_EVENT_TYPES,
@@ -23,6 +24,12 @@ import {
   type PopulationHistory,
   deleteColony,
   deleteColonyEvent,
+  updateColonyEvent,
+  updateColonyFeeding,
+  deleteColonyFeeding,
+  updateColonyMolt,
+  updateColonySubstrateChange,
+  updateColonyCareLog,
   getColony,
   listColonyEvents,
   listColonyFeedings,
@@ -78,6 +85,23 @@ function formatEventDate(iso: string): string {
   }
   return iso
 }
+
+// Local calendar day of a stored timestamp, as YYYY-MM-DD.
+function localDate(iso: string): string {
+  const d = new Date(iso)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+// Keep the original timestamp when the keeper left the day alone; otherwise
+// noon local so the chosen day survives the UTC round trip.
+function stampFor(origIso: string, newDate: string): string {
+  if (localDate(origIso) === newDate) return origIso
+  return new Date(`${newDate}T12:00:00`).toISOString()
+}
+
+type EditKind = 'feeding' | 'molt' | 'substrate' | 'care' | 'event'
 
 function todayIso(): string {
   const d = new Date()
@@ -157,6 +181,12 @@ export default function ColonyDetailPage() {
   const [feedSubmitting, setFeedSubmitting] = useState(false)
   const [feedError, setFeedError] = useState('')
 
+  // Inline edit of an existing log row (one at a time)
+  const [editing, setEditing] = useState<{ kind: EditKind; id: string } | null>(null)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editError, setEditError] = useState('')
+  const [showAllFeed, setShowAllFeed] = useState(false)
+
   // Delete colony
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -234,6 +264,7 @@ export default function ColonyDetailPage() {
 
   const removeSubstrate = async (id: string) => {
     if (!token) return
+    if (!confirm('Delete this substrate change?')) return
     try {
       await deleteColonySubstrateChange(token, id)
       await fetchAll()
@@ -270,6 +301,7 @@ export default function ColonyDetailPage() {
 
   const removeCareLog = async (id: string) => {
     if (!token) return
+    if (!confirm('Delete this water log?')) return
     try {
       await deleteColonyCareLog(token, id)
       await fetchAll()
@@ -299,6 +331,7 @@ export default function ColonyDetailPage() {
 
   const removeMolt = async (id: string) => {
     if (!token) return
+    if (!confirm('Delete this molt record?')) return
     try {
       await deleteColonyMolt(token, id)
       await fetchAll()
@@ -306,6 +339,236 @@ export default function ColonyDetailPage() {
       setMoltError(e instanceof Error ? e.message : 'Failed to delete')
     }
   }
+
+  const removeFeeding = async (id: string) => {
+    if (!token) return
+    if (!confirm('Delete this feeding?')) return
+    try {
+      await deleteColonyFeeding(token, id)
+      await fetchAll()
+    } catch (e) {
+      setFeedError(e instanceof Error ? e.message : 'Failed to delete feeding')
+    }
+  }
+
+  const startEdit = (kind: EditKind, id: string) => {
+    setEditError('')
+    setEditing({ kind, id })
+  }
+
+  const saveEdit = async (values: EditValues) => {
+    if (!token || !editing) return
+    setEditBusy(true)
+    setEditError('')
+    const text = (k: string) => String(values[k] ?? '').trim()
+    try {
+      if (editing.kind === 'feeding') {
+        const f = feedings.find((x) => x.id === editing.id)
+        if (!f) return
+        const n = parseInt(text('quantity'), 10)
+        await updateColonyFeeding(token, f.id, {
+          fed_at: stampFor(f.fed_at, text('date')),
+          food_type: text('food_type') || null,
+          ...(colonyShowsPreySize(colony?.taxon) ? { food_size: text('food_size') || null } : {}),
+          quantity: Number.isFinite(n) && n > 0 ? n : null,
+          accepted: values.accepted === true,
+          notes: text('notes') || null,
+        })
+      } else if (editing.kind === 'molt') {
+        const m = molts.find((x) => x.id === editing.id)
+        if (!m) return
+        await updateColonyMolt(token, m.id, {
+          molted_at: stampFor(m.molted_at, text('date')),
+          notes: text('notes') || null,
+        })
+      } else if (editing.kind === 'substrate') {
+        await updateColonySubstrateChange(token, editing.id, {
+          changed_at: text('date'),
+          substrate_type: text('substrate_type') || null,
+          reason: text('reason') || null,
+          notes: text('notes') || null,
+        })
+      } else if (editing.kind === 'care') {
+        const c = careLogs.find((x) => x.id === editing.id)
+        if (!c) return
+        await updateColonyCareLog(token, c.id, {
+          log_type: text('log_type') as CareLogType,
+          logged_at: stampFor(c.logged_at, text('date')),
+          notes: text('notes') || null,
+        })
+      } else {
+        const ev = events.find((x) => x.id === editing.id)
+        if (!ev) return
+        const em = colonyEventMeta(ev.event_type)
+        const payload: Record<string, unknown> = {
+          occurred_at: text('date') || ev.occurred_at,
+          notes: text('notes') || null,
+        }
+        if (em?.hasSeverity) payload.severity = text('severity') || null
+        if (ev.count_delta != null || em?.adjustsCount) {
+          const raw = text('count_delta')
+          if (raw === '' && em?.adjustsCount) {
+            setEditError('Enter a count change (use − to remove).')
+            return
+          }
+          if (raw !== '') {
+            const parsed = Number.parseInt(raw, 10)
+            if (!Number.isFinite(parsed)) {
+              setEditError('That doesn’t look like a number.')
+              return
+            }
+            if (em && !em.allowNegative && parsed < 0) {
+              setEditError(`${em.label} amounts must be positive.`)
+              return
+            }
+            payload.count_delta = parsed
+          } else {
+            payload.count_delta = null
+          }
+          payload.stage = text('stage') || null
+        }
+        if (ev.event_type === 'observation' && !text('notes')) {
+          setEditError('An observation needs a note.')
+          return
+        }
+        await updateColonyEvent(token, ev.id, payload)
+      }
+      setEditing(null)
+      await fetchAll()
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : 'Failed to save changes')
+    } finally {
+      setEditBusy(false)
+    }
+  }
+
+  const renderEditor = (kind: EditKind) => {
+    if (!editing || editing.kind !== kind) return null
+    let title = ''
+    let fields: EditField[] = []
+    let initial: EditValues = {}
+    if (kind === 'feeding') {
+      const f = feedings.find((x) => x.id === editing.id)
+      if (!f) return null
+      title = 'Edit feeding'
+      const food = colonyFoodTypes(colony?.taxon)
+      const foodOpts = [{ value: '', label: 'Not recorded' }, ...food.map((x) => ({ value: x, label: x }))]
+      if (f.food_type && !food.includes(f.food_type)) foodOpts.push({ value: f.food_type, label: f.food_type })
+      fields = [
+        { key: 'date', label: 'Date', type: 'date' },
+        { key: 'food_type', label: 'Food type', type: 'select', options: foodOpts },
+        ...(colonyShowsPreySize(colony?.taxon)
+          ? ([{
+              key: 'food_size',
+              label: 'Prey size',
+              type: 'select',
+              options: ['', 'Small', 'Medium', 'Large'].map((v) => ({ value: v, label: v || 'Not recorded' })),
+            }] as EditField[])
+          : []),
+        { key: 'quantity', label: 'Amount', type: 'number', hint: 'Leave blank if you didn’t count.' },
+        { key: 'accepted', label: 'Outcome', type: 'toggle', toggleLabels: ['Taken', 'Refused'] },
+        { key: 'notes', label: 'Notes', type: 'textarea' },
+      ]
+      initial = {
+        date: localDate(f.fed_at),
+        food_type: f.food_type ?? '',
+        food_size: f.food_size ?? '',
+        quantity: f.quantity != null ? String(f.quantity) : '',
+        accepted: f.accepted,
+        notes: f.notes ?? '',
+      }
+    } else if (kind === 'molt') {
+      const m = molts.find((x) => x.id === editing.id)
+      if (!m) return null
+      title = 'Edit molt'
+      fields = [
+        { key: 'date', label: 'Date found', type: 'date' },
+        { key: 'notes', label: 'Notes', type: 'textarea' },
+      ]
+      initial = { date: localDate(m.molted_at), notes: m.notes ?? '' }
+    } else if (kind === 'substrate') {
+      const c = substrates.find((x) => x.id === editing.id)
+      if (!c) return null
+      title = 'Edit substrate change'
+      const reasons = colonySubstrateReasons(colony?.taxon)
+      const opts = [{ value: '', label: 'Not set' }, ...reasons.map((r) => ({ value: r, label: r }))]
+      if (c.reason && !reasons.includes(c.reason)) opts.push({ value: c.reason, label: c.reason })
+      fields = [
+        { key: 'date', label: 'Date changed', type: 'date' },
+        { key: 'substrate_type', label: 'Substrate type', type: 'text' },
+        { key: 'reason', label: 'Reason', type: 'select', options: opts },
+        { key: 'notes', label: 'Notes', type: 'textarea' },
+      ]
+      initial = {
+        date: c.changed_at.slice(0, 10),
+        substrate_type: c.substrate_type ?? '',
+        reason: c.reason ?? '',
+        notes: c.notes ?? '',
+      }
+    } else if (kind === 'care') {
+      const c = careLogs.find((x) => x.id === editing.id)
+      if (!c) return null
+      title = 'Edit water log'
+      fields = [
+        { key: 'log_type', label: 'What did you do?', type: 'select',
+          options: (Object.keys(CARE_LOG_LABELS) as CareLogType[]).map((k) => ({ value: k, label: CARE_LOG_LABELS[k] })) },
+        { key: 'date', label: 'Date', type: 'date' },
+        { key: 'notes', label: 'Notes', type: 'textarea' },
+      ]
+      initial = { log_type: c.log_type, date: localDate(c.logged_at), notes: c.notes ?? '' }
+    } else {
+      const ev = events.find((x) => x.id === editing.id)
+      if (!ev) return null
+      const em = colonyEventMeta(ev.event_type)
+      title = `Edit ${em?.label ?? 'event'}`
+      fields = [{ key: 'date', label: 'Date', type: 'date' }]
+      initial = { date: ev.occurred_at.slice(0, 10), notes: ev.notes ?? '' }
+      if (ev.count_delta != null || em?.adjustsCount) {
+        fields.push(
+          { key: 'stage', label: 'Stage', type: 'text', placeholder: 'Blank = mixed' },
+          {
+            key: 'count_delta',
+            label: 'Count change',
+            type: 'text',
+            hint: 'Changing this moves the population by the difference.',
+          },
+        )
+        initial.stage = ev.stage ?? ''
+        initial.count_delta = ev.count_delta != null ? String(ev.count_delta) : ''
+      }
+      if (em?.hasSeverity) {
+        fields.push({
+          key: 'severity', label: 'Severity', type: 'select',
+          options: [
+            { value: '', label: 'Not set' },
+            { value: 'minor', label: 'Minor' },
+            { value: 'moderate', label: 'Moderate' },
+            { value: 'severe', label: 'Severe' },
+          ],
+        })
+        initial.severity = ev.severity ?? ''
+      }
+      fields.push({ key: 'notes', label: 'Notes', type: 'textarea' })
+    }
+    return (
+      <div className="mb-3">
+        <EditPanel
+          key={`${kind}-${editing.id}`}
+          title={title}
+          fields={fields}
+          initial={initial}
+          busy={editBusy}
+          error={editError}
+          onSave={saveEdit}
+          onCancel={() => setEditing(null)}
+        />
+      </div>
+    )
+  }
+
+  const editBtnCls =
+    'text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline shrink-0'
+  const delBtnCls = 'text-xs font-medium text-red-600 dark:text-red-400 hover:underline shrink-0'
 
   const submitFeeding = async () => {
     if (!token || !colonyId) return
@@ -386,7 +649,7 @@ export default function ColonyDetailPage() {
     if (!token || !colony) return
     if (
       !confirm(
-        'Delete this event? Count changes it caused will NOT be reverted.',
+        'Delete this event? Its count change will be taken back out of the population.',
       )
     ) {
       return
@@ -856,12 +1119,13 @@ export default function ColonyDetailPage() {
             </div>
           )}
 
+          {renderEditor('feeding')}
           <div className="p-4 rounded-2xl border border-theme bg-surface">
             {feedings.length === 0 ? (
               <p className="text-sm text-theme-tertiary">No feedings logged yet.</p>
             ) : (
               <ul className="divide-y divide-theme">
-                {feedings.slice(0, 10).map((f) => (
+                {(showAllFeed ? feedings : feedings.slice(0, 10)).map((f) => (
                   <li key={f.id} className="py-2 flex items-center gap-3 text-sm">
                     <span aria-hidden="true">{f.accepted ? '🍽️' : '🚫'}</span>
                     <span className="flex-1 text-theme-primary">
@@ -882,9 +1146,38 @@ export default function ColonyDetailPage() {
                     >
                       {new Date(f.fed_at).toLocaleDateString()}
                     </time>
+                    {canChange(f) && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEdit('feeding', f.id)}
+                          className={editBtnCls}
+                          aria-label={`Edit feeding from ${new Date(f.fed_at).toLocaleDateString()}`}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeFeeding(f.id)}
+                          className={delBtnCls}
+                          aria-label={`Delete feeding from ${new Date(f.fed_at).toLocaleDateString()}`}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
+            )}
+            {feedings.length > 10 && (
+              <button
+                type="button"
+                onClick={() => setShowAllFeed((v) => !v)}
+                className="mt-3 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+              >
+                {showAllFeed ? 'Show fewer' : `See all ${feedings.length}`}
+              </button>
             )}
           </div>
         </section>
@@ -983,6 +1276,7 @@ export default function ColonyDetailPage() {
             </div>
           )}
 
+          {renderEditor('care')}
           {careLogs.length === 0 ? (
             <p className="text-sm text-theme-tertiary">No watering logged yet.</p>
           ) : (
@@ -1004,14 +1298,24 @@ export default function ColonyDetailPage() {
                     </p>
                   </div>
                   {canChange(c) && (
-                  <button
-                    type="button"
-                    onClick={() => removeCareLog(c.id)}
-                    className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline shrink-0"
-                    aria-label={`Delete water log from ${new Date(c.logged_at).toLocaleDateString()}`}
-                  >
-                    Delete
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => startEdit('care', c.id)}
+                      className={editBtnCls}
+                      aria-label={`Edit water log from ${new Date(c.logged_at).toLocaleDateString()}`}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeCareLog(c.id)}
+                      className={delBtnCls}
+                      aria-label={`Delete water log from ${new Date(c.logged_at).toLocaleDateString()}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
                   )}
                 </li>
               ))}
@@ -1125,6 +1429,7 @@ export default function ColonyDetailPage() {
             </div>
           )}
 
+          {renderEditor('substrate')}
           <div className="p-4 rounded-2xl border border-theme bg-surface">
             {substrates.length === 0 ? (
               <p className="text-sm text-theme-tertiary">
@@ -1148,6 +1453,16 @@ export default function ColonyDetailPage() {
                     >
                       {formatEventDate(c.changed_at)}
                     </time>
+                    {canChange(c) && (
+                    <button
+                      type="button"
+                      onClick={() => startEdit('substrate', c.id)}
+                      className={editBtnCls}
+                      aria-label={`Edit substrate change from ${formatEventDate(c.changed_at)}`}
+                    >
+                      Edit
+                    </button>
+                    )}
                     {canChange(c) && (
                     <button
                       type="button"
@@ -1242,6 +1557,7 @@ export default function ColonyDetailPage() {
             </div>
           )}
 
+          {renderEditor('molt')}
           <div className="p-4 rounded-2xl border border-theme bg-surface">
             {molts.length === 0 ? (
               <p className="text-sm text-theme-tertiary">No molts recorded yet.</p>
@@ -1259,6 +1575,16 @@ export default function ColonyDetailPage() {
                     >
                       {new Date(m.molted_at).toLocaleDateString()}
                     </time>
+                    {canChange(m) && (
+                    <button
+                      type="button"
+                      onClick={() => startEdit('molt', m.id)}
+                      className={editBtnCls}
+                      aria-label={`Edit molt record from ${new Date(m.molted_at).toLocaleDateString()}`}
+                    >
+                      Edit
+                    </button>
+                    )}
                     {canChange(m) && (
                     <button
                       type="button"
@@ -1461,6 +1787,7 @@ export default function ColonyDetailPage() {
           >
             Timeline
           </h2>
+          {renderEditor('event')}
           {events.length === 0 ? (
             <div className="p-6 rounded-2xl border border-theme bg-surface text-center text-theme-secondary">
               No events yet. Use Log event above to record your first one.
@@ -1513,6 +1840,16 @@ export default function ColonyDetailPage() {
                         </p>
                       )}
                     </div>
+                    {canChange(ev) && (
+                    <button
+                      type="button"
+                      onClick={() => startEdit('event', ev.id)}
+                      aria-label={`Edit ${em?.label ?? ev.event_type} event`}
+                      className={`${editBtnCls} px-1`}
+                    >
+                      Edit
+                    </button>
+                    )}
                     {canChange(ev) && (
                     <button
                       type="button"

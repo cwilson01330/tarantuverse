@@ -55,6 +55,12 @@ import {
   listColonyCareLogs,
   createColonyCareLog,
   deleteColonyCareLog,
+  updateColonyCareLog,
+  updateColonyFeeding,
+  deleteColonyFeeding,
+  updateColonyMolt,
+  updateColonySubstrateChange,
+  updateColonyEvent,
   CARE_LOG_LABELS,
   type ColonyCareLog,
   type CareLogType,
@@ -171,6 +177,22 @@ export default function ColonyDetailScreen() {
   const canKeep = can(role, 'keeper');
   const mayChange = (e: { logged_by_user_id?: string | null }) => canChangeEntry(role, user?.id, e);
   const [deleting, setDeleting] = useState(false);
+  const [showAllFeed, setShowAllFeed] = useState(false);
+  // Edit modal for molt / substrate / water / event rows (feeding edits reuse
+  // the add-feeding screen). One modal, fields vary by kind.
+  const [editTarget, setEditTarget] = useState<
+    { kind: 'molt' | 'substrate' | 'care' | 'event'; id: string } | null
+  >(null);
+  const [eDate, setEDate] = useState(toISODateLocal(new Date()));
+  const [eNote, setENote] = useState('');
+  const [eType, setEType] = useState<CareLogType>('water_dish');
+  const [eReason, setEReason] = useState('');
+  const [eSubType, setESubType] = useState('');
+  const [eStage, setEStage] = useState('');
+  const [eDelta, setEDelta] = useState('');
+  const [eSeverity, setESeverity] = useState('');
+  const [eBusy, setEBusy] = useState(false);
+  const [eError, setEError] = useState('');
   const [quick, setQuick] = useState<QuickKind | null>(null);
   const [husbandryOpen, setHusbandryOpen] = useState(false);
   /** Slices that failed to load on the last fetch (empty = all good). */
@@ -555,6 +577,139 @@ export default function ColonyDetailScreen() {
     ]);
   };
 
+  /** Row tap: Edit / Delete. */
+  const rowActions = (title: string, detail: string, onEdit: () => void, onDelete: () => void) => {
+    Alert.alert(title, detail, [
+      { text: 'Edit', onPress: onEdit },
+      { text: 'Delete', style: 'destructive', onPress: onDelete },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const confirmDeleteFeeding = (f: ColonyFeedingLog) => {
+    Alert.alert('Delete this feeding?', formatLocalDate(f.fed_at), [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteColonyFeeding(f.id);
+            await fetchColony();
+          } catch (e) {
+            Alert.alert('Could not delete', getErrorMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
+  const editFeeding = (f: ColonyFeedingLog) => {
+    if (!colonyId) return;
+    router.push({
+      pathname: '/colony/add-feeding',
+      params: {
+        id: colonyId,
+        taxon: colony?.taxon ?? '',
+        feedingId: f.id,
+        fedAt: f.fed_at,
+        foodType: f.food_type ?? '',
+        foodSize: f.food_size ?? '',
+        qty: f.quantity != null ? String(f.quantity) : '',
+        acc: f.accepted ? '1' : '0',
+        note: f.notes ?? '',
+      },
+    });
+  };
+
+  const openEdit = (kind: 'molt' | 'substrate' | 'care' | 'event', row: any) => {
+    setEError('');
+    setEditTarget({ kind, id: row.id });
+    setENote(row.notes ?? '');
+    if (kind === 'molt') setEDate(toISODateLocal(new Date(row.molted_at)));
+    if (kind === 'care') {
+      setEDate(toISODateLocal(new Date(row.logged_at)));
+      setEType(row.log_type);
+    }
+    if (kind === 'substrate') {
+      setEDate(String(row.changed_at).slice(0, 10));
+      setEReason(row.reason ?? '');
+      setESubType(row.substrate_type ?? '');
+    }
+    if (kind === 'event') {
+      setEDate(String(row.occurred_at).slice(0, 10));
+      setEStage(row.stage ?? '');
+      setEDelta(row.count_delta != null ? String(row.count_delta) : '');
+      setESeverity(row.severity ?? '');
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editTarget || eBusy) return;
+    setEBusy(true);
+    setEError('');
+    try {
+      const note = eNote.trim() || null;
+      if (editTarget.kind === 'molt') {
+        const m = molts.find((x) => x.id === editTarget.id);
+        if (!m) return;
+        await updateColonyMolt(m.id, {
+          molted_at: toISODateLocal(new Date(m.molted_at)) === eDate ? m.molted_at : new Date(eDate + 'T12:00:00').toISOString(),
+          notes: note,
+        });
+      } else if (editTarget.kind === 'substrate') {
+        await updateColonySubstrateChange(editTarget.id, {
+          changed_at: eDate,
+          substrate_type: eSubType.trim() || null,
+          reason: eReason || null,
+          notes: note,
+        });
+      } else if (editTarget.kind === 'care') {
+        const c = careLogs.find((x) => x.id === editTarget.id);
+        if (!c) return;
+        await updateColonyCareLog(c.id, {
+          log_type: eType,
+          logged_at: toISODateLocal(new Date(c.logged_at)) === eDate ? c.logged_at : new Date(eDate + 'T12:00:00').toISOString(),
+          notes: note,
+        });
+      } else {
+        const ev = events.find((x) => x.id === editTarget.id);
+        if (!ev) return;
+        const payload: Record<string, unknown> = { occurred_at: eDate, notes: note };
+        if (eventHasSeverity(ev.event_type)) payload.severity = eSeverity || null;
+        if (ev.count_delta != null || eventNeedsDelta(ev.event_type)) {
+          if (eDelta.trim() === '' && eventNeedsDelta(ev.event_type)) {
+            setEError('Enter a count change (use − to remove).');
+            return;
+          }
+          const parsed = eDelta.trim() === '' ? null : parseInt(eDelta, 10);
+          if (parsed !== null && !Number.isFinite(parsed)) {
+            setEError('That doesn’t look like a number.');
+            return;
+          }
+          if (parsed !== null && parsed < 0 && ev.event_type !== 'count_correction' && POSITIVE_EVENTS.has(ev.event_type)) {
+            setEError('That amount must be positive.');
+            return;
+          }
+          payload.count_delta = parsed;
+          payload.stage = eStage.trim() || null;
+        }
+        if (ev.event_type === 'observation' && !note) {
+          setEError('An observation needs a note.');
+          return;
+        }
+        await updateColonyEvent(ev.id, payload);
+      }
+      setEditTarget(null);
+      await fetchColony();
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      setEError(typeof detail === 'string' ? detail : getErrorMessage(e));
+    } finally {
+      setEBusy(false);
+    }
+  };
+
   /** Photo options. Mirrors the invert detail screen: visible control, not a
    *  long-press-only gesture. */
   const handlePhotoOptions = (photo: ColonyPhoto) => {
@@ -851,6 +1006,14 @@ export default function ColonyDetailScreen() {
             events={events}
             canChange={mayChange}
             onDelete={(ev) => setConfirmDeleteEventId(ev.id)}
+            onEdit={(ev) =>
+              rowActions(
+                COLONY_EVENT_LABELS[ev.event_type] ?? 'Event',
+                formatLocalDate(ev.occurred_at),
+                () => openEdit('event', ev),
+                () => setConfirmDeleteEventId(ev.id),
+              )
+            }
           />
 
 
@@ -897,8 +1060,18 @@ export default function ColonyDetailScreen() {
                 No feedings logged yet.
               </Text>
             ) : (
-              feedings.slice(0, 8).map((f) => (
-                <View key={f.id} style={styles.feedRow}>
+              (showAllFeed ? feedings : feedings.slice(0, 8)).map((f) => (
+                <TouchableOpacity
+                  key={f.id}
+                  style={styles.feedRow}
+                  disabled={!mayChange(f)}
+                  onPress={() =>
+                    rowActions('Feeding', formatLocalDate(f.fed_at), () => editFeeding(f), () => confirmDeleteFeeding(f))
+                  }
+                  onLongPress={() => confirmDeleteFeeding(f)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Feeding ${formatLocalDate(f.fed_at)}. Tap to edit or delete.`}
+                >
                   <MaterialCommunityIcons
                     name={f.accepted ? 'silverware-fork-knife' : 'close-circle-outline'}
                     size={16}
@@ -924,8 +1097,19 @@ export default function ColonyDetailScreen() {
                   <Text style={[styles.detailBody, { color: colors.textTertiary }]}>
                     {new Date(f.fed_at).toLocaleDateString()}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))
+            )}
+            {feedings.length > 8 && (
+              <TouchableOpacity
+                onPress={() => setShowAllFeed((v) => !v)}
+                accessibilityRole="button"
+                style={{ minHeight: 44, justifyContent: 'center' }}
+              >
+                <Text style={[styles.addEventLink, { color: colors.primary }]}>
+                  {showAllFeed ? 'Show fewer' : `See all ${feedings.length}`}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -1010,9 +1194,12 @@ export default function ColonyDetailScreen() {
                 <TouchableOpacity
                   key={c.id}
                   disabled={!mayChange(c)}
+                  onPress={() =>
+                    rowActions(CARE_LOG_LABELS[c.log_type], formatLocalDate(c.logged_at), () => openEdit('care', c), () => confirmDeleteCareLog(c))
+                  }
                   onLongPress={() => confirmDeleteCareLog(c)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${CARE_LOG_LABELS[c.log_type]} on ${formatLocalDate(c.logged_at)}. Long press to delete.`}
+                  accessibilityLabel={`${CARE_LOG_LABELS[c.log_type]} on ${formatLocalDate(c.logged_at)}. Tap to edit or delete.`}
                   style={{ paddingVertical: 8 }}
                 >
                   <Text style={[styles.detailBody, { color: colors.textPrimary }]}>
@@ -1116,10 +1303,12 @@ export default function ColonyDetailScreen() {
                   key={c.id}
                   style={styles.feedRow}
                   disabled={!mayChange(c)}
-                  onPress={() => confirmDeleteSubstrate(c)}
+                  onPress={() =>
+                    rowActions('Substrate change', formatLocalDate(c.changed_at), () => openEdit('substrate', c), () => confirmDeleteSubstrate(c))
+                  }
                   onLongPress={() => confirmDeleteSubstrate(c)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Substrate change ${formatLocalDate(c.changed_at)}. Tap to delete.`}
+                  accessibilityLabel={`Substrate change ${formatLocalDate(c.changed_at)}. Tap to edit or delete.`}
                 >
                   <MaterialCommunityIcons name="shovel" size={16} color={colors.textSecondary} />
                   <View style={{ flex: 1 }}>
@@ -1206,9 +1395,11 @@ export default function ColonyDetailScreen() {
                   style={styles.feedRow}
                   disabled={!mayChange(m)}
                   onLongPress={() => confirmDeleteMolt(m)}
-                  onPress={() => confirmDeleteMolt(m)}
+                  onPress={() =>
+                    rowActions('Molt record', formatLocalDate(m.molted_at), () => openEdit('molt', m), () => confirmDeleteMolt(m))
+                  }
                   accessibilityRole="button"
-                  accessibilityLabel={`Molt found ${formatLocalDate(m.molted_at)}. Tap to delete.`}
+                  accessibilityLabel={`Molt found ${formatLocalDate(m.molted_at)}. Tap to edit or delete.`}
                 >
                   <MaterialCommunityIcons name="feather" size={16} color={colors.textSecondary} />
                   <Text style={[styles.detailBody, { flex: 1 }]}>
@@ -1325,12 +1516,161 @@ export default function ColonyDetailScreen() {
         </View>
       </Modal>
 
+      {/* Edit modal: molt / substrate / water / event rows */}
+      <Modal visible={editTarget !== null} transparent animationType="fade" onRequestClose={() => !eBusy && setEditTarget(null)}>
+        <View style={styles.modalBackdrop}>
+          <ScrollView
+            style={{ width: '100%', maxWidth: 420, flexGrow: 0 }}
+            contentContainerStyle={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.lg, gap: 10 }]}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.modalTitle}>
+              {editTarget?.kind === 'molt' ? 'Edit molt'
+                : editTarget?.kind === 'substrate' ? 'Edit substrate change'
+                : editTarget?.kind === 'care' ? 'Edit water log'
+                : 'Edit event'}
+            </Text>
+            {eError !== '' && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{eError}</Text>
+              </View>
+            )}
+            {editTarget?.kind === 'care' && (
+              <View style={styles.chipWrap}>
+                {(Object.keys(CARE_LOG_LABELS) as CareLogType[]).map((k) => {
+                  const sel = k === eType;
+                  return (
+                    <TouchableOpacity
+                      key={k}
+                      onPress={() => setEType(k)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: sel }}
+                      style={[styles.eventChip, { borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? colors.primary : colors.surface }]}
+                    >
+                      <Text style={[TYPE.label, { color: sel ? '#fff' : colors.textPrimary }]}>{CARE_LOG_LABELS[k]}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+            <Text style={styles.fieldLabel}>Date</Text>
+            <DateInput
+              value={parseLocalDate(eDate) ?? new Date()}
+              onChange={(d) => setEDate(toISODateLocal(d))}
+              maximumDate={editTarget?.kind === 'event' ? undefined : new Date()}
+              label="Date"
+            />
+            {editTarget?.kind === 'substrate' && (
+              <>
+                <Text style={styles.fieldLabel}>Substrate type</Text>
+                <TextInput
+                  value={eSubType}
+                  onChangeText={setESubType}
+                  placeholder="Optional"
+                  placeholderTextColor={colors.textTertiary}
+                  style={[styles.input, { borderRadius: layout.radius.sm }]}
+                />
+                <Text style={styles.fieldLabel}>Reason</Text>
+                <View style={styles.chipWrap}>
+                  {substrateReasonsFor(colony.taxon).map((r) => {
+                    const sel = r === eReason;
+                    return (
+                      <TouchableOpacity
+                        key={r}
+                        onPress={() => setEReason(sel ? '' : r)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: sel }}
+                        style={[styles.eventChip, { borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? colors.primary : colors.surface }]}
+                      >
+                        <Text style={[TYPE.label, { color: sel ? '#fff' : colors.textPrimary }]}>{r}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+            {editTarget?.kind === 'event' && (() => {
+              const ev = events.find((x) => x.id === editTarget.id);
+              if (!ev) return null;
+              return (
+                <>
+                  {(ev.count_delta != null || eventNeedsDelta(ev.event_type)) && (
+                    <>
+                      <Text style={styles.fieldLabel}>Count change (use − to remove)</Text>
+                      <TextInput
+                        value={eDelta}
+                        onChangeText={(v) => { if (v === '' || /^-?\d*$/.test(v)) setEDelta(v); }}
+                        keyboardType="numbers-and-punctuation"
+                        placeholderTextColor={colors.textTertiary}
+                        style={[styles.input, { borderRadius: layout.radius.sm }]}
+                      />
+                      <Text style={[TYPE.caption, { color: colors.textTertiary }]}>
+                        Changing this moves the population by the difference.
+                      </Text>
+                      <Text style={styles.fieldLabel}>Stage (blank = mixed)</Text>
+                      <TextInput
+                        value={eStage}
+                        onChangeText={setEStage}
+                        autoCapitalize="none"
+                        placeholderTextColor={colors.textTertiary}
+                        style={[styles.input, { borderRadius: layout.radius.sm }]}
+                      />
+                    </>
+                  )}
+                  {eventHasSeverity(ev.event_type) && (
+                    <View style={styles.chipWrap}>
+                      {SEVERITY_OPTIONS.map((o) => {
+                        const sel = o.value === eSeverity;
+                        return (
+                          <TouchableOpacity
+                            key={o.value}
+                            onPress={() => setESeverity(sel ? '' : o.value)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: sel }}
+                            style={[styles.eventChip, { borderColor: sel ? colors.primary : colors.border, backgroundColor: sel ? colors.primary : colors.surface }]}
+                          >
+                            <Text style={[TYPE.label, { color: sel ? '#fff' : colors.textPrimary }]}>{o.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </>
+              );
+            })()}
+            <Text style={styles.fieldLabel}>Notes</Text>
+            <TextInput
+              style={[styles.input, styles.textarea, { borderRadius: layout.radius.sm }]}
+              value={eNote}
+              onChangeText={setENote}
+              multiline
+              placeholder="Optional"
+              placeholderTextColor={colors.textTertiary}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setEditTarget(null)} disabled={eBusy} style={[styles.ghostBtn, { borderRadius: layout.radius.sm }]}>
+                <Text style={styles.ghostBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <PrimaryButton
+                onPress={saveEdit}
+                disabled={eBusy}
+                style={styles.saveBtn}
+                outerStyle={{ borderRadius: layout.radius.sm }}
+                accessibilityLabel="Save changes"
+              >
+                <Text style={styles.onPrimaryText}>{eBusy ? 'Saving…' : 'Save changes'}</Text>
+              </PrimaryButton>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* Delete event modal */}
       <Modal visible={confirmDeleteEventId !== null} transparent animationType="fade" onRequestClose={() => !deleting && setConfirmDeleteEventId(null)}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: layout.radius.lg }]}>
             <Text style={styles.modalTitle}>Delete this event?</Text>
-            <Text style={styles.modalBody}>Population changes it caused will NOT be reverted.</Text>
+            <Text style={styles.modalBody}>Its count change will be taken back out of the population.</Text>
             <View style={styles.modalActions}>
               <TouchableOpacity onPress={() => setConfirmDeleteEventId(null)} disabled={deleting} style={[styles.ghostBtn, { borderRadius: layout.radius.sm }]}>
                 <Text style={styles.ghostBtnText}>Cancel</Text>

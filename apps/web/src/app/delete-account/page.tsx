@@ -103,7 +103,7 @@ export default function DeleteAccountPage() {
             <p className="text-gray-700 dark:text-gray-300 mb-3">The following data will be <strong>permanently deleted</strong> immediately upon request:</p>
             <ul className="list-disc pl-6 text-gray-700 dark:text-gray-300 space-y-1">
               <li>Your account profile (username, email, display name, avatar, bio)</li>
-              <li>Your tarantula collection and all associated records</li>
+              <li>Your animal collection and all associated records</li>
               <li>Feeding logs, molt logs, and substrate change logs</li>
               <li>Photos and thumbnails</li>
               <li>Breeding records (pairings, egg sacs, offspring)</li>

@@ -284,13 +284,13 @@ export default function NotificationSettingsScreen() {
 
         {/* Local Notifications */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🕷️ Tarantula Care Reminders</Text>
+          <Text style={styles.sectionTitle}>Animal Care Reminders</Text>
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Feeding Reminders</Text>
               <Text style={styles.settingDescription}>
-                Get notified when it's time to feed your tarantulas (based on their last feeding)
+                Get notified when it's time to feed your animals (based on their last feeding)
               </Text>
             </View>
             <Switch
@@ -318,7 +318,7 @@ export default function NotificationSettingsScreen() {
             <View style={styles.settingInfo}>
               <Text style={styles.settingLabel}>Molt Predictions</Text>
               <Text style={styles.settingDescription}>
-                Get notified when a tarantula might be approaching a molt
+                Get notified when a tarantula might be approaching a molt (tarantulas only)
               </Text>
             </View>
             <Switch

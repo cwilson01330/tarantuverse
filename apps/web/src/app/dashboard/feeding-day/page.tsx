@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 import DashboardLayout from '@/components/DashboardLayout'
 import { LocationDialog } from '@/components/LocationPicker'
 import PremiumIntroCard, { shouldShowPremiumIntro } from '@/components/PremiumIntroCard'
@@ -51,27 +52,9 @@ type Outcome = 'fed' | 'refused'
 
 const FOOD_QUICK_FILLS = ['Crickets', 'Dubia', 'Roaches', 'Mealworms'] as const
 
-/** Taxon → emoji glyph. Falls back to 🐛 for unknown taxa. */
+/** Taxon → emoji glyph, from the shared registry. Falls back to 🐛 for unknown taxa. */
 function taxonEmoji(taxon: string): string {
-  switch (taxon) {
-    case 'tarantula':
-    case 'whip_spider':
-    case 'vinegaroon':
-    case 'true_spider':
-      return '🕷️'
-    case 'scorpion':
-      return '🦂'
-    case 'centipede':
-    case 'millipede':
-    case 'other':
-      return '🐛'
-    case 'mantis':
-      return '🦗'
-    case 'roach':
-      return '🪳'
-    default:
-      return '🐛'
-  }
+  return isInvertTaxon(taxon) ? INVERT_TAXA[taxon].glyph : '🐛'
 }
 
 /** Display name resolution: name → common_name → scientific_name → fallback. */

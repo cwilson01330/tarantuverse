@@ -31,7 +31,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 const TAXON_ORDER: InvertTaxon[] = [
   'tarantula', 'scorpion', 'centipede', 'whip_spider', 'vinegaroon',
-  'true_spider', 'millipede', 'mantis', 'roach', 'other',
+  'true_spider', 'millipede', 'mantis', 'roach', 'isopod', 'other',
 ]
 
 interface SpeciesHit {

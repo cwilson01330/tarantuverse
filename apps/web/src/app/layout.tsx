@@ -8,8 +8,8 @@ import AppStructuredData from '@/components/AppStructuredData'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Tarantuverse - Tarantula Husbandry Tracking',
-  description: 'Track your tarantula collection, breeding projects, and care routines',
+  title: 'Tarantuverse - Tarantula and Invertebrate Husbandry Tracking',
+  description: 'Track your tarantulas, scorpions, mantises, isopods, and other invertebrates: feedings, molts, breeding projects, and care routines',
   icons: {
     icon: '/logo-transparent.png',
     apple: '/logo.png',

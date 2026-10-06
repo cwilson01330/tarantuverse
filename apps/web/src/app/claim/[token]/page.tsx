@@ -17,6 +17,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { INVERT_TAXA, isInvertTaxon } from '@/lib/inverts'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onrender.com'
 
@@ -38,12 +39,6 @@ interface Preview {
   molt_count_at_transfer: number | null
   last_molt_at_transfer: string | null
   expires_at: string | null
-}
-
-const TAXON_GLYPH: Record<string, string> = {
-  tarantula: '🕷', scorpion: '🦂', centipede: '🐛', whip_spider: '🕸️',
-  vinegaroon: '🦂', true_spider: '🕷', millipede: '🪱', mantis: '🦗',
-  roach: '🪳', other: '🐾',
 }
 
 export default function ClaimPage() {
@@ -176,7 +171,7 @@ export default function ClaimPage() {
         <img src={preview.photo_urls[0]} alt={displayName} className="w-full h-56 object-cover" />
       ) : (
         <div className="w-full h-56 flex items-center justify-center text-6xl bg-gradient-to-br from-purple-500 to-pink-500">
-          {TAXON_GLYPH[preview.taxon] || '🐾'}
+          {(isInvertTaxon(preview.taxon) ? INVERT_TAXA[preview.taxon].glyph : '🐾')}
         </div>
       )}
 

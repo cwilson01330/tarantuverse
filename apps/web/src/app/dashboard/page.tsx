@@ -342,11 +342,13 @@ export default function DashboardHub() {
   // /inverts/ count hasn't loaded.
   const animalCount = totalAnimals ?? tarantulas.length
 
-  const handleAddTarantula = () => {
+  // Opens the collection page's taxon picker (the generic add flow) instead of
+  // jumping straight into the tarantula form.
+  const handleAddAnimal = () => {
     if (!canAddTarantula(animalCount)) {
       setShowUpgradeModal(true)
     } else {
-      router.push('/dashboard/tarantulas/add')
+      router.push('/dashboard/tarantulas?add=1')
     }
   }
 
@@ -363,14 +365,14 @@ export default function DashboardHub() {
             <div className="text-7xl mb-6">🕷️</div>
             <h1 className="text-3xl font-bold mb-4 text-theme-primary">Welcome to Tarantuverse!</h1>
             <p className="text-theme-secondary mb-8 max-w-md mx-auto text-lg">
-              Start your journey by adding your first tarantula to the collection. Track feedings, molts, husbandry, and more.
+              Start your journey by adding your first animal to your collection. Track feedings, molts, husbandry, and more.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <button
-                onClick={handleAddTarantula}
+                onClick={handleAddAnimal}
                 className="px-8 py-4 bg-gradient-brand text-white rounded-xl hover:bg-gradient-brand-hover transition-all duration-200 font-semibold shadow-lg shadow-gradient-brand hover:shadow-2xl text-lg"
               >
-                ➕ Add First Tarantula
+                ➕ Add First Animal
               </button>
               <button
                 onClick={() => router.push('/species')}
@@ -702,7 +704,7 @@ export default function DashboardHub() {
               <h2 className="text-xl font-bold text-theme-primary mb-4">Quick Actions</h2>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { Icon: PlusCircle, label: 'Add Tarantula', action: handleAddTarantula },
+                  { Icon: PlusCircle, label: 'Add Animal', action: handleAddAnimal },
                   { Icon: LayoutGrid, label: 'My Collection', action: () => router.push('/dashboard/tarantulas') },
                   { Icon: LineChart, label: 'Analytics', action: () => router.push('/dashboard/analytics') },
                   { Icon: BookOpen, label: 'Species DB', action: () => router.push('/species') },

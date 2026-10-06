@@ -25,10 +25,13 @@ export default function ColonyActivity({
   events,
   canChange,
   onDelete,
+  onEdit,
 }: {
   events: ColonyEvent[];
   canChange: (ev: ColonyEvent) => boolean;
   onDelete: (ev: ColonyEvent) => void;
+  /** Tap on a row. When given, the screen offers Edit / Delete. */
+  onEdit?: (ev: ColonyEvent) => void;
 }) {
   const { colors, layout } = useTheme();
   const [showAll, setShowAll] = useState(false);
@@ -67,6 +70,7 @@ export default function ColonyActivity({
           <TouchableOpacity
             key={ev.id}
             disabled={!changeable}
+            onPress={onEdit ? () => onEdit(ev) : undefined}
             onLongPress={() => onDelete(ev)}
             delayLongPress={350}
             activeOpacity={0.8}
@@ -74,7 +78,7 @@ export default function ColonyActivity({
             accessibilityRole={changeable ? 'button' : 'text'}
             accessibilityLabel={[sentence, when, delta ? `${delta > 0 ? 'plus' : 'minus'} ${Math.abs(delta)}` : null, detail || null, by ?? null]
               .filter(Boolean).join('. ')}
-            accessibilityHint={changeable ? 'Long press to delete this event.' : undefined}
+            accessibilityHint={changeable ? (onEdit ? 'Opens edit and delete options. Long press to delete.' : 'Long press to delete this event.') : undefined}
           >
             <View style={[styles.icon, { backgroundColor: c + '22', borderRadius: layout.radius.sm }]}>
               <MaterialCommunityIcons name={(COLONY_EVENT_MDI[ev.event_type] ?? 'circle-outline') as any} size={18} color={c} />

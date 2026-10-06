@@ -676,3 +676,78 @@ export const COLONY_EVENT_TYPES: {
 export function colonyEventMeta(type: ColonyEventType) {
   return COLONY_EVENT_TYPES.find((e) => e.type === type)
 }
+
+// ── Edit / delete log rows (audit B4) ─────────────────────────────────────────
+//
+// The by-id routes are shared with every other parent type and resolve access
+// through whichever parent the row carries, colonies included.
+
+async function putById<T>(
+  token: string,
+  path: string,
+  payload: Record<string, unknown>,
+  failure: string,
+): Promise<T> {
+  const res = await fetch(`${API_URL}/api/v1${path}`, {
+    method: 'PUT',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as any))
+    throw new Error(typeof body?.detail === 'string' ? body.detail : failure)
+  }
+  return (await res.json()) as T
+}
+
+export function updateColonyFeeding(
+  token: string,
+  feedingId: string,
+  payload: {
+    fed_at?: string
+    food_type?: string | null
+    food_size?: string | null
+    quantity?: number | null
+    accepted?: boolean
+    notes?: string | null
+  },
+): Promise<ColonyFeedingLog> {
+  return putById(token, `/feedings/${feedingId}`, payload, 'Failed to update feeding')
+}
+
+export async function deleteColonyFeeding(token: string, feedingId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/feedings/${feedingId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+  if (!res.ok && res.status !== 204) throw new Error('Failed to delete feeding')
+}
+
+export function updateColonyMolt(
+  token: string,
+  moltId: string,
+  payload: { molted_at?: string; notes?: string | null },
+): Promise<ColonyMoltLog> {
+  return putById(token, `/molts/${moltId}`, payload, 'Failed to update molt')
+}
+
+export function updateColonySubstrateChange(
+  token: string,
+  changeId: string,
+  payload: {
+    changed_at?: string
+    substrate_type?: string | null
+    reason?: string | null
+    notes?: string | null
+  },
+): Promise<ColonySubstrateChange> {
+  return putById(token, `/substrate-changes/${changeId}`, payload, 'Failed to update substrate change')
+}
+
+export function updateColonyCareLog(
+  token: string,
+  logId: string,
+  payload: { log_type?: CareLogType; logged_at?: string; notes?: string | null },
+): Promise<ColonyCareLog> {
+  return putById(token, `/care-logs/${logId}`, payload, 'Failed to update water log')
+}

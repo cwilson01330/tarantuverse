@@ -23,6 +23,7 @@ import { PrimaryButton } from '../src/components/PrimaryButton';
 import { apiClient } from '../src/services/api';
 import { useTheme } from '../src/contexts/ThemeContext';
 import { TYPE } from '../src/theme/tokens';
+import { INVERT_TAXA, type InvertTaxon } from '../src/lib/inverts';
 import { LocationSheet } from '../src/components/LocationPicker';
 import PremiumIntroCard, { shouldShowPremiumIntro } from '../src/components/PremiumIntroCard';
 import { bulkSetLocation, groupByLocation, listLocations, type LocationItem } from '../src/lib/locations';
@@ -58,20 +59,7 @@ const STATUS = {
 };
 
 function taxonEmoji(taxon: string): string {
-  switch (taxon) {
-    case 'scorpion':
-      return '🦂';
-    case 'roach':
-      return '🪳';
-    case 'centipede':
-    case 'millipede':
-    case 'other':
-      return '🐛';
-    case 'mantis':
-      return '🦗';
-    default:
-      return '🕷️'; // tarantula, true_spider, whip_spider, vinegaroon
-  }
+  return INVERT_TAXA[taxon as InvertTaxon]?.glyph ?? '🐛';
 }
 
 function displayName(a: FeedingStatus): string {

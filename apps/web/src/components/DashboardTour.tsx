@@ -20,12 +20,12 @@ const steps: TourStep[] = [
   {
     target: '[data-tour="feeding-alerts"]',
     title: 'Feeding Alerts',
-    content: 'Tarantulas overdue for feeding show up here, sorted by urgency. Click any row to log a feeding.',
+    content: 'Animals overdue for feeding show up here, sorted by urgency. Click any row to log a feeding.',
   },
   {
     target: '[data-tour="quick-actions"]',
     title: 'Quick Actions',
-    content: 'Jump to common tasks — add a tarantula, view your collection, check analytics, browse species, and more.',
+    content: 'Jump to common tasks — add an animal, view your collection, check analytics, browse species, and more.',
   },
   {
     target: '[data-tour="sidebar-nav"]',

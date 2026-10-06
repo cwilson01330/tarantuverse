@@ -177,7 +177,7 @@ export default function NotificationSettingsPage() {
           </button>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">🔔 Notification Settings</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Manage your notification preferences for tarantula care reminders and community activity
+            Manage your notification preferences for animal care reminders and community activity
           </p>
         </div>
 
@@ -188,11 +188,11 @@ export default function NotificationSettingsPage() {
           </div>
         )}
 
-        {/* Local Notifications - Tarantula Care */}
+        {/* Local Notifications - Animal Care */}
         <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
             <span className="text-2xl">🕷️</span>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Tarantula Care Reminders</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Animal Care Reminders</h2>
           </div>
 
           <div className="space-y-4">
@@ -201,7 +201,7 @@ export default function NotificationSettingsPage() {
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Feeding Reminders</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Get notified when it's time to feed your tarantulas (based on their last feeding)
+                  Get notified when it's time to feed your animals (based on their last feeding)
                 </p>
               </div>
               <button
@@ -245,7 +245,7 @@ export default function NotificationSettingsPage() {
               <div className="flex-1">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Molt Predictions</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Get notified when a tarantula might be approaching a molt
+                  Get notified when a tarantula might be approaching a molt (tarantulas only)
                 </p>
               </div>
               <button

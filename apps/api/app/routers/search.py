@@ -1,15 +1,18 @@
 """
-Global search router - search across tarantulas, species, keepers, and forums
+Global search router - search across the keeper's animals (every taxon and
+colonies), species (both catalogs), keepers, and forums
 """
 from fastapi import APIRouter, Depends, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from typing import Optional
 from app.database import get_db
 from app.models.user import User
 from app.utils.test_accounts import real_user_clause
-from app.models.tarantula import Tarantula
+from app.models.invert import Invert
+from app.models.colony import Colony
+from app.models.invert_species import InvertSpecies
 from app.models.species import Species
 from app.models.forum import ForumThread
 from app.schemas.search import SearchResult, SearchResponse
@@ -55,29 +58,55 @@ async def global_search(
     search_term = f"%{q}%"
     results = SearchResponse(query=q, total_results=0)
 
-    # Search tarantulas (only user's own if authenticated)
-    if not type or type == "tarantulas":
+    # Search the keeper's own animals — every taxon, plus colonies. (Until
+    # 2026-10-06 this read only the legacy `tarantulas` table, so a mantis,
+    # scorpion or isopod could never be found.) Results stay under the
+    # `tarantulas` key so existing clients keep working; the URL routes each
+    # one to the right detail screen.
+    if not type or type in ("tarantulas", "animals"):
         if current_user:
-            tarantulas = db.query(Tarantula).filter(
-                Tarantula.user_id == current_user.id,
+            inverts = db.query(Invert).filter(
+                Invert.user_id == current_user.id,
+                Invert.transferred_out_at.is_(None),
                 or_(
-                    Tarantula.name.ilike(search_term),
-                    Tarantula.common_name.ilike(search_term),
-                    Tarantula.scientific_name.ilike(search_term),
+                    Invert.name.ilike(search_term),
+                    Invert.common_name.ilike(search_term),
+                    Invert.scientific_name.ilike(search_term),
                 )
-            ).limit(5).all()
+            ).order_by(Invert.died_at.isnot(None), Invert.name).limit(5).all()
 
-            for tarantula in tarantulas:
+            for animal in inverts:
+                # Tarantulas keep their own web detail page (dual-written ids).
+                path = "tarantulas" if animal.taxon == "tarantula" else "inverts"
                 results.tarantulas.append(
                     SearchResult(
-                        id=str(tarantula.id),
-                        type="tarantula",
-                        title=tarantula.name or tarantula.scientific_name or "Unnamed",
-                        subtitle=tarantula.common_name or tarantula.scientific_name,
-                        image_url=tarantula.photo_url,
-                        url=f"/dashboard/tarantulas/{tarantula.id}"
+                        id=str(animal.id),
+                        type=animal.taxon,
+                        title=animal.name or animal.scientific_name or animal.common_name or "Unnamed",
+                        subtitle=animal.common_name or animal.scientific_name,
+                        image_url=animal.photo_url,
+                        url=f"/dashboard/{path}/{animal.id}",
                     )
                 )
+
+            room = 5 - len(results.tarantulas)
+            if room > 0:
+                colonies = db.query(Colony).filter(
+                    Colony.user_id == current_user.id,
+                    Colony.transferred_out_at.is_(None),
+                    Colony.name.ilike(search_term),
+                ).limit(room).all()
+                for colony in colonies:
+                    results.tarantulas.append(
+                        SearchResult(
+                            id=str(colony.id),
+                            type="colony",
+                            title=colony.name or "Colony",
+                            subtitle="Colony",
+                            image_url=colony.photo_url,
+                            url=f"/dashboard/colonies/{colony.id}",
+                        )
+                    )
 
     # Search species (public, always visible)
     if not type or type == "species":
@@ -100,6 +129,29 @@ async def global_search(
                     url=f"/species/{species.id}"
                 )
             )
+
+        # Every other taxon lives in the unified catalog. Tarantula rows there
+        # mirror the legacy table above, so they're skipped to avoid duplicates.
+        room = 5 - len(results.species)
+        if room > 0:
+            invert_species = db.query(InvertSpecies).filter(
+                InvertSpecies.taxon != "tarantula",
+                or_(
+                    InvertSpecies.scientific_name_lower.ilike(search_term),
+                    func.array_to_string(InvertSpecies.common_names, " ").ilike(search_term),
+                )
+            ).order_by(InvertSpecies.scientific_name).limit(room).all()
+            for sp in invert_species:
+                results.species.append(
+                    SearchResult(
+                        id=str(sp.id),
+                        type="species",
+                        title=sp.scientific_name,
+                        subtitle=", ".join(sp.common_names) if sp.common_names else None,
+                        image_url=sp.image_url,
+                        url=f"/species/inverts/{sp.id}",
+                    )
+                )
 
     # Search keepers (public keepers only, is_active = True)
     if not type or type == "keepers":

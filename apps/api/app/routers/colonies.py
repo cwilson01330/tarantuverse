@@ -128,6 +128,19 @@ def _apply_delta(colony: Colony, stage: Optional[str], delta: Optional[int]) -> 
     colony.stage_counts = counts
 
 
+def _reverse_delta(colony: Colony, stage: Optional[str], delta: Optional[int]) -> bool:
+    """Undo a previously applied event delta on its bucket. Returns True when
+    the reversal had to be clamped at 0 (the bucket held less than the delta
+    being taken back, e.g. the keeper corrected the count by hand since)."""
+    if delta is None or int(delta) == 0:
+        return False
+    bucket = (stage or "mixed").strip() or "mixed"
+    current = int((colony.stage_counts or {}).get(bucket, 0))
+    clamped = current - int(delta) < 0
+    _apply_delta(colony, stage, -int(delta))
+    return clamped
+
+
 # ---------- colony CRUD ----------
 
 @router.get("/", response_model=List[ColonyListItem])
@@ -376,9 +389,20 @@ async def update_event(
 ):
     log = _event_for(db, event_id, current_user, "logger")
 
+    colony = db.query(Colony).filter(Colony.id == log.colony_id).first()
+
+    old_stage, old_delta = log.stage, log.count_delta
     data = payload.model_dump(exclude_unset=True)
     for k, v in data.items():
         setattr(log, k, v)
+
+    # One transaction: take back what the event did, then apply what it now
+    # does, so the stored population never drifts from the event history.
+    if colony is not None and (
+        old_delta != log.count_delta or (old_stage or "mixed") != (log.stage or "mixed")
+    ):
+        _reverse_delta(colony, old_stage, old_delta)
+        _apply_delta(colony, log.stage, log.count_delta)
 
     db.commit()
     db.refresh(log)
@@ -393,6 +417,11 @@ async def delete_event(
     db: Session = Depends(get_db),
 ):
     log = _event_for(db, event_id, current_user, "logger")
+
+    # Deleting an event takes its population change back out (clamped at 0).
+    colony = db.query(Colony).filter(Colony.id == log.colony_id).first()
+    if colony is not None:
+        _reverse_delta(colony, log.stage, log.count_delta)
 
     db.delete(log)
     db.commit()

@@ -27,6 +27,7 @@ const TAXON_LABELS: Record<string, string> = {
   tarantula: 'tarantula',
   mantis: 'mantis',
   roach: 'roach',
+  isopod: 'isopod',
   millipede: 'millipede',
   vinegaroon: 'vinegaroon',
   true_spider: 'jumping/true spider',

@@ -21,8 +21,9 @@
  *                   "12 days since fed" would be a number without a meaning.)
  *   - growth:       backed by the generic /inverts/{id}/growth endpoint;
  *                   the invert molt form captures per-molt measurements.
- *                   Rolling out taxon-by-taxon — scorpion is the pilot
- *                   (ADR-008 follow-up). Millipedes deliberately skipped:
+ *                   Rolling out taxon-by-taxon — scorpion was the pilot
+ *                   (ADR-008 follow-up); whip spider and vinegaroon joined
+ *                   2026-10-06. Millipedes deliberately skipped:
  *                   they molt underground and keepers rarely measure.
  *   - breeding:     pairings and their offspring. What comes BETWEEN those two
  *                   differs by animal, so the module is paired with
@@ -38,9 +39,18 @@ export type FeatureModule = 'premolt' | 'feedingStats' | 'growth' | 'breeding';
 export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   tarantula: ['premolt', 'feedingStats', 'growth', 'breeding'],
   scorpion: ['feedingStats', 'growth', 'breeding'], // breeding pilot — ADR-021 Phase D (web + mobile)
-  centipede: ['feedingStats', 'growth'],
-  whip_spider: ['feedingStats'],
-  vinegaroon: ['feedingStats'],
+  // Centipede breeding enabled 2026-10-06 (consistency audit C): the female
+  // broods a clutch of eggs (no egg sac), which is exactly what the 'Clutch' /
+  // 'plings' entry in BREEDING_VOCABULARY below says. The word 'plings' still
+  // wants a keeper's second opinion.
+  centipede: ['feedingStats', 'growth', 'breeding'],
+  // Growth enabled 2026-10-06 (consistency audit C): both molt through visible
+  // instars and keepers measure them; /inverts/{id}/growth is taxon-agnostic
+  // and growthLengthLabel() already labels whip spiders 'Leg span' and
+  // vinegaroons 'Body length'. Breeding left off for now: a vinegaroon
+  // breeding module has no keeper demand on record.
+  whip_spider: ['feedingStats', 'growth'],
+  vinegaroon: ['feedingStats', 'growth'],
   // Jumping spiders are the demand here — one keeper has 24 of them, 9 males
   // and 10 females. They lay an egg sac like a tarantula, so the whole
   // pairing → sac → offspring chain is biologically the same shape.

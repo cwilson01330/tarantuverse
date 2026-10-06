@@ -30,7 +30,7 @@ interface SectionData {
 }
 
 const SECTION_ICONS = {
-  tarantulas: '🕷️',
+  tarantulas: '🐾',
   species: '📚',
   keepers: '👥',
   forums: '💬',
@@ -56,8 +56,8 @@ export default function SearchScreen() {
 
     if (results.tarantulas.length > 0) {
       newSections.push({
-        title: 'Tarantulas',
-        icon: '🕷️',
+        title: 'Animals',
+        icon: '🐾',
         data: results.tarantulas,
       })
     }
@@ -219,7 +219,7 @@ export default function SearchScreen() {
         }}>
           <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
           <TextInput
-            placeholder="Search tarantulas, species, keepers..."
+            placeholder="Search animals, species, keepers..."
             placeholderTextColor={colors.textTertiary}
             value={query}
             onChangeText={setQuery}

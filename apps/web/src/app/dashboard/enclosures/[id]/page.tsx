@@ -631,7 +631,7 @@ export default function EnclosureDetailPage() {
                 ) : (
                   <>
                     <br />
-                    <span className="text-sm">Assign tarantulas from their individual detail pages.</span>
+                    <span className="text-sm">Assign animals from their individual detail pages.</span>
                   </>
                 )}
               </p>

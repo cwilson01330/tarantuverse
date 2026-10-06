@@ -20,7 +20,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import DateInput from '../../src/components/DateInput';
-import { createColonyFeeding } from '../../src/lib/colonies';
+import { createColonyFeeding, updateColonyFeeding } from '../../src/lib/colonies';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 /**
@@ -52,24 +52,30 @@ const FOOD_SIZES = ['Small', 'Medium', 'Large'];
 
 export default function AddColonyFeedingScreen() {
   const router = useRouter();
-  const { id, taxon } = useLocalSearchParams<{ id?: string; taxon?: string }>();
+  const { id, taxon, feedingId, fedAt, foodType: foodTypeParam, foodSize: foodSizeParam, qty, acc, note } =
+    useLocalSearchParams<{
+      id?: string; taxon?: string; feedingId?: string; fedAt?: string;
+      foodType?: string; foodSize?: string; qty?: string; acc?: string; note?: string;
+    }>();
+  /** Edit mode: opened from a feeding row on the colony screen. */
+  const editing = !!feedingId;
   const foodTypes = foodTypesFor(taxon);
   // Prey size is a live-prey concept — a handful of greens has no 'Medium'.
   const showsPreySize = foodTypes === PREDATOR_FOODS;
   const { colors, layout } = useTheme();
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
-  const [date, setDate] = useState(toISODateLocal(new Date()));
-  const [foodType, setFoodType] = useState(foodTypes[0]);
+  const [date, setDate] = useState(fedAt ? toISODateLocal(new Date(fedAt)) : toISODateLocal(new Date()));
+  const [foodType, setFoodType] = useState(editing ? foodTypeParam ?? '' : foodTypes[0]);
   /** Prey size. Optional — '' means the keeper didn't record one. */
-  const [foodSize, setFoodSize] = useState('');
+  const [foodSize, setFoodSize] = useState(foodSizeParam ?? '');
   /** Prey count. Blank means unrecorded — we send null rather than defaulting
    *  to 1, because "1 cricket" for an 11-spider communal would be a claim
    *  nobody made. The backend column defaults to 1 for individuals, which is
    *  right there and wrong here. */
-  const [quantity, setQuantity] = useState('');
-  const [accepted, setAccepted] = useState(true);
-  const [notes, setNotes] = useState('');
+  const [quantity, setQuantity] = useState(qty ?? '');
+  const [accepted, setAccepted] = useState(editing ? acc !== '0' : true);
+  const [notes, setNotes] = useState(note ?? '');
   const [saving, setSaving] = useState(false);
 
 
@@ -78,15 +84,19 @@ export default function AddColonyFeedingScreen() {
     try {
       setSaving(true);
       const n = parseInt(quantity, 10);
-      await createColonyFeeding(id, {
-        fed_at: new Date(date + 'T12:00:00').toISOString(),
-        food_type: foodType,
+      // Keep the stored timestamp when the day wasn't touched.
+      const keepStamp = editing && fedAt && toISODateLocal(new Date(fedAt)) === date;
+      const payload = {
+        fed_at: keepStamp ? fedAt : new Date(date + 'T12:00:00').toISOString(),
+        food_type: foodType || null,
         food_size: foodSize || null,
         // null, not 1 — an unrecorded count stays unrecorded.
         quantity: Number.isFinite(n) && n > 0 ? n : null,
         accepted,
         notes: notes.trim() || null,
-      });
+      };
+      if (editing && feedingId) await updateColonyFeeding(feedingId, payload);
+      else await createColonyFeeding(id, payload);
       router.back();
     } catch (err) { Alert.alert('Could not save', err instanceof Error ? err.message : 'Something went wrong.'); }
     finally { setSaving(false); }
@@ -95,7 +105,7 @@ export default function AddColonyFeedingScreen() {
   const styles = makeStyles(colors);
   return (
     <View style={styles.flex}>
-      <AppHeader title="Log feeding" leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
+      <AppHeader title={editing ? 'Edit feeding' : 'Log feeding'} leftAction={<TouchableOpacity onPress={() => router.back()}><MaterialCommunityIcons name="chevron-left" size={28} color={iconColor} /></TouchableOpacity>} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <Field label="Date" colors={colors}><DateInput value={parseLocalDate(date) ?? new Date()} onChange={(d) => setDate(toISODateLocal(d))} maximumDate={new Date()} label="Feeding date" /></Field>
@@ -151,7 +161,7 @@ export default function AddColonyFeedingScreen() {
           </Field>
           <Field label="Notes (optional)" colors={colors}><TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} multiline placeholderTextColor={colors.textTertiary} /></Field>
           <TouchableOpacity style={[styles.saveButton, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-            <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save feeding'}</Text>
+            <Text style={styles.saveText}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Save feeding'}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
