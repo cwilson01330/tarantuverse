@@ -48,6 +48,9 @@ export default function ShareCardModal({
   const [fields, setFields] = useState<string[] | null>(null)
   const [link, setLink] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
+  // True from a change until the new image has loaded: the server takes a
+  // few seconds to draw a card, and the old one stays up (dimmed) meanwhile.
+  const [loading, setLoading] = useState(false)
   const [cardLink, setCardLink] = useState<{ url: string; key: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,9 +99,11 @@ export default function ShareCardModal({
     if (fields.length === 0) {
       reqId.current += 1
       setPreview(null)
+      setLoading(false)
       setError(null)
       return
     }
+    setLoading(true)
     timer.current = setTimeout(async () => {
       const id = ++reqId.current
       try {
@@ -108,6 +113,7 @@ export default function ShareCardModal({
         setPreview(r.image_url)
       } catch (e) {
         if (id !== reqId.current) return
+        setLoading(false)
         setError(e instanceof Error ? e.message : GENERIC_ERROR)
       }
     }, 350)
@@ -207,9 +213,27 @@ export default function ShareCardModal({
           {noFields
             ? <span className="text-gray-500 dark:text-gray-400 text-sm px-4 text-center">Pick at least one thing to show.</span>
             : preview
-              // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={preview} alt="Card preview" className="max-h-[480px] rounded" />
-              : <span className="text-gray-500 dark:text-gray-400">Preparing preview…</span>}
+              ? (
+                <div className="relative flex items-center justify-center" aria-busy={loading}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={preview} alt={loading ? 'Updating card preview' : 'Card preview'}
+                    onLoad={() => setLoading(false)} onError={() => setLoading(false)}
+                    className={`max-h-[480px] rounded transition-opacity ${loading ? 'opacity-40' : 'opacity-100'}`}
+                  />
+                  {loading ? (
+                    <span className="absolute inset-0 flex items-center justify-center" aria-hidden="true">
+                      <span className="h-8 w-8 rounded-full border-2 border-gray-900 dark:border-white border-t-transparent animate-spin" />
+                    </span>
+                  ) : null}
+                </div>
+              )
+              : (
+                <span className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400" role="status">
+                  <span className="h-6 w-6 rounded-full border-2 border-gray-900 dark:border-white border-t-transparent animate-spin" aria-hidden="true" />
+                  Drawing your card…
+                </span>
+              )}
         </div>
         <div className="flex flex-col gap-4">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{kind === 'molt' ? 'Share molt' : 'Share card'}</h2>

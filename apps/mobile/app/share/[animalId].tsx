@@ -33,7 +33,10 @@ export default function ShareCardScreen() {
   const [frame, setFrame] = useState<CardFrame>('specimen');
   const [fields, setFields] = useState<string[] | null>(null);
   const [link, setLink] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  // The preview remembers its shape so a new shape never shows a stretched old image.
+  const [preview, setPreview] = useState<{ uri: string; shape: CardShape } | null>(null);
+  // True from a change until the new image has actually loaded (the server takes a few seconds to draw it).
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<'save' | 'share' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -56,10 +59,11 @@ export default function ShareCardScreen() {
     if (timer.current) clearTimeout(timer.current);
     // Any change invalidates responses still in flight.
     const mine = ++reqId.current;
-    // Drop the old image so a new shape never shows a stretched stale preview.
-    setPreview(null);
+    // Keep the old image on screen (dimmed) while the new one draws.
+    setLoading(true);
     if (fields.length === 0) {
       setPreview(null);
+      setLoading(false);
       setError(null);
       return;
     }
@@ -67,9 +71,9 @@ export default function ShareCardScreen() {
       try {
         setError(null);
         const r = await createShareCard({ animal_id: animalId, kind, molt_id: moltId, fields, shape, frame, link: false, preview: true });
-        if (mine === reqId.current) setPreview(r.image_url);
+        if (mine === reqId.current) setPreview({ uri: r.image_url, shape });
       } catch {
-        if (mine === reqId.current) { setPreview(null); setError("Couldn't make the card. Try again."); }
+        if (mine === reqId.current) { setPreview(null); setLoading(false); setError("Couldn't make the card. Try again."); }
       }
     }, 350);
     return () => { if (timer.current) clearTimeout(timer.current); };
@@ -147,9 +151,22 @@ export default function ShareCardScreen() {
         <View style={[styles.previewWrap, { borderRadius: layout.radius.md }]}>
           {noFields ? (
             <Text style={[TYPE.body, { color: colors.textSecondary }]}>Pick at least one thing to show.</Text>
-          ) : preview ? (
-            <Image source={{ uri: preview }} style={{ width: '70%', aspectRatio: ASPECT[shape], borderRadius: layout.radius.sm }} accessibilityLabel="Card preview" />
-          ) : <ActivityIndicator color={colors.primary} />}
+          ) : preview && preview.shape === shape ? (
+            <View style={styles.previewFrame} accessibilityState={{ busy: loading }}>
+              <Image
+                source={{ uri: preview.uri }}
+                style={{ width: '100%', aspectRatio: ASPECT[preview.shape], borderRadius: layout.radius.sm, opacity: loading ? 0.45 : 1 }}
+                onLoadEnd={() => setLoading(false)}
+                accessibilityLabel={loading ? 'Updating card preview' : 'Card preview'}
+              />
+              {loading ? <View style={styles.previewSpinner} pointerEvents="none"><ActivityIndicator color={colors.primary} size="large" /></View> : null}
+            </View>
+          ) : (
+            <View style={styles.previewEmpty} accessibilityLabel="Preparing card preview">
+              <ActivityIndicator color={colors.primary} />
+              <Text style={[TYPE.caption, { color: colors.textSecondary }]}>Drawing your card…</Text>
+            </View>
+          )}
         </View>
         <FrameRow value={frame} onChange={pickFrame} />
         <View style={styles.chips} accessibilityRole="radiogroup">
@@ -207,6 +224,9 @@ export default function ShareCardScreen() {
 const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16, gap: 12, paddingBottom: 48 },
+  previewFrame: { width: '70%', alignItems: 'center', justifyContent: 'center' },
+  previewSpinner: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+  previewEmpty: { alignItems: 'center', gap: 8 },
   previewWrap: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, paddingVertical: 16, minHeight: 240 },
   chips: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
   chip: { borderWidth: 1, paddingHorizontal: 14, minHeight: 36, justifyContent: 'center' },
