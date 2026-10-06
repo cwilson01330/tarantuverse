@@ -138,7 +138,7 @@ class GrowthAnalytics(BaseModel):
     total_weight_gain: Optional[Decimal] = None
     total_leg_span_gain: Optional[Decimal] = None
     growth_rate_weight: Optional[Decimal] = None  # grams per month
-    growth_rate_leg_span: Optional[Decimal] = None  # cm per month
+    growth_rate_leg_span: Optional[Decimal] = None  # inches per month
     last_molt_date: Optional[datetime] = None
     days_since_last_molt: Optional[int] = None
     

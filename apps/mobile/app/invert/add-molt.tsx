@@ -210,10 +210,10 @@ export default function AddInvertMoltScreen() {
           </Field>
           <View style={styles.measureRow}>
             <View style={styles.measureCol}>
-              <Field label={`${lengthLabel} before (cm)`} colors={colors}><TextInput style={styles.input} value={lengthBefore} onChangeText={setLengthBefore} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
+              <Field label={`${lengthLabel} before (in)`} colors={colors}><TextInput style={styles.input} value={lengthBefore} onChangeText={setLengthBefore} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
             </View>
             <View style={styles.measureCol}>
-              <Field label={`${lengthLabel} after (cm)`} colors={colors}><TextInput style={styles.input} value={lengthAfter} onChangeText={setLengthAfter} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
+              <Field label={`${lengthLabel} after (in)`} colors={colors}><TextInput style={styles.input} value={lengthAfter} onChangeText={setLengthAfter} placeholder="Optional" placeholderTextColor={colors.textTertiary} keyboardType="decimal-pad" /></Field>
             </View>
           </View>
           <View style={styles.measureRow}>

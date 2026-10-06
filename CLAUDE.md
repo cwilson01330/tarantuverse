@@ -439,6 +439,8 @@
 
 - **Test accounts (2026-09-30)**: every Android upload makes Google Play's pre-launch report sign in with robot accounts on `@cloudtestlabaccounts.com`. `utils/test_accounts.py::real_user_clause()` excludes them from every admin user count (admin stats, admin analytics incl. growth/cohorts/OAuth split) and from public keeper listings (directory, search, discover totals). The admin user list still shows them, tagged `is_test_account`; admin stats return `test_accounts`. Never block the domain at signup — the pre-launch report needs to sign in. New counting/listing queries must use the clause (`tests/test_test_accounts.py` checks the routers).
 
+- **Molt measurements are INCHES, for every taxon (2026-10-05)**: `molt_logs.leg_span_before/after` (and growth rates derived from them) are stored in inches whatever the taxon — the column is called leg span for legacy reasons; for non-spiders it is body length. Every form, chart, card and label must say inches. From 2026-06-15 to 2026-10-05 the shared molt forms and growth charts wrongly said "(cm)"; the four rows proven to be cm were converted by `apps/api/fix_molt_units_20261005.py`. Planned: a per-keeper units setting (default from device region, switchable in Settings) that converts at the edges — storage stays inches.
+
 - **Password & Secret Management**:
   - Password complexity validator (uppercase, lowercase, digit, special char)
   - Dev secret detection — refuses to start in production with default key

@@ -182,7 +182,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span
           <View style={[styles.statCard, { backgroundColor: colors.surfaceElevated }]}>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Size Gain</Text>
             <Text style={[styles.statValue, { color: colors.info }]}>
-              +{parseFloat(data.total_leg_span_gain.toString()).toFixed(1)} cm
+              +{parseFloat(data.total_leg_span_gain.toString()).toFixed(2)} in
             </Text>
           </View>
         )}
@@ -241,7 +241,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span
         )}
         {(metric === 'both' || metric === 'leg_span') && hasLegSpanData && (
           <View style={styles.chartWrapper}>
-            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>{lengthLabel} (cm)</Text>
+            <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>{lengthLabel} (in)</Text>
             <LineChart
               data={{
                 labels: chartData.map((d) => d.date),
@@ -305,7 +305,7 @@ const GrowthChart: React.FC<GrowthChartProps> = ({ data, lengthLabel = 'Leg Span
             <Text style={styles.infoText}>
               <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>Size Growth Rate: </Text>
               <Text style={[styles.infoValueBlue, { color: colors.info }]}>
-                {parseFloat(data.growth_rate_leg_span.toString()).toFixed(2)} cm/mo
+                {parseFloat(data.growth_rate_leg_span.toString()).toFixed(2)} in/mo
               </Text>
             </Text>
           )}

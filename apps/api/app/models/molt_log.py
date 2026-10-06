@@ -92,7 +92,7 @@ class MoltLog(Base):
     is_ultimate = Column(Boolean, default=False, nullable=False, server_default="false")
 
     # Measurements
-    leg_span_before = Column(Numeric(5, 2))  # in inches or cm
+    leg_span_before = Column(Numeric(5, 2))  # inches, for every taxon (see CLAUDE.md, Molt measurements)
     leg_span_after = Column(Numeric(5, 2))
     weight_before = Column(Numeric(6, 2))  # in grams
     weight_after = Column(Numeric(6, 2))

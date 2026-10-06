@@ -226,7 +226,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
             <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Size Gain</div>
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              +{parseFloat(data.total_leg_span_gain.toString()).toFixed(1)} cm
+              +{parseFloat(data.total_leg_span_gain.toString()).toFixed(2)} in
             </div>
           </div>
         )}
@@ -260,7 +260,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
                 orientation="right"
                 tick={tickStyle}
                 label={{
-                  value: `${lengthLabel} (cm)`,
+                  value: `${lengthLabel} (in)`,
                   angle: 90,
                   position: "insideRight",
                   style: labelStyle,
@@ -272,7 +272,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
               formatter={(value, name) => {
                 if (name === "weight") return [`${(value as number).toFixed(1)}g`, "Weight"];
                 if (name === "legSpan")
-                  return [`${(value as number).toFixed(1)} cm`, lengthLabel];
+                  return [`${(value as number).toFixed(2)} in`, lengthLabel];
                 return [value, name || ""];
               }}
             />
@@ -322,7 +322,7 @@ export default function GrowthChart({ data, lengthLabel = "Leg Span" }: GrowthCh
               <span className="text-gray-600 dark:text-gray-400">Size Growth Rate:</span>{" "}
               <span className="font-semibold text-blue-600 dark:text-blue-400">
                 {parseFloat(data.growth_rate_leg_span.toString()).toFixed(2)}{" "}
-                cm/mo
+                in/mo
               </span>
             </div>
           )}

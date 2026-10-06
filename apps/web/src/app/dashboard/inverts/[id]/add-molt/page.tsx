@@ -144,8 +144,8 @@ export default function AddInvertMoltPage() {
           <div><label className={labelCls}>Date molted</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} /></div>
           <div><label className={labelCls}>Molt number (optional)</label><input value={moltNum} onChange={(e) => setMoltNum(e.target.value)} inputMode="numeric" placeholder="e.g. 4" className={inputCls} /></div>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className={labelCls}>{lengthLabel} before (cm)</label><input value={lengthBefore} onChange={(e) => setLengthBefore(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
-            <div><label className={labelCls}>{lengthLabel} after (cm)</label><input value={lengthAfter} onChange={(e) => setLengthAfter(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
+            <div><label className={labelCls}>{lengthLabel} before (in)</label><input value={lengthBefore} onChange={(e) => setLengthBefore(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
+            <div><label className={labelCls}>{lengthLabel} after (in)</label><input value={lengthAfter} onChange={(e) => setLengthAfter(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Weight before (g)</label><input value={weightBefore} onChange={(e) => setWeightBefore(e.target.value)} inputMode="decimal" placeholder="Optional" className={inputCls} /></div>

@@ -346,7 +346,7 @@ async def get_collection_analytics(
                 if molt.weight_after:
                     details.append(f"{molt.weight_after}g")
                 if molt.leg_span_after:
-                    details.append(f"{molt.leg_span_after}cm")
+                    details.append(f"{molt.leg_span_after} in")
                 description += f" ({', '.join(details)})"
 
             recent_activity.append(ActivityItem(
