@@ -13,12 +13,13 @@ import * as Clipboard from 'expo-clipboard';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import { TYPE } from '../../src/theme/tokens';
+import { FrameRow } from '../../src/components/share/FrameRow';
 import { AppHeader } from '../../src/components/AppHeader';
-import { CardKind, CardShape, FIELDS, FIELD_LABELS, createShareCard, getShareDefaults } from '../../src/lib/share-cards';
+import { CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, createShareCard, getShareDefaults } from '../../src/lib/share-cards';
 
 const ASPECT: Record<CardShape, number> = { story: 1080 / 1920, post: 1080 / 1350, square: 1 };
 
-/** A card link made in this screen session, reusable while fields+shape are unchanged. */
+/** A card link made in this screen session, reusable while frame+fields+shape are unchanged. */
 interface MadeLink { key: string; cardLink: string }
 
 export default function ShareCardScreen() {
@@ -29,6 +30,7 @@ export default function ShareCardScreen() {
   const iconColor = layout.useGradient ? '#fff' : colors.textPrimary;
 
   const [shape, setShape] = useState<CardShape>('story');
+  const [frame, setFrame] = useState<CardFrame>('specimen');
   const [fields, setFields] = useState<string[] | null>(null);
   const [link, setLink] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
@@ -43,7 +45,11 @@ export default function ShareCardScreen() {
 
   const noFields = fields !== null && fields.length === 0;
 
-  useEffect(() => { getShareDefaults(kind).then(setFields).catch(() => setFields(FIELDS[kind])); }, [kind]);
+  useEffect(() => {
+    getShareDefaults(kind)
+      .then((d) => { setFields(d.fields); setFrame(d.frame); })
+      .catch(() => setFields(FIELDS[kind]));
+  }, [kind]);
 
   useEffect(() => {
     if (!fields || !animalId) return;
@@ -60,14 +66,14 @@ export default function ShareCardScreen() {
     timer.current = setTimeout(async () => {
       try {
         setError(null);
-        const r = await createShareCard({ animal_id: animalId, kind, molt_id: moltId, fields, shape, link: false, preview: true });
+        const r = await createShareCard({ animal_id: animalId, kind, molt_id: moltId, fields, shape, frame, link: false, preview: true });
         if (mine === reqId.current) setPreview(r.image_url);
       } catch {
         if (mine === reqId.current) { setPreview(null); setError("Couldn't make the card. Try again."); }
       }
     }, 350);
     return () => { if (timer.current) clearTimeout(timer.current); };
-  }, [fields, shape, animalId, kind, moltId]);
+  }, [fields, shape, frame, animalId, kind, moltId]);
 
   useEffect(() => () => {
     reqId.current += 1;
@@ -82,7 +88,7 @@ export default function ShareCardScreen() {
     copyTimer.current = setTimeout(() => setCopied(false), 2000);
   };
 
-  const linkKey = (f: string[], s: CardShape) => `${[...f].sort().join(',')}|${s}`;
+  const linkKey = (f: string[], s: CardShape, fr: CardFrame) => `${[...f].sort().join(',')}|${s}|${fr}`;
 
   const toggle = (f: string) => {
     madeLink.current = null;
@@ -90,12 +96,13 @@ export default function ShareCardScreen() {
     setFields((cur) => ((cur ?? []).includes(f) ? (cur ?? []).filter((x) => x !== f) : [...(cur ?? []), f]));
   };
   const pickShape = (s: CardShape) => { madeLink.current = null; setShownLink(null); setShape(s); };
+  const pickFrame = (f: CardFrame) => { madeLink.current = null; setShownLink(null); setFrame(f); };
   const onLinkChange = (v: boolean) => { if (!v) { madeLink.current = null; setShownLink(null); } setLink(v); };
 
   const produce = async (): Promise<{ file: string; cardLink: string | null }> => {
-    const key = linkKey(fields!, shape);
+    const key = linkKey(fields!, shape, frame);
     const reuse = link && madeLink.current?.key === key ? madeLink.current : null;
-    const r = await createShareCard({ animal_id: animalId!, kind, molt_id: moltId, fields: fields!, shape, link: link && !reuse });
+    const r = await createShareCard({ animal_id: animalId!, kind, molt_id: moltId, fields: fields!, shape, frame, link: link && !reuse });
     if (link && r.card_link) madeLink.current = { key, cardLink: r.card_link };
     const file = `${FileSystem.cacheDirectory}share-card-${Date.now()}.png`;
     const dl = await FileSystem.downloadAsync(r.image_url, file);
@@ -144,6 +151,7 @@ export default function ShareCardScreen() {
             <Image source={{ uri: preview }} style={{ width: '70%', aspectRatio: ASPECT[shape], borderRadius: layout.radius.sm }} accessibilityLabel="Card preview" />
           ) : <ActivityIndicator color={colors.primary} />}
         </View>
+        <FrameRow value={frame} onChange={pickFrame} />
         <View style={styles.chips} accessibilityRole="radiogroup">
           {(['story', 'post', 'square'] as CardShape[]).map((s) => {
             const on = s === shape;

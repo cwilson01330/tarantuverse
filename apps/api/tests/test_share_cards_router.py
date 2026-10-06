@@ -90,12 +90,16 @@ def test_token_data_contains_only_chosen_fields():
     # Disallowed names never make it into the token, the response, or the
     # remembered defaults.
     assert out.fields == ["species"]
-    assert OWNER.share_defaults["tarantuverse:profile"] == ["species"]
+    assert OWNER.share_defaults["tarantuverse:profile"] == {"fields": ["species"], "frame": "specimen"}
     token = out.image_url.rsplit("/", 1)[1]
     data = run(sc.share_card_data(token, response=Response(), db=db))
     assert data["name"] is None and data["photo_url"] is None
     assert data["scientific_name"] == "Brachypelma hamorii"
-    assert "price_paid" not in str(data) and "notes" not in str(data)
+    assert "price_paid" not in str(data)
+    # `notes` is the Field-notes text block — never the animal's own notes.
+    assert data["notes"] == {"headline": "Brachypelma hamorii", "species_line": "Mexican redknee", "facts": []}
+    assert set(data) == {"app", "kind", "taxon", "header", "name", "scientific_name", "common_name",
+                         "photo_url", "facts", "notes", "shape", "frame"}
     assert data["shape"] == "story"
 
 
@@ -132,7 +136,7 @@ def test_herpetoverse_molt_card_is_rejected():
 def test_defaults_are_remembered():
     db = FakeDB()
     create(OWNER, db, fields=["name"])
-    assert OWNER.share_defaults["tarantuverse:profile"] == ["name"]
+    assert OWNER.share_defaults["tarantuverse:profile"] == {"fields": ["name"], "frame": "specimen"}
     assert run(sc.get_share_defaults(app="tarantuverse", kind="profile", current_user=OWNER))["fields"] == ["name"]
 
 
@@ -366,4 +370,56 @@ def test_non_preview_still_saves_defaults(monkeypatch):
     user = OWNER
     monkeypatch.setattr(OWNER, "share_defaults", {"tarantuverse:profile": ["name"]})
     create(user, db, fields=["species"], preview=False)
-    assert user.share_defaults["tarantuverse:profile"] == ["species"]
+    assert user.share_defaults["tarantuverse:profile"] == {"fields": ["species"], "frame": "specimen"}
+
+
+# ── Frames (Field notes + Herbarium) ─────────────────────────────────────────
+
+def test_frame_rides_the_token_and_is_remembered():
+    db = FakeDB()
+    out = create(OWNER, db, fields=["name", "species"], frame="notes")
+    assert out.frame == "notes"
+    data = run(sc.share_card_data(out.image_url.rsplit("/", 1)[1], response=Response(), db=db))
+    assert data["frame"] == "notes"
+    assert data["notes"]["headline"] == "Rosie"
+    assert OWNER.share_defaults["tarantuverse:profile"] == {"fields": ["name", "species"], "frame": "notes"}
+    got = run(sc.get_share_defaults(app="tarantuverse", kind="profile", current_user=OWNER))
+    assert got == {"fields": ["name", "species"], "frame": "notes"}
+
+
+def test_unknown_frame_is_rejected():
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        create(OWNER, FakeDB(), frame="darkroom")
+
+
+def test_old_tokens_without_a_frame_render_as_specimen():
+    from app.utils.share_token import sign_render_token
+    token = sign_render_token({"app": "tarantuverse", "kind": "profile", "animal_id": str(ANIMAL_ID),
+                               "molt_id": None, "fields": ["name"], "shape": "post"})
+    assert run(sc.share_card_data(token, response=Response(), db=FakeDB()))["frame"] == "specimen"
+
+
+def test_old_list_defaults_read_as_specimen(monkeypatch):
+    monkeypatch.setattr(OWNER, "share_defaults", {"tarantuverse:profile": ["name"]})
+    got = run(sc.get_share_defaults(app="tarantuverse", kind="profile", current_user=OWNER))
+    assert got == {"fields": ["name"], "frame": "specimen"}
+
+
+def test_preview_does_not_remember_the_frame(monkeypatch):
+    monkeypatch.setattr(OWNER, "share_defaults", {"tarantuverse:profile": {"fields": ["name"], "frame": "notes"}})
+    create(OWNER, FakeDB(), fields=["species"], frame="herbarium", preview=True)
+    assert OWNER.share_defaults == {"tarantuverse:profile": {"fields": ["name"], "frame": "notes"}}
+
+
+def test_card_link_freezes_its_frame():
+    db = FakeDB()
+    out = create(OWNER, db, link=True, fields=["name"], frame="herbarium")
+    assert run(sc.get_card_link(out.code, response=Response(), db=db))["frame"] == "herbarium"
+
+
+def test_old_card_links_render_as_specimen():
+    db = FakeDB()
+    out = create(OWNER, db, link=True, fields=["name"])
+    db.links[out.code].payload.pop("frame")
+    assert run(sc.get_card_link(out.code, response=Response(), db=db))["frame"] == "specimen"

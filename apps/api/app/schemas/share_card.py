@@ -12,6 +12,7 @@ class ShareCardCreate(BaseModel):
     molt_id: Optional[UUID] = None
     fields: Optional[List[str]] = Field(None, max_length=20)
     shape: str = Field("story", pattern="^(story|post|square|wide)$")
+    frame: str = Field("specimen", pattern="^(specimen|notes|herbarium)$")
     link: bool = False
     # Live-preview render: mints a token only. Never saves defaults or a link.
     preview: bool = False
@@ -22,6 +23,7 @@ class ShareCardCreated(BaseModel):
     card_link: Optional[str] = None
     code: Optional[str] = None
     fields: List[str]
+    frame: str = "specimen"
 
 
 class CardLinkItem(BaseModel):

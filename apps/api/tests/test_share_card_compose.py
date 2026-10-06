@@ -131,3 +131,82 @@ def _r2_base(monkeypatch):
     from app.services.storage import storage_service
     monkeypatch.setattr(storage_service, "use_r2", True, raising=False)
     monkeypatch.setattr(storage_service, "public_url_base", "https://pub.example.r2.dev", raising=False)
+
+
+# ── Field notes copy (the handwritten line) ──────────────────────────────────
+
+from app.services.share_card import ordinal, read_defaults  # noqa: E402
+
+
+@pytest.mark.parametrize("n,want", [
+    (1, "1st"), (2, "2nd"), (3, "3rd"), (4, "4th"), (9, "9th"), (11, "11th"), (12, "12th"),
+    (13, "13th"), (21, "21st"), (22, "22nd"), (23, "23rd"), (101, "101st"), (111, "111th"), (112, "112th"),
+])
+def test_ordinals(n, want):
+    assert ordinal(n) == want
+
+
+def molt9(**kw):
+    base = dict(number=9, molted_on=date(2026, 9, 29), span_before=3.2, span_after=4.1)
+    base.update(kw)
+    return MoltFacts(**base)
+
+
+def test_molt_notes_read_like_a_note():
+    card = compose_card("molt", rosie(), ["name", "species", "size_change", "days_in_care"], molt=molt9(), today=TODAY)
+    assert card["notes"] == {
+        "headline": "Rosie, 9th molt",
+        "species_line": "Brachypelma hamorii",
+        "facts": ["3.2 → 4.1 in", "day 411 with me"],
+    }
+
+
+def test_molt_notes_without_a_name():
+    card = compose_card("molt", rosie(), ["size_change"], molt=molt9(number=1), today=TODAY)
+    assert card["notes"]["headline"] == "1st molt"
+    assert card["notes"]["species_line"] is None
+
+
+def test_tv_profile_notes_line():
+    card = compose_card("profile", rosie(), list(FIELD_ALLOW[("tarantuverse", "profile")]), today=TODAY)
+    assert card["notes"] == {
+        "headline": "Rosie",
+        "species_line": "Brachypelma hamorii · female",
+        "facts": ["4.1 in", "9 molts", "1 yr, 1 mo with me"],
+    }
+    # The printed fact rows keep their old order.
+    assert [f["label"] for f in card["facts"]] == ["In care", "Molts", "Leg span"]
+
+
+def test_singular_molt_and_shed():
+    card = compose_card("profile", rosie(molt_count=1), ["molts"], today=TODAY)
+    assert card["notes"]["facts"] == ["1 molt"]
+    hv = CardSubject(app="herpetoverse", taxon="lizard", name=None, scientific_name="Correlophus ciliatus",
+                     common_name="Crested gecko", sex=None, date_acquired=None, photo_url=None, shed_count=1)
+    assert compose_card("profile", hv, ["sheds"], today=TODAY)["notes"]["facts"] == ["1 shed"]
+
+
+def test_hv_profile_notes_line():
+    mango = CardSubject(app="herpetoverse", taxon="lizard", name="Mango", scientific_name="Correlophus ciliatus",
+                        common_name="Crested gecko", sex="female", date_acquired=date(2024, 6, 1),
+                        photo_url=None, weight_g=42, length_in=8, shed_count=14)
+    card = compose_card("profile", mango, list(FIELD_ALLOW[("herpetoverse", "profile")]), today=TODAY)
+    assert card["notes"]["facts"] == ["42 g", "8 in", "14 sheds", "2 yr, 3 mo with me"]
+
+
+def test_no_name_moves_species_into_the_headline():
+    card = compose_card("profile", rosie(), ["species", "sex"], today=TODAY)
+    assert card["notes"]["headline"] == "Brachypelma hamorii"
+    assert card["notes"]["species_line"] == "Mexican redknee · female"
+
+
+def test_notes_never_carry_unchosen_fields():
+    card = compose_card("profile", rosie(), ["photo"], today=TODAY)
+    assert card["notes"] == {"headline": None, "species_line": None, "facts": []}
+
+
+def test_read_defaults_shapes():
+    assert read_defaults(None) == (None, "specimen")
+    assert read_defaults(["name"]) == (["name"], "specimen")
+    assert read_defaults({"fields": ["name"], "frame": "notes"}) == (["name"], "notes")
+    assert read_defaults({"fields": ["name"], "frame": "bogus"}) == (["name"], "specimen")

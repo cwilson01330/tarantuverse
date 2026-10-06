@@ -3,6 +3,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://tarantuverse-api.onr
 export type CardKind = 'molt' | 'profile'
 export type CardShape = 'story' | 'post' | 'square'
 export type CardApp = 'tarantuverse' | 'herpetoverse'
+export type CardFrame = 'specimen' | 'notes' | 'herbarium'
+
+/** Composer order (handoff §4): Herbarium · Field notes · Specimen. */
+export const FRAMES: { key: CardFrame; label: string }[] = [
+  { key: 'herbarium', label: 'Herbarium' },
+  { key: 'notes', label: 'Field notes' },
+  { key: 'specimen', label: 'Specimen' },
+]
 
 export const FIELD_LABELS: Record<string, string> = {
   photo: 'Photo', name: 'Name', species: 'Species', sex: 'Sex', in_care: 'Time in care',
@@ -30,11 +38,12 @@ async function call<T>(token: string, path: string, init?: RequestInit): Promise
 }
 
 export function getShareDefaults(token: string, app: CardApp, kind: CardKind) {
-  return call<{ fields: string[] }>(token, `/share-cards/defaults?app=${app}&kind=${kind}`).then((d) => d.fields)
+  return call<{ fields: string[]; frame?: CardFrame }>(token, `/share-cards/defaults?app=${app}&kind=${kind}`)
+    .then((d) => ({ fields: d.fields, frame: d.frame ?? 'specimen' }))
 }
 
 export function createShareCard(token: string, body: {
-  app: CardApp; animal_id: string; kind: CardKind; molt_id?: string; fields: string[]; shape: CardShape; link: boolean; preview?: boolean
+  app: CardApp; animal_id: string; kind: CardKind; molt_id?: string; fields: string[]; shape: CardShape; frame: CardFrame; link: boolean; preview?: boolean
 }) {
   return call<{ image_url: string; card_link: string | null; code: string | null; fields: string[] }>(
     token, '/share-cards/', { method: 'POST', body: JSON.stringify(body) },

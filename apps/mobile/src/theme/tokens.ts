@@ -46,3 +46,19 @@ export const TYPE = {
 } as const satisfies Record<string, TextStyle>;
 
 export type TypeKey = keyof typeof TYPE;
+
+// ─── Share-card paper ────────────────────────────────────────────────────
+// The share cards are images with a fixed palette (they must read the same
+// on light and dark feeds), so the composer's frame tiles picture them in the
+// same fixed colours rather than theme colours. Mirrors the renderer in
+// apps/web/src/lib/share-card.
+export const SHARE_CARD_PALETTE = {
+  specimenPaper: '#F1EFE8',
+  specimenInk: '#2C2C2A',
+  specimenRule: '#888780',
+  notesPaper: '#F4F1E8',
+  notesHand: '#1F2A44',
+  herbariumPaper: '#EDE7D6',
+  herbariumBorder: '#3B3528',
+  photo: '#444441',
+} as const;

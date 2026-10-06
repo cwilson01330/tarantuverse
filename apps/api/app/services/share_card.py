@@ -16,6 +16,10 @@ from datetime import date
 from typing import Optional
 
 SHAPES = ("story", "post", "square", "wide")
+# How the card looks. All three render from the same composed payload; the
+# Field notes frame also reads the `notes` block below.
+FRAMES = ("specimen", "notes", "herbarium")
+DEFAULT_FRAME = "specimen"
 
 FIELD_ALLOW: dict[tuple[str, str], tuple[str, ...]] = {
     ("tarantuverse", "molt"): ("photo", "name", "species", "size_change", "days_in_care"),
@@ -70,6 +74,34 @@ def clean_fields(app: str, kind: str, requested: Optional[list[str]]) -> list[st
     allowed = FIELD_ALLOW[key]
     # Keep allow-list order, drop anything else, de-duplicate.
     return [f for f in allowed if f in set(requested)]
+
+
+def clean_frame(frame: Optional[str]) -> str:
+    return frame if frame in FRAMES else DEFAULT_FRAME
+
+
+def read_defaults(saved) -> tuple[Optional[list[str]], str]:
+    """A remembered `app:kind` entry → (fields, frame). Older rows stored a
+    bare list of fields; read those as the Specimen frame."""
+    if isinstance(saved, list):
+        return saved, DEFAULT_FRAME
+    if isinstance(saved, dict):
+        fields = saved.get("fields")
+        return (fields if isinstance(fields, list) else None), clean_frame(saved.get("frame"))
+    return None, DEFAULT_FRAME
+
+
+def ordinal(n: int) -> str:
+    """1st 2nd 3rd 4th … 11th 12th 13th … 21st 22nd 101st 111th."""
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
 
 def _num(x: float) -> str:
@@ -129,6 +161,19 @@ def compose_card(
         if value:  # a missing value removes its row
             facts.append({"label": label, "value": value})
 
+    # The Field notes frame says the same facts as one handwritten line, in
+    # the keeper's voice ("4.1 in · 9 molts · 1 yr with me"). Built here, from
+    # the same chosen fields, so the client still only ever sends field names.
+    note_facts: list[str] = []
+
+    def note(value: Optional[str]) -> None:
+        if value:
+            note_facts.append(value)
+
+    name = subject.name if "name" in f else None
+    species_on = "species" in f
+    sex_on = "sex" in f and sex in ("male", "female")
+
     if kind == "molt":
         if molt is None:
             raise ValueError("molt card needs a molt")
@@ -137,39 +182,68 @@ def compose_card(
             b, a = molt.span_before, molt.span_after
             unit = " in"
             if b is not None and a is not None:
-                fact(_size_label(subject.taxon), f"{_num(b)} → {_num(a)}{unit}")
+                value = f"{_num(b)} → {_num(a)}{unit}"
             elif a is not None:
-                fact(_size_label(subject.taxon), f"{_num(a)}{unit}")
+                value = f"{_num(a)}{unit}"
+            else:
+                value = None
+            fact(_size_label(subject.taxon), value)
+            note(value)
         if "days_in_care" in f and subject.date_acquired and subject.date_acquired <= molt.molted_on:
-            fact("In care", f"day {(molt.molted_on - subject.date_acquired).days}")
+            days = (molt.molted_on - subject.date_acquired).days
+            fact("In care", f"day {days}")
+            note(f"day {days} with me")
+        headline = f"{name}, {ordinal(molt.number)} molt" if name else f"{ordinal(molt.number)} molt"
+        species_line = subject.scientific_name if species_on else None
     else:
         header = "Specimen"
-        if "sex" in f and sex in ("male", "female"):
+        if sex_on:
             header = f"Specimen · {sex}"
-        if "in_care" in f and subject.date_acquired:
-            fact("In care", in_care_label(subject.date_acquired, today))
+        in_care = in_care_label(subject.date_acquired, today) if "in_care" in f and subject.date_acquired else None
+        fact("In care", in_care)
         if subject.app == "tarantuverse":
-            if "molts" in f and subject.molt_count > 0:
-                fact("Molts", str(subject.molt_count))
             if "size" in f:
                 fact(_size_label(subject.taxon), subject.latest_size)
+                note(subject.latest_size)
+            if "molts" in f and subject.molt_count > 0:
+                fact("Molts", str(subject.molt_count))
+                note(_plural(subject.molt_count, "molt"))
+            # Fact rows keep their original order (In care first); only the
+            # handwritten line reads size-first.
+            facts.sort(key=lambda r: {"In care": 0, "Molts": 1}.get(r["label"], 2))
         else:
             if "weight" in f and subject.weight_g:
-                fact("Weight", _weight(float(subject.weight_g)))
+                w = _weight(float(subject.weight_g))
+                fact("Weight", w)
+                note(w)
             if "length" in f and subject.length_in:
-                fact("Length", f"{_num(float(subject.length_in))} in")
+                ln = f"{_num(float(subject.length_in))} in"
+                fact("Length", ln)
+                note(ln)
             if "sheds" in f and subject.shed_count > 0:
                 fact("Sheds", str(subject.shed_count))
+                note(_plural(subject.shed_count, "shed"))
+        if in_care:
+            note(f"{in_care} with me")
+        sci = subject.scientific_name if species_on else None
+        common = subject.common_name if species_on else None
+        if name:
+            headline, printed = name, sci
+        else:
+            # No name: the species becomes the handwritten headline and the
+            # printed line falls back to the common name.
+            headline, printed = (sci, common) if sci else (common, None)
+        species_line = " · ".join(v for v in (printed, sex if sex_on else None) if v) or None
 
-    species_on = "species" in f
     return {
         "app": subject.app,
         "kind": kind,
         "taxon": subject.taxon,
         "header": header,
-        "name": subject.name if "name" in f else None,
+        "name": name,
         "scientific_name": subject.scientific_name if species_on else None,
         "common_name": subject.common_name if species_on and kind == "profile" else None,
         "photo_url": allowed_photo_url(subject.photo_url) if "photo" in f else None,
         "facts": facts,
+        "notes": {"headline": headline, "species_line": species_line, "facts": note_facts},
     }

@@ -1,7 +1,9 @@
 import { ImageResponse } from 'next/og'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
-import { CardPayload, SHAPE_SIZE, Shape, SpecimenCard } from './SpecimenCard'
+import { FieldNotesCard } from './FieldNotesCard'
+import { HerbariumCard } from './HerbariumCard'
+import { CardPayload, Frame, SHAPE_SIZE, Shape, SpecimenCard } from './SpecimenCard'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -14,6 +16,10 @@ let fonts: Promise<Font[]> | null = null
 const FONT_FILES = {
   regular: path.join(process.cwd(), 'src/lib/share-card/fonts/LibreCaslonText-Regular.ttf'),
   italic: path.join(process.cwd(), 'src/lib/share-card/fonts/LibreCaslonText-Italic.ttf'),
+  // Herbarium name (OFL, from Fontsource's Latin subset).
+  gloock: path.join(process.cwd(), 'src/lib/share-card/fonts/Gloock-Regular.ttf'),
+  // Field notes handwriting (OFL, from Fontsource's Latin subset).
+  reenie: path.join(process.cwd(), 'src/lib/share-card/fonts/ReenieBeanie-Regular.ttf'),
 }
 
 function loadFonts(): Promise<Font[]> {
@@ -21,6 +27,8 @@ function loadFonts(): Promise<Font[]> {
     fonts = Promise.all([
       readFile(FONT_FILES.regular).then((data) => ({ name: 'Caslon', data, style: 'normal' as const })),
       readFile(FONT_FILES.italic).then((data) => ({ name: 'Caslon', data, style: 'italic' as const })),
+      readFile(FONT_FILES.gloock).then((data) => ({ name: 'Gloock', data, style: 'normal' as const })),
+      readFile(FONT_FILES.reenie).then((data) => ({ name: 'Reenie', data, style: 'normal' as const })),
     ]).catch((e) => {
       fonts = null // don't poison a warm instance with one transient failure
       throw e
@@ -126,6 +134,12 @@ export function sanitizePayload(raw: unknown, shapeOverride?: Shape): CardPayloa
     })
     .filter((f): f is { label: string; value: string } => !!f.label && !!f.value)
     .slice(0, 8)
+  const n = (o.notes && typeof o.notes === 'object' ? o.notes : {}) as Record<string, unknown>
+  const notes = {
+    headline: clamp(n.headline, 160),
+    species_line: clamp(n.species_line, 200),
+    facts: (Array.isArray(n.facts) ? n.facts : []).map((f) => clamp(f, 120)).filter((f): f is string => !!f).slice(0, 6),
+  }
   return {
     app: o.app === 'herpetoverse' ? 'herpetoverse' : 'tarantuverse',
     kind: o.kind === 'molt' ? 'molt' : 'profile',
@@ -136,8 +150,24 @@ export function sanitizePayload(raw: unknown, shapeOverride?: Shape): CardPayloa
     common_name: clamp(o.common_name, 200),
     photo_url: typeof o.photo_url === 'string' ? o.photo_url.slice(0, 500) : null,
     facts,
+    notes,
     shape: shapeOverride ?? asShape(typeof o.shape === 'string' ? o.shape : null),
+    frame: asFrame(o.frame, notes.headline !== null || notes.facts.length > 0),
   }
+}
+
+/** Unknown frames render as the specimen card. Field notes needs the server's
+ *  notes block; a payload without one (an old snapshot) falls back too. */
+export function asFrame(v: unknown, hasNotes: boolean): Frame {
+  if (v === 'herbarium') return 'herbarium'
+  if (v === 'notes' && hasNotes) return 'notes'
+  return 'specimen'
+}
+
+function CardFor({ p, shape }: { p: CardPayload; shape: Shape }) {
+  if (p.frame === 'herbarium') return <HerbariumCard p={p} shape={shape} />
+  if (p.frame === 'notes') return <FieldNotesCard p={p} shape={shape} />
+  return <SpecimenCard p={p} shape={shape} />
 }
 
 // Always send a finished PNG with an explicit Content-Length. Without it the
@@ -156,11 +186,11 @@ export async function renderCard(raw: unknown, policy: CachePolicy, shape?: Shap
   const headers = { 'Content-Type': 'image/png', ...IMAGE_CACHE[policy] }
   const photo = await loadPhoto(p.photo_url)
   try {
-    const buf = await new ImageResponse(<SpecimenCard p={{ ...p, photo_url: photo }} shape={useShape} />, opts).arrayBuffer()
+    const buf = await new ImageResponse(<CardFor p={{ ...p, photo_url: photo }} shape={useShape} />, opts).arrayBuffer()
     return pngResponse(buf, headers)
   } catch {
     // Any render failure (bad image, satori quirk): retry once with the glyph block.
-    const buf = await new ImageResponse(<SpecimenCard p={{ ...p, photo_url: null }} shape={useShape} />, opts).arrayBuffer()
+    const buf = await new ImageResponse(<CardFor p={{ ...p, photo_url: null }} shape={useShape} />, opts).arrayBuffer()
     return pngResponse(buf, headers)
   }
 }

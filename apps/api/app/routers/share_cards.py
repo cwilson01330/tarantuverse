@@ -24,7 +24,9 @@ from app.services.share_card import (
     MoltFacts,
     _LEG_SPAN_TAXA,
     clean_fields,
+    clean_frame,
     compose_card,
+    read_defaults,
 )
 from app.utils.dependencies import get_current_user
 from app.utils.share_token import sign_render_token, verify_render_token
@@ -156,26 +158,28 @@ async def create_share_card(
     token = sign_render_token({
         "app": body.app, "kind": body.kind, "animal_id": str(body.animal_id),
         "molt_id": str(body.molt_id) if body.molt_id else None,
-        "fields": fields, "shape": body.shape,
+        "fields": fields, "shape": body.shape, "frame": body.frame,
     })
     image_url = f"{settings.CARD_RENDERER_ORIGIN.rstrip('/')}/api/card/{token}"
 
     card_link = code = None
     if body.link and not body.preview:
         code = secrets.token_urlsafe(16)
+        # The frame is frozen with the text: a shared link always shows the
+        # card as it looked when it was shared.
+        payload = dict(compose_card(body.kind, subject, fields, molt=molt), frame=body.frame)
         db.add(CardLink(
             id=uuid.uuid4(), code=code, app=body.app, animal_id=body.animal_id, kind=body.kind,
-            payload=compose_card(body.kind, subject, fields, molt=molt),
-            created_by=current_user.id, owner_id=owner.id,
+            payload=payload, created_by=current_user.id, owner_id=owner.id,
         ))
         card_link = f"{CARD_LINK_ORIGINS[body.app]}/c/{code}"
 
     if not body.preview:
         defaults = dict(current_user.share_defaults or {})
-        defaults[f"{body.app}:{body.kind}"] = fields
+        defaults[f"{body.app}:{body.kind}"] = {"fields": fields, "frame": body.frame}
         current_user.share_defaults = defaults
     db.commit()
-    return ShareCardCreated(image_url=image_url, card_link=card_link, code=code, fields=fields)
+    return ShareCardCreated(image_url=image_url, card_link=card_link, code=code, fields=fields, frame=body.frame)
 
 
 @router.get("/share-cards/defaults")
@@ -184,9 +188,9 @@ async def get_share_defaults(
     kind: str = Query(..., pattern="^(molt|profile)$"),
     current_user: User = Depends(get_current_user),
 ):
-    saved = (current_user.share_defaults or {}).get(f"{app}:{kind}")
+    saved_fields, frame = read_defaults((current_user.share_defaults or {}).get(f"{app}:{kind}"))
     try:
-        return {"fields": clean_fields(app, kind, saved)}
+        return {"fields": clean_fields(app, kind, saved_fields), "frame": frame}
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
@@ -205,6 +209,8 @@ async def share_card_data(token: str, response: Response, db: Session = Depends(
     molt = _load_molt(db, animal_id, UUID(claims["molt_id"])) if claims.get("molt_id") else None
     card = compose_card(claims["kind"], subject, claims["fields"], molt=molt)
     card["shape"] = claims["shape"]
+    # Tokens minted before frames existed have no frame claim.
+    card["frame"] = clean_frame(claims.get("frame"))
     return card
 
 
@@ -233,7 +239,8 @@ async def get_card_link(code: str, response: Response, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Card not found")
     if link.revoked_at is not None or not _animal_exists(db, link.app, link.animal_id):
         raise HTTPException(status_code=410, detail="This card is no longer shared")
-    return dict(link.payload, shape="wide")
+    # Links shared before frames existed have no frame in their snapshot.
+    return dict(link.payload, shape="wide", frame=clean_frame((link.payload or {}).get("frame")))
 
 
 @router.get("/card-links/", response_model=List[CardLinkItem])
@@ -283,4 +290,4 @@ async def public_card(app: str, animal_id: UUID, db: Session = Depends(get_db)):
     if owner is None or owner.collection_visibility != "public":
         raise HTTPException(status_code=404, detail="Not found")
     _a, _o, subject = _load_subject(db, owner, app, animal_id, "viewer")
-    return dict(compose_card("profile", subject, PUBLIC_FIELDS[app]), shape="wide")
+    return dict(compose_card("profile", subject, PUBLIC_FIELDS[app]), shape="wide", frame="specimen")

@@ -5,6 +5,10 @@
  * same on light and dark feeds.
  */
 export type Shape = 'story' | 'post' | 'square' | 'wide'
+export type Frame = 'specimen' | 'notes' | 'herbarium'
+
+/** The Field notes frame's handwritten copy, composed on the server. */
+export type CardNotes = { headline: string | null; species_line: string | null; facts: string[] }
 
 export type CardPayload = {
   app: 'tarantuverse' | 'herpetoverse'
@@ -16,7 +20,9 @@ export type CardPayload = {
   common_name: string | null
   photo_url: string | null
   facts: { label: string; value: string }[]
+  notes: CardNotes
   shape: Shape
+  frame: Frame
 }
 
 export const SHAPE_SIZE: Record<Shape, { width: number; height: number }> = {
@@ -34,6 +40,11 @@ const PHOTO_BG = '#444441'
 
 const GLYPH: Record<string, string> = {
   tarantula: 'T', scorpion: 'S', centipede: 'C', snake: 'S', lizard: 'L',
+}
+
+/** The letter shown in place of a missing photo. */
+export function taxonGlyph(taxon: string): string {
+  return GLYPH[taxon] ?? (/^[a-z]/.test(taxon) ? taxon[0].toUpperCase() : '·')
 }
 
 function Photo({ url, taxon, w, h }: { url: string | null; taxon: string; w: number; h: number }) {
@@ -60,8 +71,9 @@ function Ruler({ width }: { width: number }) {
 }
 
 /** Values like "3.2 → 4.1 in": the arrow is drawn as SVG so satori never shapes
- *  U+2192 (Libre Caslon lacks it; satori would fetch a Google font at render). */
-function FactValue({ value, size }: { value: string; size: number }) {
+ *  U+2192 (none of our card fonts have it; satori would fetch a Google font at
+ *  render). Shared by every frame. */
+export function FactValue({ value, size, color = INK }: { value: string; size: number; color?: string }) {
   if (!value.includes(' → ')) return <span>{value}</span>
   const parts = value.split(' → ')
   const w = Math.round(size * 0.9)
@@ -73,7 +85,7 @@ function FactValue({ value, size }: { value: string; size: number }) {
         <span key={i} style={{ display: 'flex', alignItems: 'center' }}>
           {i > 0 ? (
             <svg width={w} height={h} viewBox="0 0 18 10" style={{ marginLeft: m, marginRight: m }}>
-              <path d="M0 5 H16 M11.5 1 L16.5 5 L11.5 9" stroke={INK} strokeWidth="1.5" fill="none" />
+              <path d="M0 5 H16 M11.5 1 L16.5 5 L11.5 9" stroke={color} strokeWidth="1.5" fill="none" />
             </svg>
           ) : null}
           <span>{part}</span>

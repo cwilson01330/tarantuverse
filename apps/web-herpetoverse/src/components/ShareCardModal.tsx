@@ -5,9 +5,39 @@
  * HV is dark-only: palette copied from PauseFeedingDialog, no `dark:` variants.
  */
 import { useEffect, useRef, useState } from 'react'
-import { CardApp, CardKind, CardShape, FIELDS, FIELD_LABELS, createShareCard, getShareDefaults } from '@/lib/shareCards'
+import { CardApp, CardFrame, CardKind, CardShape, FIELDS, FIELD_LABELS, FRAMES, createShareCard, getShareDefaults } from '@/lib/shareCards'
 
 const GENERIC_ERROR = "Couldn't make the card. Try again."
+
+/** A tiny abstract of each frame (handoff §4): fixed card colours, since it
+ *  pictures the card itself, not the app around it. */
+function FrameThumb({ frame }: { frame: CardFrame }) {
+  if (frame === 'herbarium') {
+    return (
+      <div className="w-full h-full relative" style={{ background: '#EDE7D6' }}>
+        <div className="absolute" style={{ left: 7, top: 6, width: 40, height: 32, background: '#444441', transform: 'rotate(-3deg)' }} />
+        <div className="absolute" style={{ left: 6, right: 6, bottom: 6, height: 20, border: '1px solid #3B3528' }} />
+      </div>
+    )
+  }
+  if (frame === 'notes') {
+    return (
+      <div className="w-full h-full relative" style={{ background: '#F4F1E8' }}>
+        <div className="absolute" style={{ left: 5, right: 5, top: 5, height: 38, background: '#444441' }} />
+        <div className="absolute" style={{ left: 6, top: 50, width: 34, height: 3, borderRadius: 2, background: '#1F2A44', transform: 'rotate(-3deg)' }} />
+        <div className="absolute" style={{ left: 8, top: 58, width: 24, height: 2, borderRadius: 2, background: '#1F2A44', transform: 'rotate(-2deg)' }} />
+      </div>
+    )
+  }
+  return (
+    <div className="w-full h-full relative" style={{ background: '#F1EFE8' }}>
+      <div className="absolute" style={{ left: 5, right: 5, top: 5, height: 34, background: '#444441', borderRadius: 2 }} />
+      <div className="absolute" style={{ left: 6, top: 45, width: 26, height: 3, background: '#2C2C2A' }} />
+      <div className="absolute" style={{ left: 6, right: 6, top: 54, height: 1, background: '#888780' }} />
+      <div className="absolute" style={{ left: 6, right: 6, top: 59, height: 1, background: '#888780' }} />
+    </div>
+  )
+}
 
 export default function ShareCardModal({
   open, onClose, app, animalId, kind, moltId, token,
@@ -15,6 +45,7 @@ export default function ShareCardModal({
   open: boolean; onClose: () => void; app: CardApp; animalId: string; kind: CardKind; moltId?: string; token: string
 }) {
   const [shape, setShape] = useState<CardShape>('post')
+  const [frame, setFrame] = useState<CardFrame>('specimen')
   const [fields, setFields] = useState<string[] | null>(null)
   const [link, setLink] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
@@ -29,7 +60,7 @@ export default function ShareCardModal({
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
-  const key = fields ? `${shape}|${[...fields].sort().join(',')}` : ''
+  const key = fields ? `${frame}|${shape}|${[...fields].sort().join(',')}` : ''
 
   // Reset per open / per molt so nothing stale from a previous card shows.
   useEffect(() => {
@@ -49,7 +80,7 @@ export default function ShareCardModal({
     if (!open) return
     let cancelled = false
     getShareDefaults(token, app, kind)
-      .then((f) => { if (!cancelled) setFields(f) })
+      .then((d) => { if (!cancelled) { setFields(d.fields); setFrame(d.frame) } })
       .catch(() => { if (!cancelled) setFields(FIELDS[`${app}:${kind}`]) })
     return () => { cancelled = true }
   }, [open, token, app, kind, moltId])
@@ -73,7 +104,7 @@ export default function ShareCardModal({
       const id = ++reqId.current
       try {
         setError(null)
-        const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields, shape, link: false, preview: true })
+        const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields, shape, frame, link: false, preview: true })
         if (id !== reqId.current) return
         setPreview(r.image_url)
       } catch (e) {
@@ -82,7 +113,7 @@ export default function ShareCardModal({
       }
     }, 350)
     return () => { if (timer.current) clearTimeout(timer.current) }
-  }, [open, fields, shape, token, app, animalId, kind, moltId])
+  }, [open, fields, shape, frame, token, app, animalId, kind, moltId])
 
   // Dialog behaviour: focus in, Escape closes, body scroll locked, focus restored.
   useEffect(() => {
@@ -137,7 +168,7 @@ export default function ShareCardModal({
     setError(null)
     try {
       const reuse = link && !!shownLink
-      const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields, shape, link: reuse ? false : link })
+      const r = await createShareCard(token, { app, animal_id: animalId, kind, molt_id: moltId, fields, shape, frame, link: reuse ? false : link })
       const url = reuse ? shownLink : r.card_link
       if (!reuse && r.card_link) setCardLink({ url: r.card_link, key })
       const blob = await fetch(r.image_url).then((x) => {
@@ -183,6 +214,19 @@ export default function ShareCardModal({
         </div>
         <div className="flex flex-col gap-4">
           <h2 className="text-sm font-semibold text-white tracking-wide">{kind === 'molt' ? 'Share molt' : 'Share card'}</h2>
+          <div className="flex gap-3" role="group" aria-label="Frame">
+            {FRAMES.map((f) => (
+              <button key={f.key} onClick={() => setFrame(f.key)} aria-pressed={frame === f.key} className="flex flex-col items-center gap-1">
+                <span
+                  className={`block overflow-hidden rounded ${frame === f.key ? 'border-[1.5px] border-emerald-500' : 'border border-neutral-700'}`}
+                  style={{ width: 56, height: 70 }}
+                >
+                  <FrameThumb frame={f.key} />
+                </span>
+                <span className={`text-[10px] ${frame === f.key ? 'text-neutral-100' : 'text-neutral-400'}`}>{f.label}</span>
+              </button>
+            ))}
+          </div>
           <div className="flex gap-2">
             {(['story', 'post', 'square'] as CardShape[]).map((s) => (
               <button key={s} onClick={() => setShape(s)} aria-pressed={shape === s}
