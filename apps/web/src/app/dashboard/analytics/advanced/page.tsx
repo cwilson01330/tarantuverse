@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DashboardLayout from "@/components/DashboardLayout";
 import apiClient from "@/lib/api";
+import { INVERT_TAXA, isInvertTaxon } from "@/lib/inverts";
 import {
   BarChart,
   Bar,
@@ -53,6 +54,10 @@ interface AdvancedAnalytics {
   enclosure_type_distribution: {
     [key: string]: number;
   };
+  /** Every taxon (2026-10-07); absent from older API deploys. */
+  taxon_distribution?: { [taxon: string]: number };
+  unique_species?: number;
+  total_animals?: number;
   total_feedings_logged: number;
   total_molts_logged: number;
   estimated_monthly_feeding_cost: number;
@@ -236,7 +241,7 @@ export default function AdvancedAnalyticsPage() {
             <CardContent className="p-6 text-center">
               <p className="text-gray-600 dark:text-gray-400 mb-4">
                 Not enough data yet to show advanced analytics. Keep tracking your
-                tarantulas!
+                collection!
               </p>
               <button
                 onClick={() => router.push("/dashboard/analytics")}
@@ -256,6 +261,17 @@ export default function AdvancedAnalyticsPage() {
     { name: "Female", value: analytics.sex_distribution.female },
     { name: "Unknown", value: analytics.sex_distribution.unknown },
   ].filter((d) => d.value > 0);
+
+  // "By group" only says something when there's more than one.
+  const taxonRows = Object.entries(analytics.taxon_distribution ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([taxon, count]) => ({
+      taxon,
+      count,
+      label: isInvertTaxon(taxon) ? INVERT_TAXA[taxon].label : taxon,
+      glyph: isInvertTaxon(taxon) ? INVERT_TAXA[taxon].glyph : "🐾",
+    }));
+  const taxonMax = Math.max(1, ...taxonRows.map((r) => r.count));
 
   const enclosureDistributionData = Object.entries(
     analytics.enclosure_type_distribution
@@ -301,7 +317,9 @@ export default function AdvancedAnalyticsPage() {
                 ${analytics.collection_value_total.toFixed(2)}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Across all tarantulas
+                {analytics.total_animals != null
+                  ? `Across ${analytics.total_animals} ${analytics.total_animals === 1 ? "animal" : "animals"}`
+                  : "Across your collection"}
               </p>
             </CardContent>
           </Card>
@@ -317,7 +335,7 @@ export default function AdvancedAnalyticsPage() {
                 ${analytics.collection_value_average.toFixed(2)}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Per tarantula
+                Per animal
               </p>
             </CardContent>
           </Card>
@@ -522,6 +540,33 @@ export default function AdvancedAnalyticsPage() {
           )}
         </div>
 
+        {/* By group (taxon) */}
+        {taxonRows.length > 1 && (
+          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-6">
+            <CardHeader>
+              <CardTitle className="text-gray-900 dark:text-white">🧭 By Group</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2">
+                {taxonRows.map((r) => (
+                  <li key={r.taxon} className="flex items-center gap-3">
+                    <span className="w-40 shrink-0 text-sm text-gray-700 dark:text-gray-300">
+                      <span aria-hidden="true">{r.glyph}</span> {r.label}
+                    </span>
+                    <div className="h-3 flex-1 rounded-full bg-gray-100 dark:bg-gray-700">
+                      <div
+                        className="h-3 rounded-full bg-purple-500"
+                        style={{ width: `${(r.count / taxonMax) * 100}%` }}
+                      />
+                    </div>
+                    <span className="w-10 text-right text-sm font-semibold text-gray-900 dark:text-white">{r.count}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Species Distribution */}
         {analytics.species_distribution.length > 0 && (
           <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mb-6">
@@ -600,7 +645,7 @@ export default function AdvancedAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-gray-900 dark:text-white">
-                {analytics.species_distribution.length}
+                {analytics.unique_species ?? analytics.species_distribution.length}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 unique species

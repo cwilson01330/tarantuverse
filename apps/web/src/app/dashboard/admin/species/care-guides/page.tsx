@@ -509,7 +509,7 @@ export default function CareGuideEditorPage() {
               </Two>
               <Two>
                 <Tri label="Bioactive clean-up crew" hint="How most keepers find isopods." value={form.bioactive_suitable ?? null} onChange={(v) => set('bioactive_suitable', v)} />
-                <Field label="Instars to maturity" hint="Mantids and scorpions.">
+                <Field label="Molts to adult" hint="Molts from hatching or birth to adult (adult = L/instar one higher). Larger sex if they differ. Leave blank unless a source states it.">
                   <input
                     type="number"
                     min={1}

@@ -28,7 +28,7 @@ import {
 } from '@/lib/animal-lifecycle'
 import {
   taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
-  tracksInstars, formatStage, stageSummary, elapsedSince, stageCountLabel,
+  tracksInstars, formatStage, stageSummary, elapsedSince, stageCountLabel, adultStageHint,
 } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
@@ -153,6 +153,8 @@ export default function InvertDetailPage() {
     feedings: 'loading', molts: 'loading', substrate: 'loading', photos: 'loading', care: 'loading',
   })
   const [growth, setGrowth] = useState<any | null>(null)
+  // Care sheet's sourced "molts to adult" (typical_instars_to_maturity), for the Stages card.
+  const [moltsToAdult, setMoltsToAdult] = useState<number | null>(null)
   const [feedingStats, setFeedingStats] = useState<InvertFeedingStats | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
@@ -189,6 +191,19 @@ export default function InvertDetailPage() {
   const [claimUrl, setClaimUrl] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(true)
+
+  // Public care-sheet read; only instar taxa with a linked species use it.
+  const speciesIdForStages = invert && tracksInstars(invert.taxon) ? invert.species_id ?? null : null
+  useEffect(() => {
+    setMoltsToAdult(null)
+    if (!speciesIdForStages) return
+    let cancelled = false
+    fetch(`${API_URL}/api/v1/invert-species/${speciesIdForStages}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((sp) => { if (!cancelled) setMoltsToAdult(sp?.typical_instars_to_maturity ?? null) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [speciesIdForStages])
   const [error, setError] = useState<string | null>(null)
 
   const getImageUrl = (url?: string | null) => {
@@ -742,10 +757,12 @@ export default function InvertDetailPage() {
 
             {/* Stages (2026-10-07): instar animals' molts as the stages they
                 reached, days per stage, problem molts and time since adulthood.
-                Elapsed only — no care sheet records stages to maturity. */}
+                Plus the care sheet's typical molts to adult, when it has a
+                sourced figure — a hint, never a countdown. */}
             {invert && tracksInstars(invert.taxon) && (molts.length > 0 || invert.current_instar != null) && (() => {
               const st = stageSummary(molts, invert.current_instar)
               const now = invert.current_instar != null ? formatStage(invert.taxon, invert.current_instar) : null
+              const typical = st.adultSince ? null : adultStageHint(invert.taxon, moltsToAdult)
               return (
                 <Section title="Stages">
                   <div className="space-y-1">
@@ -754,6 +771,7 @@ export default function InvertDetailPage() {
                         Now <span className="font-semibold">{now}</span>{st.adultSince ? ` · adult for ${elapsedSince(st.adultSince)}` : ''}
                       </p>
                     ) : null}
+                    {typical ? <p className="text-xs text-theme-secondary">{typical}</p> : null}
                     {st.averageDaysPerStage != null ? (
                       <p className="text-xs text-theme-secondary">About {st.averageDaysPerStage} days between molts so far</p>
                     ) : null}

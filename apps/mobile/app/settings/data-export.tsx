@@ -10,6 +10,10 @@ import { apiClient } from '../../src/services/api';
 interface ExportPreview {
   username: string;
   counts: {
+    /** Every animal of every taxon. Older API deploys only sent `tarantulas`. */
+    inverts?: number;
+    colonies?: number;
+    care_logs?: number;
     tarantulas: number;
     feeding_logs: number;
     molt_logs: number;
@@ -20,14 +24,18 @@ interface ExportPreview {
     egg_sacs: number;
     offspring: number;
   };
+  /** Server-side total that doesn't count tarantulas twice. */
+  total_records?: number;
   formats_available: string[];
 }
 
 const DATA_CATEGORIES = [
-  { key: 'tarantulas', label: 'Tarantulas', icon: 'spider' },
+  { key: 'inverts', label: 'Animals', icon: 'spider' },
+  { key: 'colonies', label: 'Colonies', icon: 'bug' },
   { key: 'feeding_logs', label: 'Feeding Logs', icon: 'food-drumstick' },
   { key: 'molt_logs', label: 'Molt Logs', icon: 'clipboard-text' },
   { key: 'substrate_changes', label: 'Substrate Changes', icon: 'leaf' },
+  { key: 'care_logs', label: 'Water & Misting', icon: 'water' },
   { key: 'photos', label: 'Photos', icon: 'camera' },
   { key: 'enclosures', label: 'Enclosures', icon: 'home' },
   { key: 'pairings', label: 'Pairings', icon: 'heart-multiple' },
@@ -98,8 +106,14 @@ export default function DataExportScreen() {
   };
 
   const totalRecords = preview
-    ? Object.values(preview.counts).reduce((a, b) => a + b, 0)
+    ? preview.total_records ?? Object.values(preview.counts).reduce((a, b) => a + (b ?? 0), 0)
     : 0;
+  // `inverts` covers every taxon; fall back for an API that predates it.
+  const countFor = (key: string): number => {
+    if (!preview) return 0;
+    const c = preview.counts as Record<string, number | undefined>;
+    return key === 'inverts' ? c.inverts ?? c.tarantulas ?? 0 : c[key] ?? 0;
+  };
 
   const styles = StyleSheet.create({
     container: {
@@ -270,7 +284,7 @@ export default function DataExportScreen() {
                     <MaterialCommunityIcons name={icon as any} size={20} color={colors.primary} />
                     <View>
                       <Text style={styles.summaryCount}>
-                        {preview.counts[key as keyof typeof preview.counts]}
+                        {countFor(key)}
                       </Text>
                       <Text style={styles.summaryLabel}>{label}</Text>
                     </View>
@@ -347,7 +361,7 @@ export default function DataExportScreen() {
             </View>
           </View>
           <Text style={styles.exportDescription}>
-            Everything in one archive — data organized by tarantula with downloaded photos, plus CSV files.
+            Everything in one archive — a folder for every animal and colony with its photos, plus CSV files.
           </Text>
           <TouchableOpacity
             style={[styles.exportButton, { backgroundColor: '#a855f7' }]}

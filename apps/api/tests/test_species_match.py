@@ -99,10 +99,10 @@ def test_endpoint_shape(monkeypatch):
     assert out == {
         "match": {"id": "pm", "scientific_name": "Pterinochilus murinus", "common_name": "Orange baboon",
                   "taxon": "tarantula", "slug": None, "kind": "exact"},
-        "genus": "Pterinochilus", "genus_taxon": "tarantula",
+        "genus": "Pterinochilus", "genus_taxon": "tarantula", "rank": "genus",
     }
     none = asyncio.run(r.match_invert_species(name="Liphistius jarujini", taxon=None, db=NS()))
-    assert none == {"match": None, "genus": None, "genus_taxon": None}
+    assert none == {"match": None, "genus": None, "genus_taxon": None, "rank": None}
 
 
 def test_match_route_is_registered_before_the_id_route():
@@ -224,3 +224,53 @@ def test_epithet_with_a_near_twin_is_not_guessed():
 def test_similar_but_distinct_epithets_still_resolve(word, want, other):
     rows = [CatalogRow("a", want, "tarantula"), CatalogRow("b", other, "tarantula")]
     assert match_name(word, rows, taxon="tarantula").match.row.scientific_name == want
+
+
+# ── Family / subfamily names (2026-10-07) ────────────────────────────────────
+
+@pytest.mark.parametrize("typed,group,taxon", [
+    ("Theraphosinae sp. Mandarina", "Theraphosinae", "tarantula"),
+    ("Ornithoctoninae sp 'Vietnam Silver'", "Ornithoctoninae", "tarantula"),
+    ("THERAPHOSIDAE sp", "Theraphosidae", "tarantula"),
+    ("Buthidae sp. Morocco", "Buthidae", "scorpion"),
+    ("Salticidae sp", "Salticidae", "true_spider"),
+])
+def test_a_subfamily_name_says_the_taxon_but_no_species(typed, group, taxon):
+    r = match_name(typed, CATALOG, taxon="other")
+    assert r.match is None
+    assert (r.genus, r.genus_taxon, r.rank) == (group, taxon, "group")
+
+
+def test_genus_results_say_genus():
+    assert match_name("Avicularia Variegata", CATALOG).rank == "genus"
+    assert match_name("Liphistius jarujini", CATALOG).rank is None
+
+
+def test_every_higher_taxon_maps_to_a_real_taxon():
+    from app.schemas.invert import TAXON_PATTERN
+    import re
+    from app.services.species_match import HIGHER_TAXA
+    for name, taxon in HIGHER_TAXA.items():
+        assert re.fullmatch(TAXON_PATTERN, taxon), (name, taxon)
+        assert name == name.lower()
+
+
+MAGNACRUS = CATALOG + [
+    CatalogRow("mto", "Magnacrus tongmianensis", "tarantula"),
+    CatalogRow("mta", "Magnacrus taynguyenensis", "tarantula"),
+]
+
+
+@pytest.mark.parametrize("typed", [
+    "tonogmianensis",                     # what two keepers typed
+    "Magnacrus tonogmianensis",
+    "Citharognathus tongmianensis",       # the 2002 name
+    "Ornithoctoninae sp. 'Vendula'",      # the trade name beats the subfamily rule
+])
+def test_magnacrus_tongmianensis_names(typed):
+    r = match_name(typed, MAGNACRUS, taxon="tarantula")
+    assert r.match and r.match.row.id == "mto"
+
+
+def test_the_other_magnacrus_is_not_confused():
+    assert match_name("Magnacrus Taynguyenensis", MAGNACRUS).match.row.id == "mta"

@@ -17,6 +17,8 @@ export interface SpeciesNameMatch {
   match: { id: string; scientific_name: string; common_name: string | null; taxon: InvertTaxon; slug: string | null; kind: 'exact' | 'close' | 'epithet' } | null
   genus: string | null
   genus_taxon: InvertTaxon | null
+  /** 'group' when the name is a family/subfamily ("Theraphosinae sp."). */
+  rank?: 'genus' | 'group' | null
 }
 
 export async function matchSpeciesName(name: string, taxon?: string | null): Promise<SpeciesNameMatch> {

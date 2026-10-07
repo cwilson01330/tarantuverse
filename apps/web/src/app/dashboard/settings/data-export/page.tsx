@@ -8,6 +8,10 @@ import DashboardLayout from '@/components/DashboardLayout'
 interface ExportPreview {
   username: string
   counts: {
+    /** Every animal of every taxon. Older API deploys only sent `tarantulas`. */
+    inverts?: number
+    colonies?: number
+    care_logs?: number
     tarantulas: number
     feeding_logs: number
     molt_logs: number
@@ -18,6 +22,8 @@ interface ExportPreview {
     egg_sacs: number
     offspring: number
   }
+  /** Server-side total that doesn't count tarantulas twice. */
+  total_records?: number
   formats_available: string[]
 }
 
@@ -95,7 +101,7 @@ export default function DataExportPage() {
   }
 
   const totalRecords = preview
-    ? Object.values(preview.counts).reduce((a, b) => a + b, 0)
+    ? preview.total_records ?? Object.values(preview.counts).reduce((a, b) => a + (b ?? 0), 0)
     : 0
 
   return (
@@ -132,10 +138,12 @@ export default function DataExportPage() {
             <h2 className="text-lg font-semibold text-theme-primary mb-4">Your Data Summary</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {[
-                { label: 'Tarantulas', count: preview.counts.tarantulas, icon: '🕷️' },
+                { label: 'Animals', count: preview.counts.inverts ?? preview.counts.tarantulas, icon: '🕷️' },
+                { label: 'Colonies', count: preview.counts.colonies ?? 0, icon: '🪲' },
                 { label: 'Feeding Logs', count: preview.counts.feeding_logs, icon: '🦗' },
                 { label: 'Molt Logs', count: preview.counts.molt_logs, icon: '📋' },
                 { label: 'Substrate Changes', count: preview.counts.substrate_changes, icon: '🌿' },
+                { label: 'Water & Misting', count: preview.counts.care_logs ?? 0, icon: '💧' },
                 { label: 'Photos', count: preview.counts.photos, icon: '📸' },
                 { label: 'Enclosures', count: preview.counts.enclosures, icon: '🏠' },
                 { label: 'Pairings', count: preview.counts.pairings, icon: '🧬' },
@@ -173,7 +181,7 @@ export default function DataExportPage() {
                   </span>
                 </div>
                 <p className="text-sm text-theme-secondary">
-                  A single structured file with all your data, preserving relationships between tarantulas, logs, and breeding records. Ideal for backing up and restoring your collection.
+                  A single structured file with all your data, preserving relationships between your animals, logs, and breeding records. Ideal for backing up and restoring your collection.
                 </p>
               </div>
               <button
@@ -203,7 +211,7 @@ export default function DataExportPage() {
                   </span>
                 </div>
                 <p className="text-sm text-theme-secondary">
-                  A ZIP file with one CSV per data type — tarantulas, feeding logs, molt logs, and more. Opens directly in Excel, Google Sheets, or Numbers.
+                  A ZIP file with one CSV per data type — animals, feeding logs, molt logs, and more. Opens directly in Excel, Google Sheets, or Numbers.
                 </p>
               </div>
               <button
@@ -233,7 +241,7 @@ export default function DataExportPage() {
                   </span>
                 </div>
                 <p className="text-sm text-theme-secondary">
-                  Everything in one archive — data organized by tarantula with downloaded photos, plus CSV files for spreadsheets. May take longer for large collections.
+                  Everything in one archive — a folder for every animal and colony with its photos, plus CSV files for spreadsheets. May take longer for large collections.
                 </p>
                 {preview && preview.counts.photos > 0 && (
                   <p className="text-xs text-theme-tertiary mt-1">

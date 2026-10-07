@@ -15,6 +15,7 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import { AppHeader } from '../../src/components/AppHeader';
 import UpgradeModal from '../../src/components/UpgradeModal';
 import { isPaymentRequired } from '../../src/utils/errors';
+import { INVERT_TAXA, isInvertTaxon } from '../../src/lib/inverts';
 
 interface MoltHeatmapEntry {
   month: string;
@@ -47,6 +48,10 @@ interface AdvancedAnalytics {
   enclosure_type_distribution: {
     [key: string]: number;
   };
+  /** Every taxon (2026-10-07); absent from older API deploys. */
+  taxon_distribution?: { [taxon: string]: number };
+  unique_species?: number;
+  total_animals?: number;
   total_feedings_logged: number;
   total_molts_logged: number;
   estimated_monthly_feeding_cost: number;
@@ -394,7 +399,7 @@ export default function AdvancedAnalyticsScreen() {
             <MaterialCommunityIcons name="star-four-points" size={64} color={colors.textTertiary} />
             <Text style={styles.emptyTitle}>More Data Needed</Text>
             <Text style={styles.emptyText}>
-              Keep tracking your tarantulas to unlock advanced insights!
+              Keep tracking your collection to unlock advanced insights!
             </Text>
           </View>
         </ScrollView>
@@ -435,6 +440,17 @@ export default function AdvancedAnalyticsScreen() {
     analytics.species_distribution.length > 0
       ? Math.max(...analytics.species_distribution.map((s) => s.count))
       : 0;
+
+  // "By group" only says something when there's more than one.
+  const taxonRows = Object.entries(analytics.taxon_distribution ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([taxon, count]) => ({
+      taxon,
+      count,
+      label: isInvertTaxon(taxon) ? INVERT_TAXA[taxon].label : taxon,
+      glyph: isInvertTaxon(taxon) ? INVERT_TAXA[taxon].glyph : '🐾',
+    }));
+  const maxTaxon = Math.max(1, ...taxonRows.map((r) => r.count));
 
   const premiumBadge = (
     <View style={styles.premiumBadge}>
@@ -598,6 +614,24 @@ export default function AdvancedAnalyticsScreen() {
           </View>
         )}
 
+        {/* By group (taxon) — reuses the species bar styles */}
+        {taxonRows.length > 1 && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>🧭 By Group</Text>
+            {taxonRows.map((r) => (
+              <View key={r.taxon} style={styles.speciesItem} accessibilityLabel={`${r.label}: ${r.count}`}>
+                <Text style={styles.speciesName} numberOfLines={1}>
+                  {r.glyph} {r.label}
+                </Text>
+                <View style={styles.speciesBar}>
+                  <View style={[styles.speciesBarFill, { width: `${(r.count / maxTaxon) * 100}%` as any }]} />
+                </View>
+                <Text style={styles.speciesCount}>{r.count}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Top Species */}
         {analytics.species_distribution.length > 0 && (
           <View style={styles.card}>
@@ -640,6 +674,12 @@ export default function AdvancedAnalyticsScreen() {
               </Text>
               <Text style={styles.statLabel}>Molts</Text>
             </View>
+            {analytics.unique_species != null ? (
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{analytics.unique_species}</Text>
+                <Text style={styles.statLabel}>Species</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 

@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, distinct, extract
 from app.database import get_db
 from app.models.user import User
-from app.models.tarantula import Tarantula
 from app.models.invert import Invert
 from app.models.molt_log import MoltLog
 from app.models.feeding_log import FeedingLog
@@ -97,7 +96,8 @@ async def breeding_analytics(
     pairing_by_id = {p.id: p for p in pairings}
     names = {
         t.id: (t.name or t.common_name or t.scientific_name or "Unnamed")
-        for t in db.query(Tarantula).filter(Tarantula.user_id == current_user.id).all()
+        # Every taxon's animals can be parents (ADR-021), not just tarantulas.
+        for t in db.query(Invert).filter(Invert.user_id == current_user.id).all()
     }
 
     def perf_map(parent_attr):
@@ -395,6 +395,24 @@ async def get_collection_analytics(
     )
 
 
+# Taxa whose keepers don't feed a counted live prey item, so the feeding-cost
+# fallback (one item per animal per week) would invent a bill for them.
+NO_PREY_TAXA = {"millipede", "isopod", "roach"}
+
+
+def _sex_value(sex) -> str:
+    v = getattr(sex, "value", sex)
+    return str(v).lower() if v else "unknown"
+
+
+def _owned_log_clause(model, ids):
+    """This keeper's rows in a log table by EITHER parent column — a
+    tarantula's logs carry `invert_id` always and `tarantula_id` only when
+    the writer set it (utils/legacy_logs.py)."""
+    from sqlalchemy import or_
+    return or_(model.invert_id.in_(ids), model.tarantula_id.in_(ids))
+
+
 @router.get("/advanced/", response_model=AdvancedAnalyticsResponse)
 @policy("owner_only")
 async def get_advanced_analytics(
@@ -402,17 +420,14 @@ async def get_advanced_analytics(
     db: Session = Depends(get_db)
 ):
     """
-    Get premium advanced analytics for the user's collection.
+    Premium advanced analytics for the keeper's whole collection — every
+    taxon, not just tarantulas (audit A4, 2026-10-07; this read the legacy
+    tarantula table until then, so a premium mantis keeper got an empty page).
 
-    Returns:
-    - Collection value statistics (total, average, most expensive)
-    - Molt heatmap (molts per month for last 12 months)
-    - Collection growth timeline (tarantulas added per month)
-    - Species distribution (top 10)
-    - Sex distribution
-    - Enclosure type distribution
-    - Estimated monthly feeding cost
-    - Total activity counts
+    Value, species, sex, enclosure and taxon breakdowns describe the CURRENT
+    collection (not transferred out, not died). The molt heatmap, growth
+    timeline and log totals describe history, so they include every animal
+    the keeper still owns a record of.
     """
 
     # Premium gate. Previously this endpoint was only gated client-side
@@ -430,16 +445,12 @@ async def get_advanced_analytics(
             },
         )
 
-    # Get all user's tarantulas
-    tarantulas = db.query(Tarantula).filter(
-        Tarantula.user_id == current_user.id
-    ).all()
+    owned = db.query(Invert).filter(Invert.user_id == current_user.id).all()
+    animals = [a for a in owned if a.transferred_out_at is None and a.died_at is None]
+    ids = [a.id for a in owned]
+    total_count = len(animals)
 
-    total_count = len(tarantulas)
-    tarantula_ids = [t.id for t in tarantulas]
-
-    # Empty response if no tarantulas
-    if total_count == 0:
+    if not owned:
         return AdvancedAnalyticsResponse(
             collection_value_total=0.0,
             collection_value_average=0.0,
@@ -450,148 +461,95 @@ async def get_advanced_analytics(
             species_distribution=[],
             sex_distribution={"male": 0, "female": 0, "unknown": 0},
             enclosure_type_distribution={},
+            taxon_distribution={},
+            unique_species=0,
+            total_animals=0,
             total_feedings_logged=0,
             total_molts_logged=0,
             estimated_monthly_feeding_cost=0.0,
         )
 
-    # ===== COLLECTION VALUE =====
-    collection_value_total = float(sum(float(t.price_paid or 0) for t in tarantulas))
-    collection_value_average = (
-        collection_value_total / total_count if total_count > 0 else 0.0
-    )
+    def display_name(a):
+        return a.name or a.common_name or a.scientific_name or "Unnamed"
 
-    # Find most expensive tarantula
+    # ===== COLLECTION VALUE =====
+    collection_value_total = float(sum(float(a.price_paid or 0) for a in animals))
+    collection_value_average = collection_value_total / total_count if total_count else 0.0
     most_expensive = None
     most_expensive_price = None
-    for t in tarantulas:
-        if t.price_paid:
-            if most_expensive_price is None or float(t.price_paid) > most_expensive_price:
-                most_expensive_price = float(t.price_paid)
-                most_expensive = t.name or t.common_name or t.scientific_name or "Unnamed"
+    for a in animals:
+        if a.price_paid and (most_expensive_price is None or float(a.price_paid) > most_expensive_price):
+            most_expensive_price = float(a.price_paid)
+            most_expensive = display_name(a)
 
     # ===== MOLT HEATMAP (last 12 months) =====
     now = datetime.now(timezone.utc)
     twelve_months_ago = now - timedelta(days=365)
-
     molt_data = (
         db.query(
             extract("year", MoltLog.molted_at).label("year"),
             extract("month", MoltLog.molted_at).label("month"),
             func.count(MoltLog.id).label("count"),
         )
-        .filter(
-            MoltLog.tarantula_id.in_(tarantula_ids),
-            MoltLog.molted_at >= twelve_months_ago,
-        )
-        .group_by(
-            extract("year", MoltLog.molted_at),
-            extract("month", MoltLog.molted_at),
-        )
-        .order_by(
-            extract("year", MoltLog.molted_at),
-            extract("month", MoltLog.molted_at),
-        )
+        .filter(_owned_log_clause(MoltLog, ids), MoltLog.molted_at >= twelve_months_ago)
+        .group_by(extract("year", MoltLog.molted_at), extract("month", MoltLog.molted_at))
+        .order_by(extract("year", MoltLog.molted_at), extract("month", MoltLog.molted_at))
         .all()
     )
-
     molt_heatmap = [
-        MoltHeatmapEntry(
-            month=f"{int(m.year)}-{int(m.month):02d}",
-            count=int(m.count),
-        )
+        MoltHeatmapEntry(month=f"{int(m.year)}-{int(m.month):02d}", count=int(m.count))
         for m in molt_data
     ]
 
-    # ===== COLLECTION GROWTH (last 12 months) =====
-    growth_data = (
-        db.query(
-            extract("year", Tarantula.date_acquired).label("year"),
-            extract("month", Tarantula.date_acquired).label("month"),
-            func.count(Tarantula.id).label("count"),
-        )
-        .filter(
-            Tarantula.user_id == current_user.id,
-            Tarantula.date_acquired >= twelve_months_ago.date(),
-        )
-        .group_by(
-            extract("year", Tarantula.date_acquired),
-            extract("month", Tarantula.date_acquired),
-        )
-        .order_by(
-            extract("year", Tarantula.date_acquired),
-            extract("month", Tarantula.date_acquired),
-        )
-        .all()
+    # ===== COLLECTION GROWTH (animals acquired per month, last 12 months) =====
+    cutoff = twelve_months_ago.date()
+    growth_counts = Counter(
+        f"{a.date_acquired.year}-{a.date_acquired.month:02d}"
+        for a in owned if a.date_acquired and a.date_acquired >= cutoff
     )
-
     collection_growth = [
-        CollectionGrowthEntry(
-            month=f"{int(g.year)}-{int(g.month):02d}",
-            count=int(g.count),
-        )
-        for g in growth_data
+        CollectionGrowthEntry(month=month, count=count)
+        for month, count in sorted(growth_counts.items())
     ]
 
-    # ===== SPECIES DISTRIBUTION =====
-    species_counts = Counter()
-    for t in tarantulas:
-        species_name = t.scientific_name or t.common_name or t.name or "Unknown"
-        species_counts[species_name] += 1
-
+    # ===== DISTRIBUTIONS (current collection) =====
+    species_counts = Counter(
+        (a.scientific_name or a.common_name or a.name or "Unknown") for a in animals
+    )
     species_distribution = [
         SpeciesDistEntry(species_name=name, count=count)
         for name, count in species_counts.most_common(10)
     ]
-
-    # ===== SEX DISTRIBUTION =====
+    sexes = Counter(_sex_value(a.sex) for a in animals)
     sex_distribution = {
-        "male": sum(1 for t in tarantulas if t.sex == "male"),
-        "female": sum(1 for t in tarantulas if t.sex == "female"),
-        "unknown": sum(1 for t in tarantulas if t.sex == "unknown" or t.sex is None),
+        "male": sexes.get("male", 0),
+        "female": sexes.get("female", 0),
+        "unknown": total_count - sexes.get("male", 0) - sexes.get("female", 0),
     }
+    enclosure_type_distribution = dict(Counter((a.enclosure_type or "unknown") for a in animals))
+    taxon_distribution = dict(Counter((a.taxon or "other") for a in animals))
 
-    # ===== ENCLOSURE TYPE DISTRIBUTION =====
-    enclosure_type_counts = Counter()
-    for t in tarantulas:
-        enclosure_type = t.enclosure_type or "unknown"
-        enclosure_type_counts[enclosure_type] += 1
-
-    enclosure_type_distribution = dict(enclosure_type_counts)
-
-    # ===== FEEDING COSTS =====
+    # ===== FEEDINGS =====
     total_feedings = (
-        db.query(func.count(FeedingLog.id))
-        .filter(FeedingLog.tarantula_id.in_(tarantula_ids))
-        .scalar()
-        or 0
+        db.query(func.count(FeedingLog.id)).filter(_owned_log_clause(FeedingLog, ids)).scalar() or 0
     )
-
-    # Estimate monthly feeding cost: count feedings in last 30 days * $0.50 per feeding
     thirty_days_ago = now - timedelta(days=30)
     recent_feedings = (
         db.query(func.count(FeedingLog.id))
-        .filter(
-            FeedingLog.tarantula_id.in_(tarantula_ids),
-            FeedingLog.fed_at >= thirty_days_ago,
-        )
+        .filter(_owned_log_clause(FeedingLog, ids), FeedingLog.fed_at >= thirty_days_ago)
         .scalar()
         or 0
     )
-
-    # Project to monthly average if we have data
+    # Estimate: $0.50 per feeding in the last 30 days; with no recent
+    # feedings, one prey item per predator per week.
     if recent_feedings > 0:
         estimated_monthly_feeding_cost = float(recent_feedings * 0.50)
     else:
-        # Fallback: estimate based on collection size (average 1 feeding per tarantula per week)
-        estimated_monthly_feeding_cost = float(total_count * 4 * 0.50) if total_count > 0 else 0.0
+        predators = sum(1 for a in animals if a.taxon not in NO_PREY_TAXA)
+        estimated_monthly_feeding_cost = float(predators * 4 * 0.50)
 
-    # ===== TOTAL MOLT LOGS =====
     total_molts = (
-        db.query(func.count(MoltLog.id))
-        .filter(MoltLog.tarantula_id.in_(tarantula_ids))
-        .scalar()
-        or 0
+        db.query(func.count(MoltLog.id)).filter(_owned_log_clause(MoltLog, ids)).scalar() or 0
     )
 
     return AdvancedAnalyticsResponse(
@@ -604,6 +562,9 @@ async def get_advanced_analytics(
         species_distribution=species_distribution,
         sex_distribution=sex_distribution,
         enclosure_type_distribution=enclosure_type_distribution,
+        taxon_distribution=taxon_distribution,
+        unique_species=len(species_counts),
+        total_animals=total_count,
         total_feedings_logged=total_feedings,
         total_molts_logged=total_molts,
         estimated_monthly_feeding_cost=round(estimated_monthly_feeding_cost, 2),

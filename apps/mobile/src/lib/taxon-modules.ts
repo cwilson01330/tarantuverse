@@ -357,6 +357,19 @@ export function finalMoltCopy(taxon: string): { offered: boolean; label: string;
   }
 }
 
+/** "Usually adult after about 7 molts (around L8)". `moltsToAdult` is the
+ *  care sheet's typical_instars_to_maturity, which stores MOLTS from hatching
+ *  or birth to adult; keepers number the hatchling L1 / instar 1, so the
+ *  adult stage is one more. Null when the sheet has no sourced figure, and
+ *  never for taxa that keep molting as adults. */
+export function adultStageHint(taxon: string, moltsToAdult: number | null | undefined): string | null {
+  if (moltsToAdult == null || moltsToAdult < 1 || !INSTAR_TAXA.has(taxon) || !finalMoltCopy(taxon).offered) return null;
+  const stage = formatStage(taxon, moltsToAdult + 1);
+  const around = taxon === 'mantis' ? stage : stage.charAt(0).toLowerCase() + stage.slice(1);
+  const tail = taxon === 'mantis' ? '; males often one sooner' : '';
+  return `Usually adult after about ${moltsToAdult} molts (around ${around})${tail}.`;
+}
+
 const PROBLEM_OUTCOMES = new Set(['stuck', 'lost_limb', 'fatal']);
 const OUTCOME_WORDS: Record<string, string> = { stuck: 'stuck', lost_limb: 'lost a limb', fatal: 'fatal' }
 

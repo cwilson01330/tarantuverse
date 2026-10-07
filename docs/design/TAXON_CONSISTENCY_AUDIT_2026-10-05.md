@@ -50,8 +50,8 @@ newer one while the older one kept serving tarantulas:
 | --- | --- | --- | --- |
 | A1 | **[FIXED 2026-10-05: everything says inches; 4 proven-cm rows converted]** **Molt measurements are stored in two units in the same column.** The web tarantula molt form says inches; the generic invert molt forms (web + mobile, which mobile tarantulas now use too) say cm; growth charts label cm; the share card prints " in". A keeper's growth chart can mix the two. Needs a decision on one unit, then a data look at existing rows before any conversion. | everyone who logs molt sizes | M |
 | A2 | **[FIXED 2026-10-06]** **Global search only searches the legacy tarantula table** (`routers/search.py`). A mantis, isopod or scorpion can't be found. | all non-tarantula | M |
-| A3 | **Full ZIP export only bundles tarantulas** (`export_service.py`); other taxa get no folder and no photos. The mobile export screen shows only a "Tarantulas" count. JSON/CSV are fine. | all non-tarantula | M |
-| A4 | **Premium advanced analytics read only tarantulas** (`routers/analytics.py`). A premium mantis keeper gets an empty page. | premium non-tarantula | M |
+| A3 | **[FIXED 2026-10-07: a folder per animal of every taxon + per colony, with photos; preview counts every taxon]** **Full ZIP export only bundles tarantulas** (`export_service.py`); other taxa get no folder and no photos. The mobile export screen shows only a "Tarantulas" count. JSON/CSV are fine. | all non-tarantula | M |
+| A4 | **[FIXED 2026-10-07: reads `inverts`, logs by either parent column, adds By Group + real species count]** **Premium advanced analytics read only tarantulas** (`routers/analytics.py`). A premium mantis keeper gets an empty page. | premium non-tarantula | M |
 | A5 | **[FIXED 2026-10-06]** Colony event edit/delete doesn't reverse its population change, so counts drift. | colony keepers | S |
 
 ### B. Missing capability for a group

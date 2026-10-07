@@ -471,10 +471,18 @@ async def export_preview(
             )
         ).count()
 
+    from app.models.care_log import CareLog
+    from app.models.colony import ColonyEvent
+
     feeding_count = _owned(FeedingLog)
     molt_count = _owned(MoltLog)
     substrate_count = _owned(SubstrateChange)
     photo_count = _owned(Photo)
+    colony_ids = select(Colony.id).where(Colony.user_id == current_user.id)
+    colony_count = db.query(Colony).filter(Colony.user_id == current_user.id).count()
+    colony_event_count = db.query(ColonyEvent).filter(ColonyEvent.colony_id.in_(colony_ids)).count()
+    # Same owner rule as export_service._get_care_logs.
+    care_log_count = db.query(CareLog).filter(CareLog.user_id == current_user.id).count()
     enclosure_count = db.query(Enclosure).filter(Enclosure.user_id == current_user.id).count()
     pairing_count = db.query(Pairing).filter(Pairing.user_id == current_user.id).count()
     egg_sac_count = db.query(EggSac).filter(EggSac.user_id == current_user.id).count()
@@ -499,11 +507,16 @@ async def export_preview(
     clutch_count = db.query(Clutch).filter(Clutch.user_id == current_user.id).count()
     reptile_offspring_count = db.query(ReptileOffspring).filter(ReptileOffspring.user_id == current_user.id).count()
 
-    return {
-        "username": current_user.username,
-        "counts": {
-            "animals": len(inverts),
+    counts = {
+            # Every TV animal of every taxon (tarantulas included). This key
+            # used to be "animals", which the Herpetoverse count below then
+            # overwrote — the dict literal kept only the second.
+            "inverts": len(inverts),
+            # Subset of `inverts`; kept for app builds that still read it.
             "tarantulas": len(tarantulas),
+            "colonies": colony_count,
+            "colony_events": colony_event_count,
+            "care_logs": care_log_count,
             "feeding_logs": feeding_count,
             "molt_logs": molt_count,
             "substrate_changes": substrate_count,
@@ -520,6 +533,11 @@ async def export_preview(
             "reptile_pairings": reptile_pairing_count,
             "clutches": clutch_count,
             "reptile_offspring": reptile_offspring_count,
-        },
+    }
+    return {
+        "username": current_user.username,
+        "counts": counts,
+        # Summed here so clients don't add `tarantulas` on top of `inverts`.
+        "total_records": sum(v for k, v in counts.items() if k != "tarantulas"),
         "formats_available": ["json", "csv", "full"],
     }

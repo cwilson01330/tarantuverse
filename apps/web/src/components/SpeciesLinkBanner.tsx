@@ -40,7 +40,7 @@ export default function SpeciesLinkBanner({
       ? { key: `link:${m.id}`, title: `Link the ${m.scientific_name} care sheet`, detail: 'Adds its care guide and feeding cadence to this animal.', action: 'Link care sheet', taxon: m.taxon, speciesId: m.id as string | null, name: m.scientific_name as string | null }
       : { key: `switch:${m.id}`, title: `This looks like a ${lc(m.taxon)}`, detail: `${m.scientific_name} is in our list as a ${lc(m.taxon)}. Switching keeps every feeding, molt and photo.`, action: 'Switch & link', taxon: m.taxon, speciesId: m.id as string | null, name: m.scientific_name as string | null }
     : taxon === 'other' && res?.genus_taxon && res.genus_taxon !== 'other'
-      ? { key: `genus:${res.genus_taxon}`, title: `${res.genus} is a ${lc(res.genus_taxon)} genus`, detail: `Filed as a ${lc(res.genus_taxon)} it gets the feeding card and the right care tools. Every log is kept.`, action: `File as ${lc(res.genus_taxon)}`, taxon: res.genus_taxon, speciesId: null, name: null }
+      ? { key: `genus:${res.genus_taxon}`, title: `${res.genus} is a ${lc(res.genus_taxon)} ${res.rank === 'group' ? 'group' : 'genus'}`, detail: `Filed as a ${lc(res.genus_taxon)} it gets the feeding card and the right care tools. Every log is kept.`, action: `File as ${lc(res.genus_taxon)}`, taxon: res.genus_taxon, speciesId: null, name: null }
       : null
 
   useEffect(() => {

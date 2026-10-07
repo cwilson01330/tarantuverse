@@ -409,7 +409,7 @@ export default function InvertCareSheetClient({
                 }
               />
               <Fact
-                label="Instars to maturity"
+                label="Molts to adult"
                 value={
                   species.typical_instars_to_maturity != null
                     ? `~${species.typical_instars_to_maturity}`

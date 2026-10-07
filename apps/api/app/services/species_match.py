@@ -84,6 +84,9 @@ class MatchResult:
     # tarantula genus" even when this exact species isn't in the list.
     genus: Optional[str]
     genus_taxon: Optional[str]
+    # "genus", or "group" when the name recognised is a family / subfamily
+    # ("Theraphosinae sp. Mandarina"): the app then says "a tarantula group".
+    rank: Optional[str] = None
 
 
 # Renames keepers still use. Only certain, published ones; each maps to the
@@ -108,6 +111,36 @@ SYNONYMS: dict[str, str] = {
     "aphonopelma punzoi": "Aphonopelma vorhiesi",
     "selenotypus arndsti": "Selenocosmia arndsti",
     "chilocosmia arndsti": "Selenocosmia arndsti",
+    # Hoang et al. 2025 (Zootaxa 5701): the 2002 name and the hobby trade name.
+    "citharognathus tongmianensis": "Magnacrus tongmianensis",
+    "ornithoctoninae sp vendula": "Magnacrus tongmianensis",
+    "citharognathus sp vendula": "Magnacrus tongmianensis",
+}
+
+# Family and subfamily names keepers file undescribed animals under
+# ("Theraphosinae sp. Mandarina", "Ornithoctoninae sp 'Vietnam Silver'").
+# Each belongs wholly to one taxon here, so it's enough to say "this is a
+# tarantula" — never which species. Only established names: hobby labels whose
+# rank we couldn't confirm ("Lobellini") are left out.
+HIGHER_TAXA: dict[str, str] = {
+    # Theraphosidae and its subfamilies
+    "theraphosidae": "tarantula", "theraphosinae": "tarantula", "ornithoctoninae": "tarantula",
+    "selenocosmiinae": "tarantula", "harpactirinae": "tarantula", "eumenophorinae": "tarantula",
+    "poecilotheriinae": "tarantula", "stromatopelminae": "tarantula", "aviculariinae": "tarantula",
+    "psalmopoeinae": "tarantula", "ischnocolinae": "tarantula", "schismatothelinae": "tarantula",
+    "thrigmopoeinae": "tarantula", "selenogyrinae": "tarantula",
+    # Scorpion families
+    "buthidae": "scorpion", "scorpionidae": "scorpion", "hormuridae": "scorpion",
+    "vaejovidae": "scorpion", "hadruridae": "scorpion", "euscorpiidae": "scorpion",
+    "bothriuridae": "scorpion", "diplocentridae": "scorpion",
+    # Other groups
+    "scolopendridae": "centipede", "scolopendromorpha": "centipede",
+    "phrynidae": "whip_spider", "damonidae": "whip_spider", "charinidae": "whip_spider",
+    "amblypygi": "whip_spider", "thelyphonidae": "vinegaroon", "uropygi": "vinegaroon",
+    "salticidae": "true_spider", "lycosidae": "true_spider", "sparassidae": "true_spider",
+    "theridiidae": "true_spider", "araneidae": "true_spider", "eresidae": "true_spider",
+    "mantodea": "mantis", "mantidae": "mantis", "hymenopodidae": "mantis", "empusidae": "mantis",
+    "blaberidae": "roach", "blattodea": "roach",
 }
 
 # Words that mark an undescribed or uncertain form ("Pamphobeteus sp.
@@ -205,13 +238,16 @@ def match_name(name: str, rows: Iterable[CatalogRow], taxon: Optional[str] = Non
         by_genus.setdefault(genus_of(r.scientific_name), []).append(r)
 
     def found(m: Match) -> MatchResult:
-        return MatchResult(m, m.row.scientific_name.split(" ", 1)[0], m.row.taxon)
+        return MatchResult(m, m.row.scientific_name.split(" ", 1)[0], m.row.taxon, "genus")
 
     syn = _synonym_match(target, rows)
     if syn:
         return found(syn)
 
     g = genus_of(target)
+    if g not in by_genus and g in HIGHER_TAXA:
+        group = name.strip().split()[0]
+        return MatchResult(None, group[:1].upper() + group[1:].lower(), HIGHER_TAXA[g], "group")
     if g not in by_genus and (" " not in target or g in _FORM_WORDS):
         m = _epithet_match(target, rows, taxon) if " " not in target else None
         m = m or _bare_trade_match(target, rows, taxon)
@@ -252,4 +288,4 @@ def match_name(name: str, rows: Iterable[CatalogRow], taxon: Optional[str] = Non
         genus_name = candidates[0].scientific_name.split(" ", 1)[0]
         taxa = {r.taxon for r in candidates}
         genus_taxon = taxa.pop() if len(taxa) == 1 else None
-    return MatchResult(match, genus_name, genus_taxon)
+    return MatchResult(match, genus_name, genus_taxon, "genus" if genus_name else None)

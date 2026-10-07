@@ -427,7 +427,7 @@ function InvertSpeciesCareSheetScreen() {
               colors={colors}
             />
             <CareFact
-              label="Instars to maturity"
+              label="Molts to adult"
               value={
                 species.typical_instars_to_maturity != null
                   ? `~${species.typical_instars_to_maturity}`

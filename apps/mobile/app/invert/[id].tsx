@@ -31,12 +31,13 @@ import {
   type InvertGrowthAnalytics, type InvertPairing,
   listInvertCareLogs, deleteInvertCareLog, CARE_LOG_LABELS,
   type InvertCareLog,
+  getInvertSpecies,
 } from '../../src/lib/inverts';
 import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { SPACING, TYPE } from '../../src/theme/tokens';
 import {
   taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
-  tracksInstars, formatStage, stageSummary, elapsedSince,
+  tracksInstars, formatStage, stageSummary, elapsedSince, adultStageHint,
 } from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
@@ -71,6 +72,8 @@ function InvertDetailScreen() {
   const [photos, setPhotos] = useState<InvertPhoto[]>([]);
   const [events, setEvents] = useState<AnimalEvent[]>([]);
   const [growth, setGrowth] = useState<InvertGrowthAnalytics | null>(null);
+  // Care sheet's sourced "molts to adult" (typical_instars_to_maturity), for the Stages card.
+  const [moltsToAdult, setMoltsToAdult] = useState<number | null>(null);
   const [pairings, setPairings] = useState<InvertPairing[]>([]);
   const [transferring, setTransferring] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -178,6 +181,14 @@ function InvertDetailScreen() {
         // form, even the ones that never touch a dish — those get misted.
         soft(listInvertCareLogs(id), [] as InvertCareLog[], 'water logs'),
       ]);
+      // Optional hint only, so a failure here isn't reported as missing data.
+      if (tracksInstars(i.taxon) && i.species_id) {
+        getInvertSpecies(i.species_id)
+          .then((sp) => setMoltsToAdult(sp.typical_instars_to_maturity ?? null))
+          .catch(() => setMoltsToAdult(null));
+      } else {
+        setMoltsToAdult(null);
+      }
       setPartialFailure(failed);
       setFeedings(f); setMolts(m); setSubstrate(sub); setPhotos(p); setGrowth(g); setPairings(pr);
       setEvents(ev);
@@ -1193,11 +1204,13 @@ function InvertDetailScreen() {
 
       {/* Stages (2026-10-07): for instar animals the stage, not size, is what
           keepers track — each molt as the stage it reached, days per stage,
-          problem molts, and time since adulthood. Elapsed only, never a
-          countdown: no care sheet records how many stages a species takes. */}
+          problem molts, and time since adulthood. Plus the care sheet's
+          typical molts to adult when it has a sourced figure — a hint, never
+          a countdown. */}
       {tracksInstars(invert.taxon) && (molts.length > 0 || invert.current_instar != null) && (() => {
         const st = stageSummary(molts, invert.current_instar);
         const now = invert.current_instar != null ? formatStage(invert.taxon, invert.current_instar) : null;
+        const typical = st.adultSince ? null : adultStageHint(invert.taxon, moltsToAdult);
         const preview = [
           st.adultSince ? `Adult for ${elapsedSince(st.adultSince)}` : now,
           st.averageDaysPerStage != null ? `~${st.averageDaysPerStage} days per stage` : null,
@@ -1214,6 +1227,7 @@ function InvertDetailScreen() {
           >
             <View style={{ gap: SPACING.xs }}>
               {now ? <Text style={[TYPE.body, { color: colors.textPrimary }]}>Now {now}{st.adultSince ? ` · adult for ${elapsedSince(st.adultSince)}` : ''}</Text> : null}
+              {typical ? <Text style={[TYPE.caption, { color: colors.textSecondary }]}>{typical}</Text> : null}
               {st.averageDaysPerStage != null ? (
                 <Text style={[TYPE.caption, { color: colors.textSecondary }]}>About {st.averageDaysPerStage} days between molts so far</Text>
               ) : null}

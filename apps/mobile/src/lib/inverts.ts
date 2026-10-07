@@ -615,6 +615,8 @@ export interface SpeciesNameMatch {
   /** Catalog spelling of the genus we recognised, and its taxon if unambiguous. */
   genus: string | null;
   genus_taxon: InvertTaxon | null;
+  /** 'group' when the name is a family/subfamily ("Theraphosinae sp."). */
+  rank?: 'genus' | 'group' | null;
 }
 
 export async function matchSpeciesName(name: string, taxon?: InvertTaxon | null): Promise<SpeciesNameMatch> {

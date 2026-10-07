@@ -110,7 +110,8 @@ async def match_invert_species(
     the app offers the match and the keeper decides (services/species_match).
 
     {"match": {id, scientific_name, common_name, taxon, slug, kind} | null,
-     "genus": "Avicularia" | null, "genus_taxon": "tarantula" | null}
+     "genus": "Avicularia" | null, "genus_taxon": "tarantula" | null,
+     "rank": "genus" | "group" | null}  ("group" = a family/subfamily name)
     """
     from app.services.species_match import match_name
 
@@ -124,6 +125,7 @@ async def match_invert_species(
         },
         "genus": res.genus,
         "genus_taxon": res.genus_taxon,
+        "rank": res.rank,
     }
 
 

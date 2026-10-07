@@ -623,88 +623,151 @@ class ExportService:
     # ---- Full ZIP bundle (data + photos) --------------------------------
 
     @staticmethod
-    async def export_full_zip(db: Session, user: User) -> bytes:
+    async def export_full_zip(db: Session, user: User, fetch_photo=None) -> bytes:
         """
-        Return a comprehensive ZIP containing JSON data organized by
-        tarantula plus downloaded photo files.
+        Return a complete ZIP: one folder per animal of EVERY taxon, one per
+        colony, one per Herpetoverse animal, each with its logs and its
+        downloaded photos, plus collection-wide CSVs.
+
+        Until 2026-10-07 this walked the legacy `tarantulas` table only, so a
+        mantis, scorpion or isopod keeper's "complete backup" held none of
+        their animals or photos. It now walks `inverts` (which includes the
+        tarantulas, ADR-005). `fetch_photo(url) -> bytes | None` is injectable
+        for tests.
         """
         data = ExportService._gather(db, user)
+        return await build_full_zip(data, user.username, fetch_photo)
 
-        # Build lookup maps for logs by tarantula_id
-        def _group_by_tid(items: List[Dict], key: str = "tarantula_id") -> Dict[str, List[Dict]]:
-            grouped: Dict[str, List[Dict]] = {}
-            for item in items:
-                tid = item.get(key)
-                if tid:
-                    grouped.setdefault(tid, []).append(item)
-            return grouped
 
-        feedings_by_t = _group_by_tid(data["feeding_logs"])
-        molts_by_t = _group_by_tid(data["molt_logs"])
-        substrates_by_t = _group_by_tid(data["substrate_changes"])
-        photos_by_t = _group_by_tid(data["photos"])
+TAXON_FOLDERS = {
+    "tarantula": "tarantulas", "scorpion": "scorpions", "centipede": "centipedes",
+    "whip_spider": "whip_spiders", "vinegaroon": "vinegaroons", "true_spider": "true_spiders",
+    "millipede": "millipedes", "mantis": "mantids", "roach": "roaches", "isopod": "isopods",
+    "other": "other_animals",
+}
 
-        # Reptile logs grouped by animal_id
-        a_feedings = _group_by_tid(data["animal_feeding_logs"], "animal_id")
-        sheds_by_a = _group_by_tid(data["shed_logs"], "animal_id")
-        weights_by_a = _group_by_tid(data["weight_logs"], "animal_id")
-        genos_by_a = _group_by_tid(data["genotypes"], "animal_id")
-        a_photos = _group_by_tid(data["animal_photos"], "animal_id")
 
-        buf = io.BytesIO()
+def _group(items: List[Dict], *keys: str) -> Dict[str, List[Dict]]:
+    """Group rows by the first of `keys` that is set. A dual-written
+    tarantula log carries both invert_id and tarantula_id with the same
+    value (shared primary keys), so it lands once."""
+    grouped: Dict[str, List[Dict]] = {}
+    for item in items:
+        parent = next((item.get(k) for k in keys if item.get(k)), None)
+        if parent:
+            grouped.setdefault(str(parent), []).append(item)
+    return grouped
+
+
+def _folder_name(row: Dict, fallback_prefix: str) -> str:
+    rid = str(row["id"])
+    slug = (row.get("name") or row.get("common_name") or row.get("scientific_name") or rid)[:40]
+    safe = "".join(c if c.isalnum() or c in " _-" else "_" for c in slug).strip() or fallback_prefix
+    return f"{safe}_{rid[:8]}"
+
+
+def _photo_ext(url: str) -> str:
+    tail = url.split("?", 1)[0].rsplit("/", 1)[-1]
+    ext = tail.rsplit(".", 1)[-1].lower() if "." in tail else ""
+    return ext if ext in {"jpg", "jpeg", "png", "gif", "webp"} else "jpg"
+
+
+async def build_full_zip(data: Dict[str, Any], username: str, fetch_photo=None) -> bytes:
+    """The full backup, from already-gathered export data (pure but for
+    `fetch_photo`, so it can be tested without a database or network)."""
+    client: Optional[httpx.AsyncClient] = None
+    if fetch_photo is None:
+        client = httpx.AsyncClient(timeout=15.0, follow_redirects=False)
+
+        async def fetch_photo(url: str) -> Optional[bytes]:
+            if not url.startswith(("https://", "http://")):
+                return None
+            resp = await client.get(url)
+            return resp.content if resp.status_code == 200 else None
+
+    async def add_photos(zf: zipfile.ZipFile, folder: str, photos: List[Dict]) -> None:
+        for photo in photos:
+            url = photo.get("url")
+            if not url:
+                continue
+            try:
+                body = await fetch_photo(url)
+            except Exception:
+                body = None  # one unreachable photo never sinks the backup
+            if body:
+                zf.writestr(f"{folder}/photos/{str(photo['id'])[:8]}.{_photo_ext(url)}", body)
+
+    by_parent = ("invert_id", "tarantula_id")
+    feedings = _group(data["feeding_logs"], *by_parent)
+    molts = _group(data["molt_logs"], *by_parent)
+    substrates = _group(data["substrate_changes"], *by_parent)
+    photos = _group(data["photos"], *by_parent)
+    care = _group(data["care_logs"], "invert_id")
+    colony_feedings = _group(data["feeding_logs"], "colony_id")
+    colony_molts = _group(data["molt_logs"], "colony_id")
+    colony_substrates = _group(data["substrate_changes"], "colony_id")
+    colony_photos = _group(data["photos"], "colony_id")
+    colony_care = _group(data["care_logs"], "colony_id")
+    colony_events = _group(data["colony_events"], "colony_id")
+    legacy_tarantulas = {str(t["id"]): t for t in data["tarantulas"]}
+
+    a_feedings = _group(data["animal_feeding_logs"], "animal_id")
+    sheds_by_a = _group(data["shed_logs"], "animal_id")
+    weights_by_a = _group(data["weight_logs"], "animal_id")
+    genos_by_a = _group(data["genotypes"], "animal_id")
+    a_photos = _group(data["animal_photos"], "animal_id")
+
+    buf = io.BytesIO()
+    try:
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            # Metadata
-            meta = {
-                "export_version": "1.0",
+            zf.writestr("metadata.json", json.dumps({
+                "export_version": "2.0",
                 "exported_at": datetime.utcnow().isoformat(),
                 "platform": "tarantuverse",
-                "username": user.username,
-            }
-            zf.writestr("metadata.json", json.dumps(meta, indent=2))
+                "username": username,
+            }, indent=2))
             zf.writestr("profile.json", json.dumps(data["profile"], indent=2, default=str))
 
-            # Per-tarantula folders
-            for t in data["tarantulas"]:
-                tid = t["id"]
-                slug = (t.get("name") or t.get("common_name") or tid)[:40]
-                safe_slug = "".join(c if c.isalnum() or c in " _-" else "_" for c in slug).strip()
-                folder = f"tarantulas/{safe_slug}_{tid[:8]}"
-
-                # Tarantula data bundle
-                t_bundle = {
-                    **t,
-                    "feeding_logs": feedings_by_t.get(tid, []),
-                    "molt_logs": molts_by_t.get(tid, []),
-                    "substrate_changes": substrates_by_t.get(tid, []),
-                    "photos": photos_by_t.get(tid, []),
+            # One folder per animal, grouped by taxon. Tarantulas keep their
+            # old `tarantulas/` path. The legacy row is merged UNDER the
+            # unified one so no tarantula-only field is lost.
+            for inv in data["inverts"]:
+                iid = str(inv["id"])
+                taxon = inv.get("taxon") or "other"
+                folder = f"{TAXON_FOLDERS.get(taxon, 'other_animals')}/{_folder_name(inv, taxon)}"
+                bundle = {
+                    **legacy_tarantulas.get(iid, {}),
+                    **inv,
+                    "feeding_logs": feedings.get(iid, []),
+                    "molt_logs": molts.get(iid, []),
+                    "substrate_changes": substrates.get(iid, []),
+                    "care_logs": care.get(iid, []),
+                    "photos": photos.get(iid, []),
                 }
-                zf.writestr(f"{folder}/data.json", json.dumps(t_bundle, indent=2, default=str))
+                zf.writestr(f"{folder}/data.json", json.dumps(bundle, indent=2, default=str))
+                await add_photos(zf, folder, photos.get(iid, []))
 
-                # Download and include photos
-                for photo in photos_by_t.get(tid, []):
-                    url = photo.get("url")
-                    if url:
-                        try:
-                            async with httpx.AsyncClient(timeout=15.0) as client:
-                                resp = await client.get(url)
-                                if resp.status_code == 200:
-                                    ext = url.rsplit(".", 1)[-1][:4] if "." in url else "jpg"
-                                    photo_id = photo["id"][:8]
-                                    zf.writestr(
-                                        f"{folder}/photos/{photo_id}.{ext}",
-                                        resp.content,
-                                    )
-                        except Exception:
-                            pass  # Skip photos that can't be downloaded
+            # Colonies (ADR-010): their own folders, events and photos inlined.
+            for col in data["colonies"]:
+                cid = str(col["id"])
+                folder = f"colonies/{_folder_name(col, 'colony')}"
+                bundle = {
+                    **col,
+                    "events": colony_events.get(cid, []),
+                    "feeding_logs": colony_feedings.get(cid, []),
+                    "molt_logs": colony_molts.get(cid, []),
+                    "substrate_changes": colony_substrates.get(cid, []),
+                    "care_logs": colony_care.get(cid, []),
+                    "photos": colony_photos.get(cid, []),
+                }
+                zf.writestr(f"{folder}/data.json", json.dumps(bundle, indent=2, default=str))
+                await add_photos(zf, folder, colony_photos.get(cid, []))
 
-            # Per-animal folders (Herpetoverse reptiles/amphibians)
+            # Herpetoverse reptiles/amphibians.
             for a in data["animals"]:
-                aid = a["id"]
-                slug = (a.get("name") or a.get("common_name") or aid)[:40]
-                safe_slug = "".join(c if c.isalnum() or c in " _-" else "_" for c in slug).strip()
-                folder = f"animals/{safe_slug}_{aid[:8]}"
-
-                a_bundle = {
+                aid = str(a["id"])
+                folder = f"animals/{_folder_name(a, 'animal')}"
+                bundle = {
                     **a,
                     "feeding_logs": a_feedings.get(aid, []),
                     "shed_logs": sheds_by_a.get(aid, []),
@@ -712,22 +775,9 @@ class ExportService:
                     "genotypes": genos_by_a.get(aid, []),
                     "photos": a_photos.get(aid, []),
                 }
-                zf.writestr(f"{folder}/data.json", json.dumps(a_bundle, indent=2, default=str))
+                zf.writestr(f"{folder}/data.json", json.dumps(bundle, indent=2, default=str))
+                await add_photos(zf, folder, a_photos.get(aid, []))
 
-                for photo in a_photos.get(aid, []):
-                    url = photo.get("url")
-                    if url:
-                        try:
-                            async with httpx.AsyncClient(timeout=15.0) as client:
-                                resp = await client.get(url)
-                                if resp.status_code == 200:
-                                    ext = url.rsplit(".", 1)[-1][:4] if "." in url else "jpg"
-                                    photo_id = photo["id"][:8]
-                                    zf.writestr(f"{folder}/photos/{photo_id}.{ext}", resp.content)
-                        except Exception:
-                            pass
-
-            # Reptile breeding
             reptile_breeding = {
                 "pairings": data["reptile_pairings"],
                 "clutches": data["clutches"],
@@ -735,21 +785,8 @@ class ExportService:
             }
             if any(reptile_breeding.values()):
                 zf.writestr("reptile_breeding.json", json.dumps(reptile_breeding, indent=2, default=str))
-
-            # Enclosures
             if data["enclosures"]:
                 zf.writestr("enclosures.json", json.dumps(data["enclosures"], indent=2, default=str))
-
-            # Colony mode (ADR-010) — each colony with its event log inlined.
-            if data["colonies"]:
-                events_by_colony = _group_by_tid(data["colony_events"], "colony_id")
-                colonies_bundle = [
-                    {**c, "events": events_by_colony.get(c["id"], [])}
-                    for c in data["colonies"]
-                ]
-                zf.writestr("colonies.json", json.dumps(colonies_bundle, indent=2, default=str))
-
-            # Breeding
             breeding = {
                 "pairings": data["pairings"],
                 "egg_sacs": data["egg_sacs"],
@@ -758,13 +795,21 @@ class ExportService:
             if any(breeding.values()):
                 zf.writestr("breeding.json", json.dumps(breeding, indent=2, default=str))
 
-            # Full-collection CSVs for spreadsheet users
+            # Collection-wide CSVs for spreadsheet users.
+            zf.writestr("all_animals.csv", ExportService._to_csv_bytes(data["inverts"], INVERT_FIELDS))
             zf.writestr("all_feeding_logs.csv", ExportService._to_csv_bytes(data["feeding_logs"], FEEDING_FIELDS))
             zf.writestr("all_molt_logs.csv", ExportService._to_csv_bytes(data["molt_logs"], MOLT_FIELDS))
+            zf.writestr("all_substrate_changes.csv", ExportService._to_csv_bytes(data["substrate_changes"], SUBSTRATE_CHANGE_FIELDS))
+            zf.writestr("all_care_logs.csv", ExportService._to_csv_bytes(data["care_logs"], CARE_LOG_FIELDS))
+            if data["colonies"]:
+                zf.writestr("all_colonies.csv", ExportService._to_csv_bytes(data["colonies"], COLONY_FIELDS))
 
             zf.writestr("README.txt", _FULL_ZIP_README)
+    finally:
+        if client is not None:
+            await client.aclose()
 
-        return buf.getvalue()
+    return buf.getvalue()
 
 
 # ---------------------------------------------------------------------------
@@ -808,18 +853,24 @@ This archive contains your complete Tarantuverse data including photos.
 Structure:
   metadata.json               – Export timestamp and version info
   profile.json                – Your profile information
-  tarantulas/
+  tarantulas/, scorpions/, mantids/, true_spiders/, isopods/, ...
     <name>_<id>/
-      data.json               – Tarantula info + all logs + photo metadata
+      data.json               – The animal + all its logs + photo metadata
       photos/
         <photo-id>.jpg        – Downloaded photo files
+  colonies/<name>_<id>/       – Each colony with its events, logs and photos
+  animals/<name>_<id>/        – Herpetoverse reptiles and amphibians (if any)
   enclosures.json             – Enclosure data (if any)
   breeding.json               – Pairings, egg sacs, offspring (if any)
+  all_animals.csv             – Every animal, every taxon, in one sheet
   all_feeding_logs.csv        – Feeding logs in spreadsheet format
   all_molt_logs.csv           – Molt logs in spreadsheet format
+  all_substrate_changes.csv   – Substrate changes in spreadsheet format
+  all_care_logs.csv           – Water, overflow and misting records
+  all_colonies.csv            – Colonies (if any)
 
-To re-import your tarantulas into Tarantuverse, use the Import feature
-in Dashboard > Collection > Import and upload the JSON or CSV files.
+To re-import your animals into Tarantuverse, use the Import feature in
+Dashboard > Collection > Import and upload all_animals.csv.
 
 Questions? Contact support@tarantuverse.com
 """

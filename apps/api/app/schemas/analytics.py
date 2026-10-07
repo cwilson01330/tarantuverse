@@ -83,6 +83,10 @@ class AdvancedAnalyticsResponse(BaseModel):
     species_distribution: List[SpeciesDistEntry]
     sex_distribution: Dict[str, int]  # {"male": 5, "female": 10, "unknown": 3}
     enclosure_type_distribution: Dict[str, int]  # {"terrestrial": 8, "arboreal": 5, ...}
+    # Every taxon (2026-10-07). Defaults keep older callers valid.
+    taxon_distribution: Dict[str, int] = {}  # {"tarantula": 12, "mantis": 3, ...}
+    unique_species: int = 0  # species_distribution is capped at 10; this isn't
+    total_animals: int = 0  # current collection, every taxon
 
     # Activity totals
     total_feedings_logged: int

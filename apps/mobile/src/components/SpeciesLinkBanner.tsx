@@ -40,7 +40,7 @@ export function SpeciesLinkBanner({ invert, canEdit, onChanged }: { invert: Inve
         ? { key: `link:${m.id}`, title: `Link the ${m.scientific_name} care sheet`, detail: 'Adds its care guide and feeding cadence to this animal.', action: 'Link care sheet', taxon: m.taxon, speciesId: m.id, name: m.scientific_name }
         : { key: `switch:${m.id}`, title: `This looks like a ${taxonLabel(m.taxon).toLowerCase()}`, detail: `${m.scientific_name} is in our list as a ${taxonLabel(m.taxon).toLowerCase()}. Switching keeps every feeding, molt and photo.`, action: `Switch & link`, taxon: m.taxon, speciesId: m.id, name: m.scientific_name }
       : invert.taxon === 'other' && res?.genus_taxon && res.genus_taxon !== 'other'
-        ? { key: `genus:${res.genus_taxon}`, title: `${res.genus} is a ${taxonLabel(res.genus_taxon).toLowerCase()} genus`, detail: `Filed as a ${taxonLabel(res.genus_taxon).toLowerCase()} it gets the feeding card and the right care tools. Every log is kept.`, action: `File as ${taxonLabel(res.genus_taxon).toLowerCase()}`, taxon: res.genus_taxon, speciesId: null, name: null }
+        ? { key: `genus:${res.genus_taxon}`, title: `${res.genus} is a ${taxonLabel(res.genus_taxon).toLowerCase()} ${res.rank === 'group' ? 'group' : 'genus'}`, detail: `Filed as a ${taxonLabel(res.genus_taxon).toLowerCase()} it gets the feeding card and the right care tools. Every log is kept.`, action: `File as ${taxonLabel(res.genus_taxon).toLowerCase()}`, taxon: res.genus_taxon, speciesId: null, name: null }
         : null;
 
   useEffect(() => {
