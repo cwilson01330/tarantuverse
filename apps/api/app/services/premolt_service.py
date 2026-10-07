@@ -14,6 +14,7 @@ from app.models.tarantula import Tarantula
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.models.user import User
+from app.utils.legacy_logs import tarantula_logs
 
 
 # Post-molt fasting guard. See evaluate_premolt_likely.
@@ -136,12 +137,12 @@ def predict_premolt(db: Session, tarantula_id: UUID) -> Dict[str, Any]:
 
     # Get all molt logs sorted by date (newest first)
     molt_logs = db.query(MoltLog).filter(
-        MoltLog.tarantula_id == tarantula_id
+        tarantula_logs(MoltLog, tarantula_id)
     ).order_by(MoltLog.molted_at.desc()).all()
 
     # Get all feeding logs sorted by date (newest first)
     feeding_logs = db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id == tarantula_id
+        tarantula_logs(FeedingLog, tarantula_id)
     ).order_by(FeedingLog.fed_at.desc()).all()
 
     # Calculate days since last molt

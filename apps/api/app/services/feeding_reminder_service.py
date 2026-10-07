@@ -12,6 +12,7 @@ from app.models.species import Species
 from app.models.feeding_log import FeedingLog
 from app.models.molt_log import MoltLog
 from app.schemas.feeding_reminder import FeedingReminderResponse
+from app.utils.legacy_logs import tarantula_logs
 
 
 # Words keepers use instead of digits.
@@ -128,7 +129,7 @@ def get_life_stage(tarantula: Tarantula, db: Session) -> str:
     """
     # Get most recent molt with leg_span_after data
     recent_molt = db.query(MoltLog).filter(
-        MoltLog.tarantula_id == tarantula.id,
+        tarantula_logs(MoltLog, tarantula.id),
         MoltLog.leg_span_after.isnot(None)
     ).order_by(MoltLog.molted_at.desc()).first()
 
@@ -206,7 +207,7 @@ def get_recommended_interval(tarantula: Tarantula, db: Session) -> int:
 def get_last_feeding(tarantula_id, db: Session) -> Optional[FeedingLog]:
     """Get the most recent accepted feeding log for a tarantula"""
     return db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id == tarantula_id,
+        tarantula_logs(FeedingLog, tarantula_id),
         FeedingLog.accepted == True  # Only count accepted feedings
     ).order_by(FeedingLog.fed_at.desc()).first()
 

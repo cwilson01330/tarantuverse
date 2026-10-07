@@ -30,6 +30,7 @@ from app.utils.hero_photo import sync_hero_photo
 from app.utils.photo_cleanup import delete_files
 from app.utils.limits import enforce_photo_cap
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
+from app.utils.legacy_logs import tarantula_logs
 
 
 class PhotoUpdate(BaseModel):
@@ -172,7 +173,7 @@ async def get_photos(
         raise HTTPException(status_code=404, detail="Tarantula not found")
 
     photos = db.query(Photo).filter(
-        Photo.tarantula_id == tarantula_id
+        tarantula_logs(Photo, tarantula_id)
     ).order_by(Photo.created_at.desc()).all()
 
     return [

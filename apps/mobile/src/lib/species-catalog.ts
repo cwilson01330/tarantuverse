@@ -172,14 +172,27 @@ export function normalizeEnclosureType(
   return found.length ? found[0].term : null;
 }
 
+/** Lowercase, quotes and accents off, whitespace collapsed. Mirrors the
+ *  server's species_match.normalize so "PTERINOCHILUS  MURINUS " or a curly
+ *  “Hati Hati” still finds the catalog row. */
+export function normalizeSpeciesText(s: string): string {
+  return s
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/['"‘’“”`´]/g, '')
+    .replace(/[.,;:()[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** Case-insensitive match on common OR scientific name. */
 export function searchCatalog(rows: CatalogSpecies[], query: string, limit = 25): CatalogSpecies[] {
-  const q = query.trim().toLowerCase();
+  const q = normalizeSpeciesText(query);
   if (!q) return [];
   const scored = rows
     .map((r) => {
-      const sci = r.scientific_name.toLowerCase();
-      const common = r.common_names.map((c) => c.toLowerCase());
+      const sci = normalizeSpeciesText(r.scientific_name);
+      const common = r.common_names.map((c) => normalizeSpeciesText(c));
       // Prefix matches rank above substring matches so typing "bra" surfaces
       // "Brazilian …" before "Chilean … brasiliensis".
       if (sci.startsWith(q) || common.some((c) => c.startsWith(q))) return { r, rank: 0 };

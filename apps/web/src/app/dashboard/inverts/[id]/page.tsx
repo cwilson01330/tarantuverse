@@ -31,6 +31,7 @@ import {
 } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
+import SpeciesLinkBanner from '@/components/SpeciesLinkBanner'
 import InvertFeedingStatus, {
   type InvertFeedingStats,
 } from '@/components/InvertFeedingStatus'
@@ -472,6 +473,13 @@ export default function InvertDetailPage() {
       userAvatar={user?.image ?? undefined}
     >
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {invert ? (
+          <SpeciesLinkBanner
+            animalId={invert.id} taxon={invert.taxon} scientificName={invert.scientific_name}
+            speciesId={invert.species_id} died={!!invert.died_at} canEdit={canKeep} token={token ?? null}
+            onChanged={() => fetchAll()}
+          />
+        ) : null}
         {invert && !isOwner && invert.user_id ? (
           <Link href={`/dashboard/shared/${invert.user_id}`} className="text-sm text-primary-600 hover:underline mb-4 inline-block">
             ← Back to {shared.ownerName ? `${shared.ownerName}'s collection` : 'shared collection'}

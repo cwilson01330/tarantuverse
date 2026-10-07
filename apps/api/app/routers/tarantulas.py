@@ -40,6 +40,7 @@ from app.services.inverts_dualwrite import (
 )
 from app.utils.access import policy
 from app.utils.photo_cleanup import collect_for_animal, delete_files
+from app.utils.legacy_logs import tarantula_logs
 
 router = APIRouter()
 
@@ -358,7 +359,7 @@ async def get_tarantula_growth(
 
     # Get all molt logs ordered by date
     molt_logs = db.query(MoltLog).filter(
-        MoltLog.tarantula_id == tarantula_id
+        tarantula_logs(MoltLog, tarantula_id)
     ).order_by(MoltLog.molted_at).all()
 
     if not molt_logs:
@@ -527,7 +528,7 @@ async def get_feeding_stats(
 
     # Get all feeding logs ordered by date
     feeding_logs = db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id == tarantula_id
+        tarantula_logs(FeedingLog, tarantula_id)
     ).order_by(FeedingLog.fed_at).all()
 
     # Pause state — see pst_20260502. A paused tarantula (premolt /
@@ -842,7 +843,7 @@ async def get_public_tarantula(
 
     # Get feeding logs
     feeding_logs = db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id == tarantula.id
+        tarantula_logs(FeedingLog, tarantula.id)
     ).order_by(FeedingLog.fed_at.desc()).all()
 
     total_feedings = len(feeding_logs)
@@ -852,7 +853,7 @@ async def get_public_tarantula(
 
     # Get molt logs
     molt_logs = db.query(MoltLog).filter(
-        MoltLog.tarantula_id == tarantula.id
+        tarantula_logs(MoltLog, tarantula.id)
     ).order_by(MoltLog.molted_at.desc()).all()
 
     molt_timeline = []
@@ -869,7 +870,7 @@ async def get_public_tarantula(
 
     # Get photos (limit to 10)
     photos = db.query(Photo).filter(
-        Photo.tarantula_id == tarantula.id
+        tarantula_logs(Photo, tarantula.id)
     ).order_by(Photo.created_at.desc()).limit(10).all()
 
     photos_data = []

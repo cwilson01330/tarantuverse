@@ -73,6 +73,60 @@ async def search_invert_species(
     )
 
 
+# The catalog is a few hundred rows and changes rarely; the matcher runs on
+# every keystroke pause in the add form, so keep a short-lived copy.
+_CATALOG_CACHE: dict = {"at": 0.0, "rows": []}
+_CATALOG_TTL_S = 300
+
+
+def _catalog_rows(db: Session):
+    import time
+    from app.services.species_match import CatalogRow
+
+    now = time.monotonic()
+    if _CATALOG_CACHE["rows"] and now - _CATALOG_CACHE["at"] < _CATALOG_TTL_S:
+        return _CATALOG_CACHE["rows"]
+    rows = [
+        CatalogRow(id=r.id, scientific_name=r.scientific_name, taxon=r.taxon,
+                   common_name=(r.common_names or [None])[0], slug=r.slug)
+        for r in db.query(
+            InvertSpecies.id, InvertSpecies.scientific_name, InvertSpecies.taxon,
+            InvertSpecies.common_names, InvertSpecies.slug,
+        ).all()
+        if r.scientific_name
+    ]
+    _CATALOG_CACHE.update(at=now, rows=rows)
+    return rows
+
+
+@router.get("/match")
+async def match_invert_species(
+    name: str = Query(..., min_length=2, max_length=120),
+    taxon: Optional[str] = Query(None, pattern=TAXON_PATTERN, description="The animal's taxon; only used to resolve a bare species epithet."),
+    db: Session = Depends(get_db),
+):
+    """Is this typed name a species we already list? Ignores capitals,
+    spacing, quotes and accents, and catches a one-letter typo. Read-only:
+    the app offers the match and the keeper decides (services/species_match).
+
+    {"match": {id, scientific_name, common_name, taxon, slug, kind} | null,
+     "genus": "Avicularia" | null, "genus_taxon": "tarantula" | null}
+    """
+    from app.services.species_match import match_name
+
+    res = match_name(name, _catalog_rows(db), taxon=taxon)
+    m = res.match
+    return {
+        "match": None if m is None else {
+            "id": str(m.row.id), "scientific_name": m.row.scientific_name,
+            "common_name": m.row.common_name, "taxon": m.row.taxon,
+            "slug": m.row.slug, "kind": m.kind,
+        },
+        "genus": res.genus,
+        "genus_taxon": res.genus_taxon,
+    }
+
+
 @router.get("/", response_model=List[InvertSpeciesResponse])
 async def list_invert_species(
     skip: int = Query(0, ge=0),

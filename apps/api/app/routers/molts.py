@@ -25,6 +25,7 @@ from app.utils.access import (
 )
 from app.services.activity_service import create_activity
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
+from app.utils.legacy_logs import tarantula_logs
 
 router = APIRouter()
 
@@ -47,7 +48,7 @@ async def get_molt_logs(
         raise HTTPException(status_code=404, detail="Tarantula not found")
 
     molt_logs = db.query(MoltLog).filter(
-        MoltLog.tarantula_id == tarantula_id
+        tarantula_logs(MoltLog, tarantula_id)
     ).order_by(MoltLog.molted_at.desc()).all()
 
     return molt_logs

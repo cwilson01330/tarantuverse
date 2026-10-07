@@ -22,7 +22,9 @@ import {
 } from 'react-native';
 
 import { useTheme } from '../contexts/ThemeContext';
+import { SpeciesSuggestion, useSpeciesMatch } from './SpeciesSuggestion';
 import {
+  getInvertSpecies,
   searchInvertSpecies,
   type InvertSpecies,
   type InvertTaxon,
@@ -96,6 +98,18 @@ export function InvertSpeciesPicker({ taxon, valueId, valueScientific, onChange,
     }, DEBOUNCE_MS);
   };
 
+  // Search is a substring match, so capitals/typos/a bare epithet find
+  // nothing. Ask the matcher once the search comes back empty. Same taxon
+  // only here: changing taxon goes through the Change-taxon flow.
+  const nameMatch = useSpeciesMatch(noMatch && !valueId ? query : '', taxon);
+  const suggestion = nameMatch?.match && nameMatch.match.taxon === taxon ? nameMatch.match : null;
+  const applySuggestion = async () => {
+    if (!suggestion) return;
+    try {
+      handlePick(await getInvertSpecies(suggestion.id));
+    } catch { /* leave the typed text as it is */ }
+  };
+
   const handlePick = (row: InvertSpecies) => {
     onChange(row);
     setQuery(row.scientific_name);
@@ -151,9 +165,13 @@ export function InvertSpeciesPicker({ taxon, valueId, valueScientific, onChange,
         </View>
       )}
       {noMatch && !valueId && query.trim().length > 0 && (
-        <Text style={[styles.resultCommon, styles.hint]} accessibilityLiveRegion="polite">
-          Not in our species list yet. It will be saved as you typed it.
-        </Text>
+        suggestion ? (
+          <SpeciesSuggestion match={suggestion} onUse={applySuggestion} />
+        ) : (
+          <Text style={[styles.resultCommon, styles.hint]} accessibilityLiveRegion="polite">
+            Not in our species list yet. It will be saved as you typed it.
+          </Text>
+        )
       )}
     </View>
   );

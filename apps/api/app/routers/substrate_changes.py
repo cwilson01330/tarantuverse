@@ -24,6 +24,7 @@ from app.utils.access import (
     require_can_change,
 )
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
+from app.utils.legacy_logs import tarantula_logs
 
 router = APIRouter()
 
@@ -46,7 +47,7 @@ async def get_substrate_changes(
         raise HTTPException(status_code=404, detail="Tarantula not found")
 
     changes = db.query(SubstrateChange).filter(
-        SubstrateChange.tarantula_id == tarantula_id
+        tarantula_logs(SubstrateChange, tarantula_id)
     ).order_by(SubstrateChange.changed_at.desc()).all()
 
     return changes

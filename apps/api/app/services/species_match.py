@@ -1,0 +1,159 @@
+"""Match a species name a keeper typed against the catalog.
+
+Why this exists (2026-10-07): ~20 live animals were filed as "Other" with a
+species name typed freehand. Six of those names were already in the catalog
+exactly ("PTERINOCHILUS MURINUS", "Hogna Maderiana "), and several more were
+a typo away ("Archispirostreptis Giga's"). Filed as Other, they lose the
+feeding card, the care sheet and, for tarantulas, molt prediction. The
+autocomplete only matched substrings, so capitals, stray spaces, curly quotes
+or one wrong letter meant "not in our list".
+
+This module answers one question: "is this the same species as something we
+already have?" It never writes anything; callers offer the match and the
+keeper decides.
+
+Pure functions over plain rows so it can be tested without a database.
+"""
+from __future__ import annotations
+
+import difflib
+import re
+import unicodedata
+from dataclasses import dataclass
+from typing import Iterable, Optional
+
+# Close enough to be the same name with a typo, not a different species.
+# Measured on the real cases: "archispirostreptis gigas" vs
+# "archispirostreptus gigas" scores ~0.96; two genuinely different species
+# in one genus ("avicularia avicularia" vs "avicularia variegata") ~0.6.
+CLOSE_NAME = 0.88
+CLOSE_GENUS = 0.85
+# A lone epithet is short, so one slip costs more score ("iherengi" vs
+# "iheringi" is 0.875); in exchange it must win by a wide margin.
+CLOSE_EPITHET = 0.85
+
+_QUOTES = "'\"‘’“”`´"
+
+
+def normalize(name: Optional[str]) -> str:
+    """Lowercase, accents and quotes off, punctuation-insensitive.
+
+    "Cyriocosmus sp. “Oronegro”" and "cyriocosmus sp oronegro" normalise the
+    same; so do "PTERINOCHILUS  MURINUS " and "Pterinochilus murinus".
+    """
+    if not name:
+        return ""
+    s = unicodedata.normalize("NFKD", name)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = s.lower()
+    s = "".join(c for c in s if c not in _QUOTES)
+    s = re.sub(r"[.,;:()\[\]]", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def genus_of(name: Optional[str]) -> str:
+    n = normalize(name)
+    return n.split(" ", 1)[0] if n else ""
+
+
+@dataclass
+class CatalogRow:
+    id: object
+    scientific_name: str
+    taxon: str
+    common_name: Optional[str] = None
+    slug: Optional[str] = None
+
+
+@dataclass
+class Match:
+    row: CatalogRow
+    # "exact": same name, ignoring case/spacing/quotes
+    # "close": a typo away
+    # "epithet": only the second word was typed ("minatrix"), and exactly one
+    #            species of the animal's own taxon carries it
+    kind: str
+
+
+@dataclass
+class MatchResult:
+    match: Optional[Match]
+    # The genus we recognised (catalog spelling) and its taxon when every
+    # species we list in it shares one. Lets the app say "Avicularia is a
+    # tarantula genus" even when this exact species isn't in the list.
+    genus: Optional[str]
+    genus_taxon: Optional[str]
+
+
+def _epithet_match(word: str, rows: list[CatalogRow], taxon: Optional[str]) -> Optional[Match]:
+    """A lone word like "minatrix". Common in older records, which stored the
+    species epithet without the genus. Only ever answered within the animal's
+    own taxon, and only when the word is unambiguous there: "murinus" is two
+    tarantulas, and "regius" on a tarantula must not become a jumping spider."""
+    if not taxon or taxon == "other" or len(word) < 4:
+        return None
+    pool = [(normalize(r.scientific_name).split(" ")[1:2], r) for r in rows if r.taxon == taxon]
+    pool = [(ep[0], r) for ep, r in pool if ep]
+    hits = [r for ep, r in pool if ep == word]
+    if hits:
+        return Match(hits[0], "epithet") if len(hits) == 1 else None
+    # One slip ("braunshaseni", "iherengi"): accept only a clear winner.
+    scored = sorted(((difflib.SequenceMatcher(None, word, ep).ratio(), r) for ep, r in pool), key=lambda t: t[0], reverse=True)
+    if not scored:
+        return None
+    best_score, best = scored[0]
+    runner_up = scored[1][0] if len(scored) > 1 else 0.0
+    if best_score >= CLOSE_EPITHET and best_score - runner_up >= 0.15:
+        return Match(best, "epithet")
+    return None
+
+
+def match_name(name: str, rows: Iterable[CatalogRow], taxon: Optional[str] = None) -> MatchResult:
+    """`taxon` is the animal's current taxon, when there is one. It's only
+    used to answer a bare epithet; full names match across every taxon (that
+    is how an "Other" gets told it's a tarantula)."""
+    target = normalize(name)
+    rows = list(rows)
+    if not target or not rows:
+        return MatchResult(None, None, None)
+
+    by_genus: dict[str, list[CatalogRow]] = {}
+    for r in rows:
+        by_genus.setdefault(genus_of(r.scientific_name), []).append(r)
+
+    g = genus_of(target)
+    if " " not in target and g not in by_genus:
+        m = _epithet_match(target, rows, taxon)
+        if m:
+            return MatchResult(m, m.row.scientific_name.split(" ", 1)[0], m.row.taxon)
+        return MatchResult(None, None, None)
+    if g not in by_genus:
+        # A misspelt genus ("archispirostreptis") still finds its family.
+        close = difflib.get_close_matches(g, list(by_genus), n=1, cutoff=CLOSE_GENUS)
+        g = close[0] if close else ""
+    candidates = by_genus.get(g, [])
+
+    match: Optional[Match] = None
+    for r in candidates:
+        if normalize(r.scientific_name) == target:
+            match = Match(r, "exact")
+            break
+    if match is None and candidates:
+        scored = sorted(
+            ((difflib.SequenceMatcher(None, target, normalize(r.scientific_name)).ratio(), r) for r in candidates),
+            key=lambda t: t[0],
+            reverse=True,
+        )
+        best_score, best = scored[0]
+        # Only when it's clearly the best: two near-ties mean we can't tell.
+        runner_up = scored[1][0] if len(scored) > 1 else 0.0
+        if best_score >= CLOSE_NAME and best_score - runner_up >= 0.03:
+            match = Match(best, "close")
+
+    genus_name = genus_taxon = None
+    if candidates:
+        genus_name = candidates[0].scientific_name.split(" ", 1)[0]
+        taxa = {r.taxon for r in candidates}
+        genus_taxon = taxa.pop() if len(taxa) == 1 else None
+    return MatchResult(match, genus_name, genus_taxon)

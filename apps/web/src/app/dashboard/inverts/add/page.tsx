@@ -17,6 +17,7 @@ import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
 import { INVERT_TAXA, isInvertTaxon, type InvertTaxon } from '@/lib/inverts'
+import SpeciesSuggestion, { useSpeciesMatch } from '@/components/SpeciesSuggestion'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -70,13 +71,20 @@ function AddInvertForm() {
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<SpeciesHit[]>([])
   const [open, setOpen] = useState(false)
+  // The last search for the current text came back empty.
+  const [noHits, setNoHits] = useState(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Search is a substring match, so capitals, a typo or a bare epithet find
+  // nothing; the matcher catches those (and other taxa) once it does.
+  const nameMatch = useSpeciesMatch(noHits && !speciesId ? query : '', taxon)
+  const suggestion = nameMatch?.match ?? null
 
   const onQueryChange = (text: string) => {
     setQuery(text)
     setScientificName(text)
     setSpeciesId(null)
     setOpen(true)
+    setNoHits(false)
     if (debounce.current) clearTimeout(debounce.current)
     if (!text.trim()) {
       setHits([])
@@ -87,11 +95,25 @@ function AddInvertForm() {
         const res = await fetch(
           `${API_URL}/api/v1/invert-species/search?q=${encodeURIComponent(text.trim())}&taxon=${taxon}&limit=8`,
         )
-        setHits(res.ok ? await res.json() : [])
+        const rows: SpeciesHit[] = res.ok ? await res.json() : []
+        setHits(rows)
+        setNoHits(rows.length === 0)
       } catch {
         setHits([])
       }
     }, 250)
+  }
+
+  /** Take the matcher's species. Another taxon swaps the form's taxon
+   *  (it lives in the URL); everything typed so far stays put. */
+  const applySuggestion = () => {
+    if (!suggestion) return
+    if (suggestion.taxon !== taxon) {
+      const q = new URLSearchParams(searchParams.toString())
+      q.set('taxon', suggestion.taxon)
+      router.replace(`/dashboard/inverts/add?${q}`, { scroll: false })
+    }
+    pickSpecies({ id: suggestion.id, scientific_name: suggestion.scientific_name, common_names: suggestion.common_name ? [suggestion.common_name] : [] })
   }
 
   const pickSpecies = (s: SpeciesHit) => {
@@ -101,6 +123,7 @@ function AddInvertForm() {
     if (!commonName && s.common_names?.[0]) setCommonName(s.common_names[0])
     setOpen(false)
     setHits([])
+    setNoHits(false)
   }
 
   const handleSave = async () => {
@@ -203,6 +226,11 @@ function AddInvertForm() {
                   ))}
                 </div>
               )}
+              {suggestion && !speciesId ? (
+                <SpeciesSuggestion match={suggestion} currentTaxon={taxon} onUse={applySuggestion} />
+              ) : noHits && !speciesId && query.trim() ? (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Not in our species list yet. It will be saved as you typed it.</p>
+              ) : null}
             </div>
           </Field>
 

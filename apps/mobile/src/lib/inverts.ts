@@ -607,6 +607,21 @@ export async function searchInvertSpecies(taxon: InvertTaxon, q: string, limit =
   return data;
 }
 
+/** A typed name the catalog recognises (apps/api/app/services/species_match.py).
+ *  `kind`: 'exact' ignores capitals/spacing/quotes, 'close' is a typo away,
+ *  'epithet' means only the second word was typed and it is unique in `taxon`. */
+export interface SpeciesNameMatch {
+  match: { id: string; scientific_name: string; common_name: string | null; taxon: InvertTaxon; slug: string | null; kind: 'exact' | 'close' | 'epithet' } | null;
+  /** Catalog spelling of the genus we recognised, and its taxon if unambiguous. */
+  genus: string | null;
+  genus_taxon: InvertTaxon | null;
+}
+
+export async function matchSpeciesName(name: string, taxon?: InvertTaxon | null): Promise<SpeciesNameMatch> {
+  const { data } = await apiClient.get<SpeciesNameMatch>('/invert-species/match', { params: { name, ...(taxon ? { taxon } : {}) } });
+  return data;
+}
+
 export async function getInvertSpecies(id: string): Promise<InvertSpecies> {
   // The unified catalog returns any taxon by id.
   const { data } = await apiClient.get<InvertSpecies>(`/invert-species/${id}`);

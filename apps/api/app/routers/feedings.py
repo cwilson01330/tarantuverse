@@ -41,6 +41,7 @@ from app.services.activity_service import create_activity
 from app.services.feeding_reminder_service import get_user_feeding_reminders
 # ADR-005 Phase A2 — opportunistically populate invert_id on new logs.
 from app.services.inverts_dualwrite import invert_id_if_exists
+from app.utils.legacy_logs import tarantula_logs
 
 router = APIRouter()
 
@@ -64,7 +65,7 @@ async def get_feeding_logs(
 
     # Get feeding logs ordered by date (most recent first)
     feedings = db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id == tarantula_id
+        tarantula_logs(FeedingLog, tarantula_id)
     ).order_by(FeedingLog.fed_at.desc()).all()
 
     return feedings

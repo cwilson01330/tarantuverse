@@ -56,7 +56,8 @@ import { withErrorBoundary } from '../src/components/ErrorBoundary';
 import DateInput from '../src/components/DateInput';
 import { parseLocalDate, toISODateLocal } from '../src/utils/date';
 import { getImageUrl } from '../src/utils/image-url';
-import { INVERT_TAXA } from '../src/lib/inverts';
+import { INVERT_TAXA, INVERT_TAXON_ORDER, type InvertTaxon } from '../src/lib/inverts';
+import { SpeciesSuggestion, taxonLabel, useSpeciesMatch } from '../src/components/SpeciesSuggestion';
 import { careLevelMeta } from '../src/components/caresheet';
 import { useAuth } from '../src/contexts/AuthContext';
 import { SPACING, TYPE } from '../src/theme/tokens';
@@ -67,6 +68,7 @@ import {
   normalizeEnclosureType,
   searchCatalog,
   type CatalogSpecies,
+  normalizeSpeciesText,
 } from '../src/lib/species-catalog';
 
 const UpgradeModal = React.lazy(() => import('../src/components/UpgradeModal'));
@@ -158,6 +160,10 @@ function AddScreen() {
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<CatalogSpecies | null>(null);
   const [manual, setManual] = useState(false);
+  // What a manual entry is filed as. Before 2026-10-07 every manual entry
+  // became "Other" with no way to say otherwise, which is how a typed-in
+  // tarantula lost its feeding card, care sheet and molt prediction.
+  const [manualTaxon, setManualTaxon] = useState<InvertTaxon | null>(null);
 
   const [mode, setMode] = useState<Mode>('individual');
   const [nickname, setNickname] = useState('');
@@ -199,6 +205,20 @@ function AddScreen() {
   }, [preselectId]);
 
   const results = useMemo(() => searchCatalog(catalog, query), [catalog, query]);
+
+  // "Did you mean…?" — asked of the server when search finds nothing, and
+  // while a manual scientific name is being typed.
+  const matchText = picked ? '' : manual ? scientificName : results.length === 0 ? query : '';
+  const nameMatch = useSpeciesMatch(matchText, manual ? manualTaxon : null);
+  const suggested = useMemo(() => {
+    const m = nameMatch?.match;
+    if (!m) return null;
+    const key = normalizeSpeciesText(m.scientific_name);
+    const entry = catalog.find((c) => c.taxon === m.taxon && normalizeSpeciesText(c.scientific_name) === key);
+    return entry ? { m, entry } : null;
+  }, [nameMatch, catalog]);
+  const genusTaxon = nameMatch?.genus_taxon ?? null;
+  const effectiveManualTaxon: InvertTaxon = manualTaxon ?? genusTaxon ?? 'other';
 
   const choose = useCallback((s: CatalogSpecies) => {
     setPicked(s);
@@ -297,7 +317,7 @@ function AddScreen() {
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      const taxon = picked?.taxon ?? 'other';
+      const taxon = picked?.taxon ?? effectiveManualTaxon;
       const husbandry = buildHusbandry(mode === 'colony' ? 'colony' : 'animal');
 
       if (mode === 'colony') {
@@ -547,7 +567,9 @@ function AddScreen() {
               )}
 
               {!!query && results.length === 0 && !catalogLoading && (
-                <Text style={styles.warnLine}>No species matched “{query}”.</Text>
+                suggested
+                  ? <SpeciesSuggestion match={suggested.m} onUse={() => choose(suggested.entry)} />
+                  : <Text style={styles.warnLine}>No species matched “{query}”.</Text>
               )}
 
               <TouchableOpacity style={styles.manualRow} onPress={() => setManual(true)}>
@@ -578,10 +600,38 @@ function AddScreen() {
                   autoCapitalize="words"
                 />
               </Field>
-              <Text style={styles.hintLine}>
-                Manual entries aren&apos;t linked to a care sheet, so there&apos;s nothing to
-                prefill from.
-              </Text>
+              {suggested ? (
+                <SpeciesSuggestion match={suggested.m} onUse={() => choose(suggested.entry)} />
+              ) : (
+                <Text style={styles.hintLine}>
+                  Manual entries aren&apos;t linked to a care sheet, so there&apos;s nothing to
+                  prefill from.
+                </Text>
+              )}
+              <Text style={[styles.sectionLabel, { marginTop: 12 }]}>WHAT KIND OF ANIMAL?</Text>
+              <View style={styles.taxonChips} accessibilityRole="radiogroup" accessibilityLabel="What kind of animal">
+                {INVERT_TAXON_ORDER.map((t) => {
+                  const on = t === effectiveManualTaxon;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => setManualTaxon(t)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      style={[styles.taxonChip, { borderRadius: layout.radius.full, borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + '1F' : 'transparent' }]}
+                    >
+                      <Text style={[styles.taxonChipText, { color: on ? colors.primary : colors.textSecondary }]}>
+                        {taxonEmoji(t)} {taxonLabel(t)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {!manualTaxon && genusTaxon && nameMatch?.genus ? (
+                <Text style={styles.hintLine}>
+                  {nameMatch.genus} is a {taxonLabel(genusTaxon).toLowerCase()} genus, so it&apos;s filed as one. Tap to change.
+                </Text>
+              ) : null}
             </View>
           )}
 
@@ -1026,6 +1076,9 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
     resultSci: { fontSize: 12, fontStyle: 'italic', color: colors.textTertiary },
 
     manualRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
+    taxonChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    taxonChip: { borderWidth: 1, paddingHorizontal: 12, minHeight: 36, justifyContent: 'center' },
+    taxonChipText: { ...TYPE.label },
     manualText: { fontSize: 14, color: colors.primary, fontWeight: '600' },
 
     pickedCard: {

@@ -50,6 +50,7 @@ from app.services.storage import storage_service
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.config import settings
 from app.utils.access import policy
+from app.utils.legacy_logs import tarantula_logs
 
 logger = logging.getLogger(__name__)
 
@@ -805,18 +806,18 @@ async def get_public_tarantula_profile(
     # Most recent ACCEPTED feeding — refused offers shouldn't reset the
     # "last fed" indicator on the public profile.
     last_feeding = db.query(FeedingLog).filter(
-        FeedingLog.tarantula_id == t_uuid,
+        tarantula_logs(FeedingLog, t_uuid),
         FeedingLog.accepted.is_(True),
     ).order_by(FeedingLog.fed_at.desc()).first()
 
     # Most recent molt
     last_molt = db.query(MoltLog).filter(
-        MoltLog.tarantula_id == t_uuid
+        tarantula_logs(MoltLog, t_uuid)
     ).order_by(MoltLog.molted_at.desc()).first()
 
     # Photos (max 10 for public view)
     photos = db.query(Photo).filter(
-        Photo.tarantula_id == t_uuid
+        tarantula_logs(Photo, t_uuid)
     ).order_by(Photo.created_at.desc()).limit(10).all()
 
     # Lineage — parents via Pairing / Offspring

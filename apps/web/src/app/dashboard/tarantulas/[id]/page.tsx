@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import SpeciesLinkBanner from '@/components/SpeciesLinkBanner'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useSubscription } from '@/hooks/useSubscription'
@@ -1236,6 +1237,16 @@ export default function TarantulaDetailPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Typed species name matches a care sheet (or another taxon): offer it.
+          This page is owner-only (legacy /tarantulas/ route), so the owner can edit. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 empty:hidden">
+        <SpeciesLinkBanner
+          animalId={tarantula.id} taxon="tarantula" scientificName={tarantula.scientific_name}
+          speciesId={tarantula.species_id} died={!!tarantula.died_at} canEdit token={token ?? null}
+          onChanged={(t) => (t === 'tarantula' ? token && fetchTarantula(token) : router.push(`/dashboard/inverts/${tarantula.id}`))}
+        />
       </div>
 
       {/* Status card (ADR-015). Above the action bar because it changes what

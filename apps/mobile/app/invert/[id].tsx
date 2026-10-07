@@ -43,6 +43,7 @@ import PhotoViewer from '../../src/components/PhotoViewer';
 import QRSheet from '../../src/components/QRSheet';
 import { PauseFeedingSheet } from '../../src/components/PauseFeedingSheet';
 import { FeedingCadenceSheet } from '../../src/components/FeedingCadenceSheet';
+import { SpeciesLinkBanner } from '../../src/components/SpeciesLinkBanner';
 import { getErrorMessage } from '../../src/utils/errors';
 import { MarkDiedSheet } from '../../src/components/MarkDiedSheet';
 import {
@@ -771,6 +772,9 @@ function InvertDetailScreen() {
           {ownerName ? `${ownerName}'s animal. ` : ''}You're a {ROLE_LABEL[role]} — {ROLE_HELP[role]}
         </Text>
       )}
+
+      {/* Typed species name matches a care sheet (or another taxon): offer it. */}
+      <SpeciesLinkBanner invert={invert} canEdit={canKeep} onChanged={fetchAll} />
 
       {/* Feeding card — the question the keeper opened the screen to answer,
           answered first. Registry-gated: a millipede has no feeding cadence,
