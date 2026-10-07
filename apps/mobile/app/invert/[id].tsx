@@ -35,7 +35,7 @@ import {
 import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '../../src/components/ui';
 import { SPACING, TYPE } from '../../src/theme/tokens';
 import {
-  taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch,
+  taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
 } from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
@@ -748,6 +748,9 @@ function InvertDetailScreen() {
               {invert.current_instar ? (
                 <Text style={styles.heroMeta}>· {invert.current_instar} molts</Text>
               ) : null}
+              {lastMoltAgo(molts) ? (
+                <Text style={styles.heroMeta}>· molted {lastMoltAgo(molts)}</Text>
+              ) : null}
               <Text style={styles.heroMeta}>· {meta?.label ?? 'Invert'}</Text>
             </View>
           </View>
@@ -1189,7 +1192,7 @@ function InvertDetailScreen() {
 
       {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot).
           GrowthChart renders its own card, so no Section wrapper. */}
-      {taxonHasModule(invert.taxon, 'growth') && growth && growth.total_molts > 0 && (
+      {growth && showGrowthChart(invert.taxon, growth as any) && (
         <CollapsibleRow
           icon="chart-line"
           title="Growth"

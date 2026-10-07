@@ -27,7 +27,7 @@ import {
   type DeathCause,
 } from '@/lib/animal-lifecycle'
 import {
-  taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch,
+  taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
 } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
@@ -611,6 +611,7 @@ export default function InvertDetailPage() {
             <Section title="Identity">
               <Fact label="Sex" value={cap(invert.sex)} />
               <Fact label="Molts" value={invert.current_instar != null ? String(invert.current_instar) : null} />
+              <Fact label="Last molt" value={lastMoltAgo(molts)} />
               <Fact
                 label={isWhipSpider ? 'Leg span' : 'Size'}
                 value={invert.current_length_mm != null ? `${invert.current_length_mm} mm` : null}
@@ -736,7 +737,7 @@ export default function InvertDetailPage() {
             )}
 
             {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot) */}
-            {invert && taxonHasModule(invert.taxon, 'growth') && growth && growth.total_molts > 0 && (
+            {invert && growth && showGrowthChart(invert.taxon, growth) && (
               <GrowthChart data={growth} lengthLabel={growthLengthLabel(invert.taxon)} />
             )}
 

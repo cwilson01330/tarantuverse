@@ -98,7 +98,9 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   // Jumping spiders lay an egg sac like a tarantula, so the pairing → sac →
   // offspring chain is the same shape. Enabled 2026-09-20 on real demand.
   true_spider: ['feedingStats', 'growth', 'breeding'],
-  millipede: [], // detritivore — no live-prey cadence, and molts underground
+  // Growth opt-in (2026-10-07): shown only once a molt carries a
+  // measurement (showGrowthChart). Mirrors the mobile registry.
+  millipede: ['growth'],
   // Instar tracking is core to mantis keeping. Breeding enabled 2026-09-22:
   // the ootheca → nymphs vocabulary below is correct and now actually read by
   // the hubs, so a mantis breeder is no longer offered a spider's "egg sac".
@@ -112,11 +114,44 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   // nag about, and no per-animal molt log worth charting: isopods molt in two
   // halves and nobody records it.
   isopod: [],
-  other: [],
+  // Catch-all keepers file real predators under; cards appear only with
+  // data (2026-10-07, every taxon first-class). Mirrors mobile.
+  other: ['feedingStats', 'growth'],
 }
 
 export function taxonHasModule(taxon: string, module: FeatureModule): boolean {
   return isInvertTaxon(taxon) && TAXON_MODULES[taxon].includes(module)
+}
+
+/**
+ * Growth chart visibility. Most taxa show the card as soon as a molt exists
+ * (it explains how to start measuring). Taxa that rarely get measured opt in
+ * only once a molt actually carries a size or weight, so a millipede keeper
+ * who never measures sees nothing new.
+ */
+const GROWTH_NEEDS_MEASUREMENT = new Set<string>(['millipede'])
+
+export function showGrowthChart(
+  taxon: string,
+  growth: { total_molts: number; data_points?: { leg_span?: unknown; weight?: unknown }[] } | null | undefined,
+): boolean {
+  if (!growth || growth.total_molts <= 0 || !taxonHasModule(taxon, 'growth')) return false
+  if (!GROWTH_NEEDS_MEASUREMENT.has(taxon)) return true
+  return (growth.data_points ?? []).some((p) => p.leg_span != null || p.weight != null)
+}
+
+/** "today" / "yesterday" / "12 days ago" for the most recent molt, by calendar
+ *  day in the viewer's timezone. A fact, not a prediction, so every taxon
+ *  that logs molts gets it (premolt prediction stays tarantula-only). */
+export function lastMoltAgo(molts: { molted_at: string }[]): string | null {
+  if (!molts.length) return null
+  const latest = molts.reduce((a, b) => (new Date(b.molted_at) > new Date(a.molted_at) ? b : a))
+  const d = new Date(latest.molted_at)
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const n = Math.round((day(new Date()) - day(d)) / 86_400_000)
+  if (n <= 0) return 'today'
+  if (n === 1) return 'yesterday'
+  return `${n} days ago`
 }
 
 /**
