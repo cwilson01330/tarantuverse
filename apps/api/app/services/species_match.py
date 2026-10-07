@@ -86,6 +86,75 @@ class MatchResult:
     genus_taxon: Optional[str]
 
 
+# Renames keepers still use. Only certain, published ones; each maps to the
+# current catalog name and only applies when that name is in the catalog.
+SYNONYMS: dict[str, str] = {
+    "haploclastus devamatha": "Cilantica psychedelicus",   # Mirza 2024
+    "thrigmopoeus psychedelicus": "Cilantica psychedelicus",
+    "devamatha": "Cilantica psychedelicus",                # bare old epithet
+    "pterinopelma sazimai": "Lasiocyano sazimai",
+    "brachypelma albopilosum": "Tliltocatl albopilosus",   # Mendoza & Francke 2020
+    "brachypelma albopilosus": "Tliltocatl albopilosus",
+    "brachypelma vagans": "Tliltocatl vagans",
+    "brachypelma kahlenbergi": "Tliltocatl kahlenbergi",
+    "avicularia versicolor": "Caribena versicolor",        # Fukushima & Bertani 2017
+    "haplopelma lividum": "Cyriopagopus lividus",
+    "haplopelma schmidti": "Cyriopagopus schmidti",
+}
+
+# Words that mark an undescribed or uncertain form ("Pamphobeteus sp.
+# 'mascara'", "cf.", "aff."). Their trade names are localities and colour
+# forms: one letter apart is a different animal ("Cascada" vs "mascara",
+# "Green Gold" vs "Green"), so forms are never fuzzy-matched.
+_FORM_WORDS = {"sp", "spp", "cf", "aff"}
+_COLOUR_WORDS = {"blue", "green", "black", "red", "orange", "purple", "white", "gold", "golden",
+                 "silver", "yellow", "brown", "grey", "gray", "pink", "dark", "light"}
+
+
+def _is_form(n: str) -> bool:
+    return any(t in _FORM_WORDS for t in n.split(" ")[1:]) or n.split(" ", 1)[0] in _FORM_WORDS
+
+
+def _form_key(n: str) -> str:
+    """Normalised name without the form words or spaces:
+    "tapinauchenius sp yasuni" and "tapinauchenius yasuni" -> "tapinaucheniusyasuni"."""
+    return "".join(t for t in n.split(" ") if t not in _FORM_WORDS)
+
+
+def _trade_key(n: str) -> str:
+    """Just the trade name of a form, without genus: "hatihati", "dominicanpurple"."""
+    toks = n.split(" ")
+    if toks and toks[0] not in _FORM_WORDS:
+        toks = toks[1:]
+    return "".join(t for t in toks if t not in _FORM_WORDS)
+
+
+def _bare_trade_match(target: str, rows: list[CatalogRow], taxon: Optional[str]) -> Optional[Match]:
+    """A form's trade name typed without its genus ("sp. Dominican Purple",
+    "HatiHati"). Same guard as a bare epithet: the animal's own taxon only,
+    and only when exactly one form there carries that name."""
+    if not taxon or taxon == "other":
+        return None
+    key = _trade_key(target) if target.split(" ", 1)[0] in _FORM_WORDS else target.replace(" ", "")
+    # A bare colour ("sp. Blue", "sp. Green") is what keepers call many
+    # different animals; being the only one we list doesn't make it theirs.
+    words = [t for t in target.split(" ") if t not in _FORM_WORDS]
+    if len(key) < 6 or all(w in _COLOUR_WORDS for w in words):
+        return None
+    hits = [r for r in rows if r.taxon == taxon and _is_form(normalize(r.scientific_name))
+            and _trade_key(normalize(r.scientific_name)) == key]
+    return Match(hits[0], "epithet") if len(hits) == 1 else None
+
+
+def _synonym_match(target: str, rows: list[CatalogRow]) -> Optional[Match]:
+    canonical = SYNONYMS.get(target)
+    if not canonical:
+        return None
+    want = normalize(canonical)
+    hit = next((r for r in rows if normalize(r.scientific_name) == want), None)
+    return Match(hit, "close") if hit else None
+
+
 def _epithet_match(word: str, rows: list[CatalogRow], taxon: Optional[str]) -> Optional[Match]:
     """A lone word like "minatrix". Common in older records, which stored the
     species epithet without the genus. Only ever answered within the animal's
@@ -122,12 +191,18 @@ def match_name(name: str, rows: Iterable[CatalogRow], taxon: Optional[str] = Non
     for r in rows:
         by_genus.setdefault(genus_of(r.scientific_name), []).append(r)
 
+    def found(m: Match) -> MatchResult:
+        return MatchResult(m, m.row.scientific_name.split(" ", 1)[0], m.row.taxon)
+
+    syn = _synonym_match(target, rows)
+    if syn:
+        return found(syn)
+
     g = genus_of(target)
-    if " " not in target and g not in by_genus:
-        m = _epithet_match(target, rows, taxon)
-        if m:
-            return MatchResult(m, m.row.scientific_name.split(" ", 1)[0], m.row.taxon)
-        return MatchResult(None, None, None)
+    if g not in by_genus and (" " not in target or g in _FORM_WORDS):
+        m = _epithet_match(target, rows, taxon) if " " not in target else None
+        m = m or _bare_trade_match(target, rows, taxon)
+        return found(m) if m else MatchResult(None, None, None)
     if g not in by_genus:
         # A misspelt genus ("archispirostreptis") still finds its family.
         close = difflib.get_close_matches(g, list(by_genus), n=1, cutoff=CLOSE_GENUS)
@@ -140,8 +215,16 @@ def match_name(name: str, rows: Iterable[CatalogRow], taxon: Optional[str] = Non
             match = Match(r, "exact")
             break
     if match is None and candidates:
+        # Forms match on their name alone, never on spelling distance.
+        key = _form_key(target)
+        forms = [r for r in candidates if _is_form(normalize(r.scientific_name))]
+        same = [r for r in forms if _form_key(normalize(r.scientific_name)) == key]
+        if len(same) == 1:
+            match = Match(same[0], "close")
+    named = [r for r in candidates if not _is_form(normalize(r.scientific_name))]
+    if match is None and named and not _is_form(target):
         scored = sorted(
-            ((difflib.SequenceMatcher(None, target, normalize(r.scientific_name)).ratio(), r) for r in candidates),
+            ((difflib.SequenceMatcher(None, target, normalize(r.scientific_name)).ratio(), r) for r in named),
             key=lambda t: t[0],
             reverse=True,
         )

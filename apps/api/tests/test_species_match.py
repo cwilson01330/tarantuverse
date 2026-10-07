@@ -150,3 +150,58 @@ def test_a_bare_genus_matches_no_species():
 def test_real_typos_from_the_collection(typed, taxon, want, kind):
     r = match_name(typed, CATALOG, taxon=taxon)
     assert r.match and r.match.row.id == want and r.match.kind == kind
+
+
+# ── Named forms ("sp. 'mascara'") and renames — from the 2026-10-07 report ───
+
+FORMS = CATALOG + [
+    CatalogRow("pm2", "Pamphobeteus sp. 'mascara'", "tarantula"),
+    CatalogRow("pg", "Phormictopus sp. 'Green'", "tarantula"),
+    CatalogRow("pdp", "Phormictopus sp. 'Dominican Purple'", "tarantula"),
+    CatalogRow("ty", "Tapinauchenius sp. 'Yasuni'", "tarantula"),
+    CatalogRow("ov", "Omothymus sp. 'Valhalla'", "tarantula"),
+    CatalogRow("cil", "Cilantica psychedelicus", "tarantula"),
+    CatalogRow("las", "Lasiocyano sazimai", "tarantula"),
+]
+
+
+@pytest.mark.parametrize("typed", ["Pamphobeteus sp. Cascada", "Phormictopus sp. Green Gold", "Phormictopus sp 'Green Gold Carapace'"])
+def test_a_different_form_is_never_a_typo(typed):
+    """Locality / colour forms one letter apart are different animals."""
+    assert match_name(typed, FORMS, taxon="tarantula").match is None
+
+
+@pytest.mark.parametrize("typed,want", [
+    ("Pamphobeteus Mascara", "pm2"), ("Tapinauchenius Yasuni", "ty"), ("Omothymus Valhalla", "ov"),
+    ("Phormictopus Dominican Purple", "pdp"), ("Phormictopus sp. Dominican Purple", "pdp"),
+    ("Cyriopagopus sp hati hati", "ch"),
+])
+def test_same_form_without_sp_or_quotes(typed, want):
+    r = match_name(typed, FORMS, taxon="tarantula")
+    assert r.match and r.match.row.id == want
+
+
+@pytest.mark.parametrize("typed,want", [("sp. Dominican Purple", "pdp"), ("sp. Valhalla", "ov"), ("HatiHati", "ch")])
+def test_bare_form_name_unique_in_taxon(typed, want):
+    r = match_name(typed, FORMS, taxon="tarantula")
+    assert r.match and r.match.row.id == want and r.match.kind == "epithet"
+    assert match_name(typed, FORMS, taxon="true_spider").match is None
+
+
+@pytest.mark.parametrize("typed,want", [
+    ("devamatha", "cil"), ("Haploclastus devamatha", "cil"), ("Pterinopelma sazimai", "las"),
+    ("Brachypelma albopilosum", "ta"),
+])
+def test_published_renames(typed, want):
+    r = match_name(typed, FORMS, taxon="tarantula")
+    assert r.match and r.match.row.id == want
+
+
+def test_rename_needs_the_new_name_in_the_catalog():
+    assert match_name("Pterinopelma sazimai", CATALOG).match is None
+
+
+@pytest.mark.parametrize("typed", ["sp. Blue", "sp. blue", "sp. Green", "sp. Black Orange"])
+def test_bare_colour_names_match_nothing(typed):
+    rows = FORMS + [CatalogRow("hb", "Homoeomma sp. 'Blue'", "tarantula")]
+    assert match_name(typed, rows, taxon="tarantula").match is None
