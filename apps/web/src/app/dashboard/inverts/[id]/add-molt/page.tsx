@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import DashboardLayout from '@/components/DashboardLayout'
-import { INVERT_TAXA, isInvertTaxon, growthLengthLabel } from '@/lib/inverts'
+import { INVERT_TAXA, isInvertTaxon, growthLengthLabel, finalMoltCopy } from '@/lib/inverts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const inputCls = 'w-full px-3 py-2 border border-theme rounded-lg bg-surface text-theme-primary focus:outline-none focus:ring-2 focus:ring-electric-blue-500'
@@ -204,6 +204,7 @@ export default function AddInvertMoltPage() {
               correct — a matured male cannot molt again — so the copy states
               the effect rather than relying on the label. Not tarantula-only:
               mantids terminate in both sexes. */}
+          {finalMoltCopy(taxon ?? '').offered && (
           <div>
             <label className={labelCls}>Was this the final molt?</label>
             <button
@@ -219,14 +220,13 @@ export default function AddInvertMoltPage() {
               <span aria-hidden="true" className="text-lg leading-none">
                 {isUltimate ? '●' : '○'}
               </span>
-              This was the ultimate molt
+              {finalMoltCopy(taxon ?? '').label}
             </button>
             <p className="mt-1 text-xs text-theme-tertiary">
-              {isUltimate
-                ? 'Recorded as matured — no further molts expected, so premolt predictions stop here. You can untick this later.'
-                : 'For a male that has matured, or any animal whose adult molt is its last. Leave off if they’ll keep growing.'}
+              {isUltimate ? finalMoltCopy(taxon ?? '').done : finalMoltCopy(taxon ?? '').hint}
             </p>
           </div>
+          )}
           <div><label className={labelCls}>Notes (optional)</label><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className={inputCls} /></div>
           <button onClick={save} disabled={saving || !prefix} className="w-full py-3 bg-gradient-brand text-white rounded-xl font-semibold disabled:opacity-60">{saving ? 'Saving…' : isEdit ? 'Update molt' : 'Save molt'}</button>
         </div>

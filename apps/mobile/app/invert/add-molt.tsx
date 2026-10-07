@@ -14,7 +14,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { can, useCollectionRole } from '../../src/lib/co-keepers';
 import { COPY as LIFECYCLE_COPY, pronounsFor } from '../../src/lib/lifecycle-copy';
 import { requestMarkDied } from '../../src/lib/pending-intent';
-import { growthLengthLabel } from '../../src/lib/taxon-modules';
+import { finalMoltCopy, growthLengthLabel } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 /** successful / stuck / lost_limb / fatal — the backend vocabulary. Finer
@@ -285,6 +285,7 @@ export default function AddInvertMoltScreen() {
               cannot molt again — but it's a one-way-feeling change, so the
               copy says plainly what it does rather than relying on the label.
               Not restricted to tarantulas: mantids terminate in both sexes. */}
+          {finalMoltCopy(taxon ?? '').offered && (
           <Field label="Was this the final molt?" colors={colors}>
             <TouchableOpacity
               onPress={() => setIsUltimate((v) => !v)}
@@ -297,8 +298,8 @@ export default function AddInvertMoltScreen() {
               ]}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: isUltimate }}
-              accessibilityLabel="This was the ultimate molt"
-              accessibilityHint="Stops premolt predictions for this animal. Use when a male has matured."
+              accessibilityLabel={finalMoltCopy(taxon ?? '').label}
+              accessibilityHint={finalMoltCopy(taxon ?? '').hint}
             >
               <MaterialCommunityIcons
                 name={isUltimate ? 'check-circle' : 'checkbox-blank-circle-outline'}
@@ -306,15 +307,14 @@ export default function AddInvertMoltScreen() {
                 color={isUltimate ? colors.primary : colors.textTertiary}
               />
               <Text style={[styles.ultimateLabel, { color: colors.textPrimary }]}>
-                This was the ultimate molt
+                {finalMoltCopy(taxon ?? '').label}
               </Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textTertiary, fontSize: 12, marginTop: 6 }}>
-              {isUltimate
-                ? 'Recorded as matured — no further molts expected, so premolt predictions stop here. You can untick this later.'
-                : 'For a male that has matured, or any animal whose adult molt is its last. Leave off if they’ll keep growing.'}
+              {isUltimate ? finalMoltCopy(taxon ?? '').done : finalMoltCopy(taxon ?? '').hint}
             </Text>
           </Field>
+          )}
           <Field label="Notes (optional)" colors={colors}><TextInput style={[styles.input, styles.textArea]} value={notes} onChangeText={setNotes} placeholder="How they look post-molt, behavior, etc." placeholderTextColor={colors.textTertiary} multiline /></Field>
           <TouchableOpacity style={[styles.saveButton, (saving || !taxon) && { opacity: 0.6 }]} onPress={handleSave} disabled={saving || !taxon}>
             <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save molt'}</Text>

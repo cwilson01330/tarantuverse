@@ -19,6 +19,7 @@ import {
   INVERT_TAXA, changeInvertTaxon, describeTaxonChangeError, getInvert, updateInvert,
   type Invert, type InvertTaxon, type Sex, type Source,
 } from '../../src/lib/inverts';
+import { stageCountLabel } from '../../src/lib/taxon-modules';
 import { parseLocalDate, toISODateLocal } from '../../src/utils/date';
 
 const SEX_OPTIONS: { value: Sex; label: string }[] = [
@@ -172,7 +173,7 @@ export default function EditInvertScreen() {
               })}
             </View>
           </Field>
-          <Field label="Molts"><TextInput style={styles.input} value={form.current_instar?.toString() ?? ''} onChangeText={(t) => update('current_instar', t ? Number(t) : null)} keyboardType="number-pad" /></Field>
+          <Field label={stageCountLabel(form.taxon)}><TextInput style={styles.input} value={form.current_instar?.toString() ?? ''} onChangeText={(t) => update('current_instar', t ? Number(t) : null)} keyboardType="number-pad" /></Field>
           <Field label={meta?.sizeLabel ?? 'Size (mm)'}><TextInput style={styles.input} value={form.current_length_mm ?? ''} onChangeText={(t) => update('current_length_mm', t)} keyboardType="decimal-pad" /></Field>
 
           <SectionHeader title="Acquisition" colors={colors} />

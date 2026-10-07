@@ -28,6 +28,7 @@ import {
 } from '@/lib/animal-lifecycle'
 import {
   taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
+  tracksInstars, formatStage, stageSummary, elapsedSince, stageCountLabel,
 } from '@/lib/inverts'
 import { formatLocalDate } from '@/lib/date'
 import FeedingCadenceDialog from '@/components/FeedingCadenceDialog'
@@ -111,7 +112,7 @@ interface Invert {
 
 interface Attributed { logged_by_user_id?: string | null; logged_by_name?: string | null; sitter_name?: string | null }
 interface FeedingLog extends Attributed { id: string; fed_at: string; food_type?: string | null; accepted: boolean; notes?: string | null }
-interface MoltLog extends Attributed { id: string; molted_at: string; notes?: string | null }
+interface MoltLog extends Attributed { id: string; molted_at: string; notes?: string | null; outcome?: string | null; is_ultimate?: boolean }
 interface SubstrateChange extends Attributed { id: string; changed_at: string; substrate_type?: string | null; substrate_depth?: string | null; reason?: string | null; notes?: string | null }
 /** Hydration events (car_20260909). Three types, because a top-up, a
  *  deliberate overflow to damp the substrate, and a misting are three
@@ -610,7 +611,10 @@ export default function InvertDetailPage() {
             {/* Identity facts */}
             <Section title="Identity">
               <Fact label="Sex" value={cap(invert.sex)} />
-              <Fact label="Molts" value={invert.current_instar != null ? String(invert.current_instar) : null} />
+              <Fact
+                label={stageCountLabel(invert.taxon)}
+                value={invert.current_instar != null ? (tracksInstars(invert.taxon) ? formatStage(invert.taxon, invert.current_instar) : String(invert.current_instar)) : null}
+              />
               <Fact label="Last molt" value={lastMoltAgo(molts)} />
               <Fact
                 label={isWhipSpider ? 'Leg span' : 'Size'}
@@ -735,6 +739,49 @@ export default function InvertDetailPage() {
                 </p>
               </Section>
             )}
+
+            {/* Stages (2026-10-07): instar animals' molts as the stages they
+                reached, days per stage, problem molts and time since adulthood.
+                Elapsed only — no care sheet records stages to maturity. */}
+            {invert && tracksInstars(invert.taxon) && (molts.length > 0 || invert.current_instar != null) && (() => {
+              const st = stageSummary(molts, invert.current_instar)
+              const now = invert.current_instar != null ? formatStage(invert.taxon, invert.current_instar) : null
+              return (
+                <Section title="Stages">
+                  <div className="space-y-1">
+                    {now ? (
+                      <p className="text-sm text-theme-primary">
+                        Now <span className="font-semibold">{now}</span>{st.adultSince ? ` · adult for ${elapsedSince(st.adultSince)}` : ''}
+                      </p>
+                    ) : null}
+                    {st.averageDaysPerStage != null ? (
+                      <p className="text-xs text-theme-secondary">About {st.averageDaysPerStage} days between molts so far</p>
+                    ) : null}
+                    {st.problemSummary ? (
+                      <p className="text-xs text-amber-700 dark:text-amber-400">{st.problemCount} of {molts.length} molts had problems ({st.problemSummary})</p>
+                    ) : null}
+                  </div>
+                  {st.entries.length > 0 ? (
+                    <ul className="mt-3 divide-y divide-gray-200 dark:divide-gray-700">
+                      {st.entries.map((e) => (
+                        <li key={e.id} className="flex justify-between py-2 text-sm">
+                          <span className="font-medium text-theme-primary">
+                            {e.stage != null ? formatStage(invert.taxon, e.stage) : 'Molt'}{e.isFinal ? ' · adult' : ''}
+                            {e.outcome && e.outcome !== 'successful' ? ` · ${e.outcome === 'lost_limb' ? 'lost a limb' : e.outcome}` : ''}
+                          </span>
+                          <span className="text-theme-secondary">
+                            {formatLocalDate(e.molted_at)}{e.daysSincePrevious != null ? ` · ${e.daysSincePrevious}d` : ''}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {invert.current_instar == null ? (
+                    <p className="mt-2 text-xs text-theme-tertiary">Set the current instar in Edit and every molt will be numbered.</p>
+                  ) : null}
+                </Section>
+              )
+            })()}
 
             {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot) */}
             {invert && growth && showGrowthChart(invert.taxon, growth) && (

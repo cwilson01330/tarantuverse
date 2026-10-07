@@ -26,6 +26,7 @@ from app.utils.access import (
 from app.services.activity_service import create_activity
 from app.services.inverts_dualwrite import invert_id_if_exists  # ADR-005 A2
 from app.utils.legacy_logs import tarantula_logs
+from app.utils.instar import adjust_instar_for_molt
 
 router = APIRouter()
 
@@ -79,6 +80,8 @@ async def create_molt_log(
     )
 
     db.add(new_molt)
+    db.flush()
+    adjust_instar_for_molt(db, new_molt, +1)
     db.commit()
     db.refresh(new_molt)
     
@@ -156,6 +159,8 @@ async def create_scorpion_molt_log(
         **molt_data.model_dump(),
     )
     db.add(new_molt)
+    db.flush()
+    adjust_instar_for_molt(db, new_molt, +1)
     db.commit()
     db.refresh(new_molt)
     return new_molt
@@ -218,6 +223,8 @@ async def create_centipede_molt_log(
         **molt_data.model_dump(),
     )
     db.add(new_molt)
+    db.flush()
+    adjust_instar_for_molt(db, new_molt, +1)
     db.commit()
     db.refresh(new_molt)
     return new_molt
@@ -275,6 +282,8 @@ async def create_whip_spider_molt_log(
         **molt_data.model_dump(),
     )
     db.add(new_molt)
+    db.flush()
+    adjust_instar_for_molt(db, new_molt, +1)
     db.commit()
     db.refresh(new_molt)
     return new_molt
@@ -317,6 +326,8 @@ async def create_invert_molt_log(
     invert, access = load_invert(db, current_user, invert_id, "logger", not_found="Animal not found")
     new_molt = MoltLog(**invert_log_fields(db, invert), logged_by_user_id=access.logged_by_user_id, **molt_data.model_dump())
     db.add(new_molt)
+    db.flush()
+    adjust_instar_for_molt(db, new_molt, +1)
     db.commit()
     db.refresh(new_molt)
     return new_molt
@@ -372,6 +383,7 @@ async def delete_molt_log(
     _parent, access = load_log_parent(db, current_user, molt, "logger", not_found="Molt log not found")
     require_can_change(access, molt)
 
+    adjust_instar_for_molt(db, molt, -1)
     db.delete(molt)
     db.commit()
     return None

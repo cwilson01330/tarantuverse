@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import ChangeTaxonDialog, { describeTaxonChangeFailure } from '@/components/ChangeTaxonDialog'
-import { INVERT_TAXA, isInvertTaxon, type InvertTaxon } from '@/lib/inverts'
+import { INVERT_TAXA, isInvertTaxon, stageCountLabel, type InvertTaxon } from '@/lib/inverts'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -184,7 +184,7 @@ export default function EditInvertPage() {
               </Field>
 
               <div className="grid grid-cols-2 gap-4">
-                <Field label="Molts"><input value={form.current_instar ?? ''} onChange={(e) => set('current_instar', e.target.value ? Number(e.target.value) : null)} inputMode="numeric" className={inputCls} /></Field>
+                <Field label={stageCountLabel(form.taxon)}><input value={form.current_instar ?? ''} onChange={(e) => set('current_instar', e.target.value ? Number(e.target.value) : null)} inputMode="numeric" className={inputCls} /></Field>
                 <Field label={meta?.sizeLabel ?? 'Size (mm)'}><input value={form.current_length_mm ?? ''} onChange={(e) => set('current_length_mm', e.target.value)} inputMode="decimal" className={inputCls} /></Field>
               </div>
 

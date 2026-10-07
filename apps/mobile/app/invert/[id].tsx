@@ -36,6 +36,7 @@ import { SectionCard, InfoRow as UIInfoRow, InfoGrid, type InfoGridItem } from '
 import { SPACING, TYPE } from '../../src/theme/tokens';
 import {
   taxonHasModule, growthLengthLabel, clutchSectionLabel, offspringNoun, taxonLaysClutch, showGrowthChart, lastMoltAgo,
+  tracksInstars, formatStage, stageSummary, elapsedSince,
 } from '../../src/lib/taxon-modules';
 import GrowthChart from '../../src/components/GrowthChart';
 import PremoltPredictionCard from '../../src/components/PremoltPredictionCard';
@@ -746,7 +747,7 @@ function InvertDetailScreen() {
                   life_stage. Molt count is the real proxy keepers use, so that's
                   what's shown when we have it. */}
               {invert.current_instar ? (
-                <Text style={styles.heroMeta}>· {invert.current_instar} molts</Text>
+                <Text style={styles.heroMeta}>· {formatStage(invert.taxon, invert.current_instar)}</Text>
               ) : null}
               {lastMoltAgo(molts) ? (
                 <Text style={styles.heroMeta}>· molted {lastMoltAgo(molts)}</Text>
@@ -1189,6 +1190,54 @@ function InvertDetailScreen() {
           <PremoltPredictionCard tarantulaId={id!} />
         </View>
       )}
+
+      {/* Stages (2026-10-07): for instar animals the stage, not size, is what
+          keepers track — each molt as the stage it reached, days per stage,
+          problem molts, and time since adulthood. Elapsed only, never a
+          countdown: no care sheet records how many stages a species takes. */}
+      {tracksInstars(invert.taxon) && (molts.length > 0 || invert.current_instar != null) && (() => {
+        const st = stageSummary(molts, invert.current_instar);
+        const now = invert.current_instar != null ? formatStage(invert.taxon, invert.current_instar) : null;
+        const preview = [
+          st.adultSince ? `Adult for ${elapsedSince(st.adultSince)}` : now,
+          st.averageDaysPerStage != null ? `~${st.averageDaysPerStage} days per stage` : null,
+          st.problemCount ? `${st.problemCount} problem ${st.problemCount === 1 ? 'molt' : 'molts'}` : null,
+        ].filter(Boolean).join(' · ');
+        return (
+          <CollapsibleRow
+            icon="stairs-up"
+            title="Stages"
+            preview={preview || `${molts.length} ${molts.length === 1 ? 'molt' : 'molts'} logged`}
+            expanded={!!openRows.stages}
+            onToggle={() => toggleRow('stages')}
+            colors={colors}
+          >
+            <View style={{ gap: SPACING.xs }}>
+              {now ? <Text style={[TYPE.body, { color: colors.textPrimary }]}>Now {now}{st.adultSince ? ` · adult for ${elapsedSince(st.adultSince)}` : ''}</Text> : null}
+              {st.averageDaysPerStage != null ? (
+                <Text style={[TYPE.caption, { color: colors.textSecondary }]}>About {st.averageDaysPerStage} days between molts so far</Text>
+              ) : null}
+              {st.problemSummary ? (
+                <Text style={[TYPE.caption, { color: colors.warning }]}>{st.problemCount} of {molts.length} molts had problems ({st.problemSummary})</Text>
+              ) : null}
+              {st.entries.map((e) => (
+                <View key={e.id} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SPACING.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                  <Text style={[TYPE.bodyStrong, { color: colors.textPrimary }]}>
+                    {e.stage != null ? formatStage(invert.taxon, e.stage) : 'Molt'}{e.isFinal ? ' · adult' : ''}
+                    {e.outcome && e.outcome !== 'successful' ? ` · ${e.outcome === 'lost_limb' ? 'lost a limb' : e.outcome}` : ''}
+                  </Text>
+                  <Text style={[TYPE.caption, { color: colors.textSecondary }]}>
+                    {fmtDate(e.molted_at)}{e.daysSincePrevious != null ? ` · ${e.daysSincePrevious}d` : ''}
+                  </Text>
+                </View>
+              ))}
+              {invert.current_instar == null ? (
+                <Text style={[TYPE.caption, { color: colors.textTertiary }]}>Set the current instar in Edit and every molt will be numbered.</Text>
+              ) : null}
+            </View>
+          </CollapsibleRow>
+        );
+      })()}
 
       {/* Growth module (registry-gated — ADR-008 rollout, scorpion pilot).
           GrowthChart renders its own card, so no Section wrapper. */}

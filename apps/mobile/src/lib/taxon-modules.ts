@@ -291,3 +291,134 @@ export function offspringNoun(taxon: string): string {
   const v = breedingVocabulary(taxon);
   return v.clutch?.offspring ?? v.liveBirth?.offspring ?? 'offspring';
 }
+
+// ---------------------------------------------------------------------------
+// Stages (2026-10-07). For most non-tarantulas the instar, not size, is what
+// keepers track: mantis keepers set it on two-thirds of their mantids and had
+// logged no sizes at all. `current_instar` holds the instar for these taxa
+// (keepers enter "L6", not a molt count) and the molt count for tarantulas;
+// the server adds one per newest molt either way (api/app/utils/instar.py).
+
+/** Taxa whose keepers count instars. */
+const INSTAR_TAXA = new Set<string>(['mantis', 'scorpion', 'centipede', 'whip_spider', 'vinegaroon', 'true_spider']);
+
+export function tracksInstars(taxon: string): boolean {
+  return INSTAR_TAXA.has(taxon);
+}
+
+/** Label for the current_instar field. */
+export function stageCountLabel(taxon: string): string {
+  return INSTAR_TAXA.has(taxon) ? 'Instar' : 'Molts';
+}
+
+/** "L5" for mantids (the hobby's notation), "Instar 5" for other instar
+ *  taxa, "5 molts" otherwise. */
+export function formatStage(taxon: string, n: number): string {
+  if (taxon === 'mantis') return `L${n}`
+  if (INSTAR_TAXA.has(taxon)) return `Instar ${n}`
+  return `${n} ${n === 1 ? 'molt' : 'molts'}`;
+}
+
+/** Wording for the "final molt" flag. Centipedes and whip spiders keep
+ *  molting as adults, so the flag isn't offered for them at all. */
+export function finalMoltCopy(taxon: string): { offered: boolean; label: string; hint: string; done: string } {
+  if (taxon === 'centipede' || taxon === 'whip_spider') {
+    return { offered: false, label: '', hint: '', done: '' }
+  }
+  if (taxon === 'tarantula') {
+    return {
+      offered: true,
+      label: 'This was the ultimate molt',
+      hint: 'For a male that has matured. Leave off if they’ll keep growing.',
+      done: 'Recorded as matured — no further molts expected, so premolt predictions stop here. You can untick this later.',
+    }
+  }
+  if (taxon === 'mantis') {
+    return {
+      offered: true,
+      label: 'This was the final molt (now adult)',
+      hint: 'Mantids stop molting once they reach adulthood, when the wings are fully formed.',
+      done: 'Recorded as adult — no further molts expected. You can untick this later.',
+    }
+  }
+  if (taxon === 'true_spider') {
+    return {
+      offered: true,
+      label: 'This was the final molt (now mature)',
+      hint: 'Most spiders stop molting at maturity; mature males show swollen palps.',
+      done: 'Recorded as mature — no further molts expected. You can untick this later.',
+    }
+  }
+  return {
+    offered: true,
+    label: 'This was the final molt (now adult)',
+    hint: 'Use when the animal has reached adulthood and won’t molt again.',
+    done: 'Recorded as adult — no further molts expected. You can untick this later.',
+  }
+}
+
+const PROBLEM_OUTCOMES = new Set(['stuck', 'lost_limb', 'fatal']);
+const OUTCOME_WORDS: Record<string, string> = { stuck: 'stuck', lost_limb: 'lost a limb', fatal: 'fatal' }
+
+export interface StageEntry {
+  id: string;
+  molted_at: string;
+  /** Stage reached with this molt, when the current stage is known. */
+  stage: number | null;
+  daysSincePrevious: number | null;
+  outcome: string | null;
+  isFinal: boolean;
+}
+
+export interface StageSummary {
+  entries: StageEntry[] // newest first;
+  averageDaysPerStage: number | null;
+  problemCount: number;
+  problemSummary: string | null // "1 stuck, 1 lost a limb";
+  adultSince: string | null // ISO date of the final molt;
+}
+
+const dayMs = 86_400_000;
+const dayOf = (iso: string) => {
+  const d = new Date(iso);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+/** The molt history as stages. The stage at each molt is counted back from
+ *  the current one (newest molt = current stage), so it needs no baseline. */
+export function stageSummary(
+  molts: { id: string; molted_at: string; outcome?: string | null; is_ultimate?: boolean }[],
+  currentStage: number | null | undefined,
+): StageSummary {
+  const asc = [...molts].sort((a, b) => dayOf(a.molted_at) - dayOf(b.molted_at));
+  const entries: StageEntry[] = asc.map((m, i) => ({
+    id: m.id,
+    molted_at: m.molted_at,
+    stage: currentStage != null ? currentStage - (asc.length - 1 - i) : null,
+    daysSincePrevious: i > 0 ? Math.round((dayOf(m.molted_at) - dayOf(asc[i - 1].molted_at)) / dayMs) : null,
+    outcome: m.outcome ?? null,
+    isFinal: !!m.is_ultimate,
+  }));
+  for (const e of entries) if (e.stage != null && e.stage < 1) e.stage = null
+  const gaps = entries.map((e) => e.daysSincePrevious).filter((d): d is number => d != null && d > 0);
+  const problems = entries.filter((e) => e.outcome && PROBLEM_OUTCOMES.has(e.outcome));
+  const counts: Record<string, number> = {}
+  for (const p of problems) counts[p.outcome!] = (counts[p.outcome!] ?? 0) + 1
+  const finalMolt = [...entries].reverse().find((e) => e.isFinal);
+  return {
+    entries: entries.reverse(),
+    averageDaysPerStage: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null,
+    problemCount: problems.length,
+    problemSummary: problems.length ? Object.entries(counts).map(([k, n]) => `${n} ${OUTCOME_WORDS[k] ?? k}`).join(', ') : null,
+    adultSince: finalMolt?.molted_at ?? null,
+  }
+}
+
+/** "5 days", "6 weeks", "4 months" since a date. Elapsed only. */
+export function elapsedSince(iso: string): string {
+  const days = Math.max(0, Math.round((dayOf(new Date().toISOString()) - dayOf(iso)) / dayMs));
+  if (days < 14) return `${days} ${days === 1 ? 'day' : 'days'}`
+  if (days < 63) return `${Math.round(days / 7)} weeks`
+  const months = Math.round(days / 30.4);
+  return `${months} ${months === 1 ? 'month' : 'months'}`;
+}

@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { LocationField } from '@/components/LocationPicker'
 import DashboardLayout from '@/components/DashboardLayout'
 import UpgradeModal from '@/components/UpgradeModal'
-import { INVERT_TAXA, isInvertTaxon, type InvertTaxon } from '@/lib/inverts'
+import { INVERT_TAXA, isInvertTaxon, stageCountLabel, type InvertTaxon } from '@/lib/inverts'
 import SpeciesSuggestion, { useSpeciesMatch } from '@/components/SpeciesSuggestion'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -253,7 +253,7 @@ function AddInvertForm() {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Molts"><input value={molts} onChange={(e) => setMolts(e.target.value)} inputMode="numeric" placeholder="e.g. 4" className={inputCls} /></Field>
+            <Field label={stageCountLabel(taxon)}><input value={molts} onChange={(e) => setMolts(e.target.value)} inputMode="numeric" placeholder="e.g. 4" className={inputCls} /></Field>
             <Field label={meta.sizeLabel}><input value={sizeMm} onChange={(e) => setSizeMm(e.target.value)} inputMode="decimal" placeholder="e.g. 180" className={inputCls} /></Field>
           </div>
 
