@@ -100,6 +100,14 @@ SYNONYMS: dict[str, str] = {
     "avicularia versicolor": "Caribena versicolor",        # Fukushima & Bertani 2017
     "haplopelma lividum": "Cyriopagopus lividus",
     "haplopelma schmidti": "Cyriopagopus schmidti",
+    # Surfaced while researching the 2026-10-07 care-sheet batch.
+    "selenobrachys philippinus": "Orphnaecus philippinus",
+    "brachypelma epicureanum": "Tliltocatl epicureanus",
+    "euathlus vulpinus": "Phrixotrichus vulpinus",
+    "aphonopelma jungi": "Aphonopelma vorhiesi",        # Hamilton et al. 2016
+    "aphonopelma punzoi": "Aphonopelma vorhiesi",
+    "selenotypus arndsti": "Selenocosmia arndsti",
+    "chilocosmia arndsti": "Selenocosmia arndsti",
 }
 
 # Words that mark an undescribed or uncertain form ("Pamphobeteus sp.

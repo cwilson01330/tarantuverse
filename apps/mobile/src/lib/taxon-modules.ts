@@ -54,7 +54,9 @@ export const TAXON_MODULES: Record<string, FeatureModule[]> = {
   // Jumping spiders are the demand here — one keeper has 24 of them, 9 males
   // and 10 females. They lay an egg sac like a tarantula, so the whole
   // pairing → sac → offspring chain is biologically the same shape.
-  true_spider: ['feedingStats', 'breeding'],
+  // Growth (2026-10-07): keepers measure huntsmen, wolf spiders and big
+  // jumpers after a molt; the chart only appears once a molt has a size.
+  true_spider: ['feedingStats', 'growth', 'breeding'],
   millipede: [], // detritivore — no live-prey cadence, and molts underground
   // Instar tracking is core to mantis keeping. Breeding enabled 2026-09-22:
   // the ootheca → nymphs vocabulary below is correct and now actually read by

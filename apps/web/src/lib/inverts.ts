@@ -97,7 +97,7 @@ export const TAXON_MODULES: Record<InvertTaxon, FeatureModule[]> = {
   vinegaroon: ['feedingStats', 'growth'],
   // Jumping spiders lay an egg sac like a tarantula, so the pairing → sac →
   // offspring chain is the same shape. Enabled 2026-09-20 on real demand.
-  true_spider: ['feedingStats', 'breeding'],
+  true_spider: ['feedingStats', 'growth', 'breeding'],
   millipede: [], // detritivore — no live-prey cadence, and molts underground
   // Instar tracking is core to mantis keeping. Breeding enabled 2026-09-22:
   // the ootheca → nymphs vocabulary below is correct and now actually read by
