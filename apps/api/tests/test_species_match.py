@@ -205,3 +205,22 @@ def test_rename_needs_the_new_name_in_the_catalog():
 def test_bare_colour_names_match_nothing(typed):
     rows = FORMS + [CatalogRow("hb", "Homoeomma sp. 'Blue'", "tarantula")]
     assert match_name(typed, rows, taxon="tarantula").match is None
+
+
+def test_epithet_with_a_near_twin_is_not_guessed():
+    """'auratus' is Phormictopus auratus exactly, but Brachypelma auratum is
+    one letter away and far more often kept (2026-10-07 report)."""
+    rows = CATALOG + [CatalogRow("pa2", "Phormictopus auratus", "tarantula"), CatalogRow("ba", "Brachypelma auratum", "tarantula")]
+    assert match_name("auratus", rows, taxon="tarantula").match is None
+    assert match_name("auratum", rows, taxon="tarantula").match is None
+    # Without the twin it still resolves.
+    assert match_name("auratus", CATALOG + [CatalogRow("pa2", "Phormictopus auratus", "tarantula")], taxon="tarantula").match.row.id == "pa2"
+
+
+@pytest.mark.parametrize("word,want,other", [
+    ("striata", "Poecilotheria striata", "Lasiodora striatipes"),
+    ("formosus", "Hapalopus formosus", "Poecilotheria formosa"),
+])
+def test_similar_but_distinct_epithets_still_resolve(word, want, other):
+    rows = [CatalogRow("a", want, "tarantula"), CatalogRow("b", other, "tarantula")]
+    assert match_name(word, rows, taxon="tarantula").match.row.scientific_name == want

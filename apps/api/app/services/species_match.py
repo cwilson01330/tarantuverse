@@ -166,7 +166,12 @@ def _epithet_match(word: str, rows: list[CatalogRow], taxon: Optional[str]) -> O
     pool = [(ep[0], r) for ep, r in pool if ep]
     hits = [r for ep, r in pool if ep == word]
     if hits:
-        return Match(hits[0], "epithet") if len(hits) == 1 else None
+        if len(hits) != 1:
+            return None
+        # A near-twin epithet in the same taxon ("auratus" vs Brachypelma
+        # "auratum") means the keeper may have meant the other one.
+        twins = [ep for ep, r in pool if r is not hits[0] and difflib.SequenceMatcher(None, word, ep).ratio() >= CLOSE_EPITHET]
+        return None if twins else Match(hits[0], "epithet")
     # One slip ("braunshaseni", "iherengi"): accept only a clear winner.
     scored = sorted(((difflib.SequenceMatcher(None, word, ep).ratio(), r) for ep, r in pool), key=lambda t: t[0], reverse=True)
     if not scored:
